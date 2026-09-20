@@ -163,8 +163,14 @@ Salen del **tipo de dato**, con estas excepciones observadas en los 2.460 pasos:
 - **Puesto Trabajo**: las opciones del combo son exactamente los puestos de la **hoja de ruta de la
   receta asociada**. Dolomax (receta 5000001459, P. Trabajo principal FCBLFA01) ofrece 4 puestos
   (FCBLFA01, FCBLEP01, FCBLSE01, FCBLIN01) y los usa en sus notificaciones. Sin receta asociada (RMD PRUEBA)
-  el combo solo trae los puestos heredados. Por eso conviene **asociar la receta antes** de configurar
-  las notificaciones (Asociar fórmulas: la tabla "Recetas Asociadas" muestra P. Trabajo, H. Ruta y Contador).
+  el combo solo trae los puestos heredados. **Regla de negocio (confirmada por la operación):** a una
+  versión nueva NO se le puede asociar la receta mientras la versión anterior esté autorizada y use esa
+  misma receta; la asociación se hace al autorizar la nueva versión (la anterior deja de usarla). Por eso una
+  versión Ingresada recién creada aparece con "Recetas Asociadas: Sin datos", INSUMOS en 0 y las
+  notificaciones sin Puesto de Trabajo: es el estado esperado, no un pendiente. Para RMD nuevos sin
+  versión previa que use la receta, sí se asocia antes (la tabla "Recetas Asociadas" muestra P. Trabajo,
+  H. Ruta y Contador). Cómo se completan los puestos de una versión nueva antes de autorizar sigue por
+  confirmar.
 - **Clave Modelo**: la lista tiene 47 valores, pero solo tres se usan en notificaciones: **Setup Pre
   Proceso**, **Proceso** y **Setup Post Proceso** (el resto son nombres de personas/proveedores).
 - Secuencia por puesto: 1.er puesto — Documentación "FECHA / HORA INICIO" = Setup Pre (inicio) y el
