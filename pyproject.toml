@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Automatización de ingreso y configuración de Registros de Manufactura Digital (RMD) sobre SAP Fiori/UI5."
 requires-python = ">=3.10"
 dependencies = [
-    "playwright>=1.44",
+    "playwright>=1.51",
     "python-dotenv>=1.0",
     "click>=8.1",
     "PyYAML>=6.0",

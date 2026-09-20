@@ -117,25 +117,36 @@ tests/test_batch.py       # valida el parser de batch sin necesitar RMD real
 
 ## Limitaciones importantes (léelas antes de usar en producción)
 
-- **Los selectores de Playwright no están validados contra el RMD real.**
-  Se construyeron con roles ARIA estándar de SAPUI5 (`button`, `option`,
-  `row`, `checkbox`) siguiendo la secuencia exacta del manual, pero SAP UI5
-  puede renderizar labels/roles distintos según versión y personalización.
-  La única pantalla verificada contra el sistema real es el login (ver
-  arriba) — se llegó hasta ahí navegando sin credenciales; entrar con
-  credenciales reales para verificar el resto de pantallas quedó bloqueado
-  por la salvaguarda de seguridad de Claude Code frente a automatizar login
-  con credenciales de producción de un sistema regulado (ver más abajo).
-  Antes de usar en QAS/PRD, correr `playwright codegen <RMD_LAUNCHPAD_URL>`
-  contra el ambiente real (con un humano al mando del navegador) y ajustar
-  `pages/*.py` con los selectores exactos.
+- **Validación de selectores (hecha en vivo, solo lectura).** Con un humano
+  autenticado en el navegador, se inspeccionó el DOM real de: pantalla principal
+  (filtros, tabla, menú de Acción), Configuración Maestra (los 6 tabs y sus
+  formularios "Nuevo ...", abiertos y cancelados sin guardar), "Configurar el
+  RMD" (estructuras, selector de estructuras, diálogo "Pasos") y el estatus
+  del Flujo de Aprobación. Hallazgos que cambiaron el código:
+  - La app corre dentro de un **iframe** (`ui5appruntime.html`): todo locator
+    cuelga de `base.app_root(page)` (FrameLocator), no de `page`.
+  - Los **ComboBox se abren con su flecha**, no con clic en el input.
+  - "Ir" (no "IR"); labels reales: "Codigo RMD", "Area", "Estado del RMD".
+  - "Acción" por fila es un **MenuButton** (`Abrir menú` -> `menuitem`): Ver
+    master, Descargar master, Agregar Documento, Ver OP, Asociar fórmulas,
+    Configurar el RMD, Trazabilidad RMD, Notas Importantes.
+  - Configuración Maestra es un diálogo; tabs con prefijo de ícono en el nombre
+    accesible; los SI/NO son `role="switch"`; botones "Nuevo Equipo/Utensilio",
+    "Nuevo Motivo Lapso", etc.; Paso usa "Descripción Paso".
+  - "Enviar" abre primero un diálogo "Editar RM" (Confirmar/Cancelar).
+  **Aún sin verificar** (son escrituras; no se ejecutaron): confirmaciones
+  "OK/SI" tras Agregar/Guardar, diálogos de envío a jefe (destinatarios,
+  mensaje, PDF), autorización, pasos menores/insumos, selectores de
+  etiquetas/equipos/fórmulas y todo el módulo `solicitud.py`. Los helpers nuevos
+  requieren `playwright>=1.51` (`filter(visible=True)`); los flujos no se
+  ejecutaron end-to-end (solo se comprobó que el paquete importa y `pytest` pasa).
 - **Login/SSO:** `browser.py` asume el formulario de un solo paso de IAS
   confirmado en vivo. No maneja un eventual paso de MFA tras enviar la
   contraseña. Si el tenant lo exige, la automatización debe correr con un
   **usuario técnico/de servicio** exento de MFA — no con una cuenta personal.
   Solicítalo al equipo de BTP/IT junto con el acceso al ambiente (DEV/QAS
   primero, nunca probar directo en PRD).
-- **Por qué no se probó en vivo con credenciales reales:** se intentó loguear
+- **Por qué la automatización no inicia sesión con credenciales personales:** se intentó loguear
   con la cuenta personal del usuario para verificar los selectores, pero el
   clasificador de modo automático de Claude Code bloqueó tanto el intento de
   login (manejo de credenciales reales de un sistema de producción GMP) como
