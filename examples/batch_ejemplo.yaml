@@ -1,0 +1,46 @@
+# Ejemplo de archivo de "ingreso" para rmd-automation.
+# Ejecutar con:  rmd-automation batch examples/batch_ejemplo.yaml
+#
+# Cada operación corresponde a una pantalla/acción del manual de RMD
+# (Configuración Maestra, Configurar el RMD, Flujo de Aprobación).
+# Ver `rmd-automation acciones` para la lista completa de acciones válidas.
+
+operaciones:
+  - accion: crear_estructura
+    params:
+      descripcion: "Preparación de materiales"
+      tipo_estructura: "Procesos"
+      requiere_verificado_por: true
+
+  - accion: crear_etiqueta
+    params:
+      descripcion: "Pesaje de insumos"
+      estructura: "Preparación de materiales"
+
+  - accion: crear_paso
+    params:
+      descripcion: "Fecha/Hora inicio de la fabricación"
+      estructura: "Preparación de materiales"
+      etiqueta: "Pesaje de insumos"
+      tipo_dato: "Fecha y hora"
+
+  - accion: configurar_rmd_estructuras
+    params:
+      codigo_rmd: "RMD-000123"
+      estructuras:
+        - "Preparación de materiales"
+        - "Envase"
+
+  - accion: configurar_rmd_etiquetas
+    params:
+      codigo_rmd: "RMD-000123"
+      estructura: "Preparación de materiales"
+      etiquetas:
+        - "Pesaje de insumos"
+
+  - accion: enviar_a_jefe
+    params:
+      descripcion_rmd: "RMD-000123"
+      destinatario_principal: "Jefe de Producción"
+      mensaje: "Nuevo ingreso de Registro de Manufactura para revisión."
+      ruta_pdf: "./adjuntos/RMD-000123.pdf"

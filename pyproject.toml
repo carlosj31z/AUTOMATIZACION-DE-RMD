@@ -1,0 +1,24 @@
+[project]
+name = "rmd-automation"
+version = "0.1.0"
+description = "Automatización de ingreso y configuración de Registros de Manufactura Digital (RMD) sobre SAP Fiori/UI5."
+requires-python = ">=3.10"
+dependencies = [
+    "playwright>=1.44",
+    "python-dotenv>=1.0",
+    "click>=8.1",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+rmd-automation = "rmd_automation.cli:cli"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
