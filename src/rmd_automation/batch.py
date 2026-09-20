@@ -46,6 +46,31 @@ def _configurar_rmd_inicial(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor.generar_predecesores()
 
 
+def _configurar_rmd_paso_numero(a: RmdAutomation, p: Dict[str, Any]) -> None:
+    editor = a.editor_de_rmd(p["codigo_rmd"])
+    editor.establecer_paso_numero(p["paso"], p["decimales"])
+
+
+def _configurar_rmd_paso_rango(a: RmdAutomation, p: Dict[str, Any]) -> None:
+    editor = a.editor_de_rmd(p["codigo_rmd"])
+    editor.establecer_paso_rango(p["paso"], p["valor_inicial"], p["valor_final"], p["margen"], p["decimales"])
+
+
+def _configurar_rmd_paso_formula(a: RmdAutomation, p: Dict[str, Any]) -> None:
+    editor = a.editor_de_rmd(p["codigo_rmd"])
+    editor.establecer_paso_formula(p["paso"], p["decimales"], p["pasos_formula"])
+
+
+def _configurar_rmd_notificacion(a: RmdAutomation, p: Dict[str, Any]) -> None:
+    editor = a.editor_de_rmd(p["codigo_rmd"])
+    editor.configurar_notificacion(p["etiqueta"], p["clave_modelo"], p["puesto_trabajo"])
+
+
+def _configurar_rmd_predecesor(a: RmdAutomation, p: Dict[str, Any]) -> None:
+    editor = a.editor_de_rmd(p["codigo_rmd"])
+    editor.establecer_predecesor(p["paso"], p["codigo_paso_predecesor"])
+
+
 # Nombre de la operación (tal como aparece en el archivo de batch) -> handler.
 # Para agregar una operación nueva: crear el método en la página correspondiente
 # (pages/*.py) y registrar aquí una entrada con sus argumentos por **params.
@@ -65,9 +90,17 @@ _DISPATCH: Dict[str, Callable[[RmdAutomation, Dict[str, Any]], None]] = {
     "configurar_rmd_equipos": _configurar_rmd_equipos,
     "configurar_rmd_pasos": _configurar_rmd_pasos,
     "configurar_rmd_inicial": _configurar_rmd_inicial,
+    "configurar_rmd_paso_numero": _configurar_rmd_paso_numero,
+    "configurar_rmd_paso_rango": _configurar_rmd_paso_rango,
+    "configurar_rmd_paso_formula": _configurar_rmd_paso_formula,
+    "configurar_rmd_notificacion": _configurar_rmd_notificacion,
+    "configurar_rmd_predecesor": _configurar_rmd_predecesor,
+    "generar_solicitud_nuevo_rmd": lambda a, p: a.solicitud.generar_nuevo_rmd(**p),
+    "generar_solicitud_nueva_edicion": lambda a, p: a.solicitud.generar_nueva_edicion(**p),
+    "aprobar_solicitud": lambda a, p: a.solicitud.aprobar(**p),
+    "rechazar_solicitud": lambda a, p: a.solicitud.rechazar(**p),
     "enviar_a_jefe": lambda a, p: a.flujo_aprobacion.enviar_a_jefe(**p),
     "cambiar_destinatario": lambda a, p: a.flujo_aprobacion.cambiar_destinatario(**p),
-    "rechazar_solicitud": lambda a, p: a.flujo_aprobacion.rechazar_solicitud(**p),
     "autorizar_rmd": lambda a, p: a.flujo_aprobacion.autorizar(**p),
 }
 

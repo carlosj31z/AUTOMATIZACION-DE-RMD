@@ -10,6 +10,7 @@ from .pages.configuracion import ConfiguracionPage
 from .pages.configuracion_maestra import ConfiguracionMaestraPage
 from .pages.flujo_aprobacion import FlujoAprobacionPage
 from .pages.rmd_editor import RmdEditor
+from .pages.solicitud import SolicitudPage
 
 T = TypeVar("T")
 
@@ -22,6 +23,7 @@ class RmdAutomation:
         self.configuracion = ConfiguracionPage(page)
         self.configuracion_maestra = ConfiguracionMaestraPage(page)
         self.flujo_aprobacion = FlujoAprobacionPage(page)
+        self.solicitud = SolicitudPage(page)
 
     def editor_de_rmd(self, codigo_rmd: str) -> RmdEditor:
         self.configuracion.configurar_rmd(codigo_rmd)

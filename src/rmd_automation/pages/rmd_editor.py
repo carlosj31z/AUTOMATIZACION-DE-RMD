@@ -66,6 +66,50 @@ class RmdEditor:
             self.page.get_by_role("button", name="Guardar")
         ).click()
 
+    def marcar_paso_op_opcional(self, paso: str) -> None:
+        # Manual 7.3: columna PM/OP en documentación/preparación de máquinas/material/fabricación.
+        self._fila(paso).get_by_role("checkbox", name="PM/OP").check()
+
+    def marcar_control_calidad(self, paso: str) -> None:
+        # Manual 7.4: columna "Estado CC", aplica también a pasos menores.
+        self._fila(paso).get_by_role("checkbox", name="Estado CC").check()
+
+    def establecer_paso_numero(self, paso: str, decimales: int) -> None:
+        # Manual 7.6.1: paso complejo tipo Número.
+        self.establecer_tipo_dato(paso, "Número")
+        base.fill_field(self._fila(paso), "Decimales", str(decimales))
+        self.guardar()
+
+    def establecer_paso_rango(
+        self, paso: str, valor_inicial: float, valor_final: float, margen: float, decimales: int
+    ) -> None:
+        # Manual 7.6.2: paso complejo tipo Rango.
+        self.establecer_tipo_dato(paso, "Rango")
+        fila = self._fila(paso)
+        base.fill_field(fila, "Valor Inicial", str(valor_inicial))
+        base.fill_field(fila, "Valor Final", str(valor_final))
+        base.fill_field(fila, "Margen", str(margen))
+        base.fill_field(fila, "Decimales", str(decimales))
+        self.guardar()
+
+    def establecer_paso_formula(self, paso: str, decimales: int, pasos_formula: Iterable[str]) -> None:
+        # Manual 7.6.3: paso complejo tipo Fórmula (icono de matraz para elegir los pasos que la componen).
+        self.establecer_tipo_dato(paso, "Fórmula")
+        fila = self._fila(paso)
+        base.fill_field(fila, "Decimales", str(decimales))
+        fila.get_by_role("button", name="Fórmula").click()
+        for paso_formula in pasos_formula:
+            self.page.get_by_role("checkbox", name=paso_formula).check()
+        self.guardar()
+
+    def configurar_notificacion(self, etiqueta: str, clave_modelo: str, puesto_trabajo: str) -> None:
+        # Manual 7.6.4: notificación (Setup Pre Proceso / Proceso / Setup Post Proceso) por etiqueta.
+        self._fila(etiqueta).get_by_role("button", name="Editar").click()
+        self.establecer_tipo_dato(etiqueta, "Notificación")
+        base.select_dropdown(self.page, "Clave Modelo", clave_modelo)
+        base.select_dropdown(self.page, "Puesto de Trabajo", puesto_trabajo)
+        self.guardar()
+
     def guardar(self) -> None:
         base.click_button(self.page, "Guardar")
 

@@ -26,19 +26,19 @@ def rmd_session(config: RMDConfig) -> Iterator[Page]:
 def _login(page: Page, config: RMDConfig) -> None:
     """Inicia sesión vía SAP Identity Authentication Service (IAS).
 
-    El manual RMD indica: "Ingresar al SAP S/4 HANA PRD, colocar usuario y
-    contraseña y presionar Iniciar sesión". Los campos exactos del formulario
-    de IAS (usuario/contraseña, SSO corporativo, MFA) dependen de cómo
-    Medifarma lo tenga configurado y no pudieron confirmarse sin acceso al
-    entorno real: valida y ajusta estos selectores con Playwright Inspector
-    (`playwright codegen <RMD_LAUNCHPAD_URL>`) contra el ambiente DEV/QAS
-    antes de usar esto en PRD. Si el tenant exige MFA interactivo, esta
-    automatización debe correr con un usuario técnico/de servicio exento de
-    MFA, no con la cuenta personal de un usuario.
+    Confirmado navegando (sin credenciales) hasta la pantalla real de login de
+    Medifarma: el portal RMD redirige a un Fiori Launchpad en
+    `*.cpp.cfapps.us10.hana.ondemand.com`, que a su vez redirige (OAuth2/PKCE)
+    a `https://<tenant>.accounts.ondemand.com/oauth2/authorize`, donde SAP IAS
+    muestra un único formulario ("SAP BTP subaccount MediFarma-Portal-PRD:
+    Sign In") con los campos "Email or User Name" y "Password" en la misma
+    pantalla (no en dos pasos) y un botón "Continue". No se observó un paso de
+    MFA en el formulario inicial; si el tenant lo exige tras enviar la
+    contraseña, esta función no lo maneja — correr con un usuario técnico/de
+    servicio exento de MFA, no con la cuenta personal de un usuario.
     """
     page.goto(config.launchpad_url)
-    page.get_by_label("Usuario").or_(page.get_by_label("E-mail o teléfono")).fill(config.username)
-    page.get_by_role("button", name="Continuar").click()
-    page.get_by_label("Contraseña").fill(config.password)
-    page.get_by_role("button", name="Iniciar sesión").click()
+    page.get_by_placeholder("Email or User Name").fill(config.username)
+    page.get_by_placeholder("Password").fill(config.password)
+    page.get_by_role("button", name="Continue").click()
     page.wait_for_load_state("networkidle")

@@ -43,14 +43,6 @@ class FlujoAprobacionPage:
         base.click_button(self.page, "Guardar")
         base.confirm_dialog(self.page, "SI")
 
-    def rechazar_solicitud(self, codigo_solicitud: str, motivo: str) -> None:
-        base.fill_field(self.page, "Código de solicitud", codigo_solicitud)
-        base.click_ir(self.page)
-        base.click_button(self.page, "Rechazar")
-        base.fill_field(self.page, "Motivo de Rechazo", motivo)
-        base.click_button(self.page, "Rechazar")
-        base.confirm_dialog(self.page, "OK")
-
     def autorizar(self, descripcion_rmd: str) -> None:
         base.fill_field(self.page, "Descripción", descripcion_rmd)
         base.click_ir(self.page)
