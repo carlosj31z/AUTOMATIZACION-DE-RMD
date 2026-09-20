@@ -166,11 +166,13 @@ Salen del **tipo de dato**, con estas excepciones observadas en los 2.460 pasos:
   el combo solo trae los puestos heredados. **Regla de negocio (confirmada por la operación):** a una
   versión nueva NO se le puede asociar la receta mientras la versión anterior esté autorizada y use esa
   misma receta; la asociación se hace al autorizar la nueva versión (la anterior deja de usarla). Por eso una
-  versión Ingresada recién creada aparece con "Recetas Asociadas: Sin datos", INSUMOS en 0 y las
-  notificaciones sin Puesto de Trabajo: es el estado esperado, no un pendiente. Para RMD nuevos sin
+  versión Ingresada recién creada aparece con "Recetas Asociadas: Sin datos" e INSUMOS en 0: es el estado
+  esperado, no un pendiente. Los Puestos de Trabajo de las notificaciones sí se copian de la versión anterior
+  (Clorfenamina v4 conserva FSOLME02 y FSOLTA03 como la v3); una lectura anterior los dio por vacíos porque
+  el combo aún no había cargado su valor al leerlo. Para RMD nuevos sin
   versión previa que use la receta, sí se asocia antes (la tabla "Recetas Asociadas" muestra P. Trabajo,
-  H. Ruta y Contador). Cómo se completan los puestos de una versión nueva antes de autorizar sigue por
-  confirmar.
+  H. Ruta y Contador). Al aprobar producción: se suspende la versión anterior, se asocia la receta si falta
+  y se revisan los puestos de trabajo respecto a la versión anterior.
 - **Clave Modelo**: la lista tiene 47 valores, pero solo tres se usan en notificaciones: **Setup Pre
   Proceso**, **Proceso** y **Setup Post Proceso** (el resto son nombres de personas/proveedores).
 - Secuencia por puesto: 1.er puesto — Documentación "FECHA / HORA INICIO" = Setup Pre (inicio) y el

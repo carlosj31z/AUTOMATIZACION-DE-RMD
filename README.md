@@ -73,6 +73,20 @@ rmd-automation validar examples/batch_ejemplo.yaml   # valida el archivo sin abr
 rmd-automation batch examples/batch_ejemplo.yaml     # ejecuta las operaciones contra RMD
 ```
 
+### Comparar versiones y revisar reglas (solo lectura)
+
+```bash
+rmd-automation extraer 2202609081 --salida data/snapshots/rmd_2202609081.json   # lee el RMD del portal
+rmd-automation comparar data/snapshots/rmd_2202608443.json data/snapshots/rmd_2202609081.json --salida data/comparacion.md
+rmd-automation revisar data/snapshots/rmd_2202609081.json --salida data/revision.md   # --falla-si-error para CI
+```
+
+`extraer` usa `src/rmd_automation/js/extraer.js` (abre diálogos de consulta y los cierra; no guarda nada).
+`comparar` y `revisar` trabajan sobre los JSON y no necesitan el portal. Las reglas están en
+`src/rmd_automation/reglas.py` (Decimal obligatorio, casillas por tipo de dato, predecesores y "Sin tipo de
+dato", notificaciones, V.B. con luz inactínica, pasos retirados, procesos menores…). La carpeta `data/` está
+ignorada por git: los snapshots contienen procesos de manufactura reales.
+
 Un archivo de "ingreso" (batch) es una lista de operaciones declarativas:
 
 ```yaml
