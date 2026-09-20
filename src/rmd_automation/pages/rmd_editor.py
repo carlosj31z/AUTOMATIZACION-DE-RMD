@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Iterable
 
 from playwright.sync_api import Locator, Page
@@ -27,8 +28,24 @@ class RmdEditor:
         (Orden, Depende, Código, Descripción, Tipo Dato, Val. Inicial, Val.
         Final, Margen, Decimal, Estado CC, Estado Mov., Formato, Imagen, Estado)
         y botones Imprimir/Agregar/Guardar/Eliminar.
-    Lo demás (pasos menores, insumos, confirmaciones tras Agregar, selectores
-    de etiquetas/equipos/fórmulas) NO se abrió por ser flujos de escritura.
+      - Jerarquía real (coincide con el manual 5.2-5.6): estructura -> icono
+        "Adicionar Etiqueta" abre el diálogo "Etiqueta (n)" (tabla Orden/Código/
+        Descripción/Items/Conforme/Proceso Menor) cuyo botón "+" (tooltip
+        "Etiqueta") abre el selector "Adicionar Etiquetas: <ESTRUCTURA>"; en cada
+        etiqueta el icono "Adicionar Pasos RMD" abre "Pasos (n)", cuyo botón "+"
+        (tooltip "Agregar" o "Agregar Estructura", según la versión) abre el
+        selector "Adicionar Pasos" (Código Paso, Descripción, Estructura,
+        Etiqueta, Flag Numérico + Ir; tabla de ~1600 pasos).
+      - En "Pasos (n)" de una etiqueta las columnas son: Orden, Depende, Código,
+        Descripción, Tipo Dato, Clave Modelo, Puesto Trabajo, Val. Inicial, Val.
+        Final, Margen, Decimal, Estado CC, Estado Mov., PM OP, Gen PP, Edit,
+        R. Por, V.B., Imagen, Formato, Proc. Men., Estado.
+      - El editor principal NO tiene botón "Guardar": estructuras/etiquetas/
+        equipos/pasos quedan asignados al confirmar con OK (manual: un OK de
+        confirmación "¿Desea asignar ...?" y otro de éxito). "Guardar" solo
+        existe dentro de los diálogos de pasos (ediciones inline).
+    Lo demás (pasos menores, insumos, textos exactos de los OK de confirmación,
+    selector de equipos/fórmulas) NO se abrió por ser flujos de escritura.
     """
 
     def __init__(self, page: Page):
@@ -44,7 +61,10 @@ class RmdEditor:
         self._marcar_y_agregar(estructuras)
 
     def agregar_etiquetas(self, estructura: str, etiquetas: Iterable[str]) -> None:
+        # Manual 5.3: fila de la estructura -> "Adicionar Etiqueta" -> diálogo "Etiqueta (n)"
+        # -> botón "+" (tooltip "Etiqueta") -> selector "Adicionar Etiquetas: <ESTRUCTURA>".
         self._fila(estructura).get_by_role("button", name="Adicionar Etiqueta").click()
+        base.click_button(self._dlg, "Etiqueta")
         self._marcar_y_agregar(etiquetas)
 
     def asociar_formulas(self, codigo_o_descripcion: str, recetas: Iterable[str]) -> None:
@@ -59,10 +79,20 @@ class RmdEditor:
         self._fila(estructura).get_by_role("button", name="Adicionar Equipo").click()
         self._marcar_y_agregar(equipos)
 
-    def agregar_pasos(self, estructura: str, pasos: Iterable[str]) -> None:
-        # Fila de la estructura -> "Adicionar Pasos RMD" -> diálogo "Pasos (n)" -> "Agregar" -> selector.
-        self._fila(estructura).get_by_role("button", name="Adicionar Pasos RMD").click()
-        base.click_button(self._dlg, "Agregar")
+    def agregar_pasos(self, estructura: str, pasos: Iterable[str], etiqueta: str | None = None) -> None:
+        """Manual 5.6. Los pasos cuelgan de una etiqueta (p. ej. Procedimiento -> DOCUMENTACION)
+        o directamente de la estructura (Precauciones, Notas importantes...): si se indica
+        `etiqueta` se navega estructura -> "Etiqueta (n)" -> fila de la etiqueta."""
+        fila = self._fila(estructura)
+        if etiqueta:
+            fila.get_by_role("button", name="Adicionar Etiqueta").click()
+            self._fila(etiqueta).get_by_role("button", name="Adicionar Pasos RMD").click()
+        else:
+            fila.get_by_role("button", name="Adicionar Pasos RMD").click()
+        # El "+" del diálogo "Pasos (n)" se llama "Agregar" o "Agregar Estructura" según la versión.
+        self._dlg.get_by_role("button", name=re.compile(r"^Agregar( Estructura)?$")).filter(
+            visible=True
+        ).first.click()
         self._marcar_y_agregar(pasos)
 
     def agregar_procesos_menores(self, paso: str, procesos_menores: Iterable[str]) -> None:
@@ -78,11 +108,11 @@ class RmdEditor:
 
     def configuracion_inicial(self) -> None:
         base.click_button(self._dlg, "Configuración Inicial")
-        base.confirm_dialog(self.app, "OK")
+        self._confirmar_y_cerrar_exito()
 
     def generar_predecesores(self) -> None:
         base.click_button(self._dlg, "Generar Predecesores")
-        base.confirm_dialog(self.app, "OK")
+        self._confirmar_y_cerrar_exito()
 
     def establecer_tipo_dato(self, paso: str, tipo_dato: str) -> None:
         # Columna "Tipo Dato" de la tabla del diálogo "Pasos (n)" (ComboBox).
@@ -94,8 +124,8 @@ class RmdEditor:
         self.guardar()
 
     def marcar_paso_op_opcional(self, paso: str) -> None:
-        # Manual 7.3 (columna PM/OP). Sin verificar: no hay columna "PM/OP" en la tabla observada.
-        self._fila(paso).get_by_role("checkbox", name="PM/OP").check()
+        # Manual 7.3: columna "PM OP" (nombre real, sin barra) de la tabla de pasos.
+        self._fila(paso).get_by_role("checkbox", name="PM OP").check()
 
     def marcar_control_calidad(self, paso: str) -> None:
         # Manual 7.4: columna "Estado CC" (verificada), aplica también a pasos menores.
@@ -129,27 +159,38 @@ class RmdEditor:
             self._casilla_de_fila(paso_formula).check()
         self.guardar()
 
-    def configurar_notificacion(self, etiqueta: str, clave_modelo: str, puesto_trabajo: str) -> None:
-        # Manual 7.6.4: notificación por etiqueta. En el alta de pasos existe el campo "Clave Modelo".
-        self._fila(etiqueta).get_by_role("button", name="Editar").click()
-        self.establecer_tipo_dato(etiqueta, "Notificación")
-        base.select_dropdown(self._dlg, "Clave Modelo", clave_modelo, root=self.app)
-        base.select_dropdown(self._dlg, "Puesto de Trabajo", puesto_trabajo, root=self.app)
+    def configurar_notificacion(self, paso: str, clave_modelo: str, puesto_trabajo: str) -> None:
+        # Manual 7.6.4: en la tabla de pasos de la etiqueta (p. ej. DOCUMENTACION) se elige
+        # Tipo Dato = Notificación y luego Clave Modelo (Setup Pre Proceso / Proceso /
+        # Setup Post Proceso) y Puesto Trabajo; se guarda con el disquete ("Guardar").
+        self.establecer_tipo_dato(paso, "Notificación")
+        fila = self._fila(paso)
+        base.select_dropdown(fila, "Clave Modelo", clave_modelo, root=self.app)
+        base.select_dropdown(fila, "Puesto Trabajo", puesto_trabajo, root=self.app)
         self.guardar()
 
     def guardar(self) -> None:
         base.click_button(self._dlg, "Guardar")
 
     def _marcar_y_agregar(self, items: Iterable[str]) -> None:
+        # Selector de tabla con casillas: filtro "Buscar" (estructuras/etiquetas) o
+        # "Descripción" (pasos) + "Ir"; luego Agregar -> OK de confirmación -> OK de éxito.
         picker = self._dlg
-        buscar = picker.get_by_label("Buscar", exact=True)
         for item in items:
-            if buscar.count():
-                buscar.first.fill(item)
-                base.click_ir(picker)
+            for etiqueta_filtro in ("Buscar", "Descripción"):
+                filtro = picker.get_by_label(etiqueta_filtro, exact=True).filter(visible=True)
+                if filtro.count():
+                    filtro.first.fill(item)
+                    base.click_ir(picker)
+                    break
             self._casilla_de_fila(item, picker).check()
         base.click_button(picker, "Agregar")
-        base.confirmar_si_aparece(self.app, "OK")
+        self._confirmar_y_cerrar_exito()
+
+    def _confirmar_y_cerrar_exito(self) -> None:
+        base.confirmar_si_aparece(self.app, "OK")  # "¿Desea ...?"
+        self.page.wait_for_timeout(500)
+        base.confirmar_si_aparece(self.app, "OK")  # mensaje de éxito
 
     def _casilla_de_fila(self, texto: str, scope: Locator | None = None) -> Locator:
         # Las casillas de selección de UI5 se llaman "Selección de elementos": se ubican por su fila.

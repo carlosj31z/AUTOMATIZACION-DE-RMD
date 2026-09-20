@@ -89,7 +89,7 @@ operaciones:
 ```
 
 Cada operación mapea 1:1 a una acción del manual — correr `rmd-automation
-acciones` para la lista completa (27 al momento de escribir esto): crear
+acciones` para la lista completa (28 al momento de escribir esto): crear
 solicitudes y aprobar/rechazarlas, estructuras/etiquetas/pasos/motivos/
 utensilios/motivo-lapsos en Configuración Maestra, configuración de un RMD
 —estructuras, etiquetas, fórmulas, equipos, pasos, pasos complejos
@@ -109,7 +109,7 @@ src/rmd_automation/
     rmd_editor.py              # secciones 5-7: "Configurar el RMD", incl. pasos complejos (7.6)
     flujo_aprobacion.py        # sección 8: enviar a jefe, autorizar
   actions.py              # fachada de alto nivel (RmdAutomation)
-  batch.py                # runner declarativo (YAML/JSON) + tabla de despacho (27 acciones)
+  batch.py                # runner declarativo (YAML/JSON) + tabla de despacho (28 acciones)
   cli.py                  # comandos: batch / validar / acciones
 examples/batch_ejemplo.yaml
 tests/test_batch.py       # valida el parser de batch sin necesitar RMD real
@@ -133,7 +133,18 @@ tests/test_batch.py       # valida el parser de batch sin necesitar RMD real
   - Configuración Maestra es un diálogo; tabs con prefijo de ícono en el nombre
     accesible; los SI/NO son `role="switch"`; botones "Nuevo Equipo/Utensilio",
     "Nuevo Motivo Lapso", etc.; Paso usa "Descripción Paso".
-  - "Enviar" abre primero un diálogo "Editar RM" (Confirmar/Cancelar).
+  - "Enviar" abre "Solicitar Revisión de Registro de Manufactura" (Destinatarios,
+    Destinatarios adicionales, Mensaje Documentación Técnica, adjunto con
+    `<input type=file>`); clic en el cuerpo de una fila abre "Editar RM".
+  - Ingreso de un RMD (manual 5) contrastado con el sistema: "Nuevo RMD" ->
+    "Generar nuevo RMD" (Asociar Solicitud, Descripción RMD, Etapa, Planta,
+    Motivo, Área Solicitante; sin adjunto). "Configurar el RMD" -> estructura ->
+    "Adicionar Etiqueta" -> "Etiqueta (n)" -> "+" -> selector de etiquetas; en la
+    etiqueta "Adicionar Pasos RMD" -> "Pasos (n)" -> "+" -> selector "Adicionar
+    Pasos". El editor principal no tiene "Guardar"; las columnas de pasos son
+    "PM OP", "Clave Modelo", "Puesto Trabajo", "Decimal", "Estado CC", etc.
+  - Acción batch nueva `crear_rmd`; `configurar_rmd_pasos` recibe `estructura`
+    (+ `etiqueta` opcional) y `configurar_rmd_notificacion` recibe `paso`.
   **Aún sin verificar** (son escrituras; no se ejecutaron): confirmaciones
   "OK/SI" tras Agregar/Guardar, diálogos de envío a jefe (destinatarios,
   mensaje, PDF), autorización, pasos menores/insumos, selectores de

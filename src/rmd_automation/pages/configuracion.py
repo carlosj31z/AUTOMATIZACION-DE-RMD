@@ -98,6 +98,33 @@ class ConfiguracionPage:
         self.filtrar(ConfiguracionFiltro(descripcion=descripcion_master))
         self.elegir_accion("Trazabilidad RMD")
 
+    def crear_rmd(
+        self,
+        asociar_solicitud: str,
+        descripcion: str,
+        etapa: str,
+        planta: str,
+        motivo: str,
+        area_solicitante: str,
+    ) -> None:
+        # Manual 5.1: botón "Nuevo RMD" de la barra de la tabla -> diálogo "Generar nuevo RMD"
+        # (verificado: Asociar Solicitud, Descripción RMD, Etapa, Planta, Motivo, Área
+        # Solicitante; Confirmar/Cancelar; sin adjunto). Tras Confirmar, el manual indica un
+        # aviso "¿está seguro...?" (OK) y un mensaje "Se registró exitosamente la Manufactura
+        # Digital" (OK): esos dos pasos no se ejecutaron en la validación.
+        base.click_button(self.app, "Nuevo RMD")
+        dlg = base.dialogo_activo(self.app)
+        base.select_dropdown(dlg, "Asociar Solicitud", asociar_solicitud, root=self.app)
+        base.fill_field(dlg, "Descripción RMD", descripcion)
+        base.select_dropdown(dlg, "Etapa", etapa, root=self.app)
+        base.select_dropdown(dlg, "Planta", planta, root=self.app)
+        base.select_dropdown(dlg, "Motivo", motivo, root=self.app)
+        base.select_dropdown(dlg, "Área Solicitante", area_solicitante, root=self.app)
+        base.click_button(dlg, "Confirmar")
+        base.confirm_dialog(self.app, "OK")  # advertencia de confirmación
+        self.page.wait_for_timeout(500)
+        base.confirmar_si_aparece(self.app, "OK")  # mensaje de éxito
+
     def abrir_configuracion_maestra(self) -> None:
         # Botón "Configurar" de la barra de la tabla principal -> diálogo "Configuracion Maestra".
         base.click_button(self.app, "Configurar")

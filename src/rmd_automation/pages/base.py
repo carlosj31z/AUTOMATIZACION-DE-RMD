@@ -71,7 +71,7 @@ def select_dropdown(scope: Scope, label: str, option: str, root: Optional[Scope]
     popover de opciones (el iframe completo). Si no se pasa, se usa `scope`.
     """
     combo = scope.get_by_label(label, exact=True).filter(visible=True).first
-    combo.locator("xpath=ancestor::div[contains(@class,'sapMComboBox')][1]").get_by_role(
+    combo.locator("xpath=ancestor::div[contains(@class,'sapMComboBoxBase')][1]").get_by_role(
         "button", name="Opciones de selección"
     ).click()
     (root or scope).get_by_role("option", name=option).filter(visible=True).first.click()

@@ -14,13 +14,11 @@ Operacion = Dict[str, Any]
 def _configurar_rmd_estructuras(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor = a.editor_de_rmd(p["codigo_rmd"])
     editor.agregar_estructuras(p["estructuras"])
-    editor.guardar()
 
 
 def _configurar_rmd_etiquetas(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor = a.editor_de_rmd(p["codigo_rmd"])
     editor.agregar_etiquetas(p["estructura"], p["etiquetas"])
-    editor.guardar()
 
 
 def _configurar_rmd_formulas(a: RmdAutomation, p: Dict[str, Any]) -> None:
@@ -31,13 +29,11 @@ def _configurar_rmd_formulas(a: RmdAutomation, p: Dict[str, Any]) -> None:
 def _configurar_rmd_equipos(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor = a.editor_de_rmd(p["codigo_rmd"])
     editor.agregar_equipos(p["estructura"], p["equipos"])
-    editor.guardar()
 
 
 def _configurar_rmd_pasos(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor = a.editor_de_rmd(p["codigo_rmd"])
-    editor.agregar_pasos(p["etiqueta"], p["pasos"])
-    editor.guardar()
+    editor.agregar_pasos(p["estructura"], p["pasos"], p.get("etiqueta"))
 
 
 def _configurar_rmd_inicial(a: RmdAutomation, p: Dict[str, Any]) -> None:
@@ -63,7 +59,7 @@ def _configurar_rmd_paso_formula(a: RmdAutomation, p: Dict[str, Any]) -> None:
 
 def _configurar_rmd_notificacion(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor = a.editor_de_rmd(p["codigo_rmd"])
-    editor.configurar_notificacion(p["etiqueta"], p["clave_modelo"], p["puesto_trabajo"])
+    editor.configurar_notificacion(p["paso"], p["clave_modelo"], p["puesto_trabajo"])
 
 
 def _configurar_rmd_predecesor(a: RmdAutomation, p: Dict[str, Any]) -> None:
@@ -95,6 +91,7 @@ _DISPATCH: Dict[str, Callable[[RmdAutomation, Dict[str, Any]], None]] = {
     "configurar_rmd_paso_formula": _configurar_rmd_paso_formula,
     "configurar_rmd_notificacion": _configurar_rmd_notificacion,
     "configurar_rmd_predecesor": _configurar_rmd_predecesor,
+    "crear_rmd": lambda a, p: a.configuracion.crear_rmd(**p),
     "generar_solicitud_nuevo_rmd": lambda a, p: a.solicitud.generar_nuevo_rmd(**p),
     "generar_solicitud_nueva_edicion": lambda a, p: a.solicitud.generar_nueva_edicion(**p),
     "aprobar_solicitud": lambda a, p: a.solicitud.aprobar(**p),
