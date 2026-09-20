@@ -183,10 +183,62 @@ class RmdEditor:
         # Columna "Tipo Dato" de la tabla del diálogo "Pasos (n)" (ComboBox).
         base.select_dropdown(self._fila(paso), "Tipo Dato", tipo_dato, root=self.app)
 
-    def establecer_predecesor(self, paso: str, codigo_paso_predecesor: str) -> None:
-        # Columna "Depende" de la tabla de pasos.
-        base.fill_field(self._fila(paso), "Depende", codigo_paso_predecesor)
+    def _fila_orden(self, orden: int) -> Locator:
+        # Un mismo código de paso puede repetirse en la etiqueta (p. ej. "CONDICIONES AMBIENTALES:"),
+        # así que las filas de "Pasos (n)" se ubican por posición (Orden = posición 1..n).
+        return self._dlg.locator("tbody tr").nth(orden - 1)
+
+    def establecer_predecesor(
+        self,
+        orden_paso: int,
+        codigo_predecesor: str,
+        orden_predecesor: int,
+    ) -> None:
+        """Asigna a mano la columna "Depende" del paso `orden_paso` (un solo predecesor por paso).
+
+        Verificado: el ícono "Mostrar ayuda para entradas" de la celda abre "Lista de Predecesores"
+        (lista de selección única con buscador; lista TODOS los pasos del RMD, cada uno como
+        "<ESTRUCTURA> - Codigo: <código> <descripción> Orden: <n>"). Como un código puede aparecer
+        varias veces, se elige la fila por código Y orden. Después hay que pulsar Guardar.
+        """
+        fila = self._fila_orden(orden_paso)
+        fila.get_by_role("button", name="Mostrar ayuda para entradas").click()
+        lista = self._dlg
+        lista.get_by_placeholder("Buscar").fill(codigo_predecesor)
+        lista.get_by_role("listitem").filter(
+            has_text=re.compile(rf"Codigo: {re.escape(codigo_predecesor)}.*Orden: {orden_predecesor}$")
+        ).first.click()
+
+    def limpiar_predecesor(self, orden_paso: int) -> None:
+        # Verificado: vaciar el campo y guardar deja el paso sin predecesor.
+        fila = self._fila_orden(orden_paso)
+        fila.get_by_label("Depende", exact=True).fill("")
+
+    def predecesores_secuenciales(self) -> None:
+        """Regla de la operación: el predecesor es el paso anterior, salvo los "Sin tipo de dato",
+        que NO llevan predecesor ni son predecesor del siguiente (el siguiente depende del último
+        paso con tipo de dato). El primer paso de la etiqueta conserva su predecesor (cruza a otra
+        etiqueta: último de Notas importantes para las tres primeras etiquetas, último de la
+        preparación anterior para la etapa principal). No genera ramas paralelas: esas se añaden
+        aparte con `establecer_predecesor`. Aplica sobre el diálogo "Pasos (n)" ya abierto y guarda.
+        """
+        filas = self._dlg.locator("tbody tr")
+        total = filas.count()
+        anterior: tuple[str, int] | None = None
+        for i in range(1, total + 1):
+            fila = filas.nth(i - 1)
+            tipo = fila.get_by_label("Tipo Dato", exact=True).input_value()
+            codigo = fila.locator("td").nth(4).inner_text().strip()
+            actual = fila.get_by_label("Depende", exact=True).input_value().strip()
+            if tipo == "Sin tipo de dato":
+                if actual:
+                    self.limpiar_predecesor(i)
+                continue
+            if anterior is not None and not actual.startswith(f"{anterior[0]} ({anterior[1]})"):
+                self.establecer_predecesor(i, anterior[0], anterior[1])
+            anterior = (codigo, i)
         self.guardar()
+        self._confirmar_y_cerrar_exito()
 
     def marcar_paso_op_opcional(self, paso: str) -> None:
         # Manual 7.3: columna "PM OP" (nombre real, sin barra) de la tabla de pasos.

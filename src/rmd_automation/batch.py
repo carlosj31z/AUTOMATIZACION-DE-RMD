@@ -63,7 +63,8 @@ def _configurar_rmd_notificacion(a: RmdAutomation, p: Dict[str, Any]) -> None:
 
 def _configurar_rmd_predecesor(a: RmdAutomation, p: Dict[str, Any]) -> None:
     editor = a.editor_de_rmd(p["codigo_rmd"])
-    editor.establecer_predecesor(p["paso"], p["codigo_paso_predecesor"])
+    editor.establecer_predecesor(p["orden_paso"], p["codigo_predecesor"], p["orden_predecesor"])
+    editor.guardar()
 
 
 # Nombre de la operación (tal como aparece en el archivo de batch) -> handler.

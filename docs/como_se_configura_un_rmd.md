@@ -106,6 +106,93 @@ Reglas observadas:
   dato y añadir las ramas paralelas. Regenerarlo tras añadir pasos los engancha a la cadena. El aviso
   de éxito ("Se generaron los predecesores correctamente.") tarda varios segundos.
 
+## 5 ter. Asignar "Depende" a mano (verificado en RMD PRUEBA, Fabricación de 151 pasos)
+
+Mecanismo: en "Pasos (n)", el ícono "Mostrar ayuda para entradas" de la celda Depende abre "Lista de
+Predecesores": lista de selección única con buscador que muestra **todos** los pasos del RMD
+("<ESTRUCTURA> - Codigo: X … Orden: N"). Como un código puede repetirse (p. ej. "CONDICIONES
+AMBIENTALES:" aparece varias veces), hay que elegir por **código y orden**. Para quitar el predecesor
+se vacía el campo. Luego Guardar ("Se guardaron correctamente los cambios."). Se aplicó la regla de la
+operación (predecesor = paso anterior; los "Sin tipo de dato" ni llevan predecesor ni son predecesor
+del siguiente): 105 pasos encadenados, 45 "Sin tipo de dato" sin predecesor, 0 discrepancias tras
+guardar y reabrir. También se comprobó que se admiten **paralelos** (dos pasos con el mismo
+predecesor) y se restauró la cadena. En pantalla, el `(n)` de "código (n)" es el orden del predecesor.
+
+### Cómo aparecen los paralelos en los RMD reales (regla "predecesor = anterior no Sin tipo")
+
+Cumplen la regla: Fabricación 84 % (377 de 451 pasos con tipo), Acondicionado 91 % (440/482), Envase
+88 % (81/92). El resto son ramas paralelas (≈ 62 en Fabricación, 35 en Acondicionado, ~1 en Envase) y
+unos pocos pasos sin predecesor (7 en Fabricación). Patrones:
+
+1. **Tareas simultáneas tras el inicio**: varios pasos con el mismo predecesor, normalmente la
+   notificación de inicio ("FECHA / HORA INICIO DE FABRICACION/ACONDICIONADO"): p. ej. Mentholatum #4 y
+   #6 ← #2; Acondicionado Mentholatum #9, #11, #12 ← #6. Suelen ser pasos redactados "PARALELAMENTE…"
+   o "EN PARALELO…".
+2. **Bloque de Control de Calidad**: "EL PERSONAL DE CALIDAD INGRESA…" (Realizado por + Estado CC)
+   depende del último paso operativo (no de la notificación final): corre en paralelo con el cierre;
+   "TRASVASAR EL PRODUCTO APROBADO" depende del primer paso de CC y no del Visto bueno del jefe.
+3. **Notificaciones encadenadas por puesto**: "Setup Pre" del siguiente puesto ← "Setup Post final" del
+   anterior; "Inicio de proceso" ← "Fin de la preparación" (NOT→NOT: 10 casos); el Setup Post inicial
+   depende de la notificación de **fin del proceso**, saltándose el bloque de CC.
+4. **"CONDICIONES AMBIENTALES:" repetido dentro del procedimiento** depende de un paso anterior
+   (medición en paralelo con la operación).
+5. **Pasos condicionales o independientes sin predecesor** ("EN CASO QUE…", "BAJO LA SUPERVISION DEL
+   JEFE…", "PARALELAMENTE TRITURAR…", "ENTREGAR LA DOCUMENTACION…": los no-Sin-tipo sin predecesor).
+6. Un solo predecesor por paso: el "cierre" de una rama paralela (join) se resuelve haciendo que el
+   paso siguiente dependa de la rama principal; la otra rama simplemente termina.
+
+Los primeros pasos de cada etiqueta cruzan etiquetas (`código (orden en la otra etiqueta)`).
+
+## 5 quater. Casillas (Edit, R. Por, V.B., Estado CC, PM OP, Gen PP)
+
+Salen del **tipo de dato**, con estas excepciones observadas en los 2.460 pasos:
+
+| Casilla | Cuándo se marca |
+|---|---|
+| **Edit** | El operario registra un valor en el RMD digital: Fecha y Hora, Fecha, Hora, Notificacion, Números, Rango, Texto, Lote, Fecha Vencimiento, Fórmula, Entrega, MuestraCC, Verificación Check en procesos menores de verificación. No se marca en Múltiple check, Realizado por, Visto bueno ni Sin tipo de dato. |
+| **R. Por** | Tipo "Realizado por" y "Realizado por y Visto bueno" (firma de quien ejecuta). |
+| **V.B.** | "Visto bueno" y "Realizado por y Visto bueno" (firma del jefe/supervisor: pasos críticos como despejes, adiciones de insumo, trasvases). Excepciones raras: "Realizado por" o "Múltiple check" con R. Por + V.B. cuando el paso exige visto bueno. |
+| **Estado CC** | Pasos de **Control de Calidad**: "EL PERSONAL DE CALIDAD … INGRESA…" y "CALIDAD … REGISTRA LOS RESULTADOS" (Realizado por + Estado CC, 34 casos), MuestraCC (Estado CC + Edit) y, en procesos menores, "CANTIDAD MUESTREADA" y "FECHA / HORA DE MUESTREO" (Edit + Estado CC). |
+| **PM OP** | Paso **opcional** según la OP ("ELIJA LA OPCION SEGUN CORRESPONDA", "REALIZAR LA PRUEBA DE INTEGRIDAD… SEGÚN CORRESPONDA", "COLOCAR LAS CHAQUETAS…", "REGISTRAR LA MATERIA PRIMA…"): 3–7 casos en 33 RMD. |
+| **Gen PP** | Muy raro (1 caso: preparar la máquina codificadora); genera datos de producto en proceso. |
+| **Estado Mov.** | No aparece marcada en ninguno de los RMD leídos. |
+
+## 5 quinquies. Clave Modelo y Puesto de Trabajo (Notificacion + Edit)
+
+- Tipo "Notificacion" siempre con **Edit** marcado (199 de 199).
+- **Puesto Trabajo**: las opciones del combo son exactamente los puestos de la **hoja de ruta de la
+  receta asociada**. Dolomax (receta 5000001459, P. Trabajo principal FCBLFA01) ofrece 4 puestos
+  (FCBLFA01, FCBLEP01, FCBLSE01, FCBLIN01) y los usa en sus notificaciones. Sin receta asociada (RMD PRUEBA)
+  el combo solo trae los puestos heredados. Por eso conviene **asociar la receta antes** de configurar
+  las notificaciones (Asociar fórmulas: la tabla "Recetas Asociadas" muestra P. Trabajo, H. Ruta y Contador).
+- **Clave Modelo**: la lista tiene 47 valores, pero solo tres se usan en notificaciones: **Setup Pre
+  Proceso**, **Proceso** y **Setup Post Proceso** (el resto son nombres de personas/proveedores).
+- Secuencia por puesto: 1.er puesto — Documentación "FECHA / HORA INICIO" = Setup Pre (inicio) y el
+  "FECHA / HORA FINAL" de la última preparación = Setup Pre (fin); en la etapa principal: Proceso
+  (inicio y fin de la preparación/fabricación) → Setup Post (inicial y final). Cada puesto siguiente:
+  Setup Pre (ini/fin) → Proceso (ini/fin) → Setup Post (ini/fin).
+
+## 5 sexies. Otros detalles de la configuración
+
+- **Etiquetas ("Etiqueta (n)")**: "Conforme" ✓ en Documentación y en las dos preparaciones, ✗ en la
+  etapa principal y Rendimiento. "Proceso Menor" ✓ siempre en la etapa principal y en la preparación que
+  tiene procesos menores (Preparación del material o de máquinas según el producto); ✗ en Documentación
+  y Rendimiento.
+- **Procesos menores** (botón de fila azul = tiene; rojo = no tiene): son líneas de captura bajo un paso.
+  Tipos reales: notas/instrucciones (Sin tipo de dato, decimal 0); **insumos** de la receta (Números,
+  decimal 3, con "Cantidad Insumos", sin Edit); Hora inicio/final (Hora, Edit); velocidad/temperatura de
+  proceso (Números decimal 1, Edit); presión (Texto, Edit); **temperatura y humedad ambiental
+  (Rango 15–25 / 1–100, margen 10, decimal 1, Edit)** dentro del paso "CONDICIONES AMBIENTALES:";
+  muestreo de CC (Números decimal 3 + Fecha y Hora, Edit + Estado CC); verificación del jefe
+  (Verificación Check, Edit); en Acondicionado además Lote, Texto (fecha de elaboración/expira),
+  Verificación Check por máquina y Rango de velocidad de faja. Los procesos menores no tienen "Depende".
+  Envase (ejemplo 2202608966) no tenía procesos menores en la etiqueta ENVASE.
+- La estructura **CONDICIONES AMBIENTALES** de un RMD son solo textos (Sin tipo de dato): los valores
+  medibles se capturan en los procesos menores del paso "CONDICIONES AMBIENTALES:" del Procedimiento.
+- **INSUMOS** (estructura 4) es solo lectura ("Ver Insumos"): viene de la receta asociada
+  (Cód. Insumo, Descripción, Cant. Receta, Cant. en RMD, UM); sin receta no hay insumos que asignar a los
+  procesos menores.
+
 ## 5 bis. Qué tener en cuenta al configurar
 
 1. Añadir pasos del catálogo existente; no crear pasos maestros sin necesidad (afecta a todos los RMD).
