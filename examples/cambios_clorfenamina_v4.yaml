@@ -1,0 +1,19 @@
+# Cambios decididos para CLORFENAMINA 4mg TAB - Fabricación (versión Ingresada).
+# Uso (sin abrir el portal):  rmd-automation cambios plan examples/cambios_clorfenamina_v4.yaml --snapshot data/snapshots/rmd_2202609081.json
+# Uso (portal, con confirmación):  rmd-automation cambios aplicar examples/cambios_clorfenamina_v4.yaml --confirmar
+rmd: "2202609081"
+descripcion: "Retiro de equipos auxiliares de la Riva y pasos que ya no deben existir"
+cambios:
+  - accion: quitar_equipos
+    equipos: ["SOL-E172", "SOL-E173"]      # desempolvador y detector asignados a la Riva (retirada)
+
+  - accion: quitar_pasos
+    lista: "PROCEDIMIENTO>DOCUMENTACION"
+    pasos: ["SOLICITAR AL JEFE O SUPERVISOR DE TURNO, ASIGNE LOS NOMBRES"]
+
+  - accion: quitar_pasos
+    lista: "NOTAS IMPORTANTES DURANTE EL PROCESO"
+    pasos: ["CUANDO SE ELIGE LA OPCION \"NO APLICA\""]
+
+  - accion: predecesores_secuenciales
+    lista: "PROCEDIMIENTO>PREPARACION DE LAS MAQUINAS O EQUIPOS"

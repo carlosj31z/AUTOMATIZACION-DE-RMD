@@ -89,6 +89,7 @@
     CORE().byId(F().contentDocument.querySelector('[id$=btnGo]').id.replace(/-inner$/, '')).firePress(); await W(3500);
     const fila = [...F().contentDocument.querySelectorAll('tbody tr')].find((r) => vis(r) && r.children[1]?.textContent.trim() === code);
     if (!fila) throw new Error('No se encontró el RMD ' + code);
+    out.version = fila.children[2]?.textContent.trim(); out.estado = fila.children[3]?.textContent.trim();
     const menu = CORE().byId(fila.querySelector('.sapMMenuBtn').id).getMenu();
     menu.fireItemSelected({ item: menu.getItems().find((i) => i.getText() === 'Configurar el RMD') });
     await until(() => TOP() && /Estructura de RMD/.test(TOP().innerText), 25000); await W(800);

@@ -333,6 +333,74 @@ class RmdEditor:
         base.click_button(picker, "Agregar")
         self._confirmar_y_cerrar_exito()
 
+    # -- navegación y edición usadas por el ejecutor de cambios (cambios.py) -------------------
+
+    def abrir_pasos(self, estructura: str, etiqueta: str | None = None) -> None:
+        """Deja abierto el diálogo "Pasos (n)" de una estructura o de una etiqueta del Procedimiento."""
+        fila = self._fila(estructura)
+        if etiqueta:
+            fila.get_by_role("button", name="Adicionar Etiqueta").click()
+            self._fila(etiqueta).get_by_role("button", name="Adicionar Pasos RMD").click()
+        else:
+            fila.get_by_role("button", name="Adicionar Pasos RMD").click()
+
+    def cerrar_dialogo(self) -> None:
+        """Cierra el diálogo activo (y, si el paso estaba dentro de "Etiqueta (n)", también ése)."""
+        base.click_button(self._dlg, "Cancelar")
+
+    def cerrar_editor(self) -> None:
+        try:
+            while self.app.get_by_role("dialog").count() > 1:
+                base.click_button(self._dlg, "Cancelar")
+            base.click_button(self._dlg, "Cerrar")
+        except Exception:  # el editor ya estaba cerrado
+            pass
+
+    def eliminar_pasos(self, estructura: str, pasos: Iterable[str], etiqueta: str | None = None) -> None:
+        """Marca los pasos por texto y usa "Eliminar" del diálogo "Pasos (n)".
+
+        El diálogo de confirmación se asume igual al de Equipos ("¿Desea proceder con la eliminación
+        del registro seleccionado?" -> "Borrar"); NO se verificó en vivo para pasos.
+        """
+        self.abrir_pasos(estructura, etiqueta)
+        dlg = self._dlg
+        for texto in pasos:
+            self._casilla_de_fila(texto, dlg).check()
+        base.click_button(dlg, "Eliminar")
+        base.confirm_dialog(self.app, "Borrar")
+        self._confirmar_y_cerrar_exito()
+        self.cerrar_dialogo()
+        if etiqueta:
+            self.cerrar_dialogo()
+
+    def configurar_paso(
+        self,
+        estructura: str,
+        etiqueta: str | None,
+        paso: str,
+        tipo_dato: str | None = None,
+        decimal: int | str | None = None,
+        casillas: Iterable[str] | None = None,
+    ) -> None:
+        """Ajusta tipo de dato, decimal y casillas (Edit, R. Por, V.B., Estado CC…) de un paso y guarda."""
+        self.abrir_pasos(estructura, etiqueta)
+        fila = self._fila(paso)
+        if tipo_dato:
+            self.establecer_tipo_dato(paso, tipo_dato)
+        if decimal is not None:
+            base.fill_field(fila, "Decimal", str(decimal))
+        if casillas is not None:
+            deseadas = set(casillas)
+            for nombre in ("Edit", "R. Por", "V.B.", "Estado CC", "PM OP", "Gen PP", "Estado Mov."):
+                caja = fila.get_by_role("checkbox", name=nombre)
+                if caja.count():
+                    caja.check() if nombre in deseadas else caja.uncheck()
+        self.guardar()
+        self._confirmar_y_cerrar_exito()
+        self.cerrar_dialogo()
+        if etiqueta:
+            self.cerrar_dialogo()
+
     def _confirmar_y_cerrar_exito(self) -> None:
         base.confirmar_si_aparece(self.app, "OK")  # "¿Desea ...?"
         self.page.wait_for_timeout(500)

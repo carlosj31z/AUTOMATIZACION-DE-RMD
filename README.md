@@ -87,6 +87,21 @@ rmd-automation revisar data/snapshots/rmd_2202609081.json --salida data/revision
 dato", notificaciones, V.B. con luz inactínica, pasos retirados, procesos menores…). La carpeta `data/` está
 ignorada por git: los snapshots contienen procesos de manufactura reales.
 
+### Aplicar cambios decididos (ejecutor con plan y confirmación)
+
+```bash
+rmd-automation cambios plan examples/cambios_clorfenamina_v4.yaml --snapshot data/snapshots/rmd_2202609081.json
+rmd-automation cambios aplicar examples/cambios_clorfenamina_v4.yaml            # solo muestra el plan
+rmd-automation cambios aplicar examples/cambios_clorfenamina_v4.yaml --confirmar  # pide confirmación y ejecuta
+```
+
+La especificación YAML lista los cambios (`quitar_equipos`, `agregar_equipos`, `quitar_pasos`, `agregar_pasos`,
+`configurar_paso`, `predecesores_secuenciales`). El ejecutor: 1) lee el RMD y **se niega si no está Ingresado**;
+2) calcula qué falta y qué ya está aplicado (es idempotente); 3) sin `--confirmar` solo muestra el plan; con él
+pide confirmación humana; 4) ejecuta, relee y verifica; 5) anota cada corrida en `data/auditoria.jsonl`.
+No existe ninguna acción para enviar a jefe ni autorizar. Verificado en vivo: quitar equipos (mismo flujo
+del portal); sin verificar en vivo: quitar pasos y configurar_paso desde Playwright.
+
 Un archivo de "ingreso" (batch) es una lista de operaciones declarativas:
 
 ```yaml
