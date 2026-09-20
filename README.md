@@ -148,6 +148,8 @@ tests/test_batch.py       # valida el parser de batch sin necesitar RMD real
     de equipos, especificaciones, pasos, procesos menores, notas, documentos y
     los textos reales de confirmación/éxito. Acciones batch nuevas:
     `nueva_version_rmd`, `copiar_de_rmd`.
+  - Reglas de configuración aprendidas de 33 RMD autorizados de Lima (estructuras, etiquetas,
+    tipos de dato, notificaciones, fórmulas y predecesores): `docs/como_se_configura_un_rmd.md`.
   - Acción batch nueva `crear_rmd`; `configurar_rmd_pasos` recibe `estructura`
     (+ `etiqueta` opcional) y `configurar_rmd_notificacion` recibe `paso`.
   **Aún sin verificar** (son escrituras; no se ejecutaron): confirmaciones

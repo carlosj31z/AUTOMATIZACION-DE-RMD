@@ -8,6 +8,10 @@ from playwright.sync_api import Locator, Page
 from . import base
 
 
+# Signos del diálogo "Fórmulas" (lista "Seleccionar signo"); "CT" = Cantidad Teórica.
+SIGNOS_FORMULA = ("(", ")", "+", "-", "*", "/", "CT")
+
+
 class RmdEditor:
     """Acciones dentro del diálogo 'Configurar el RMD' (manual RMD, secciones 5 a 7).
 
@@ -216,7 +220,8 @@ class RmdEditor:
 
     def establecer_paso_formula(self, paso: str, decimales: int, pasos_formula: Iterable[str]) -> None:
         # Manual 7.6.3, verificado: 1) Tipo Dato = Fórmula + Decimal + Edit y Guardar (el botón
-        # "Fórmula" de la fila solo aparece tras guardar); 2) "Fórmula" abre el diálogo "Fórmulas"
+        # "Fórmula" de la fila solo aparece tras guardar; en los RMD reales: Cantidad obtenida =
+        # entregada + muestreada, Merma = teórica - obtenida, Rendimiento = obtenida / teórica * 100); 2) "Fórmula" abre el diálogo "Fórmulas"
         # (Pasos Disponibles / seleccionados, con botones de radio, "Mover a seleccionados" y
         # "Mover a disponibles"); 3) Guardar -> "¿Desea guardar la fórmula generada?" [OK] ->
         # "Se grabó la fórmula exitosamente." [OK].
@@ -228,9 +233,18 @@ class RmdEditor:
         self._confirmar_y_cerrar_exito()
         self._fila(paso).get_by_role("button", name="Fórmula").click()
         formulas = self._dlg
-        for paso_formula in pasos_formula:
-            formulas.get_by_role("row").filter(has_text=paso_formula).first.get_by_role("radio").check()
-            base.click_button(formulas, "Mover a seleccionados")
+        # `pasos_formula` es la fórmula EN ORDEN: códigos/textos de paso y signos, p. ej.
+        # ["5275", "/", "5533", "*", "100"] o ["5224", "+", "181147"]. La lista de seleccionados se
+        # arma por inserción (no hay flechas para reordenar): sin signos entre pasos la fórmula
+        # queda inválida ("5224  181147"). Las constantes numéricas usan el campo "Ingrese
+        # Cantidad" (no probado).
+        for token in pasos_formula:
+            if token in SIGNOS_FORMULA:
+                formulas.locator("[id$='--signos']").click()
+                self.app.get_by_role("option", name=token, exact=True).click()
+            else:
+                formulas.get_by_role("row").filter(has_text=token).first.get_by_role("radio").check()
+                base.click_button(formulas, "Mover a seleccionados")
         base.click_button(formulas, "Guardar")
         self._confirmar_y_cerrar_exito()
 
