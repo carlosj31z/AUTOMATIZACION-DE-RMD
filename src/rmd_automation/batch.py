@@ -22,8 +22,7 @@ def _configurar_rmd_etiquetas(a: RmdAutomation, p: Dict[str, Any]) -> None:
 
 
 def _configurar_rmd_formulas(a: RmdAutomation, p: Dict[str, Any]) -> None:
-    editor = a.editor_de_rmd(p["codigo_rmd"])
-    editor.asociar_formulas(p["codigo_o_descripcion"], p["recetas"])
+    a.configuracion.asociar_formulas(p["codigo_rmd"], p["recetas"], descripcion=p["codigo_o_descripcion"])
 
 
 def _configurar_rmd_equipos(a: RmdAutomation, p: Dict[str, Any]) -> None:
@@ -92,6 +91,8 @@ _DISPATCH: Dict[str, Callable[[RmdAutomation, Dict[str, Any]], None]] = {
     "configurar_rmd_notificacion": _configurar_rmd_notificacion,
     "configurar_rmd_predecesor": _configurar_rmd_predecesor,
     "crear_rmd": lambda a, p: a.configuracion.crear_rmd(**p),
+    "nueva_version_rmd": lambda a, p: a.editor_de_rmd(p["codigo_rmd"]).nueva_version(),
+    "copiar_de_rmd": lambda a, p: a.editor_de_rmd(p["codigo_rmd"]).copiar_de_rmd(p["codigo_rmd_origen"]),
     "generar_solicitud_nuevo_rmd": lambda a, p: a.solicitud.generar_nuevo_rmd(**p),
     "generar_solicitud_nueva_edicion": lambda a, p: a.solicitud.generar_nueva_edicion(**p),
     "aprobar_solicitud": lambda a, p: a.solicitud.aprobar(**p),

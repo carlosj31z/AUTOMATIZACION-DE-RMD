@@ -67,17 +67,27 @@ class RmdEditor:
         base.click_button(self._dlg, "Etiqueta")
         self._marcar_y_agregar(etiquetas)
 
-    def asociar_formulas(self, codigo_o_descripcion: str, recetas: Iterable[str]) -> None:
-        # Sin verificar: en la pantalla principal existe la acción de fila "Asociar fórmulas".
-        base.click_button(self._dlg, "Agregar Producto")
-        base.fill_field(self._dlg, "Código y/o Descripción y/o Variante", codigo_o_descripcion)
-        base.click_ir(self._dlg)
-        self._marcar_y_agregar(recetas)
-        base.click_button(self._dlg, "Guardar")
 
     def agregar_equipos(self, estructura: str, equipos: Iterable[str]) -> None:
+        # Verificado: icono "Adicionar Equipo" de la fila -> diálogo "Equipos (n)" -> "+"
+        # (tooltip "Adicionar Equipo") -> selector "Adicionar Equipos: EQUIPOS" (filtros Cod.
+        # Equipo, Descripción, Cod. GACI, Estado, Área + Ir; el "+" del selector es "Agregar
+        # Agrupador"). Confirmación: "¿Desea asignar los equipos o utensilios seleccionadas?".
         self._fila(estructura).get_by_role("button", name="Adicionar Equipo").click()
+        base.click_button(self._dlg, "Adicionar Equipo")
         self._marcar_y_agregar(equipos)
+
+    def eliminar_equipos(self, estructura: str, equipos: Iterable[str]) -> None:
+        # Verificado: casillas + "Eliminar" -> "¿Desea proceder con la eliminación del registro
+        # seleccionado?" [Borrar] -> "Se eliminaron los registros correctamente" [OK].
+        self._fila(estructura).get_by_role("button", name="Adicionar Equipo").click()
+        dlg = self._dlg
+        for equipo in equipos:
+            self._casilla_de_fila(equipo, dlg).check()
+        base.click_button(dlg, "Eliminar")
+        base.confirm_dialog(self.app, "Borrar")
+        self._confirmar_y_cerrar_exito()
+        base.click_button(self._dlg, "Cancelar")
 
     def agregar_pasos(self, estructura: str, pasos: Iterable[str], etiqueta: str | None = None) -> None:
         """Manual 5.6. Los pasos cuelgan de una etiqueta (p. ej. Procedimiento -> DOCUMENTACION)
@@ -96,21 +106,67 @@ class RmdEditor:
         self._marcar_y_agregar(pasos)
 
     def agregar_procesos_menores(self, paso: str, procesos_menores: Iterable[str]) -> None:
-        # Sin verificar (los pasos menores no se abrieron en la validación).
+        # Verificado: fila del paso -> "Procesos Menores" -> diálogo "Procesos Menores para el
+        # Paso: ..." -> "+" (tooltip "Adicionar Pasos RMD") -> selector "Adicionar Pasos".
         self._fila(paso).get_by_role("button", name="Procesos Menores").click()
-        base.click_button(self._dlg, "Agregar Pasos Menores")
+        base.click_button(self._dlg, "Adicionar Pasos RMD")
         self._marcar_y_agregar(procesos_menores)
 
     def agregar_insumos(self, proceso_menor: str, insumos: Iterable[str]) -> None:
-        # Sin verificar.
-        self._fila(proceso_menor).get_by_role("button", name="Agregar Insumo").click()
+        # Verificado hasta el selector: en "Procesos Menores para el Paso" el botón "Agregar
+        # Insumo" abre "Adicionar Pasos" (Código, Descripción, UM, Cantidad); con un proceso menor
+        # sin insumos disponibles la tabla sale vacía.
+        self._casilla_de_fila(proceso_menor).check()
+        base.click_button(self._dlg, "Agregar Insumo")
         self._marcar_y_agregar(insumos)
 
+    def nueva_version(self) -> None:
+        # Verificado: "Advertencia: ¿Desea generar una nueva versión?" [OK]/[Cancelar].
+        base.click_button(self._dlg, "Nueva Versión")
+        self._confirmar_y_cerrar_exito()
+
+    def copiar_de_rmd(self, codigo_rmd_origen: str) -> None:
+        # Verificado: "Copiar De: <RMD>" con filtros Código RMD, Descripción, Etapa, Planta + Ir,
+        # tabla con casillas y Confirmar/Cancelar.
+        base.click_button(self._dlg, "Copiar de RMD")
+        dlg = self._dlg
+        base.fill_field(dlg, "Código RMD", codigo_rmd_origen)
+        base.click_ir(dlg)
+        self._casilla_de_fila(codigo_rmd_origen, dlg).check()
+        base.click_button(dlg, "Confirmar")
+        self._confirmar_y_cerrar_exito()
+
+    def copiar_a_rmd(
+        self,
+        descripcion: str,
+        codigo_defecto: str,
+        planta: str,
+        motivo_solicitud: str,
+        fecha_solicitud: str,
+        observacion: str = "",
+    ) -> None:
+        # Verificado: "Copiar Información del RMD: <RMD>" con Descripción RMD, Cod. defecto,
+        # Etapa y Estado (solo lectura), Planta, Motivo de Solicitud, Fecha Solicitud y Observacion.
+        base.click_button(self._dlg, "Copiar a RMD")
+        dlg = self._dlg
+        base.fill_field(dlg, "Descripción RMD", descripcion)
+        base.fill_field(dlg, "Cod. defecto", codigo_defecto)
+        base.select_dropdown(dlg, "Planta", planta, root=self.app)
+        base.select_dropdown(dlg, "Motivo de Solicitud", motivo_solicitud, root=self.app)
+        base.fill_field(dlg, "Fecha Solicitud", fecha_solicitud)
+        if observacion:
+            base.fill_field(dlg, "Observacion", observacion)
+        base.click_button(dlg, "Confirmar")
+        self._confirmar_y_cerrar_exito()
+
     def configuracion_inicial(self) -> None:
+        # Verificado: "Advertencia: ¿Desea realizar la configuracion inicial del RMD?" [OK].
         base.click_button(self._dlg, "Configuración Inicial")
         self._confirmar_y_cerrar_exito()
 
     def generar_predecesores(self) -> None:
+        # Verificado: "Advertencia: ¿Desea generar Predecesores?" [OK]; el aviso de éxito
+        # ("Se generaron los predecesores correctamente.") tarda varios segundos.
         base.click_button(self._dlg, "Generar Predecesores")
         self._confirmar_y_cerrar_exito()
 
@@ -190,7 +246,7 @@ class RmdEditor:
     def _confirmar_y_cerrar_exito(self) -> None:
         base.confirmar_si_aparece(self.app, "OK")  # "¿Desea ...?"
         self.page.wait_for_timeout(500)
-        base.confirmar_si_aparece(self.app, "OK")  # mensaje de éxito
+        base.confirmar_si_aparece(self.app, "OK", timeout_ms=15000)  # mensaje de éxito (puede tardar)
 
     def _casilla_de_fila(self, texto: str, scope: Locator | None = None) -> Locator:
         # Las casillas de selección de UI5 se llaman "Selección de elementos": se ubican por su fila.

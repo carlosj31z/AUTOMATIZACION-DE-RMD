@@ -78,21 +78,23 @@ class ConfiguracionPage:
         # El diálogo de carga en sí no se abrió durante la validación (es una escritura).
         self.filtrar(ConfiguracionFiltro(descripcion=descripcion_producto))
         self.elegir_accion("Agregar Documento")
+        # Verificado: diálogo "Agregar Documentos al RMD: ..." con <input type=file> ("Examinar...")
+        # y botones Guardar/Cerrar; el mensaje de éxito posterior no se capturó.
         dlg = base.dialogo_activo(self.app)
-        with self.page.expect_file_chooser() as fc_info:
-            base.click_button(dlg, "Navegar")
-        fc_info.value.set_files(ruta_archivo)
+        dlg.locator("input[type=file]").set_input_files(ruta_archivo)
         base.click_button(dlg, "Guardar")
-        base.confirm_dialog(self.app, "OK")
+        base.confirmar_si_aparece(self.app, "OK")
 
     def agregar_nota_importante(self, descripcion_producto: str, nota: str) -> None:
-        # Opción "Notas Importantes" (verificada); el formulario interno no se abrió.
+        # Verificado: "Ver Notas Importantes RMD" -> "Agregar Nota Importante" -> "Ingresar Nota
+        # Importante" (textarea con placeholder, sin label) -> Confirmar; se guarda sin confirmación.
         self.filtrar(ConfiguracionFiltro(descripcion=descripcion_producto))
         self.elegir_accion("Notas Importantes")
+        base.click_button(base.dialogo_activo(self.app), "Agregar Nota Importante")
         dlg = base.dialogo_activo(self.app)
-        base.click_button(dlg, "+")
-        base.fill_field(dlg, "Nota", nota)
+        dlg.get_by_placeholder("Ingrese una nota importante").fill(nota)
         base.click_button(dlg, "Confirmar")
+        base.click_button(base.dialogo_activo(self.app), "Cerrar")
 
     def ver_trazabilidad(self, descripcion_master: str) -> None:
         self.filtrar(ConfiguracionFiltro(descripcion=descripcion_master))
@@ -124,6 +126,32 @@ class ConfiguracionPage:
         base.confirm_dialog(self.app, "OK")  # advertencia de confirmación
         self.page.wait_for_timeout(500)
         base.confirmar_si_aparece(self.app, "OK")  # mensaje de éxito
+
+    def asociar_formulas(
+        self, codigo_rmd: str, recetas: "list[str]", codigo: str = "", descripcion: str = "", variante: str = ""
+    ) -> None:
+        # Manual 5.4 (verificado hasta el selector): acción de fila "Asociar fórmulas" -> "Asociar
+        # Fórmula: <RMD>" (Recetas Asociadas (n), "Agregar Producto", Guardar/Cancelar) -> selector
+        # "Asociar Recetas al RM" con filtros Código, Descripción, Variante + Ir y casillas ->
+        # Agregar -> OK -> éxito -> Guardar en el formulario principal.
+        self.filtrar(ConfiguracionFiltro(codigo_rmd=codigo_rmd))
+        self.elegir_accion("Asociar fórmulas")
+        base.click_button(base.dialogo_activo(self.app), "Agregar Producto")
+        picker = base.dialogo_activo(self.app)
+        if codigo:
+            base.fill_field(picker, "Código", codigo)
+        if descripcion:
+            base.fill_field(picker, "Descripción", descripcion)
+        if variante:
+            base.fill_field(picker, "Variante", variante)
+        base.click_ir(picker)
+        for receta in recetas:
+            base.row_by_text(picker, receta).first.get_by_role("checkbox").first.check()
+        base.click_button(picker, "Agregar")
+        base.confirmar_si_aparece(self.app, "OK")
+        self.page.wait_for_timeout(500)
+        base.confirmar_si_aparece(self.app, "OK", timeout_ms=10000)
+        base.click_button(base.dialogo_activo(self.app), "Guardar")
 
     def abrir_configuracion_maestra(self) -> None:
         # Botón "Configurar" de la barra de la tabla principal -> diálogo "Configuracion Maestra".

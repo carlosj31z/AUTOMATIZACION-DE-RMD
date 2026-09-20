@@ -89,7 +89,7 @@ operaciones:
 ```
 
 Cada operación mapea 1:1 a una acción del manual — correr `rmd-automation
-acciones` para la lista completa (28 al momento de escribir esto): crear
+acciones` para la lista completa (30 al momento de escribir esto): crear
 solicitudes y aprobar/rechazarlas, estructuras/etiquetas/pasos/motivos/
 utensilios/motivo-lapsos en Configuración Maestra, configuración de un RMD
 —estructuras, etiquetas, fórmulas, equipos, pasos, pasos complejos
@@ -109,7 +109,7 @@ src/rmd_automation/
     rmd_editor.py              # secciones 5-7: "Configurar el RMD", incl. pasos complejos (7.6)
     flujo_aprobacion.py        # sección 8: enviar a jefe, autorizar
   actions.py              # fachada de alto nivel (RmdAutomation)
-  batch.py                # runner declarativo (YAML/JSON) + tabla de despacho (28 acciones)
+  batch.py                # runner declarativo (YAML/JSON) + tabla de despacho (30 acciones)
   cli.py                  # comandos: batch / validar / acciones
 examples/batch_ejemplo.yaml
 tests/test_batch.py       # valida el parser de batch sin necesitar RMD real
@@ -143,6 +143,11 @@ tests/test_batch.py       # valida el parser de batch sin necesitar RMD real
     etiqueta "Adicionar Pasos RMD" -> "Pasos (n)" -> "+" -> selector "Adicionar
     Pasos". El editor principal no tiene "Guardar"; las columnas de pasos son
     "PM OP", "Clave Modelo", "Puesto Trabajo", "Decimal", "Estado CC", etc.
+  - Exploración completa sobre un RMD de prueba (ver `docs/configurar_rmd_verificado.md`):
+    todas las opciones del menú de Acción, la barra del editor, los diálogos
+    de equipos, especificaciones, pasos, procesos menores, notas, documentos y
+    los textos reales de confirmación/éxito. Acciones batch nuevas:
+    `nueva_version_rmd`, `copiar_de_rmd`.
   - Acción batch nueva `crear_rmd`; `configurar_rmd_pasos` recibe `estructura`
     (+ `etiqueta` opcional) y `configurar_rmd_notificacion` recibe `paso`.
   **Aún sin verificar** (son escrituras; no se ejecutaron): confirmaciones
