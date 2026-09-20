@@ -103,3 +103,35 @@ Descripción, UM, Cantidad; vacío si no hay insumos), Guardar, Eliminar, Cerrar
   En Playwright los clics por rol/nombre no tienen ese problema.
 - Los avisos de éxito pueden tardar (Generar Predecesores, Eliminar): esperar hasta ~15 s.
 - Un clic en el cuerpo de una fila de la tabla principal abre "Editar RM" (no el envío).
+
+## Segunda pasada: escritura real sobre el RMD de prueba
+
+Se añadieron a "RMD PRUEBA" pasos que ya existían en el catálogo (sin crear pasos maestros nuevos)
+y se configuró su tipo de dato; todo se comprobó cerrando y reabriendo el diálogo.
+
+- **Asignar pasos**: casillas -> Agregar -> "Confirmación: ¿Desea asignar los pasos seleccionadas?." [OK]
+  -> "Éxito: Se asignó exitosamente los pasos a la estructura." [OK]. Los pasos nuevos entran con
+  Tipo Dato "Sin tipo de dato" y sin "Depende".
+- **Lista real de Tipo Dato** (ComboBox): Verificación Check, Texto, Cantidad, Fecha, Fecha y Hora, Hora,
+  Números, Realizado por, Visto bueno, Realizado por y Visto bueno, Múltiple check, Rango, Lote,
+  Fórmula, Sin tipo de dato, Notificacion (sin tilde), MuestraCC, Fecha Vencimiento, Entrega.
+- **Guardar exige "Decimal"**: sin él -> "Advertencia: Por favor complete los campos obligatorios"
+  (aunque el tipo sea Entrega o Sin tipo de dato; los pasos existentes usan Decimal 3, o 0).
+- Configuraciones aplicadas y persistidas:
+  - Precauciones / Notas importantes -> Verificación Check.
+  - Condiciones ambientales: temperatura 15–30 y humedad 25–45 -> Rango (Val. Inicial/Final, Margen 0, Decimal 1).
+  - Documentación: verificaciones -> Múltiple check; fecha/hora final -> Notificacion, Clave Modelo
+    "Setup Post Proceso", Puesto Trabajo FSOLFA02 (opciones útiles de Clave Modelo: Setup Pre Proceso,
+    Proceso, Setup Post Proceso).
+  - Fabricación: "pH: (1.50 - 3.50)" -> Rango 1.5–3.5; "DETERMINAR EL pH…" -> Números (Decimal 2, Edit).
+  - Rendimiento: "CANTIDAD ENTREGADA (TAB)" -> Entrega (Edit); "CANTIDAD OBTENIDA…" -> Fórmula.
+- **Fórmula**: el botón "Fórmula" de la fila aparece solo después de guardar. Abre "Fórmulas" (Pasos
+  Disponibles / seleccionados con radios; "Mover a seleccionados", "Mover a disponibles"). Guardar ->
+  "Confirmación: ¿Desea guardar la fórmula generada?." [OK] -> "Éxito: Se grabó la fórmula exitosamente." [OK].
+- **Proceso menor**: en "Procesos Menores para el Paso" el "+" asigna con la misma confirmación/éxito.
+  "Agregar Insumo" sigue vacío: los insumos salen de las recetas asociadas (Asociar fórmulas).
+- **Nueva Versión**: tras el OK no hay aviso; el editor se cierra solo (~10 s) y aparece un RMD nuevo
+  (2202609090, versión 2, Ingresado) con toda la configuración copiada (los conteos de items coinciden).
+- **Configuración Inicial**: tras el OK no se observó ningún aviso de éxito en ~15 s (el manual menciona uno).
+- Selector de pasos: los combos Estructura/Etiqueta del filtro son poco fiables (Estructura=PROCEDIMIENTO +
+  Etiqueta=DOCUMENTACION devolvió 0); buscar por Descripción funciona bien.

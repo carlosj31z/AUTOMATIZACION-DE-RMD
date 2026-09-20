@@ -121,9 +121,14 @@ class RmdEditor:
         self._marcar_y_agregar(insumos)
 
     def nueva_version(self) -> None:
-        # Verificado: "Advertencia: ¿Desea generar una nueva versión?" [OK]/[Cancelar].
+        # Verificado: "Advertencia: ¿Desea generar una nueva versión?" [OK]/[Cancelar]. Tras el OK
+        # no hay aviso de éxito: el editor se cierra solo (~10 s) y aparece un RMD nuevo
+        # (código siguiente, versión +1, estado Ingresado) con toda la configuración copiada.
         base.click_button(self._dlg, "Nueva Versión")
-        self._confirmar_y_cerrar_exito()
+        base.confirm_dialog(self.app, "OK")
+        self.app.get_by_role("dialog").filter(has_text="Estructura de RMD").wait_for(
+            state="detached", timeout=60000
+        )
 
     def copiar_de_rmd(self, codigo_rmd_origen: str) -> None:
         # Verificado: "Copiar De: <RMD>" con filtros Código RMD, Descripción, Etapa, Planta + Ir,
@@ -188,9 +193,12 @@ class RmdEditor:
         self._fila(paso).get_by_role("checkbox", name="Estado CC").check()
 
     def establecer_paso_numero(self, paso: str, decimales: int) -> None:
-        # Manual 7.6.1: paso complejo tipo Número.
-        self.establecer_tipo_dato(paso, "Número")
-        base.fill_field(self._fila(paso), "Decimal", str(decimales))
+        # Manual 7.6.1: tipo "Números" (con s). "Decimal" es obligatorio: sin él Guardar responde
+        # "Advertencia: Por favor complete los campos obligatorios". Se marca también "Edit".
+        self.establecer_tipo_dato(paso, "Números")
+        fila = self._fila(paso)
+        base.fill_field(fila, "Decimal", str(decimales))
+        fila.get_by_role("checkbox", name="Edit").check()
         self.guardar()
 
     def establecer_paso_rango(
@@ -203,29 +211,45 @@ class RmdEditor:
         base.fill_field(fila, "Val. Final", str(valor_final))
         base.fill_field(fila, "Margen", str(margen))
         base.fill_field(fila, "Decimal", str(decimales))
+        fila.get_by_role("checkbox", name="Edit").check()
         self.guardar()
 
     def establecer_paso_formula(self, paso: str, decimales: int, pasos_formula: Iterable[str]) -> None:
-        # Manual 7.6.3: paso complejo tipo Fórmula (icono de matraz para elegir los pasos que la componen).
+        # Manual 7.6.3, verificado: 1) Tipo Dato = Fórmula + Decimal + Edit y Guardar (el botón
+        # "Fórmula" de la fila solo aparece tras guardar); 2) "Fórmula" abre el diálogo "Fórmulas"
+        # (Pasos Disponibles / seleccionados, con botones de radio, "Mover a seleccionados" y
+        # "Mover a disponibles"); 3) Guardar -> "¿Desea guardar la fórmula generada?" [OK] ->
+        # "Se grabó la fórmula exitosamente." [OK].
         self.establecer_tipo_dato(paso, "Fórmula")
         fila = self._fila(paso)
         base.fill_field(fila, "Decimal", str(decimales))
-        fila.get_by_role("button", name="Fórmula").click()
-        for paso_formula in pasos_formula:
-            self._casilla_de_fila(paso_formula).check()
+        fila.get_by_role("checkbox", name="Edit").check()
         self.guardar()
+        self._confirmar_y_cerrar_exito()
+        self._fila(paso).get_by_role("button", name="Fórmula").click()
+        formulas = self._dlg
+        for paso_formula in pasos_formula:
+            formulas.get_by_role("row").filter(has_text=paso_formula).first.get_by_role("radio").check()
+            base.click_button(formulas, "Mover a seleccionados")
+        base.click_button(formulas, "Guardar")
+        self._confirmar_y_cerrar_exito()
 
     def configurar_notificacion(self, paso: str, clave_modelo: str, puesto_trabajo: str) -> None:
         # Manual 7.6.4: en la tabla de pasos de la etiqueta (p. ej. DOCUMENTACION) se elige
         # Tipo Dato = Notificación y luego Clave Modelo (Setup Pre Proceso / Proceso /
         # Setup Post Proceso) y Puesto Trabajo; se guarda con el disquete ("Guardar").
-        self.establecer_tipo_dato(paso, "Notificación")
+        self.establecer_tipo_dato(paso, "Notificacion")  # sin tilde en la lista real
         fila = self._fila(paso)
         base.select_dropdown(fila, "Clave Modelo", clave_modelo, root=self.app)
         base.select_dropdown(fila, "Puesto Trabajo", puesto_trabajo, root=self.app)
+        base.fill_field(fila, "Decimal", "0")  # obligatorio para poder guardar
         self.guardar()
+        self._confirmar_y_cerrar_exito()
 
     def guardar(self) -> None:
+        # Guardar en los diálogos de pasos responde "Se guardaron correctamente los cambios." [OK]
+        # (sin confirmación previa; el aviso puede tardar). Con campos vacíos: "Por favor
+        # complete los campos obligatorios" (p. ej. Decimal).
         base.click_button(self._dlg, "Guardar")
 
     def _marcar_y_agregar(self, items: Iterable[str]) -> None:
