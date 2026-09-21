@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.4.0
+// @version      1.4.1
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -93,7 +93,7 @@
   html.rmd-ui .sapMDialog.sapMMessageDialog { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
   html.rmd-cols .sapMDialog:not(.sapMMessageDialog) table.sapMListTbl { table-layout: fixed; width: 100% !important; }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-th, #1f2229); }
-  html.rmd-ui .sapMDialog.rmd-pasos .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-th, #1f2229); }
+  html.rmd-ui .sapMDialog.rmd-sticky .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-th, #1f2229); }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB > td { padding-top: 7px; padding-bottom: 7px; vertical-align: middle; }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:hover > td { background: rgba(80,160,255,.13) !important; }
   html.rmd-zebra .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:nth-child(odd) > td { background: rgba(255,255,255,.035); }
@@ -194,21 +194,23 @@
     const ths = [...tabla.querySelectorAll('thead th')];
     if (ths.length < 5) return;
     const nombres = ths.map((th) => NORM(th.textContent));
-    const esPasos = nombres.includes('CLAVE MODELO') && nombres.includes('TIPO DATO');
+    const esPasos = nombres.includes('TIPO DATO') && nombres.includes('DEPENDE');   // Fabricación, Notas, Rendimiento…
     const esPM = nombres.includes('CANTIDAD INSUMOS');
     const filas = filasPrincipales(tabla);
 
     // tamaño del diálogo
-    d.classList.toggle('rmd-pasos', esPasos);
-    d.classList.toggle('rmd-medio', !esPasos);
-    d.classList.toggle('rmd-ancho', !esPasos && (esPM || ths.length > 12));
+    const grande = esPasos && filas.length > 12;                      // muchas filas: casi pantalla completa; pocas: solo el alto que necesitan
+    d.classList.toggle('rmd-pasos', grande);
+    d.classList.toggle('rmd-medio', !grande);
+    d.classList.toggle('rmd-ancho', !grande && (esPM || ths.length > 12));
+    d.classList.toggle('rmd-sticky', esPasos || esPM);
 
     // anchos, grupos y tooltips
     ths.forEach((th, i) => {
       const n = nombres[i];
       if (on('grupos') && TIP[n]) th.title = TIP[n];
       if (!on('columnas')) return;
-      if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', (esPasos && innerWidth >= 1600 ? 380 : 240) + 'px', 'important'); return; }
+      if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', (grande && innerWidth >= 1600 ? 380 : 240) + 'px', 'important'); return; }
       const w = ANCHOS[n];
       if (w) { th.style.setProperty('width', w + 'px', 'important'); th.style.setProperty('min-width', w + 'px', 'important'); }
     });
@@ -309,12 +311,12 @@
     const previo = tabla.__rmdAlertas;
     tabla.__rmdAlertas = { n: alertas, filas: primeras, sig: previo ? previo.sig : 0 };
 
-    if (esPasos && on('filtro') && filas.length >= 8) filtroLocal(tabla, true);
+    if (esPasos && (on('filtro') || on('reglas'))) filtroLocal(tabla, true);
     else if (esPM && on('reglas')) filtroLocal(tabla, false);
     actualizarBarra(d, tabla);
     // alturas para que barra de filtro, título de la tabla (con Guardar) y cabecera de columnas queden siempre visibles
     const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
-    const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = esPasos && hdr ? hdr.offsetHeight : 0;
+    const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = (esPasos || esPM) && hdr ? hdr.offsetHeight : 0;
     d.style.setProperty('--rmd-h1', h1 + 'px'); d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
   }
 
@@ -419,8 +421,8 @@
   }
   new MutationObserver(() => {
     if (pendiente) return; pendiente = true;
-    requestAnimationFrame(() => { pendiente = false; ajustarTodo(); });
-  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    setTimeout(() => { pendiente = false; ajustarTodo(); }, 60);   // setTimeout (no rAF): también corre con la pestaña en segundo plano
+  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked'] });  // aria-checked: casillas que se pintan tarde
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
   document.addEventListener('click', () => setTimeout(ajustarTodo, 120), true);
 

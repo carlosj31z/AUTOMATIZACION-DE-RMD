@@ -1,4 +1,4 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.4.0
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.4.1
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
 Solo actúa dentro del iframe de la app (`ui5appruntime.html`) y **solo cambia la vista**. Lo único que "pulsa" por ti:
