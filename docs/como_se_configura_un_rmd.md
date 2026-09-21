@@ -258,3 +258,19 @@ Verificación Check sí lleva Edit (41 de 41).
   y pasos de Calidad en Operaciones sin Estado CC (Fabricación cápsulas blandas #24 y #25; Acondicionado #33).
 
 El linter (`revisar`) y el userscript de Tampermonkey avisan de todo esto.
+
+## 5 septies. Especificaciones: qué guarda y cómo ordena el portal (leído del código de la app, solo lectura)
+
+Cada fila de la ventana **Especificaciones** es un registro `MD_ES_ESPECIFICACION`: `ensayoPadreId` (grupo, del catálogo; es el título en negrita),
+`ensayoHijo` (la descripción), `especificacion` (el texto), `tipoDatoId`, `valorInicial`, `valorFinal`, `margen`, `decimales`, `orden`, y, si vienen de SAP,
+`ensayoPadreSAP` y `Merknr` (número de característica).
+
+- El **Guardar del portal solo actualiza** Tipo Dato, Valor Inicial/Final, Margen y Decimal (más fecha y usuario de actualización) de **todas** las filas:
+  **no envía `ensayoHijo`, `especificacion` ni `orden`**. Por eso, sin ayuda, no se puede corregir un texto ni cambiar el orden (solo borrar y volver a agregar).
+- **Orden al mostrar:** si ninguna fila viene de SAP, por `orden`; si todas vienen de SAP, por `Merknr` (el `orden` se ignora); con mezcla el criterio es incoherente.
+  Las filas nuevas reciben `orden = (número total de especificaciones del RMD) + 1`, así que los valores de una estructura no tienen por qué ser consecutivos.
+- **Agregar**, **Eliminar** y **Ensayos SAP** vuelven a leer del servidor: lo que estuviera editado y sin guardar se pierde. (Ensayos SAP además **escribe**: trae de la receta
+  las características que aún no están.)
+- El userscript añade a esa misma actualización de cada fila los textos y el orden que el usuario haya cambiado (`model.update` del propio portal, sin otra vía), y solo
+  permite reordenar cuando ninguna fila viene de SAP. Los objetos de las filas se comparten en memoria con el resto del portal, por eso, si se cierra la ventana sin guardar,
+  el script restablece lo último guardado.

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.8.2
-// @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
+// @version      1.9.0
+// @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante, copiar/pegar la configuración de un paso, reordenar y editar Especificaciones, aviso de códigos en Asociar Fórmula y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -17,6 +17,7 @@
   if (window.__rmdUiMejoras) return;
   window.__rmdUiMejoras = true;
 
+  const VERSION = '1.9.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -26,8 +27,8 @@
     ['depende', 'Depende: tooltip con el paso'], ['sintipo', '"Sin tipo de dato" en rojo y negrita'],
     ['puesto', 'Puesto de Trabajo faltante parpadea'], ['reglas', 'Alertas de casillas incoherentes'],
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
-    ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'],
-    ['exito', 'Cerrar solos los mensajes de éxito'],
+    ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior'], ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'],
+    ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
@@ -38,6 +39,11 @@
   const setTxt = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
   const visible = (e) => !!e && e.getClientRects().length > 0;                   // (offsetParent es null en elementos con position:fixed)
   const enDialogo = (el) => el.closest && el.closest('.sapMDialog:not(.sapMMessageDialog)');
+  // Ventanas que el script ajusta: las del RMD ("<código> - <descripción>"), procesos menores y selectores "Adicionar…".
+  // Las demás (p. ej. "Asociar Fórmula") se dejan exactamente como las dibuja el portal.
+  const GESTIONADAS = /^\d{6,}\s*-|^Procesos Menores para el Paso|^Adicionar /i;
+  const cabecera = (d) => norm((d.querySelector('h2') || {}).textContent);
+  const gestionada = (d) => GESTIONADAS.test(cabecera(d));
   const dialogos = () => [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter((d) => d.getClientRects().length);
 
   // ---- utilidades UI5 ---------------------------------------------------------------------------
@@ -84,9 +90,9 @@
     --rmd-borde-campo: #89919a; --rmd-acento: #0a6ed1; --rmd-acento-texto: #0a6ed1; --rmd-rojo: #bb0000; --rmd-ambar: #b45f06; --rmd-verde: #107e3e; }
 
   /* ── Ventanas emergentes: centradas y con el pie (Cancelar/Cerrar) siempre visible ── */
-  html.rmd-ui .sapMDialog:not(.sapMPopover) { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important; }
-  html.rmd-ui .sapMDialog:not(.sapMPopover) > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; }
-  html.rmd-ui .sapMDialog:not(.sapMPopover) > footer, html.rmd-ui .sapMDialog:not(.sapMPopover) > header { flex: 0 0 auto !important; }
+  html.rmd-ui .sapMDialog.rmd-g { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important; }
+  html.rmd-ui .sapMDialog.rmd-g > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; scrollbar-gutter: stable; }   /* el ancho útil no cambia al aparecer la barra vertical */
+  html.rmd-ui .sapMDialog.rmd-g > footer, html.rmd-ui .sapMDialog.rmd-g > header { flex: 0 0 auto !important; }
   html.rmd-ui .sapMDialog.rmd-pasos {
     width: 98vw !important; max-width: 98vw !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
@@ -94,16 +100,20 @@
     width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 24px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
   html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: min(1560px, 97vw) !important; }
-  html.rmd-ui .sapMDialog.sapMMessageDialog { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
+  html.rmd-ui .sapMDialog.sapMMessageDialog { position: fixed !important; margin: 0 !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
 
   /* ── Tablas: mismas filas del portal, un poco más de aire; cabecera fija ── */
-  html.rmd-cols .sapMDialog:not(.sapMMessageDialog) table.sapMListTbl { table-layout: fixed; width: 100% !important; }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-cabecera); }
+  html.rmd-cols .sapMDialog.rmd-g table.sapMListTbl { table-layout: fixed; }
+  html.rmd-ui .sapMDialog.rmd-g thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-cabecera); }
   html.rmd-ui .sapMDialog.rmd-sticky .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-barra); }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB > td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:hover > td { background: rgba(27,141,236,.09) !important; }
-  html.rmd-ui .sapMDialog td .sapMText, html.rmd-ui .sapMDialog td .sapMLabel { white-space: normal; line-height: 1.35; }
-  html.rmd-ui .sapMDialog input:focus { outline: 1px solid var(--rmd-acento) !important; outline-offset: -1px; }
+  html.rmd-cols .sapMDialog table.rmd-compacto thead th { font-size: 12.5px; }
+  html.rmd-cols .sapMDialog table.rmd-compacto thead th .sapMColumnHeader { padding-left: 3px; padding-right: 3px; }
+  html.rmd-cols .sapMDialog table.rmd-compacto tbody td { padding-left: 4px; padding-right: 4px; }
+  html.rmd-cols .sapMDialog.rmd-g thead th, html.rmd-cols .sapMDialog.rmd-g thead th .sapMText { overflow-wrap: normal !important; word-break: keep-all !important; hyphens: none !important; }
+  html.rmd-ui .sapMDialog.rmd-g tbody tr.sapMLIB > td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
+  html.rmd-ui .sapMDialog.rmd-g tbody tr.sapMLIB:hover > td { background: rgba(27,141,236,.09) !important; }
+  html.rmd-ui .sapMDialog.rmd-g td .sapMText, html.rmd-ui .sapMDialog.rmd-g td .sapMLabel { white-space: normal; line-height: 1.35; }
+  html.rmd-ui .sapMDialog.rmd-g input:focus { outline: 1px solid var(--rmd-acento) !important; outline-offset: -1px; }
 
   /* ── Señales sobre la tabla (discretas: tinte suave + marca lateral, sin contornos) ── */
   html.rmd-sintipo td.rmd-td-sintipo input, html.rmd-sintipo td.rmd-td-sintipo .sapMSltLabel { color: var(--rmd-rojo) !important; -webkit-text-fill-color: var(--rmd-rojo) !important; font-weight: 700 !important; }
@@ -132,6 +142,21 @@
   #rmd-filtro-bar button.rmd-alerta { border: 0; background: transparent; color: var(--rmd-ambar); font: inherit; font-size: 13px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
   #rmd-filtro-bar button.rmd-alerta:hover { background: rgba(240,180,90,.12); }
   #rmd-filtro-bar button.rmd-alerta.ok { color: var(--rmd-verde); cursor: default; } #rmd-filtro-bar button.rmd-alerta.ok:hover { background: transparent; }
+  /* ── Especificaciones: subir/bajar, asa para arrastrar y textos editables ── */
+  .rmd-orden-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
+  .rmd-espec-nota { color: var(--rmd-ambar); font: 600 12px var(--rmd-fuente); white-space: nowrap; }
+  td.rmd-ed .sapMObjectIdentifierText, td.rmd-ed > .sapMText { display: none !important; }
+  td.rmd-ed-desc { position: relative; padding-left: 26px !important; }
+  textarea.rmd-edit { display: block; width: 100%; box-sizing: border-box; min-height: 28px; margin: 3px 0 0; padding: 4px 8px; resize: none; overflow: hidden; background: var(--rmd-barra); color: var(--rmd-texto);
+    border: 1px solid var(--rmd-borde-campo); border-radius: 3px; font: 14px/1.35 var(--rmd-fuente); }
+  td.rmd-ed > textarea.rmd-edit:first-child { margin-top: 0; }
+  textarea.rmd-edit:hover { border-color: var(--rmd-acento-texto); } textarea.rmd-edit:focus { outline: 2px solid var(--rmd-acento); outline-offset: -1px; border-color: var(--rmd-acento); }
+  textarea.rmd-edit.rmd-vacio { border-color: var(--rmd-rojo); }
+  .rmd-grip { position: absolute; left: 5px; top: 50%; width: 16px; height: 26px; margin-top: -13px; display: flex; align-items: center; justify-content: center; color: var(--rmd-apagado); cursor: grab; border-radius: 3px; }
+  .rmd-grip:hover { color: var(--rmd-acento-texto); background: rgba(27,141,236,.14); } .rmd-grip:active { cursor: grabbing; }
+  .rmd-grip svg { width: 10px; height: 16px; fill: currentColor; pointer-events: none; }
+  tr.rmd-espec-mod > td.sapMListTblSelCol { box-shadow: inset 3px 0 0 var(--rmd-ambar); }
+  tr.rmd-arrastrando { opacity: .4; } tr.rmd-drop-antes > td { box-shadow: inset 0 2px 0 var(--rmd-acento); } tr.rmd-drop-despues > td { box-shadow: inset 0 -2px 0 var(--rmd-acento); }
   .rmd-copia-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
   #rmd-filtro-bar .rmd-clip:empty { display: none; }
   #rmd-filtro-bar .rmd-clip { flex: 1 1 200px; min-width: 0; margin-left: auto; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -156,14 +181,30 @@
   .rmd-toast { position: fixed; left: 50%; bottom: 28px; z-index: 100001; max-width: min(640px, 86vw); transform: translateX(-50%); padding: 10px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-verde); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font: 14px/1.4 var(--rmd-fuente); }
   .rmd-toast.error { border-left-color: var(--rmd-rojo); }
 
-  /* ── Panel de opciones: un botón redondo discreto ── */
-  #rmd-ui-panel { position: fixed; left: 12px; bottom: 12px; z-index: 99999; font: 13px var(--rmd-fuente); color: var(--rmd-texto); }
-  #rmd-ui-panel summary { display: grid; place-items: center; width: 28px; height: 28px; list-style: none; border: 1px solid var(--rmd-borde); border-radius: 50%; background: var(--rmd-cabecera); color: var(--rmd-apagado); cursor: pointer; opacity: .55; transition: opacity .15s; }
-  #rmd-ui-panel summary::-webkit-details-marker { display: none; } #rmd-ui-panel summary:hover, #rmd-ui-panel[open] summary { opacity: 1; }
-  #rmd-ui-panel summary svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  #rmd-ui-panel .rmd-panel-cuerpo { position: absolute; left: 0; bottom: 36px; min-width: 270px; max-height: 70vh; overflow: auto; padding: 10px 14px; background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.4); }
-  #rmd-ui-panel label { display: flex; align-items: center; gap: 8px; margin: 5px 0; cursor: pointer; white-space: nowrap; } #rmd-ui-panel input[type=checkbox] { accent-color: var(--rmd-acento); }
-  #rmd-ui-panel .rmd-panel-nota { margin-top: 6px; color: var(--rmd-apagado); font-size: 12px; }
+  #rmd-aviso-asociar { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
+  #rmd-aviso-asociar.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
+  .rmd-campo-aviso .sapMInputBaseContentWrapper, .rmd-campo-aviso .sapMInputBaseInner { box-shadow: 0 0 0 2px var(--rmd-ambar) !important; border-radius: 2px; }
+  /* ── Botón de mejoras (esquina inferior izquierda) y su panel ── */
+  #rmd-ui-panel { position: fixed; left: 14px; bottom: 14px; z-index: 99999; font: 13px var(--rmd-fuente); color: var(--rmd-texto); }
+  #rmd-ui-panel summary { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; list-style: none; cursor: pointer; border-radius: 50%;
+    background: var(--rmd-superficie); color: var(--rmd-acento-texto); border: 1px solid var(--rmd-acento); box-shadow: 0 2px 10px rgba(0,0,0,.4); transition: transform .12s, background .12s; }
+  #rmd-ui-panel summary::-webkit-details-marker { display: none; }
+  #rmd-ui-panel summary:hover { background: var(--rmd-acento); color: #fff; transform: scale(1.06); }
+  #rmd-ui-panel[open] summary { background: var(--rmd-acento); color: #fff; }
+  #rmd-ui-panel summary svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  #rmd-ui-panel .rmd-panel-cuerpo { position: absolute; left: 0; bottom: 48px; width: 330px; max-height: calc(100vh - 100px); overflow: auto; padding: 14px 16px 12px;
+    background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+  #rmd-ui-panel .rmd-panel-cab { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  #rmd-ui-panel .rmd-panel-cab b { font-size: 15px; font-weight: 600; } #rmd-ui-panel .rmd-panel-cab span { color: var(--rmd-apagado); font-size: 12px; }
+  #rmd-ui-panel .rmd-grupo { margin: 9px 0 2px; padding-top: 7px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font: 600 11px var(--rmd-fuente); letter-spacing: .6px; text-transform: uppercase; }
+  #rmd-ui-panel .rmd-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 4px 0; cursor: pointer; line-height: 1.25; }
+  #rmd-ui-panel .rmd-fila.maestro { padding: 8px 10px; margin-bottom: 2px; border-radius: 8px; background: rgba(27,141,236,.10); font-weight: 600; }
+  #rmd-ui-panel .rmd-fila span { flex: 1 1 auto; }
+  #rmd-ui-panel input[type=checkbox] { flex: 0 0 auto; appearance: none; -webkit-appearance: none; position: relative; width: 34px; height: 19px; margin: 0; border-radius: 10px; background: var(--rmd-borde-campo); cursor: pointer; transition: background .15s; }
+  #rmd-ui-panel input[type=checkbox]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  #rmd-ui-panel input[type=checkbox]:checked { background: var(--rmd-acento); } #rmd-ui-panel input[type=checkbox]:checked::after { transform: translateX(15px); }
+  #rmd-ui-panel input[type=checkbox]:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
+  #rmd-ui-panel .rmd-panel-pie { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font-size: 12px; }
   `;
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
@@ -201,6 +242,11 @@
     'ESTADO CC': 60, 'PM OP': 56, 'GEN PP': 56, 'EDIT': 50, 'R. POR': 56, 'V.B.': 50, 'PROC. MEN.': 70, 'ESTADO': 80, 'ACC.': 150,
     'CONFORME': 110, 'PROCESO MENOR': 130, 'ACCIONES': 110, 'CANTIDAD INSUMOS': 150, 'UM': 64, 'TAB': 56,
   };
+  // versión compacta de los mismos anchos (ventanas de menos de ~1700 px de contenido)
+  const ANCHOS_COMPACTOS = {
+    'ORDEN': 50, 'CÓDIGO': 70, 'CODIGO': 70, 'TIPO DATO': 108, 'CLAVE MODELO': 80, 'PUESTO TRABAJO': 88, 'VAL. INICIAL': 56, 'VAL. FINAL': 56, 'MARGEN': 54, 'DECIMAL': 56, 'DECIM.': 56,
+    'ESTADO CC': 52, 'PM OP': 40, 'GEN PP': 42, 'EDIT': 40, 'R. POR': 40, 'V.B.': 40, 'PROC. MEN.': 52, 'ESTADO': 58,
+  };
   const OCULTAS = ['ESTADO MOV.', 'IMAGEN', 'FORMATO'];
   const TIP = {
     'ESTADO CC': 'Estado CC: el paso queda sujeto al estado de Control de Calidad',
@@ -223,13 +269,79 @@
   }
   function limpiarMarcas(td) { td.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta'); td.removeAttribute('data-rmd-aviso'); }
 
+  function quitarAnchos(tabla, ths) {
+    ths.forEach((th) => { th.style.removeProperty('width'); th.style.removeProperty('min-width'); });
+    tabla.style.removeProperty('width');
+  }
+  // Reparte el ancho: columnas con ancho fijo (escaladas hasta un 20 % si la ventana es estrecha) y la descripción con lo que sobra,
+  // nunca menos de un mínimo; si no cabe, la tabla se ensancha y aparece desplazamiento horizontal (en vez de aplastar la descripción).
+  // mínimos que mantienen legibles las cabeceras (una palabra nunca se parte) y los controles de cada columna
+  const MIN_FIJOS = { 'ORDEN': 48, 'TIPO DATO': 104, 'CLAVE MODELO': 76, 'PUESTO TRABAJO': 84, 'VAL. INICIAL': 54, 'VAL. FINAL': 54, 'MARGEN': 52, 'DECIMAL': 54, 'DECIM.': 54 };
+  function ordenarColumnas(tabla, ths, nombres, filas, tipoTabla) {
+    const cont = tabla.closest('.sapMDialogScrollCont') || tabla.parentElement;
+    const C = Math.floor(cont ? cont.clientWidth : 0); if (C < 300) return;               // aún sin medidas
+    const compacto = C < 1700, iDep = nombres.indexOf('DEPENDE'), iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO');
+    tabla.classList.toggle('rmd-compacto', compacto);                                       // cabeceras algo más pequeñas en ventanas estrechas
+    const minDesc = tipoTabla === 'pasos' ? (C >= 1600 ? 340 : C >= 1500 ? 300 : C >= 1400 ? 250 : 225) : (tipoTabla === 'pm' ? 260 : tipoTabla === 'espec' ? 520 : 240);
+    // en ventanas estrechas la columna "Estado" (siempre "Activo") se oculta para dar espacio a las casillas
+    const iEst = nombres.indexOf('ESTADO');
+    const ocultarEstado = tipoTabla === 'pasos' && compacto && C < 1500 && iEst >= 0 && filas.length > 0 && filas.every((tr) => celda(tr, iEst) && norm(celda(tr, iEst).textContent) === 'Activo');
+    if (ocultarEstado) tabla.dataset.rmdOcultaEstado = '1'; else delete tabla.dataset.rmdOcultaEstado;
+    let depW = null;
+    if (iDep >= 0) {                                                                       // Depende: ancho para ver siempre el valor completo
+      let max = anchoTexto(ths[iDep], 'Depende');
+      filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
+      depW = Math.min(Math.max(max + 62, compacto ? 116 : 130), 300);
+    }
+    let codW = 0;                                                                          // Código: que un código de 6-10 dígitos no se parta
+    if (iCod >= 0) filas.slice(0, 60).forEach((tr) => { const td = celda(tr, iCod); if (td) { const cs = getComputedStyle(td); codW = Math.max(codW, anchoTexto(td, norm(td.textContent)) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 6); } });
+    const minimo = (th, i, n) => {
+      const palabras = norm(th.textContent).split(' ').filter(Boolean);
+      const ih = th.querySelector('.sapMColumnHeader') || th, cs = getComputedStyle(ih), cs0 = getComputedStyle(th);
+      const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (ih === th ? 0 : (parseFloat(cs0.paddingLeft) || 0) + (parseFloat(cs0.paddingRight) || 0));
+      const cab = palabras.length ? Math.max(...palabras.map((p) => anchoTexto(th, p))) + pad + 4 : 0;
+      return Math.max(38, MIN_FIJOS[n] || 0, cab, i === iCod ? codW : 0);
+    };
+    const fijos = ths.map((th, i) => {
+      const n = nombres[i];
+      if ((on('ocultar') && OCULTAS.includes(n)) || (ocultarEstado && n === 'ESTADO')) return 0;
+      if (/^DESCRIPCI/.test(n) || (tipoTabla === 'espec' && n === 'ESPECIFICACIONES')) return null;   // columnas flexibles (en Especificaciones: descripción y texto de la especificación)
+      if (i === iDep) return depW;
+      const w = (compacto && ANCHOS_COMPACTOS[n]) || ANCHOS[n]; if (w) return w;
+      if (n === '' && th.classList.contains('sapMListTblSelCol')) return compacto ? 34 : 36;
+      if (n === '' && th.classList.contains('sapMListTblNavCol')) return compacto ? 28 : 40;
+      if (n === '' && /sapMListTbl(Highlight|Navigated)Col/.test(th.className)) return 0;   // franjas de resaltado/navegación: sin ancho en el portal
+      if (getComputedStyle(th).display === 'none') return 0;
+      if (!th.dataset.rmdW0) th.dataset.rmdW0 = String(Math.max(40, Math.round(th.getBoundingClientRect().width)));   // sin regla propia: conserva su ancho
+      return +th.dataset.rmdW0;
+    });
+    const suma = fijos.reduce((a, w) => a + (w || 0), 0);
+    const controles = fijos.reduce((a, w, i) => a + (nombres[i] === '' ? (w || 0) : 0), 0);   // selección y navegación no se escalan
+    const sumaEscalable = suma - (depW || 0) - controles;                                   // Depende no se comprime: debe verse completo
+    const f = Math.max(0.8, Math.min(1, (C - minDesc - (depW || 0) - controles) / Math.max(sumaEscalable, 1)));
+    const finales = fijos.map((w, i) => {
+      if (w == null) return null; if (w === 0) return 0; if (i === iDep) return w;
+      const n = nombres[i], esControl = n === '' ;                                          // selección y navegación no se tocan
+      return esControl ? w : Math.max(minimo(ths[i], i, n), Math.round(w * f));
+    });
+    const sumaF = finales.reduce((a, w) => a + (w || 0), 0), W = Math.max(tipoTabla === 'espec' ? 420 : Math.min(minDesc, 205), C - sumaF);   // la descripción cede hasta 205 px antes de que aparezca desplazamiento horizontal
+    const wDes = tipoTabla === 'espec' ? Math.round(W * 0.4) : W, wEsp = W - wDes;
+    ths.forEach((th, i) => {
+      const w = finales[i] === null ? (tipoTabla === 'espec' && nombres[i] === 'ESPECIFICACIONES' ? wEsp : wDes) : finales[i]; if (!w) return;
+      th.style.setProperty('width', w + 'px', 'important'); th.style.setProperty('min-width', w + 'px', 'important');
+    });
+    tabla.style.setProperty('width', (sumaF + W) + 'px', 'important');
+  }
+
   function ajustarTabla(tabla) {
-    const d = enDialogo(tabla); if (!d) return;
+    const d = enDialogo(tabla); if (!d || !gestionada(d)) return;
+    d.classList.add('rmd-g');
     const ths = [...tabla.querySelectorAll('thead th')];
     if (ths.length < 5) return;
     const nombres = ths.map((th) => NORM(th.textContent));
     const esPasos = nombres.includes('TIPO DATO') && nombres.includes('DEPENDE');   // Fabricación, Notas, Rendimiento…
     const esPM = nombres.includes('CANTIDAD INSUMOS');
+    const esEspec = nombres.includes('ESPECIFICACIONES') && nombres.includes('TIPO DATO') && !nombres.includes('DEPENDE');
     const filas = filasPrincipales(tabla);
 
     // tamaño del diálogo
@@ -239,31 +351,17 @@
     d.classList.toggle('rmd-ancho', !grande && (esPM || ths.length > 12));
     d.classList.toggle('rmd-sticky', esPasos || esPM);
 
-    // anchos, grupos y tooltips
-    ths.forEach((th, i) => {
-      const n = nombres[i];
-      if (on('grupos') && TIP[n]) th.title = TIP[n];
-      if (!on('columnas')) { th.style.removeProperty('width'); th.style.removeProperty('min-width'); return; }
-      if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', (grande && innerWidth >= 1600 ? 380 : 240) + 'px', 'important'); return; }
-      const w = ANCHOS[n];
-      if (w) { th.style.setProperty('width', w + 'px', 'important'); th.style.setProperty('min-width', w + 'px', 'important'); }
-    });
-    // Depende: ancho para ver siempre el valor completo
-    const iDep = nombres.indexOf('DEPENDE');
-    if (on('columnas') && iDep >= 0) {
-      let max = anchoTexto(ths[iDep], 'Depende');
-      filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
-      const w = Math.min(Math.max(max + 62, 130), 420);
-      ths[iDep].style.setProperty('width', w + 'px', 'important'); ths[iDep].style.setProperty('min-width', w + 'px', 'important');
-    }
+    // tooltips de las cabeceras
+    ths.forEach((th, i) => { if (on('grupos') && TIP[nombres[i]]) th.title = TIP[nombres[i]]; });
+    if (on('columnas')) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : 'otro'); else { quitarAnchos(tabla, ths); delete tabla.dataset.rmdOcultaEstado; }
     // columnas ocultas
     ths.forEach((th, i) => {
-      const oculta = on('ocultar') && OCULTAS.includes(nombres[i]);
+      const oculta = (on('ocultar') && OCULTAS.includes(nombres[i])) || (tabla.dataset.rmdOcultaEstado === '1' && nombres[i] === 'ESTADO');
       th.style.display = oculta ? 'none' : '';
       filas.forEach((tr) => { if (celda(tr, i)) celda(tr, i).style.display = oculta ? 'none' : ''; });
     });
 
-    const iTipo = nombres.indexOf('TIPO DATO'), iOrd = nombres.indexOf('ORDEN'), iDes = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
+    const iDep = nombres.indexOf('DEPENDE'), iTipo = nombres.indexOf('TIPO DATO'), iOrd = nombres.indexOf('ORDEN'), iDes = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
     const iClave = nombres.indexOf('CLAVE MODELO'), iPuesto = nombres.indexOf('PUESTO TRABAJO'), iDec = Math.max(nombres.indexOf('DECIMAL'), nombres.indexOf('DECIM.'));
     const iVI = nombres.indexOf('VAL. INICIAL'), iVF = nombres.indexOf('VAL. FINAL');
     const iCant = nombres.indexOf('CANTIDAD INSUMOS'), iUM = nombres.indexOf('UM');
@@ -357,6 +455,7 @@
     else if (esPM && on('reglas')) filtroLocal(tabla, false);
     else if (esPM) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); }
     actualizarBarra(d, tabla);
+    if (esEspec) sincronizarEspec(d, tabla);
     // alturas para que barra de filtro, título de la tabla (con Guardar) y cabecera de columnas queden siempre visibles
     const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
     const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = (esPasos || esPM) && hdr ? hdr.offsetHeight : 0;
@@ -441,6 +540,7 @@
   function decorarCabeceras() {
     const estado = on('estado') ? estadoDelRmd() : '';
     dialogos().forEach((d) => {
+      if (!gestionada(d)) return;
       const h2 = d.querySelector('header h2.sapMTitle, h2.sapMTitle'); if (!h2) return;
       const barra = h2.closest('.sapMBar') || h2.parentElement;
       let b = barra.querySelector('.rmd-estado');
@@ -458,18 +558,293 @@
     });
   }
 
+  // ---- 6b. Ventana "Asociar Fórmula": avisar si Código Agrupador / Código faltan o difieren de la versión anterior -----------
+  // Los datos de todas las versiones están en el modelo de la tabla principal (codAgrupadorReceta = "Código Agrupador",
+  // codDefectoReceta = "Código"; codigoversionprincipal une las versiones de un mismo RMD). Solo se lee: no se cambia nada.
+  const CACHE_RMD = new Map();                                       // código -> datos de las filas que la tabla principal ha mostrado en esta sesión
+  function tablaPrincipal() {
+    const t = [...document.querySelectorAll('table')].find((x) => x.id && /-listUl$/.test(x.id) && !x.closest('[role=dialog]'));
+    const ctl = t && sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); return ctl && ctl.getItems ? ctl : null;
+  }
+  function filasDe(ctl) {
+    const filas = [];
+    ctl.getItems().forEach((it) => {
+      const nombres = Object.keys(it.oBindingContexts || {}); const c = nombres.length && it.getBindingContext(nombres[0] === 'undefined' ? undefined : nombres[0]); const o = c && c.getObject();
+      if (o && o.codigo != null) filas.push({ codigo: o.codigo, version: o.version, codigoversionprincipal: o.codigoversionprincipal, codAgrupadorReceta: o.codAgrupadorReceta, codDefectoReceta: o.codDefectoReceta });
+    });
+    return filas;
+  }
+  const cachearFilas = (ctl) => filasDe(ctl).forEach((o) => CACHE_RMD.set(String(o.codigo), o));
+  // Se recuerdan las filas de cada búsqueda para poder comparar con la versión anterior aunque ahora la lista esté filtrada por un solo código
+  function vigilarListaPrincipal() {
+    const ctl = tablaPrincipal(); if (!ctl || ctl.__rmdVigila) return;
+    ctl.__rmdVigila = true; ctl.attachUpdateFinished(() => cachearFilas(ctl)); cachearFilas(ctl);
+  }
+  function filaPrincipal(codigo) {
+    const ctl = tablaPrincipal(); if (ctl) cachearFilas(ctl);
+    const filas = [...CACHE_RMD.values()];
+    const actual = CACHE_RMD.get(String(codigo)); if (!actual) return { filas, actual: null, anterior: null };
+    const cadena = String(actual.codigoversionprincipal || actual.codigo);
+    const previas = filas.filter((o) => (String(o.codigoversionprincipal || o.codigo) === cadena || String(o.codigo) === cadena) && Number(o.version) < Number(actual.version));
+    previas.sort((a, b) => Number(b.version) - Number(a.version));
+    return { filas, actual, anterior: previas[0] || null };
+  }
+  function campoDe(d, etiqueta) {
+    const lab = [...d.querySelectorAll('label')].find((l) => norm(l.getAttribute('aria-label') || l.textContent).replace(/[:*]\s*$/, '') === etiqueta);
+    return lab && lab.getAttribute('for') ? document.getElementById(lab.getAttribute('for')) : null;
+  }
+  function valorDeCampo(d, etiqueta) { const el = campoDe(d, etiqueta); return el ? norm(el.value) : null; }
+  function marcarCampo(d, etiqueta, mal) {
+    const el = campoDe(d, etiqueta), base = el && el.closest('.sapMInputBase'); if (base) base.classList.toggle('rmd-campo-aviso', !!mal);
+  }
+  function revisarAsociar() {
+    const d = dialogos().find((x) => /^Asociar F[óo]rmula/i.test(cabecera(x)));
+    if (!d) return;
+    let av = d.querySelector('#rmd-aviso-asociar');
+    if (!on('asociar')) { if (av) av.remove(); marcarCampo(d, 'Código Agrupador', false); marcarCampo(d, 'Código', false); return; }
+    const codigoRmd = (/^Asociar F[óo]rmula:\s*(\d+)/i.exec(cabecera(d)) || [])[1];
+    const agr = valorDeCampo(d, 'Código Agrupador'), cod = valorDeCampo(d, 'Código');
+    if (agr === null || cod === null) return;                                           // aún no está dibujada
+    const avisos = []; let malAgr = false, malCod = false;
+    if (!agr) { avisos.push('El Código Agrupador está vacío.'); malAgr = true; }
+    if (!cod) { avisos.push('El Código está vacío.'); malCod = true; }
+    const rel = filaPrincipal(codigoRmd); let nota = '';
+    if (rel && rel.anterior) {
+      const ant = rel.anterior, etq = `versión anterior v${ant.version} (RMD ${ant.codigo})`;
+      if (agr && String(ant.codAgrupadorReceta || '') !== agr) { avisos.push(`El Código Agrupador (${agr}) no coincide con la ${etq}: ${ant.codAgrupadorReceta || 'vacío'}.`); malAgr = true; }
+      if (cod && String(ant.codDefectoReceta || '') !== cod) { avisos.push(`El Código (${cod}) no coincide con la ${etq}: ${ant.codDefectoReceta || 'vacío'}.`); malCod = true; }
+      if (!avisos.length) nota = `✓ Código Agrupador y Código coinciden con la ${etq}.`;
+    } else if (rel.actual && Number(rel.actual.version) <= 1) nota = 'Es la primera versión: no hay versión anterior con la que comparar.';
+    else nota = 'No se encontró la versión anterior entre los RMD consultados: busca el producto por descripción (sin filtrar por código) para poder compararla.';
+    const texto = avisos.length ? avisos.map((a) => '⚠ ' + a).join('\n') : nota;
+    if (!av) {
+      av = document.createElement('div'); av.id = 'rmd-aviso-asociar';
+      const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return;
+      cont.insertBefore(av, cont.firstChild);
+    }
+    av.className = avisos.length ? 'aviso' : 'ok'; if (av.textContent !== texto) av.textContent = texto;
+    marcarCampo(d, 'Código Agrupador', malAgr); marcarCampo(d, 'Código', malCod);
+  }
+
+  // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones -------------------------------------
+  // El Guardar del portal solo envía Tipo Dato y valores numéricos de cada especificación (MD_ES_ESPECIFICACION). Aquí las filas se
+  // pueden mover (Subir / Bajar o arrastrando el asa) y sus textos se pueden editar; al pulsar ese mismo Guardar, los cambios viajan
+  // en la actualización de cada fila (ensayoHijo, especificacion, orden) con la conexión del propio portal: no se abre otra vía.
+  // Las especificaciones importadas de SAP ("Ensayos SAP") las ordena el portal por su número de característica (Merknr):
+  // en ellas no se reordena. Si se cierra la ventana sin guardar, los cambios se descartan (el portal comparte los objetos en memoria).
+  const BASE_ESPEC = new WeakMap();                                   // fila -> textos y orden tal como están guardados
+  const CAMPOS_ESPEC = ['ensayoHijo', 'especificacion', 'orden'];
+  const MSG_SAP = 'Estas especificaciones vienen de SAP y el portal las ordena por su número de característica: no se pueden reordenar.';
+  let espAbierta = null, espSinVer = 0, espEnviando = 0;              // ventana de Especificaciones abierta: { d, datos }; guardados en curso
+  const esTablaEspec = (t) => { const n = [...t.querySelectorAll('thead th')].map((th) => NORM(th.textContent)); return n.includes('ESPECIFICACIONES') && n.includes('TIPO DATO') && !n.includes('DEPENDE'); };
+  function contextoDe(item) {
+    const c = item.oBindingContexts || {}, k = 'aListEspecificacionAssignResponsive' in c ? 'aListEspecificacionAssignResponsive' : Object.keys(c)[0];
+    return k === undefined ? null : item.getBindingContext(k === 'undefined' ? undefined : k);
+  }
+  function estadoEspec(d) {
+    const t = [...d.querySelectorAll('table.sapMListTbl')].find(esTablaEspec); if (!t) return null;
+    const ctl = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); if (!ctl || !ctl.getItems) return null;
+    const items = ctl.getItems(), c0 = items.length && contextoDe(items[0]), model = c0 && c0.getModel(), datos = model && model.getData();
+    return Array.isArray(datos) ? { t, ctl, items, model, datos } : null;
+  }
+  const baseDe = (r) => { let b = BASE_ESPEC.get(r); if (!b) { b = {}; CAMPOS_ESPEC.forEach((k) => { b[k] = r[k]; }); BASE_ESPEC.set(r, b); } return b; };
+  function pendientesEspec(datos) {
+    const out = {};
+    datos.forEach((r) => {
+      const b = r.mdEstructuraEspecificacionId && BASE_ESPEC.get(r); if (!b) return;
+      const c = {}; CAMPOS_ESPEC.forEach((k) => { if (r[k] !== b[k]) c[k] = r[k]; });
+      if (Object.keys(c).length) out[r.mdEstructuraEspecificacionId] = c;
+    });
+    return out;
+  }
+  const reordenable = (datos) => datos.length > 1 && datos.every((r) => r.ensayoPadreSAP == null || r.ensayoPadreSAP === '');
+  const firmaEspec = (d) => { const e = estadoEspec(d); return e ? '#' + e.datos.map((r) => [r.mdEstructuraEspecificacionId, r.ensayoHijo, r.especificacion].join('¦')).join('|') : ''; };
+  const descartarEspec = (datos) => { (datos || []).forEach((r) => { const b = BASE_ESPEC.get(r); if (b) Object.assign(r, b); }); };
+  const filaDeTr = (tr) => { const it = tr && sap.ui.getCore().byId(tr.id), c = it && contextoDe(it); return c && c.getObject(); };
+  const autoAltura = (ta) => { if (!visible(ta)) return; ta.style.height = 'auto'; ta.style.height = Math.max(28, ta.scrollHeight + 2) + 'px'; };
+
+  // La orden se reparte entre las filas conservando el conjunto de valores que ya tenían (así no chocan con otras estructuras del RMD)
+  function aplicarOrden(e, arr, mover) {
+    const previos = e.datos.map((r) => Number(r.orden)), validos = previos.every(Number.isFinite) && new Set(previos).size === previos.length;
+    const valores = validos ? previos.slice().sort((a, b) => a - b) : arr.map((_, i) => i + 1);
+    arr.forEach((r, i) => { r.orden = valores[i]; });
+    e.model.setData(arr);
+    e.ctl.removeSelections(true);
+    e.ctl.getItems().forEach((it, i) => { if (mover.includes(arr[i])) it.setSelected(true); });
+  }
+  function moverFilas(d, sentido) {
+    const e = estadoEspec(d); if (!e || !reordenable(e.datos)) return;
+    const sel = new Set(e.ctl.getSelectedItems().map((it) => { const c = contextoDe(it); return c && c.getObject(); }).filter(Boolean));
+    if (!sel.size) { toast('Marca la casilla de las filas que quieres mover.'); return; }
+    const arr = e.datos.slice();
+    if (sentido < 0) { for (let i = 1; i < arr.length; i++) if (sel.has(arr[i]) && !sel.has(arr[i - 1])) [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; }
+    else { for (let i = arr.length - 2; i >= 0; i--) if (sel.has(arr[i]) && !sel.has(arr[i + 1])) [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]]; }
+    if (arr.some((r, i) => r !== e.datos[i])) { aplicarOrden(e, arr, [...sel]); setTimeout(ajustarTodo, 50); }
+  }
+  function moverA(d, fila, destino, antes) {
+    const e = estadoEspec(d); if (!e || !reordenable(e.datos) || !fila || fila === destino) return;
+    const arr = e.datos.filter((r) => r !== fila), i = arr.indexOf(destino); if (i < 0) return;
+    arr.splice(antes ? i : i + 1, 0, fila);
+    if (arr.some((r, k) => r !== e.datos[k])) { aplicarOrden(e, arr, [fila]); setTimeout(ajustarTodo, 50); }
+  }
+  function instalarArrastre(d, t) {
+    if (t.__rmdDnd) return; t.__rmdDnd = true;
+    let origen = null;
+    const limpiar = () => t.querySelectorAll('.rmd-arrastrando, .rmd-drop-antes, .rmd-drop-despues').forEach((x) => x.classList.remove('rmd-arrastrando', 'rmd-drop-antes', 'rmd-drop-despues'));
+    const filaBajo = (e) => e.target.closest && e.target.closest('tr.sapMListTblRow');
+    t.addEventListener('dragstart', (e) => {
+      const g = e.target.closest && e.target.closest('.rmd-grip'), tr = g && g.closest('tr'); if (!tr) return;
+      origen = filaDeTr(tr); if (!origen) { e.preventDefault(); return; }
+      e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'rmd-espec');
+      try { e.dataTransfer.setDragImage(tr, 24, 16); } catch (x) { /* sin imagen de arrastre */ }
+      setTimeout(() => tr.classList.add('rmd-arrastrando'), 0);
+    });
+    t.addEventListener('dragover', (e) => {
+      const tr = origen && filaBajo(e); if (!tr) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const q = tr.getBoundingClientRect(), antes = e.clientY < q.top + q.height / 2;
+      t.querySelectorAll('.rmd-drop-antes, .rmd-drop-despues').forEach((x) => x.classList.remove('rmd-drop-antes', 'rmd-drop-despues'));
+      tr.classList.add(antes ? 'rmd-drop-antes' : 'rmd-drop-despues');
+    });
+    t.addEventListener('drop', (e) => {
+      const tr = origen && filaBajo(e); if (!tr) return;
+      e.preventDefault(); const q = tr.getBoundingClientRect();
+      moverA(d, origen, filaDeTr(tr), e.clientY < q.top + q.height / 2); origen = null; limpiar();
+    });
+    t.addEventListener('dragend', () => { origen = null; limpiar(); });
+  }
+
+  // El Guardar del portal recorre todas las filas y actualiza cada una (model.update, de forma síncrona): mientras se ejecuta,
+  // se añaden a esa misma petición los textos y la orden modificados. Si algo no encaja, la edición no se ofrece (nunca se pierde un cambio).
+  // controlador de la vista que contiene un control UI5 (es el que el Guardar del portal usa como "b": b.mainModelv2 = modelo OData v2)
+  function controladorDe(ctl) { let c = ctl; while (c && !c.getController) c = c.getParent && c.getParent(); return c && c.getController(); }
+  function enganchar(d) {
+    if (d.__rmdEng) return true;
+    const e = estadoEspec(d), ctrl = e && controladorDe(e.ctl);
+    const b = botonPorTitulo(d, 'Guardar'), ctl = b && sap.ui.getCore().byId(b.id.replace(/-inner$/, ''));
+    const reg = ctl && ctl.mEventRegistry && ctl.mEventRegistry.press, l = reg && reg[0];
+    if (!ctrl || !ctrl.mainModelv2 || typeof ctrl.mainModelv2.update !== 'function' || !l || typeof l.fFunction !== 'function' || !l.oListener || l.oListener.mainModelv2 !== ctrl.mainModelv2) return false;
+    if (!l.rmdEnganchado) {
+      const original = l.fFunction;
+      l.fFunction = function () {
+        const ee = espAbierta && estadoEspec(espAbierta.d), actual = ee ? { d: espAbierta.d, datos: ee.datos } : null, pend = on('espec') && actual ? pendientesEspec(actual.datos) : {};
+        if (!Object.keys(pend).length) return original.apply(this, arguments);
+        const vacias = actual.datos.filter((r) => pend[r.mdEstructuraEspecificacionId] && 'ensayoHijo' in pend[r.mdEstructuraEspecificacionId] && !norm(r.ensayoHijo));
+        if (vacias.length) { toast('La Descripción no puede quedar vacía: escribe un texto o restaura el original antes de guardar.', true); return undefined; }
+        const modelo = ctrl.mainModelv2, propio = Object.prototype.hasOwnProperty.call(modelo, 'update'), upd = modelo.update;
+        modelo.update = function (ruta, datos, params) {
+          const m = /MD_ES_ESPECIFICACION\('([^']+)'\)/.exec(String(ruta)), extra = m && pend[m[1]];
+          if (!extra) return upd.apply(this, arguments);
+          const p = Object.assign({}, params), ok = p.success, ko = p.error; espEnviando++;
+          p.success = function () { espEnviando--; const fila = actual.datos.find((r) => r.mdEstructuraEspecificacionId === m[1]); if (fila) Object.assign(baseDe(fila), extra); return ok ? ok.apply(this, arguments) : undefined; };
+          p.error = function () { espEnviando--; toast('No se pudo guardar el texto o la posición de una especificación. Revisa e inténtalo de nuevo.', true); return ko ? ko.apply(this, arguments) : undefined; };
+          return upd.call(this, ruta, Object.assign({}, datos, extra), p);
+        };
+        try { return original.apply(this, arguments); }
+        finally { if (propio) modelo.update = upd; else delete modelo.update; setTimeout(() => { espEnviando = 0; }, 60000); }   // válvula: si una respuesta no llega, no se retiene el descarte para siempre
+      };
+      l.rmdEnganchado = true;
+    }
+    d.__rmdEng = true; return true;
+  }
+  // longitudes máximas de la entidad (el servicio las declara en $metadata: 150 y 500); así el cuadro no deja escribir de más
+  function limitesEspec(e) {
+    if (e.t.__rmdLim) return e.t.__rmdLim;
+    const lim = { ensayoHijo: 150, especificacion: 500 };
+    try {
+      const m = controladorDe(e.ctl).mainModelv2, sch = (m.getServiceMetadata().dataServices.schema || []).find((x) => (x.entityType || []).some((y) => y.name === 'MD_ES_ESPECIFICACION'));
+      const tipo = sch.entityType.find((y) => y.name === 'MD_ES_ESPECIFICACION');
+      Object.keys(lim).forEach((k) => { const p = tipo.property.find((y) => y.name === k), n = p && parseInt(p.maxLength, 10); if (n > 0) lim[k] = n; });
+    } catch (x) { /* se mantienen los valores por defecto */ }
+    return (e.t.__rmdLim = lim);
+  }
+  function escribirEspec(d, ta) {
+    const tr = ta.closest('tr'), it = tr && sap.ui.getCore().byId(tr.id), c = it && contextoDe(it); if (!c) return;
+    if (ta.dataset.campo === 'ensayoHijo' && /[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/[\r\n]+/g, ' ');   // (también si se pega texto con saltos de línea)
+    if (ta.maxLength > 0 && ta.value.length > ta.maxLength) ta.value = ta.value.slice(0, ta.maxLength);
+    c.getModel().setProperty(c.getPath() + '/' + ta.dataset.campo, ta.value);
+    autoAltura(ta); ta.classList.toggle('rmd-vacio', ta.dataset.campo === 'ensayoHijo' && !norm(ta.value));
+    setTimeout(ajustarTodo, 80);
+  }
+  const ICONO_SUBIR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
+  const ICONO_BAJAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4"/></svg>';
+  const ICONO_ASA = '<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></svg>';
+  function quitarEdicionEspec(d, t) {
+    d.querySelectorAll('.rmd-orden-grupo').forEach((x) => x.remove());
+    (t || d).querySelectorAll('textarea.rmd-edit, .rmd-grip').forEach((x) => x.remove());
+    (t || d).querySelectorAll('.rmd-ed, .rmd-ed-desc, .rmd-espec-mod').forEach((x) => x.classList.remove('rmd-ed', 'rmd-ed-desc', 'rmd-espec-mod'));
+  }
+  function sincronizarEspec(d, t) {
+    const e = estadoEspec(d); if (!e) return;
+    e.datos.forEach((r) => baseDe(r));
+    espAbierta = { d, datos: e.datos }; espSinVer = 0;
+    const editable = on('espec') && /ingres/i.test(estadoDelRmd()) && enganchar(d);
+    if (!editable) { quitarEdicionEspec(d, t); return; }
+    const hdr = d.querySelector('.sapMListHdr'), puede = reordenable(e.datos), pend = pendientesEspec(e.datos), n = Object.keys(pend).length;
+    let g = hdr && hdr.querySelector('.rmd-orden-grupo');
+    if (hdr && !g) {
+      g = document.createElement('span'); g.className = 'rmd-orden-grupo';
+      const nota = document.createElement('span'); nota.className = 'rmd-espec-nota';
+      g.append(botonIcono(ICONO_SUBIR, 'Subir', 'rmd-subir', () => moverFilas(d, -1)), botonIcono(ICONO_BAJAR, 'Bajar', 'rmd-bajar', () => moverFilas(d, 1)), nota);
+      const ref = hdr.querySelector('.sapMTBSeparator') || hdr.querySelector('button'); if (ref) hdr.insertBefore(g, ref); else hdr.appendChild(g);
+    }
+    if (g) {
+      const marcadas = e.ctl.getSelectedItems().length, [bs, bb] = g.querySelectorAll('button');
+      bs.disabled = bb.disabled = !puede || !marcadas;
+      bs.title = puede ? 'Sube una posición las filas marcadas (también puedes arrastrarlas desde el asa de la izquierda)' : MSG_SAP;
+      bb.title = puede ? 'Baja una posición las filas marcadas (también puedes arrastrarlas desde el asa de la izquierda)' : MSG_SAP;
+      setTxt(g.querySelector('.rmd-espec-nota'), n ? `● ${n} fila${n === 1 ? '' : 's'} con cambios sin guardar` : '');
+    }
+    const cols = [...t.querySelectorAll('thead th')].map((th) => NORM(th.textContent));
+    const iDes = cols.findIndex((c) => /^DESCRIPCI/.test(c)), iEsp = cols.indexOf('ESPECIFICACIONES');
+    instalarArrastre(d, t);
+    const lim = limitesEspec(e);
+    e.items.forEach((it) => {
+      const tr = it.getDomRef(), c = contextoDe(it), fila = c && c.getObject(); if (!tr || !fila) return;
+      tr.classList.toggle('rmd-espec-mod', !!pend[fila.mdEstructuraEspecificacionId]);
+      [['ensayoHijo', iDes], ['especificacion', iEsp]].forEach(([campo, i]) => {
+        const td = tr.children[i]; if (!td) return;
+        td.classList.add('rmd-ed'); if (campo === 'ensayoHijo') td.classList.add('rmd-ed-desc');
+        let ta = td.querySelector(':scope > textarea.rmd-edit');
+        if (!ta) {
+          ta = document.createElement('textarea'); ta.className = 'rmd-edit'; ta.rows = 1; ta.spellcheck = false; ta.dataset.campo = campo;
+          ta.setAttribute('aria-label', campo === 'ensayoHijo' ? 'Descripción' : 'Especificaciones'); ta.maxLength = lim[campo];
+          ta.addEventListener('input', () => escribirEspec(d, ta));
+          // que la lista de UI5 no reaccione (marcar la fila, mover el foco con las flechas, Enter = abrir…) a lo que se hace dentro del texto
+          ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'keyup', 'keypress'].forEach((ev) => ta.addEventListener(ev, (e) => e.stopPropagation()));
+          ta.addEventListener('keydown', (e) => { if (campo === 'ensayoHijo' && e.key === 'Enter') e.preventDefault(); if (e.key !== 'Escape' && e.key !== 'Tab') e.stopPropagation(); });   // la Descripción es de una sola línea
+          td.appendChild(ta);
+        }
+        const v = fila[campo] == null ? '' : String(fila[campo]);
+        if (ta.value !== v && document.activeElement !== ta) ta.value = v;
+        ta.classList.toggle('rmd-vacio', campo === 'ensayoHijo' && !norm(ta.value));
+        autoAltura(ta);
+      });
+      const tdD = tr.children[iDes]; let asa = tdD && tdD.querySelector(':scope > .rmd-grip');
+      if (tdD && puede && !asa) {
+        asa = document.createElement('span'); asa.className = 'rmd-grip'; asa.draggable = true; asa.title = 'Arrastra para cambiar la posición'; asa.innerHTML = ICONO_ASA;
+        ['click', 'dblclick', 'mouseup', 'touchend'].forEach((ev) => asa.addEventListener(ev, (e) => e.stopPropagation()));
+        tdD.appendChild(asa);
+      }
+      else if (asa && !puede) asa.remove();
+    });
+  }
+
   let pendiente = false;
   window.__rmdStats = { ajustes: 0 };
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, #rmd-filtro-bar, .rmd-estado').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-con-estado, .rmd-pm-titulo').forEach((e) => e.classList.remove('rmd-con-estado', 'rmd-pm-titulo'));
+    document.querySelectorAll('.rmd-campo-aviso').forEach((e) => e.classList.remove('rmd-campo-aviso'));
+    document.querySelectorAll('.sapMDialog').forEach((d) => quitarEdicionEspec(d));
     document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => {
       c.style.removeProperty('display'); if (c.tagName === 'TH') { c.style.removeProperty('width'); c.style.removeProperty('min-width'); }
       c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto');
     });
     document.querySelectorAll('.sapMDialog tbody tr').forEach((r) => r.style.removeProperty('display'));
-    document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'));
+    document.querySelectorAll('.sapMDialog table.sapMListTbl').forEach((t) => t.style.removeProperty('width'));
+    document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'));
   }
   function ajustarTodo() {
     if (!opc.activo) { limpiezaTotal(); return; }
@@ -485,17 +860,24 @@
   let firmaPrev = '';
   const firmaTablas = () => {
     let f = ''; const ts = document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl');
-    ts.forEach((t) => { t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
+    ts.forEach((t) => { f += ((t.closest('.sapMDialogScrollCont') || t.parentElement || {}).clientWidth || 0) + ';';   // el ancho útil cambia si aparece una barra de desplazamiento o se redimensiona
+      t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
     return f + ts.length;
   };
   let sinVentanas = 0;
   function revisionPeriodica() {
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
+    if (opc.activo) { vigilarListaPrincipal(); revisarAsociar(); }
+    if (espAbierta) {                                                    // ventana de Especificaciones cerrada sin guardar: se descartan sus cambios
+      if (dialogos().includes(espAbierta.d)) espSinVer = 0;
+      else if (++espSinVer >= 2 && !espEnviando) { descartarEspec(espAbierta.datos); espAbierta = null; espSinVer = 0; }   // (no mientras haya un guardado en curso)
+    }
     if (!opc.activo || !document.querySelector('.sapMDialog')) { firmaPrev = ''; return; }
     const f = firmaTablas(); if (f !== firmaPrev) { firmaPrev = f; ajustarTodo(); }
   }
   setInterval(() => { const t0 = performance.now(); revisionPeriodica(); window.__rmdStats.pollMs = Math.round((performance.now() - t0) * 10) / 10; }, 700);
+  window.addEventListener('resize', () => setTimeout(ajustarTodo, 150));
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
   document.addEventListener('click', () => setTimeout(ajustarTodo, 120), true);
 
@@ -508,7 +890,7 @@
       if (x.closest('.sapMListTblSelCol')) return;                    // marcar filas para copiar/borrar no es un cambio de datos
       f += (x.tagName === 'INPUT' ? x.value : (x.getAttribute('aria-checked') || '')[0]) + '|';
     });
-    return f;
+    return f + firmaEspec(d);                                          // Especificaciones: orden y textos (viven en el modelo)
   }
   const rebase = (d) => { if (d) { d.__rmdBase = firmaDialogo(d); d.__rmdN = d.querySelectorAll('table tbody tr').length; } };
   function refrescarBases() {
@@ -526,6 +908,11 @@
     if (!on('singuardar')) return;
     const b = e.target.closest && e.target.closest('button'); const d = b && enDialogo(b); if (!d) return;
     if (b.title === 'Guardar') { rebase(d); return; }
+    // Agregar / Eliminar / Ensayos SAP vuelven a leer las especificaciones del servidor: los textos u orden sin guardar se perderían
+    if (['Agregar', 'Eliminar', 'Ensayos SAP'].includes(b.title) && espAbierta && espAbierta.d === d && Object.keys(pendientesEspec(espAbierta.datos)).length) {
+      if (!confirm('Hay textos u orden de especificaciones sin guardar.\nSi continúas se perderán.\n¿Continuar?')) { e.preventDefault(); e.stopPropagation(); }
+      return;
+    }
     const t = norm(b.textContent);
     if ((t === 'Cancelar' || t === 'Cerrar') && sucia(d)) {
       if (!confirm('Hay cambios sin guardar en esta ventana.\n¿Descartarlos y cerrar?')) { e.preventDefault(); e.stopPropagation(); } else rebase(d);
@@ -898,17 +1285,28 @@
   }
 
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
+  // Grupos del panel (las claves son las de OPC)
+  const GRUPOS_PANEL = [
+    ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
+    ['Alertas', ['reglas', 'sintipo', 'puesto']],
+    ['Herramientas', ['filtro', 'copiar', 'espec', 'asociar', 'singuardar', 'exito', 'enter']],
+  ];
   function panel() {
+    const etiqueta = Object.fromEntries(OPC);
+    const fila = (k, cls) => `<label class="rmd-fila ${cls || ''}"><span>${etiqueta[k]}</span><input type="checkbox" data-k="${k}" ${opc[k] ? 'checked' : ''}></label>`;
     const p = document.createElement('details'); p.id = 'rmd-ui-panel';
-    p.innerHTML = '<summary title="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
-      OPC.map(([k, t]) => `<label><input type="checkbox" data-k="${k}" ${opc[k] ? 'checked' : ''}> ${t}</label>`).join('') +
-      '<div class="rmd-panel-nota">Ctrl+S = Guardar el diálogo abierto</div></div>';
+    p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
+      '<div class="rmd-panel-cab"><b>Mejoras de interfaz</b><span>v' + VERSION + '</span></div>' + fila('activo', 'maestro') +
+      GRUPOS_PANEL.map(([t, ks]) => `<div class="rmd-grupo">${t}</div>` + ks.map((k) => fila(k)).join('')).join('') +
+      '<div class="rmd-panel-pie"><span>Ctrl+S = Guardar el diálogo abierto</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
+    const refrescar = () => p.querySelectorAll('input[data-k]').forEach((i) => { i.checked = !!opc[i.dataset.k]; });
     p.addEventListener('change', (e) => {
       const k = e.target.dataset && e.target.dataset.k; if (!k) return;
       e.stopPropagation(); opc[k] = e.target.checked; guardar(opc); aplicarClases();
       document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => { if (c.style.display === 'none') c.style.display = ''; });
       ajustarTodo();
     });
+    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = true; }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
     document.body.appendChild(p);
   }
   aplicarClases(); panel(); ajustarTodo();

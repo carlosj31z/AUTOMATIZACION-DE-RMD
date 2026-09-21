@@ -1,15 +1,17 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.8.2
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.9.0
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
-Solo actúa dentro del iframe de la app (`ui5appruntime.html`) y **solo cambia la vista**. Lo único que "pulsa" por ti:
+Solo actúa dentro del iframe de la app (`ui5appruntime.html`). Casi todo es vista; **solo escribe cuando tú lo pides**: "Aplicar" en la vista previa de Pegar y el
+**Guardar del propio portal** (en Especificaciones, ese Guardar incluye además los textos y el orden que hayas editado). Lo único que "pulsa" por ti:
 "Ir" (Enter en un filtro), el OK de los mensajes de **Éxito** y, si tú lo pides con Ctrl+S, el botón Guardar del diálogo abierto.
-Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mejora.
+Un botón redondo de ajustes (abajo a la izquierda) abre una tarjeta con un interruptor por mejora (agrupadas en *Ventanas y tablas*, *Alertas* y *Herramientas*) y un interruptor general "Mejoras activas".
+Desde la versión 1.9 el script **solo modifica las ventanas del RMD** ("<código> - <descripción>", "Procesos Menores para el Paso…" y los selectores "Adicionar…"); ventanas como **Asociar Fórmula** se dejan exactamente como las dibuja el portal (solo se les añade, si activas esa mejora, un aviso de códigos).
 
 | Mejora | Qué hace |
 |---|---|
 | Enter = Ir | En filtros y selectores "Adicionar…". No actúa con una lista desplegada ni dentro de la tabla de pasos. |
-| Diálogos a medida | **Pasos**: casi pantalla completa. **Estructura, Etiquetas, Procesos menores, selectores**: centrados y solo con el alto que necesitan. |
-| Columnas ordenadas | Anchos por nombre; la descripción toma el resto. **Depende** se mide con el texto más largo y siempre se ve completo. |
+| Diálogos a medida | **Pasos**: casi pantalla completa. **Estructura, Etiquetas, Procesos menores, Especificaciones, selectores**: centrados y solo con el alto que necesitan. |
+| Columnas ordenadas | Anchos por nombre; la descripción toma el resto (nunca menos de 205 px: si no cabe, aparece desplazamiento horizontal en vez de aplastarla). **Depende** se mide con el texto más largo y siempre se ve completo. Las cabeceras no parten palabras y ocupan como máximo dos líneas; en ventanas estrechas (< 1500 px) la columna Estado se oculta si todo es "Activo". Sin desplazamiento horizontal desde 1366 px de ancho. |
 | Columnas ocultas | Estado Mov., Imagen y Formato. |
 | Estado del RMD | Etiqueta (INGRESADO / AUTORIZADO / SUSPENDIDO) **pegada a la derecha** de la cabecera de cada ventana emergente. |
 | Título del paso menor | Muestra la descripción completa del paso mayor (hasta 2 líneas; tooltip con el texto entero). |
@@ -25,6 +27,8 @@ Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mej
 | Calidad en Operaciones | El paso mayor "EL PERSONAL DE CALIDAD EN OPERACIONES…" / "CALIDAD EN OPERACIONES REGISTRA…" (Realizado por) debe llevar R. Por + **Estado CC**; los procesos menores de muestreo ("CANTIDAD MUESTREADA", "FECHA / HORA DE MUESTREO") llevan Edit + Estado CC. |
 | Insumos | Procesos menores con Cantidad Insumos / UM: **sin Edit** (si lo tienen marcado se pide desmarcarlo). |
 | Textos | Marca la descripción que dice "CONTROL DE CALIDAD" (→ "CALIDAD EN OPERACIONES"), "MUESTRA PARA CONTROL DE CALIDAD" (→ "CANTIDAD MUESTREADA (unidad):") o la nota antigua "…CONTROL DE CALIDAD O CONTROL DE PROCESO…". Se acepta la forma "…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE". |
+| **Asociar Fórmula: aviso de códigos** | Al abrir "Asociar Fórmula" compara el **Código Agrupador** y el **Código** con los de la **versión anterior** del mismo RMD (los datos salen de la tabla principal; solo lectura). Muestra una franja **✓ coinciden** o **⚠ no coincide / está vacío** (con el valor anterior) y resalta el campo en ámbar. Si la versión anterior no está en el listado (filtros), lo indica. La ventana conserva su tamaño y aspecto del portal. |
+| **Especificaciones: reordenar y editar** | En la ventana de Especificaciones (solo RMD **Ingresados**): **Descripción** y **Especificaciones** pasan a ser cuadros de texto editables (con los máximos del servicio: 150 y 500 caracteres), cada fila tiene un **asa ⠿** para arrastrarla y hay botones **Subir / Bajar** (mueven las filas marcadas una posición). Las filas cambiadas se marcan con una barra ámbar y aparece "● n filas con cambios sin guardar". Se guarda con el **Guardar del propio portal**: sus textos y su orden viajan en la misma actualización de cada fila (entidad `MD_ES_ESPECIFICACION`: `ensayoHijo`, `especificacion`, `orden`), con la conexión del portal. Sin guardar: al cerrar se avisa y se descartan; **Agregar / Eliminar / Ensayos SAP** avisan antes porque releen del servidor. Una Descripción vacía no se guarda. Las especificaciones **importadas de SAP** (`ensayoPadreSAP`) las ordena el portal por su número de característica (`Merknr`), por eso ahí no se reordena (sí se pueden editar los textos). |
 | **Copiar / Pegar configuración** | En la ventana de Pasos, en la barra del título de la tabla ("Pasos (n)"), **a la izquierda del icono de impresora**: **Copiar configuración** y **Pegar**. 1) Marca la casilla del paso de referencia y pulsa Copiar (lee su configuración y sus procesos menores). 2) Marca la casilla del paso nuevo y pulsa Pegar: aparece una **vista previa** con lo que cambiará (puedes desmarcar campos y procesos menores) y solo escribe al pulsar **Aplicar**; Escape cierra la vista previa. Copia Tipo Dato, Clave Modelo, Puesto, Val. Inicial/Final, Margen, Decimal y casillas; no copia Orden, Depende, Código ni Descripción. Los procesos menores se agregan **por código** con el selector "Adicionar Pasos RMD", se configuran igual que el origen y se guardan (si ya existen en el destino, no se duplican: se actualiza su configuración). Los **insumos** no se copian (se agregan con "Agregar Insumo"). **El paso copiado es temporal**: se descarta al cerrar el RMD, por eso al abrir otro RMD no queda ningún aviso. Protecciones: no pega en RMD que no estén **Ingresados**, ni sobre el mismo paso copiado, ni en un RMD distinto del copiado. |
 
 ## Estilo
