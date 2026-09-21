@@ -18,3 +18,12 @@ leyendo SharePoint en solo lectura:
 
 Nota: en la hoja PLANTA 2 la columna APLICA puede ser SI / NO / SI-BORRADOR; los ítems "Creación de receta" o
 "producto nuevo" suelen ser NO para RMD existentes. Se revisa caso por caso; no se aplican cambios sin confirmar.
+
+## Antes del ingreso — sugerencia de la matriz de priorizados
+Libro `2.- LISTADOS AMBAS PLANTAS/Matriz RMD priorizados v1 KZ 2026.xlsx`, hoja **PLANTA 2 DOC TEC** (solo Planta 2).
+El analista anota ahí, antes de iniciar el ingreso, los RMD pendientes: columna **G** (ingreso) y **K** (autorización)
+con "PENDIENTE", y en la columna **O** ("observación adicional") el motivo. No hay código de RMD: se busca por
+**nombre de producto y etapa**. Es solo una sugerencia (no bloquea el ingreso).
+
+El conector de SharePoint no alcanza esa hoja (corta el libro antes), así que se exporta la hoja a `.xlsx`/`.csv`
+y se usa: `rmd-automation cambios aplicar spec.yaml --matriz data/matriz_planta2.xlsx --producto "CLORFENAMINA 4 mg" --etapa Fabricación`.

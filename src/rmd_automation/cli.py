@@ -101,8 +101,13 @@ def cambios_plan(spec: str, snapshot: str) -> None:
 @click.argument("spec", type=click.Path(exists=True))
 @click.option("--confirmar", is_flag=True, help="Sin este indicador solo se muestra el plan.")
 @click.option("--auditoria", type=click.Path(), default="data/auditoria.jsonl", show_default=True)
+@click.option("--matriz", type=click.Path(exists=True), default=None, help='Hoja "PLANTA 2 DOC TEC" exportada (.xlsx/.csv) para la sugerencia previa.')
+@click.option("--producto", default="", help="Nombre del producto (para buscarlo en la matriz).")
+@click.option("--etapa", default="", help="Etapa (Fabricación, Envase, Acondicionado…).")
 @click.option("--referencia", default=None, help='"Codigo RMD" de un RMD de referencia (vacío = no hay). Si se omite, se pregunta.')
-def cambios_aplicar(spec: str, confirmar: bool, auditoria: str, referencia: str | None) -> None:
+def cambios_aplicar(
+    spec: str, confirmar: bool, auditoria: str, matriz: str | None, producto: str, etapa: str, referencia: str | None
+) -> None:
     """Lee el RMD, muestra el plan y, con --confirmar y una confirmación humana, lo ejecuta y lo verifica."""
     from . import cambios as cb
     from .actions import RmdAutomation
@@ -111,6 +116,10 @@ def cambios_aplicar(spec: str, confirmar: bool, auditoria: str, referencia: str 
     from .extraer import extraer
 
     sp = cb.cargar_spec(spec)
+    if matriz and producto:
+        from . import matriz as mz
+
+        click.echo(mz.a_texto(mz.buscar_pendientes(matriz, producto, etapa)))
     if referencia is None and not sp.rmd_referencia:
         referencia = click.prompt(
             '¿Hay un RMD de referencia? Escribe su "Codigo RMD" (Enter si no hay)', default="", show_default=False
