@@ -119,7 +119,9 @@ def cambios_aplicar(
     if matriz and producto:
         from . import matriz as mz
 
-        click.echo(mz.a_texto(mz.buscar_pendientes(matriz, producto, etapa)))
+        aviso = mz.a_texto(mz.revisar(matriz, producto, etapa))
+        if aviso:  # solo se avisa si hay algo anormal
+            click.echo(aviso)
     if referencia is None and not sp.rmd_referencia:
         referencia = click.prompt(
             '¿Hay un RMD de referencia? Escribe su "Codigo RMD" (Enter si no hay)', default="", show_default=False
@@ -170,15 +172,13 @@ def _mostrar_referencia(page, sp) -> None:
     Path("data/snapshots").mkdir(parents=True, exist_ok=True)
     Path(f"data/snapshots/ref_{sp.rmd_referencia}.json").write_text(json.dumps(ref, ensure_ascii=False), encoding="utf-8")
     actual = extraer(page, sp.rmd, procesos_menores=False)
-    click.echo(f"
---- RMD de referencia {sp.rmd_referencia} (estado {ref.get('estado')!r}) vs RMD {sp.rmd} ---")
+    click.echo(f"\n--- RMD de referencia {sp.rmd_referencia} (estado {ref.get('estado')!r}) vs RMD {sp.rmd} ---")
     click.echo(cmp.a_markdown(cmp.comparar(ref, actual)))
 
 
 def _preguntar_revisiones(sp) -> None:
     """Tras terminar el ingreso: ofrece las revisiones que se hacen fuera del portal (con el asistente)."""
-    click.echo("
-Ingreso terminado. Revisiones posteriores disponibles:")
+    click.echo("\nIngreso terminado. Revisiones posteriores disponibles:")
     for i, r in enumerate(REVISIONES, 1):
         click.echo(f"  {i}. {r}")
     if click.confirm("¿Necesitas aplicar estas revisiones ahora?", default=False):

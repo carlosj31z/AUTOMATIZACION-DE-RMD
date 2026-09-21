@@ -27,3 +27,8 @@ con "PENDIENTE", y en la columna **O** ("observación adicional") el motivo. No 
 
 El conector de SharePoint no alcanza esa hoja (corta el libro antes), así que se exporta la hoja a `.xlsx`/`.csv`
 y se usa: `rmd-automation cambios aplicar spec.yaml --matriz data/matriz_planta2.xlsx --producto "CLORFENAMINA 4 mg" --etapa Fabricación`.
+
+Avisos de la matriz: el programa **solo avisa si hay algo anormal** (si todo está normal no muestra nada):
+- el producto/etapa **no figura** en la matriz → debe incluirse (no es habitual);
+- una fila del producto **sin estado de ingreso** (ni PENDIENTE ni INGRESADO) → debe completarse;
+- una fila **PENDIENTE** → se muestra el motivo (columna O).

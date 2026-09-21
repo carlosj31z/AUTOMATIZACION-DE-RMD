@@ -49,8 +49,8 @@ def _columna(cabecera: List[str], *claves: str) -> int | None:
     return None
 
 
-def buscar_pendientes(ruta: str | Path, producto: str, etapa: str = "", hoja: str = "PLANTA 2 DOC TEC") -> List[Pendiente]:
-    """Filas cuyo producto (y etapa, si se da) coinciden y cuyo ingreso o autorización dice PENDIENTE."""
+def _coincidencias(ruta, producto: str, etapa: str, hoja: str) -> List[Pendiente]:
+    """Todas las filas de la matriz cuyo producto (y etapa, si se da) coinciden."""
     filas = _filas(Path(ruta), hoja)
     # La cabecera es la fila que tiene a la vez la columna del nombre y la de ETAPA (las filas 1-3 son leyendas).
     ini = next(
@@ -69,19 +69,44 @@ def buscar_pendientes(ruta: str | Path, producto: str, etapa: str = "", hoja: st
         et = r[c_etapa] if c_etapa is not None and c_etapa < len(r) else ""
         if e and et and e not in normalizar(et) and normalizar(et) not in e:
             continue
-        ing, aut = r[COL_INGRESO], r[COL_AUTORIZACION]
-        if "PENDIENTE" in normalizar(ing) or "PENDIENTE" in normalizar(aut):
-            out.append(Pendiente(n, r[c_prod], et, ing, aut, r[COL_OBSERVACION]))
+        out.append(Pendiente(n, r[c_prod], et, r[COL_INGRESO], r[COL_AUTORIZACION], r[COL_OBSERVACION]))
     return out
 
 
-def a_texto(pend: List[Pendiente]) -> str:
-    if not pend:
-        return "Matriz de priorizados: el producto no figura como pendiente."
-    out = ["Matriz de priorizados (sugerencia, revisar antes del ingreso):"]
-    for x in pend:
-        out.append(
-            f"  fila {x.fila}: {x.producto} [{x.etapa or 'sin etapa'}] ingreso={x.ingreso or '-'} "
-            f"autorización={x.autorizacion or '-'} — motivo: {x.motivo or '(sin observación)'}"
-        )
-    return "\n".join(out)
+def buscar_pendientes(ruta: str | Path, producto: str, etapa: str = "", hoja: str = "PLANTA 2 DOC TEC") -> List[Pendiente]:
+    """Filas del producto cuyo ingreso o autorización dice PENDIENTE."""
+    return [
+        x for x in _coincidencias(ruta, producto, etapa, hoja)
+        if "PENDIENTE" in normalizar(x.ingreso) or "PENDIENTE" in normalizar(x.autorizacion)
+    ]
+
+
+def revisar(ruta: str | Path, producto: str, etapa: str = "", hoja: str = "PLANTA 2 DOC TEC") -> List[str]:
+    """Avisos para el usuario. Lista vacía = todo normal (no se muestra nada).
+
+    - el producto/etapa no está en la matriz -> hay que incluirlo (no es habitual);
+    - una fila del producto sin estado de ingreso -> hay que completarla;
+    - una fila PENDIENTE -> se muestra el motivo (columna O).
+    """
+    filas = _coincidencias(ruta, producto, etapa, hoja)
+    etiqueta = f"{producto}" + (f" [{etapa}]" if etapa else "")
+    if not filas:
+        return [f"{etiqueta} NO figura en la matriz de pendientes: debe incluirse (no es habitual)."]
+    avisos: List[str] = []
+    for x in filas:
+        if not normalizar(x.ingreso):
+            avisos.append(
+                f"fila {x.fila} ({x.producto} [{x.etapa}]): sin estado de ingreso, ni PENDIENTE ni INGRESADO: debe completarse."
+            )
+        elif "PENDIENTE" in normalizar(x.ingreso) or "PENDIENTE" in normalizar(x.autorizacion):
+            avisos.append(
+                f"fila {x.fila} ({x.producto} [{x.etapa}]): ingreso={x.ingreso or '-'}, autorización={x.autorizacion or '-'} "
+                f"— motivo: {x.motivo or '(sin observación)'}"
+            )
+    return avisos
+
+
+def a_texto(avisos: List[str]) -> str:
+    if not avisos:
+        return ""
+    return "Matriz de priorizados (aviso previo al ingreso):\n" + "\n".join(f"  - {a}" for a in avisos)
