@@ -1,10 +1,12 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.9.0
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.9.1
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
 Solo actúa dentro del iframe de la app (`ui5appruntime.html`). Casi todo es vista; **solo escribe cuando tú lo pides**: "Aplicar" en la vista previa de Pegar y el
 **Guardar del propio portal** (en Especificaciones, ese Guardar incluye además los textos y el orden que hayas editado). Lo único que "pulsa" por ti:
 "Ir" (Enter en un filtro), el OK de los mensajes de **Éxito** y, si tú lo pides con Ctrl+S, el botón Guardar del diálogo abierto.
 Un botón redondo de ajustes (abajo a la izquierda) abre una tarjeta con un interruptor por mejora (agrupadas en *Ventanas y tablas*, *Alertas* y *Herramientas*) y un interruptor general "Mejoras activas".
+**El botón es persistente** (v1.9.1): cuelga de `<html>` y no del `<body>`. Tampermonkey ejecuta el script al terminar de leer el HTML, unos segundos *antes* de que UI5 monte la app en el `<body>`; al montarla,
+UI5 aparta a una zona oculta cualquier nodo con `id` que cuelgue del `<body>`, y el botón desaparecía. Además se vigila (observador de `<html>` + revisión periódica): si algo lo retira o pierde la hoja de estilos, se vuelve a colgar el mismo elemento con su estado.
 Desde la versión 1.9 el script **solo modifica las ventanas del RMD** ("<código> - <descripción>", "Procesos Menores para el Paso…" y los selectores "Adicionar…"); ventanas como **Asociar Fórmula** se dejan exactamente como las dibuja el portal (solo se les añade, si activas esa mejora, un aviso de códigos).
 
 | Mejora | Qué hace |

@@ -1,10 +1,10 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
-  K botón de mejoras y panel · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  K botón de mejoras y panel · L el botón no desaparece al cargar la página (inyección temprana, como Tampermonkey) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -16,7 +16,7 @@ NUNCA apuntes RMD_PRUEBA a un RMD real si vas a ejecutar el bloque D: cambia y b
 """
 import json, os, sys, time, traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from util import SCRIPT, abrir, abrir_dialogo, marcar_fila, cerrar_todo
+from util import SCRIPT, abrir, abrir_con_inyeccion_temprana, abrir_dialogo, marcar_fila, cerrar_todo
 from playwright.sync_api import sync_playwright
 from rmd_automation.actions import RmdAutomation
 from rmd_automation.pages.configuracion import ConfiguracionFiltro
@@ -27,9 +27,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJK).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKL).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -695,6 +695,40 @@ with sync_playwright() as p:
             todas = fr.evaluate("[...document.querySelectorAll('#rmd-ui-panel input[data-k]')].every(i=>i.checked)")
             fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
             return (a is False and marca is False and b_ is True and marca2 is True and todas), f"{a} {marca} {b_} {marca2} {todas}"
+
+    # ───────────────────────── L. El botón de mejoras es persistente (no desaparece al cargar la página) ─────────────────────────
+    if "L" in SOLO:
+        cerrar_seguro()
+        pg2, fr2, t_inyeccion = abrir_con_inyeccion_temprana(b, src)      # el script se inyecta ANTES de que la app se monte, como hace Tampermonkey
+        MEDIR_BOTON = """() => { const p = document.getElementById('rmd-ui-panel'); const s = p && p.querySelector('summary'); const q = s && s.getBoundingClientRect(); const pt = q && document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+          return { existe: !!p, padre: p && p.parentNode && p.parentNode.tagName, encima: !!pt && !!pt.closest('#rmd-ui-panel'), preservado: !!document.querySelector('#sap-ui-preserve #rmd-ui-panel'),
+                   izq: q && Math.round(q.left), abajo: q && Math.round(innerHeight - q.bottom), ancho: q && Math.round(q.width), abierto: p && p.open }; }"""
+        try:
+            @prueba("L1 Inyectado antes de que la app se monte (Tampermonkey), el botón sigue visible y encima de todo cuando la app aparece; cuelga de <html>, no del <body>")
+            def _():
+                r = fr2.evaluate(MEDIR_BOTON)
+                ok = r["existe"] and r["padre"] == "HTML" and r["encima"] and not r["preservado"] and r["izq"] <= 24 and r["abajo"] <= 24 and r["ancho"] == 40
+                return ok, f"inyectado a los {t_inyeccion}s: {r}"
+            @prueba("L2 Cuando UI5 aparta los nodos con id que cuelgan del <body> (lo que antes escondía el botón; una sonda con id sí se aparta), el botón sigue visible y encima de todo")
+            def _():
+                fr2.evaluate("() => { const s = document.createElement('div'); s.id = 'rmd-sonda'; document.body.appendChild(s); }")      # sonda: un nodo con id colgando del <body>
+                llamado = fr2.evaluate("() => { try { sap.ui.require('sap/ui/core/RenderManager').preserveContent(document.body, false, true); return true; } catch (e) { return String(e); } }")
+                pg2.wait_for_timeout(1500)
+                sonda = fr2.evaluate("() => { const s = document.getElementById('rmd-sonda'); return s ? s.parentNode.id || s.parentNode.tagName : 'desaparecida'; }")
+                r = fr2.evaluate(MEDIR_BOTON)
+                return (llamado is True and sonda == "sap-ui-preserve" and r["existe"] and r["padre"] == "HTML" and r["encima"] and not r["preservado"]), f"preserveContent={llamado} sonda={sonda} | {r}"
+            @prueba("L3 Si algo retira el botón, se vuelve a colgar solo con su estado (abierto) en menos de 2 s")
+            def _():
+                fr2.evaluate("() => { const p = document.getElementById('rmd-ui-panel'); p.open = true; p.remove(); }"); pg2.wait_for_timeout(1500)
+                r = fr2.evaluate(MEDIR_BOTON); fr2.evaluate("document.getElementById('rmd-ui-panel').open = false")
+                return (r["existe"] and r["padre"] == "HTML" and r["abierto"] is True and r["encima"]), str(r)
+            @prueba("L4 Si se pierde la hoja de estilos del script, se restablece y el botón conserva su aspecto")
+            def _():
+                fr2.evaluate("() => { [...document.querySelectorAll('style')].filter((x) => x.textContent.includes('#rmd-ui-panel')).forEach((x) => x.remove()); }"); pg2.wait_for_timeout(1500)
+                r = fr2.evaluate("() => ({ estilos: [...document.querySelectorAll('style')].filter((x) => x.textContent.includes('#rmd-ui-panel')).length, ancho: Math.round(document.querySelector('#rmd-ui-panel summary').getBoundingClientRect().width) })")
+                return (r["estilos"] == 1 and r["ancho"] == 40), str(r)
+        finally:
+            pg2.close()
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

@@ -63,3 +63,32 @@ def cerrar_todo(fr, pg):
             except Exception:
                 continue
         pg.wait_for_timeout(1000)
+
+
+def abrir_con_inyeccion_temprana(b, src, ancho=1415, alto=886, espera=180):
+    """Abre el portal en una pestaña nueva e inyecta el script en cuanto el iframe de la app tiene DOM, sin esperar a que la app esté montada
+    (como hace Tampermonkey con document-idle). Devuelve (pagina, frame, segundos_hasta_inyectar) cuando aparece el botón "Ir" de la app."""
+    import time
+    pg = b.contexts[0].new_page()
+    pg.set_viewport_size({"width": ancho, "height": alto})
+    t0 = time.time()
+    pg.goto(url_portal(), wait_until="commit")
+    inyectado = None
+    while time.time() - t0 < espera:
+        pg.wait_for_timeout(150)
+        fr = next((f for f in pg.frames if "ui5appruntime" in f.url), None)
+        if fr is None:
+            continue
+        try:
+            if inyectado is None:
+                estado = fr.evaluate("({rs: document.readyState, body: !!document.body})")
+                if estado["body"] and estado["rs"] in ("interactive", "complete"):
+                    fr.evaluate(src); inyectado = round(time.time() - t0, 1)
+                continue
+            if fr.evaluate("!!document.querySelector('[id$=btnGo]')"):
+                pg.wait_for_timeout(1500)
+                return pg, fr, inyectado
+        except Exception:
+            continue
+    raise RuntimeError("La app no llegó a mostrarse")
+

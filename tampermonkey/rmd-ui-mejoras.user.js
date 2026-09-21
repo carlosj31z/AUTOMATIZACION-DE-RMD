@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.9.0
+// @version      1.9.1
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante, copiar/pegar la configuración de un paso, reordenar y editar Especificaciones, aviso de códigos en Asociar Fórmula y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -17,7 +17,7 @@
   if (window.__rmdUiMejoras) return;
   window.__rmdUiMejoras = true;
 
-  const VERSION = '1.9.0';                                                       // mantener igual a @version
+  const VERSION = '1.9.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -563,6 +563,7 @@
   // codDefectoReceta = "Código"; codigoversionprincipal une las versiones de un mismo RMD). Solo se lee: no se cambia nada.
   const CACHE_RMD = new Map();                                       // código -> datos de las filas que la tabla principal ha mostrado en esta sesión
   function tablaPrincipal() {
+    if (!(window.sap && sap.ui && sap.ui.getCore)) return null;                                // UI5 aún cargando
     const t = [...document.querySelectorAll('table')].find((x) => x.id && /-listUl$/.test(x.id) && !x.closest('[role=dialog]'));
     const ctl = t && sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); return ctl && ctl.getItems ? ctl : null;
   }
@@ -866,6 +867,7 @@
   };
   let sinVentanas = 0;
   function revisionPeriodica() {
+    montarPanel();
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
     if (opc.activo) { vigilarListaPrincipal(); revisarAsociar(); }
@@ -1307,7 +1309,17 @@
       ajustarTodo();
     });
     p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = true; }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
-    document.body.appendChild(p);
+    panelEl = p; montarPanel();
   }
+  // El botón cuelga de <html>, no de <body>: UI5 usa el <body> como zona de dibujo y, al montar la app (unos segundos después de cargar la página),
+  // aparta a su zona oculta de "preservados" cualquier nodo con id que cuelgue del <body>, y el botón desaparecía. Fuera del <body> no lo toca.
+  // Además se vigila (observador de <html> y revisión periódica) por si algo lo retira: se vuelve a colgar el mismo elemento, con su estado.
+  let panelEl = null;
+  function montarPanel() {
+    if (panelEl && (panelEl.parentNode !== html || !panelEl.isConnected)) html.appendChild(panelEl);
+    if (!estilo.isConnected) (document.head || html).appendChild(estilo);
+    if (!!on('ancho') !== html.classList.contains('rmd-ui')) aplicarClases();                 // (si algo reescribiera las clases de <html>)
+  }
+  new MutationObserver(montarPanel).observe(html, { childList: true });
   aplicarClases(); panel(); ajustarTodo();
 })();
