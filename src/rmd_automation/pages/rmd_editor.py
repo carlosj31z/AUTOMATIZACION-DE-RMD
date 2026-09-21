@@ -100,9 +100,9 @@ class RmdEditor:
         fila = self._fila(estructura)
         if etiqueta:
             fila.get_by_role("button", name="Adicionar Etiqueta").click()
-            self._fila(etiqueta).get_by_role("button", name="Adicionar Pasos RMD").click()
+            self._fila(etiqueta).locator("button[title='Adicionar Pasos RMD']").click()
         else:
-            fila.get_by_role("button", name="Adicionar Pasos RMD").click()
+            fila.locator("button[title='Adicionar Pasos RMD']").click()
         # El "+" del diálogo "Pasos (n)" se llama "Agregar" o "Agregar Estructura" según la versión.
         self._dlg.get_by_role("button", name=re.compile(r"^Agregar( Estructura)?$")).filter(
             visible=True
@@ -210,8 +210,9 @@ class RmdEditor:
         fila.get_by_role("button", name="Mostrar ayuda para entradas").click()
         lista = self._dlg
         lista.get_by_placeholder("Buscar").fill(codigo_predecesor)
-        lista.get_by_role("listitem").filter(
-            has_text=re.compile(rf"Codigo: {re.escape(codigo_predecesor)}.*Orden: {orden_predecesor}$")
+        # Los ítems son role=option y has_text usa textContent (sin saltos de línea entre código, descripción y orden).
+        lista.get_by_role("option").filter(
+            has_text=re.compile(rf"Codigo: {re.escape(codigo_predecesor)}(?!\d).*Orden: {orden_predecesor}$", re.S)
         ).first.click()
 
     def limpiar_predecesor(self, orden_paso: int) -> None:
@@ -327,6 +328,8 @@ class RmdEditor:
         # Selector de tabla con casillas: filtro "Buscar" (estructuras/etiquetas) o
         # "Descripción" (pasos) + "Ir"; luego Agregar -> OK de confirmación -> OK de éxito.
         picker = self._dlg
+        # El selector tarda en abrirse: todos tienen un botón "Ir"; el diálogo anterior (Pasos, Etiqueta...) no.
+        picker.get_by_role("button", name="Ir", exact=True).first.wait_for(timeout=60_000)
         for item in items:
             for etiqueta_filtro in ("Buscar", "Descripción"):
                 filtro = picker.get_by_label(etiqueta_filtro, exact=True).filter(visible=True)
@@ -345,9 +348,14 @@ class RmdEditor:
         fila = self._fila(estructura)
         if etiqueta:
             fila.get_by_role("button", name="Adicionar Etiqueta").click()
-            self._fila(etiqueta).get_by_role("button", name="Adicionar Pasos RMD").click()
+            fila_etq = self._fila(etiqueta)
+            fila_etq.wait_for(timeout=60_000)  # el diálogo "Etiqueta (n)" tarda en abrir
+            fila_etq.locator("button[title='Adicionar Pasos RMD']").click()  # el nombre accesible es otro (aria-labelledby)
         else:
-            fila.get_by_role("button", name="Adicionar Pasos RMD").click()
+            fila.locator("button[title='Adicionar Pasos RMD']").click()
+        self._dlg.get_by_role("button", name="Guardar").or_(
+            self._dlg.get_by_role("button", name=re.compile(r"^Agregar( Estructura)?$"))
+        ).first.wait_for(timeout=60_000)
 
     def cerrar_dialogo(self) -> None:
         """Cierra el diálogo activo (y, si el paso estaba dentro de "Etiqueta (n)", también ése)."""
@@ -413,9 +421,11 @@ class RmdEditor:
         self.page.wait_for_timeout(500)
         base.confirmar_si_aparece(self.app, "OK", timeout_ms=15000)  # mensaje de éxito (puede tardar)
 
-    def _casilla_de_fila(self, texto: str, scope: Locator | None = None) -> Locator:
-        # Las casillas de selección de UI5 se llaman "Selección de elementos": se ubican por su fila.
-        return base.row_by_text(scope or self._dlg, texto).first.get_by_role("checkbox").first
+    def _casilla_de_fila(self, texto: str, scope: Locator | None = None) -> "base.CasillaFila":
+        # La casilla de selección de UI5 está oculta al árbol de accesibilidad (td role=presentation,
+        # aria-hidden): no existe get_by_role("checkbox"). Se hace clic en la celda de selección de la
+        # fila y se comprueba aria-selected.
+        return base.CasillaFila(base.row_by_text(scope or self._dlg, texto).first)
 
     def _fila(self, texto: str) -> Locator:
         return base.row_by_text(self._dlg, texto).first

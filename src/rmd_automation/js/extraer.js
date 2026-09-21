@@ -59,9 +59,9 @@
     const tbl = TOP().querySelector('table'); if (!tbl) return;
     const ctl = CORE().byId(tbl.id.replace(/-listUl$/, ''));
     const g = ctl && ctl._oGrowingDelegate;
-    for (let i = 0; i < 40 && g && g.requestNewPage; i++) {
-      const antes = rowsOf(TOP()).length; g.requestNewPage(); await W(900);
-      if (rowsOf(TOP()).length === antes) break;
+    for (let i = 0; i < 200 && g && g.requestNewPage; i++) {
+      const antes = rowsOf(TOP()).length; g.requestNewPage();
+      if (!(await until(() => rowsOf(TOP()).length > antes, 2500))) break;
     }
   };
   const readPasos = () => rowsOf(TOP()).map((t) => {
@@ -81,13 +81,16 @@
       f['Tipo Dato'], f['Val. Inicial'], f['Val. Final'], f['Margen'], f['Decim.'], chk.join(',')].join('|');
   });
 
-  window.__extraerRmd = async (code) => {
+  window.__extraerRmd = async (code, opciones) => {
+    const conPM = !opciones || opciones.procesosMenores !== false;
     await cerrarTodo();
     const out = { code, structs: [] };
     limpiarCombo(ml('Etapa')); limpiarCombo(ml('Planta')); limpiarCombo(ml('Area')); limpiarCombo(ml('Estado del RMD'));
     const cr = ml('Codigo RMD'); cr.setValue(code); cr.fireChange({ value: code });
-    CORE().byId(F().contentDocument.querySelector('[id$=btnGo]').id.replace(/-inner$/, '')).firePress(); await W(3500);
-    const fila = [...F().contentDocument.querySelectorAll('tbody tr')].find((r) => vis(r) && r.children[1]?.textContent.trim() === code);
+    CORE().byId(F().contentDocument.querySelector('[id$=btnGo]').id.replace(/-inner$/, '')).firePress(); await W(1500);
+    const buscar = () => [...F().contentDocument.querySelectorAll('tbody tr')].find((r) => vis(r) && r.children[1]?.textContent.trim() === code);
+    await until(() => buscar(), 25000);
+    const fila = buscar();
     if (!fila) throw new Error('No se encontró el RMD ' + code);
     out.version = fila.children[2]?.textContent.trim(); out.estado = fila.children[3]?.textContent.trim();
     const menu = CORE().byId(fila.querySelector('.sapMMenuBtn').id).getMenu();
@@ -108,7 +111,7 @@
             const o = { ...e };
             if (await openPress(e.n, 'Adicionar Pasos RMD', /Pasos \(/)) {
               await cargarTodo(); o.p = readPasos(); o.pm = {};
-              for (const x of o.p.filter((x) => x.pm)) {
+              for (const x of conPM ? o.p.filter((x) => x.pm) : []) {
                 const tr = rowsOf(TOP()).find((t) => t.children[2]?.querySelector('input')?.value === x.o);
                 const b = tr && [...tr.querySelectorAll('button')].find((y) => y.title === 'Procesos Menores'); if (!b) continue;
                 const antes = TOP(); CORE().byId(b.id).firePress();

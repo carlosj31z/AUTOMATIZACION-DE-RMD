@@ -126,6 +126,20 @@ utensilios/motivo-lapsos en Configuración Maestra, configuración de un RMD
 (número/rango/fórmula/notificación), predecesores—, exportar máster, agregar
 documento/nota, envío a jefe, cambio de destinatario, autorización.
 
+### Sesión sin guardar credenciales (login manual y CDP)
+
+El programa nunca necesita tu usuario/contraseña: inicia sesión tú en el navegador.
+
+- `RMD_LOGIN_MANUAL=true`: abre una ventana visible y espera (5 min) a que inicies sesión.
+- `RMD_CDP_URL=http://127.0.0.1:9222`: se conecta a un Chromium ya abierto y con sesión, para varias corridas seguidas
+  (no lo cierra al terminar). Ábrelo así:
+
+```bash
+chrome.exe --remote-debugging-port=9222 --user-data-dir=data/perfil_chromium
+```
+
+Validado con `examples/cambios_prueba.yaml` sobre un RMD de prueba (nunca lo apuntes a un RMD real sin revisar el plan).
+
 ## Estructura del proyecto
 
 ```

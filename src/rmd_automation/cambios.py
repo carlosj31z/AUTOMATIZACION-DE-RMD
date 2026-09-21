@@ -136,14 +136,16 @@ def _plan_secuenciales(a: Accion, snap: dict) -> None:
         return
     faltan = 0
     anterior: Optional[dict] = None
+    pos_anterior = 0
     for i, p in enumerate(lst.pasos):
         if p.get("td") == "Sin tipo de dato":
             faltan += 1 if (p.get("dep") or "").strip() else 0
             continue
         if anterior is not None:
-            if orden_de_dep(p.get("dep", "")) != int(anterior.get("o") or 0):
+            # Si la vista angosta no expone el campo Orden, el orden es la posición en la lista.
+            if orden_de_dep(p.get("dep", "")) != int(anterior.get("o") or pos_anterior):
                 faltan += 1
-        anterior = p
+        anterior, pos_anterior = p, i + 1
     a.estado = PENDIENTE if faltan else APLICADO
     a.detalle = f"{faltan} paso(s) con predecesor distinto de la regla" if faltan else "cadena ya conforme"
 
@@ -213,6 +215,9 @@ def ejecutar(spec: Spec, plan: List[Accion], automation) -> None:
             elif a.tipo == "agregar_pasos":
                 est, _, etq = p["lista"].partition(">")
                 editor.agregar_pasos(est, p["pasos"], etq or None)
+                editor.cerrar_dialogo()  # "Pasos (n)"
+                if etq:
+                    editor.cerrar_dialogo()  # "Etiqueta (n)"
             elif a.tipo == "configurar_paso":
                 est, _, etq = p["lista"].partition(">")
                 editor.configurar_paso(est, etq or None, p["paso"], p.get("tipo_dato"), p.get("decimal"), p.get("casillas"))

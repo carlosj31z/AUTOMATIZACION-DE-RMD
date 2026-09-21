@@ -92,3 +92,21 @@ def tab(scope: Scope, nombre: str) -> Locator:
     # El nombre accesible de cada tab lleva un prefijo del ícono/estado
     # ("Positivo Estructura", "Neutro Etiqueta", ...): se acota por sufijo.
     return scope.get_by_role("tab", name=re.compile(rf"(^|\s){re.escape(nombre)}$"))
+
+
+class CasillaFila:
+    """Casilla de selección (multi-select) de una fila de tabla UI5, vista desde la fila."""
+
+    def __init__(self, fila: Locator):
+        self.fila = fila
+
+    def check(self) -> None:
+        if self.fila.get_attribute("aria-selected") != "true":
+            self.fila.locator("td.sapMListTblSelCol").click()
+            self.fila.page.wait_for_function(
+                "e => e.getAttribute('aria-selected') === 'true'", arg=self.fila.element_handle(), timeout=5000
+            )
+
+    def uncheck(self) -> None:
+        if self.fila.get_attribute("aria-selected") == "true":
+            self.fila.locator("td.sapMListTblSelCol").click()

@@ -1,0 +1,22 @@
+# Especificación de PRUEBA para validar el ejecutor sobre un RMD de prueba (nunca sobre uno real).
+rmd: "2202609091"
+descripcion: "Validación del ejecutor en RMD de prueba"
+cambios:
+  - accion: quitar_equipos
+    equipos: ["SOL-E172"]
+
+  - accion: quitar_pasos
+    lista: "NOTAS IMPORTANTES DURANTE EL PROCESO"
+    pasos: ["RESPETAR LAS TEMPERATURAS"]
+
+  - accion: agregar_pasos
+    lista: "NOTAS IMPORTANTES DURANTE EL PROCESO"
+    pasos: ["MANITOL POLVO ACTUA COMO COMPENSADOR"]
+
+  - accion: configurar_paso
+    lista: "PROCEDIMIENTO>RENDIMIENTO"
+    paso: "CANTIDAD ENTREGADA"
+    decimal: 2
+
+  - accion: predecesores_secuenciales
+    lista: "NOTAS IMPORTANTES DURANTE EL PROCESO"

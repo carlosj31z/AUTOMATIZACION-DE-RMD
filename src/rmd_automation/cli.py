@@ -111,7 +111,7 @@ def cambios_aplicar(spec: str, confirmar: bool, auditoria: str) -> None:
 
     sp = cb.cargar_spec(spec)
     with rmd_session(load_config()) as page:
-        snap = extraer(page, sp.rmd)
+        snap = extraer(page, sp.rmd, procesos_menores=False)
         if snap.get("estado") != "Ingresado":
             raise click.ClickException(
                 f"El RMD {sp.rmd} está en estado {snap.get('estado')!r}; solo se modifican versiones Ingresadas."
@@ -131,7 +131,7 @@ def cambios_aplicar(spec: str, confirmar: bool, auditoria: str) -> None:
             cb.auditar(auditoria, sp, plan, "cancelado por el usuario")
             return
         cb.ejecutar(sp, plan, RmdAutomation(page))
-        despues = cb.planificar(sp, extraer(page, sp.rmd))
+        despues = cb.planificar(sp, extraer(page, sp.rmd, procesos_menores=False))
         ok = all(a.estado == cb.APLICADO for a in despues)
         cb.auditar(auditoria, sp, despues, "verificado" if ok else "verificación con diferencias")
         click.echo(cb.plan_a_texto(sp, despues))
