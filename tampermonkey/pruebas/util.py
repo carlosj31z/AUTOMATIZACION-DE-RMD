@@ -56,6 +56,14 @@ def cerrar_todo(fr, pg):
     for _ in range(12):
         if not fr.evaluate("[...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length)"):
             return
+        # aviso propio del script ("Tienes cambios sin guardar"): se descarta (su primer botón es el de descartar/continuar)
+        if fr.evaluate("!!document.querySelector('.rmd-modal-aviso')"):
+            try:
+                fr.locator(".rmd-modal-aviso button").first.click(timeout=3000)
+            except Exception:
+                pass
+            pg.wait_for_timeout(1200)
+            continue
         for nombre in ("Cancelar", "Cerrar"):
             try:
                 fr.get_by_role("dialog").last.get_by_role("button", name=nombre).click(timeout=4000)

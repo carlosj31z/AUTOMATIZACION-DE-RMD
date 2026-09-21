@@ -100,6 +100,13 @@ Reglas observadas:
   depende de "condiciones ambientales", "inicio del encapsulado" depende del "final de
   preparación").
 - **CONDICIONES AMBIENTALES y RENDIMIENTO no llevan predecesores.**
+- **Todo paso mayor con tipo de dato (distinto de "Sin tipo de dato") debe llevar predecesor** en Precauciones, Notas importantes, Procedimiento
+  (todas las etiquetas salvo Rendimiento), etc. (la operación lo pidió; el linter y el userscript lo avisan). En 26 RMD leídos, los autorizados lo
+  cumplen salvo casos aislados. **Cuando no aplica:** el primer paso con tipo de PRECAUCIONES (cabeza de toda la cadena), Rendimiento y Condiciones
+  ambientales (no llevan), y los pasos condicionales o en paralelo por su redacción ("EN CASO QUE…", "PARALELAMENTE…", "EN PARALELO…", "BAJO LA
+  SUPERVISION…", "ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA…"). El primer paso con tipo de Notas importantes, Documentación, las preparaciones
+  y la etapa principal **sí** lleva predecesor (el último de la lista anterior). **Cuidado:** el portal **vacía el Depende de una fila en cuanto se marca
+  su casilla Estado CC** (comprobado en pantalla, con y sin el userscript): el predecesor se asigna *después* de marcar Estado CC.
 - El botón **Generar Predecesores** genera una cadena lineal completa en orden de estructuras (incluso
   encadenando Rendimiento con el último paso de Fabricación y a los Sin tipo de dato). Sirve de base:
   después hay que **quitar** los predecesores de Rendimiento/Condiciones, **saltar** los Sin tipo de
@@ -248,9 +255,11 @@ Otros pasos que mencionan a Calidad en Operaciones **no** llevan Estado CC: "SOL
 Verificación Check sí lleva Edit (41 de 41).
 
 **Textos que cambiaron** (la operación pidió reemplazar todo "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"):
-- Nota del granel (Envase, Notas importantes): antes "…APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE";
-  algunos RMD vigentes dicen "…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES…", pero la operación confirmó que **solo debe quedar
-  Calidad en Operaciones**: cualquier "CONTROL DE CALIDAD" se alerta.
+- Nota del granel (Envase, Notas importantes): antes "…APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE" (se alerta:
+  hay que cambiarla). La redacción vigente **"VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES,
+  SEGUN APLIQUE."** es **correcta** (la operación lo confirmó; está en los RMD de Envase autorizados): nombra a Calidad en Operaciones, así que
+  no se alerta (tampoco con las dos áreas al revés). Fuera de esa fórmula, cualquier otro "CONTROL DE CALIDAD" se alerta: solo debe quedar
+  Calidad en Operaciones.
 - "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION" (Acondicionado) y
   "ESPERAR RESULTADOS DE CONTROL DE CALIDAD…" (Fabricación) todavía aparecen con el texto antiguo incluso en RMD autorizados
   de septiembre de 2026: hay que actualizarlos.

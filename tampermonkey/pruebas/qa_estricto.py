@@ -1,10 +1,12 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
-  K botón de mejoras y panel · L el botón no desaparece al cargar la página (inyección temprana, como Tampermonkey) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  K botón de mejoras y panel · L el botón no desaparece al cargar la página (inyección temprana, como Tampermonkey)
+  M aviso de cambios sin guardar (sin falsos avisos tras guardar; aviso propio centrado) · N predecesor obligatorio en pasos con tipo de dato y texto
+  'CONTROL DE CALIDAD O CALIDAD EN OPERACIONES' · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -14,7 +16,7 @@ Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variable
   Extra: RMD_ASOCIAR + ASOCIAR_DESC (RMD con versión anterior visible al buscar esa descripción), RMD_LAYOUT + ETQS_LISTAS (listas de Pasos).
 NUNCA apuntes RMD_PRUEBA a un RMD real si vas a ejecutar el bloque D: cambia y borra procesos menores del paso 19.
 """
-import json, os, sys, time, traceback
+import json, os, re, sys, time, traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from util import SCRIPT, abrir, abrir_con_inyeccion_temprana, abrir_dialogo, marcar_fila, cerrar_todo
 from playwright.sync_api import sync_playwright
@@ -27,9 +29,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMND"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKL).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMN).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -108,6 +110,14 @@ with sync_playwright() as p:
         finally: ACEPTAR[0] = False
     pg.on("dialog", on_dialog)
     fr.evaluate(src); fr.evaluate(JS_UTIL)
+
+    def aviso_propio():
+        """Aviso propio del script (ventana centrada 'Tienes cambios sin guardar' y similares): datos del aviso visible, o None."""
+        return fr.evaluate("""() => { const m = document.querySelector('.rmd-modal-aviso'); if (!m) return null; const q = m.getBoundingClientRect(), f = m.closest('.rmd-modal-fondo').getBoundingClientRect();
+          return { titulo: (m.querySelector('h3')||{}).textContent, texto: m.innerText, botones: [...m.querySelectorAll('button')].map(b => b.textContent.trim()), cx: Math.round(q.left + q.width / 2), cy: Math.round(q.top + q.height / 2),
+                   vw: innerWidth, vh: innerHeight, fondo: [Math.round(f.width), Math.round(f.height)], w: Math.round(q.width), h: Math.round(q.height) }; }""")
+    def pulsar_aviso(texto):
+        fr.locator(".rmd-modal-aviso button", has_text=texto).click(); pg.wait_for_timeout(900)
 
     # ───────────────────────── A. Diseño y estructura ─────────────────────────
     if "A" in SOLO:
@@ -493,7 +503,10 @@ with sync_playwright() as p:
             abrir_dialogo(fr, pg, "ESPECIFICACIONES", "Adicionar Especificaciones"); pg.wait_for_timeout(4500)
         def cerrar_spec():
             i = fr.evaluate("() => " + TOP + ".id"); ACEPTAR[0] = True
-            try: fr.locator(f"[id='{i}'] footer button", has_text="Cancelar").click(); pg.wait_for_timeout(2500)
+            try:
+                fr.locator(f"[id='{i}'] footer button", has_text="Cancelar").click(); pg.wait_for_timeout(1200)
+                if aviso_propio(): pulsar_aviso("Descartar y cerrar")               # había cambios sin guardar: se descartan
+                pg.wait_for_timeout(1500)
             finally: ACEPTAR[0] = False
         ESTADO_ESPEC = "() => { const d=" + TOP + """; const t=d.querySelector('table'); const ctl=sap.ui.getCore().byId(t.id.replace(/-listUl$/,''));
           const items=ctl.getItems(); const filas=items.map(it=>{ const k=Object.keys(it.oBindingContexts)[0]; const o=it.getBindingContext(k).getObject(); return [o.ensayoHijo, (o.especificacion||'').slice(-14), o.orden, it.getSelected()?'x':'']; });
@@ -594,15 +607,18 @@ with sync_playwright() as p:
                 pendientes_antes = sum(1 for m in antes["modificadas"] if m)
                 ok = todas and len(con_texto) == 1 and con_texto[0]["datos"]["especificacion"].endswith("(EDITADO)") and len(con_orden) >= 1 and not bloqueadas and despues["nota"] == ""
                 return ok, f"peticiones={len(capt)} con_texto={len(con_texto)} con_orden={len(con_orden)} bloqueadas={bloqueadas} pendientes_antes={pendientes_antes} nota_despues={despues['nota']!r}"
-            @prueba("J7 Descartar: un cambio sin guardar se pierde al cerrar la ventana (con aviso previo) y al reabrir queda lo último guardado")
+            @prueba("J7 Descartar: un cambio sin guardar se pierde al cerrar la ventana (con el aviso propio, centrado) y al reabrir queda lo último guardado")
             def _():
                 guardado = fr.evaluate(ESTADO_ESPEC)
                 ta = fr.locator(f"[id='{dlg_id()}'] textarea.rmd-edit[data-campo=especificacion]").nth(0); ta.click(); ta.press("End"); ta.type(" SIN GUARDAR"); pg.wait_for_timeout(700)
-                antes = len(dialogos_nativos); cerrar_spec()
-                aviso = dialogos_nativos[antes:] if len(dialogos_nativos) > antes else []
+                nativos = len(dialogos_nativos); i = dlg_id()
+                fr.locator(f"[id='{i}'] footer button", has_text="Cancelar").click(); pg.wait_for_timeout(1000)
+                av = aviso_propio()
+                centrado = bool(av) and abs(av["cx"] - av["vw"] / 2) <= 2 and abs(av["cy"] - av["vh"] / 2) <= 2
+                pulsar_aviso("Descartar y cerrar"); pg.wait_for_timeout(1500)
                 reabrir_spec(); e = fr.evaluate(ESTADO_ESPEC)
-                ok = bool(aviso) and "sin guardar" in aviso[0].lower() and e["textos"] == guardado["textos"] and [f[0] for f in e["filas"]] == [f[0] for f in guardado["filas"]] and e["nota"] == ""
-                return ok, f"aviso={aviso[:1]} textos_iguales={e['textos'] == guardado['textos']}"
+                ok = bool(av) and "cambios sin guardar" in av["titulo"].lower() and centrado and len(dialogos_nativos) == nativos and e["textos"] == guardado["textos"] and [f[0] for f in e["filas"]] == [f[0] for f in guardado["filas"]] and e["nota"] == ""
+                return ok, f"aviso={av and av['titulo']} centrado={centrado} sin cuadro del navegador={len(dialogos_nativos) == nativos} textos_iguales={e['textos'] == guardado['textos']}"
             @prueba("J8 Una Descripción vacía no se guarda: se avisa y no se envía ninguna petición")
             def _():
                 listo, bloqueadas, guardia = cortafuegos_y_stub()
@@ -649,15 +665,17 @@ with sync_playwright() as p:
                 te = fr.locator(f"[id='{did}'] textarea.rmd-edit[data-campo=especificacion]").nth(1); te.click(); te.press("End"); te.press("Enter"); te.type("Y")
                 multi = fr.evaluate("(" + TOP + ").querySelectorAll('textarea.rmd-edit[data-campo=especificacion]')[1].value.includes(String.fromCharCode(10))")
                 return (lim == "150,500" and largo == 150 and una_linea == "Fila 2A" and multi), f"límites={lim} largo tras teclear 170={largo} descripción tras Enter={una_linea!r} especificación admite salto={multi}"
-            @prueba("J12 Con textos u orden sin guardar, 'Agregar' (igual que Eliminar y Ensayos SAP, que vuelven a leer del servidor) pide confirmación antes de continuar")
+            @prueba("J12 Con textos u orden sin guardar, 'Agregar' (igual que Eliminar y Ensayos SAP, que vuelven a leer del servidor) pide confirmación con el aviso propio antes de continuar")
             def _():
                 ta = fr.locator(f"[id='{dlg_id()}'] textarea.rmd-edit[data-campo=especificacion]").nth(0); ta.click(); ta.press("End"); ta.type(" Z"); pg.wait_for_timeout(600)
-                n0 = fr.evaluate("window.__q.d().length"); antes = len(dialogos_nativos)
+                n0 = fr.evaluate("window.__q.d().length"); nativos = len(dialogos_nativos)
                 bid = fr.evaluate("() => [...(" + TOP + ").querySelectorAll('button')].find(x=>x.title==='Agregar').id")
-                fr.locator(f"[id='{bid}']").click(); pg.wait_for_timeout(1800)      # (solo 'Agregar': abre un formulario; nunca se pulsa 'Ensayos SAP', que escribe)
-                msg = dialogos_nativos[antes:]; n1 = fr.evaluate("window.__q.d().length")
+                fr.locator(f"[id='{bid}']").click(); pg.wait_for_timeout(1500)      # (solo 'Agregar': abre un formulario; nunca se pulsa 'Ensayos SAP', que escribe)
+                av = aviso_propio(); n1 = fr.evaluate("window.__q.d().length")
+                if av: pulsar_aviso("Volver")
+                n2 = fr.evaluate("window.__q.d().length")
                 cerrar_spec()
-                return (bool(msg) and "sin guardar" in msg[0] and n1 == n0), f"{msg[:1]} diálogos {n0}->{n1}"
+                return (bool(av) and "sin guardar" in av["titulo"].lower() and av["botones"] == ["Continuar sin guardar", "Volver"] and n1 == n0 and n2 == n0 and len(dialogos_nativos) == nativos), f"{av and av['titulo']} botones={av and av['botones']} diálogos {n0}->{n1}->{n2}"
             cerrar_seguro()
             # RMD que no está Ingresado: no se ofrece edición ni reorden (el portal tampoco deja modificarlo)
             ab = abrir_spec(RMD_AUTORIZADO)
@@ -730,6 +748,193 @@ with sync_playwright() as p:
         finally:
             pg2.close()
 
+    # ───────────────────────── M. Aviso de cambios sin guardar: sin falsos avisos tras guardar, y aviso propio centrado ─────────────────────────
+    if "M" in SOLO:
+        cerrar_seguro(); pg.set_viewport_size({"width": 1415, "height": 886}); pg.wait_for_timeout(1200)
+        TOPM = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
+        def abrir_estructura(nombre, codigo=None, con_editor=True):
+            """Abre la lista de pasos de una estructura (PRECAUCIONES…) del RMD; con_editor=False reutiliza el editor ya abierto."""
+            codigo = codigo or RMD_PRUEBA
+            for intento in range(3):
+                try:
+                    if con_editor:
+                        RmdAutomation(pg).editor_de_rmd(codigo); pg.wait_for_timeout(4000)
+                    abrir_dialogo(fr, pg, nombre, "Adicionar Pasos RMD"); pg.wait_for_timeout(3500)
+                    return True
+                except Exception as ex:
+                    ultimo_error_m[0] = str(ex)[:160]
+                    cerrar_seguro(); pg.wait_for_timeout(4000 * (intento + 1)); con_editor = True
+            return False
+        ultimo_error_m = [""]
+        def n_dialogos(): return fr.evaluate("window.__q.d().length")
+        def id_top(): return fr.evaluate("() => " + TOPM + ".id")
+        def tocar_casilla(fila=1):
+            """Clic REAL en la casilla Estado CC de la fila (0-based): es una edición de la persona."""
+            rid = fr.evaluate("(n) => { const d=" + TOPM + "; const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim().toUpperCase()); const i=ths.indexOf('ESTADO CC');"
+                              " const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[n]; tr.scrollIntoView({block:'center'}); return tr.id + '|' + i; }", fila)
+            tid, i = rid.split("|"); pg.wait_for_timeout(500)
+            fr.locator(f"[id='{tid}'] td").nth(int(i)).locator("[role=checkbox]").click(); pg.wait_for_timeout(500)
+        def cancelar():
+            fr.locator(f"[id='{id_top()}'] footer button", has_text="Cancelar").click(); pg.wait_for_timeout(1000)
+        def guardar_neutro():
+            """Pulsa el Guardar REAL del portal, pero con su acción sustituida por una que no hace nada (no se escribe nada)."""
+            fr.evaluate("() => { const d=" + TOPM + "; const b=[...d.querySelectorAll('button')].find(x=>x.title==='Guardar'); const c=sap.ui.getCore().byId(b.id.replace(/-inner$/,'')); const l=c.mEventRegistry.press||[];"
+                        " if (!window.__pressOrig) window.__pressOrig = l.map(x=>x.fFunction); l.forEach(x=>{ x.fFunction = function(){}; }); }")
+            bid = fr.evaluate("() => [...(" + TOPM + ").querySelectorAll('button')].find(x=>x.title==='Guardar').id")
+            fr.locator(f"[id='{bid}']").click(); pg.wait_for_timeout(300)
+        def ruido_del_portal():
+            """Cambia un valor como lo haría el portal tras guardar o al refrescar: con la API de UI5, sin ningún evento de teclado ni ratón."""
+            fr.evaluate("() => { const d=" + TOPM + "; const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim().toUpperCase()); const i=ths.indexOf('VAL. INICIAL');"
+                        " const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[1]; const inp=tr.children[i].querySelector('input'); const c=sap.ui.getCore().byId(inp.id.replace(/-inner$/,'')); c.setValue('7'); }")
+        def sucia_ahora(): return fr.evaluate("(window.__rmdStats.sucias().pop() || [null])[0]")
+        def mensaje_portal(tipo, texto):
+            fr.evaluate("([t, x]) => { sap.ui.require(['sap/m/MessageBox'], (MB) => MB[t](x)); }", [tipo, texto]); pg.wait_for_timeout(1000)
+        def cerrar_mensajes():
+            for _ in range(3):
+                try: fr.locator(".sapMMessageDialog button").filter(has_text="OK").first.click(timeout=2500); pg.wait_for_timeout(600)
+                except Exception: break
+        listo = abrir_estructura("PRECAUCIONES")
+        if not listo:
+            registrar("M0 Se pudo abrir la lista de Precauciones del RMD de prueba", False, f"RMD {RMD_PRUEBA}: {ultimo_error_m[0]}")
+        else:
+            nativos0 = len(dialogos_nativos)
+            @prueba("M1 Tocar una casilla y pulsar Cancelar muestra el aviso propio: centrado en la página, con botones claros y sin el cuadro del navegador")
+            def _():
+                tocar_casilla(1); cancelar(); av = aviso_propio()
+                centrado = bool(av) and abs(av["cx"] - av["vw"] / 2) <= 2 and abs(av["cy"] - av["vh"] / 2) <= 2 and av["fondo"] == [av["vw"], av["vh"]]
+                ok = bool(av) and av["titulo"] == "Tienes cambios sin guardar" and av["botones"] == ["Descartar y cerrar", "Seguir editando"] and centrado and len(dialogos_nativos) == nativos0 and n_dialogos() == 2
+                return ok, f"{av and (av['titulo'], av['botones'], (av['cx'], av['cy']), (av['vw'], av['vh']), (av['w'], av['h']))} nativos={len(dialogos_nativos) - nativos0}"
+            @prueba("M2 'Seguir editando', Escape y Enter conservan el trabajo (la ventana sigue abierta y sin guardar); 'Descartar y cerrar' cierra")
+            def _():
+                pulsar_aviso("Seguir editando"); a = (aviso_propio() is None, n_dialogos() == 2, sucia_ahora())
+                cancelar(); e1 = aviso_propio() is not None; pg.keyboard.press("Escape"); pg.wait_for_timeout(700); b_ = (aviso_propio() is None, n_dialogos() == 2)
+                cancelar(); e2 = aviso_propio() is not None; pg.keyboard.press("Enter"); pg.wait_for_timeout(700); c = (aviso_propio() is None, n_dialogos() == 2)
+                cancelar(); pulsar_aviso("Descartar y cerrar"); pg.wait_for_timeout(1200); d_ = (aviso_propio() is None, n_dialogos() == 1)
+                return (a == (True, True, True) and e1 and b_ == (True, True) and e2 and c == (True, True) and d_ == (True, True)), f"{a} {e1} {b_} {e2} {c} {d_}"
+            @prueba("M3 Guardar y luego Cancelar NO avisa aunque el portal cambie valores después de guardar (aviso falso corregido)")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1); guardar_neutro(); antes = sucia_ahora()
+                ruido_del_portal(); cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
+                return (antes is False and av is None and cerrado), f"sucia tras guardar={antes} aviso={av and av['titulo']} cerrada={cerrado}"
+            @prueba("M4 Lo mismo con Ctrl+S: tras guardar, aunque el portal cambie valores, Cancelar no avisa")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1)
+                fr.evaluate("() => { const d=" + TOPM + "; const b=[...d.querySelectorAll('button')].find(x=>x.title==='Guardar'); const c=sap.ui.getCore().byId(b.id.replace(/-inner$/,'')); (c.mEventRegistry.press||[]).forEach(x=>{ x.fFunction = function(){}; }); }")
+                pg.keyboard.press("Control+s"); pg.wait_for_timeout(400); ruido_del_portal(); cancelar()
+                av = aviso_propio(); cerrado = n_dialogos() == 1
+                return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
+            @prueba("M5 Si el portal responde con una Advertencia al guardar (no se guardó), la ventana sigue sin guardar y Cancelar avisa")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1); guardar_neutro()
+                mensaje_portal("warning", "Faltan campos obligatorios (prueba)"); cerrar_mensajes(); pg.wait_for_timeout(500)
+                sucia = sucia_ahora(); cancelar(); av = aviso_propio()
+                if av: pulsar_aviso("Descartar y cerrar")
+                return (sucia is True and bool(av) and n_dialogos() == 1), f"sucia={sucia} aviso={av and av['titulo']}"
+            @prueba("M6 Si el portal responde con Éxito al guardar, la ventana queda limpia y Cancelar no avisa")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1); guardar_neutro()
+                mensaje_portal("success", "Se guardaron correctamente los cambios (prueba)"); pg.wait_for_timeout(2500); cerrar_mensajes()
+                ruido_del_portal(); cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
+                return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
+            @prueba("M7 Cambios que hace el portal sin que la persona toque nada (cargar, refrescar) no cuentan como cambios sin guardar")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); ruido_del_portal(); cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
+                return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
+            @prueba("M8 Marcar filas para copiar/borrar y escribir en el filtro local no cuentan como cambios")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False)
+                rid = fr.evaluate("() => { const d=" + TOPM + "; const tr=[...d.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[2]; return tr.id; }")
+                fr.locator(f"[id='{rid}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(400)
+                fr.locator("#rmd-filtro-bar input.rmd-filtro").last.fill("USAR"); pg.wait_for_timeout(500)
+                cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
+                return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
+            @prueba("M9 Tocar una casilla y volver a dejarla igual no avisa (no hay diferencia)")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1); tocar_casilla(1); cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
+                return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
+            @prueba("M10 Con 'Avisar cambios sin guardar' apagado, Cancelar cierra sin avisar")
+            def _():
+                abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1)
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(700)
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
+                if not cerrado: cerrar_seguro()
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(700)
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
+            cerrar_seguro()
+
+    # ───────────────────────── N. Predecesor obligatorio en pasos con tipo de dato, y texto "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" ─────────────────────────
+    if "N" in SOLO:
+        cerrar_seguro(); pg.set_viewport_size({"width": 1415, "height": 886}); pg.wait_for_timeout(1200)
+        TOPN = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
+        LEER_PRED = "() => { const d=" + TOPN + """; const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim().toUpperCase()); const iD=ths.indexOf('DEPENDE'), iT=ths.indexOf('TIPO DATO'), iDes=ths.findIndex(x=>/^DESCRIPCI/.test(x));
+          const filas=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)); const cuenta=(d.querySelector('#rmd-filtro-bar .rmd-alerta')||{}).textContent;
+          return { lista: window.__rmdStats.listas().pop(), cuenta, filas: filas.map((tr,k)=>({ k, tipo:(tr.children[iT].querySelector('input')||{}).value, dep:(tr.children[iD].querySelector('input')||{}).value, falta:tr.children[iD].classList.contains('rmd-falta'), aviso:tr.children[iD].title,
+            faltaDes:tr.children[iDes].classList.contains('rmd-falta'), avisoDes:tr.children[iDes].title, desc:tr.children[iDes].textContent.trim().slice(0,60) })) }; }"""
+        def vaciar_dep(k):
+            fr.evaluate("(k) => { const d=" + TOPN + "; const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim().toUpperCase()); const iD=ths.indexOf('DEPENDE');"
+                        " const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[k]; const inp=tr.children[iD].querySelector('input'); const c=sap.ui.getCore().byId(inp.id.replace(/-inner$/,'')); c.setValue(''); c.fireChange({value:''}); }", k)
+            pg.wait_for_timeout(1300)
+        def poner_desc(k, texto):
+            fr.evaluate("([k, x]) => { const d=" + TOPN + "; const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim().toUpperCase()); const iDes=ths.findIndex(x=>/^DESCRIPCI/.test(x));"
+                        " const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[k]; const sp=tr.children[iDes].querySelector('.sapMText'); sap.ui.getCore().byId(sp.id).setText(x); }", [k, texto])
+            pg.wait_for_timeout(1300)
+        def abrir_lista(estructura=None, etiqueta=None):
+            for intento in range(3):
+                try:
+                    RmdAutomation(pg).editor_de_rmd(RMD_PRUEBA); pg.wait_for_timeout(4000)
+                    if estructura: abrir_dialogo(fr, pg, estructura, "Adicionar Pasos RMD")
+                    else:
+                        abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, etiqueta, "Adicionar Pasos RMD")
+                    pg.wait_for_timeout(3500); return True
+                except Exception:
+                    cerrar_seguro(); pg.wait_for_timeout(4000 * (intento + 1))
+            return False
+        if abrir_lista(estructura="PRECAUCIONES"):
+            @prueba("N1 Precauciones: el primer paso (cabeza de la cadena) no necesita predecesor; los demás con tipo de dato sí, y se avisa en la celda Depende y en el contador")
+            def _():
+                a = fr.evaluate(LEER_PRED); cuenta_antes = a["cuenta"]
+                cabeza_ok = not a["filas"][0]["falta"] and a["lista"] == "PRECAUCIONES"
+                k = next(f["k"] for f in a["filas"] if f["k"] > 0 and f["dep"] and f["tipo"] and "sin tipo" not in f["tipo"].lower())
+                vaciar_dep(k); b_ = fr.evaluate(LEER_PRED)
+                marcado = b_["filas"][k]["falta"] and "Falta el predecesor" in b_["filas"][k]["aviso"] and not b_["filas"][0]["falta"]
+                return (cabeza_ok and marcado and b_["cuenta"] != cuenta_antes), f"lista={a['lista']} cabeza_sin_aviso={cabeza_ok} fila {k} marcada={marcado} contador {cuenta_antes!r} -> {b_['cuenta']!r}"
+            cerrar_seguro()
+        if abrir_lista(etiqueta="FABRICACION"):
+            @prueba("N2 Fabricación: un paso con tipo de dato sin predecesor se marca; un 'Sin tipo de dato' sin predecesor no")
+            def _():
+                a = fr.evaluate(LEER_PRED)
+                sin = next((f["k"] for f in a["filas"] if "sin tipo" in (f["tipo"] or "").lower() and not f["dep"]), None)
+                k = next(f["k"] for f in a["filas"] if f["dep"] and f["tipo"] and "sin tipo" not in f["tipo"].lower() and not re.search(r"CASO QUE|SUPERVISION|PARALEL|ENTREGAR LA DOCUMENTACION", f["desc"].upper()))
+                vaciar_dep(k); b_ = fr.evaluate(LEER_PRED)
+                return (b_["filas"][k]["falta"] and (sin is None or not b_["filas"][sin]["falta"])), f"lista={a['lista']!r} fila {k} marcada={b_['filas'][k]['falta']} sin-tipo(fila {sin}) marcada={sin is not None and b_['filas'][sin]['falta']}"
+            @prueba("N3 Los pasos condicionales o en paralelo ('EN CASO QUE…', 'PARALELAMENTE…', 'BAJO LA SUPERVISION…', 'ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA…') pueden ir sin predecesor")
+            def _():
+                a = fr.evaluate(LEER_PRED); k = next(f["k"] for f in a["filas"] if f["k"] > 3 and f["dep"] and f["tipo"] and "sin tipo" not in f["tipo"].lower())
+                resultados = {}
+                for texto in ("EN CASO QUE SE DETECTE UN DESVIO, AVISAR AL JEFE.", "PARALELAMENTE TRITURAR EL EXCIPIENTE.", "BAJO LA SUPERVISION DEL JEFE, REALIZAR EL MUESTREO.", "ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA AL JEFE O SUPERVISOR.", "MEDIR EL PESO DEL GRANEL."):
+                    poner_desc(k, texto); vaciar_dep(k); resultados[texto[:12]] = fr.evaluate(LEER_PRED)["filas"][k]["falta"]
+                esperado = {"EN CASO QUE ": False, "PARALELAMENT": False, "BAJO LA SUPE": False, "ENTREGAR LA ": False, "MEDIR EL PES": True}
+                return resultados == esperado, str(resultados)
+            @prueba("N4 'VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.' es correcto (no se alerta); otros 'CONTROL DE CALIDAD' sí")
+            def _():
+                a = fr.evaluate(LEER_PRED); k = next(f["k"] for f in a["filas"] if f["k"] > 3 and f["dep"] and f["tipo"] and "sin tipo" not in f["tipo"].lower())
+                res = {}
+                for clave, texto in (("correcto", "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE."),
+                                     ("invertido", "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CALIDAD EN OPERACIONES O CONTROL DE CALIDAD, SEGUN APLIQUE."),
+                                     ("antiguo", "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE."),
+                                     ("suelto", "AVISAR AL CONTROL DE CALIDAD"), ("solo_operaciones", "AVISAR A CALIDAD EN OPERACIONES")):
+                    poner_desc(k, texto); res[clave] = fr.evaluate(LEER_PRED)["filas"][k]["faltaDes"]
+                return res == {"correcto": False, "invertido": False, "antiguo": True, "suelto": True, "solo_operaciones": False}, str(res)
+            cerrar_seguro()
+        if abrir_lista(etiqueta="RENDIMIENTO"):
+            @prueba("N5 Rendimiento no lleva predecesores: ni aunque un paso con tipo de dato esté sin predecesor se marca")
+            def _():
+                a = fr.evaluate(LEER_PRED); tipados = [f for f in a["filas"] if f["tipo"] and "sin tipo" not in f["tipo"].lower()]
+                return (bool(tipados) and not any(f["falta"] for f in a["filas"])), f"lista={a['lista']!r} pasos con tipo={len(tipados)} marcados={sum(1 for f in a['filas'] if f['falta'])}"
+            cerrar_seguro()
+
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:
         pg.wait_for_timeout(3500)
@@ -767,7 +972,7 @@ with sync_playwright() as p:
                 pg.wait_for_timeout(500)
                 if not fr.evaluate("[...document.querySelectorAll('.sapMMessageDialog')].some(x=>x.getClientRects().length)"): cerrado = True; break
             return (info["txt"].startswith("Éxito") and info["cx"] <= 2 and info["cy"] <= 2 and cerrado), f"{info} cerrado_solo={cerrado}"
-        @prueba("D3 Cambios sin guardar: avisa al Cancelar (se rechaza y la ventana sigue abierta); sin cambios no avisa")
+        @prueba("D3 Cambios sin guardar: avisa al Cancelar con el aviso propio (centrado; 'Seguir editando' deja la ventana abierta); sin cambios no avisa")
         def _():
             marcar = fr.evaluate("""() => { const d=window.__q.top(); const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim().toUpperCase()); const iE=ths.indexOf('PM OP'); const iO=ths.indexOf('ORDEN');
               const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)).find(r=>r.children[iO].querySelector('input').value==='21'); tr.scrollIntoView({block:'center'}); return tr.id+'|'+iE; }""")
@@ -775,14 +980,14 @@ with sync_playwright() as p:
             caja = fr.locator(f"[id='{trid}'] td").nth(int(iE)).locator("[role=checkbox]")
             caja.click(); pg.wait_for_timeout(600)
             n0 = len(dialogos_nativos)
-            fr.evaluate("""() => { const d=window.__q.top(); const b=[...d.querySelectorAll('footer button')].find(x=>x.textContent.trim()==='Cancelar'); b.click(); }"""); pg.wait_for_timeout(1000)
+            fr.get_by_role("dialog").last.get_by_role("button", name="Cancelar").click(); pg.wait_for_timeout(1000)
+            av = aviso_propio()
+            if av: pulsar_aviso("Seguir editando")
             abierto = fr.evaluate("window.__q.d().length") >= 3
-            avisos = dialogos_nativos[n0:]
             caja.click(); pg.wait_for_timeout(600)          # se revierte el cambio: vuelve a estar limpio
-            n1 = len(dialogos_nativos)
             fr.get_by_role("dialog").last.get_by_role("button", name="Cancelar").click(); pg.wait_for_timeout(1800)      # clic real: cierra si no hay cambios
-            sin_aviso = len(dialogos_nativos) == n1 and fr.evaluate("window.__q.d().length") == 2
-            return (bool(avisos) and "sin guardar" in avisos[0] and abierto and sin_aviso), f"avisos={avisos} abierto={abierto} sin_aviso_al_revertir={sin_aviso}"
+            sin_aviso = aviso_propio() is None and fr.evaluate("window.__q.d().length") == 2 and len(dialogos_nativos) == n0
+            return (bool(av) and "sin guardar" in av["titulo"].lower() and abierto and sin_aviso), f"aviso={av and av['titulo']} abierto={abierto} sin_aviso_al_revertir={sin_aviso}"
         # se acepta el aviso al cerrar (descarta los cambios de prueba)
         pass
         cerrar_seguro()

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.9.1
+// @version      1.10.0
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante, copiar/pegar la configuración de un paso, reordenar y editar Especificaciones, aviso de códigos en Asociar Fórmula y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -17,7 +17,7 @@
   if (window.__rmdUiMejoras) return;
   window.__rmdUiMejoras = true;
 
-  const VERSION = '1.9.1';                                                       // mantener igual a @version
+  const VERSION = '1.10.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -66,7 +66,7 @@
     if (e.key === 's' && (e.ctrlKey || e.metaKey) && on('singuardar')) {
       const d = dialogos().pop();
       const g = d && botonPorTitulo(d, 'Guardar');
-      if (g) { e.preventDefault(); e.stopPropagation(); pulsar(g); rebase(d); }
+      if (g) { e.preventDefault(); e.stopPropagation(); alGuardar(d); pulsar(g); }
       return;
     }
     if (!on('enter') || e.key !== 'Enter' || e.isComposing) return;
@@ -173,6 +173,13 @@
   .rmd-modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
   .rmd-modal-cuerpo { flex: 1 1 auto; min-height: 0; overflow: auto; } .rmd-modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
   .rmd-modal p { margin: 0 0 10px; } .rmd-modal label { color: var(--rmd-texto); } .rmd-modal input[type=checkbox] { accent-color: var(--rmd-acento); }
+  /* ── Aviso propio (centrado en la página) en lugar del cuadro del navegador ── */
+  .rmd-modal.rmd-modal-aviso { width: min(460px, 92vw); padding: 24px 26px 18px; }
+  .rmd-aviso-cab { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; } .rmd-aviso-cab h3 { margin: 0; font-size: 17px; }
+  .rmd-aviso-ico { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(240,180,90,.16); color: var(--rmd-ambar); }
+  .rmd-aviso-ico svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .rmd-modal-aviso .rmd-modal-cuerpo p { margin: 0 0 8px; } .rmd-modal-aviso .rmd-aviso-ayuda { color: var(--rmd-apagado); font-size: 13px; }
+  .rmd-btn.peligro { color: var(--rmd-rojo); border-color: var(--rmd-rojo); } .rmd-btn.peligro:hover:not(:disabled) { background: rgba(255,138,138,.12); border-color: var(--rmd-rojo); }
   .rmd-tabla { width: 100%; margin: 6px 0 14px; border-collapse: collapse; }
   .rmd-tabla th { padding: 6px 8px; border-bottom: 1px solid var(--rmd-borde); text-align: left; font: 600 11px var(--rmd-fuente); letter-spacing: .5px; text-transform: uppercase; color: var(--rmd-apagado); }
   .rmd-tabla td { padding: 6px 8px; border-bottom: 1px solid rgba(128,140,155,.16); text-align: left; vertical-align: top; }
@@ -218,6 +225,11 @@
   const CON_EDIT = new Set(['FECHA Y HORA', 'FECHA', 'HORA', 'NUMEROS', 'RANGO', 'TEXTO', 'LOTE', 'FECHA VENCIMIENTO', 'FORMULA', 'ENTREGA', 'MUESTRACC', 'CANTIDAD', 'NOTIFICACION']);
   const NUMERICOS = new Set(['NUMEROS', 'RANGO', 'FORMULA', 'ENTREGA', 'MUESTRACC']);
   const CLAVES = ['SETUP PRE PROCESO', 'PROCESO', 'SETUP POST PROCESO'];
+  // "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (nota del granel de Envase) es la redacción vigente y correcta: nombra a Calidad en Operaciones
+  const ALTERNATIVA_CALIDAD = /CONTROL DE CALIDAD\s+O\s+CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES\s+O\s+CONTROL DE CALIDAD/g;
+  // Pasos que por su redacción pueden ir sin predecesor (condicionales, en paralelo o de cierre; ver docs/como_se_configura_un_rmd.md §5)
+  const INDEPENDIENTES = /\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA/;
+  const LISTAS_SIN_PREDECESOR = /^(RENDIMIENTO|CONDICIONES AMBIENTALES)/;
   // devuelve { casilla: true|false } = estado que debe tener; solo las casillas que la regla fija
   function reglaCasillas(tipo, esPM) {
     const t = SIN_ACENTOS(tipo);
@@ -333,6 +345,26 @@
     tabla.style.setProperty('width', (sumaF + W) + 'px', 'important');
   }
 
+  // Nombre de la lista de pasos que muestra la ventana (PRECAUCIONES, NOTAS IMPORTANTES…, una etiqueta del PROCEDIMIENTO…). El portal no lo escribe en la ventana,
+  // pero sí en su modelo: las filas de una etiqueta llevan mdEsEtiquetaId (y listMdEsEtiqueta trae su nombre); las de una estructura, el nombre está en
+  // headerAddEstructura.descripcion_est. Si el modelo no está disponible se deduce del contenido (Rendimiento: MuestraCC/Entrega; Precauciones: su primer paso).
+  function nombreDeLista(tabla, filas, iTipo, iDes) {
+    try {
+      const ctl = sap.ui.getCore().byId(tabla.id.replace(/-listUl$/, '')), it = ctl && ctl.getItems && ctl.getItems()[0], c = it && contextoDe(it), fila = c && c.getObject();
+      let vista = ctl; while (vista && !vista.getController) vista = vista.getParent && vista.getParent();
+      if (fila && vista) {
+        const idEtq = fila.mdEsEtiquetaId_mdEsEtiquetaId;
+        const nombre = idEtq
+          ? ((vista.getModel('listMdEsEtiqueta').getData().find((e) => e.mdEsEtiquetaId === idEtq) || {}).etiquetaId || {}).descripcion
+          : (vista.getModel('headerAddEstructura').getData() || {}).descripcion_est;
+        if (nombre) return SIN_ACENTOS(nombre);
+      }
+    } catch (e) { /* sin modelo: se deduce del contenido */ }
+    const tipos = filas.map((tr) => SIN_ACENTOS((inputDe(celda(tr, iTipo)) || {}).value || ''));
+    if (tipos.some((x) => x === 'MUESTRACC' || x === 'ENTREGA')) return 'RENDIMIENTO';
+    const d0 = filas[0] && iDes >= 0 ? SIN_ACENTOS(celda(filas[0], iDes) && celda(filas[0], iDes).textContent) : '';
+    return /^EVITAR EL INGRESO AL AREA DE TRABAJO/.test(d0) ? 'PRECAUCIONES' : '';
+  }
   function ajustarTabla(tabla) {
     const d = enDialogo(tabla); if (!d || !gestionada(d)) return;
     d.classList.add('rmd-g');
@@ -376,7 +408,13 @@
     });
 
     let alertas = 0; const primeras = [];
-    filas.forEach((tr) => {
+    // Predecesores: todo paso con tipo de dato lleva predecesor (Depende), salvo el primero de PRECAUCIONES (cabeza de la cadena), los pasos
+    // condicionales o en paralelo y las listas que no los usan (RENDIMIENTO, CONDICIONES AMBIENTALES).
+    const lista = esPasos ? nombreDeLista(tabla, filas, iTipo, iDes) : ''; d.__rmdListaEfectiva = lista;
+    const tipadoFila = (tr) => { const t = SIN_ACENTOS((inputDe(celda(tr, iTipo)) || {}).value || ''); return !!t && t !== 'SIN TIPO DE DATO'; };
+    const aplicaPred = esPasos && iDep >= 0 && !LISTAS_SIN_PREDECESOR.test(lista);
+    const kCabeza = aplicaPred && /^PRECAUCIONES/.test(lista) ? filas.findIndex(tipadoFila) : -1;
+    filas.forEach((tr, k) => {
       const tdTipo = iTipo >= 0 ? celda(tr, iTipo) : null;
       const tipo = tdTipo ? (inputDe(tdTipo) || {}).value || '' : '';
       const t = SIN_ACENTOS(tipo);
@@ -429,7 +467,7 @@
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
       if (tdDes) {
         if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"');
-        else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(desc)) marcarFalta(iDes, 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)');
+        else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(desc.replace(ALTERNATIVA_CALIDAD, 'CALIDAD EN OPERACIONES'))) marcarFalta(iDes, 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)');
       }
       if (NUMERICOS.has(t) && vacio(iDec)) marcarFalta(iDec, `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar`);
       if (t === 'RANGO') { if (vacio(iVI)) marcarFalta(iVI, 'Rango: falta Val. Inicial'); if (vacio(iVF)) marcarFalta(iVF, 'Rango: falta Val. Final'); }
@@ -442,6 +480,12 @@
         const v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
         if (v && !mm) marcarFalta(iDep, 'Predecesor colgante (sin orden): reasignar Depende');
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
+        else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
+          // (el portal vacía el predecesor de la fila en cuanto se marca la casilla Estado CC: se avisa para asignarlo después de marcarla)
+          const cc = iChk['ESTADO CC'] >= 0 && celda(tr, iChk['ESTADO CC']) && marcada(celda(tr, iChk['ESTADO CC']));
+          marcarFalta(iDep, 'Falta el predecesor (Depende): todo paso con tipo de dato debe depender de un paso anterior con tipo de dato; solo se omite en pasos condicionales o en paralelo.' +
+            (cc ? ' Ojo: el portal vacía este campo al marcar Estado CC; asígnalo después de marcarla.' : ''));
+        }
       }
       if (avisos.length) { alertas += avisos.length; primeras.push({ tr, texto: avisos[0] }); }
     });
@@ -680,13 +724,13 @@
     const arr = e.datos.slice();
     if (sentido < 0) { for (let i = 1; i < arr.length; i++) if (sel.has(arr[i]) && !sel.has(arr[i - 1])) [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; }
     else { for (let i = arr.length - 2; i >= 0; i--) if (sel.has(arr[i]) && !sel.has(arr[i + 1])) [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]]; }
-    if (arr.some((r, i) => r !== e.datos[i])) { aplicarOrden(e, arr, [...sel]); setTimeout(ajustarTodo, 50); }
+    if (arr.some((r, i) => r !== e.datos[i])) { aplicarOrden(e, arr, [...sel]); d.__rmdInter = true; setTimeout(ajustarTodo, 50); }
   }
   function moverA(d, fila, destino, antes) {
     const e = estadoEspec(d); if (!e || !reordenable(e.datos) || !fila || fila === destino) return;
     const arr = e.datos.filter((r) => r !== fila), i = arr.indexOf(destino); if (i < 0) return;
     arr.splice(antes ? i : i + 1, 0, fila);
-    if (arr.some((r, k) => r !== e.datos[k])) { aplicarOrden(e, arr, [fila]); setTimeout(ajustarTodo, 50); }
+    if (arr.some((r, k) => r !== e.datos[k])) { aplicarOrden(e, arr, [fila]); d.__rmdInter = true; setTimeout(ajustarTodo, 50); }
   }
   function instalarArrastre(d, t) {
     if (t.__rmdDnd) return; t.__rmdDnd = true;
@@ -832,7 +876,7 @@
   }
 
   let pendiente = false;
-  window.__rmdStats = { ajustes: 0 };
+  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
     document.querySelectorAll('.rmd-copia-grupo, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar').forEach((e) => e.remove());
@@ -884,8 +928,10 @@
   document.addEventListener('click', () => setTimeout(ajustarTodo, 120), true);
 
   // ---- 7. Avisar cambios sin guardar -----------------------------------------------------------
-  // Se compara una "firma" de la tabla (valores y casillas) con la del momento en que se cargó o se guardó por última vez.
-  // (Las casillas de UI5 no lanzan el evento "change" del navegador, por eso no se vigilan eventos sino el estado.)
+  // Una ventana está "sucia" cuando la persona TOCÓ algo (bandera __rmdInter) y la firma de la tabla (valores y casillas) difiere de la del
+  // último momento limpio (carga o guardado). Lo que hace el propio portal —cargar, refrescar tras guardar, rellenar valores tardíos— no cuenta:
+  // mientras la persona no haya tocado nada, la base se va actualizando sola. Así, tras guardar y cancelar no aparece un aviso falso.
+  // (Las casillas de UI5 no lanzan el evento "change" del navegador, por eso se compara el estado y no se vigilan solo eventos.)
   function firmaDialogo(d) {
     let f = '';
     d.querySelectorAll('table tbody input, table tbody [role=checkbox]').forEach((x) => {
@@ -894,42 +940,102 @@
     });
     return f + firmaEspec(d);                                          // Especificaciones: orden y textos (viven en el modelo)
   }
-  const rebase = (d) => { if (d) { d.__rmdBase = firmaDialogo(d); d.__rmdN = d.querySelectorAll('table tbody tr').length; } };
+  const rebase = (d) => { if (d) { d.__rmdBase = firmaDialogo(d); d.__rmdN = d.querySelectorAll('table tbody tr').length; d.__rmdInter = false; } };
   function refrescarBases() {
     dialogos().forEach((d) => {
       if (!d.querySelector('table tbody')) return;
-      if (!d.__rmdT0) d.__rmdT0 = Date.now();
       const n = d.querySelectorAll('table tbody tr').length;
-      // mientras carga (filas nuevas, indicador de ocupado o primeros segundos) la firma cambia sola: se toma como base
-      if (d.__rmdBase === undefined || d.__rmdN !== n || Date.now() - d.__rmdT0 < 3000 || ocupado()) rebase(d);
+      if (d.__rmdBase === undefined || d.__rmdN !== n) { rebase(d); return; }          // filas nuevas o quitadas: la lista se volvió a cargar
+      if (!d.__rmdInter) { const f = firmaDialogo(d); if (f !== d.__rmdBase) d.__rmdBase = f; }   // cambios del portal, no de la persona: se aceptan
     });
   }
-  const sucia = (d) => d.__rmdBase !== undefined && firmaDialogo(d) !== d.__rmdBase;
-  window.__rmdStats.sucias = () => dialogos().map((d) => [d.__rmdBase === undefined ? null : sucia(d), d.__rmdN]);   // diagnóstico
+  const sucia = (d) => d.__rmdBase !== undefined && !!d.__rmdInter && firmaDialogo(d) !== d.__rmdBase;
+  window.__rmdStats.sucias = () => dialogos().map((d) => [d.__rmdBase === undefined ? null : sucia(d), d.__rmdN, !!d.__rmdInter]);   // diagnóstico
+
+  // Qué toques cuentan como "editar": teclear, marcar casillas, elegir opciones de listas (incluido el selector de predecesores) o pegar/soltar.
+  // No cuentan: el botón de mejoras, los avisos, el filtro local, marcar filas, la barra del título ni pulsar en las celdas de la tabla.
+  const EXCLUIDOS_EDICION = '#rmd-ui-panel, .rmd-modal-fondo, .sapMMessageDialog, .rmd-filtro, .sapMListTblSelCol, .sapMListHdr';
+  function marcarEdicion(e) {
+    if (!e.isTrusted || !opc.activo) return;
+    const t = e.target; if (!t || !t.closest || t.closest(EXCLUIDOS_EDICION)) return;
+    let edita = false;
+    if (e.type === 'input' || e.type === 'change' || e.type === 'paste' || e.type === 'cut') edita = !!t.closest('input, textarea, select');
+    else if (e.type === 'drop') edita = true;
+    else {                                                              // clic, o Espacio/Enter sobre el control
+      const enTablaRmd = !!t.closest('.sapMDialog.rmd-g table');       // (elegir una fila del selector "Adicionar Pasos" no edita esta ventana)
+      edita = !!t.closest('[role=checkbox], .sapMCb') || (!enTablaRmd && !!t.closest('[role=option], .sapMSelectList li, li.sapMLIB, .sapMSltItem'));
+    }
+    if (edita) dialogos().forEach((d) => { d.__rmdInter = true; });
+  }
+  ['input', 'change', 'paste', 'cut', 'click', 'drop'].forEach((ev) => document.addEventListener(ev, marcarEdicion, true));
+  document.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') marcarEdicion(e); }, true);
+
+  // Al pulsar Guardar (o Ctrl+S) lo que hay en pantalla pasa a ser la base; si el portal responde con una advertencia o un error,
+  // no se guardó nada y la ventana vuelve a estar sin guardar (ver más abajo, en la lectura de mensajes).
+  function alGuardar(d) { d.__rmdPrev = { base: d.__rmdBase, inter: !!d.__rmdInter }; d.__rmdGuardando = Date.now(); rebase(d); }
+  function resultadoGuardado(exito) {
+    dialogos().forEach((d) => {
+      if (!d.__rmdGuardando || Date.now() - d.__rmdGuardando > 30000) return;
+      if (exito) rebase(d); else if (d.__rmdPrev) { d.__rmdBase = d.__rmdPrev.base; d.__rmdInter = d.__rmdPrev.inter; }
+      d.__rmdGuardando = 0; d.__rmdPrev = null;
+    });
+  }
+
+  // Aviso propio, centrado en la página y con botones claros (sustituye al cuadro del navegador, que salía arriba y con texto seco).
+  // Devuelve una promesa: true = confirma (botón "si"); false = "no", Escape o Enter (por defecto se conserva el trabajo).
+  const ICONO_AVISO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6 2.9 19.4h18.2L12 3.6z"/><path d="M12 10v4.4"/><path d="M12 17.1v.1"/></svg>';
+  function confirmar(titulo, mensaje, ayuda, { si = 'Aceptar', no = 'Cancelar', peligro = false } = {}) {
+    return new Promise((resolve) => {
+      let hecho = false;
+      const fin = (v) => { if (hecho) return; hecho = true; document.removeEventListener('keydown', teclas, true); w.cerrar(); resolve(v); };
+      const w = ventana(titulo, { cancelar: () => fin(false) });
+      const tarjeta = w.fondo.querySelector('.rmd-modal'); tarjeta.classList.add('rmd-modal-aviso'); tarjeta.setAttribute('role', 'alertdialog'); tarjeta.setAttribute('aria-label', titulo);
+      const h3 = tarjeta.querySelector('h3'), cab = document.createElement('div'); cab.className = 'rmd-aviso-cab';
+      const ico = document.createElement('span'); ico.className = 'rmd-aviso-ico'; ico.innerHTML = ICONO_AVISO;
+      h3.replaceWith(cab); cab.append(ico, h3);
+      const p = document.createElement('p'); p.textContent = mensaje; w.cuerpo.append(p);
+      if (ayuda) { const a = document.createElement('p'); a.className = 'rmd-aviso-ayuda'; a.textContent = ayuda; w.cuerpo.append(a); }
+      const bSi = botonModal(si, peligro ? 'peligro' : '', () => fin(true)), bNo = botonModal(no, 'primario', () => fin(false));
+      w.pie.append(bSi, bNo);
+      const teclas = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); fin(false); }
+        else if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); (document.activeElement === bNo ? bSi : bNo).focus(); }
+      };
+      document.addEventListener('keydown', teclas, true);
+      setTimeout(() => bNo.focus(), 40);
+    });
+  }
   document.addEventListener('click', (e) => {
     if (!on('singuardar')) return;
     const b = e.target.closest && e.target.closest('button'); const d = b && enDialogo(b); if (!d) return;
-    if (b.title === 'Guardar') { rebase(d); return; }
+    if (b.title === 'Guardar') { alGuardar(d); return; }
     // Agregar / Eliminar / Ensayos SAP vuelven a leer las especificaciones del servidor: los textos u orden sin guardar se perderían
     if (['Agregar', 'Eliminar', 'Ensayos SAP'].includes(b.title) && espAbierta && espAbierta.d === d && Object.keys(pendientesEspec(espAbierta.datos)).length) {
-      if (!confirm('Hay textos u orden de especificaciones sin guardar.\nSi continúas se perderán.\n¿Continuar?')) { e.preventDefault(); e.stopPropagation(); }
+      e.preventDefault(); e.stopPropagation();
+      confirmar('Textos u orden sin guardar', 'Esta acción vuelve a cargar las especificaciones desde el servidor y perderías lo que editaste.',
+        'Para conservarlo, vuelve y pulsa Guardar antes.', { si: 'Continuar sin guardar', no: 'Volver', peligro: true }).then((seguir) => { if (seguir) pulsar(b); });
       return;
     }
     const t = norm(b.textContent);
     if ((t === 'Cancelar' || t === 'Cerrar') && sucia(d)) {
-      if (!confirm('Hay cambios sin guardar en esta ventana.\n¿Descartarlos y cerrar?')) { e.preventDefault(); e.stopPropagation(); } else rebase(d);
+      e.preventDefault(); e.stopPropagation();
+      confirmar('Tienes cambios sin guardar', 'Si cierras esta ventana ahora, los cambios que hiciste en ella se perderán.',
+        'Para conservarlos, vuelve y pulsa Guardar (o Ctrl+S).', { si: 'Descartar y cerrar', no: 'Seguir editando', peligro: true })
+        .then((descartar) => { if (descartar) { rebase(d); pulsar(b); } });
     }
   }, true);
 
-  // ---- 8. Cerrar solos los mensajes de éxito ---------------------------------------------------
+  // ---- 8. Mensajes del portal: resultado de un guardado y cierre automático de los de éxito -----------------
   const visto = new WeakSet();
   new MutationObserver(() => {
-    if (!on('exito')) return;
+    if (!on('singuardar') && !on('exito')) return;
     document.querySelectorAll('.sapMMessageDialog').forEach((m) => {
       if (visto.has(m) || !visible(m)) return;
       const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent);
       const botones = [...m.querySelectorAll('button')].filter((b) => visible(b) && norm(b.textContent));   // sin los botones de desbordamiento vacíos
-      if (/^[ÉE]xito/i.test(titulo) && botones.length === 1 && norm(botones[0].textContent) === 'OK') { visto.add(m); setTimeout(() => pulsar(botones[0]), 900); }
+      const exito = /^[ÉE]xito/i.test(titulo);
+      if (on('singuardar') && (exito || /^(Advertencia|Error|Aviso|Atenci)/i.test(titulo))) { visto.add(m); resultadoGuardado(exito); }
+      if (on('exito') && exito && botones.length === 1 && norm(botones[0].textContent) === 'OK') { visto.add(m); setTimeout(() => pulsar(botones[0]), 900); }
     });
   }).observe(document.body, { childList: true, subtree: true });
 
@@ -1186,7 +1292,7 @@
         const cfg = {}; for (const k of op.campos) cfg[k] = portapapeles.paso[k];
         cfg.chk = {}; for (const k of op.casillas) cfg.chk[k] = portapapeles.paso.chk[k];
         log(`Paso #${destino.orden} · ${destino.desc}`);
-        if (op.campos.length || op.casillas.length) await aplicarFila(tabla, trId, cfg, columnas(tabla), log);
+        if (op.campos.length || op.casillas.length) { await aplicarFila(tabla, trId, cfg, columnas(tabla), log); d.__rmdInter = true; }   // lo aplicado por el script cuenta como cambio sin guardar hasta que se guarde
         if (op.guardar && (op.campos.length || op.casillas.length)) {
           const g = botonPorTitulo(d, 'Guardar'); if (!g) throw new Error('No encuentro el botón Guardar del paso');
           log('Guardando el paso…'); pulsar(g); rebase(d);
@@ -1212,7 +1318,7 @@
             const fs = filasPMde(dPM).filter((tr) => leerPMfila(tPM, tr).codigo === x.codigo); const tr = fs[fs.length - 1];
             if (!tr) { log(`⚠ No encuentro ${x.codigo} para configurarlo`); continue; }
             log(`Configurando ${x.codigo} · ${x.desc}`);
-            await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log);
+            await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log); dPM.__rmdInter = true;
           }
           const g = botonPorTitulo(dPM, 'Guardar'); if (!g) throw new Error('No encuentro el botón Guardar de procesos menores');
           log('Guardando los procesos menores…'); pulsar(g); rebase(dPM);

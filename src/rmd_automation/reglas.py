@@ -40,6 +40,12 @@ PASOS_PROHIBIDOS = [
 LISTAS_SIN_PREDECESORES = ("RENDIMIENTO", "CONDICIONES AMBIENTALES")
 ETAPAS_PRINCIPALES = ("FABRICACION", "ENVASE", "ACONDICIONADO", "RECUBRIMIENTO")
 
+# Pasos que por su redacción pueden ir sin predecesor (condicionales, en paralelo o de cierre; ver docs/como_se_configura_un_rmd.md §5).
+INDEPENDIENTES = re.compile(r"\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA")
+# "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (nota del granel de Envase) es la redacción vigente y correcta:
+# nombra a Calidad en Operaciones, así que no cuenta como un "Control de Calidad" pendiente de cambiar.
+ALTERNATIVA_CALIDAD = re.compile(r"CONTROL DE CALIDAD\s+O\s+CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES\s+O\s+CONTROL DE CALIDAD")
+
 
 @dataclass
 class Hallazgo:
@@ -57,6 +63,7 @@ def _avisos_texto(donde: str, orden: str, desc: str) -> List["Hallazgo"]:
     "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA"."""
     if re.search(r"MUESTRA PARA (EL )?CONTROL DE CALIDAD", desc):
         return [Hallazgo("AVISO", donde, orden, 'debe figurar "CANTIDAD MUESTREADA" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"')]
+    desc = ALTERNATIVA_CALIDAD.sub("CALIDAD EN OPERACIONES", desc)          # "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" es correcto
     if "CONTROL DE CALIDAD" in desc or re.search(r"APROBACION DE .*CONTROL DE PROCESO", desc):
         return [Hallazgo("AVISO", donde, orden, 'reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)')]
     return []
@@ -106,6 +113,8 @@ def revisar(snap: dict) -> List[Hallazgo]:
             h.append(Hallazgo("AVISO", "PROCEDIMIENTO", "-", f"falta la etiqueta {esperado}"))
 
     notificaciones: Dict[Tuple[str, str], int] = {}
+    # La cadena de predecesores empieza en el primer paso con tipo de la primera lista que los lleva (normalmente PRECAUCIONES): ese no lleva predecesor.
+    lista_cabeza = next((l.nombre for l in todas if _lleva_predecesores(l.nombre) and any(p.get("td") != "Sin tipo de dato" for p in l.pasos)), None)
 
     for lst in todas:
         pasos = lst.pasos
@@ -182,8 +191,11 @@ def revisar(snap: dict) -> List[Hallazgo]:
                     h.append(Hallazgo("ERROR", nombre, o, "un Sin tipo de dato no lleva predecesor"))
                 continue
             if not dep:
-                if i > 0 and ultimo_con_tipo is not None:
-                    h.append(Hallazgo("AVISO", nombre, o, "paso con tipo de dato sin predecesor (¿independiente o condicional?)"))
+                cabeza = nombre == lista_cabeza and ultimo_con_tipo is None
+                if not cabeza and not INDEPENDIENTES.search(desc):
+                    h.append(Hallazgo("AVISO", nombre, o, "paso con tipo de dato sin predecesor: debe depender de un paso anterior con tipo de dato (Depende); "
+                                                          "solo se omite en pasos condicionales o en paralelo"
+                                                          + ("; el portal vacía el predecesor al marcar Estado CC: asignarlo después de marcarla" if "Estado CC" in chk else "")))
             else:
                 ord_pred = orden_de_dep(dep)
                 if ord_pred is None:

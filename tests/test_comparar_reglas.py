@@ -148,3 +148,51 @@ def test_calidad_en_operaciones_insumos_y_textos():
     assert "muestreo de Calidad en Operaciones sin Edit + Estado CC" in msgs
     assert "los insumos no llevan Edit" in msgs
     assert "CANTIDAD MUESTREADA" in msgs and "CALIDAD EN OPERACIONES" in msgs
+
+
+def test_control_de_calidad_o_calidad_en_operaciones_es_correcto():
+    """La nota del granel de Envase ('…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE') es la redacción vigente: no se alerta."""
+    s = snap_base()
+    fab = s["structs"][3]["etq"][1]["p"]
+    fab.append(paso(6, "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.",
+                    dep="1005 (5)"))
+    assert not [m for m in mensajes(s) if "CONTROL DE CALIDAD" in m]
+    # la redacción antigua y cualquier otro "Control de Calidad" siguen alertándose
+    s = snap_base()
+    s["structs"][3]["etq"][1]["p"].append(paso(6, "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE.", dep="1005 (5)"))
+    s["structs"][3]["etq"][1]["p"].append(paso(7, "AVISAR AL CONTROL DE CALIDAD", dep="1006 (6)"))
+    assert len([m for m in mensajes(s) if "reemplazar" in m and "CONTROL DE CALIDAD" in m]) == 2
+
+
+def sin_predecesor(snap):
+    return [(h.lista, h.orden) for h in reglas.revisar(snap) if "sin predecesor" in h.mensaje and h.nivel == "AVISO"]
+
+
+def test_paso_con_tipo_sin_predecesor_se_avisa_cuando_aplica():
+    s = snap_base()
+    # base: el primer paso de PRECAUCIONES es la cabeza de la cadena (no lleva predecesor); FABRICACION #1 (con tipo, sin dep) sí debe llevarlo
+    assert ("PROCEDIMIENTO>FABRICACION", "1") in sin_predecesor(s)
+    assert not [x for x in sin_predecesor(s) if x[0].startswith("PRECAUCIONES")]
+    # un paso de Precauciones que no es el primero
+    s["structs"][0]["p"].append(paso(2, "USAR GUANTES", "Verificación Check"))
+    assert ("PRECAUCIONES", "2") in sin_predecesor(s)
+    s["structs"][0]["p"][1]["dep"] = "1001 (1)"
+    assert ("PRECAUCIONES", "2") not in sin_predecesor(s)
+    # Notas importantes: su primer paso también depende del último de Precauciones
+    s["structs"].insert(1, {"o": "2", "n": "NOTAS IMPORTANTES DURANTE EL PROCESO", "items": "1", "p": [paso(1, "NO USAR ESMALTE", "Verificación Check")]})
+    assert ("NOTAS IMPORTANTES DURANTE EL PROCESO", "1") in sin_predecesor(s)
+    s["structs"][1]["p"][0]["dep"] = "1002 (2)"
+    assert ("NOTAS IMPORTANTES DURANTE EL PROCESO", "1") not in sin_predecesor(s)
+
+
+def test_predecesor_no_aplica_en_sin_tipo_rendimiento_condiciones_ni_pasos_condicionales():
+    s = snap_base()
+    assert not [x for x in sin_predecesor(s) if x[0].endswith("RENDIMIENTO")]                   # Rendimiento no lleva predecesores
+    assert ("PROCEDIMIENTO>FABRICACION", "3") not in sin_predecesor(s)                          # Sin tipo de dato
+    s["structs"][3]["etq"][1]["p"].append(paso(6, "EN CASO QUE SE DETECTE DESVIO, AVISAR AL JEFE", "Realizado por", chk="R. Por"))
+    s["structs"][3]["etq"][1]["p"].append(paso(7, "PARALELAMENTE TRITURAR EL EXCIPIENTE", "Realizado por", chk="R. Por"))
+    s["structs"][3]["etq"][1]["p"].append(paso(8, "ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA AL JEFE O SUPERVISOR.", "Realizado por", chk="R. Por"))
+    s["structs"][3]["etq"][1]["p"].append(paso(9, "MEDIR EL PESO", "Realizado por", chk="R. Por"))
+    lista = sin_predecesor(s)
+    assert ("PROCEDIMIENTO>FABRICACION", "9") in lista
+    assert not [x for x in lista if x[1] in ("6", "7", "8") and x[0].endswith("FABRICACION")]
