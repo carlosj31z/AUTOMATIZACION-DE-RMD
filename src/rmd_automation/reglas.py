@@ -57,10 +57,8 @@ def _avisos_texto(donde: str, orden: str, desc: str) -> List["Hallazgo"]:
     "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA"."""
     if re.search(r"MUESTRA PARA (EL )?CONTROL DE CALIDAD", desc):
         return [Hallazgo("AVISO", donde, orden, 'debe figurar "CANTIDAD MUESTREADA" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"')]
-    if "APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO" in desc:
-        return [Hallazgo("AVISO", donde, orden, 'la nota del granel ahora dice "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE"')]
-    if "CONTROL DE CALIDAD" in desc and "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" not in desc:
-        return [Hallazgo("AVISO", donde, orden, 'reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"')]
+    if "CONTROL DE CALIDAD" in desc or re.search(r"APROBACION DE .*CONTROL DE PROCESO", desc):
+        return [Hallazgo("AVISO", donde, orden, 'reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)')]
     return []
 
 

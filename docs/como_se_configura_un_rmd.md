@@ -249,7 +249,8 @@ Verificación Check sí lleva Edit (41 de 41).
 
 **Textos que cambiaron** (la operación pidió reemplazar todo "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"):
 - Nota del granel (Envase, Notas importantes): antes "…APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE";
-  ahora "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (esta forma se acepta).
+  algunos RMD vigentes dicen "…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES…", pero la operación confirmó que **solo debe quedar
+  Calidad en Operaciones**: cualquier "CONTROL DE CALIDAD" se alerta.
 - "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION" (Acondicionado) y
   "ESPERAR RESULTADOS DE CONTROL DE CALIDAD…" (Fabricación) todavía aparecen con el texto antiguo incluso en RMD autorizados
   de septiembre de 2026: hay que actualizarlos.
