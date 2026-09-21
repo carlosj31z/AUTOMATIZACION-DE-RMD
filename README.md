@@ -126,6 +126,11 @@ utensilios/motivo-lapsos en Configuración Maestra, configuración de un RMD
 (número/rango/fórmula/notificación), predecesores—, exportar máster, agregar
 documento/nota, envío a jefe, cambio de destinatario, autorización.
 
+### Flujo: RMD de referencia y revisiones posteriores
+
+`cambios aplicar` pregunta primero si hay un RMD de referencia (su "Codigo RMD") y, al terminar, si se desean
+las revisiones de tren de equipos, controles de cambio pendientes y utensilios. Ver `docs/flujo_y_revisiones.md`.
+
 ### Sesión sin guardar credenciales (login manual y CDP)
 
 El programa nunca necesita tu usuario/contraseña: inicia sesión tú en el navegador.

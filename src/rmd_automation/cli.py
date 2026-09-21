@@ -101,7 +101,8 @@ def cambios_plan(spec: str, snapshot: str) -> None:
 @click.argument("spec", type=click.Path(exists=True))
 @click.option("--confirmar", is_flag=True, help="Sin este indicador solo se muestra el plan.")
 @click.option("--auditoria", type=click.Path(), default="data/auditoria.jsonl", show_default=True)
-def cambios_aplicar(spec: str, confirmar: bool, auditoria: str) -> None:
+@click.option("--referencia", default=None, help='"Codigo RMD" de un RMD de referencia (vacío = no hay). Si se omite, se pregunta.')
+def cambios_aplicar(spec: str, confirmar: bool, auditoria: str, referencia: str | None) -> None:
     """Lee el RMD, muestra el plan y, con --confirmar y una confirmación humana, lo ejecuta y lo verifica."""
     from . import cambios as cb
     from .actions import RmdAutomation
@@ -110,7 +111,15 @@ def cambios_aplicar(spec: str, confirmar: bool, auditoria: str) -> None:
     from .extraer import extraer
 
     sp = cb.cargar_spec(spec)
+    if referencia is None and not sp.rmd_referencia:
+        referencia = click.prompt(
+            '¿Hay un RMD de referencia? Escribe su "Codigo RMD" (Enter si no hay)', default="", show_default=False
+        )
+    if referencia:
+        sp.rmd_referencia = referencia.strip()
     with rmd_session(load_config()) as page:
+        if sp.rmd_referencia:
+            _mostrar_referencia(page, sp)
         snap = extraer(page, sp.rmd, procesos_menores=False)
         if snap.get("estado") != "Ingresado":
             raise click.ClickException(
@@ -137,6 +146,41 @@ def cambios_aplicar(spec: str, confirmar: bool, auditoria: str) -> None:
         click.echo(cb.plan_a_texto(sp, despues))
         if not ok:
             raise click.ClickException("La verificación posterior encontró diferencias; revisa el plan de arriba.")
+        _preguntar_revisiones(sp)
+
+
+def _mostrar_referencia(page, sp) -> None:
+    """Lee (solo lectura) el RMD de referencia y muestra en qué se diferencia del RMD a modificar."""
+    import json
+    from pathlib import Path
+
+    from . import comparar as cmp
+    from .extraer import extraer
+
+    ref = extraer(page, sp.rmd_referencia, procesos_menores=False)
+    Path("data/snapshots").mkdir(parents=True, exist_ok=True)
+    Path(f"data/snapshots/ref_{sp.rmd_referencia}.json").write_text(json.dumps(ref, ensure_ascii=False), encoding="utf-8")
+    actual = extraer(page, sp.rmd, procesos_menores=False)
+    click.echo(f"
+--- RMD de referencia {sp.rmd_referencia} (estado {ref.get('estado')!r}) vs RMD {sp.rmd} ---")
+    click.echo(cmp.a_markdown(cmp.comparar(ref, actual)))
+
+
+def _preguntar_revisiones(sp) -> None:
+    """Tras terminar el ingreso: ofrece las revisiones que se hacen fuera del portal (con el asistente)."""
+    click.echo("
+Ingreso terminado. Revisiones posteriores disponibles:")
+    for i, r in enumerate(REVISIONES, 1):
+        click.echo(f"  {i}. {r}")
+    if click.confirm("¿Necesitas aplicar estas revisiones ahora?", default=False):
+        click.echo(f"Pídele al asistente: 'revisar RMD {sp.rmd}: tren de equipos, controles de cambio y utensilios'.")
+
+
+REVISIONES = [
+    "Tren de equipos (TREN DE EQUIPOS PL2.xlsx): los equipos del RMD deben coincidir con la línea/sala de la etapa.",
+    'Controles de cambio pendientes (1.-CC-NC-DES Para actualizar RMD.xlsx, hoja "PLANTA 2"): ¿alguno aplica a este RMD?',
+    "Listas de utensilios y accesorios por sección (04.-RMD/UTENSILIOS/PLANTA 2): utensilios que exige cada sección del RMD.",
+]
 
 
 def _emitir(texto: str, salida: str | None) -> None:

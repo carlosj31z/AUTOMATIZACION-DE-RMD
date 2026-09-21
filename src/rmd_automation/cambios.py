@@ -44,6 +44,7 @@ class Spec:
     rmd: str
     descripcion: str
     cambios: List[Dict[str, Any]]
+    rmd_referencia: str = ""  # "Codigo RMD" del RMD de referencia (opcional)
 
 
 def cargar_spec(ruta: str | Path) -> Spec:
@@ -53,7 +54,10 @@ def cargar_spec(ruta: str | Path) -> Spec:
     for i, c in enumerate(datos["cambios"], 1):
         if c.get("accion") not in ACCIONES:
             raise ValueError(f"Cambio #{i}: acción desconocida {c.get('accion')!r}. Válidas: {sorted(ACCIONES)}")
-    return Spec(str(datos["rmd"]), str(datos.get("descripcion", "")), datos["cambios"])
+    return Spec(
+        str(datos["rmd"]), str(datos.get("descripcion", "")), datos["cambios"],
+        str(datos.get("rmd_referencia") or "").strip(),
+    )
 
 
 def _lista(snap: dict, nombre: str):
@@ -175,6 +179,8 @@ def planificar(spec: Spec, snap: dict) -> List[Accion]:
 
 def plan_a_texto(spec: Spec, plan: List[Accion]) -> str:
     out = [f"Plan para el RMD {spec.rmd}" + (f" — {spec.descripcion}" if spec.descripcion else "")]
+    if spec.rmd_referencia:
+        out.append(f"RMD de referencia: {spec.rmd_referencia}")
     for a in plan:
         marca = {PENDIENTE: "▶", APLICADO: "✓", ERROR: "✗"}[a.estado]
         out.append(f" {marca} {a.indice}. {a.tipo}: {a.detalle or ', '.join(a.mensajes)} [{a.estado}]")
