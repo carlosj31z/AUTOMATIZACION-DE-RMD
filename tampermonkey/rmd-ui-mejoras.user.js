@@ -268,6 +268,11 @@
         const cant = iCant >= 0 ? norm((inputDe(celda(tr, iCant)) || {}).value) : '', um = iUM >= 0 ? norm(celda(tr, iUM) && celda(tr, iUM).textContent) : '';
         if (cant || um) regla.EDIT = false;
       }
+      const tdDes = iDes >= 0 ? celda(tr, iDes) : null, desc = SIN_ACENTOS(tdDes && tdDes.textContent);
+      // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
+      // muestreo (cantidad / fecha-hora de muestreo) llevan Estado CC; los de muestreo, además, Edit.
+      if (regla && t === 'REALIZADO POR' && /CALIDAD EN OPERACIONES/.test(desc)) regla['ESTADO CC'] = true;
+      if (esPM && regla && /MUESTREAD|MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
       if (regla) for (const [c, debe] of Object.entries(regla)) {
         const i = iChk[c]; if (i == null || i < 0 || !celda(tr, i)) continue;
         if (marcada(celda(tr, i)) !== debe) {
@@ -280,6 +285,10 @@
       // obligatorios por tipo
       const vacio = (idx) => idx >= 0 && !norm((inputDe(celda(tr, idx)) || {}).value);
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
+      if (tdDes) {
+        if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"');
+        else if (/CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"');
+      }
       if (NUMERICOS.has(t) && vacio(iDec)) marcarFalta(iDec, `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar`);
       if (t === 'RANGO') { if (vacio(iVI)) marcarFalta(iVI, 'Rango: falta Val. Inicial'); if (vacio(iVF)) marcarFalta(iVF, 'Rango: falta Val. Final'); }
       if (t === 'NOTIFICACION' && iClave >= 0) {
@@ -297,31 +306,32 @@
     const previo = tabla.__rmdAlertas;
     tabla.__rmdAlertas = { n: alertas, filas: primeras, sig: previo ? previo.sig : 0 };
 
-    if (on('filtro') && esPasos && filas.length >= 8) filtroLocal(tabla);
+    if (esPasos && on('filtro') && filas.length >= 8) filtroLocal(tabla, true);
+    else if (esPM && on('reglas')) filtroLocal(tabla, false);
     actualizarBarra(d, tabla);
     // alturas para que barra de filtro, título de la tabla (con Guardar) y cabecera de columnas queden siempre visibles
     const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
-    const h1 = esPasos && bar ? bar.offsetHeight : 0, h2 = esPasos && hdr ? hdr.offsetHeight : 0;
+    const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = esPasos && hdr ? hdr.offsetHeight : 0;
     d.style.setProperty('--rmd-h1', h1 + 'px'); d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
   }
 
   // ---- 5. Filtro local + contador + alertas -----------------------------------------------------
-  function filtroLocal(tabla) {
+  function filtroLocal(tabla, conFiltro) {
     const d = enDialogo(tabla); if (!d) return;
     let barra = d.querySelector('#rmd-filtro-bar');
     if (!barra) {
       barra = document.createElement('div'); barra.id = 'rmd-filtro-bar';
-      barra.innerHTML = '<input class="rmd-filtro" type="text" placeholder="Filtrar pasos por texto, código u orden…"><span class="rmd-cuenta"></span><button type="button" class="rmd-alerta ok"></button>';
+      barra.innerHTML = (conFiltro ? '<input class="rmd-filtro" type="text" placeholder="Filtrar pasos por texto, código u orden…">' : '') + '<span class="rmd-cuenta"></span><button type="button" class="rmd-alerta ok"></button>';
       const cont = tabla.closest('.sapMDialogScrollCont') || d;
       cont.parentNode.insertBefore(barra, cont);
-      barra.querySelector('input').addEventListener('input', () => aplicarFiltro(d));
+      const inp = barra.querySelector('input'); if (inp) inp.addEventListener('input', () => aplicarFiltro(d));
       barra.querySelector('button').addEventListener('click', () => irAlSiguiente(d));
     }
     aplicarFiltro(d);
   }
   function aplicarFiltro(d) {
     const barra = d.querySelector('#rmd-filtro-bar'), tabla = d.querySelector('table.sapMListTbl'); if (!barra || !tabla) return;
-    const q = NORM(barra.querySelector('input').value);
+    const inp = barra.querySelector('input'), q = NORM(inp ? inp.value : '');
     let visibles = 0, total = 0;
     const todas = [...tabla.querySelectorAll('tbody tr')];
     todas.forEach((tr, k) => {
@@ -332,7 +342,7 @@
       tr.style.display = ok ? '' : 'none'; if (sub) sub.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     });
-    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} pasos`);
+    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} ${inp ? 'pasos' : 'procesos menores'}`);
   }
   function actualizarBarra(d, tabla) {
     const barra = d.querySelector('#rmd-filtro-bar'); if (!barra || !tabla.__rmdAlertas) return;

@@ -133,3 +133,18 @@ def test_procesos_menores():
     msgs = mensajes(s)
     assert any("Rango sin Decimal" in m or "Sin Decimal" in m or "sin Decimal" in m for m in msgs)
     assert any("Hora sin Edit" in m for m in msgs)
+
+
+def test_calidad_en_operaciones_insumos_y_textos():
+    s = snap_base()
+    fab = s["structs"][3]["etq"][1]
+    fab["p"][3] = paso(4, "EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA", "Realizado por", chk="R. Por", dep="1002 (2)")
+    fab["p"][2] = paso(3, "AVISAR AL CONTROL DE CALIDAD", "Sin tipo de dato")
+    fab["pm"] = {"4": ["1|/83022/CANTIDAD MUESTREADA (kg):||Números|||||Edit",
+                       "2|/10000003/SIMETICONA|6.511|Números|||||Edit"]}
+    s["structs"][3]["etq"][2]["p"][1] = paso(2, "MUESTRA PARA CONTROL DE CALIDAD", "MuestraCC", chk="Estado CC,Edit", dc="3")
+    msgs = " | ".join(str(x) for x in reglas.revisar(s))
+    assert "Calidad en Operaciones (Realizado por) sin Estado CC" in msgs
+    assert "muestreo de Calidad en Operaciones sin Edit + Estado CC" in msgs
+    assert "los insumos no llevan Edit" in msgs
+    assert "CANTIDAD MUESTREADA" in msgs and "CALIDAD EN OPERACIONES" in msgs

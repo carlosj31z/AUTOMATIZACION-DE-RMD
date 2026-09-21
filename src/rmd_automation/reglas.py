@@ -52,6 +52,16 @@ class Hallazgo:
         return f"[{self.nivel}] {self.lista} #{self.orden}: {self.mensaje}"
 
 
+def _avisos_texto(donde: str, orden: str, desc: str) -> List["Hallazgo"]:
+    """Textos que la operación cambió: "CONTROL DE CALIDAD" pasó a "CALIDAD EN OPERACIONES"; en Rendimiento la
+    "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA"."""
+    if re.search(r"MUESTRA PARA (EL )?CONTROL DE CALIDAD", desc):
+        return [Hallazgo("AVISO", donde, orden, 'debe figurar "CANTIDAD MUESTREADA" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"')]
+    if "CONTROL DE CALIDAD" in desc:
+        return [Hallazgo("AVISO", donde, orden, 'reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"')]
+    return []
+
+
 def _o(lst: Lista, i: int) -> str:
     return str(lst.pasos[i].get("o") or i + 1)
 
@@ -141,6 +151,10 @@ def revisar(snap: dict) -> List[Hallazgo]:
                 h.append(Hallazgo("AVISO", nombre, o, "Realizado por y Visto bueno sin R. Por + V.B."))
             if td == "Visto bueno" and "V.B." not in chk:
                 h.append(Hallazgo("AVISO", nombre, o, "Visto bueno sin V.B."))
+            desc = normalizar(p.get("d"))
+            if td == "Realizado por" and "CALIDAD EN OPERACIONES" in desc and "Estado CC" not in chk:
+                h.append(Hallazgo("AVISO", nombre, o, "paso de Calidad en Operaciones (Realizado por) sin Estado CC"))
+            h.extend(_avisos_texto(nombre, o, desc))
             if td in TIPOS_SIN_EDIT and "Edit" in chk and nombre.startswith("PROCEDIMIENTO"):
                 h.append(Hallazgo("AVISO", nombre, o, f"{td} con Edit marcado (no es habitual)"))
 
@@ -224,6 +238,13 @@ def revisar(snap: dict) -> List[Hallazgo]:
                     h.append(Hallazgo("ERROR", donde, "-", f"{tipo} sin Decimal: {descripcion_pm(fila)[:50]}"))
                 if tipo == "Rango" and not (vi.strip() and vf.strip()):
                     h.append(Hallazgo("ERROR", donde, "-", f"Rango sin valores: {descripcion_pm(fila)[:50]}"))
+                desc_pm = normalizar(descripcion_pm(fila))
+                h.extend(_avisos_texto(donde, "-", desc_pm))
+                chk_pm = {c.strip() for c in chk.split(",") if c.strip()}
+                if cantidad.strip() and "Edit" in chk_pm:
+                    h.append(Hallazgo("AVISO", donde, "-", f"los insumos no llevan Edit: {descripcion_pm(fila)[:50]}"))
+                if not cantidad.strip() and ("MUESTREAD" in desc_pm or "MUESTREO" in desc_pm) and not {"Edit", "Estado CC"} <= chk_pm:
+                    h.append(Hallazgo("AVISO", donde, "-", f"muestreo de Calidad en Operaciones sin Edit + Estado CC: {descripcion_pm(fila)[:50]}"))
                 capturas = {"Hora", "Fecha y Hora", "Texto", "Lote", "Rango", "Fecha Vencimiento"}
                 if tipo in capturas and "Edit" not in chk:
                     h.append(Hallazgo("AVISO", donde, "-", f"{tipo} sin Edit: {descripcion_pm(fila)[:50]}"))
