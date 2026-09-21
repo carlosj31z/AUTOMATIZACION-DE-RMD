@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.2.0
+// @version      1.3.0
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -22,7 +22,7 @@
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   const OPC = [
     ['activo', 'Mejoras activas'], ['enter', 'Enter = Ir'], ['ancho', 'Diálogos a medida'], ['columnas', 'Columnas ordenadas'],
-    ['ocultar', 'Ocultar Estado Mov., Imagen, Formato'], ['grupos', 'Colores por grupo + tooltips'],
+    ['ocultar', 'Ocultar Estado Mov., Imagen, Formato'], ['grupos', 'Tooltips en las cabeceras'],
     ['depende', 'Depende: tooltip con el paso'], ['sintipo', '"Sin tipo de dato" en rojo y negrita'],
     ['puesto', 'Puesto de Trabajo faltante parpadea'], ['reglas', 'Alertas de casillas incoherentes'],
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
@@ -35,6 +35,7 @@
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const setTxt = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
   const enDialogo = (el) => el.closest && el.closest('.sapMDialog:not(.sapMMessageDialog)');
   const dialogos = () => [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter((d) => d.getClientRects().length);
 
@@ -75,29 +76,29 @@
 
   // ---- 2. Estilos --------------------------------------------------------------------------------
   const CSS = `
-  /* Pasos: pantalla completa (muchas filas) */
+  /* Todas las ventanas emergentes: centradas y con el pie (Cancelar/Cerrar) siempre visible */
+  html.rmd-ui .sapMDialog:not(.sapMPopover) { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important; }
+  html.rmd-ui .sapMDialog:not(.sapMPopover) > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; }
+  html.rmd-ui .sapMDialog:not(.sapMPopover) > footer, html.rmd-ui .sapMDialog:not(.sapMPopover) > header { flex: 0 0 auto !important; }
+  /* Pasos: casi pantalla completa (muchas filas) */
   html.rmd-ui .sapMDialog.rmd-pasos {
     width: 98vw !important; max-width: 98vw !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
-    left: 1vw !important; top: 8px !important; box-sizing: border-box !important; }
+    left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
   /* Estructura, Etiquetas, Procesos menores, selectores: solo el alto que necesitan, centrados */
   html.rmd-ui .sapMDialog.rmd-medio {
-    width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 16px) !important;
-    left: 50% !important; transform: translateX(-50%) !important; top: 6vh !important; box-sizing: border-box !important; }
+    width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 24px) !important;
+    left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
   html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: min(1560px, 97vw) !important; }
-  html.rmd-ui .sapMDialog.rmd-medio .sapMDialogScroll { min-height: 0; }
+  /* Mensajes (confirmación, advertencia, éxito): también centrados */
+  html.rmd-ui .sapMDialog.sapMMessageDialog { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
   html.rmd-cols .sapMDialog:not(.sapMMessageDialog) table.sapMListTbl { table-layout: fixed; width: 100% !important; }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: 0; z-index: 3; background: var(--rmd-th, #1f2229); }
+  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-th, #1f2229); }
+  html.rmd-ui .sapMDialog.rmd-pasos .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-th, #1f2229); }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB > td { padding-top: 7px; padding-bottom: 7px; vertical-align: middle; }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:hover > td { background: rgba(80,160,255,.13) !important; }
   html.rmd-zebra .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:nth-child(odd) > td { background: rgba(255,255,255,.035); }
   html.rmd-ui .sapMDialog td .sapMText, html.rmd-ui .sapMDialog td .sapMLabel { white-space: normal; line-height: 1.35; }
   html.rmd-ui .sapMDialog input:focus { outline: 2px solid #3aa0ff !important; outline-offset: 0; }
-  /* grupos de columnas */
-  html.rmd-grupos th[data-rmd-g="id"]   { box-shadow: inset 0 3px 0 #5b9bd5; }
-  html.rmd-grupos th[data-rmd-g="tipo"] { box-shadow: inset 0 3px 0 #e0a030; }
-  html.rmd-grupos th[data-rmd-g="lim"]  { box-shadow: inset 0 3px 0 #b07cd8; }
-  html.rmd-grupos th[data-rmd-g="chk"]  { box-shadow: inset 0 3px 0 #4cb782; }
-  html.rmd-grupos th[data-rmd-g="acc"]  { box-shadow: inset 0 3px 0 #8a8f98; }
   /* "Sin tipo de dato": rojo y negrita */
   html.rmd-sintipo td.rmd-td-sintipo input, html.rmd-sintipo td.rmd-td-sintipo .sapMSltLabel { color: #ff5c5c !important; font-weight: 800 !important; -webkit-text-fill-color: #ff5c5c !important; }
   /* contraste y campos editables */
@@ -120,7 +121,7 @@
   .sapMDialog h2.rmd-pm-titulo { white-space: normal !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; max-width: 100%; }
   .sapMDialog .rmd-pm-cab { height: auto !important; min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
   /* barra del filtro local y de alertas */
-  #rmd-filtro-bar { display: flex; gap: 10px; align-items: center; padding: 6px 16px; font: 13px system-ui, sans-serif; color: #dfe3ea; flex-wrap: wrap; }
+  #rmd-filtro-bar { position: sticky; top: 0; z-index: 9; background: var(--rmd-th, #1f2229); border-bottom: 1px solid rgba(255,255,255,.12); display: flex; gap: 10px; align-items: center; padding: 6px 16px; font: 13px system-ui, sans-serif; color: #dfe3ea; flex-wrap: wrap; }
   #rmd-filtro-bar input { flex: 0 1 360px; padding: 5px 8px; border-radius: 6px; border: 1px solid #56617a; background: #12151a; color: #fff; }
   #rmd-filtro-bar span { opacity: .85; }
   #rmd-filtro-bar button.rmd-alerta { border: 1px solid #ff4d4d; background: #3a1616; color: #ffb3b3; border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
@@ -133,7 +134,7 @@
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
   function aplicarClases() {
-    [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['zebra', 'rmd-zebra'], ['grupos', 'rmd-grupos'], ['sintipo', 'rmd-sintipo'],
+    [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['zebra', 'rmd-zebra'], ['sintipo', 'rmd-sintipo'],
       ['contraste', 'rmd-contraste'], ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
   }
 
@@ -165,13 +166,6 @@
     'CONFORME': 110, 'PROCESO MENOR': 130, 'ACCIONES': 110, 'CANTIDAD INSUMOS': 150, 'UM': 64, 'TAB': 56,
   };
   const OCULTAS = ['ESTADO MOV.', 'IMAGEN', 'FORMATO'];
-  const GRUPO = {
-    'ORDEN': 'id', 'DEPENDE': 'id', 'CÓDIGO': 'id', 'CODIGO': 'id', 'DESCRIPCIÓN': 'id', 'DESCRIPCION': 'id',
-    'TIPO DATO': 'tipo', 'CLAVE MODELO': 'tipo', 'PUESTO TRABAJO': 'tipo',
-    'VAL. INICIAL': 'lim', 'VAL. FINAL': 'lim', 'MARGEN': 'lim', 'DECIMAL': 'lim', 'DECIM.': 'lim',
-    'ESTADO CC': 'chk', 'ESTADO MOV.': 'chk', 'PM OP': 'chk', 'GEN PP': 'chk', 'EDIT': 'chk', 'R. POR': 'chk', 'V.B.': 'chk',
-    'PROC. MEN.': 'acc', 'ESTADO': 'acc',
-  };
   const TIP = {
     'ESTADO CC': 'Estado CC: el paso queda sujeto al estado de Control de Calidad',
     'PM OP': 'PM OP: proceso menor opcional', 'GEN PP': 'Gen PP: genera producto en proceso',
@@ -210,7 +204,7 @@
     // anchos, grupos y tooltips
     ths.forEach((th, i) => {
       const n = nombres[i];
-      if (on('grupos')) { if (GRUPO[n]) th.dataset.rmdG = GRUPO[n]; if (TIP[n]) th.title = TIP[n]; } else { delete th.dataset.rmdG; }
+      if (on('grupos') && TIP[n]) th.title = TIP[n];
       if (!on('columnas')) return;
       if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', esPasos ? '380px' : '260px', 'important'); return; }
       const w = ANCHOS[n];
@@ -234,6 +228,7 @@
     const iTipo = nombres.indexOf('TIPO DATO'), iOrd = nombres.indexOf('ORDEN'), iDes = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
     const iClave = nombres.indexOf('CLAVE MODELO'), iPuesto = nombres.indexOf('PUESTO TRABAJO'), iDec = Math.max(nombres.indexOf('DECIMAL'), nombres.indexOf('DECIM.'));
     const iVI = nombres.indexOf('VAL. INICIAL'), iVF = nombres.indexOf('VAL. FINAL');
+    const iCant = nombres.indexOf('CANTIDAD INSUMOS'), iUM = nombres.indexOf('UM');
     const iChk = Object.fromEntries(CHK.map((c) => [c, nombres.indexOf(c)]));
     const porOrden = {}, infoOrden = {};
     const iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO');
@@ -268,6 +263,11 @@
       if (!on('reglas') || !tdTipo) return;
       const avisos = [];
       const regla = reglaCasillas(tipo);
+      // Procesos menores que son INSUMOS de la receta (llevan Cantidad Insumos / UM): nunca llevan Edit.
+      if (esPM && regla) {
+        const cant = iCant >= 0 ? norm((inputDe(celda(tr, iCant)) || {}).value) : '', um = iUM >= 0 ? norm(celda(tr, iUM) && celda(tr, iUM).textContent) : '';
+        if (cant || um) regla.EDIT = false;
+      }
       if (regla) for (const [c, debe] of Object.entries(regla)) {
         const i = iChk[c]; if (i == null || i < 0 || !celda(tr, i)) continue;
         if (marcada(celda(tr, i)) !== debe) {
@@ -299,6 +299,10 @@
 
     if (on('filtro') && esPasos && filas.length >= 8) filtroLocal(tabla);
     actualizarBarra(d, tabla);
+    // alturas para que barra de filtro, título de la tabla (con Guardar) y cabecera de columnas queden siempre visibles
+    const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
+    const h1 = esPasos && bar ? bar.offsetHeight : 0, h2 = esPasos && hdr ? hdr.offsetHeight : 0;
+    d.style.setProperty('--rmd-h1', h1 + 'px'); d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
   }
 
   // ---- 5. Filtro local + contador + alertas -----------------------------------------------------
@@ -328,7 +332,7 @@
       tr.style.display = ok ? '' : 'none'; if (sub) sub.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     });
-    barra.querySelector('.rmd-cuenta').textContent = q ? `${visibles} de ${total} pasos` : `${total} pasos`;
+    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} pasos`);
   }
   function actualizarBarra(d, tabla) {
     const barra = d.querySelector('#rmd-filtro-bar'); if (!barra || !tabla.__rmdAlertas) return;
@@ -336,14 +340,14 @@
     if (!on('reglas')) { b.style.display = 'none'; return; }
     b.style.display = '';
     b.classList.toggle('ok', n === 0);
-    b.textContent = n === 0 ? '✔ Casillas coherentes con el tipo de dato' : `⚠ ${n} incoherencia(s) — clic para ir a la siguiente`;
+    setTxt(b, n === 0 ? '✔ Casillas coherentes con el tipo de dato' : `⚠ ${n} incoherencia(s) — clic para ir a la siguiente`);
   }
   function irAlSiguiente(d) {
     const tabla = d.querySelector('table.sapMListTbl'); const a = tabla && tabla.__rmdAlertas; if (!a || !a.filas.length) return;
     a.sig = (a.sig || 0) % a.filas.length; const { tr, texto } = a.filas[a.sig]; a.sig++;
     tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
     tr.animate([{ outline: '3px solid #ff4d4d' }, { outline: '3px solid transparent' }], { duration: 1600 });
-    const cuenta = d.querySelector('#rmd-filtro-bar .rmd-cuenta'); if (cuenta) cuenta.textContent = texto;
+    setTxt(d.querySelector('#rmd-filtro-bar .rmd-cuenta'), texto);
   }
 
   // ---- 6. Estado del RMD en la cabecera de cada ventana + título completo del paso menor ------
@@ -369,7 +373,7 @@
       const tr = filasPrincipales(t).find((r) => celda(r, iC) && norm(celda(r, iC).textContent) === cod);
       if (!tr) continue;
       const txt = `Procesos Menores para el Paso: ${cod} (${norm(celda(tr, iD).textContent)})`;
-      if (norm(h2.textContent) !== txt) h2.textContent = txt;
+      if (norm(h2.textContent) !== txt) setTxt(h2, txt);
       return;
     }
   }
@@ -382,7 +386,7 @@
       if (on('estado') && estado) {
         if (!b) { b = document.createElement('span'); b.className = 'rmd-estado'; h2.after(b); }
         const cls = /ingres/i.test(estado) ? 'ingresado' : /autoriz/i.test(estado) ? 'autorizado' : /suspend/i.test(estado) ? 'suspendido' : 'otro';
-        b.className = 'rmd-estado ' + cls; b.textContent = estado.toUpperCase();
+        b.className = 'rmd-estado ' + cls; setTxt(b, estado.toUpperCase());
         b.title = cls === 'ingresado' ? 'RMD en estado Ingresado: se puede modificar' : `RMD ${estado}: revisar antes de modificar`;
       } else if (b) b.remove();
       if (on('pmtitulo') && /^Procesos Menores para el Paso/i.test(norm(h2.textContent))) {
@@ -393,8 +397,10 @@
   }
 
   let pendiente = false;
+  window.__rmdStats = { ajustes: 0 };
   function ajustarTodo() {
     if (!opc.activo) return;
+    window.__rmdStats.ajustes++;
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
     decorarCabeceras();
   }
