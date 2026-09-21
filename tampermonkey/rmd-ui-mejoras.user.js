@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.6.0
+// @version      1.6.1
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -27,7 +27,7 @@
     ['puesto', 'Puesto de Trabajo faltante parpadea'], ['reglas', 'Alertas de casillas incoherentes'],
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
     ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'],
-    ['exito', 'Cerrar solos los mensajes de éxito'], ['contraste', 'Más contraste / campos editables'], ['zebra', 'Filas alternas'],
+    ['exito', 'Cerrar solos los mensajes de éxito'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
@@ -101,28 +101,25 @@
   html.rmd-ui .sapMDialog.rmd-sticky .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-barra); }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB > td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:hover > td { background: rgba(27,141,236,.09) !important; }
-  html.rmd-zebra .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:nth-child(odd) > td { background: rgba(255,255,255,.02); }
   html.rmd-ui .sapMDialog td .sapMText, html.rmd-ui .sapMDialog td .sapMLabel { white-space: normal; line-height: 1.35; }
   html.rmd-ui .sapMDialog input:focus { outline: 1px solid var(--rmd-acento) !important; outline-offset: -1px; }
 
   /* ── Señales sobre la tabla (discretas: tinte suave + marca lateral, sin contornos) ── */
   html.rmd-sintipo td.rmd-td-sintipo input, html.rmd-sintipo td.rmd-td-sintipo .sapMSltLabel { color: var(--rmd-rojo) !important; -webkit-text-fill-color: var(--rmd-rojo) !important; font-weight: 700 !important; }
-  html.rmd-contraste .sapMDialog .sapMInputBaseDisabled .sapMInputBaseInner, html.rmd-contraste .sapMDialog .sapMInputBaseDisabled { opacity: .8 !important; }
-  html.rmd-contraste .sapMDialog .sapMInputBaseInner::placeholder { color: var(--rmd-apagado) !important; opacity: 1; }
-  html.rmd-contraste .sapMDialog .sapMInputBase:not(.sapMInputBaseDisabled):not(.sapMInputBaseReadonly) .sapMInputBaseInner { background: rgba(255,255,255,.04) !important; }
   @keyframes rmdPulso { 0%, 100% { box-shadow: 0 0 0 1px rgba(255,138,138,.95); background: rgba(255,138,138,.16); } 50% { box-shadow: 0 0 0 1px rgba(255,138,138,.25); background: transparent; } }
   html.rmd-puesto td.rmd-sin-puesto .sapMInputBase, html.rmd-puesto td.rmd-sin-puesto .sapMComboBoxBase { animation: rmdPulso 2.4s ease-in-out infinite; border-radius: 3px; }
   @media (prefers-reduced-motion: reduce) { html.rmd-puesto td.rmd-sin-puesto .sapMInputBase, html.rmd-puesto td.rmd-sin-puesto .sapMComboBoxBase { animation: none; box-shadow: 0 0 0 1px rgba(255,138,138,.9); } }
-  html.rmd-reglas td.rmd-marcar    { background: rgba(240,180,90,.13) !important; box-shadow: inset 3px 0 0 var(--rmd-ambar); }
-  html.rmd-reglas td.rmd-desmarcar { background: rgba(255,138,138,.13) !important; box-shadow: inset 3px 0 0 var(--rmd-rojo); }
-  html.rmd-reglas td.rmd-falta     { background: rgba(255,138,138,.10) !important; box-shadow: inset 0 -2px 0 var(--rmd-rojo); }
+  html.rmd-reglas td.rmd-marcar    { outline: 2px dashed #ffb02e; outline-offset: -3px; background: rgba(255,176,46,.18) !important; }
+  html.rmd-reglas td.rmd-desmarcar { outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.20) !important; }
+  html.rmd-reglas td.rmd-falta     { outline: 2px solid #ff4d4d; outline-offset: -3px; }
 
   /* ── Estado del RMD: etiqueta con contorno, sin relleno ── */
-  .rmd-estado { display: inline-block; margin-left: 10px; padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font: 600 11px/18px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; background: transparent; }
+  .rmd-estado { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 2; margin: 0; padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font: 600 11px/18px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; background: transparent; }
   .rmd-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-estado.autorizado { color: var(--rmd-verde); } .rmd-estado.suspendido { color: var(--rmd-ambar); } .rmd-estado.otro { color: var(--rmd-apagado); }
 
   /* ── Título del paso menor: hasta 2 líneas ── */
   .sapMDialog h2.rmd-pm-titulo { white-space: normal !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; max-width: 100%; }
+  .sapMDialog .rmd-con-estado .sapMBarMiddle { box-sizing: border-box; padding-right: 128px; }
   .sapMDialog .rmd-pm-cab { height: auto !important; min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
 
   /* ── Barra fija: filtro, incoherencias y copiar/pegar ── */
@@ -168,8 +165,8 @@
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
   function aplicarClases() {
-    [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['zebra', 'rmd-zebra'], ['sintipo', 'rmd-sintipo'],
-      ['contraste', 'rmd-contraste'], ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
+    [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['sintipo', 'rmd-sintipo'],
+      ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
   }
 
   // ---- 3. Reglas: tipo de dato -> casillas ------------------------------------------------------
@@ -439,11 +436,12 @@
       const barra = h2.closest('.sapMBar') || h2.parentElement;
       let b = barra.querySelector('.rmd-estado');
       if (on('estado') && estado) {
-        if (!b) { b = document.createElement('span'); b.className = 'rmd-estado'; h2.after(b); }
+        if (!b) { b = document.createElement('span'); b.className = 'rmd-estado'; barra.appendChild(b); }
+        barra.classList.add('rmd-con-estado');
         const cls = /ingres/i.test(estado) ? 'ingresado' : /autoriz/i.test(estado) ? 'autorizado' : /suspend/i.test(estado) ? 'suspendido' : 'otro';
         b.className = 'rmd-estado ' + cls; setTxt(b, estado.toUpperCase());
         b.title = cls === 'ingresado' ? 'RMD en estado Ingresado: se puede modificar' : `RMD ${estado}: revisar antes de modificar`;
-      } else if (b) b.remove();
+      } else if (b) { b.remove(); barra.classList.remove('rmd-con-estado'); }
       if (on('pmtitulo') && /^Procesos Menores para el Paso/i.test(norm(h2.textContent))) {
         tituloPMCompleto(h2);
         h2.classList.add('rmd-pm-titulo'); h2.title = norm(h2.textContent); barra.classList.add('rmd-pm-cab');
@@ -463,6 +461,14 @@
     if (pendiente) return; pendiente = true;
     setTimeout(() => { pendiente = false; ajustarTodo(); }, 60);   // setTimeout (no rAF): también corre con la pestaña en segundo plano
   }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked'] });  // aria-checked: casillas que se pintan tarde
+  // UI5 rellena valores (Tipo Dato, casillas…) de forma tardía y sin cambiar el DOM: se vigila una "firma" de las tablas abiertas
+  let firmaPrev = '';
+  const firmaTablas = () => {
+    let f = ''; const ts = document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl');
+    ts.forEach((t) => { t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
+    return f + ts.length;
+  };
+  setInterval(() => { if (!opc.activo || !document.querySelector('.sapMDialog')) { firmaPrev = ''; return; } const f = firmaTablas(); if (f !== firmaPrev) { firmaPrev = f; ajustarTodo(); } }, 700);
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
   document.addEventListener('click', () => setTimeout(ajustarTodo, 120), true);
 

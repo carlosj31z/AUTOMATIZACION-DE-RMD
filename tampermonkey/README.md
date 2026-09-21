@@ -1,4 +1,4 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.6.0
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.6.1
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
 Solo actúa dentro del iframe de la app (`ui5appruntime.html`) y **solo cambia la vista**. Lo único que "pulsa" por ti:
@@ -11,7 +11,7 @@ Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mej
 | Diálogos a medida | **Pasos**: casi pantalla completa. **Estructura, Etiquetas, Procesos menores, selectores**: centrados y solo con el alto que necesitan. |
 | Columnas ordenadas | Anchos por nombre; la descripción toma el resto. **Depende** se mide con el texto más largo y siempre se ve completo. |
 | Columnas ocultas | Estado Mov., Imagen y Formato. |
-| Estado del RMD | Insignia de color (INGRESADO / AUTORIZADO / SUSPENDIDO) en la cabecera de cada ventana emergente. |
+| Estado del RMD | Etiqueta (INGRESADO / AUTORIZADO / SUSPENDIDO) **pegada a la derecha** de la cabecera de cada ventana emergente. |
 | Título del paso menor | Muestra la descripción completa del paso mayor (hasta 2 líneas; tooltip con el texto entero). |
 | "Sin tipo de dato" | Texto en **rojo y negrita** en Tipo Dato. |
 | Puesto de Trabajo | Si el combo está habilitado y vacío, la casilla se resalta y **parpadea**. |
@@ -22,7 +22,6 @@ Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mej
 | Ventanas | Todas (incluidos los mensajes) **centradas** y con el pie (Cancelar/Cerrar) siempre visible; no se desbordan de la pantalla. |
 | Cambios sin guardar | Avisa antes de Cancelar si editaste algo; **Ctrl+S** = Guardar. |
 | Éxito automático | Cierra solo los mensajes de título "Éxito" con un único OK (900 ms). Confirmaciones y advertencias no se tocan. |
-| Contraste / filas alternas / resalte / foco | Lectura más cómoda en tablas largas. |
 | Calidad en Operaciones | El paso mayor "EL PERSONAL DE CALIDAD EN OPERACIONES…" / "CALIDAD EN OPERACIONES REGISTRA…" (Realizado por) debe llevar R. Por + **Estado CC**; los procesos menores de muestreo ("CANTIDAD MUESTREADA", "FECHA / HORA DE MUESTREO") llevan Edit + Estado CC. |
 | Insumos | Procesos menores con Cantidad Insumos / UM: **sin Edit** (si lo tienen marcado se pide desmarcarlo). |
 | Textos | Marca la descripción que dice "CONTROL DE CALIDAD" (→ "CALIDAD EN OPERACIONES"), "MUESTRA PARA CONTROL DE CALIDAD" (→ "CANTIDAD MUESTREADA (unidad):") o la nota antigua "…CONTROL DE CALIDAD O CONTROL DE PROCESO…". Se acepta la forma "…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE". |
@@ -31,6 +30,6 @@ Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mej
 ## Estilo
 Diseño minimalista para no romper la costumbre del usuario de la interfaz original: usa la tipografía y la paleta del propio tema Fiori
 (oscuro por defecto; cambia a claro si el portal cambia de tema), botones con contorno fino y texto de acento (relleno solo en "Aplicar"),
-alertas con un tinte suave y una marca lateral en vez de contornos, etiquetas de estado con contorno, un aviso de incoherencias en texto
+casillas a marcar/desmarcar **encerradas** (recuadro discontinuo ámbar = marcar, sólido rojo = desmarcar), etiquetas de estado con contorno, un aviso de incoherencias en texto
 discreto, animación lenta (2,4 s) en el Puesto de Trabajo faltante —se desactiva si el sistema pide reducir movimiento— y un botón de ajustes pequeño.
 Las tablas siguen siendo las del portal.
