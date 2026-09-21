@@ -1,4 +1,4 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.6.1
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.8.2
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
 Solo actúa dentro del iframe de la app (`ui5appruntime.html`) y **solo cambia la vista**. Lo único que "pulsa" por ti:
@@ -20,12 +20,12 @@ Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mej
 | Tooltips | Significado de Edit, R. Por, V.B., Estado CC, PM OP, Gen PP… al pasar el cursor por la cabecera (sin barras de color). |
 | Filtro local | "Filtrar pasos" con contador y botón de incoherencias **siempre visibles** (fijos arriba), igual que el título de la tabla con Guardar y la cabecera de columnas. |
 | Ventanas | Todas (incluidos los mensajes) **centradas** y con el pie (Cancelar/Cerrar) siempre visible; no se desbordan de la pantalla. |
-| Cambios sin guardar | Avisa antes de Cancelar si editaste algo; **Ctrl+S** = Guardar. |
+| Cambios sin guardar | Avisa antes de Cancelar/Cerrar si editaste valores o casillas (compara el estado actual con el del último guardado); marcar filas para copiar no cuenta como cambio. **Ctrl+S** = Guardar. |
 | Éxito automático | Cierra solo los mensajes de título "Éxito" con un único OK (900 ms). Confirmaciones y advertencias no se tocan. |
 | Calidad en Operaciones | El paso mayor "EL PERSONAL DE CALIDAD EN OPERACIONES…" / "CALIDAD EN OPERACIONES REGISTRA…" (Realizado por) debe llevar R. Por + **Estado CC**; los procesos menores de muestreo ("CANTIDAD MUESTREADA", "FECHA / HORA DE MUESTREO") llevan Edit + Estado CC. |
 | Insumos | Procesos menores con Cantidad Insumos / UM: **sin Edit** (si lo tienen marcado se pide desmarcarlo). |
 | Textos | Marca la descripción que dice "CONTROL DE CALIDAD" (→ "CALIDAD EN OPERACIONES"), "MUESTRA PARA CONTROL DE CALIDAD" (→ "CANTIDAD MUESTREADA (unidad):") o la nota antigua "…CONTROL DE CALIDAD O CONTROL DE PROCESO…". Se acepta la forma "…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE". |
-| **Copiar / Pegar configuración** | En la ventana de Pasos, en la barra fija de arriba: **⧉ Copiar configuración** y **⎘ Pegar en el paso marcado**. 1) Marca la casilla del paso de referencia y pulsa Copiar (lee su configuración y sus procesos menores). 2) Marca la casilla del paso nuevo y pulsa Pegar: aparece una **vista previa** con lo que cambiará (puedes desmarcar campos y procesos menores) y solo escribe al pulsar **Aplicar**. Copia Tipo Dato, Clave Modelo, Puesto, Val. Inicial/Final, Margen, Decimal y casillas; no copia Orden, Depende, Código ni Descripción. Los procesos menores se agregan **por código** con el selector "Adicionar Pasos RMD", se configuran igual que el origen y se guardan. Los **insumos** no se copian (se agregan con "Agregar Insumo"). El portapapeles queda guardado en el navegador: se puede copiar en un RMD de referencia y pegar en otro RMD. |
+| **Copiar / Pegar configuración** | En la ventana de Pasos, en la barra del título de la tabla ("Pasos (n)"), **a la izquierda del icono de impresora**: **Copiar configuración** y **Pegar**. 1) Marca la casilla del paso de referencia y pulsa Copiar (lee su configuración y sus procesos menores). 2) Marca la casilla del paso nuevo y pulsa Pegar: aparece una **vista previa** con lo que cambiará (puedes desmarcar campos y procesos menores) y solo escribe al pulsar **Aplicar**; Escape cierra la vista previa. Copia Tipo Dato, Clave Modelo, Puesto, Val. Inicial/Final, Margen, Decimal y casillas; no copia Orden, Depende, Código ni Descripción. Los procesos menores se agregan **por código** con el selector "Adicionar Pasos RMD", se configuran igual que el origen y se guardan (si ya existen en el destino, no se duplican: se actualiza su configuración). Los **insumos** no se copian (se agregan con "Agregar Insumo"). **El paso copiado es temporal**: se descarta al cerrar el RMD, por eso al abrir otro RMD no queda ningún aviso. Protecciones: no pega en RMD que no estén **Ingresados**, ni sobre el mismo paso copiado, ni en un RMD distinto del copiado. |
 
 ## Estilo
 Diseño minimalista para no romper la costumbre del usuario de la interfaz original: usa la tipografía y la paleta del propio tema Fiori
@@ -33,3 +33,7 @@ Diseño minimalista para no romper la costumbre del usuario de la interfaz origi
 casillas a marcar/desmarcar **encerradas** (recuadro discontinuo ámbar = marcar, sólido rojo = desmarcar), etiquetas de estado con contorno, un aviso de incoherencias en texto
 discreto, animación lenta (2,4 s) en el Puesto de Trabajo faltante —se desactiva si el sistema pide reducir movimiento— y un botón de ajustes pequeño.
 Las tablas siguen siendo las del portal.
+
+## Apagar mejoras
+Cada casilla del botón de ajustes retira lo que esa mejora añadió (botones, barra, etiqueta de estado, columnas ocultas, anchos); con "Mejoras activas" apagado
+la ventana vuelve a verse exactamente como la del portal.

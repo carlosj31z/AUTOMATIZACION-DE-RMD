@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.6.1
+// @version      1.8.2
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -36,6 +36,7 @@
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
   const setTxt = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
+  const visible = (e) => !!e && e.getClientRects().length > 0;                   // (offsetParent es null en elementos con position:fixed)
   const enDialogo = (el) => el.closest && el.closest('.sapMDialog:not(.sapMMessageDialog)');
   const dialogos = () => [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter((d) => d.getClientRects().length);
 
@@ -48,10 +49,10 @@
   function botonIr(desde) {
     const raiz = desde.closest('[role=dialog]') || document;
     return raiz.querySelector('[id$=btnGo]') ||
-      [...raiz.querySelectorAll('button')].find((b) => b.offsetParent && norm(b.textContent) === 'Ir');
+      [...raiz.querySelectorAll('button')].find((b) => visible(b) && norm(b.textContent) === 'Ir');
   }
   function botonPorTitulo(raiz, titulo) {
-    return [...raiz.querySelectorAll('button')].find((b) => b.offsetParent && (b.title === titulo || norm(b.textContent) === titulo));
+    return [...raiz.querySelectorAll('button')].find((b) => visible(b) && (b.title === titulo || norm(b.textContent) === titulo));
   }
 
   // ---- 1. Enter en un filtro = pulsar "Ir"; Ctrl+S = Guardar -----------------------------------
@@ -59,7 +60,7 @@
     if (e.key === 's' && (e.ctrlKey || e.metaKey) && on('singuardar')) {
       const d = dialogos().pop();
       const g = d && botonPorTitulo(d, 'Guardar');
-      if (g) { e.preventDefault(); e.stopPropagation(); pulsar(g); }
+      if (g) { e.preventDefault(); e.stopPropagation(); pulsar(g); rebase(d); }
       return;
     }
     if (!on('enter') || e.key !== 'Enter' || e.isComposing) return;
@@ -131,6 +132,8 @@
   #rmd-filtro-bar button.rmd-alerta { border: 0; background: transparent; color: var(--rmd-ambar); font: inherit; font-size: 13px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
   #rmd-filtro-bar button.rmd-alerta:hover { background: rgba(240,180,90,.12); }
   #rmd-filtro-bar button.rmd-alerta.ok { color: var(--rmd-verde); cursor: default; } #rmd-filtro-bar button.rmd-alerta.ok:hover { background: transparent; }
+  .rmd-copia-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
+  #rmd-filtro-bar .rmd-clip:empty { display: none; }
   #rmd-filtro-bar .rmd-clip { flex: 1 1 200px; min-width: 0; margin-left: auto; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* ── Botones (discretos: contorno fino y texto de acento; el relleno solo en la acción principal) ── */
@@ -240,7 +243,7 @@
     ths.forEach((th, i) => {
       const n = nombres[i];
       if (on('grupos') && TIP[n]) th.title = TIP[n];
-      if (!on('columnas')) return;
+      if (!on('columnas')) { th.style.removeProperty('width'); th.style.removeProperty('min-width'); return; }
       if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', (grande && innerWidth >= 1600 ? 380 : 240) + 'px', 'important'); return; }
       const w = ANCHOS[n];
       if (w) { th.style.setProperty('width', w + 'px', 'important'); th.style.setProperty('min-width', w + 'px', 'important'); }
@@ -348,7 +351,11 @@
     tabla.__rmdAlertas = { n: alertas, filas: primeras, sig: previo ? previo.sig : 0 };
 
     if (esPasos && (on('filtro') || on('reglas'))) filtroLocal(tabla, true);
+    else if (esPasos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); filas.forEach((tr) => tr.style.removeProperty('display')); }
+    if (esPasos && on('copiar')) instalarBotonesCopia(d);
+    else if (esPasos) d.querySelectorAll('.rmd-copia-grupo, .rmd-clip').forEach((e) => e.remove());
     else if (esPM && on('reglas')) filtroLocal(tabla, false);
+    else if (esPM) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); }
     actualizarBarra(d, tabla);
     // alturas para que barra de filtro, título de la tabla (con Guardar) y cabecera de columnas queden siempre visibles
     const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
@@ -366,14 +373,16 @@
       const cont = tabla.closest('.sapMDialogScrollCont') || d;
       cont.parentNode.insertBefore(barra, cont);
       const inp = barra.querySelector('input'); if (inp) inp.addEventListener('input', () => aplicarFiltro(d));
-      if (conFiltro && on('copiar')) instalarBotonesCopia(barra, d, tabla);
+      if (conFiltro && on('copiar')) { const sp = document.createElement('span'); sp.className = 'rmd-clip'; barra.appendChild(sp); pintarEstadoPortapapeles(); }
       barra.querySelector('button').addEventListener('click', () => irAlSiguiente(d));
     }
     aplicarFiltro(d);
   }
   function aplicarFiltro(d) {
     const barra = d.querySelector('#rmd-filtro-bar'), tabla = d.querySelector('table.sapMListTbl'); if (!barra || !tabla) return;
-    const inp = barra.querySelector('input'), q = NORM(inp ? inp.value : '');
+    const inp = barra.querySelector('input');
+    if (inp) { if (!on('filtro')) { inp.value = ''; inp.style.display = 'none'; } else inp.style.display = ''; }   // filtro apagado: solo alertas
+    const q = NORM(inp ? inp.value : '');
     let visibles = 0, total = 0;
     const todas = [...tabla.querySelectorAll('tbody tr')];
     todas.forEach((tr, k) => {
@@ -451,8 +460,19 @@
 
   let pendiente = false;
   window.__rmdStats = { ajustes: 0 };
+  // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
+  function limpiezaTotal() {
+    document.querySelectorAll('.rmd-copia-grupo, #rmd-filtro-bar, .rmd-estado').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-con-estado, .rmd-pm-titulo').forEach((e) => e.classList.remove('rmd-con-estado', 'rmd-pm-titulo'));
+    document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => {
+      c.style.removeProperty('display'); if (c.tagName === 'TH') { c.style.removeProperty('width'); c.style.removeProperty('min-width'); }
+      c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto');
+    });
+    document.querySelectorAll('.sapMDialog tbody tr').forEach((r) => r.style.removeProperty('display'));
+    document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'));
+  }
   function ajustarTodo() {
-    if (!opc.activo) return;
+    if (!opc.activo) { limpiezaTotal(); return; }
     window.__rmdStats.ajustes++;
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
     decorarCabeceras();
@@ -468,19 +488,47 @@
     ts.forEach((t) => { t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
     return f + ts.length;
   };
-  setInterval(() => { if (!opc.activo || !document.querySelector('.sapMDialog')) { firmaPrev = ''; return; } const f = firmaTablas(); if (f !== firmaPrev) { firmaPrev = f; ajustarTodo(); } }, 700);
+  let sinVentanas = 0;
+  function revisionPeriodica() {
+    if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
+    if (opc.activo && opc.singuardar) refrescarBases();
+    if (!opc.activo || !document.querySelector('.sapMDialog')) { firmaPrev = ''; return; }
+    const f = firmaTablas(); if (f !== firmaPrev) { firmaPrev = f; ajustarTodo(); }
+  }
+  setInterval(() => { const t0 = performance.now(); revisionPeriodica(); window.__rmdStats.pollMs = Math.round((performance.now() - t0) * 10) / 10; }, 700);
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
   document.addEventListener('click', () => setTimeout(ajustarTodo, 120), true);
 
   // ---- 7. Avisar cambios sin guardar -----------------------------------------------------------
-  const sucio = new WeakSet();
-  document.addEventListener('change', (e) => { const d = enDialogo(e.target); if (d && e.target.closest('table') && on('singuardar')) sucio.add(d); }, true);
+  // Se compara una "firma" de la tabla (valores y casillas) con la del momento en que se cargó o se guardó por última vez.
+  // (Las casillas de UI5 no lanzan el evento "change" del navegador, por eso no se vigilan eventos sino el estado.)
+  function firmaDialogo(d) {
+    let f = '';
+    d.querySelectorAll('table tbody input, table tbody [role=checkbox]').forEach((x) => {
+      if (x.closest('.sapMListTblSelCol')) return;                    // marcar filas para copiar/borrar no es un cambio de datos
+      f += (x.tagName === 'INPUT' ? x.value : (x.getAttribute('aria-checked') || '')[0]) + '|';
+    });
+    return f;
+  }
+  const rebase = (d) => { if (d) { d.__rmdBase = firmaDialogo(d); d.__rmdN = d.querySelectorAll('table tbody tr').length; } };
+  function refrescarBases() {
+    dialogos().forEach((d) => {
+      if (!d.querySelector('table tbody')) return;
+      if (!d.__rmdT0) d.__rmdT0 = Date.now();
+      const n = d.querySelectorAll('table tbody tr').length;
+      // mientras carga (filas nuevas, indicador de ocupado o primeros segundos) la firma cambia sola: se toma como base
+      if (d.__rmdBase === undefined || d.__rmdN !== n || Date.now() - d.__rmdT0 < 3000 || ocupado()) rebase(d);
+    });
+  }
+  const sucia = (d) => d.__rmdBase !== undefined && firmaDialogo(d) !== d.__rmdBase;
+  window.__rmdStats.sucias = () => dialogos().map((d) => [d.__rmdBase === undefined ? null : sucia(d), d.__rmdN]);   // diagnóstico
   document.addEventListener('click', (e) => {
     if (!on('singuardar')) return;
     const b = e.target.closest && e.target.closest('button'); const d = b && enDialogo(b); if (!d) return;
-    if (b.title === 'Guardar') { sucio.delete(d); return; }
-    if (norm(b.textContent) === 'Cancelar' && sucio.has(d)) {
-      if (!confirm('Hay cambios sin guardar en esta ventana.\n¿Descartarlos y cerrar?')) { e.preventDefault(); e.stopPropagation(); } else sucio.delete(d);
+    if (b.title === 'Guardar') { rebase(d); return; }
+    const t = norm(b.textContent);
+    if ((t === 'Cancelar' || t === 'Cerrar') && sucia(d)) {
+      if (!confirm('Hay cambios sin guardar en esta ventana.\n¿Descartarlos y cerrar?')) { e.preventDefault(); e.stopPropagation(); } else rebase(d);
     }
   }, true);
 
@@ -489,9 +537,9 @@
   new MutationObserver(() => {
     if (!on('exito')) return;
     document.querySelectorAll('.sapMMessageDialog').forEach((m) => {
-      if (visto.has(m) || !m.offsetParent) return;
+      if (visto.has(m) || !visible(m)) return;
       const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent);
-      const botones = [...m.querySelectorAll('button')].filter((b) => b.offsetParent);
+      const botones = [...m.querySelectorAll('button')].filter((b) => visible(b) && norm(b.textContent));   // sin los botones de desbordamiento vacíos
       if (/^[ÉE]xito/i.test(titulo) && botones.length === 1 && norm(botones[0].textContent) === 'OK') { visto.add(m); setTimeout(() => pulsar(botones[0]), 900); }
     });
   }).observe(document.body, { childList: true, subtree: true });
@@ -505,7 +553,7 @@
       if (!d || d.classList.contains('sapMMessageDialog')) continue;
       setTimeout(() => {
         if (!botonIr(d)) return;
-        const i = [...d.querySelectorAll('input[type=text]')].find((x) => x.offsetParent && !x.readOnly && !x.classList.contains('rmd-filtro'));
+        const i = [...d.querySelectorAll('input[type=text]')].find((x) => visible(x) && !x.readOnly && !x.classList.contains('rmd-filtro'));
         if (i) i.focus();
       }, 350);
     }
@@ -515,7 +563,7 @@
   // Flujo: se marca la casilla del paso de referencia -> "Copiar configuración"; se marca la casilla del paso nuevo ->
   // "Pegar en el paso marcado". Muestra una vista previa y solo escribe al pulsar "Aplicar". Usa los propios controles de
   // SAP (Tipo Dato, casillas, selector "Adicionar Pasos RMD" de los procesos menores) y los botones Guardar del portal.
-  // El portapapeles se guarda en el navegador: se puede copiar en un RMD de referencia y pegar en otro RMD.
+  // El portapapeles es temporal: dura mientras el RMD siga abierto.
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   async function hasta(pred, ms = 15000, paso = 200) {
     const t0 = Date.now();
@@ -597,7 +645,7 @@
       const m = [...document.querySelectorAll('.sapMMessageDialog')].filter((x) => x.getClientRects().length).pop();
       if (m) {
         const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent), texto = norm((m.querySelector('section') || {}).textContent);
-        const botones = [...m.querySelectorAll('footer button')].filter((b) => b.getClientRects().length);
+        const botones = [...m.querySelectorAll('footer button')].filter((b) => visible(b) && norm(b.textContent));
         const ok = botones.find((b) => /^(OK|Aceptar|Sí|Si)$/i.test(norm(b.textContent)));
         if (/[ÉE]xito|Confirmaci/i.test(titulo) && ok && !/elimin|borrar/i.test(texto)) { vistos.push(`${titulo}: ${texto}`); pulsar(ok); ultimo = Date.now(); await esperar(700); continue; }
         return { problema: `${titulo}: ${texto}`, vistos };
@@ -644,30 +692,35 @@
   }
 
   // ---- ventana propia: vista previa y registro del avance ----
-  function ventana(titulo) {
+  function ventana(titulo, opciones = {}) {
     const fondo = document.createElement('div'); fondo.className = 'rmd-modal-fondo';
     fondo.innerHTML = `<div class="rmd-modal"><h3></h3><div class="rmd-modal-cuerpo"></div><div class="rmd-modal-pie"></div></div>`;
     fondo.querySelector('h3').textContent = titulo; document.body.appendChild(fondo);
-    return { fondo, cuerpo: fondo.querySelector('.rmd-modal-cuerpo'), pie: fondo.querySelector('.rmd-modal-pie'), cerrar: () => fondo.remove() };
+    // Escape solo actúa sobre esta ventana: no debe cerrar la ventana de SAP que está debajo
+    const teclas = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (opciones.cancelar) opciones.cancelar(); } };
+    document.addEventListener('keydown', teclas, true);
+    return { fondo, cuerpo: fondo.querySelector('.rmd-modal-cuerpo'), pie: fondo.querySelector('.rmd-modal-pie'), cerrar: () => { document.removeEventListener('keydown', teclas, true); fondo.remove(); } };
   }
   const botonModal = (txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-btn ' + (cls || ''); b.textContent = txt; b.addEventListener('click', fn); return b; };
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function toast(txt, error) {
+    document.querySelectorAll('.rmd-toast').forEach((x) => x.remove());
     const t = document.createElement('div'); t.className = 'rmd-toast' + (error ? ' error' : ''); t.textContent = txt; document.body.appendChild(t);
     setTimeout(() => t.remove(), error ? 9000 : 5500);
   }
   const resumenCasillas = (c) => Object.entries(c || {}).filter(([, v]) => v).map(([k]) => NOMBRE_CASILLA[k] || k).join(' + ') || 'sin casillas';
   const resumenPaso = (p) => `${p.tipo || '(sin tipo)'}${p.clave ? ' · ' + p.clave : ''}${p.puesto ? ' · ' + p.puesto : ''}${p.dec !== '' && p.dec != null ? ' · dec ' + p.dec : ''} · ${resumenCasillas(p.chk)}`;
 
+  // El portapapeles vive solo en memoria y mientras el RMD siga abierto: al cerrar todas las ventanas (o abrir otro RMD) se descarta.
   let portapapeles = null;
-  try { portapapeles = JSON.parse(localStorage.getItem('rmdUiPortapapeles')); } catch (e) { portapapeles = null; }
-  const guardarPortapapeles = () => { try { localStorage.setItem('rmdUiPortapapeles', JSON.stringify(portapapeles)); } catch (e) { /* sin almacenamiento */ } };
+  try { localStorage.removeItem('rmdUiPortapapeles'); } catch (e) { /* versiones anteriores lo guardaban en el navegador: se elimina */ }
+  function limpiarPortapapeles() { portapapeles = null; pintarEstadoPortapapeles(); }
   function pintarEstadoPortapapeles() {
-    document.querySelectorAll('#rmd-filtro-bar .rmd-clip').forEach((sp) => {
-      const t = portapapeles ? `Copiado: #${portapapeles.paso.orden} ${portapapeles.paso.desc.slice(0, 60)}${portapapeles.paso.desc.length > 60 ? '…' : ''} — ${portapapeles.pms.filter((x) => !x.insumo).length} proceso(s) menor(es)` : 'Nada copiado todavía';
-      setTxt(sp, t); sp.title = portapapeles ? `Origen RMD ${portapapeles.rmd || ''}: ${portapapeles.paso.desc}` : '';
+    document.querySelectorAll('.rmd-clip').forEach((sp) => {
+      const t = portapapeles ? `Copiado: #${portapapeles.paso.orden} ${portapapeles.paso.desc.slice(0, 60)}${portapapeles.paso.desc.length > 60 ? '…' : ''} — ${portapapeles.pms.filter((x) => !x.insumo).length} proceso(s) menor(es)` : '';
+      setTxt(sp, t); sp.title = portapapeles ? `RMD ${portapapeles.rmd || ''}: ${portapapeles.paso.desc}` : '';
     });
-    document.querySelectorAll('#rmd-filtro-bar .rmd-pegar').forEach((b) => { b.disabled = !portapapeles; });
+    document.querySelectorAll('.rmd-pegar').forEach((b) => { b.disabled = !portapapeles; });
   }
 
   let ocupadoCopia = false;
@@ -682,7 +735,7 @@
       const b = [...sel[0].querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
       if (b) pms = await leerPMsDe(tabla, sel[0].id);
       const rmd = (d.querySelector('h2') || {}).textContent || '';
-      portapapeles = { paso, pms, rmd: norm(rmd).split(' - ')[0], cuando: new Date().toISOString() }; guardarPortapapeles(); pintarEstadoPortapapeles();
+      portapapeles = { paso, pms, rmd: norm(rmd).split(' - ')[0], dialogoId: d.id, trId: sel[0].id }; pintarEstadoPortapapeles();
       const ins = pms.filter((x) => x.insumo).length;
       toast(`Copiado el paso #${paso.orden} con ${pms.length - ins} proceso(s) menor(es)${ins ? ` (${ins} insumo(s) no se copian: se agregan con "Agregar Insumo")` : ''}. Ahora marca el paso nuevo y pulsa "Pegar".`);
     } catch (e) { toast('No se pudo copiar: ' + e.message, true); } finally { ocupadoCopia = false; }
@@ -691,7 +744,7 @@
   // la vista previa devuelve las opciones elegidas o null si se cancela
   function vistaPrevia(destino, pmDestino) {
     return new Promise((resolver) => {
-      const o = portapapeles.paso, v = ventana('Pegar configuración y procesos menores');
+      const o = portapapeles.paso, v = ventana('Pegar configuración y procesos menores', { cancelar: () => { v.cerrar(); resolver(null); } });
       const campos = [['tipo', 'Tipo Dato'], ['clave', 'Clave Modelo'], ['puesto', 'Puesto Trabajo'], ['vi', 'Val. Inicial'], ['vf', 'Val. Final'], ['mg', 'Margen'], ['dec', 'Decimal']];
       const filasCfg = campos.map(([k, et]) => { const a = destino[k], n = o[k], dif = String(a) !== String(n); return `<tr><td><input type="checkbox" data-c="${k}" ${dif ? 'checked' : ''}></td><td>${et}</td><td>${esc(a) || '—'}</td><td class="${dif ? 'rmd-dif' : ''}">${esc(n) || '—'}</td></tr>`; }).join('');
       const filasChk = Object.keys(o.chk).map((k) => { const a = destino.chk[k], n = o.chk[k], dif = a !== n; return `<tr><td><input type="checkbox" data-x="${k}" ${dif ? 'checked' : ''}></td><td>Casilla ${NOMBRE_CASILLA[k]}</td><td>${a ? 'marcada' : 'no'}</td><td class="${dif ? 'rmd-dif' : ''}">${n ? 'marcada' : 'no'}</td></tr>`; }).join('');
@@ -725,6 +778,10 @@
       if (!portapapeles) { toast('Primero copia un paso de referencia.', true); return; }
       const sel = seleccionadas(tabla);
       if (sel.length !== 1) { toast('Marca la casilla de UN solo paso (el destino) y pulsa "Pegar".', true); return; }
+      const rmdActual = norm((d.querySelector('h2') || {}).textContent).split(' - ')[0], estado = estadoDelRmd();
+      if (portapapeles.rmd && rmdActual && portapapeles.rmd !== rmdActual) { toast(`El paso copiado es del RMD ${portapapeles.rmd}; este es el ${rmdActual}. Copia de nuevo en este RMD.`, true); limpiarPortapapeles(); return; }
+      if (estado && !/ingres/i.test(estado)) { toast(`El RMD está ${estado}: solo se puede pegar en versiones Ingresadas.`, true); return; }
+      if (sel[0].id === portapapeles.trId && d.id === portapapeles.dialogoId) { toast('El paso marcado es el mismo que se copió: marca el paso destino.', true); return; }
       const trId = sel[0].id, destino = leerPaso(tabla, sel[0]);
       toast('Leyendo el paso destino…');
       const btnPM = [...sel[0].querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
@@ -732,7 +789,7 @@
       const op = await vistaPrevia(destino, pmDestino);
       if (!op) return;
 
-      const v = ventana('Aplicando…'); const lineas = [];
+      const v = ventana('Aplicando…', { cancelar: () => { if (!listo.disabled) v.cerrar(); } }); const lineas = [];
       const log = (t) => { lineas.push(t); v.cuerpo.innerHTML = '<pre class="rmd-log">' + esc(lineas.join('\n')) + '</pre>'; v.cuerpo.scrollTop = v.cuerpo.scrollHeight; };
       const listo = botonModal('Cerrar', 'primario', () => v.cerrar()); listo.disabled = true; v.pie.append(listo);
       try {
@@ -743,9 +800,11 @@
         if (op.campos.length || op.casillas.length) await aplicarFila(tabla, trId, cfg, columnas(tabla), log);
         if (op.guardar && (op.campos.length || op.casillas.length)) {
           const g = botonPorTitulo(d, 'Guardar'); if (!g) throw new Error('No encuentro el botón Guardar del paso');
-          log('Guardando el paso…'); pulsar(g);
+          log('Guardando el paso…'); pulsar(g); rebase(d);
           const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
-          log('✔ Paso guardado' + (r.vistos.length ? ` (${r.vistos.join(' | ')})` : '')); await esperar(1200);
+          if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log(`✔ Paso guardado (${r.vistos.join(' | ')})`);
+          else log('⚠ El portal no mostró el mensaje de éxito: verifica que el paso se guardó.');
+          await esperar(1200);
         } else if (op.campos.length || op.casillas.length) log('ℹ Configuración aplicada sin guardar: revisa y pulsa Guardar.');
 
         // 2) procesos menores
@@ -767,13 +826,16 @@
             await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log);
           }
           const g = botonPorTitulo(dPM, 'Guardar'); if (!g) throw new Error('No encuentro el botón Guardar de procesos menores');
-          log('Guardando los procesos menores…'); pulsar(g);
+          log('Guardando los procesos menores…'); pulsar(g); rebase(dPM);
           const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
-          log('✔ Procesos menores guardados'); await esperar(1000);
+          if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log('✔ Procesos menores guardados');
+          else log('⚠ El portal no mostró el mensaje de éxito: verifica que los procesos menores se guardaron.');
+          await esperar(1000);
           await cerrarDialogo(dPM);
         }
-        log('\nListo. Revisa el resultado en la tabla.');
-        v.fondo.querySelector('h3').textContent = 'Terminado';
+        const conAvisos = lineas.filter((l) => l.startsWith('⚠')).length;
+        log(conAvisos ? `\nTerminado con ${conAvisos} aviso(s) (líneas con ⚠). Revisa el resultado en la tabla.` : '\nListo. Revisa el resultado en la tabla.');
+        v.fondo.querySelector('h3').textContent = conAvisos ? 'Terminado con avisos' : 'Terminado';
       } catch (e) {
         log('\n✖ Se detuvo: ' + e.message + '\nRevisa el estado del paso antes de reintentar (lo ya aplicado no se deshace solo).');
         v.fondo.querySelector('h3').textContent = 'Se detuvo por un error';
@@ -821,14 +883,18 @@
   const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
   const botonIcono = (icono, txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-btn ' + (cls || ''); b.innerHTML = icono + '<span></span>'; b.querySelector('span').textContent = txt; b.addEventListener('click', fn); return b; };
-  function instalarBotonesCopia(barra, d, tabla) {
-    if (barra.querySelector('.rmd-copiar')) return;
+  // Los botones van en la barra de herramientas de la tabla ("Pasos (n)"), justo a la izquierda del separador y del icono de impresora.
+  function instalarBotonesCopia(d) {
+    const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-copia-grupo')) return;
+    const grupo = document.createElement('span'); grupo.className = 'rmd-copia-grupo';
     const bc = botonIcono(ICONO_COPIAR, 'Copiar configuración', 'rmd-copiar', () => copiarPaso(d, tablaDe(d)));
     bc.title = 'Marca la casilla del paso de referencia y pulsa aquí: copia su configuración y sus procesos menores.';
     const bp = botonIcono(ICONO_PEGAR, 'Pegar', 'rmd-pegar', () => pegarPaso(d, tablaDe(d)));
     bp.title = 'Marca la casilla del paso nuevo y pulsa aquí: muestra una vista previa y aplica la configuración y los procesos menores copiados.';
-    const sp = document.createElement('span'); sp.className = 'rmd-clip';
-    barra.append(bc, bp, sp); pintarEstadoPortapapeles();
+    grupo.append(bc, bp);
+    const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((b) => b.title === 'Imprimir');
+    if (ref) hdr.insertBefore(grupo, ref); else hdr.appendChild(grupo);
+    pintarEstadoPortapapeles();
   }
 
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
