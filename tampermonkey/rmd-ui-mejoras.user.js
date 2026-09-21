@@ -144,9 +144,11 @@
   const NUMERICOS = new Set(['NUMEROS', 'RANGO', 'FORMULA', 'ENTREGA', 'MUESTRACC']);
   const CLAVES = ['SETUP PRE PROCESO', 'PROCESO', 'SETUP POST PROCESO'];
   // devuelve { casilla: true|false } = estado que debe tener; solo las casillas que la regla fija
-  function reglaCasillas(tipo) {
+  function reglaCasillas(tipo, esPM) {
     const t = SIN_ACENTOS(tipo);
     if (!t) return null;
+    // Verificación Check: en pasos mayores (precauciones/notas) sin casillas; en procesos menores lleva Edit
+    if (t === 'VERIFICACION CHECK') return esPM ? { 'EDIT': true } : { 'EDIT': false, 'R. POR': false, 'V.B.': false };
     if (t === 'REALIZADO POR') return { 'R. POR': true, 'V.B.': false, 'EDIT': false };
     if (t === 'REALIZADO POR Y VISTO BUENO') return { 'R. POR': true, 'V.B.': true, 'EDIT': false };
     if (t === 'VISTO BUENO') return { 'V.B.': true, 'R. POR': false, 'EDIT': false };
@@ -206,7 +208,7 @@
       const n = nombres[i];
       if (on('grupos') && TIP[n]) th.title = TIP[n];
       if (!on('columnas')) return;
-      if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', esPasos ? '380px' : '260px', 'important'); return; }
+      if (/^DESCRIPCI/.test(n)) { th.style.setProperty('width', 'auto', 'important'); th.style.setProperty('min-width', (esPasos && innerWidth >= 1600 ? 380 : 240) + 'px', 'important'); return; }
       const w = ANCHOS[n];
       if (w) { th.style.setProperty('width', w + 'px', 'important'); th.style.setProperty('min-width', w + 'px', 'important'); }
     });
@@ -262,7 +264,7 @@
       [...tr.querySelectorAll('td.rmd-marcar,td.rmd-desmarcar,td.rmd-falta')].forEach(limpiarMarcas);
       if (!on('reglas') || !tdTipo) return;
       const avisos = [];
-      const regla = reglaCasillas(tipo);
+      const regla = reglaCasillas(tipo, esPM);
       // Procesos menores que son INSUMOS de la receta (llevan Cantidad Insumos / UM): nunca llevan Edit.
       if (esPM && regla) {
         const cant = iCant >= 0 ? norm((inputDe(celda(tr, iCant)) || {}).value) : '', um = iUM >= 0 ? norm(celda(tr, iUM) && celda(tr, iUM).textContent) : '';
@@ -271,7 +273,7 @@
       const tdDes = iDes >= 0 ? celda(tr, iDes) : null, desc = SIN_ACENTOS(tdDes && tdDes.textContent);
       // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
       // muestreo (cantidad / fecha-hora de muestreo) llevan Estado CC; los de muestreo, además, Edit.
-      if (regla && t === 'REALIZADO POR' && /CALIDAD EN OPERACIONES/.test(desc)) regla['ESTADO CC'] = true;
+      if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
       if (esPM && regla && /MUESTREAD|MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
       if (regla) for (const [c, debe] of Object.entries(regla)) {
         const i = iChk[c]; if (i == null || i < 0 || !celda(tr, i)) continue;
@@ -286,8 +288,9 @@
       const vacio = (idx) => idx >= 0 && !norm((inputDe(celda(tr, idx)) || {}).value);
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
       if (tdDes) {
-        if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"');
-        else if (/CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"');
+        if (/APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO/.test(desc)) marcarFalta(iDes, 'La nota del granel ahora dice "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE"');
+        else if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"');
+        else if (/CONTROL DE CALIDAD/.test(desc) && !/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES/.test(desc)) marcarFalta(iDes, 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"');
       }
       if (NUMERICOS.has(t) && vacio(iDec)) marcarFalta(iDec, `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar`);
       if (t === 'RANGO') { if (vacio(iVI)) marcarFalta(iVI, 'Rango: falta Val. Inicial'); if (vacio(iVF)) marcarFalta(iVF, 'Rango: falta Val. Final'); }

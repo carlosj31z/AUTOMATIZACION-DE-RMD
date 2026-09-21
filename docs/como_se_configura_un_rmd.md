@@ -217,3 +217,43 @@ Salen del **tipo de dato**, con estas excepciones observadas en los 2.460 pasos:
 - La fórmula de "Cantidad obtenida" se guardó primero sin signo; se rehízo como `5224 + 181147`.
 - Temperatura/humedad de Condiciones ambientales se habían puesto como Rango; en la práctica real son
   "Sin tipo de dato" y se revirtieron.
+
+## 5 sexies. Calidad en Operaciones, insumos y textos (validado en RMD de septiembre de 2026)
+
+Fuente: lectura de solo lectura de los últimos RMD **Autorizados** e **Ingresados** de Planta Lima (Fabricación, Envase,
+Acondicionado y Recubrimiento; áreas Sólidos, Cápsulas blandas, Cosméticos, Semisólidos, Polvos efervescentes, Mentholatum…).
+
+**Calidad en Operaciones (lo último que se implementó).** El paso mayor va como **Realizado por** con **R. Por + Estado CC** cuando
+lo ejecuta el personal de Calidad: "EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA DE FABRICACION Y REALIZA EL MUESTREO…",
+"EL PERSONAL DE CALIDAD EN OPERACIONES REALIZA EL CONTROL INSPECTIVO DEL PROCESO Y RETIRA SUS MUESTRAS…" y
+"CALIDAD EN OPERACIONES REGISTRA LOS RESULTADOS:". Sus procesos menores son:
+
+| Proceso menor | Tipo | Casillas |
+|---|---|---|
+| TOMAR LA MUESTRA DEL BULK… (opcional) | Sin tipo de dato | ninguna |
+| CANTIDAD MUESTREADA (unidad): | Números (decimal 3 en kg; según la unidad) | Edit + Estado CC |
+| FECHA / HORA DE MUESTREO: | Fecha y Hora | Edit + Estado CC |
+| EL JEFE O SUPERVISOR DE LA SECCION VERIFICA… (opcional) | Verificación Check | Edit |
+
+Otros pasos que mencionan a Calidad en Operaciones **no** llevan Estado CC: "SOLICITAR A CALIDAD EN OPERACIONES LA DETERMINACION DE…",
+"ESPERAR RESULTADOS DE CALIDAD EN OPERACIONES…" (Realizado por + R. Por) y "EL JEFE O SUPERVISOR… VERIFICA… POR CALIDAD EN OPERACIONES"
+(Visto bueno + V.B.).
+
+**Rendimiento.** El paso de muestra es **MuestraCC** (Edit + Estado CC) y se llama **"CANTIDAD MUESTREADA (unidad):"**, ya no
+"MUESTRA PARA CONTROL DE CALIDAD (…)".
+
+**Insumos** (procesos menores con Cantidad Insumos / UM, tipo Números): **sin ninguna casilla**, tampoco Edit (36 de 36).
+
+**Precauciones y Notas importantes** ahora usan **Múltiple check** (sin casillas), no Verificación Check. En procesos menores,
+Verificación Check sí lleva Edit (41 de 41).
+
+**Textos que cambiaron** (la operación pidió reemplazar todo "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"):
+- Nota del granel (Envase, Notas importantes): antes "…APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE";
+  ahora "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (esta forma se acepta).
+- "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION" (Acondicionado) y
+  "ESPERAR RESULTADOS DE CONTROL DE CALIDAD…" (Fabricación) todavía aparecen con el texto antiguo incluso en RMD autorizados
+  de septiembre de 2026: hay que actualizarlos.
+- Los RMD **Ingresados** revisados aún traían: paso de muestra "MUESTRA PARA CONTROL DE CALIDAD (FOLIOS):" (Envase),
+  y pasos de Calidad en Operaciones sin Estado CC (Fabricación cápsulas blandas #24 y #25; Acondicionado #33).
+
+El linter (`revisar`) y el userscript de Tampermonkey avisan de todo esto.

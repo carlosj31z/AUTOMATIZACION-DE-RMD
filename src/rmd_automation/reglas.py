@@ -57,7 +57,9 @@ def _avisos_texto(donde: str, orden: str, desc: str) -> List["Hallazgo"]:
     "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA"."""
     if re.search(r"MUESTRA PARA (EL )?CONTROL DE CALIDAD", desc):
         return [Hallazgo("AVISO", donde, orden, 'debe figurar "CANTIDAD MUESTREADA" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"')]
-    if "CONTROL DE CALIDAD" in desc:
+    if "APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO" in desc:
+        return [Hallazgo("AVISO", donde, orden, 'la nota del granel ahora dice "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE"')]
+    if "CONTROL DE CALIDAD" in desc and "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" not in desc:
         return [Hallazgo("AVISO", donde, orden, 'reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"')]
     return []
 
@@ -125,8 +127,8 @@ def revisar(snap: dict) -> List[Hallazgo]:
                     h.append(Hallazgo("AVISO", nombre, _o(lst, i), f"las condiciones ambientales van como Sin tipo de dato (es {p.get('td')})"))
         if nombre.startswith(("PRECAUCIONES", "NOTAS")):
             for i, p in enumerate(pasos):
-                if p.get("td") != "Verificación Check":
-                    h.append(Hallazgo("AVISO", nombre, _o(lst, i), f"se espera Verificación Check (es {p.get('td')})"))
+                if p.get("td") not in ("Múltiple check", "Verificación Check"):
+                    h.append(Hallazgo("AVISO", nombre, _o(lst, i), f"se espera Múltiple check (es {p.get('td')})"))
 
         # -- reglas por paso ----------------------------------------------------------
         ultimo_con_tipo: Optional[int] = None
@@ -152,7 +154,7 @@ def revisar(snap: dict) -> List[Hallazgo]:
             if td == "Visto bueno" and "V.B." not in chk:
                 h.append(Hallazgo("AVISO", nombre, o, "Visto bueno sin V.B."))
             desc = normalizar(p.get("d"))
-            if td == "Realizado por" and "CALIDAD EN OPERACIONES" in desc and "Estado CC" not in chk:
+            if td == "Realizado por" and re.match(r"(EL )?PERSONAL DE CALIDAD|CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)", desc) and "Estado CC" not in chk:
                 h.append(Hallazgo("AVISO", nombre, o, "paso de Calidad en Operaciones (Realizado por) sin Estado CC"))
             h.extend(_avisos_texto(nombre, o, desc))
             if td in TIPOS_SIN_EDIT and "Edit" in chk and nombre.startswith("PROCEDIMIENTO"):
@@ -245,8 +247,8 @@ def revisar(snap: dict) -> List[Hallazgo]:
                     h.append(Hallazgo("AVISO", donde, "-", f"los insumos no llevan Edit: {descripcion_pm(fila)[:50]}"))
                 if not cantidad.strip() and ("MUESTREAD" in desc_pm or "MUESTREO" in desc_pm) and not {"Edit", "Estado CC"} <= chk_pm:
                     h.append(Hallazgo("AVISO", donde, "-", f"muestreo de Calidad en Operaciones sin Edit + Estado CC: {descripcion_pm(fila)[:50]}"))
-                capturas = {"Hora", "Fecha y Hora", "Texto", "Lote", "Rango", "Fecha Vencimiento"}
-                if tipo in capturas and "Edit" not in chk:
+                capturas = {"Hora", "Fecha y Hora", "Texto", "Lote", "Rango", "Fecha Vencimiento", "Números", "Fórmula", "Verificación Check"}
+                if tipo in capturas and not cantidad.strip() and "Edit" not in chk_pm:
                     h.append(Hallazgo("AVISO", donde, "-", f"{tipo} sin Edit: {descripcion_pm(fila)[:50]}"))
                 if tipo == "Sin tipo de dato" and "Edit" in chk:
                     h.append(Hallazgo("AVISO", donde, "-", f"Sin tipo de dato con Edit: {descripcion_pm(fila)[:50]}"))
