@@ -52,9 +52,13 @@ def _columna(cabecera: List[str], *claves: str) -> int | None:
 def buscar_pendientes(ruta: str | Path, producto: str, etapa: str = "", hoja: str = "PLANTA 2 DOC TEC") -> List[Pendiente]:
     """Filas cuyo producto (y etapa, si se da) coinciden y cuyo ingreso o autorización dice PENDIENTE."""
     filas = _filas(Path(ruta), hoja)
-    ini = next((i for i, r in enumerate(filas) if _columna(r, "PRODUCTO") is not None), 0)
+    # La cabecera es la fila que tiene a la vez la columna del nombre y la de ETAPA (las filas 1-3 son leyendas).
+    ini = next(
+        (i for i, r in enumerate(filas) if _columna(r, "NOMBRE", "PRODUCTO") is not None and _columna(r, "ETAPA") is not None),
+        0,
+    )
     cab = filas[ini] if filas else []
-    c_prod = _columna(cab, "NOMBRE DEL PRODUCTO", "PRODUCTO") or 0
+    c_prod = _columna(cab, "NOMBRE", "PRODUCTO") or 0
     c_etapa = _columna(cab, "ETAPA")
     p, e = normalizar(producto), normalizar(etapa)
     out: List[Pendiente] = []
