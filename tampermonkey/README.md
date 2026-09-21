@@ -1,9 +1,9 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.5.0
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.6.0
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
 Solo actúa dentro del iframe de la app (`ui5appruntime.html`) y **solo cambia la vista**. Lo único que "pulsa" por ti:
 "Ir" (Enter en un filtro), el OK de los mensajes de **Éxito** y, si tú lo pides con Ctrl+S, el botón Guardar del diálogo abierto.
-Un panel "UI+" (abajo a la izquierda) activa o desactiva cada mejora.
+Un botón discreto de ajustes (abajo a la izquierda) activa o desactiva cada mejora.
 
 | Mejora | Qué hace |
 |---|---|
@@ -27,3 +27,10 @@ Un panel "UI+" (abajo a la izquierda) activa o desactiva cada mejora.
 | Insumos | Procesos menores con Cantidad Insumos / UM: **sin Edit** (si lo tienen marcado se pide desmarcarlo). |
 | Textos | Marca la descripción que dice "CONTROL DE CALIDAD" (→ "CALIDAD EN OPERACIONES"), "MUESTRA PARA CONTROL DE CALIDAD" (→ "CANTIDAD MUESTREADA (unidad):") o la nota antigua "…CONTROL DE CALIDAD O CONTROL DE PROCESO…". Se acepta la forma "…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE". |
 | **Copiar / Pegar configuración** | En la ventana de Pasos, en la barra fija de arriba: **⧉ Copiar configuración** y **⎘ Pegar en el paso marcado**. 1) Marca la casilla del paso de referencia y pulsa Copiar (lee su configuración y sus procesos menores). 2) Marca la casilla del paso nuevo y pulsa Pegar: aparece una **vista previa** con lo que cambiará (puedes desmarcar campos y procesos menores) y solo escribe al pulsar **Aplicar**. Copia Tipo Dato, Clave Modelo, Puesto, Val. Inicial/Final, Margen, Decimal y casillas; no copia Orden, Depende, Código ni Descripción. Los procesos menores se agregan **por código** con el selector "Adicionar Pasos RMD", se configuran igual que el origen y se guardan. Los **insumos** no se copian (se agregan con "Agregar Insumo"). El portapapeles queda guardado en el navegador: se puede copiar en un RMD de referencia y pegar en otro RMD. |
+
+## Estilo
+Diseño minimalista para no romper la costumbre del usuario de la interfaz original: usa la tipografía y la paleta del propio tema Fiori
+(oscuro por defecto; cambia a claro si el portal cambia de tema), botones con contorno fino y texto de acento (relleno solo en "Aplicar"),
+alertas con un tinte suave y una marca lateral en vez de contornos, etiquetas de estado con contorno, un aviso de incoherencias en texto
+discreto, animación lenta (2,4 s) en el Puesto de Trabajo faltante —se desactiva si el sistema pide reducir movimiento— y un botón de ajustes pequeño.
+Las tablas siguen siendo las del portal.

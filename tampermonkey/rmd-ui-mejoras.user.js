@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.5.0
+// @version      1.6.0
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -76,73 +76,94 @@
 
   // ---- 2. Estilos --------------------------------------------------------------------------------
   const CSS = `
-  /* Todas las ventanas emergentes: centradas y con el pie (Cancelar/Cerrar) siempre visible */
+  /* ── Paleta: se apoya en los colores del propio tema Fiori (oscuro por defecto; claro si el portal cambia de tema) ── */
+  html { --rmd-texto: #fafafa; --rmd-apagado: #b8bec1; --rmd-superficie: #29313a; --rmd-barra: #1e242b; --rmd-cabecera: #232931; --rmd-borde: #3a4552; --rmd-borde-campo: #4a5666;
+    --rmd-acento: #1b8dec; --rmd-acento-texto: #6bb6f5; --rmd-rojo: #ff8a8a; --rmd-ambar: #f0b45a; --rmd-verde: #8fd19e; --rmd-fuente: "72", "72full", Arial, Helvetica, sans-serif; }
+  html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-texto: #32363a; --rmd-apagado: #6a6d70; --rmd-superficie: #ffffff; --rmd-barra: #f7f7f7; --rmd-cabecera: #f2f2f2; --rmd-borde: #d9d9d9;
+    --rmd-borde-campo: #89919a; --rmd-acento: #0a6ed1; --rmd-acento-texto: #0a6ed1; --rmd-rojo: #bb0000; --rmd-ambar: #b45f06; --rmd-verde: #107e3e; }
+
+  /* ── Ventanas emergentes: centradas y con el pie (Cancelar/Cerrar) siempre visible ── */
   html.rmd-ui .sapMDialog:not(.sapMPopover) { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important; }
   html.rmd-ui .sapMDialog:not(.sapMPopover) > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; }
   html.rmd-ui .sapMDialog:not(.sapMPopover) > footer, html.rmd-ui .sapMDialog:not(.sapMPopover) > header { flex: 0 0 auto !important; }
-  /* Pasos: casi pantalla completa (muchas filas) */
   html.rmd-ui .sapMDialog.rmd-pasos {
     width: 98vw !important; max-width: 98vw !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
-  /* Estructura, Etiquetas, Procesos menores, selectores: solo el alto que necesitan, centrados */
   html.rmd-ui .sapMDialog.rmd-medio {
     width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 24px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
   html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: min(1560px, 97vw) !important; }
-  /* Mensajes (confirmación, advertencia, éxito): también centrados */
   html.rmd-ui .sapMDialog.sapMMessageDialog { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
+
+  /* ── Tablas: mismas filas del portal, un poco más de aire; cabecera fija ── */
   html.rmd-cols .sapMDialog:not(.sapMMessageDialog) table.sapMListTbl { table-layout: fixed; width: 100% !important; }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-th, #1f2229); }
-  html.rmd-ui .sapMDialog.rmd-sticky .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-th, #1f2229); }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB > td { padding-top: 7px; padding-bottom: 7px; vertical-align: middle; }
-  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:hover > td { background: rgba(80,160,255,.13) !important; }
-  html.rmd-zebra .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:nth-child(odd) > td { background: rgba(255,255,255,.035); }
+  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-cabecera); }
+  html.rmd-ui .sapMDialog.rmd-sticky .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-barra); }
+  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB > td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
+  html.rmd-ui .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:hover > td { background: rgba(27,141,236,.09) !important; }
+  html.rmd-zebra .sapMDialog:not(.sapMMessageDialog) tbody tr.sapMLIB:nth-child(odd) > td { background: rgba(255,255,255,.02); }
   html.rmd-ui .sapMDialog td .sapMText, html.rmd-ui .sapMDialog td .sapMLabel { white-space: normal; line-height: 1.35; }
-  html.rmd-ui .sapMDialog input:focus { outline: 2px solid #3aa0ff !important; outline-offset: 0; }
-  /* "Sin tipo de dato": rojo y negrita */
-  html.rmd-sintipo td.rmd-td-sintipo input, html.rmd-sintipo td.rmd-td-sintipo .sapMSltLabel { color: #ff5c5c !important; font-weight: 800 !important; -webkit-text-fill-color: #ff5c5c !important; }
-  /* contraste y campos editables */
-  html.rmd-contraste .sapMDialog .sapMInputBaseDisabled .sapMInputBaseInner, html.rmd-contraste .sapMDialog .sapMInputBaseDisabled { opacity: .78 !important; }
-  html.rmd-contraste .sapMDialog .sapMInputBaseInner::placeholder { color: #9aa3b2 !important; opacity: 1; }
-  html.rmd-contraste .sapMDialog .sapMInputBase:not(.sapMInputBaseDisabled):not(.sapMInputBaseReadonly) .sapMInputBaseInner {
-    background: rgba(255,255,255,.07) !important; border-bottom: 1px solid #6c7a92 !important; }
-  /* Puesto de Trabajo sin asignar: resalta y parpadea */
-  @keyframes rmdParpadeo { 0%,100% { box-shadow: 0 0 0 2px #ff3b3b; background: rgba(255,59,59,.28); } 50% { box-shadow: 0 0 0 2px rgba(255,59,59,0); background: transparent; } }
-  html.rmd-puesto td.rmd-sin-puesto .sapMInputBase, html.rmd-puesto td.rmd-sin-puesto .sapMComboBoxBase { animation: rmdParpadeo 1s ease-in-out infinite; border-radius: 4px; }
-  /* casillas incoherentes con el tipo de dato */
-  html.rmd-reglas td.rmd-marcar    { outline: 2px dashed #ffb02e; outline-offset: -3px; background: rgba(255,176,46,.18) !important; }
-  html.rmd-reglas td.rmd-desmarcar { outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.20) !important; }
-  html.rmd-reglas td.rmd-falta     { outline: 2px solid #ff4d4d; outline-offset: -3px; }
-  /* estado del RMD en la cabecera de cada ventana */
-  .rmd-estado { display: inline-block; margin-left: 12px; padding: 2px 10px; border-radius: 999px; font: 700 12px system-ui, sans-serif; color: #fff; vertical-align: middle; letter-spacing: .3px; }
-  .rmd-estado.ingresado { background: #2b7fd9; } .rmd-estado.autorizado { background: #2fa35a; }
-  .rmd-estado.suspendido { background: #d8912b; } .rmd-estado.otro { background: #6b7280; }
-  /* título del paso menor: hasta 2 líneas */
+  html.rmd-ui .sapMDialog input:focus { outline: 1px solid var(--rmd-acento) !important; outline-offset: -1px; }
+
+  /* ── Señales sobre la tabla (discretas: tinte suave + marca lateral, sin contornos) ── */
+  html.rmd-sintipo td.rmd-td-sintipo input, html.rmd-sintipo td.rmd-td-sintipo .sapMSltLabel { color: var(--rmd-rojo) !important; -webkit-text-fill-color: var(--rmd-rojo) !important; font-weight: 700 !important; }
+  html.rmd-contraste .sapMDialog .sapMInputBaseDisabled .sapMInputBaseInner, html.rmd-contraste .sapMDialog .sapMInputBaseDisabled { opacity: .8 !important; }
+  html.rmd-contraste .sapMDialog .sapMInputBaseInner::placeholder { color: var(--rmd-apagado) !important; opacity: 1; }
+  html.rmd-contraste .sapMDialog .sapMInputBase:not(.sapMInputBaseDisabled):not(.sapMInputBaseReadonly) .sapMInputBaseInner { background: rgba(255,255,255,.04) !important; }
+  @keyframes rmdPulso { 0%, 100% { box-shadow: 0 0 0 1px rgba(255,138,138,.95); background: rgba(255,138,138,.16); } 50% { box-shadow: 0 0 0 1px rgba(255,138,138,.25); background: transparent; } }
+  html.rmd-puesto td.rmd-sin-puesto .sapMInputBase, html.rmd-puesto td.rmd-sin-puesto .sapMComboBoxBase { animation: rmdPulso 2.4s ease-in-out infinite; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { html.rmd-puesto td.rmd-sin-puesto .sapMInputBase, html.rmd-puesto td.rmd-sin-puesto .sapMComboBoxBase { animation: none; box-shadow: 0 0 0 1px rgba(255,138,138,.9); } }
+  html.rmd-reglas td.rmd-marcar    { background: rgba(240,180,90,.13) !important; box-shadow: inset 3px 0 0 var(--rmd-ambar); }
+  html.rmd-reglas td.rmd-desmarcar { background: rgba(255,138,138,.13) !important; box-shadow: inset 3px 0 0 var(--rmd-rojo); }
+  html.rmd-reglas td.rmd-falta     { background: rgba(255,138,138,.10) !important; box-shadow: inset 0 -2px 0 var(--rmd-rojo); }
+
+  /* ── Estado del RMD: etiqueta con contorno, sin relleno ── */
+  .rmd-estado { display: inline-block; margin-left: 10px; padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font: 600 11px/18px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; background: transparent; }
+  .rmd-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-estado.autorizado { color: var(--rmd-verde); } .rmd-estado.suspendido { color: var(--rmd-ambar); } .rmd-estado.otro { color: var(--rmd-apagado); }
+
+  /* ── Título del paso menor: hasta 2 líneas ── */
   .sapMDialog h2.rmd-pm-titulo { white-space: normal !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; max-width: 100%; }
   .sapMDialog .rmd-pm-cab { height: auto !important; min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
-  /* barra del filtro local y de alertas */
-  #rmd-filtro-bar { position: sticky; top: 0; z-index: 9; background: var(--rmd-th, #1f2229); border-bottom: 1px solid rgba(255,255,255,.12); display: flex; gap: 10px; align-items: center; padding: 6px 16px; font: 13px system-ui, sans-serif; color: #dfe3ea; flex-wrap: wrap; }
-  #rmd-filtro-bar input { flex: 0 1 360px; padding: 5px 8px; border-radius: 6px; border: 1px solid #56617a; background: #12151a; color: #fff; }
-  #rmd-filtro-bar span { opacity: .85; }
-  #rmd-filtro-bar button.rmd-alerta { border: 1px solid #ff4d4d; background: #3a1616; color: #ffb3b3; border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
-  #rmd-filtro-bar button.rmd-alerta.ok { border-color: #2fa35a; background: #12301f; color: #9ce3b8; cursor: default; }
-  /* copiar / pegar configuración */
-  .rmd-btn { font: 600 13px system-ui, sans-serif; padding: 5px 12px; border-radius: 6px; border: 1px solid #56617a; background: #2a2f39; color: #e8eaed; cursor: pointer; }
-  .rmd-btn:hover:not(:disabled) { filter: brightness(1.2); } .rmd-btn:disabled { opacity: .45; cursor: default; }
-  .rmd-btn.primario { background: #2b7fd9; border-color: #2b7fd9; color: #fff; }
-  #rmd-filtro-bar .rmd-clip { flex: 1 1 260px; font-size: 12px; opacity: .85; }
-  .rmd-modal-fondo { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100000; display: grid; place-items: center; }
-  .rmd-modal { background: #1f2229; color: #e8eaed; border: 1px solid #4a5568; border-radius: 10px; padding: 16px 20px; width: min(1000px, 94vw); max-height: 90vh; display: flex; flex-direction: column; font: 13px system-ui, sans-serif; }
-  .rmd-modal h3 { margin: 0 0 8px; font-size: 16px; } .rmd-modal-cuerpo { overflow: auto; flex: 1 1 auto; min-height: 0; } .rmd-modal-pie { display: flex; justify-content: flex-end; gap: 10px; padding-top: 12px; }
-  .rmd-tabla { width: 100%; border-collapse: collapse; margin: 8px 0; } .rmd-tabla th, .rmd-tabla td { border-bottom: 1px solid #333a46; padding: 4px 8px; text-align: left; vertical-align: top; }
-  .rmd-dif { color: #ffd166; font-weight: 700; } .rmd-atenuada { opacity: .55; } .rmd-nota { opacity: .75; }
-  .rmd-log { white-space: pre-wrap; font: 12px ui-monospace, Consolas, monospace; margin: 0; }
-  .rmd-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #12301f; color: #c9f5da; border: 1px solid #2fa35a; padding: 10px 16px; border-radius: 8px; z-index: 100001; max-width: 80vw; font: 13px system-ui, sans-serif; }
-  .rmd-toast.error { background: #3a1616; color: #ffb3b3; border-color: #ff4d4d; }
-  #rmd-ui-panel { position: fixed; left: 10px; bottom: 10px; z-index: 99999; font: 12px system-ui, sans-serif;
-    background: rgba(20,22,27,.94); color: #e8eaed; border: 1px solid #444; border-radius: 8px; padding: 4px 8px; max-height: 70vh; overflow: auto; }
-  #rmd-ui-panel summary { cursor: pointer; list-style: none; }
-  #rmd-ui-panel label { display: block; margin: 3px 0; cursor: pointer; white-space: nowrap; }
+
+  /* ── Barra fija: filtro, incoherencias y copiar/pegar ── */
+  #rmd-filtro-bar { position: sticky; top: 0; z-index: 9; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 7px 16px; background: var(--rmd-barra); border-bottom: 1px solid var(--rmd-borde); font: 14px var(--rmd-fuente); color: var(--rmd-apagado); }
+  #rmd-filtro-bar input.rmd-filtro { flex: 0 1 260px; height: 30px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-cabecera); color: var(--rmd-texto); font: inherit; }
+  #rmd-filtro-bar input.rmd-filtro:focus { outline: none; border-color: var(--rmd-acento); }
+  #rmd-filtro-bar input.rmd-filtro::placeholder { color: var(--rmd-apagado); }
+  #rmd-filtro-bar .rmd-cuenta { font-size: 13px; }
+  #rmd-filtro-bar button.rmd-alerta { border: 0; background: transparent; color: var(--rmd-ambar); font: inherit; font-size: 13px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+  #rmd-filtro-bar button.rmd-alerta:hover { background: rgba(240,180,90,.12); }
+  #rmd-filtro-bar button.rmd-alerta.ok { color: var(--rmd-verde); cursor: default; } #rmd-filtro-bar button.rmd-alerta.ok:hover { background: transparent; }
+  #rmd-filtro-bar .rmd-clip { flex: 1 1 200px; min-width: 0; margin-left: auto; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Botones (discretos: contorno fino y texto de acento; el relleno solo en la acción principal) ── */
+  .rmd-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: transparent; color: var(--rmd-acento-texto); font: 14px var(--rmd-fuente); cursor: pointer; }
+  .rmd-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .rmd-btn:hover:not(:disabled) { background: rgba(27,141,236,.12); border-color: var(--rmd-acento); } .rmd-btn:disabled { opacity: .4; cursor: default; }
+  .rmd-btn.primario { background: var(--rmd-acento); border-color: var(--rmd-acento); color: #fff; } .rmd-btn.primario:hover:not(:disabled) { filter: brightness(1.1); }
+
+  /* ── Ventana de vista previa / registro ── */
+  .rmd-modal-fondo { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; background: rgba(0,0,0,.5); }
+  .rmd-modal { display: flex; flex-direction: column; width: min(920px, 94vw); max-height: 88vh; padding: 20px 24px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,.45); font: 14px/1.45 var(--rmd-fuente); }
+  .rmd-modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+  .rmd-modal-cuerpo { flex: 1 1 auto; min-height: 0; overflow: auto; } .rmd-modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
+  .rmd-modal p { margin: 0 0 10px; } .rmd-modal label { color: var(--rmd-texto); } .rmd-modal input[type=checkbox] { accent-color: var(--rmd-acento); }
+  .rmd-tabla { width: 100%; margin: 6px 0 14px; border-collapse: collapse; }
+  .rmd-tabla th { padding: 6px 8px; border-bottom: 1px solid var(--rmd-borde); text-align: left; font: 600 11px var(--rmd-fuente); letter-spacing: .5px; text-transform: uppercase; color: var(--rmd-apagado); }
+  .rmd-tabla td { padding: 6px 8px; border-bottom: 1px solid rgba(128,140,155,.16); text-align: left; vertical-align: top; }
+  .rmd-dif { color: var(--rmd-acento-texto); font-weight: 600; } .rmd-atenuada { opacity: .5; } .rmd-nota { color: var(--rmd-apagado); font-size: 13px; }
+  .rmd-log { margin: 0; white-space: pre-wrap; font: 12.5px/1.5 ui-monospace, Consolas, monospace; color: var(--rmd-texto); }
+  .rmd-toast { position: fixed; left: 50%; bottom: 28px; z-index: 100001; max-width: min(640px, 86vw); transform: translateX(-50%); padding: 10px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-verde); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font: 14px/1.4 var(--rmd-fuente); }
+  .rmd-toast.error { border-left-color: var(--rmd-rojo); }
+
+  /* ── Panel de opciones: un botón redondo discreto ── */
+  #rmd-ui-panel { position: fixed; left: 12px; bottom: 12px; z-index: 99999; font: 13px var(--rmd-fuente); color: var(--rmd-texto); }
+  #rmd-ui-panel summary { display: grid; place-items: center; width: 28px; height: 28px; list-style: none; border: 1px solid var(--rmd-borde); border-radius: 50%; background: var(--rmd-cabecera); color: var(--rmd-apagado); cursor: pointer; opacity: .55; transition: opacity .15s; }
+  #rmd-ui-panel summary::-webkit-details-marker { display: none; } #rmd-ui-panel summary:hover, #rmd-ui-panel[open] summary { opacity: 1; }
+  #rmd-ui-panel summary svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  #rmd-ui-panel .rmd-panel-cuerpo { position: absolute; left: 0; bottom: 36px; min-width: 270px; max-height: 70vh; overflow: auto; padding: 10px 14px; background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.4); }
+  #rmd-ui-panel label { display: flex; align-items: center; gap: 8px; margin: 5px 0; cursor: pointer; white-space: nowrap; } #rmd-ui-panel input[type=checkbox] { accent-color: var(--rmd-acento); }
+  #rmd-ui-panel .rmd-panel-nota { margin-top: 6px; color: var(--rmd-apagado); font-size: 12px; }
   `;
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
@@ -374,7 +395,7 @@
     if (!on('reglas')) { b.style.display = 'none'; return; }
     b.style.display = '';
     b.classList.toggle('ok', n === 0);
-    setTxt(b, n === 0 ? '✔ Casillas coherentes con el tipo de dato' : `⚠ ${n} incoherencia(s) — clic para ir a la siguiente`);
+    setTxt(b, n === 0 ? '✓ Sin incoherencias' : `⚠ ${n} incoherencia${n === 1 ? '' : 's'} · ir a la siguiente ›`);
   }
   function irAlSiguiente(d) {
     const tabla = d.querySelector('table.sapMListTbl'); const a = tabla && tabla.__rmdAlertas; if (!a || !a.filas.length) return;
@@ -790,11 +811,15 @@
     log(`✔ ${x.codigo} agregado`);
   }
 
+  const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
+  const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';
+  const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
+  const botonIcono = (icono, txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-btn ' + (cls || ''); b.innerHTML = icono + '<span></span>'; b.querySelector('span').textContent = txt; b.addEventListener('click', fn); return b; };
   function instalarBotonesCopia(barra, d, tabla) {
     if (barra.querySelector('.rmd-copiar')) return;
-    const bc = botonModal('⧉ Copiar configuración', 'primario rmd-copiar', () => copiarPaso(d, tablaDe(d)));
+    const bc = botonIcono(ICONO_COPIAR, 'Copiar configuración', 'rmd-copiar', () => copiarPaso(d, tablaDe(d)));
     bc.title = 'Marca la casilla del paso de referencia y pulsa aquí: copia su configuración y sus procesos menores.';
-    const bp = botonModal('⎘ Pegar en el paso marcado', 'rmd-pegar', () => pegarPaso(d, tablaDe(d)));
+    const bp = botonIcono(ICONO_PEGAR, 'Pegar', 'rmd-pegar', () => pegarPaso(d, tablaDe(d)));
     bp.title = 'Marca la casilla del paso nuevo y pulsa aquí: muestra una vista previa y aplica la configuración y los procesos menores copiados.';
     const sp = document.createElement('span'); sp.className = 'rmd-clip';
     barra.append(bc, bp, sp); pintarEstadoPortapapeles();
@@ -803,8 +828,9 @@
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   function panel() {
     const p = document.createElement('details'); p.id = 'rmd-ui-panel';
-    p.innerHTML = '<summary>UI+</summary>' + OPC.map(([k, t]) => `<label><input type="checkbox" data-k="${k}" ${opc[k] ? 'checked' : ''}> ${t}</label>`).join('') +
-      '<div style="opacity:.7;margin-top:4px">Ctrl+S = Guardar</div>';
+    p.innerHTML = '<summary title="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
+      OPC.map(([k, t]) => `<label><input type="checkbox" data-k="${k}" ${opc[k] ? 'checked' : ''}> ${t}</label>`).join('') +
+      '<div class="rmd-panel-nota">Ctrl+S = Guardar el diálogo abierto</div></div>';
     p.addEventListener('change', (e) => {
       const k = e.target.dataset && e.target.dataset.k; if (!k) return;
       e.stopPropagation(); opc[k] = e.target.checked; guardar(opc); aplicarClases();
