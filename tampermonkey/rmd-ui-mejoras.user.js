@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.4.1
+// @version      1.4.2
 // @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante parpadeando y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -275,6 +275,10 @@
       const tdDes = iDes >= 0 ? celda(tr, iDes) : null, desc = SIN_ACENTOS(tdDes && tdDes.textContent);
       // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
       // muestreo (cantidad / fecha-hora de muestreo) llevan Estado CC; los de muestreo, además, Edit.
+      // Excepciones vistas en RMD autorizados: CONDICIONES AMBIENTALES (Realizado por + V.B. cuando el proceso lleva luz inactínica)
+      // y CONTRAMUESTRA (MuestraCC solo con Edit).
+      if (regla && t === 'REALIZADO POR' && /^CONDICIONES AMBIENTALES/.test(desc)) delete regla['V.B.'];
+      if (regla && t === 'MUESTRACC' && /CONTRAMUESTRA/.test(desc)) delete regla['ESTADO CC'];
       if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
       if (esPM && regla && /MUESTREAD|MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
       if (regla) for (const [c, debe] of Object.entries(regla)) {
@@ -282,7 +286,9 @@
         if (marcada(celda(tr, i)) !== debe) {
           const td = celda(tr, i);
           td.classList.add(debe ? 'rmd-marcar' : 'rmd-desmarcar');
-          td.dataset.rmdAviso = `${debe ? 'MARCAR' : 'DESMARCAR'} ${NOMBRE_CASILLA[c]} (Tipo Dato: ${tipo})`; td.title = td.dataset.rmdAviso;
+          td.dataset.rmdAviso = `${debe ? 'MARCAR' : 'DESMARCAR'} ${NOMBRE_CASILLA[c]} (Tipo Dato: ${tipo})` +
+            (t === 'REALIZADO POR' && c === 'V.B.' && !debe ? ' — o cambiar el tipo a "Realizado por y Visto bueno"' : '');
+          td.title = td.dataset.rmdAviso;
           avisos.push(td.dataset.rmdAviso);
         }
       }

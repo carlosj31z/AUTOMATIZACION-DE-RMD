@@ -145,7 +145,7 @@ def revisar(snap: dict) -> List[Hallazgo]:
 
             if td in TIPOS_CON_EDIT and "Edit" not in chk:
                 h.append(Hallazgo("AVISO", nombre, o, f"{td} sin casilla Edit"))
-            if td == "MuestraCC" and "Estado CC" not in chk:
+            if td == "MuestraCC" and "Estado CC" not in chk and "CONTRAMUESTRA" not in normalizar(p.get("d")):
                 h.append(Hallazgo("AVISO", nombre, o, "MuestraCC sin Estado CC"))
             if td == "Realizado por" and "R. Por" not in chk:
                 h.append(Hallazgo("AVISO", nombre, o, "Realizado por sin R. Por"))
