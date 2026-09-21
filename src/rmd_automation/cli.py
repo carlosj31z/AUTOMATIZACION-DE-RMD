@@ -114,50 +114,99 @@ def cambios_aplicar(
     from .browser import rmd_session
     from .config import load_config
     from .extraer import extraer
+    from .flujo import Flujo
 
     sp = cb.cargar_spec(spec)
+    flujo = Flujo(sp.rmd)
+    flujo.mostrar()
+
+    # 1. Matriz de priorizados: solo se avisa si hay algo anormal.
     if matriz and producto:
         from . import matriz as mz
 
+        flujo.empezar("matriz")
         aviso = mz.a_texto(mz.revisar(matriz, producto, etapa))
-        if aviso:  # solo se avisa si hay algo anormal
-            click.echo(aviso)
+        if aviso:
+            click.echo(click.style(aviso, fg="yellow"))
+            flujo.hecho("matriz", "hay avisos (ver arriba)")
+        else:
+            flujo.hecho("matriz", "sin observaciones")
+    else:
+        flujo.omitir("matriz", "sin --matriz/--producto")
+
+    # 2. RMD de referencia.
+    flujo.empezar("referencia")
     if referencia is None and not sp.rmd_referencia:
         referencia = click.prompt(
             '¿Hay un RMD de referencia? Escribe su "Codigo RMD" (Enter si no hay)', default="", show_default=False
         )
     if referencia:
         sp.rmd_referencia = referencia.strip()
+
     with rmd_session(load_config()) as page:
         if sp.rmd_referencia:
             _mostrar_referencia(page, sp)
+            flujo.hecho("referencia", f"referencia {sp.rmd_referencia}")
+        else:
+            flujo.omitir("referencia", "no hay RMD de referencia")
+
+        # 3. Lectura.
+        flujo.empezar("lectura")
         snap = extraer(page, sp.rmd, procesos_menores=False)
         if snap.get("estado") != "Ingresado":
+            flujo.error("lectura", f"estado {snap.get('estado')!r}")
             raise click.ClickException(
                 f"El RMD {sp.rmd} está en estado {snap.get('estado')!r}; solo se modifican versiones Ingresadas."
             )
+        flujo.hecho("lectura", f"versión {snap.get('version', '?')}, estado {snap.get('estado')}")
+
+        # 4. Plan.
+        flujo.empezar("plan")
         plan = cb.planificar(sp, snap)
         click.echo(cb.plan_a_texto(sp, plan))
         pendientes = [a for a in plan if a.estado == cb.PENDIENTE]
         if any(a.estado == cb.ERROR for a in plan):
+            flujo.error("plan", "hay acciones con error")
             raise click.ClickException("El plan tiene errores; corrige la especificación.")
+        flujo.hecho("plan", f"{len(pendientes)} pendiente(s) de {len(plan)}")
         if not pendientes:
-            click.echo("Nada que hacer.")
+            for c in ("confirmacion", "aplicacion", "verificacion"):
+                flujo.omitir(c, "nada que hacer")
+            _preguntar_revisiones(sp, flujo)
             return
         if not confirmar:
-            click.echo("Modo plan: agrega --confirmar para ejecutar.")
+            for c in ("confirmacion", "aplicacion", "verificacion", "revisiones"):
+                flujo.omitir(c, "modo plan (sin --confirmar)")
             return
-        if not click.confirm(f"¿Ejecutar {len(pendientes)} cambio(s) sobre el RMD real {sp.rmd}?"):
+
+        # 5. Confirmación humana.
+        flujo.empezar("confirmacion")
+        if not click.confirm(f"¿Ejecutar {len(pendientes)} cambio(s) sobre el RMD {sp.rmd}?"):
+            flujo.omitir("confirmacion", "cancelado por el usuario")
             cb.auditar(auditoria, sp, plan, "cancelado por el usuario")
             return
-        cb.ejecutar(sp, plan, RmdAutomation(page))
+        flujo.hecho("confirmacion", "autorizado")
+
+        # 6. Aplicación.
+        flujo.empezar("aplicacion", f"{len(pendientes)} cambio(s) en el portal…")
+        try:
+            cb.ejecutar(sp, plan, RmdAutomation(page))
+        except Exception as e:
+            flujo.error("aplicacion", str(e)[:120])
+            raise
+        flujo.hecho("aplicacion", f"{len(pendientes)} cambio(s) aplicados")
+
+        # 7. Verificación.
+        flujo.empezar("verificacion")
         despues = cb.planificar(sp, extraer(page, sp.rmd, procesos_menores=False))
         ok = all(a.estado == cb.APLICADO for a in despues)
         cb.auditar(auditoria, sp, despues, "verificado" if ok else "verificación con diferencias")
         click.echo(cb.plan_a_texto(sp, despues))
         if not ok:
+            flujo.error("verificacion", "hay diferencias")
             raise click.ClickException("La verificación posterior encontró diferencias; revisa el plan de arriba.")
-        _preguntar_revisiones(sp)
+        flujo.hecho("verificacion", "todos los cambios verificados")
+        _preguntar_revisiones(sp, flujo)
 
 
 def _mostrar_referencia(page, sp) -> None:
@@ -176,13 +225,17 @@ def _mostrar_referencia(page, sp) -> None:
     click.echo(cmp.a_markdown(cmp.comparar(ref, actual)))
 
 
-def _preguntar_revisiones(sp) -> None:
+def _preguntar_revisiones(sp, flujo) -> None:
     """Tras terminar el ingreso: ofrece las revisiones que se hacen fuera del portal (con el asistente)."""
-    click.echo("\nIngreso terminado. Revisiones posteriores disponibles:")
+    flujo.empezar("revisiones")
+    click.echo("Ingreso terminado. Revisiones posteriores disponibles:")
     for i, r in enumerate(REVISIONES, 1):
         click.echo(f"  {i}. {r}")
     if click.confirm("¿Necesitas aplicar estas revisiones ahora?", default=False):
         click.echo(f"Pídele al asistente: 'revisar RMD {sp.rmd}: tren de equipos, controles de cambio y utensilios'.")
+        flujo.hecho("revisiones", "solicitadas al asistente")
+    else:
+        flujo.omitir("revisiones", "el usuario no las necesita")
 
 
 REVISIONES = [

@@ -73,7 +73,7 @@ def _lleva_predecesores(nombre: str) -> bool:
 def _luz_inactinica(snap: dict) -> bool:
     for lst in listas(snap):
         for p in lst.pasos:
-            if "LUZ INACTINICA" in normalizar(p["d"]):
+            if "LUZ INACTINICA" in normalizar(p.get("d")):
                 return True
         for filas in lst.procesos_menores.values():
             if any("LUZ INACTINICA" in normalizar(descripcion_pm(f)) for f in filas):
@@ -105,7 +105,7 @@ def revisar(snap: dict) -> List[Hallazgo]:
         # -- pasos prohibidos --------------------------------------------------------
         for i, p in enumerate(pasos):
             for marca, motivo in PASOS_PROHIBIDOS:
-                if marca in normalizar(p["d"]):
+                if marca in normalizar(p.get("d")):
                     h.append(Hallazgo("ERROR", nombre, _o(lst, i), f"no debe existir en RMD nuevos ({motivo})"))
 
         # -- estructuras informativas -------------------------------------------------
@@ -192,11 +192,11 @@ def revisar(snap: dict) -> List[Hallazgo]:
         # -- V.B. en condiciones ambientales según luz inactínica ---------------------
         if _es_principal(nombre):
             for i, p in enumerate(pasos):
-                if not normalizar(p["d"]).startswith("CONDICIONES AMBIENTALES"):
+                if not normalizar(p.get("d")).startswith("CONDICIONES AMBIENTALES"):
                     continue
                 orden = str(p.get("o") or i + 1)
                 inicia = any(
-                    orden_de_dep(q.get("dep", "")) == int(orden) and normalizar(q["d"]).startswith("FECHA / HORA INICIO")
+                    orden_de_dep(q.get("dep", "")) == int(orden) and normalizar(q.get("d")).startswith("FECHA / HORA INICIO")
                     for q in pasos
                     if orden.isdigit()
                 )

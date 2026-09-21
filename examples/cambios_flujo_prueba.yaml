@@ -1,0 +1,7 @@
+# Prueba del flujo completo sobre el RMD de prueba (nunca sobre uno real).
+rmd: "2202609091"
+descripcion: "Prueba del flujo completo: quitar un paso de Notas"
+cambios:
+  - accion: quitar_pasos
+    lista: "NOTAS IMPORTANTES DURANTE EL PROCESO"
+    pasos: ["MANITOL POLVO ACTUA COMO COMPENSADOR"]

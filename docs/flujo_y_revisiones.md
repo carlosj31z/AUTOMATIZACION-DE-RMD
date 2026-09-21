@@ -32,3 +32,8 @@ Avisos de la matriz: el programa **solo avisa si hay algo anormal** (si todo est
 - el producto/etapa **no figura** en la matriz → debe incluirse (no es habitual);
 - una fila del producto **sin estado de ingreso** (ni PENDIENTE ni INGRESADO) → debe completarse;
 - una fila **PENDIENTE** → se muestra el motivo (columna O).
+
+## Seguimiento del flujo
+`cambios aplicar` muestra las 8 etapas (○ pendiente, ▶ en curso, ✔ hecha, – omitida, ✖ error) y escribe
+`data/estado_flujo.html` (se recarga cada 3 s; se puede abrir desde cualquier navegador) y `data/estado_flujo.json`.
+Validado de punta a punta en un RMD de prueba (`examples/cambios_flujo_prueba.yaml`).

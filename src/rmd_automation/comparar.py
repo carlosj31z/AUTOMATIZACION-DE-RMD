@@ -19,13 +19,13 @@ ABREV = {
 
 
 def _clave(p: dict) -> str:
-    return f"{normalizar(p['d'])}#{p.get('cod', '')}"
+    return f"{normalizar(p.get('d'))}#{p.get('cod', '')}"
 
 
 def _resumen(p: dict) -> str:
     td = ABREV.get(p.get("td", ""), p.get("td", ""))
     extra = f" [{p['chk']}]" if p.get("chk") else ""
-    return f"{p.get('o', '')} {td}{extra} {p['d'][:90]}"
+    return f"{p.get('o', '')} {td}{extra} {(p.get('d') or '')[:90]}"
 
 
 @dataclass
@@ -112,7 +112,7 @@ def comparar(a: dict, b: dict) -> Diff:
             if q.get("ck", "") != p.get("ck", "") or q.get("pt", "") != p.get("pt", ""):
                 cambios.append(f"clave/puesto {q.get('ck', '')}/{q.get('pt', '')} → {p.get('ck', '')}/{p.get('pt', '')}")
             if cambios:
-                d.cambiados.append(f"{p['d'][:70]}: " + "; ".join(cambios))
+                d.cambiados.append(f"{(p.get('d') or '')[:70]}: " + "; ".join(cambios))
         # procesos menores: se comparan por paso (descripción del paso) y por contenido
         if x and y:
             def pm_map(lst):

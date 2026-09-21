@@ -70,7 +70,7 @@ def _lista(snap: dict, nombre: str):
 
 def _coincidencias(lista, texto: str) -> List[dict]:
     t = normalizar(texto)
-    return [p for p in lista.pasos if t in normalizar(p["d"]) or t == str(p.get("cod"))]
+    return [p for p in lista.pasos if t in normalizar(p.get("d")) or t == str(p.get("cod"))]
 
 
 def _plan_equipos(a: Accion, snap: dict, quitar: bool) -> None:
