@@ -135,3 +135,14 @@ y se configuró su tipo de dato; todo se comprobó cerrando y reabriendo el diá
 - **Configuración Inicial**: tras el OK no se observó ningún aviso de éxito en ~15 s (el manual menciona uno).
 - Selector de pasos: los combos Estructura/Etiqueta del filtro son poco fiables (Estructura=PROCEDIMIENTO +
   Etiqueta=DOCUMENTACION devolvió 0); buscar por Descripción funciona bien.
+
+## Tercera pasada: quitar pasos y reparar predecesores (RMD de prueba 2202609091)
+
+- **Eliminar pasos**: casilla de la fila -> "Eliminar" -> "Confirmación: ¿Desea proceder con la eliminación del
+  registro seleccionado?" [Borrar] -> "Éxito: Se eliminaron los registros correctamente" [OK]. El diálogo
+  "Pasos (n)" sigue abierto con un paso menos.
+- **Efecto colateral**: el paso que dependía del eliminado conserva su "Depende" como referencia colgante
+  (`118560` sin `(orden)`). Se corrige con la Lista de Predecesores (buscar por código, elegir por código y
+  orden) y Guardar ("Se guardaron correctamente los cambios."); se comprobó tras cerrar y reabrir.
+- **Filas pop-in**: con la vista angosta las tablas de "Pasos (n)" intercalan una fila secundaria
+  (`tr.sapMListTblSubRow`) tras cada paso; hay que ignorarlas al contar filas por posición.

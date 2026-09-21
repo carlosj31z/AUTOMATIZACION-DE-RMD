@@ -99,8 +99,9 @@ La especificación YAML lista los cambios (`quitar_equipos`, `agregar_equipos`, 
 `configurar_paso`, `predecesores_secuenciales`). El ejecutor: 1) lee el RMD y **se niega si no está Ingresado**;
 2) calcula qué falta y qué ya está aplicado (es idempotente); 3) sin `--confirmar` solo muestra el plan; con él
 pide confirmación humana; 4) ejecuta, relee y verifica; 5) anota cada corrida en `data/auditoria.jsonl`.
-No existe ninguna acción para enviar a jefe ni autorizar. Verificado en vivo: quitar equipos (mismo flujo
-del portal); sin verificar en vivo: quitar pasos y configurar_paso desde Playwright.
+No existe ninguna acción para enviar a jefe ni autorizar. Verificado en vivo (RMD de prueba, mediante el navegador
+integrado): quitar equipos, quitar pasos (con el predecesor colgante que deja) y reasignar predecesores. Falta
+validar la ejecución de estas acciones con Playwright (selectores del código Python).
 
 Un archivo de "ingreso" (batch) es una lista de operaciones declarativas:
 

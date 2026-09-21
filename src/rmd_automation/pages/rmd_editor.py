@@ -186,7 +186,12 @@ class RmdEditor:
     def _fila_orden(self, orden: int) -> Locator:
         # Un mismo código de paso puede repetirse en la etiqueta (p. ej. "CONDICIONES AMBIENTALES:"),
         # así que las filas de "Pasos (n)" se ubican por posición (Orden = posición 1..n).
-        return self._dlg.locator("tbody tr").nth(orden - 1)
+        return self._filas_principales().nth(orden - 1)
+
+    def _filas_principales(self) -> Locator:
+        # Con la vista angosta UI5 intercala una fila "pop-in" (clase ...SubRow) tras cada paso;
+        # esas filas no llevan los controles editables y descuadran el conteo por posición.
+        return self._dlg.locator("tbody tr:not([class*='SubRow'])")
 
     def establecer_predecesor(
         self,
@@ -222,7 +227,7 @@ class RmdEditor:
         preparación anterior para la etapa principal). No genera ramas paralelas: esas se añaden
         aparte con `establecer_predecesor`. Aplica sobre el diálogo "Pasos (n)" ya abierto y guarda.
         """
-        filas = self._dlg.locator("tbody tr")
+        filas = self._filas_principales()
         total = filas.count()
         anterior: tuple[str, int] | None = None
         for i in range(1, total + 1):
@@ -359,8 +364,10 @@ class RmdEditor:
     def eliminar_pasos(self, estructura: str, pasos: Iterable[str], etiqueta: str | None = None) -> None:
         """Marca los pasos por texto y usa "Eliminar" del diálogo "Pasos (n)".
 
-        El diálogo de confirmación se asume igual al de Equipos ("¿Desea proceder con la eliminación
-        del registro seleccionado?" -> "Borrar"); NO se verificó en vivo para pasos.
+        Verificado en un RMD de prueba: "Confirmación: ¿Desea proceder con la eliminación del registro
+        seleccionado?" [Borrar] -> "Éxito: Se eliminaron los registros correctamente" [OK]. Quitar un paso
+        deja "colgante" el predecesor del paso siguiente (queda como "código" sin "(orden)"): conviene
+        ejecutar después `predecesores_secuenciales` o reasignar ese "Depende".
         """
         self.abrir_pasos(estructura, etiqueta)
         dlg = self._dlg
