@@ -72,8 +72,8 @@
   // ---- 2. Estilos --------------------------------------------------------------------------------
   const CSS = `
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog):not(.sapMPopover) {
-    width: 98vw !important; max-width: 98vw !important; height: 94vh !important; max-height: 94vh !important;
-    left: 1vw !important; top: 3vh !important; }
+    width: 98vw !important; max-width: 98vw !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
+    left: 1vw !important; top: 8px !important; box-sizing: border-box !important; }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) .sapMDialogScroll { min-height: 0; }
   html.rmd-cols .sapMDialog:not(.sapMMessageDialog) table.sapMListTbl { table-layout: fixed; width: 100% !important; }
   html.rmd-ui .sapMDialog:not(.sapMMessageDialog) thead th { position: sticky; top: 0; z-index: 3; background: var(--rmd-th, #1f2229); }

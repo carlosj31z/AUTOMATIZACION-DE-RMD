@@ -8,7 +8,7 @@ Un panel "UI+" (abajo a la derecha) activa o desactiva cada mejora.
 | Mejora | Qué hace |
 |---|---|
 | Enter = Ir | En filtros y selectores "Adicionar…". No actúa con una lista desplegada ni dentro de la tabla de pasos. |
-| Diálogos anchos | 98 % del ancho y 94 % del alto. |
+| Diálogos anchos | 98 % del ancho y todo el alto del área de la app (el pie con Cancelar siempre visible). |
 | Columnas ordenadas | Anchos por nombre; la descripción toma el resto (mín. 380 px). **Depende** se mide con el texto más largo y siempre se ve completo. |
 | Columnas ocultas | Estado Mov., Imagen y Formato. |
 | Grupos y tooltips | Banda de color por grupo (identificación, tipo, límites, casillas, acciones) y tooltip con el significado de Edit, R. Por, V.B., Estado CC, PM OP, Gen PP… |
