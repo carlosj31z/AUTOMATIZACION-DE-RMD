@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.10.0
-// @description  Enter = "Ir", diálogos a medida (Pasos a pantalla completa; Estructura/Etiquetas/Procesos menores al alto que necesitan), columnas ordenadas, estado del RMD en la cabecera, alertas de casillas incoherentes con el tipo de dato, Puesto de Trabajo faltante, copiar/pegar la configuración de un paso, reordenar y editar Especificaciones, aviso de códigos en Asociar Fórmula y más.
+// @version      1.12.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, sesión prolongada automáticamente y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,14 +10,7 @@
 
 (function () {
   'use strict';
-  // Solo actúa dentro del iframe de la app UI5 (ui5appruntime.html). Solo cambia la vista;
-  // lo único que "pulsa" son botones de búsqueda (Ir), el OK de mensajes de éxito y, si el usuario
-  // lo pide con Ctrl+S, el botón Guardar del diálogo abierto.
-  if (!/ui5appruntime/.test(location.pathname)) return;
-  if (window.__rmdUiMejoras) return;
-  window.__rmdUiMejoras = true;
-
-  const VERSION = '1.10.0';                                                       // mantener igual a @version
+  const VERSION = '1.12.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -27,11 +20,50 @@
     ['depende', 'Depende: tooltip con el paso'], ['sintipo', '"Sin tipo de dato" en rojo y negrita'],
     ['puesto', 'Puesto de Trabajo faltante parpadea'], ['reglas', 'Alertas de casillas incoherentes'],
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
-    ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior'], ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'],
-    ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
+    ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior y validar la 1ª línea de Observaciones'],
+    ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'], ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
+    ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando")'],
+    ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
+    ['verop', 'Ver OP: más filas por página y exportar a CSV'],
+    ['minusculas', 'Pasar MAYÚSCULAS a minúsculas con redacción correcta (experimental)'], ['ortografia', 'Avisar textos en MAYÚSCULAS con posibles faltas de ortografía (experimental)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
+  // Por defecto apagadas: pasar a minúsculas es una redacción automática y la ortografía usa un diccionario reducido; ambas piden revisar el resultado.
+  ['minusculas', 'ortografia'].forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
+
+  // ---- 0. Shell de Fiori (fuera del iframe de la app): solo el aviso de sesión por inactividad -------------------------------
+  // El aviso "Debido a la inactividad, se finalizará su sesión en N minutos." (Continuar trabajando / Salir) lo pinta el shell del
+  // portal, no la app: esta ventana está fuera del iframe ui5appruntime.html, así que se vigila aquí, antes del resto del script.
+  // No se puede alargar el tiempo (lo controla el servidor): en su lugar se pulsa "Continuar trabajando" en cuanto aparece.
+  if (!/ui5appruntime/.test(location.pathname)) {
+    if (window.__rmdSesionShell) return;
+    window.__rmdSesionShell = true;
+    const activaSesion = () => { const o = leer(); return o.activo !== false && o.sesion !== false; };   // se relee por si se cambia en el otro marco
+    const vistos = new WeakSet();
+    function prolongarSesion() {
+      if (!activaSesion()) return;
+      document.querySelectorAll('.sapMDialog, [role=alertdialog]').forEach((d) => {
+        if (vistos.has(d) || !d.getClientRects().length || !/inactividad/i.test(d.textContent || '')) return;
+        const btn = [...d.querySelectorAll('button')].find((b) => /Continuar trabajando/i.test(b.textContent || ''));
+        if (!btn) return;
+        vistos.add(d);
+        const id = btn.id.replace(/-inner$/, ''), ctl = window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore().byId(id);
+        if (ctl && ctl.firePress) ctl.firePress(); else btn.click();
+        try { console.info('[RMD] Sesión prolongada automáticamente (aviso de inactividad).'); } catch (e) { /* sin consola */ }
+      });
+    }
+    new MutationObserver(prolongarSesion).observe(document.body, { childList: true, subtree: true });
+    setInterval(prolongarSesion, 1000);
+    prolongarSesion();
+    return;
+  }
+
+  // A partir de aquí, solo dentro del iframe de la app UI5 (ui5appruntime.html). Solo cambia la vista; lo único que "pulsa" son
+  // botones de búsqueda (Ir), el OK de mensajes de éxito, "Continuar trabajando" del aviso de sesión y, si el usuario lo pide
+  // con Ctrl+S, el botón Guardar del diálogo abierto.
+  if (window.__rmdUiMejoras) return;
+  window.__rmdUiMejoras = true;
 
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
   const NORM = (t) => norm(t).toUpperCase();
@@ -158,6 +190,11 @@
   tr.rmd-espec-mod > td.sapMListTblSelCol { box-shadow: inset 3px 0 0 var(--rmd-ambar); }
   tr.rmd-arrastrando { opacity: .4; } tr.rmd-drop-antes > td { box-shadow: inset 0 2px 0 var(--rmd-acento); } tr.rmd-drop-despues > td { box-shadow: inset 0 -2px 0 var(--rmd-acento); }
   .rmd-copia-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
+  .rmd-nuevo-paso-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; margin-left: 10px; vertical-align: middle; }
+  .rmd-nuevo-paso-grupo .rmd-btn { height: 32px; }
+  .rmd-aa { position: absolute; right: 4px; bottom: 4px; z-index: 2; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-acento-texto); cursor: pointer; }
+  .rmd-aa:hover { background: var(--rmd-acento); color: #fff; } .rmd-aa svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  textarea.rmd-ortografia { text-decoration: underline wavy var(--rmd-ambar) 1.5px; text-underline-offset: 3px; }
   #rmd-filtro-bar .rmd-clip:empty { display: none; }
   #rmd-filtro-bar .rmd-clip { flex: 1 1 200px; min-width: 0; margin-left: auto; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -188,8 +225,8 @@
   .rmd-toast { position: fixed; left: 50%; bottom: 28px; z-index: 100001; max-width: min(640px, 86vw); transform: translateX(-50%); padding: 10px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-verde); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font: 14px/1.4 var(--rmd-fuente); }
   .rmd-toast.error { border-left-color: var(--rmd-rojo); }
 
-  #rmd-aviso-asociar { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
-  #rmd-aviso-asociar.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
+  #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
+  #rmd-aviso-asociar.ok, #rmd-aviso-nomenclatura.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
   .rmd-campo-aviso .sapMInputBaseContentWrapper, .rmd-campo-aviso .sapMInputBaseInner { box-shadow: 0 0 0 2px var(--rmd-ambar) !important; border-radius: 2px; }
   /* ── Botón de mejoras (esquina inferior izquierda) y su panel ── */
   #rmd-ui-panel { position: fixed; left: 14px; bottom: 14px; z-index: 99999; font: 13px var(--rmd-fuente); color: var(--rmd-texto); }
@@ -268,6 +305,64 @@
     'CLAVE MODELO': 'Clave Modelo: solo Setup Pre Proceso, Proceso y Setup Post Proceso',
     'PROC. MEN.': 'Procesos menores del paso', 'MARGEN': 'Margen de tolerancia', 'DECIMAL': 'Cantidad de decimales',
   };
+  // ---- Experimental (apagado por defecto): pasar MAYÚSCULAS a minúsculas con redacción correcta, y avisar de posibles
+  // faltas de ortografía. No sustituye una revisión humana: son heurísticas (mayúscula tras punto, un diccionario reducido
+  // de acentos y de palabras conocidas, y patrones de terminación habituales del español) y no un corrector real.
+  // Nunca escriben solas: solo actúan cuando la persona pulsa el botón "Aa" o revisa el aviso.
+  const DICCIONARIO_ACENTOS = Object.fromEntries([
+    // palabras frecuentes en procedimientos: se guarda su forma acentuada; la clave (SIN_ACENTOS) es la que se busca
+    'según', 'también', 'así', 'además', 'después', 'través', 'única', 'único', 'únicas', 'únicos', 'está', 'están', 'estará', 'estarán', 'será', 'serán', 'aún', 'ésta', 'éste', 'ésa', 'ése', 'cómo', 'cuándo', 'dónde', 'qué', 'quién', 'cuál', 'condición', 'condiciones', 'operación', 'operaciones', 'verificación', 'verificaciones', 'aprobación', 'aprobaciones', 'documentación', 'información', 'preparación', 'fabricación', 'inspección', 'inspecciones', 'sanitización', 'limpieza', 'identificación', 'especificación', 'especificaciones', 'notificación', 'notificaciones', 'formulación', 'presión', 'revisión', 'revisiones', 'decisión', 'versión', 'versiones', 'posición', 'posiciones', 'producción', 'función', 'estación', 'validación', 'calibración', 'evaluación', 'rotación', 'situación', 'acción', 'reacción', 'atención', 'sección', 'sesión', 'expresión', 'impresión', 'dimensión', 'extensión', 'conexión', 'transición', 'distribución', 'administración', 'configuración', 'autorización', 'organización', 'generación', 'agitación', 'filtración', 'destilación', 'granulación', 'compresión', 'dispersión', 'suspensión', 'solución', 'disolución', 'estabilización', 'despeje', 'técnico', 'técnica', 'técnicos', 'técnicas', 'básico', 'básica', 'básicos', 'básicas', 'práctico', 'práctica', 'químico', 'química', 'químicos', 'químicas', 'físico', 'física', 'físicos', 'físicas', 'automático', 'automática', 'automáticos', 'automáticas', 'electrónico', 'electrónica', 'público', 'pública', 'lógico', 'lógica', 'crítico', 'crítica', 'críticos', 'críticas', 'numérico', 'numérica', 'específico', 'específica', 'específicos', 'específicas', 'periódico', 'periódica', 'periódicamente', 'máximo', 'máxima', 'máximos', 'máximas', 'mínimo', 'mínima', 'mínimos', 'mínimas', 'rápido', 'rápida', 'rápidamente', 'código', 'códigos', 'número', 'números', 'área', 'áreas', 'línea', 'líneas', 'máquina', 'máquinas', 'título', 'período', 'régimen', 'límite', 'límites', 'análisis', 'fórmula', 'fórmulas', 'estándar', 'estándares', 'párrafo', 'ítem', 'ítems', 'módulo', 'módulos', 'símbolo', 'símbolos', 'válido', 'válida', 'válidos', 'válidas',
+  ].map((p) => [SIN_ACENTOS(p), p]));
+  delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // "mas" (cantidad, con tilde) es ambiguo con "mas" (pero, sin tilde): no se acentua solo
+  // Palabras "conocidas" para el aviso de ortografia: nexos y palabras cortas muy frecuentes, mas los terminos propios
+  // de este portal (recogidos de las propias reglas de este script) para no marcarlos como sospechosos.
+  const PALABRAS_CORTAS = ('que de la el los las en con para por se su sus un una unos unas al del mas segun tambien asi cuando '
+    + 'donde hasta entre sobre antes despues durante mientras cada todo toda todos todas otro otra otros otras este esta estos '
+    + 'estas ese esa esos esas aquel aquella sin no si ya aun aunque pero porque como muy poco mucho menos tanto tal cual '
+    + 'cuales quien quienes cuyo cuyos y o u e ni le les lo nos os nuestro nuestra vuestro vuestra mi tu su fue ser es son era '
+    + 'eran sera seran esta estan estara estaran hay ha han habia debe deben debera deberan puede pueden podra podran').split(' ');
+  const PALABRAS_TERMINO = Object.keys(NOMBRE_CASILLA).concat(Object.values(TIP).join(' ').split(/\W+/), OPC.map(([, t]) => t).join(' ').split(/\W+/));
+  const PALABRAS_CONOCIDAS = new Set([...PALABRAS_CORTAS, ...Object.values(DICCIONARIO_ACENTOS)].map(SIN_ACENTOS)
+    .concat(PALABRAS_TERMINO.map(SIN_ACENTOS)).filter(Boolean));
+  // Terminaciones habituales del espanol (verbos conjugados, adverbios en -mente, sustantivos/adjetivos comunes):
+  // si una palabra termina asi, se da por conocida aunque no este en la lista (evita avisos de sobra; el objetivo es
+  // detectar solo palabras claramente raras, no hacer un corrector completo).
+  const TERMINACIONES_CONOCIDAS = /(?:CION|SION|MENTE|ANDO|IENDO|ADO|ADA|ADOS|ADAS|IDO|IDA|IDOS|IDAS|AR|ER|IR|ARON|IERON|ABA|ABAN|IA|IAN|ARSE|ERSE|IRSE|OSO|OSA|OSOS|OSAS|IVO|IVA|IVOS|IVAS|BLE|BLES|DAD|DADES|EZ|EZA|MIENTO|MIENTOS|ANTE|ANTES|ENTE|ENTES)$/;
+  // mismo patron que src/rmd_automation/referencias.py (Tipo I/P/F + Area + sufijo -NNN obligatorio)
+  const PATRON_REFERENCIA_JS = /\b[IPF][A-Z0-9]{3}-[A-Z]?\d{3}\b/;
+  // siglas que se conservan tal cual (no se protege ninguna otra secuencia en mayusculas: el texto de entrada ya viene
+  // todo en mayusculas, asi que "proteger cualquier palabra en mayusculas" dejaria todo el texto sin tocar)
+  const SIGLAS_CONOCIDAS = new Set(['RMD', 'CC', 'UM', 'OP', 'PM', 'SAP', 'GMP', 'ID', 'OK', 'CT']);
+  const MARCA = (i) => String.fromCharCode(1) + i + String.fromCharCode(2);
+  const RX_MARCA = new RegExp(String.fromCharCode(1) + '(\\d+)' + String.fromCharCode(2), 'g');
+  function capitalizarOracion(texto) {
+    const CONSERVAR = [];
+    let t = String(texto || '');
+    t = t.replace(new RegExp(PATRON_REFERENCIA_JS.source, 'g'), (m) => { CONSERVAR.push(m); return MARCA(CONSERVAR.length - 1); });
+    t = t.replace(/\b[A-ZÑ]{2,}\b/g, (m) => { if (!SIGLAS_CONOCIDAS.has(m)) return m; CONSERVAR.push(m); return MARCA(CONSERVAR.length - 1); });
+    t = t.toLowerCase();
+    t = t.replace(/(^\s*|[.!?¡¿]\s+|\n\s*)([a-záéíóúñ])/g, (m, pre, letra) => pre + letra.toUpperCase());
+    t = t.replace(RX_MARCA, (_, i) => CONSERVAR[+i]);
+    return t;
+  }
+  function restaurarAcentos(texto) {
+    return String(texto || '').replace(/\p{L}+/gu, (palabra) => {
+      const clave = SIN_ACENTOS(palabra); const acentuada = DICCIONARIO_ACENTOS[clave]; if (!acentuada) return palabra;
+      const conMayuscula = palabra[0] === palabra[0].toUpperCase() && palabra[0] !== palabra[0].toLowerCase();
+      return conMayuscula ? acentuada[0].toUpperCase() + acentuada.slice(1) : acentuada;
+    });
+  }
+  const mejorarTexto = (texto) => restaurarAcentos(capitalizarOracion(texto));
+  function revisarOrtografia(texto) {
+    const sinCodigos = String(texto || '').replace(new RegExp(PATRON_REFERENCIA_JS.source, 'g'), ' ');
+    const vistas = new Set(); const dudosas = [];
+    sinCodigos.replace(/[A-ZÁÉÍÓÚÑ]{3,}/g, (m) => {
+      const clave = SIN_ACENTOS(m); if (PALABRAS_CONOCIDAS.has(clave) || TERMINACIONES_CONOCIDAS.test(clave) || vistas.has(clave)) return m;
+      vistas.add(clave); dudosas.push(m); return m;
+    });
+    return dudosas;
+  }
+
   const lienzo = document.createElement('canvas').getContext('2d');
   const filasPrincipales = (t) => [...t.querySelectorAll('tbody tr')].filter((r) => !/SubRow/.test(r.className));
   const celda = (tr, i) => tr.children[i];
@@ -599,6 +694,7 @@
         tituloPMCompleto(h2);
         h2.classList.add('rmd-pm-titulo'); h2.title = norm(h2.textContent); barra.classList.add('rmd-pm-cab');
       }
+      if (/^Adicionar Pasos/i.test(cabecera(d))) { if (on('nuevopaso')) instalarBotonNuevoPaso(d); else quitarBotonNuevoPaso(d); }
     });
   }
 
@@ -642,13 +738,53 @@
   function marcarCampo(d, etiqueta, mal) {
     const el = campoDe(d, etiqueta), base = el && el.closest('.sapMInputBase'); if (base) base.classList.toggle('rmd-campo-aviso', !!mal);
   }
+  // Nomenclatura de la 1ª línea de "Observaciones" en Asociar Fórmula: AAAAMMDD + 2 iniciales - prioridad - Ccomplejidad - FI1.0 - FA1.0 - Ffase
+  // (ejemplo real visto: "20260918CJ-1-C2-FI1.0-FA1.0-F2"). FI y FA son literales fijos ("1.0"): si alguna vez varían, hay que revisar esta regla.
+  function analizarNomenclatura(linea) {
+    const l = (linea || '').trim();
+    if (!l) return { ok: false, avisos: ['La primera línea de Observaciones está vacía: falta la nomenclatura (AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase).'] };
+    const avisos = [];
+    const mFecha = /^(\d{4})(\d{2})(\d{2})/.exec(l);
+    let resto = l, fechaTxt = '';
+    if (!mFecha) { avisos.push('Debe empezar con la fecha en formato AAAAMMDD (8 dígitos).'); }
+    else {
+      const [bruto, a, m, dd] = mFecha, f = new Date(Number(a), Number(m) - 1, Number(dd));
+      const ok = f.getFullYear() === Number(a) && f.getMonth() === Number(m) - 1 && f.getDate() === Number(dd) && Number(a) >= 2000 && Number(a) <= 2100;
+      if (!ok) avisos.push(`La fecha "${bruto}" no es válida.`);
+      fechaTxt = `${dd}/${m}/${a}`; resto = l.slice(8);
+    }
+    const mIni = /^([A-ZÑ]{2})/i.exec(resto); let iniciales = '';
+    if (!mIni) avisos.push('Después de la fecha deben ir 2 letras con las iniciales de quien carga el registro (nombre + apellido).');
+    else { iniciales = mIni[1].toUpperCase(); resto = resto.slice(2); }
+    const partes = resto.split('-');                              // ['', prioridad, 'C…', 'FI…', 'FA…', 'F…']
+    if (partes[0] !== '') avisos.push(`Falta el guion después de las iniciales${iniciales ? ` ("${iniciales}")` : ''}.`);
+    const prioridad = partes[1] || '';
+    if (!/^[123]$/.test(prioridad)) avisos.push(`La prioridad ("${prioridad}") debe ser 1, 2 o 3.`);
+    const complejidad = partes[2] || '', mComp = /^C(0\.5|1|1\.5|2|2\.5|3)$/.exec(complejidad);
+    if (!mComp) avisos.push(`La complejidad ("${complejidad}") debe ser C0.5, C1, C1.5, C2, C2.5 o C3.`);
+    const fi = partes[3] || '';
+    if (fi !== 'FI1.0') avisos.push(`El campo fijo debe ser exactamente "FI1.0" (aparece "${fi}").`);
+    const fa = partes[4] || '';
+    if (fa !== 'FA1.0') avisos.push(`El campo fijo debe ser exactamente "FA1.0" (aparece "${fa}").`);
+    const fase = partes[5] || '', mFase = /^F(1R?|2R?)$/.exec(fase);
+    if (!mFase) avisos.push(`La fase ("${fase}") debe ser F1, F1R, F2 o F2R.`);
+    if (partes.length > 6) avisos.push('Sobran datos al final de la línea.');
+    const ok = avisos.length === 0;
+    return { ok, avisos, resumen: ok ? `fecha ${fechaTxt} · iniciales ${iniciales} · prioridad ${prioridad} · complejidad ${mComp[1]} · fase ${mFase[1]}` : null };
+  }
+
   function revisarAsociar() {
     const d = dialogos().find((x) => /^Asociar F[óo]rmula/i.test(cabecera(x)));
     if (!d) return;
-    let av = d.querySelector('#rmd-aviso-asociar');
-    if (!on('asociar')) { if (av) av.remove(); marcarCampo(d, 'Código Agrupador', false); marcarCampo(d, 'Código', false); return; }
+    let av = d.querySelector('#rmd-aviso-asociar'), avN = d.querySelector('#rmd-aviso-nomenclatura');
+    if (!on('asociar')) {
+      if (av) av.remove(); if (avN) avN.remove();
+      marcarCampo(d, 'Código Agrupador', false); marcarCampo(d, 'Código', false); marcarCampo(d, 'Observaciones', false);
+      return;
+    }
     const codigoRmd = (/^Asociar F[óo]rmula:\s*(\d+)/i.exec(cabecera(d)) || [])[1];
     const agr = valorDeCampo(d, 'Código Agrupador'), cod = valorDeCampo(d, 'Código');
+    const elObs = campoDe(d, 'Observaciones'), obs = elObs ? elObs.value : null;   // sin normalizar: se necesitan los saltos de línea
     if (agr === null || cod === null) return;                                           // aún no está dibujada
     const avisos = []; let malAgr = false, malCod = false;
     if (!agr) { avisos.push('El Código Agrupador está vacío.'); malAgr = true; }
@@ -669,6 +805,18 @@
     }
     av.className = avisos.length ? 'aviso' : 'ok'; if (av.textContent !== texto) av.textContent = texto;
     marcarCampo(d, 'Código Agrupador', malAgr); marcarCampo(d, 'Código', malCod);
+
+    // Nomenclatura de la 1ª línea de Observaciones
+    if (obs !== null) {
+      const res = analizarNomenclatura((obs || '').split(/\r?\n/)[0]);
+      const textoN = res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' : res.avisos.map((a) => '⚠ ' + a).join('\n');
+      if (!avN) {
+        avN = document.createElement('div'); avN.id = 'rmd-aviso-nomenclatura';
+        av.insertAdjacentElement('afterend', avN);
+      }
+      avN.className = res.ok ? 'ok' : 'aviso'; if (avN.textContent !== textoN) avN.textContent = textoN;
+      marcarCampo(d, 'Observaciones', !res.ok);
+    } else if (avN) avN.remove();
   }
 
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones -------------------------------------
@@ -879,7 +1027,8 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
     document.querySelectorAll('.rmd-con-estado, .rmd-pm-titulo').forEach((e) => e.classList.remove('rmd-con-estado', 'rmd-pm-titulo'));
     document.querySelectorAll('.rmd-campo-aviso').forEach((e) => e.classList.remove('rmd-campo-aviso'));
     document.querySelectorAll('.sapMDialog').forEach((d) => quitarEdicionEspec(d));
@@ -896,6 +1045,8 @@
     window.__rmdStats.ajustes++;
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
     decorarCabeceras();
+    gestionarVerOP();
+    gestionarTextosMayusculas();
   }
   new MutationObserver(() => {
     if (pendiente) return; pendiente = true;
@@ -1374,6 +1525,131 @@
     log(`✔ ${x.codigo} agregado`);
   }
 
+  // ---- Ventana "Ver OP" (Ordenes de Produccion Asociadas): más filas por página y exportar a CSV para filtrar/ordenar por fecha ----
+  // Solo lee lo que ya está cargado (o lo que "Más"/cargarTodo trae con los mismos controles del portal); no cambia nada del RMD.
+  const RX_VER_OP = /^Visualizar las Ordenes de Producci[oó]n/i;
+  const ICONO_EXPORTAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8.2M4.8 6.9 8 10.1l3.2-3.2"/><path d="M2.5 11.5v1.8A1.2 1.2 0 0 0 3.7 14.5h8.6a1.2 1.2 0 0 0 1.2-1.2v-1.8"/></svg>';
+  const csvCelda = (t) => '"' + String(t == null ? '' : t).replace(/"/g, '""').replace(/\s+/g, ' ').trim() + '"';
+  function csvVerOP(t) {
+    // las celdas de Item/Acciones son iconos sin texto: se usan solo las columnas con encabezado de texto
+    const thsTodas = [...t.querySelectorAll('thead th')]; const idx = thsTodas.map((th, i) => [i, norm(th.textContent)]).filter(([, n]) => n);
+    const filas = filasPrincipales(t);
+    const lineas = [idx.map(([, n]) => csvCelda(n)).join(';')];
+    filas.forEach((tr) => { lineas.push(idx.map(([i]) => csvCelda(celda(tr, i) && celda(tr, i).textContent)).join(';')); });
+    return String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10));   // BOM: para que Excel abra los acentos bien
+  }
+  function descargarTexto(nombre, texto) {
+    const blob = new Blob([texto], { type: 'text/csv;charset=utf-8' }), url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  async function exportarVerOP(d, t, boton) {
+    boton.disabled = true; const texto0 = boton.querySelector('span').textContent;
+    try {
+      setTxt(boton.querySelector('span'), 'Cargando…'); await cargarTodo(t.closest('tr') || t);
+      const rmd = (/RMD:\s*(\d+)/.exec(cabecera(d)) || [])[1] || 'rmd';
+      descargarTexto(`OP_asociadas_${rmd}.csv`, csvVerOP(t));
+    } catch (e) { toast('No se pudo exportar: ' + e.message, true); }
+    finally { boton.disabled = false; setTxt(boton.querySelector('span'), texto0); }
+  }
+  window.__rmdStats.csvVerOP = csvVerOP;   // diagnóstico: genera el CSV sin descargarlo
+  function gestionarVerOP() {
+    if (!on('verop')) { quitarBotonesVerOP(); return; }
+    dialogos().forEach((d) => {
+      if (!RX_VER_OP.test(cabecera(d))) return;
+      const t = d.querySelector('table.sapMListTbl'); if (!t) return;
+      const ctl = ctlDe(t);
+      if (ctl && ctl.setGrowingThreshold && ctl.getGrowingThreshold && ctl.getGrowingThreshold() < 15) ctl.setGrowingThreshold(15);
+      const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-exportar-op')) return;
+      const b = botonIcono(ICONO_EXPORTAR, 'Exportar a CSV', 'rmd-exportar-op', () => exportarVerOP(d, t, b));
+      b.title = 'Descarga todas las OP asociadas (carga primero las que falten) en un .csv para filtrar y ordenar por fecha en Excel.';
+      const ref = hdr.querySelector('.sapMTBSpacer') || hdr.firstElementChild;
+      if (ref) ref.insertAdjacentElement('afterend', b); else hdr.appendChild(b);
+    });
+  }
+  function quitarBotonesVerOP() { document.querySelectorAll('.rmd-exportar-op').forEach((e) => e.remove()); }
+
+  // ---- Experimental: aplicar "Aa" (minúsculas con redacción correcta) y el aviso de ortografía sobre los textarea editables
+  // ya existentes (Descripción Paso de "Nuevo Paso", Descripción/Especificaciones de Especificaciones). Nunca escriben solas.
+  const ICONO_AA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11 5 3l3 8M2.8 8.5h4.4"/><path d="M9.5 11c0-1.4 1.1-2.3 2.5-2.3s2.4.8 2.4 2c0 1-.7 1.3-1.8 1.6-1.2.3-2.7.6-2.7 2 0 .9.8 1.2 1.7 1.2 1.1 0 2-.5 2.4-1.3"/></svg>';
+  const casiTodoMayus = (t) => { const letras = (t || '').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, ''); return letras.length > 4 && letras === letras.toUpperCase() && letras !== letras.toLowerCase(); };
+  function gestionarTextosMayusculas() {
+    document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) textarea').forEach((ta) => {
+      const d = enDialogo(ta); const aplica = d && (gestionada(d) || /^Nuevo Paso/i.test(cabecera(d)));
+      if (!aplica) { ta.classList.remove('rmd-ortografia'); const b = ta.parentElement && ta.parentElement.querySelector(':scope > .rmd-aa'); if (b) b.remove(); return; }
+      if (ta.readOnly || ta.disabled) return;
+      if (!on('minusculas')) { const b = ta.parentElement && ta.parentElement.querySelector(':scope > .rmd-aa'); if (b) b.remove(); }
+      else if (casiTodoMayus(ta.value) && ta.parentElement && !ta.parentElement.querySelector(':scope > .rmd-aa')) {
+        getComputedStyle(ta.parentElement).position === 'static' && (ta.parentElement.style.position = 'relative');
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-aa'; b.innerHTML = ICONO_AA;
+        b.title = 'Pasar a minúsculas con mayúscula al iniciar oración (experimental: revisa el resultado antes de guardar).';
+        b.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          ta.value = mejorarTexto(ta.value); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.dispatchEvent(new Event('change', { bubbles: true })); ta.focus();
+        });
+        ta.parentElement.appendChild(b);
+      }
+      if (!on('ortografia')) { ta.classList.remove('rmd-ortografia'); ta.removeAttribute('data-rmd-dudosas'); return; }
+      const dudosas = revisarOrtografia(ta.value);
+      ta.classList.toggle('rmd-ortografia', dudosas.length > 0);
+      if (dudosas.length) { const t = 'Palabras no reconocidas (revisar ortografía; puede haber falsos avisos): ' + dudosas.join(', '); ta.title = t; ta.dataset.rmdDudosas = t; }
+      else { ta.removeAttribute('title'); ta.removeAttribute('data-rmd-dudosas'); }
+    });
+  }
+
+  // ---- Botón "Nuevo Paso" dentro del selector "Adicionar Pasos": abre el mismo "Nuevo Paso" de Configuración Maestra, apilado
+  // encima (no navega fuera de la edición del RMD), y precarga Estructura/Etiqueta con el contexto de este selector si coinciden.
+  // No pulsa "Agregar" por el usuario: solo abre la ventana para que la complete y guarde ella misma.
+  const ICONO_NUEVO_PASO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h8M2 8h5M2 12.5h5"/><circle cx="12.5" cy="10.5" r="2.8"/><path d="M12.5 9v3M11 10.5h3"/></svg>';
+  function instalarBotonNuevoPaso(d) {
+    if (d.querySelector('.rmd-nuevo-paso-grupo')) return;
+    const ir = botonIr(d); if (!ir) return;
+    const grupo = document.createElement('span'); grupo.className = 'rmd-nuevo-paso-grupo';
+    const b = botonIcono(ICONO_NUEVO_PASO, 'Nuevo Paso', 'rmd-nuevo-paso', () => abrirNuevoPasoMaestro(d));
+    b.title = 'Abre "Nuevo Paso" de Configuración Maestra (para crear un paso que aún no existe) sin salir de este selector.';
+    grupo.appendChild(b);
+    ir.insertAdjacentElement('afterend', grupo);
+  }
+  function quitarBotonNuevoPaso(d) { d.querySelectorAll('.rmd-nuevo-paso-grupo').forEach((x) => x.remove()); }
+  async function abrirNuevoPasoMaestro(d) {
+    if (window.__rmdAbriendoNuevoPaso) return; window.__rmdAbriendoNuevoPaso = true;
+    try {
+      const estructura = valorDeCampo(d, 'Estructura'), etiqueta = valorDeCampo(d, 'Etiqueta');
+      const previos = new Set(dialogos());
+      const btnConfigurar = botonPorTitulo(document, 'Configurar'); if (!btnConfigurar) throw new Error('No encuentro el botón "Configurar" de la lista principal');
+      pulsar(btnConfigurar);
+      const maestra = await hasta(() => dialogos().find((x) => !previos.has(x) && /^Configuraci[oó]n Maestra/i.test(cabecera(x))), 15000);
+      if (!maestra) throw new Error('No se abrió "Configuración Maestra"');
+      await hasta(() => !ocupado(), 15000); await esperar(500);
+      const tab = [...maestra.querySelectorAll('[role=tab]')].find((x) => /(^|\s)Paso(\s|$)/.test(norm(x.textContent)));
+      if (!tab) throw new Error('No encuentro la pestaña "Paso" de Configuración Maestra');
+      // Los filtros de esta barra (IconTabBar en modo filtro) no reaccionan a un .click() sintético: hace falta la secuencia real de eventos de puntero.
+      const opts = { bubbles: true, cancelable: true, view: window };
+      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((tipo) => { const Ctor = tipo.startsWith('pointer') ? PointerEvent : MouseEvent; tab.dispatchEvent(new Ctor(tipo, opts)); });
+      await esperar(1200); await hasta(() => !ocupado(), 15000);
+      const btnNuevo = botonPorTitulo(maestra, 'Nuevo Paso') || [...maestra.querySelectorAll('button')].find((b) => visible(b) && /^Nuevo Paso/i.test(norm(b.textContent)));
+      if (!btnNuevo) throw new Error('No encuentro el botón "Nuevo Paso"');
+      const previos2 = new Set(dialogos());
+      pulsar(btnNuevo);
+      const dlg = await hasta(() => dialogos().find((x) => !previos2.has(x) && /^Nuevo Paso/i.test(cabecera(x))), 15000);
+      if (!dlg) throw new Error('No se abrió la ventana "Nuevo Paso"');
+      await esperar(500);
+      const fijar = async (etiquetaCampo, texto) => {
+        if (!texto) return false;
+        const el = campoDe(dlg, etiquetaCampo), c = el && ctlDe(el); if (!c || !c.getItems) return false;
+        const it = await hasta(() => c.getItems().find((x) => norm(x.getText ? x.getText() : '') === norm(texto)), 4000, 250);   // Etiqueta depende de la Estructura elegida: su lista tarda en llenarse
+        if (!it) return false;
+        c.setSelectedItem(it); if (c.setValue) c.setValue(it.getText());
+        if (c.fireSelectionChange) c.fireSelectionChange({ selectedItem: it }); if (c.fireChange) c.fireChange({ value: it.getText() });
+        return true;
+      };
+      if (await fijar('Estructura', estructura)) await fijar('Etiqueta', etiqueta);
+      toast('Se abrió "Nuevo Paso" de Configuración Maestra. Complétalo y pulsa Agregar; luego cierra esta ventana y busca el nuevo código aquí para añadirlo al RMD.');
+    } catch (e) {
+      toast('No se pudo abrir "Nuevo Paso": ' + e.message, true);
+    } finally { window.__rmdAbriendoNuevoPaso = false; }
+  }
+
   const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
   const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
@@ -1397,7 +1673,8 @@
   const GRUPOS_PANEL = [
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
     ['Alertas', ['reglas', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'espec', 'asociar', 'singuardar', 'exito', 'enter']],
+    ['Herramientas', ['filtro', 'copiar', 'espec', 'nuevopaso', 'verop', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Experimental', ['minusculas', 'ortografia']],
   ];
   function panel() {
     const etiqueta = Object.fromEntries(OPC);

@@ -24,10 +24,15 @@ export RMD_PRUEBA=<RMD de PRUEBA Ingresado>   # solo el bloque D lo modifica (y 
 python tampermonkey/pruebas/qa_estricto.py                # todos los bloques (incluido D, que escribe: exige RMD_PRUEBA)
 python tampermonkey/pruebas/qa_estricto.py ABCEFGHIJKLMN  # sin escribir (sin RMD_PRUEBA usa el RMD Ingresado 2202609081)
 ```
-**Sin sesión del portal:** `python tampermonkey/pruebas/qa_local.py` lanza su propio Chrome (headless) sobre una *maqueta* del DOM del portal y prueba el aviso de cambios sin guardar
-(aviso propio centrado, sin falsos avisos tras guardar, Ctrl+S, Advertencia/Éxito del portal), el predecesor obligatorio y el texto "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES". No escribe nada
-y no necesita el Chrome del puerto 9222. Complementa a `qa_estricto.py`, que sigue siendo la referencia contra el portal real.
+**Sin sesión del portal**, ambos lanzan su propio Chrome (headless) sobre una *maqueta* del DOM del portal; no escriben nada y no necesitan el Chrome del puerto 9222:
+```bash
+python tampermonkey/pruebas/qa_local.py           # aviso sin guardar, predecesor obligatorio, texto "CONTROL DE CALIDAD..."
+python tampermonkey/pruebas/qa_local_sesion.py    # aviso de sesión por inactividad ("Continuar trabajando")
+```
+Complementan a `qa_estricto.py`, que sigue siendo la referencia contra el portal real.
 
 Los bloques **sin D no escriben**: solo cambian datos *en memoria* de la pestaña de prueba (que se cierra al terminar) y todo guardado se simula. Por eso pueden
 ejecutarse sobre un RMD real Ingresado (`RMD_PRUEBA`, `RMD_LAYOUT`, `RMD_ASOCIAR` + `ASOCIAR_DESC`, `ETQS_LISTAS`). **Nunca apuntes `RMD_PRUEBA` a un RMD real si vas a ejecutar el bloque D.**
 Los casos que un RMD no trae (Puesto faltante, casillas incoherentes) se provocan en memoria.
+
+Las mejoras añadidas en v1.11-1.12 (botón "Nuevo Paso" en el selector "Adicionar Pasos", exportar/más filas en "Ver OP", nomenclatura de Observaciones en Asociar Fórmula, y las dos experimentales de texto en mayúsculas) se comprobaron a mano contra el portal real (capturas y lectura del DOM), sin escribir nada, pero **no tienen todavía un bloque propio** en `qa_estricto.py` como H/I/J/K/L/M/N.
