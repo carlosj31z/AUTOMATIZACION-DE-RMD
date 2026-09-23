@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.15.0
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable (OP y recetas), Documentos citados, exportar todas las recetas asociadas de la lista principal, sesión prolongada automáticamente y más.
+// @version      1.16.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable (OP y recetas), Documentos citados, exportar todas las recetas asociadas y versiones de la lista principal a .xlsx con autofiltro, sesión prolongada automáticamente y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.15.0';                                                       // mantener igual a @version
+  const VERSION = '1.16.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -1694,69 +1694,27 @@
     finally { boton.disabled = false; setTxt(boton.querySelector('span'), texto0); }
   }
   window.__rmdStats.csvVerOP = csvVerOP;   // diagnóstico: genera el CSV sin descargarlo
-  // ---- Exportar las recetas asociadas al RMD (solo su última versión, no todo el historial) de las OP ya cargadas -----------
-  // Cada fila de Ver OP trae su RMD en fila.mdId (código y versión); "Recetas Asociadas" solo se ve abriendo "Asociar Fórmula"
-  // de ESE RMD desde la lista principal (no hay atajo). Se filtra ahí (aunque esté tapada por este diálogo, sigue en el DOM),
-  // se abre "Asociar Fórmula" apilado, se lee su tabla y se cierra; al terminar se restaura el filtro "Codigo RMD" de la lista.
-  async function leerRecetasAsociadas(codigo) {
-    const campo = campoDe(document, 'Codigo RMD');
-    if (!campo) throw new Error('No encuentro el filtro "Codigo RMD" de la lista principal.');
-    const c = ctlDe(campo); if (c && c.setValue) c.setValue(codigo); else { campo.value = codigo; campo.dispatchEvent(new Event('input', { bubbles: true })); }
-    const btnIr = botonIr(document.body); if (!btnIr) throw new Error('No encuentro el botón "Ir" de la lista principal.');
-    const previos = new Set(dialogos());
-    pulsar(btnIr);
-    await hasta(() => !ocupado(), 15000); await esperar(500);
-    const filaLista = [...document.querySelectorAll('table.sapMListTbl tbody tr')].filter((tr) => !tr.closest('.sapMDialog') && tr.getClientRects().length).find((tr) => norm(tr.textContent).includes(codigo));
-    if (!filaLista) throw new Error(`No encontré el RMD ${codigo} en la lista principal (¿el filtro no coincidió?).`);
-    const btnMenu = [...filaLista.querySelectorAll('button')].find((b) => visible(b) && /Abrir men/i.test(b.getAttribute('aria-label') || b.title || ''));
-    if (!btnMenu) throw new Error(`No encontré el menú de acciones del RMD ${codigo}.`);
-    pulsar(btnMenu);
-    const item = await hasta(() => [...document.querySelectorAll('[role=menuitem]')].find((m) => visible(m) && /Asociar f[oó]rmulas/i.test(norm(m.textContent))), 5000);
-    if (!item) throw new Error(`No encontré "Asociar fórmulas" en el menú del RMD ${codigo}.`);
-    item.click();
-    const dAsoc = await hasta(() => dialogos().find((x) => !previos.has(x) && /^Asociar F[oó]rmula/i.test(cabecera(x))), 15000);
-    if (!dAsoc) throw new Error(`No se abrió "Asociar Fórmula" para el RMD ${codigo}.`);
-    await hasta(() => !ocupado(), 15000); await esperar(500);
-    const tabla = tablaDe(dAsoc), resultado = [];
-    if (tabla) {
-      const ths = [...tabla.querySelectorAll('thead th')].map((th) => NORM(th.textContent));
-      const iCod = ths.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iVer = ths.findIndex((n) => n === 'VERSIÓN' || n === 'VERSION');
-      const iDes = ths.findIndex((n) => /^DESCRIPCI/.test(n)), iEst = ths.indexOf('ESTADO'), iPt = ths.findIndex((n) => /P\.?\s*TRABAJO/.test(n));
-      const val = (tr, i) => (i >= 0 && celda(tr, i) ? norm(celda(tr, i).textContent) : '');
-      filasPrincipales(tabla).forEach((tr) => resultado.push({ codigo: val(tr, iCod), version: val(tr, iVer), descripcion: val(tr, iDes), estado: val(tr, iEst), puesto: val(tr, iPt) }));
-    }
-    await cerrarDialogo(dAsoc);
-    return resultado;
-  }
+  // ---- Exportar recetas asociadas: TODAS las versiones de RMD que aparezcan entre las OP ya cargadas (no solo la última).
+  // Usa la misma consulta masiva de leerRecetasPorFiltro (ver más abajo, junto a "Recetas asociadas" de la lista principal):
+  // cada fila de Ver OP trae su RMD en fila.mdId.codigo, y en este modelo cada código ya es de una versión concreta (una
+  // versión nueva es un código distinto), así que basta juntar los códigos distintos y pedirlos todos de una vez.
   async function exportarRecetasVerOP(d, t, boton) {
     boton.disabled = true; const texto0 = boton.querySelector('span').textContent;
-    const campoFiltro = campoDe(document, 'Codigo RMD'), filtroOriginal = campoFiltro ? campoFiltro.value : null;
     try {
       const filas = filasPrincipales(t).map(objetoDeFila).filter(Boolean);
-      const porCodigo = new Map();
-      filas.forEach((f) => { const m = f.mdId; if (!m || !m.codigo) return; const act = porCodigo.get(m.codigo); if (!act || (Number(m.version) || 0) > (Number(act.version) || 0)) porCodigo.set(m.codigo, m); });
-      if (!porCodigo.size) throw new Error('No se encontró el código de RMD en estas OP (recarga "Ver OP" e inténtalo de nuevo).');
+      const codigos = [...new Set(filas.map((f) => f.mdId && f.mdId.codigo).filter(Boolean))];
+      if (!codigos.length) throw new Error('No se encontró el código de RMD en estas OP (recarga "Ver OP" e inténtalo de nuevo).');
       setTxt(boton.querySelector('span'), 'Buscando…');
-      const lineas = [['Código RMD', 'Versión RMD', 'Código Receta', 'Versión Receta', 'Descripción', 'Estado', 'P. Trabajo'].map(csvCelda).join(';')];
-      let i = 0;
-      for (const [codigo, m] of porCodigo) {
-        i++; setTxt(boton.querySelector('span'), `Buscando… ${i}/${porCodigo.size}`);
-        const recetas = await leerRecetasAsociadas(codigo);
-        if (!recetas.length) lineas.push([codigo, m.version || '', '', '', '(sin recetas asociadas)', '', ''].map(csvCelda).join(';'));
-        else recetas.forEach((r) => lineas.push([codigo, m.version || '', r.codigo, r.version, r.descripcion, r.estado, r.puesto].map(csvCelda).join(';')));
-      }
-      descargarTexto(`Recetas_asociadas_${[...porCodigo.keys()].join('-')}.csv`, String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10)));
-      toast(`Recetas asociadas exportadas (${porCodigo.size} RMD, última versión de cada uno).`);
+      const modelo = modeloListaPrincipal();
+      if (!modelo) throw new Error('No encuentro el modelo de datos: abre también "Configuración Manufactura Digital" (la lista principal) en esta misma pestaña.');
+      const Filter = sap.ui.model.Filter, FilterOperator = sap.ui.model.FilterOperator;
+      const filtros = [new Filter({ filters: codigos.map((c) => new Filter('codigo', FilterOperator.EQ, c)), and: false })];
+      const datos = await leerRecetasPorFiltro(modelo, filtros);
+      const filasXlsx = datos.flatMap(filasRecetasDeMD);
+      await descargarXLSX(`Recetas_asociadas_${codigos.join('-')}.xlsx`, columnasRecetas(), filasXlsx);
+      toast(`Recetas asociadas exportadas (${datos.length} RMD: todas las versiones que aparecen entre estas OP).`);
     } catch (e) { toast('No se pudo exportar las recetas: ' + e.message, true); }
-    finally {
-      boton.disabled = false; setTxt(boton.querySelector('span'), texto0);
-      if (campoFiltro && filtroOriginal !== null) {
-        try {
-          const c = ctlDe(campoFiltro); if (c && c.setValue) c.setValue(filtroOriginal); else campoFiltro.value = filtroOriginal;
-          const btnIr = botonIr(document.body); if (btnIr) { pulsar(btnIr); await hasta(() => !ocupado(), 15000); }
-        } catch (e2) { /* no crítico: la persona puede volver a filtrar la lista a mano */ }
-      }
-    }
+    finally { boton.disabled = false; setTxt(boton.querySelector('span'), texto0); }
   }
   function alternarMenuExportar(ev, d, t) {
     ev.stopPropagation();
@@ -1980,10 +1938,13 @@
   // ---- Exportar recetas asociadas de la lista principal (junto al icono nativo "Exportar"): ese botón del portal
   // (createColumnMDExport + exportExcelConstructorTotal) solo trae "Código por Defecto" (codDefectoReceta), un único
   // código; un RMD puede tener VARIAS recetas asociadas (la misma tabla "Recetas Asociadas" que se ve en Asociar
-  // Fórmula). En vez de abrir esa ventana RMD por RMD (inviable con miles de filas), se usa el mismo modelo OData que
-  // ya usa el propio botón "Exportar" (mainModelv2, entidad "MD") con una sola lectura de más pidiendo "aReceta/recetaId"
+  // Fórmula), en CUALQUIER versión (cada versión es un código de RMD distinto, no hace falta elegir "la última"). En vez
+  // de abrir esa ventana RMD por RMD (inviable con miles de filas), se usa el mismo modelo OData que ya usa el propio
+  // botón "Exportar" (mainModelv2, entidad "MD") con una sola lectura de más pidiendo "aReceta/recetaId" y "estadoIdRmd"
   // — la misma API que el portal ya usa para leer, con el mismo filtro que tenga puesta la lista en ese momento (no se
-  // inventa ninguna llamada al backend fuera de las que el propio portal ya hace con su modelo).
+  // inventa ninguna llamada al backend fuera de las que el propio portal ya hace con su modelo). El archivo se genera
+  // con sap.ui.export.Spreadsheet (la misma librería que ya usa el botón nativo "Exportar"): produce un .xlsx real, con
+  // autofiltro en la fila de encabezado de fábrica (se comprobó: no hace falta configurarlo aparte).
   function modeloListaPrincipal() {
     const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return null;
     const ctl = ctlDe(btnExportar); const ctrl = ctl && ctl.mEventRegistry && ctl.mEventRegistry.press && ctl.mEventRegistry.press[0] && ctl.mEventRegistry.press[0].oListener;
@@ -2009,32 +1970,58 @@
     if (d.planta) n.push(new F('sucursalId_iMaestraId', OP.EQ, d.planta));
     return n;
   }
+  function leerRecetasPorFiltro(modelo, filtros) {
+    return new Promise((resolve, reject) => {
+      modelo.read('/MD', {
+        filters: filtros, urlParameters: { $expand: 'aReceta/recetaId,estadoIdRmd' },
+        success: (d) => resolve(d.results || []),
+        error: () => reject(new Error('El servidor no pudo responder la consulta (¿demasiadas filas? prueba filtrando más)')),
+      });
+    });
+  }
+  // Una fila por receta asociada (o una sola fila con el Código por Defecto si el RMD no tiene ninguna en "Asociar Fórmula").
+  function filasRecetasDeMD(md) {
+    const base = {
+      codigoRmd: md.codigo || '', version: md.version != null ? String(md.version) : '',
+      estadoRmd: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', descripcionRmd: md.descripcion || '', etapa: md.nivelTxt || '',
+      observacion: md.observacion || '',
+    };
+    const recetas = (md.aReceta && md.aReceta.results) || [];
+    if (!recetas.length) return [{ ...base, codigoReceta: md.codDefectoReceta || '', versionReceta: '', descripcionReceta: '(sin recetas en "Asociar Fórmula"; código por defecto)', estadoReceta: '', puestoTrabajo: '', hojaRuta: '', contador: '' }];
+    return recetas.map((r) => { const rc = r.recetaId || {}; return { ...base, codigoReceta: rc.Matnr || '', versionReceta: rc.Verid || '', descripcionReceta: rc.Text1 || '', estadoReceta: rc.Atwrt || '', puestoTrabajo: rc.Mdv01 || '', hojaRuta: rc.Plnnr || '', contador: rc.Alnal || '' }; });
+  }
+  // Función (no const): sap.ui.export.EdmType solo existe dentro del iframe de la app, una vez cargada esa librería del
+  // portal; evaluarlo al cargar el script (en vez de al usarlo) rompería el script entero en cualquier página donde
+  // "sap" aún no exista (se detectó con qa_local.py, que corre sobre una maqueta sin SAPUI5 real).
+  function columnasRecetas() {
+    const T = sap.ui.export.EdmType.String;
+    return [
+      { label: 'Código RMD', property: 'codigoRmd', type: T }, { label: 'Versión', property: 'version', type: T },
+      { label: 'Estado RMD', property: 'estadoRmd', type: T }, { label: 'Descripción RMD', property: 'descripcionRmd', type: T },
+      { label: 'Etapa', property: 'etapa', type: T }, { label: 'Código Receta', property: 'codigoReceta', type: T },
+      { label: 'Versión Receta', property: 'versionReceta', type: T }, { label: 'Descripción Receta', property: 'descripcionReceta', type: T },
+      { label: 'Estado/Etapa Receta', property: 'estadoReceta', type: T }, { label: 'Puesto Trabajo', property: 'puestoTrabajo', type: T },
+      { label: 'Hoja Ruta', property: 'hojaRuta', type: T }, { label: 'Contador', property: 'contador', type: T },
+      { label: 'Observación', property: 'observacion', type: T },
+    ];
+  }
+  function descargarXLSX(nombre, columnas, filas) {
+    const hoja = new sap.ui.export.Spreadsheet({ workbook: { columns: columnas }, dataSource: filas, fileName: nombre, worker: false });
+    return hoja.build().finally(() => hoja.destroy());
+  }
   async function exportarRecetasListaCompleta(btn) {
     if (window.__rmdExportandoRecetasLista) return; window.__rmdExportandoRecetasLista = true;
     btn.disabled = true; const texto0 = btn.querySelector('span').textContent;
     try {
       const modelo = modeloListaPrincipal(); if (!modelo) throw new Error('No encuentro el modelo de datos de la lista (¿sigues en Configuración RMD?).');
       const filtros = filtrosListaPrincipal();
-      if (!filtros.length && !(await confirmar('Sin filtro puesto', 'No hay ningún filtro activo en la lista: esto exportaría las recetas asociadas de TODOS los RMD (miles de filas) y puede tardar bastante.',
+      if (!filtros.length && !(await confirmar('Sin filtro puesto', 'No hay ningún filtro activo en la lista: esto exportaría las recetas asociadas de TODOS los RMD y TODAS sus versiones (miles de filas) y puede tardar bastante.',
           'Filtra primero por Código, Descripción u otro campo si solo necesitas unos pocos RMD.', { si: 'Exportar todos igual', no: 'Cancelar', peligro: true }))) { return; }
       setTxt(btn.querySelector('span'), 'Exportando…');
-      const datos = await new Promise((resolve, reject) => {
-        modelo.read('/MD', {
-          filters: filtros, urlParameters: { $expand: 'aReceta/recetaId' },
-          success: (d) => resolve(d.results || []),
-          error: () => reject(new Error('El servidor no pudo responder la consulta (¿demasiadas filas? prueba filtrando más)')),
-        });
-      });
-      const lineas = [['Código RMD', 'Versión', 'Descripción RMD', 'Etapa', 'Código Receta', 'Versión Receta', 'Descripción Receta', 'Estado/Etapa Receta', 'Puesto Trabajo', 'Hoja Ruta', 'Contador'].map(csvCelda).join(';')];
-      let filasReceta = 0;
-      datos.forEach((md) => {
-        const recetas = (md.aReceta && md.aReceta.results) || [];
-        const base = [md.codigo, md.version, md.descripcion, md.nivelTxt];
-        if (!recetas.length) { lineas.push([...base, md.codDefectoReceta || '', '', '(sin recetas en "Asociar Fórmula"; código por defecto arriba)', '', '', '', ''].map(csvCelda).join(';')); return; }
-        recetas.forEach((r) => { const rc = r.recetaId || {}; filasReceta++; lineas.push([...base, rc.Matnr, rc.Verid, rc.Text1, rc.Atwrt, rc.Mdv01, rc.Plnnr, rc.Alnal].map(csvCelda).join(';')); });
-      });
-      descargarTexto(`RMD_Recetas_Asociadas_${new Date().toISOString().slice(0, 10)}.csv`, String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10)));
-      toast(`Recetas exportadas: ${datos.length} RMD, ${filasReceta} recetas asociadas en total.`);
+      const datos = await leerRecetasPorFiltro(modelo, filtros);
+      const filas = datos.flatMap(filasRecetasDeMD);
+      await descargarXLSX(`RMD_Recetas_Asociadas_${new Date().toISOString().slice(0, 10)}.xlsx`, columnasRecetas(), filas);
+      toast(`Recetas exportadas: ${datos.length} RMD (todas las versiones que trae el filtro), ${filas.length} filas de receta.`);
     } catch (e) { toast('No se pudo exportar las recetas: ' + e.message, true); }
     finally { btn.disabled = false; setTxt(btn.querySelector('span'), texto0); window.__rmdExportandoRecetasLista = false; }
   }
@@ -2043,7 +2030,7 @@
     const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return;
     const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra || barra.querySelector('.rmd-recetas-lista')) return;
     const b = botonIcono(ICONO_EXPORTAR, 'Recetas asociadas', 'rmd-recetas-lista', () => exportarRecetasListaCompleta(b));
-    b.title = 'Exporta TODAS las recetas asociadas (tabla "Recetas Asociadas" de Asociar Fórmula, no solo el Código por Defecto) de los RMD que muestra el filtro actual de esta lista; si no hay filtro, exporta de todos (avisa antes).';
+    b.title = 'Exporta TODAS las recetas asociadas (tabla "Recetas Asociadas" de Asociar Fórmula, no solo el Código por Defecto) y TODAS las versiones de los RMD que muestra el filtro actual de esta lista; si no hay filtro, exporta de todos (avisa antes). Incluye Estado del RMD y Observación. Archivo .xlsx con autofiltro en el encabezado.';
     btnExportar.insertAdjacentElement('afterend', b);
   }
 
