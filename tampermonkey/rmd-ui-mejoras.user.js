@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.18.0
+// @version      1.19.0
 // @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable a CSV, Documentos citados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.18.0';                                                       // mantener igual a @version
+  const VERSION = '1.19.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -1951,7 +1951,8 @@
   // que lee aquí todo el maestro con sus recetas (lectura paginada de arriba, sin filtro) y se lo pasa a esa página abierta
   // en otra pestaña con postMessage, restringido a su origen exacto. No se envía nada a ningún servidor nuevo ni se toca
   // ninguna credencial: los datos van de una pestaña a otra dentro del mismo navegador, y Status RMD los procesa igual que
-  // si se hubiera subido el Excel (pide DNI para la trazabilidad, como siempre).
+  // si se hubiera subido el Excel. v1.19: el envío lleva también el usuario con el que se inició sesión en el portal
+  // (nombre y correo, del propio launchpad), y Status RMD registra la sincronización con él: un solo clic, sin DNI.
   const URL_STATUS_RMD = 'https://status-rmd.vercel.app/';
   const ORIGEN_STATUS_RMD = 'https://status-rmd.vercel.app';
   // Las dos últimas columnas (v1.18) traen Fecha Registro / Solicitud CON hora (ISO en UTC; Status RMD la pasa a hora
@@ -1967,6 +1968,19 @@
     const v = { ...f, recetas, fechaRegistro: fechaIso(f.fechaRegistro), fechaSolicitud: fechaIso(f.fechaSolicitud),
       fechaRegistroHora: fechaHoraIso(f.fechaRegistro), fechaSolicitudHora: fechaHoraIso(f.fechaSolicitud) };
     return COLUMNAS_PUENTE.map((c) => v[c]);
+  }
+  // Usuario con el que se inició sesión en el portal: lo da el propio launchpad (sap.ushell.Container.getUser()), en este
+  // frame o en el de arriba (mismo origen). Solo nombre, correo e identificador: nunca se lee ninguna contraseña.
+  function usuarioSapActual() {
+    for (const w of [window, window.parent, window.top]) {
+      try {
+        const C = w && w.sap && w.sap.ushell && w.sap.ushell.Container, u = C && C.getUser && C.getUser();
+        if (!u) continue;
+        const id = String((u.getId && u.getId()) || ''), nombre = String((u.getFullName && u.getFullName()) || ''), email = String((u.getEmail && u.getEmail()) || '');
+        if (id || email) return { id, nombre, email };
+      } catch (e) { /* frame de otro origen o launchpad aún cargando */ }
+    }
+    return null;
   }
   const ICONO_ENVIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h9.5M8.5 4.5 12 8l-3.5 3.5"/><path d="M14 2.5v11"/></svg>';
   async function enviarAStatusRmd(btn) {
@@ -1988,15 +2002,17 @@
     try {
       const modelo = modeloListaPrincipal(); if (!modelo) throw new Error('abre la lista "Configuración Manufactura Digital" para poder leer el maestro');
       const datos = await leerMDPaginado(modelo, [], (h, t) => setTxt(span, `Leyendo SAP… ${h}/${t}`));
-      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente) };
+      const usuarioSap = usuarioSapActual();
+      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente), usuarioSap };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
       if (!listo) throw new Error('Status RMD no respondió: ¿cargó la página y ya tiene la versión con enlace a SAP?');
       win.postMessage(payload, ORIGEN_STATUS_RMD);
-      setTxt(span, 'Confirma tu DNI en Status RMD…');
+      // Con el usuario de SAP no hay nada que confirmar allá; sin él (launchpad sin usuario), Status RMD pide el DNI.
+      setTxt(span, usuarioSap ? 'Procesando en Status RMD…' : 'Confirma tu DNI en Status RMD…');
       await hasta(() => respuesta || win.closed, 300000, 300);
-      if (!respuesta) throw new Error('no llegó la confirmación de Status RMD (¿se canceló el DNI o se cerró la pestaña?)');
+      if (!respuesta) throw new Error(usuarioSap ? 'no llegó la confirmación de Status RMD (¿se cerró la pestaña?)' : 'no llegó la confirmación de Status RMD (¿se canceló el DNI o se cerró la pestaña?)');
       if (!respuesta.ok) throw new Error(respuesta.motivo || 'Status RMD no aceptó los datos');
       toast(`Enviado a Status RMD: ${datos.length} RMD leídos de SAP. ${respuesta.resumen || ''}`.trim());
     } catch (e) { toast('No se pudo enviar a Status RMD: ' + e.message, true); }
@@ -2008,7 +2024,7 @@
     const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra) return;
     if (!barra.querySelector('.rmd-status-rmd')) {
       const s = botonIcono(ICONO_ENVIAR, 'Enviar a Status RMD', 'rmd-status-rmd', () => enviarAStatusRmd(s));
-      s.title = 'Lee aquí el maestro completo de RMD con sus recetas y se lo pasa directo a Status RMD (status-rmd.vercel.app) en otra pestaña, sin descargar ni subir archivos. Allí se confirma con el DNI, como siempre.';
+      s.title = 'Lee aquí el maestro completo de RMD con sus recetas y se lo pasa directo a Status RMD (status-rmd.vercel.app) en otra pestaña, sin descargar ni subir archivos. Allí queda registrado con tu usuario de SAP (sin DNI).';
       btnExportar.insertAdjacentElement('afterend', s);
     }
   }
