@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.14.0
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable (OP y recetas), Documentos citados, sesión prolongada automáticamente y más.
+// @version      1.15.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable (OP y recetas), Documentos citados, exportar todas las recetas asociadas de la lista principal, sesión prolongada automáticamente y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.14.0';                                                       // mantener igual a @version
+  const VERSION = '1.15.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -26,6 +26,7 @@
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
     ['verop', 'Ver OP: ver todas y exportar a CSV'],
     ['documentos', 'Documentos citados (Procedimientos/Formatos/Instructivos)'],
+    ['recetaslista', 'Exportar recetas asociadas (lista principal, junto a "Exportar")'],
     ['minusculas', 'Pasar MAYÚSCULAS a minúsculas con redacción correcta (experimental)'],
     ['ortografia', 'Avisar ortografía y concordancia en MAYÚSCULAS, tildes y puntuación en minúsculas (experimental)'],
   ];
@@ -1108,7 +1109,7 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-menu-exportar, .rmd-documentos-citados, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-menu-exportar, .rmd-documentos-citados, .rmd-recetas-lista, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -1130,6 +1131,7 @@
     decorarCabeceras();
     gestionarVerOP();
     gestionarDocumentosCitados();
+    gestionarExportarRecetasLista();
     gestionarTextosMayusculas();
   }
   new MutationObserver(() => {
@@ -1975,6 +1977,76 @@
     if (ref) ref.insertAdjacentElement('afterend', b); else hdr.appendChild(b);
   }
 
+  // ---- Exportar recetas asociadas de la lista principal (junto al icono nativo "Exportar"): ese botón del portal
+  // (createColumnMDExport + exportExcelConstructorTotal) solo trae "Código por Defecto" (codDefectoReceta), un único
+  // código; un RMD puede tener VARIAS recetas asociadas (la misma tabla "Recetas Asociadas" que se ve en Asociar
+  // Fórmula). En vez de abrir esa ventana RMD por RMD (inviable con miles de filas), se usa el mismo modelo OData que
+  // ya usa el propio botón "Exportar" (mainModelv2, entidad "MD") con una sola lectura de más pidiendo "aReceta/recetaId"
+  // — la misma API que el portal ya usa para leer, con el mismo filtro que tenga puesta la lista en ese momento (no se
+  // inventa ninguna llamada al backend fuera de las que el propio portal ya hace con su modelo).
+  function modeloListaPrincipal() {
+    const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return null;
+    const ctl = ctlDe(btnExportar); const ctrl = ctl && ctl.mEventRegistry && ctl.mEventRegistry.press && ctl.mEventRegistry.press[0] && ctl.mEventRegistry.press[0].oListener;
+    const vista = ctrl && ctrl.getView && ctrl.getView();
+    return vista && vista.getModel('mainModelv2');
+  }
+  // Mismos filtros que arma el propio exportExcelConstructorTotal a partir del modelo "oDataFilter" de la vista (campos
+  // del filtro de la lista): si no hay nada filtrado, se exporta sin filtro de estado propio (a diferencia del portal,
+  // que por defecto excluye un estado; aquí se avisa antes si no hay ningún filtro puesto, por el volumen).
+  function filtrosListaPrincipal() {
+    const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar');
+    const ctl = ctlDe(btnExportar); const ctrl = ctl && ctl.mEventRegistry.press[0].oListener;
+    const vista = ctrl && ctrl.getView && ctrl.getView(); const s = vista && vista.getModel('oDataFilter');
+    const d = (s && s.getData()) || {}; const F = sap.ui.model.Filter, OP = sap.ui.model.FilterOperator;
+    const n = [];
+    if (d.code) n.push(new F('codigo', OP.Contains, d.code));
+    if (d.description) n.push(new F('tolower(descripcion)', OP.Contains, `'${String(d.description).toLowerCase().replace("'", "''")}'`));
+    if (d.stageProcess) n.push(new F('estadoIdProceso_iMaestraId', OP.EQ, d.stageProcess));
+    if (d.productid) n.push(new F('codAgrupadorReceta', OP.Contains, d.productid));
+    if (d.level) n.push(new F('nivelTxt', OP.EQ, d.level));
+    if (d.statusRMD) n.push(new F('estadoIdRmd_iMaestraId', OP.EQ, d.statusRMD));
+    if (d.area) n.push(new F('areaRmdTxt', OP.EQ, d.area));
+    if (d.planta) n.push(new F('sucursalId_iMaestraId', OP.EQ, d.planta));
+    return n;
+  }
+  async function exportarRecetasListaCompleta(btn) {
+    if (window.__rmdExportandoRecetasLista) return; window.__rmdExportandoRecetasLista = true;
+    btn.disabled = true; const texto0 = btn.querySelector('span').textContent;
+    try {
+      const modelo = modeloListaPrincipal(); if (!modelo) throw new Error('No encuentro el modelo de datos de la lista (¿sigues en Configuración RMD?).');
+      const filtros = filtrosListaPrincipal();
+      if (!filtros.length && !(await confirmar('Sin filtro puesto', 'No hay ningún filtro activo en la lista: esto exportaría las recetas asociadas de TODOS los RMD (miles de filas) y puede tardar bastante.',
+          'Filtra primero por Código, Descripción u otro campo si solo necesitas unos pocos RMD.', { si: 'Exportar todos igual', no: 'Cancelar', peligro: true }))) { return; }
+      setTxt(btn.querySelector('span'), 'Exportando…');
+      const datos = await new Promise((resolve, reject) => {
+        modelo.read('/MD', {
+          filters: filtros, urlParameters: { $expand: 'aReceta/recetaId' },
+          success: (d) => resolve(d.results || []),
+          error: () => reject(new Error('El servidor no pudo responder la consulta (¿demasiadas filas? prueba filtrando más)')),
+        });
+      });
+      const lineas = [['Código RMD', 'Versión', 'Descripción RMD', 'Etapa', 'Código Receta', 'Versión Receta', 'Descripción Receta', 'Estado/Etapa Receta', 'Puesto Trabajo', 'Hoja Ruta', 'Contador'].map(csvCelda).join(';')];
+      let filasReceta = 0;
+      datos.forEach((md) => {
+        const recetas = (md.aReceta && md.aReceta.results) || [];
+        const base = [md.codigo, md.version, md.descripcion, md.nivelTxt];
+        if (!recetas.length) { lineas.push([...base, md.codDefectoReceta || '', '', '(sin recetas en "Asociar Fórmula"; código por defecto arriba)', '', '', '', ''].map(csvCelda).join(';')); return; }
+        recetas.forEach((r) => { const rc = r.recetaId || {}; filasReceta++; lineas.push([...base, rc.Matnr, rc.Verid, rc.Text1, rc.Atwrt, rc.Mdv01, rc.Plnnr, rc.Alnal].map(csvCelda).join(';')); });
+      });
+      descargarTexto(`RMD_Recetas_Asociadas_${new Date().toISOString().slice(0, 10)}.csv`, String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10)));
+      toast(`Recetas exportadas: ${datos.length} RMD, ${filasReceta} recetas asociadas en total.`);
+    } catch (e) { toast('No se pudo exportar las recetas: ' + e.message, true); }
+    finally { btn.disabled = false; setTxt(btn.querySelector('span'), texto0); window.__rmdExportandoRecetasLista = false; }
+  }
+  function gestionarExportarRecetasLista() {
+    if (!on('recetaslista')) { document.querySelectorAll('.rmd-recetas-lista').forEach((e) => e.remove()); return; }
+    const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return;
+    const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra || barra.querySelector('.rmd-recetas-lista')) return;
+    const b = botonIcono(ICONO_EXPORTAR, 'Recetas asociadas', 'rmd-recetas-lista', () => exportarRecetasListaCompleta(b));
+    b.title = 'Exporta TODAS las recetas asociadas (tabla "Recetas Asociadas" de Asociar Fórmula, no solo el Código por Defecto) de los RMD que muestra el filtro actual de esta lista; si no hay filtro, exporta de todos (avisa antes).';
+    btnExportar.insertAdjacentElement('afterend', b);
+  }
+
   // ---- Experimental: aplicar "Aa" (minúsculas con redacción correcta) y el aviso de ortografía sobre los textarea editables
   // ya existentes (Descripción Paso de "Nuevo Paso", Descripción/Especificaciones de Especificaciones). Nunca escriben solas.
   const ICONO_AA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11 5 3l3 8M2.8 8.5h4.4"/><path d="M9.5 11c0-1.4 1.1-2.3 2.5-2.3s2.4.8 2.4 2c0 1-.7 1.3-1.8 1.6-1.2.3-2.7.6-2.7 2 0 .9.8 1.2 1.7 1.2 1.1 0 2-.5 2.4-1.3"/></svg>';
@@ -2086,7 +2158,7 @@
   const GRUPOS_PANEL = [
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
     ['Alertas', ['reglas', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'espec', 'nuevopaso', 'verop', 'documentos', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Herramientas', ['filtro', 'copiar', 'espec', 'nuevopaso', 'verop', 'documentos', 'recetaslista', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
     ['Experimental', ['minusculas', 'ortografia']],
   ];
   function panel() {
