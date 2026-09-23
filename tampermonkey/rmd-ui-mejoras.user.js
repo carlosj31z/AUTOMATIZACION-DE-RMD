@@ -1954,15 +1954,19 @@
   // si se hubiera subido el Excel (pide DNI para la trazabilidad, como siempre).
   const URL_STATUS_RMD = 'https://status-rmd.vercel.app/';
   const ORIGEN_STATUS_RMD = 'https://status-rmd.vercel.app';
+  // Las dos últimas columnas (v1.18) traen Fecha Registro / Solicitud CON hora (ISO en UTC; Status RMD la pasa a hora
+  // local): con solo el día, dos RMD registrados el mismo día no se podrían ordenar. Van aparte, al final, para que una
+  // versión de Status RMD que aún no las conozca siga recibiendo las fechas de siempre (solo el día).
   const COLUMNAS_PUENTE = ['codigo', 'codigoSolicitud', 'version', 'estado', 'codDefecto', 'codAgrupador', 'descripcion', 'etapa', 'fechaRegistro',
-    'usuarioRegistro', 'fechaAut', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'planta', 'seccion', 'motivo', 'observacion', 'linaje', 'recetas'];
+    'usuarioRegistro', 'fechaAut', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'planta', 'seccion', 'motivo', 'observacion', 'linaje', 'recetas',
+    'fechaRegistroHora', 'fechaSolicitudHora'];
   function filaPuente(md) {
     const f = datosBaseDeMD(md);
     const recetas = ((md.aReceta && md.aReceta.results) || []).map((r) => { const rc = r.recetaId || {}; return [rc.Matnr || '', rc.Verid || '', rc.Atwrt || '', (rc.Text1 || '').trim(), rc.Mdv01 || '', rc.Plnnr || '', rc.Alnal || '']; });
-    // Fecha Registro / Solicitud con su hora (ISO en UTC; Status RMD la pasa a hora local): con solo el día, dos RMD
-    // registrados el mismo día no se podrían ordenar, y el día en UTC se corría uno en los registros de la noche.
     const fechaHoraIso = (x) => (x instanceof Date && !isNaN(x) ? x.toISOString() : '');
-    return COLUMNAS_PUENTE.map((c) => (c === 'recetas' ? recetas : (c === 'fechaRegistro' || c === 'fechaSolicitud') ? fechaHoraIso(f[c]) : f[c]));
+    const v = { ...f, recetas, fechaRegistro: fechaIso(f.fechaRegistro), fechaSolicitud: fechaIso(f.fechaSolicitud),
+      fechaRegistroHora: fechaHoraIso(f.fechaRegistro), fechaSolicitudHora: fechaHoraIso(f.fechaSolicitud) };
+    return COLUMNAS_PUENTE.map((c) => v[c]);
   }
   const ICONO_ENVIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h9.5M8.5 4.5 12 8l-3.5 3.5"/><path d="M14 2.5v11"/></svg>';
   async function enviarAStatusRmd(btn) {
