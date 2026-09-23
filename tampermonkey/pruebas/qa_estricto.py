@@ -924,9 +924,11 @@ with sync_playwright() as p:
                 for clave, texto in (("correcto", "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE."),
                                      ("invertido", "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CALIDAD EN OPERACIONES O CONTROL DE CALIDAD, SEGUN APLIQUE."),
                                      ("antiguo", "VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE."),
-                                     ("suelto", "AVISAR AL CONTROL DE CALIDAD"), ("solo_operaciones", "AVISAR A CALIDAD EN OPERACIONES")):
+                                     ("suelto", "AVISAR AL CONTROL DE CALIDAD"), ("solo_operaciones", "AVISAR A CALIDAD EN OPERACIONES"),
+                                     ("formato_fpro250", "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD."),
+                                     ("formato_y_otro", "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD. AVISAR AL CONTROL DE CALIDAD.")):
                     poner_desc(k, texto); res[clave] = fr.evaluate(LEER_PRED)["filas"][k]["faltaDes"]
-                return res == {"correcto": False, "invertido": False, "antiguo": True, "suelto": True, "solo_operaciones": False}, str(res)
+                return res == {"correcto": False, "invertido": False, "antiguo": True, "suelto": True, "solo_operaciones": False, "formato_fpro250": False, "formato_y_otro": True}, str(res)
             cerrar_seguro()
         if abrir_lista(etiqueta="RENDIMIENTO"):
             @prueba("N5 Rendimiento no lleva predecesores: ni aunque un paso con tipo de dato esté sin predecesor se marca")

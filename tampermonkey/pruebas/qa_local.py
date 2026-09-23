@@ -231,12 +231,15 @@ with sync_playwright() as p:
         filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}] + [{"desc": t, "tipo": "Realizado por"} for t in textos]
         abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
         return [f["falta"] for f in a["filas"]] == [False, False, False, False, False, False, True], str([f["falta"] for f in a["filas"]])
-    @prueba("LN4 'VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.' es correcto; los demás 'CONTROL DE CALIDAD' se alertan")
+    @prueba("LN4 'VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.' y 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA…' son correctos; los demás 'CONTROL DE CALIDAD' se alertan")
     def _():
         textos = [("VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.", False),
                   ("VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CALIDAD EN OPERACIONES O CONTROL DE CALIDAD, SEGUN APLIQUE.", False),
                   ("VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE.", True),
-                  ("AVISAR AL CONTROL DE CALIDAD", True), ("AVISAR A CALIDAD EN OPERACIONES", False), ("MUESTRA PARA CONTROL DE CALIDAD (kg):", True)]
+                  ("AVISAR AL CONTROL DE CALIDAD", True), ("AVISAR A CALIDAD EN OPERACIONES", False), ("MUESTRA PARA CONTROL DE CALIDAD (kg):", True),
+                  ("FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD.", False),
+                  ("FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD. AVISAR AL CONTROL DE CALIDAD.", True),
+                  ("ESPERAR RESULTADOS DE CONTROL DE CALIDAD PARA CONTINUAR.", True)]
         filas = [{"desc": t, "tipo": "Verificación Check", "dep": f"{1000 + k} ({k + 1})"} for k, (t, _) in enumerate(textos)]
         filas[0]["dep"] = "999 (1)"
         abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)

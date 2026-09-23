@@ -164,6 +164,21 @@ def test_control_de_calidad_o_calidad_en_operaciones_es_correcto():
     assert len([m for m in mensajes(s) if "reemplazar" in m and "CONTROL DE CALIDAD" in m]) == 2
 
 
+def test_entrega_del_formato_de_inspeccion_a_control_de_calidad_no_se_alerta():
+    """El cierre de Acondicionado que entrega el FPRO-250 a Control de Calidad para su aprobación es correcto (confirmado por el
+    usuario): no se alerta, ni con tildes. Otro "CONTROL DE CALIDAD" en el mismo paso, o en otro paso, sí."""
+    formato = "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD."
+    for texto in (formato, "Finalmente entregar el formato de inspección en líneas de producción (FPRO-250 VIGENTE) a Control de Calidad "
+                           "para su aprobación en el sistema, así como el sobre técnico con la documentación al área de Aseguramiento de la Calidad."):
+        s = snap_base()
+        s["structs"][3]["etq"][1]["p"].append(paso(6, texto, dep="1005 (5)"))
+        assert not [m for m in mensajes(s) if "CONTROL DE CALIDAD" in m]
+    s = snap_base()
+    s["structs"][3]["etq"][1]["p"].append(paso(6, formato + " AVISAR AL CONTROL DE CALIDAD.", dep="1005 (5)"))
+    s["structs"][3]["etq"][1]["p"].append(paso(7, "ESPERAR RESULTADOS DE CONTROL DE CALIDAD PARA CONTINUAR.", dep="1006 (6)"))
+    assert len([m for m in mensajes(s) if "reemplazar" in m and "CONTROL DE CALIDAD" in m]) == 2
+
+
 def sin_predecesor(snap):
     return [(h.lista, h.orden) for h in reglas.revisar(snap) if "sin predecesor" in h.mensaje and h.nivel == "AVISO"]
 

@@ -260,9 +260,12 @@ Verificación Check sí lleva Edit (41 de 41).
   SEGUN APLIQUE."** es **correcta** (la operación lo confirmó; está en los RMD de Envase autorizados): nombra a Calidad en Operaciones, así que
   no se alerta (tampoco con las dos áreas al revés). Fuera de esa fórmula, cualquier otro "CONTROL DE CALIDAD" se alerta: solo debe quedar
   Calidad en Operaciones.
-- "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION" (Acondicionado) y
-  "ESPERAR RESULTADOS DE CONTROL DE CALIDAD…" (Fabricación) todavía aparecen con el texto antiguo incluso en RMD autorizados
-  de septiembre de 2026: hay que actualizarlos.
+- **"FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION
+  EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD."** (cierre de Acondicionado)
+  también es **correcto** (la operación lo confirmó): no se alerta, ni con tildes. Solo se exceptúa esa frase: si el mismo paso trae otro
+  "CONTROL DE CALIDAD", ese sí se alerta.
+- "ESPERAR RESULTADOS DE CONTROL DE CALIDAD…" (Fabricación) todavía aparece con el texto antiguo incluso en RMD autorizados
+  de septiembre de 2026: hay que actualizarlo.
 - Los RMD **Ingresados** revisados aún traían: paso de muestra "MUESTRA PARA CONTROL DE CALIDAD (FOLIOS):" (Envase),
   y pasos de Calidad en Operaciones sin Estado CC (Fabricación cápsulas blandas #24 y #25; Acondicionado #33).
 

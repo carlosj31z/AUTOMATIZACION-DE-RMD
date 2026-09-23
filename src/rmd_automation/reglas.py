@@ -9,6 +9,7 @@ indicaciones de la operación (ver docs/como_se_configura_un_rmd.md). Niveles:
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -42,9 +43,17 @@ ETAPAS_PRINCIPALES = ("FABRICACION", "ENVASE", "ACONDICIONADO", "RECUBRIMIENTO")
 
 # Pasos que por su redacción pueden ir sin predecesor (condicionales, en paralelo o de cierre; ver docs/como_se_configura_un_rmd.md §5).
 INDEPENDIENTES = re.compile(r"\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA")
-# "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (nota del granel de Envase) es la redacción vigente y correcta:
-# nombra a Calidad en Operaciones, así que no cuenta como un "Control de Calidad" pendiente de cambiar.
+# Redacciones con "CONTROL DE CALIDAD" que son correctas y no se alertan (confirmadas por el usuario):
+# - "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (nota del granel de Envase): nombra a Calidad en Operaciones;
+# - "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL
+#   SISTEMA, ASI COMO EL SOBRE TECNICO…" (cierre de Acondicionado). Se quita solo esa frase: otro "CONTROL DE CALIDAD" en el mismo paso sí se alerta.
 ALTERNATIVA_CALIDAD = re.compile(r"CONTROL DE CALIDAD\s+O\s+CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES\s+O\s+CONTROL DE CALIDAD")
+ENTREGA_FORMATO_INSPECCION = re.compile(r"FINALMENTE\s+ENTREGAR\s+EL\s+FORMATO\s+DE\s+INSPECCION\s+EN\s+LINEAS\s+DE\s+PRODUCCION\s*"
+                                        r"\(FPRO-\d+(?:\s+VIGENTE)?\)\s*A\s+CONTROL\s+DE\s+CALIDAD\s+PARA\s+SU\s+APROBACION\s+EN\s+EL\s+SISTEMA")
+
+
+def _sin_acentos(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
 
 
 @dataclass
@@ -63,7 +72,8 @@ def _avisos_texto(donde: str, orden: str, desc: str) -> List["Hallazgo"]:
     "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA"."""
     if re.search(r"MUESTRA PARA (EL )?CONTROL DE CALIDAD", desc):
         return [Hallazgo("AVISO", donde, orden, 'debe figurar "CANTIDAD MUESTREADA" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"')]
-    desc = ALTERNATIVA_CALIDAD.sub("CALIDAD EN OPERACIONES", desc)          # "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" es correcto
+    desc = ALTERNATIVA_CALIDAD.sub("CALIDAD EN OPERACIONES", _sin_acentos(desc))   # "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" es correcto
+    desc = ENTREGA_FORMATO_INSPECCION.sub("FINALMENTE ENTREGAR EL FORMATO DE INSPECCION", desc)   # la entrega del FPRO-250 a Control de Calidad también
     if "CONTROL DE CALIDAD" in desc or re.search(r"APROBACION DE .*CONTROL DE PROCESO", desc):
         return [Hallazgo("AVISO", donde, orden, 'reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)')]
     return []
