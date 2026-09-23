@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.13.0
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 y exportable, Documentos citados, sesión prolongada automáticamente y más.
+// @version      1.14.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable (OP y recetas), Documentos citados, sesión prolongada automáticamente y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,13 +10,13 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.13.0';                                                       // mantener igual a @version
+  const VERSION = '1.14.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   const OPC = [
     ['activo', 'Mejoras activas'], ['enter', 'Enter = Ir'], ['ancho', 'Diálogos a medida'], ['columnas', 'Columnas ordenadas'],
-    ['ocultar', 'Ocultar Estado Mov., Imagen, Formato'], ['grupos', 'Tooltips en las cabeceras'],
+    ['ocultar', 'Ocultar Estado Mov., Imagen, Formato, PM OP, Gen PP'], ['grupos', 'Tooltips en las cabeceras'],
     ['depende', 'Depende: tooltip con el paso'], ['sintipo', '"Sin tipo de dato" en rojo y negrita'],
     ['puesto', 'Puesto de Trabajo faltante parpadea'], ['reglas', 'Alertas de casillas incoherentes'],
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
@@ -26,7 +26,8 @@
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
     ['verop', 'Ver OP: ver todas y exportar a CSV'],
     ['documentos', 'Documentos citados (Procedimientos/Formatos/Instructivos)'],
-    ['minusculas', 'Pasar MAYÚSCULAS a minúsculas con redacción correcta (experimental)'], ['ortografia', 'Avisar textos en MAYÚSCULAS con posibles faltas de ortografía (experimental)'],
+    ['minusculas', 'Pasar MAYÚSCULAS a minúsculas con redacción correcta (experimental)'],
+    ['ortografia', 'Avisar ortografía y concordancia en MAYÚSCULAS, tildes y puntuación en minúsculas (experimental)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
@@ -123,7 +124,9 @@
     --rmd-borde-campo: #89919a; --rmd-acento: #0a6ed1; --rmd-acento-texto: #0a6ed1; --rmd-rojo: #bb0000; --rmd-ambar: #b45f06; --rmd-verde: #107e3e; }
 
   /* ── Ventanas emergentes: centradas y con el pie (Cancelar/Cerrar) siempre visible ── */
-  html.rmd-ui .sapMDialog.rmd-g { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important; }
+  html.rmd-ui .sapMDialog.rmd-g { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important;
+    transition: width .14s ease, height .14s ease, left .14s ease, top .14s ease; }   /* suaviza el "salto" al volver de un diálogo hijo (p. ej. cerrar Procesos Menores) mientras se reaplican estas medidas */
+  @media (prefers-reduced-motion: reduce) { html.rmd-ui .sapMDialog.rmd-g { transition: none; } }
   html.rmd-ui .sapMDialog.rmd-g > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; scrollbar-gutter: stable; }   /* el ancho útil no cambia al aparecer la barra vertical */
   html.rmd-ui .sapMDialog.rmd-g > footer, html.rmd-ui .sapMDialog.rmd-g > header { flex: 0 0 auto !important; }
   html.rmd-ui .sapMDialog.rmd-pasos {
@@ -194,6 +197,24 @@
   .rmd-nuevo-paso-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; margin-left: 10px; vertical-align: middle; }
   .rmd-nuevo-paso-grupo .rmd-btn { height: 32px; }
   .rmd-exportar-op, .rmd-documentos-citados { margin: 0 4px; height: 32px; }
+  .rmd-cuenta-verop { align-self: center; margin: 0 4px; color: var(--rmd-apagado); font-size: 12.5px; white-space: nowrap; }
+  /* ── Filtro por columna de Ver OP (estilo Autofiltro de Excel): icono junto al encabezado + desplegable de valores ── */
+  .rmd-th-filtro { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 4px; padding: 0; border: 0; background: transparent; color: var(--rmd-apagado); cursor: pointer; border-radius: 3px; vertical-align: middle; }
+  .rmd-th-filtro:hover { background: rgba(27,141,236,.16); color: var(--rmd-acento-texto); }
+  .rmd-th-filtro.activo { color: var(--rmd-acento-texto); }
+  .rmd-th-filtro svg { width: 10px; height: 10px; fill: currentColor; }
+  .rmd-menu-filtro-col { position: fixed; z-index: 100002; display: flex; flex-direction: column; width: 220px; max-height: 320px; padding: 6px; background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+  .rmd-filtro-col-buscar { height: 26px; margin-bottom: 6px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 12.5px var(--rmd-fuente); }
+  .rmd-filtro-col-buscar::placeholder { color: var(--rmd-apagado); }
+  .rmd-filtro-col-lista { flex: 1 1 auto; overflow: auto; max-height: 220px; display: flex; flex-direction: column; gap: 1px; }
+  .rmd-filtro-col-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 3px; font-size: 12.5px; color: var(--rmd-texto); cursor: pointer; }
+  .rmd-filtro-col-item:hover { background: rgba(27,141,236,.10); }
+  .rmd-filtro-col-item input { accent-color: var(--rmd-acento); flex: 0 0 auto; }
+  .rmd-filtro-col-pie { display: flex; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rmd-borde); }
+  .rmd-filtro-col-pie .rmd-btn { flex: 1 1 auto; padding: 0 4px; height: 26px; font-size: 11.5px; justify-content: center; }
+  .rmd-menu-exportar { position: fixed; z-index: 100002; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+  .rmd-menu-exportar .rmd-btn { justify-content: flex-start; white-space: nowrap; border-color: transparent; }
+  .rmd-menu-exportar .rmd-btn:hover:not(:disabled) { background: rgba(27,141,236,.14); border-color: transparent; }
   .rmd-aa { position: absolute; right: 4px; bottom: 4px; z-index: 2; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-acento-texto); cursor: pointer; }
   .rmd-aa:hover { background: var(--rmd-acento); color: #fff; } .rmd-aa svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   textarea.rmd-ortografia { text-decoration: underline wavy var(--rmd-ambar) 1.5px; text-underline-offset: 3px; }
@@ -298,7 +319,7 @@
     'ORDEN': 50, 'CÓDIGO': 70, 'CODIGO': 70, 'TIPO DATO': 108, 'CLAVE MODELO': 80, 'PUESTO TRABAJO': 88, 'VAL. INICIAL': 56, 'VAL. FINAL': 56, 'MARGEN': 54, 'DECIMAL': 56, 'DECIM.': 56,
     'ESTADO CC': 52, 'PM OP': 40, 'GEN PP': 42, 'EDIT': 40, 'R. POR': 40, 'V.B.': 40, 'PROC. MEN.': 52, 'ESTADO': 58,
   };
-  const OCULTAS = ['ESTADO MOV.', 'IMAGEN', 'FORMATO'];
+  const OCULTAS = ['ESTADO MOV.', 'IMAGEN', 'FORMATO', 'PM OP', 'GEN PP'];
   const TIP = {
     'ESTADO CC': 'Estado CC: el paso queda sujeto al estado de Control de Calidad',
     'PM OP': 'PM OP: proceso menor opcional', 'GEN PP': 'Gen PP: genera producto en proceso',
@@ -314,6 +335,15 @@
   const DICCIONARIO_ACENTOS = Object.fromEntries([
     // palabras frecuentes en procedimientos: se guarda su forma acentuada; la clave (SIN_ACENTOS) es la que se busca
     'según', 'también', 'así', 'además', 'después', 'través', 'única', 'único', 'únicas', 'únicos', 'está', 'están', 'estará', 'estarán', 'será', 'serán', 'aún', 'ésta', 'éste', 'ésa', 'ése', 'cómo', 'cuándo', 'dónde', 'qué', 'quién', 'cuál', 'condición', 'condiciones', 'operación', 'operaciones', 'verificación', 'verificaciones', 'aprobación', 'aprobaciones', 'documentación', 'información', 'preparación', 'fabricación', 'inspección', 'inspecciones', 'sanitización', 'limpieza', 'identificación', 'especificación', 'especificaciones', 'notificación', 'notificaciones', 'formulación', 'presión', 'revisión', 'revisiones', 'decisión', 'versión', 'versiones', 'posición', 'posiciones', 'producción', 'función', 'estación', 'validación', 'calibración', 'evaluación', 'rotación', 'situación', 'acción', 'reacción', 'atención', 'sección', 'sesión', 'expresión', 'impresión', 'dimensión', 'extensión', 'conexión', 'transición', 'distribución', 'administración', 'configuración', 'autorización', 'organización', 'generación', 'agitación', 'filtración', 'destilación', 'granulación', 'compresión', 'dispersión', 'suspensión', 'solución', 'disolución', 'estabilización', 'despeje', 'técnico', 'técnica', 'técnicos', 'técnicas', 'básico', 'básica', 'básicos', 'básicas', 'práctico', 'práctica', 'químico', 'química', 'químicos', 'químicas', 'físico', 'física', 'físicos', 'físicas', 'automático', 'automática', 'automáticos', 'automáticas', 'electrónico', 'electrónica', 'público', 'pública', 'lógico', 'lógica', 'crítico', 'crítica', 'críticos', 'críticas', 'numérico', 'numérica', 'específico', 'específica', 'específicos', 'específicas', 'periódico', 'periódica', 'periódicamente', 'máximo', 'máxima', 'máximos', 'máximas', 'mínimo', 'mínima', 'mínimos', 'mínimas', 'rápido', 'rápida', 'rápidamente', 'código', 'códigos', 'número', 'números', 'área', 'áreas', 'línea', 'líneas', 'máquina', 'máquinas', 'título', 'período', 'régimen', 'límite', 'límites', 'análisis', 'fórmula', 'fórmulas', 'estándar', 'estándares', 'párrafo', 'ítem', 'ítems', 'módulo', 'módulos', 'símbolo', 'símbolos', 'válido', 'válida', 'válidos', 'válidas',
+    // ampliación: verbos conjugados y términos frecuentes en instructivos de manufactura
+    'verificará', 'verificarán', 'deberá', 'deberán', 'podrá', 'podrán', 'tendrá', 'tendrán', 'permitirá', 'permitirán',
+    'requerirá', 'requerirán', 'garantizará', 'asegurará', 'confirmará', 'registrará', 'indicará', 'señalará', 'señal', 'señales',
+    'válvula', 'válvulas', 'rótulo', 'rótulos', 'próximo', 'próxima', 'próximos', 'próximas', 'último', 'última', 'últimos', 'últimas',
+    'ningún', 'algún', 'algúnos', 'día', 'días', 'ahí', 'allí', 'aquí', 'útil', 'útiles', 'fácil', 'fáciles', 'difícil', 'difíciles',
+    'exposición', 'composición', 'disposición', 'descripción', 'inscripción', 'prescripción', 'excepción', 'concepción', 'percepción',
+    'interrupción', 'producción', 'reproducción', 'introducción', 'conducción', 'deducción', 'reducción', 'construcción', 'destrucción',
+    'instrucción', 'obstrucción', 'traducción', 'protección', 'inyección', 'proyección', 'reflexión', 'conexión', 'perfección',
+    'confección', 'infección',
   ].map((p) => [SIN_ACENTOS(p), p]));
   delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // "mas" (cantidad, con tilde) es ambiguo con "mas" (pero, sin tilde): no se acentua solo
   // Palabras "conocidas" para el aviso de ortografia: nexos y palabras cortas muy frecuentes, mas los terminos propios
@@ -329,7 +359,10 @@
   // Terminaciones habituales del espanol (verbos conjugados, adverbios en -mente, sustantivos/adjetivos comunes):
   // si una palabra termina asi, se da por conocida aunque no este en la lista (evita avisos de sobra; el objetivo es
   // detectar solo palabras claramente raras, no hacer un corrector completo).
-  const TERMINACIONES_CONOCIDAS = /(?:CION|SION|MENTE|ANDO|IENDO|ADO|ADA|ADOS|ADAS|IDO|IDA|IDOS|IDAS|AR|ER|IR|ARON|IERON|ABA|ABAN|IA|IAN|ARSE|ERSE|IRSE|OSO|OSA|OSOS|OSAS|IVO|IVA|IVOS|IVAS|BLE|BLES|DAD|DADES|EZ|EZA|MIENTO|MIENTOS|ANTE|ANTES|ENTE|ENTES)$/;
+  const TERMINACIONES_CONOCIDAS = /(?:CION|CIONES|SION|SIONES|MENTE|ANDO|IENDO|ADO|ADA|ADOS|ADAS|IDO|IDA|IDOS|IDAS|AR|ER|IR|ARON|IERON|ABA|ABAN|IA|IAN|ARSE|ERSE|IRSE|OSO|OSA|OSOS|OSAS|IVO|IVA|IVOS|IVAS|BLE|BLES|DAD|DADES|EZ|EZA|MIENTO|MIENTOS|ANTE|ANTES|ENTE|ENTES|OS|AS|ES|ON|ONES|TOR|TORA|TORES|TORAS|DOR|DORA|DORES|DORAS|ERO|ERA|EROS|ERAS|ARIO|ARIA|ARIOS|ARIAS|ISTA|ISTAS|URA|URAS|ENCIA|ENCIAS|ANCIA|ANCIAS|ISMO|ISMOS|ALES)$/;
+  // sustantivos singulares que ya terminan en "S" (no son plural): evita falsos avisos de concordancia artículo-sustantivo
+  const INVARIABLES_EN_S = new Set(['ANALISIS', 'DOSIS', 'CRISIS', 'VIRUS', 'TORAX', 'OASIS', 'SINTESIS', 'TESIS', 'CARIES', 'LUNES',
+    'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'ATLAS', 'PARENTESIS', 'ENFASIS', 'GAS', 'YES', 'PLUS', 'BUS', 'STATUS', 'CAMPUS']);
   // mismo patron que src/rmd_automation/referencias.py (Tipo I/P/F + Area + sufijo -NNN obligatorio)
   const PATRON_REFERENCIA_JS = /\b[IPF][A-Z0-9]{3}-[A-Z]?\d{3}\b/;
   // siglas que se conservan tal cual (no se protege ninguna otra secuencia en mayusculas: el texto de entrada ya viene
@@ -364,6 +397,37 @@
     });
     return dudosas;
   }
+  // Concordancia de número entre artículo y el sustantivo que le sigue (EL/LA/UN/UNA = singular; LOS/LAS/UNOS/UNAS = plural).
+  // Heurística deliberadamente conservadora (con excepciones de sustantivos invariables en "S"): puede haber falsos avisos
+  // en casos raros del español, pero evita marcar de más. No revisa nada más de la oración (ni orden ni otras reglas).
+  function revisarConcordancia(texto) {
+    const sinCodigos = String(texto || '').replace(new RegExp(PATRON_REFERENCIA_JS.source, 'g'), ' ');
+    const avisos = []; const vistos = new Set();
+    sinCodigos.replace(/\b(EL|LA|LOS|LAS|UN|UNA|UNOS|UNAS)\s+([A-ZÁÉÍÓÚÑ]{3,})\b/g, (m, art, palabra) => {
+      const clave = SIN_ACENTOS(palabra);
+      if (PALABRAS_CORTAS.includes(clave.toLowerCase())) return m;   // nexo (que, cual…), no es sustantivo
+      const singular = art === 'EL' || art === 'LA' || art === 'UN' || art === 'UNA';
+      const terminaEnS = /S$/.test(palabra), clavePar = art + ' ' + palabra;
+      if (vistos.has(clavePar)) return m;
+      if (singular && terminaEnS && !INVARIABLES_EN_S.has(clave)) { vistos.add(clavePar); avisos.push(`"${art} ${palabra}" (artículo singular, palabra en plural)`); }
+      else if (!singular && !terminaEnS && !INVARIABLES_EN_S.has(clave)) { vistos.add(clavePar); avisos.push(`"${art} ${palabra}" (artículo plural, palabra en singular)`); }
+      return m;
+    });
+    return avisos;
+  }
+  // Para texto ya en minúsculas (tras "Aa"): tildes que faltan (según el mismo diccionario que restaurarAcentos) y falta de
+  // puntuación final. No revisa ortografía por palabra aquí (en minúsculas casi todo son palabras válidas del diccionario).
+  function revisarTildesYPuntuacion(texto) {
+    const t = String(texto || ''); const avisos = []; const vistas = new Set();
+    t.replace(new RegExp(PATRON_REFERENCIA_JS.source, 'g'), ' ').replace(/\p{L}+/gu, (palabra) => {
+      const clave = SIN_ACENTOS(palabra), correcta = DICCIONARIO_ACENTOS[clave];
+      if (correcta && palabra.toLowerCase() !== correcta.toLowerCase() && !vistas.has(clave)) { vistas.add(clave); avisos.push(`"${palabra}" podría llevar tilde: "${correcta}"`); }
+      return palabra;
+    });
+    const limpio = norm(t);
+    if (limpio && !/[.!?…]["'）\])]?$/.test(limpio)) avisos.push('Falta el signo de puntuación final (punto).');
+    return avisos;
+  }
 
   const lienzo = document.createElement('canvas').getContext('2d');
   const filasPrincipales = (t) => [...t.querySelectorAll('tbody tr')].filter((r) => !/SubRow/.test(r.className));
@@ -389,7 +453,7 @@
   function ordenarColumnas(tabla, ths, nombres, filas, tipoTabla) {
     const cont = tabla.closest('.sapMDialogScrollCont') || tabla.parentElement;
     const C = Math.floor(cont ? cont.clientWidth : 0); if (C < 300) return;               // aún sin medidas
-    const compacto = C < 1700, iDep = nombres.indexOf('DEPENDE'), iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO');
+    const compacto = C < 1700, iDep = nombres.indexOf('DEPENDE'), iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iTipo = nombres.indexOf('TIPO DATO');
     tabla.classList.toggle('rmd-compacto', compacto);                                       // cabeceras algo más pequeñas en ventanas estrechas
     const minDesc = tipoTabla === 'pasos' ? (C >= 1600 ? 340 : C >= 1500 ? 300 : C >= 1400 ? 250 : 225) : (tipoTabla === 'pm' ? 260 : tipoTabla === 'espec' ? 520 : 240);
     // en ventanas estrechas la columna "Estado" (siempre "Activo") se oculta para dar espacio a las casillas
@@ -401,6 +465,15 @@
       let max = anchoTexto(ths[iDep], 'Depende');
       filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
       depW = Math.min(Math.max(max + 62, compacto ? 116 : 130), 300);
+    }
+    let tipoW = null;
+    if (iTipo >= 0) {                                                                      // Tipo Dato: ancho para que "Verificación Check", "Realizado por"… no se corten
+      let max = anchoTexto(ths[iTipo], 'Tipo Dato');
+      filas.forEach((tr) => { const i = inputDe(celda(tr, iTipo)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
+      // tope 180 (no 260): "Realizado por y Visto bueno" (el valor más largo real) aun así se trunca un poco, pero deja
+      // sitio a la Descripción en tablas con muchas columnas (p. ej. Fabricación); los valores cortos habituales
+      // ("Verificación Check", "Sin tipo de dato", "Notificación"…) caben completos de sobra con este tope.
+      tipoW = Math.min(Math.max(max + 46, compacto ? 110 : 130), 180);
     }
     let codW = 0;                                                                          // Código: que un código de 6-10 dígitos no se parta
     if (iCod >= 0) filas.slice(0, 60).forEach((tr) => { const td = celda(tr, iCod); if (td) { const cs = getComputedStyle(td); codW = Math.max(codW, anchoTexto(td, norm(td.textContent)) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 6); } });
@@ -416,6 +489,7 @@
       if ((on('ocultar') && OCULTAS.includes(n)) || (ocultarEstado && n === 'ESTADO')) return 0;
       if (/^DESCRIPCI/.test(n) || (tipoTabla === 'espec' && n === 'ESPECIFICACIONES')) return null;   // columnas flexibles (en Especificaciones: descripción y texto de la especificación)
       if (i === iDep) return depW;
+      if (i === iTipo) return tipoW;
       const w = (compacto && ANCHOS_COMPACTOS[n]) || ANCHOS[n]; if (w) return w;
       if (n === '' && th.classList.contains('sapMListTblSelCol')) return compacto ? 34 : 36;
       if (n === '' && th.classList.contains('sapMListTblNavCol')) return compacto ? 28 : 40;
@@ -426,10 +500,10 @@
     });
     const suma = fijos.reduce((a, w) => a + (w || 0), 0);
     const controles = fijos.reduce((a, w, i) => a + (nombres[i] === '' ? (w || 0) : 0), 0);   // selección y navegación no se escalan
-    const sumaEscalable = suma - (depW || 0) - controles;                                   // Depende no se comprime: debe verse completo
-    const f = Math.max(0.8, Math.min(1, (C - minDesc - (depW || 0) - controles) / Math.max(sumaEscalable, 1)));
+    const sumaEscalable = suma - (depW || 0) - (tipoW || 0) - controles;                     // Depende y Tipo Dato no se comprimen: deben verse completos
+    const f = Math.max(0.8, Math.min(1, (C - minDesc - (depW || 0) - (tipoW || 0) - controles) / Math.max(sumaEscalable, 1)));
     const finales = fijos.map((w, i) => {
-      if (w == null) return null; if (w === 0) return 0; if (i === iDep) return w;
+      if (w == null) return null; if (w === 0) return 0; if (i === iDep || i === iTipo) return w;
       const n = nombres[i], esControl = n === '' ;                                          // selección y navegación no se tocan
       return esControl ? w : Math.max(minimo(ths[i], i, n), Math.round(w * f));
     });
@@ -541,13 +615,14 @@
       }
       const tdDes = iDes >= 0 ? celda(tr, iDes) : null, desc = SIN_ACENTOS(tdDes && tdDes.textContent);
       // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
-      // muestreo (cantidad / fecha-hora de muestreo) llevan Estado CC; los de muestreo, además, Edit.
-      // Excepciones vistas en RMD autorizados: CONDICIONES AMBIENTALES (Realizado por + V.B. cuando el proceso lleva luz inactínica)
-      // y CONTRAMUESTRA (MuestraCC solo con Edit).
+      // muestreo (cantidad / fecha-hora de muestreo, exactamente) llevan Estado CC; los de muestreo, además, Edit.
+      // Excepciones vistas en RMD autorizados: CONDICIONES AMBIENTALES (Realizado por + V.B. cuando el proceso lleva luz inactínica),
+      // CONTRAMUESTRA (MuestraCC solo con Edit) y la verificación del jefe/supervisor ("...VERIFICA EL PROCESO DE MUESTREO..."),
+      // que solo menciona "muestreo" de paso pero no es a Control de Calidad a quien le toca verificarla.
       if (regla && t === 'REALIZADO POR' && /^CONDICIONES AMBIENTALES/.test(desc)) delete regla['V.B.'];
       if (regla && t === 'MUESTRACC' && /CONTRAMUESTRA/.test(desc)) delete regla['ESTADO CC'];
       if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
-      if (esPM && regla && /MUESTREAD|MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
+      if (esPM && regla && /^CANTIDAD MUESTREADA|^FECHA\s*\/?\s*HORA DE MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
       if (regla) for (const [c, debe] of Object.entries(regla)) {
         const i = iChk[c]; if (i == null || i < 0 || !celda(tr, i)) continue;
         if (marcada(celda(tr, i)) !== debe) {
@@ -1033,7 +1108,9 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-documentos-citados, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-menu-exportar, .rmd-documentos-citados, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
+    document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
     document.querySelectorAll('.rmd-con-estado, .rmd-pm-titulo').forEach((e) => e.classList.remove('rmd-con-estado', 'rmd-pm-titulo'));
     document.querySelectorAll('.rmd-campo-aviso').forEach((e) => e.classList.remove('rmd-campo-aviso'));
@@ -1057,8 +1134,8 @@
   }
   new MutationObserver(() => {
     if (pendiente) return; pendiente = true;
-    setTimeout(() => { pendiente = false; ajustarTodo(); }, 60);   // setTimeout (no rAF): también corre con la pestaña en segundo plano
-  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked'] });  // aria-checked: casillas que se pintan tarde
+    setTimeout(() => { pendiente = false; ajustarTodo(); }, 30);   // setTimeout (no rAF): también corre con la pestaña en segundo plano; más corto que antes (60ms) para que el tamaño del diálogo (rmd-pasos/rmd-medio) se reaplique más rápido al cerrar un diálogo hijo
+  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked', 'readonly', 'disabled', 'aria-readonly', 'aria-disabled'] });  // aria-checked: casillas que se pintan tarde; readonly/disabled: campos (p. ej. Descripción Paso) que el portal habilita un instante después de abrir el diálogo
   // UI5 rellena valores (Tipo Dato, casillas…) de forma tardía y sin cambiar el DOM: se vigila una "firma" de las tablas abiertas
   let firmaPrev = '';
   const firmaTablas = () => {
@@ -1573,7 +1650,11 @@
       const antes = ctrl._currentSkip;
       pulsar(btnDer);
       if (!(await hasta(() => ctrl._currentSkip !== antes, 15000))) break;
-      await hasta(() => !ocupado(), 15000); await esperar(500);
+      // El grueso del tiempo lo consume el propio portal (onGetRMDVerOP hace 10 llamadas OData anidadas por página: RMD, receta,
+      // estructura, equipo, paso, insumo, utensilio, especificación y etiqueta); probado en vivo que subir el tamaño de página
+      // NO ayuda (una página de 20 tardó más que 4 páginas de 5), así que no se toca `_pageSize`. Aquí solo se recorta la espera
+      // propia tras el indicador de ocupado (antes 500ms) al mínimo para que el DOM termine de pintar la página.
+      await hasta(() => !ocupado(), 15000); await esperar(150);
       const pag = leerPagina(); if (!pag.length) break;
       agregar(pag); vueltas++;
       if (avisar) avisar(acumulado.length);
@@ -1611,21 +1692,185 @@
     finally { boton.disabled = false; setTxt(boton.querySelector('span'), texto0); }
   }
   window.__rmdStats.csvVerOP = csvVerOP;   // diagnóstico: genera el CSV sin descargarlo
+  // ---- Exportar las recetas asociadas al RMD (solo su última versión, no todo el historial) de las OP ya cargadas -----------
+  // Cada fila de Ver OP trae su RMD en fila.mdId (código y versión); "Recetas Asociadas" solo se ve abriendo "Asociar Fórmula"
+  // de ESE RMD desde la lista principal (no hay atajo). Se filtra ahí (aunque esté tapada por este diálogo, sigue en el DOM),
+  // se abre "Asociar Fórmula" apilado, se lee su tabla y se cierra; al terminar se restaura el filtro "Codigo RMD" de la lista.
+  async function leerRecetasAsociadas(codigo) {
+    const campo = campoDe(document, 'Codigo RMD');
+    if (!campo) throw new Error('No encuentro el filtro "Codigo RMD" de la lista principal.');
+    const c = ctlDe(campo); if (c && c.setValue) c.setValue(codigo); else { campo.value = codigo; campo.dispatchEvent(new Event('input', { bubbles: true })); }
+    const btnIr = botonIr(document.body); if (!btnIr) throw new Error('No encuentro el botón "Ir" de la lista principal.');
+    const previos = new Set(dialogos());
+    pulsar(btnIr);
+    await hasta(() => !ocupado(), 15000); await esperar(500);
+    const filaLista = [...document.querySelectorAll('table.sapMListTbl tbody tr')].filter((tr) => !tr.closest('.sapMDialog') && tr.getClientRects().length).find((tr) => norm(tr.textContent).includes(codigo));
+    if (!filaLista) throw new Error(`No encontré el RMD ${codigo} en la lista principal (¿el filtro no coincidió?).`);
+    const btnMenu = [...filaLista.querySelectorAll('button')].find((b) => visible(b) && /Abrir men/i.test(b.getAttribute('aria-label') || b.title || ''));
+    if (!btnMenu) throw new Error(`No encontré el menú de acciones del RMD ${codigo}.`);
+    pulsar(btnMenu);
+    const item = await hasta(() => [...document.querySelectorAll('[role=menuitem]')].find((m) => visible(m) && /Asociar f[oó]rmulas/i.test(norm(m.textContent))), 5000);
+    if (!item) throw new Error(`No encontré "Asociar fórmulas" en el menú del RMD ${codigo}.`);
+    item.click();
+    const dAsoc = await hasta(() => dialogos().find((x) => !previos.has(x) && /^Asociar F[oó]rmula/i.test(cabecera(x))), 15000);
+    if (!dAsoc) throw new Error(`No se abrió "Asociar Fórmula" para el RMD ${codigo}.`);
+    await hasta(() => !ocupado(), 15000); await esperar(500);
+    const tabla = tablaDe(dAsoc), resultado = [];
+    if (tabla) {
+      const ths = [...tabla.querySelectorAll('thead th')].map((th) => NORM(th.textContent));
+      const iCod = ths.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iVer = ths.findIndex((n) => n === 'VERSIÓN' || n === 'VERSION');
+      const iDes = ths.findIndex((n) => /^DESCRIPCI/.test(n)), iEst = ths.indexOf('ESTADO'), iPt = ths.findIndex((n) => /P\.?\s*TRABAJO/.test(n));
+      const val = (tr, i) => (i >= 0 && celda(tr, i) ? norm(celda(tr, i).textContent) : '');
+      filasPrincipales(tabla).forEach((tr) => resultado.push({ codigo: val(tr, iCod), version: val(tr, iVer), descripcion: val(tr, iDes), estado: val(tr, iEst), puesto: val(tr, iPt) }));
+    }
+    await cerrarDialogo(dAsoc);
+    return resultado;
+  }
+  async function exportarRecetasVerOP(d, t, boton) {
+    boton.disabled = true; const texto0 = boton.querySelector('span').textContent;
+    const campoFiltro = campoDe(document, 'Codigo RMD'), filtroOriginal = campoFiltro ? campoFiltro.value : null;
+    try {
+      const filas = filasPrincipales(t).map(objetoDeFila).filter(Boolean);
+      const porCodigo = new Map();
+      filas.forEach((f) => { const m = f.mdId; if (!m || !m.codigo) return; const act = porCodigo.get(m.codigo); if (!act || (Number(m.version) || 0) > (Number(act.version) || 0)) porCodigo.set(m.codigo, m); });
+      if (!porCodigo.size) throw new Error('No se encontró el código de RMD en estas OP (recarga "Ver OP" e inténtalo de nuevo).');
+      setTxt(boton.querySelector('span'), 'Buscando…');
+      const lineas = [['Código RMD', 'Versión RMD', 'Código Receta', 'Versión Receta', 'Descripción', 'Estado', 'P. Trabajo'].map(csvCelda).join(';')];
+      let i = 0;
+      for (const [codigo, m] of porCodigo) {
+        i++; setTxt(boton.querySelector('span'), `Buscando… ${i}/${porCodigo.size}`);
+        const recetas = await leerRecetasAsociadas(codigo);
+        if (!recetas.length) lineas.push([codigo, m.version || '', '', '', '(sin recetas asociadas)', '', ''].map(csvCelda).join(';'));
+        else recetas.forEach((r) => lineas.push([codigo, m.version || '', r.codigo, r.version, r.descripcion, r.estado, r.puesto].map(csvCelda).join(';')));
+      }
+      descargarTexto(`Recetas_asociadas_${[...porCodigo.keys()].join('-')}.csv`, String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10)));
+      toast(`Recetas asociadas exportadas (${porCodigo.size} RMD, última versión de cada uno).`);
+    } catch (e) { toast('No se pudo exportar las recetas: ' + e.message, true); }
+    finally {
+      boton.disabled = false; setTxt(boton.querySelector('span'), texto0);
+      if (campoFiltro && filtroOriginal !== null) {
+        try {
+          const c = ctlDe(campoFiltro); if (c && c.setValue) c.setValue(filtroOriginal); else campoFiltro.value = filtroOriginal;
+          const btnIr = botonIr(document.body); if (btnIr) { pulsar(btnIr); await hasta(() => !ocupado(), 15000); }
+        } catch (e2) { /* no crítico: la persona puede volver a filtrar la lista a mano */ }
+      }
+    }
+  }
+  function alternarMenuExportar(ev, d, t) {
+    ev.stopPropagation();
+    const existente = document.querySelector('.rmd-menu-exportar'); if (existente) { existente.remove(); return; }
+    const btn = ev.currentTarget, r = btn.getBoundingClientRect();
+    const menu = document.createElement('div'); menu.className = 'rmd-menu-exportar';
+    menu.style.left = Math.round(r.left) + 'px'; menu.style.top = Math.round(r.bottom + 4) + 'px';
+    const bOP = botonModal('OP asociadas (.csv)', '', () => { menu.remove(); exportarVerOP(d, t, btn); });
+    const bRec = botonModal('Recetas del RMD (última versión, .csv)', '', () => { menu.remove(); exportarRecetasVerOP(d, t, btn); });
+    menu.append(bOP, bRec);
+    document.body.appendChild(menu);
+    const cerrar = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', cerrar, true); } };
+    setTimeout(() => document.addEventListener('click', cerrar, true), 0);
+  }
+  // Filtro por columna al estilo Excel: un icono de embudo junto a cada encabezado abre un desplegable con los valores
+  // únicos de esa columna (con buscador y casillas, como el AutoFiltro de Excel); desmarcar valores oculta esas filas.
+  // El estado (qué valores quedan marcados por columna) vive en la propia tabla (t.__rmdFiltrosCol) y se reaplica cada vez
+  // que se llama (idempotente): sigue filtrando tras "Ver todas" o la flecha "▷". Se combinan varias columnas con Y.
+  const ICONO_FILTRO_COL = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1.5h10l-3.7 4.6V10l-2.6 1.3V6.1Z"/></svg>';
+  function valoresColumnaVerOP(t, i) {
+    const vistos = new Map();
+    filasPrincipales(t).forEach((tr) => { const txt = norm(celda(tr, i) && celda(tr, i).textContent) || '(vacío)'; const clave = SIN_ACENTOS(txt); if (!vistos.has(clave)) vistos.set(clave, txt); });
+    return [...vistos.entries()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
+  }
+  function aplicarFiltrosColumnaVerOP(t) {
+    const estado = t.__rmdFiltrosCol; const filas = filasPrincipales(t);
+    let visibles = 0;
+    filas.forEach((tr) => {
+      let ok = true;
+      if (estado) for (const [i, permitidos] of estado) {
+        const clave = SIN_ACENTOS(norm(celda(tr, i) && celda(tr, i).textContent) || '(vacío)');
+        if (!permitidos.has(clave)) { ok = false; break; }
+      }
+      tr.style.display = ok ? '' : 'none'; if (ok) visibles++;
+    });
+    const cuenta = t.closest('.sapMDialog').querySelector('.rmd-cuenta-verop');
+    if (cuenta) cuenta.textContent = (estado && estado.size) ? `${visibles} de ${filas.length} filas` : '';
+  }
+  function actualizarIconosFiltroVerOP(t) {
+    const estado = t.__rmdFiltrosCol;
+    t.querySelectorAll('.rmd-th-filtro').forEach((btn) => btn.classList.toggle('activo', !!(estado && estado.has(+btn.dataset.col))));
+  }
+  function abrirMenuFiltroColumna(ev, t, i) {
+    ev.stopPropagation();
+    document.querySelectorAll('.rmd-menu-filtro-col').forEach((m) => m.remove());
+    const btn = ev.currentTarget, r = btn.getBoundingClientRect();
+    const valores = valoresColumnaVerOP(t, i);
+    const estado = t.__rmdFiltrosCol || (t.__rmdFiltrosCol = new Map());
+    const seleccionados = new Set(estado.has(i) ? estado.get(i) : valores.map(([clave]) => clave));
+    const menu = document.createElement('div'); menu.className = 'rmd-menu-filtro-col';
+    menu.style.left = Math.round(Math.min(r.left, window.innerWidth - 236)) + 'px'; menu.style.top = Math.round(r.bottom + 4) + 'px';
+    const buscar = document.createElement('input'); buscar.type = 'text'; buscar.placeholder = 'Buscar…'; buscar.className = 'rmd-filtro-col-buscar';
+    const lista = document.createElement('div'); lista.className = 'rmd-filtro-col-lista';
+    const pintar = (texto) => {
+      lista.innerHTML = '';
+      valores.filter(([, txt]) => !texto || SIN_ACENTOS(txt).includes(SIN_ACENTOS(texto))).forEach(([clave, txt]) => {
+        const lab = document.createElement('label'); lab.className = 'rmd-filtro-col-item';
+        const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = seleccionados.has(clave);
+        chk.addEventListener('change', () => { if (chk.checked) seleccionados.add(clave); else seleccionados.delete(clave); });
+        lab.append(chk, document.createTextNode(' ' + txt));
+        lista.appendChild(lab);
+      });
+      if (!lista.children.length) { const p = document.createElement('p'); p.className = 'rmd-nota'; p.textContent = 'Sin coincidencias.'; lista.appendChild(p); }
+    };
+    pintar('');
+    buscar.addEventListener('input', () => pintar(buscar.value));
+    buscar.addEventListener('click', (e) => e.stopPropagation());
+    const pie = document.createElement('div'); pie.className = 'rmd-filtro-col-pie';
+    const bTodo = botonModal('Todo', '', () => { valores.forEach(([clave]) => seleccionados.add(clave)); pintar(buscar.value); });
+    const bNinguno = botonModal('Ninguno', '', () => { seleccionados.clear(); pintar(buscar.value); });
+    const bOk = botonModal('Aceptar', 'primario', () => {
+      if (seleccionados.size >= valores.length) estado.delete(i); else estado.set(i, new Set(seleccionados));
+      aplicarFiltrosColumnaVerOP(t); actualizarIconosFiltroVerOP(t); menu.remove(); document.removeEventListener('click', cerrar, true);
+    });
+    pie.append(bTodo, bNinguno, bOk);
+    menu.append(buscar, lista, pie);
+    document.body.appendChild(menu);
+    const cerrar = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', cerrar, true); } };
+    setTimeout(() => document.addEventListener('click', cerrar, true), 0);
+  }
+  function instalarFiltrosVerOP(d, t) {
+    const thead = t.querySelector('thead'), filaEnc = thead && thead.querySelector('tr'); if (!filaEnc) return;
+    if (!filaEnc.dataset.rmdFiltroCol) {
+      filaEnc.dataset.rmdFiltroCol = '1';
+      [...filaEnc.children].forEach((th, i) => {
+        const texto = norm(th.textContent); if (!texto) return;
+        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'rmd-th-filtro'; btn.dataset.col = String(i);
+        btn.innerHTML = ICONO_FILTRO_COL; btn.title = `Filtrar por ${texto} (como el Autofiltro de Excel)`;
+        btn.addEventListener('click', (ev) => abrirMenuFiltroColumna(ev, t, i));
+        (th.querySelector('.sapMColumnHeader') || th).appendChild(btn);
+      });
+    }
+    aplicarFiltrosColumnaVerOP(t); actualizarIconosFiltroVerOP(t);
+  }
   function gestionarVerOP() {
     if (!on('verop')) { quitarBotonesVerOP(); return; }
     dialogos().forEach((d) => {
       if (!RX_VER_OP.test(cabecera(d))) return;
       const t = d.querySelector('table.sapMListTbl'); if (!t) return;
+      instalarFiltrosVerOP(d, t);
       const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-exportar-op')) return;
       const bT = botonIcono(ICONO_VER_TODAS, 'Ver todas', 'rmd-exportar-op', () => verTodasOP(d, t, bT));
       bT.title = 'Recorre las páginas (5 en 5, con la misma flecha "▷" del portal) y las muestra todas juntas en esta tabla.';
-      const bE = botonIcono(ICONO_EXPORTAR, 'Exportar a CSV', 'rmd-exportar-op', () => exportarVerOP(d, t, bE));
-      bE.title = 'Recorre todas las páginas y descarga un .csv (con BOM, para Excel) para filtrar y ordenar por fecha.';
+      const menuE = document.createElement('span'); menuE.className = 'rmd-exportar-menu';
+      const bE = botonIcono(ICONO_EXPORTAR, 'Exportar a CSV ▾', 'rmd-exportar-op', (ev) => alternarMenuExportar(ev, d, t));
+      bE.title = 'Elegir qué exportar: las OP asociadas, o las recetas asociadas a los RMD de esas OP.';
+      const cuenta = document.createElement('span'); cuenta.className = 'rmd-cuenta-verop';
       const ref = hdr.querySelector('.sapMTBSpacer') || hdr.firstElementChild;
-      if (ref) { ref.insertAdjacentElement('afterend', bE); ref.insertAdjacentElement('afterend', bT); } else { hdr.appendChild(bT); hdr.appendChild(bE); }
+      if (ref) { ref.insertAdjacentElement('afterend', cuenta); ref.insertAdjacentElement('afterend', bE); ref.insertAdjacentElement('afterend', bT); } else { hdr.appendChild(bT); hdr.appendChild(bE); hdr.appendChild(cuenta); }
     });
   }
-  function quitarBotonesVerOP() { document.querySelectorAll('.rmd-exportar-op').forEach((e) => e.remove()); }
+  function quitarBotonesVerOP() {
+    document.querySelectorAll('.rmd-exportar-op, .rmd-cuenta-verop, .rmd-menu-exportar').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
+    document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
+  }
 
   // ---- "Documentos citados" (Procedimientos, Formatos, Instructivos): recorre PRECAUCIONES, NOTAS IMPORTANTES DURANTE EL
   // PROCESO, CONDICIONES AMBIENTALES y las etiquetas de PROCEDIMIENTO abriendo cada lista de pasos con los mismos botones del
@@ -1753,9 +1998,14 @@
         ta.parentElement.appendChild(b);
       }
       if (!on('ortografia')) { ta.classList.remove('rmd-ortografia'); ta.removeAttribute('data-rmd-dudosas'); return; }
-      const dudosas = revisarOrtografia(ta.value);
-      ta.classList.toggle('rmd-ortografia', dudosas.length > 0);
-      if (dudosas.length) { const t = 'Palabras no reconocidas (revisar ortografía; puede haber falsos avisos): ' + dudosas.join(', '); ta.title = t; ta.dataset.rmdDudosas = t; }
+      // En MAYÚSCULAS: ortografía por palabra + concordancia de artículo (singular/plural). En minúsculas (tras "Aa"): tildes
+      // que faltan y puntuación final, no ortografía por palabra (ya casi todo son palabras válidas del diccionario).
+      const enMayus = casiTodoMayus(ta.value);
+      const avisos = enMayus
+        ? [...revisarOrtografia(ta.value).map((p) => `"${p}" no reconocida`), ...revisarConcordancia(ta.value)]
+        : revisarTildesYPuntuacion(ta.value);
+      ta.classList.toggle('rmd-ortografia', avisos.length > 0);
+      if (avisos.length) { const t = '(revisar; puede haber falsos avisos) ' + avisos.join(' · '); ta.title = t; ta.dataset.rmdDudosas = t; }
       else { ta.removeAttribute('title'); ta.removeAttribute('data-rmd-dudosas'); }
     });
   }
