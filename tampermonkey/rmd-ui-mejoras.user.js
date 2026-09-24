@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.20.0
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable a CSV, Documentos citados e incoherencias de todo el RMD (con procesos menores, en Excel), Indicadores del mes (BD RMD con tablas dinámicas), envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente y más.
+// @version      1.21.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados e incoherencias de todo el RMD (con procesos menores, en Excel), Indicadores del mes (BD RMD con tablas dinámicas), envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.20.0';                                                       // mantener igual a @version
+  const VERSION = '1.21.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -22,8 +22,9 @@
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
     ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior y validar la 1ª línea de Observaciones'],
     ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'], ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
-    ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando")'],
+    ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando" y sin el error del refresco automático al volver)'],
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
+    ['pasominusculas', 'Botón "En minúsculas": crea el paso en minúsculas a partir de uno en MAYÚSCULAS (abre "Nuevo Paso" con todo copiado)'],
     ['verop', 'Ver OP: ver todas y exportar a CSV'],
     ['documentos', 'Documentos citados e incoherencias de todo el RMD (con procesos menores; Excel)'],
     ['statusrmd', 'Botón "Enviar a Status RMD" (maestro completo sin archivo)'],
@@ -161,6 +162,9 @@
   html.rmd-reglas td.rmd-marcar    { outline: 2px dashed #ffb02e; outline-offset: -3px; background: rgba(255,176,46,.18) !important; }
   html.rmd-reglas td.rmd-desmarcar { outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.20) !important; }
   html.rmd-reglas td.rmd-falta     { outline: 2px solid #ff4d4d; outline-offset: -3px; }
+  /* paso con procesos menores mal configurados (revisados sin abrir su ventana): la celda "Proc. Men." con un contador rojo */
+  html.rmd-reglas td.rmd-pm-mal { position: relative; outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.14) !important; }
+  html.rmd-reglas td.rmd-pm-mal::after { content: attr(data-rmd-pm); position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #ff4d4d; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; pointer-events: none; }
 
   /* ── Estado del RMD: etiqueta con contorno, sin relleno ── */
   .rmd-estado { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 2; margin: 0; padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font: 600 11px/18px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; background: transparent; }
@@ -200,6 +204,10 @@
   .rmd-nuevo-paso-grupo .rmd-btn { height: 32px; }
   .rmd-exportar-op, .rmd-documentos-citados { margin: 0 4px; height: 32px; }
   .rmd-cuenta-verop { align-self: center; margin: 0 4px; color: var(--rmd-apagado); font-size: 12.5px; white-space: nowrap; }
+  .rmd-op-avance { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0,0,0,.38); }
+  .rmd-op-caja { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 300px; padding: 18px 22px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.4); font: 14px/1.4 var(--rmd-fuente); }
+  .rmd-op-barra { width: 260px; height: 6px; border-radius: 3px; background: rgba(128,140,155,.25); overflow: hidden; } .rmd-op-barra > div { width: 0; height: 100%; background: var(--rmd-acento); transition: width .25s ease; }
+  .rmd-op-txt { color: var(--rmd-apagado); font-size: 13px; }
   /* ── Filtro por columna de Ver OP (estilo Autofiltro de Excel): icono junto al encabezado + desplegable de valores ── */
   .rmd-th-filtro { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 4px; padding: 0; border: 0; background: transparent; color: var(--rmd-apagado); cursor: pointer; border-radius: 3px; vertical-align: middle; }
   .rmd-th-filtro:hover { background: rgba(27,141,236,.16); color: var(--rmd-acento-texto); }
@@ -218,7 +226,11 @@
   .rmd-aa:hover { background: var(--rmd-acento); color: #fff; } .rmd-aa svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   textarea.rmd-ortografia { text-decoration: underline wavy var(--rmd-ambar) 1.5px; text-underline-offset: 3px; }
   #rmd-filtro-bar .rmd-clip:empty { display: none; }
-  #rmd-filtro-bar .rmd-clip { flex: 1 1 200px; min-width: 0; margin-left: auto; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #rmd-filtro-bar .rmd-clip { flex: 1 1 200px; min-width: 0; margin-left: auto; display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 12px; }
+  #rmd-filtro-bar .rmd-clip > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rmd-clip-x { flex: 0 0 auto; width: 18px; height: 18px; padding: 0; border: 1px solid var(--rmd-borde-campo); border-radius: 50%; background: transparent; color: var(--rmd-apagado); font: 13px/1 var(--rmd-fuente); cursor: pointer; }
+  .rmd-clip-x:hover { color: var(--rmd-rojo); border-color: var(--rmd-rojo); }
+  .rmd-min-texto { width: 100%; min-height: 64px; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13.5px/1.45 var(--rmd-fuente); resize: vertical; }
 
   /* ── Botones (discretos: contorno fino y texto de acento; el relleno solo en la acción principal) ── */
   .rmd-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: transparent; color: var(--rmd-acento-texto); font: 14px var(--rmd-fuente); cursor: pointer; }
@@ -316,6 +328,46 @@
     return null;
   }
   const NOMBRE_CASILLA = { 'EDIT': 'Edit', 'R. POR': 'R. Por', 'V.B.': 'V.B.', 'ESTADO CC': 'Estado CC', 'PM OP': 'PM OP', 'GEN PP': 'Gen PP', 'TAB': 'Tab' };
+  // Reglas de UNA fila (paso mayor o proceso menor) sobre sus datos, sin tocar la pantalla. Las usa ajustarTabla para marcar la
+  // tabla que se ve y también la revisión de procesos menores leídos del modelo (sin abrir su ventana): así ambas dicen lo mismo.
+  // f = { esPM, tipo (texto del Tipo Dato), desc, chk: { 'EDIT': bool, … } solo con las casillas que tiene la tabla, cant, um, dec,
+  //       vi, vf, clave, dep } (undefined = la tabla no tiene esa columna). Devuelve [{ col, clase, msg }]; el predecesor obligatorio
+  //       (que depende de toda la lista) se revisa aparte, en ajustarTabla.
+  function reglasDeFila(f) {
+    const out = [], tipo = f.tipo || '', t = SIN_ACENTOS(tipo), desc = SIN_ACENTOS(f.desc || ''), chk = f.chk || {};
+    const regla = reglaCasillas(tipo, f.esPM);
+    // Procesos menores que son INSUMOS de la receta (llevan Cantidad Insumos / UM): nunca llevan Edit.
+    if (f.esPM && regla && (norm(f.cant) || norm(f.um))) regla.EDIT = false;
+    // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
+    // muestreo (cantidad / fecha-hora de muestreo, exactamente) llevan Estado CC; los de muestreo, además, Edit.
+    // Excepciones vistas en RMD autorizados: CONDICIONES AMBIENTALES (Realizado por + V.B. cuando el proceso lleva luz inactínica),
+    // CONTRAMUESTRA (MuestraCC solo con Edit) y la verificación del jefe/supervisor ("...VERIFICA EL PROCESO DE MUESTREO..."),
+    // que solo menciona "muestreo" de paso pero no es a Control de Calidad a quien le toca verificarla.
+    if (regla && t === 'REALIZADO POR' && /^CONDICIONES AMBIENTALES/.test(desc)) delete regla['V.B.'];
+    if (regla && t === 'MUESTRACC' && /CONTRAMUESTRA/.test(desc)) delete regla['ESTADO CC'];
+    if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
+    if (f.esPM && regla && /^CANTIDAD MUESTREADA|^FECHA\s*\/?\s*HORA DE MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
+    if (regla) for (const [c, debe] of Object.entries(regla)) {
+      if (!(c in chk) || chk[c] === debe) continue;
+      out.push({ col: c, clase: debe ? 'rmd-marcar' : 'rmd-desmarcar', msg: `${debe ? 'MARCAR' : 'DESMARCAR'} ${NOMBRE_CASILLA[c]} (Tipo Dato: ${tipo})` +
+        (t === 'REALIZADO POR' && c === 'V.B.' && !debe ? ' — o cambiar el tipo a "Realizado por y Visto bueno"' : '') });
+    }
+    // PM OP: ningún paso debe llevarla marcada (indicación del equipo, septiembre de 2026).
+    if (chk['PM OP']) out.push({ col: 'PM OP', clase: 'rmd-desmarcar', msg: 'DESMARCAR PM OP: ningún paso debe llevarla marcada' });
+    if (f.desc != null) {
+      if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"' });
+      else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(sinCalidadCorrecta(desc))) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)' });
+    }
+    const vacio = (v) => v !== undefined && !norm(v);
+    if (NUMERICOS.has(t) && vacio(f.dec)) out.push({ col: 'DECIMAL', clase: 'rmd-falta', msg: `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar` });
+    if (t === 'RANGO') {
+      if (vacio(f.vi)) out.push({ col: 'VAL. INICIAL', clase: 'rmd-falta', msg: 'Rango: falta Val. Inicial' });
+      if (vacio(f.vf)) out.push({ col: 'VAL. FINAL', clase: 'rmd-falta', msg: 'Rango: falta Val. Final' });
+    }
+    if (t === 'NOTIFICACION' && f.clave !== undefined && !CLAVES.includes(SIN_ACENTOS(f.clave || ''))) out.push({ col: 'CLAVE MODELO', clase: 'rmd-falta', msg: 'Notificación: falta Clave Modelo (Setup Pre Proceso, Proceso o Setup Post Proceso)' });
+    if (t === 'SIN TIPO DE DATO' && f.dep !== undefined && norm(f.dep)) out.push({ col: 'DEPENDE', clase: 'rmd-falta', msg: 'Sin tipo de dato no lleva predecesor: vaciar Depende' });
+    return out;
+  }
 
   // ---- 4. Tablas: columnas, ocultar, tooltips, predecesores, reglas ------------------------------
   const ANCHOS = {
@@ -332,7 +384,7 @@
   const OCULTAS = ['ESTADO MOV.', 'IMAGEN', 'FORMATO', 'PM OP', 'GEN PP'];
   const TIP = {
     'ESTADO CC': 'Estado CC: el paso queda sujeto al estado de Control de Calidad',
-    'PM OP': 'PM OP: proceso menor opcional', 'GEN PP': 'Gen PP: genera producto en proceso',
+    'PM OP': 'PM OP: paso opcional según la OP (no debe marcarse en ningún paso)', 'GEN PP': 'Gen PP: genera producto en proceso',
     'EDIT': 'Edit: el operario puede editar el valor', 'R. POR': 'R. Por: registra "Realizado por"',
     'V.B.': 'V.B.: requiere visto bueno del jefe o supervisor', 'DEPENDE': 'Depende: paso predecesor (código y orden)',
     'CLAVE MODELO': 'Clave Modelo: solo Setup Pre Proceso, Proceso y Setup Post Proceso',
@@ -354,6 +406,11 @@
     'interrupción', 'producción', 'reproducción', 'introducción', 'conducción', 'deducción', 'reducción', 'construcción', 'destrucción',
     'instrucción', 'obstrucción', 'traducción', 'protección', 'inyección', 'proyección', 'reflexión', 'conexión', 'perfección',
     'confección', 'infección',
+    // términos de proceso frecuentes en los pasos (para "En minúsculas", v1.21)
+    'adición', 'adiciones', 'nitrogenación', 'recolección', 'esterilización', 'medición', 'mediciones', 'dosificación', 'recepción', 'liberación',
+    'desinfección', 'rotulación', 'lubricación', 'homogenización', 'homogeneización', 'dilución', 'emulsión', 'purificación', 'clarificación',
+    'vacío', 'térmico', 'térmica', 'hermético', 'hermética', 'estéril', 'estériles', 'depósito', 'depósitos', 'nitrógeno', 'oxígeno', 'ácido',
+    'hidróxido', 'cápsula', 'cápsulas', 'fármaco', 'químicamente', 'ámbar', 'polietileno', 'última', 'sólido', 'sólidos', 'líquido', 'líquidos',
   ].map((p) => [SIN_ACENTOS(p), p]));
   delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // "mas" (cantidad, con tilde) es ambiguo con "mas" (pero, sin tilde): no se acentua solo
   // Palabras "conocidas" para el aviso de ortografia: nexos y palabras cortas muy frecuentes, mas los terminos propios
@@ -450,7 +507,7 @@
     lienzo.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     return Math.ceil(lienzo.measureText(texto).width);
   }
-  function limpiarMarcas(td) { td.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta'); td.removeAttribute('data-rmd-aviso'); }
+  function limpiarMarcas(td) { if (td.matches('.rmd-marcar,.rmd-desmarcar,.rmd-falta')) td.removeAttribute('title'); td.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta'); td.removeAttribute('data-rmd-aviso'); }
 
   function quitarAnchos(tabla, ths) {
     ths.forEach((th) => { th.style.removeProperty('width'); th.style.removeProperty('min-width'); });
@@ -496,7 +553,7 @@
     };
     const fijos = ths.map((th, i) => {
       const n = nombres[i];
-      if ((on('ocultar') && OCULTAS.includes(n)) || (ocultarEstado && n === 'ESTADO')) return 0;
+      if ((on('ocultar') && OCULTAS.includes(n) && !(n === 'PM OP' && tabla.dataset.rmdPmop === '1')) || (ocultarEstado && n === 'ESTADO')) return 0;
       if (/^DESCRIPCI/.test(n) || (tipoTabla === 'espec' && n === 'ESPECIFICACIONES')) return null;   // columnas flexibles (en Especificaciones: descripción y texto de la especificación)
       if (i === iDep) return depW;
       if (i === iTipo) return tipoW;
@@ -566,10 +623,13 @@
 
     // tooltips de las cabeceras
     ths.forEach((th, i) => { if (on('grupos') && TIP[nombres[i]]) th.title = TIP[nombres[i]]; });
+    // PM OP no debe marcarse nunca: si algún paso la tiene marcada, la columna deja de ocultarse para que se vea y se corrija
+    const iPmop = nombres.indexOf('PM OP');
+    if (iPmop >= 0 && filas.some((tr) => marcada(celda(tr, iPmop)))) tabla.dataset.rmdPmop = '1'; else delete tabla.dataset.rmdPmop;
     if (on('columnas')) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : 'otro'); else { quitarAnchos(tabla, ths); delete tabla.dataset.rmdOcultaEstado; }
     // columnas ocultas
     ths.forEach((th, i) => {
-      const oculta = (on('ocultar') && OCULTAS.includes(nombres[i])) || (tabla.dataset.rmdOcultaEstado === '1' && nombres[i] === 'ESTADO');
+      const oculta = (on('ocultar') && OCULTAS.includes(nombres[i]) && !(nombres[i] === 'PM OP' && tabla.dataset.rmdPmop === '1')) || (tabla.dataset.rmdOcultaEstado === '1' && nombres[i] === 'ESTADO');
       th.style.display = oculta ? 'none' : '';
       filas.forEach((tr) => { if (celda(tr, i)) celda(tr, i).style.display = oculta ? 'none' : ''; });
     });
@@ -577,8 +637,14 @@
     const iDep = nombres.indexOf('DEPENDE'), iTipo = nombres.indexOf('TIPO DATO'), iOrd = nombres.indexOf('ORDEN'), iDes = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
     const iClave = nombres.indexOf('CLAVE MODELO'), iPuesto = nombres.indexOf('PUESTO TRABAJO'), iDec = Math.max(nombres.indexOf('DECIMAL'), nombres.indexOf('DECIM.'));
     const iVI = nombres.indexOf('VAL. INICIAL'), iVF = nombres.indexOf('VAL. FINAL');
-    const iCant = nombres.indexOf('CANTIDAD INSUMOS'), iUM = nombres.indexOf('UM');
+    const iCant = nombres.indexOf('CANTIDAD INSUMOS'), iUM = nombres.indexOf('UM'), iProcMen = nombres.indexOf('PROC. MEN.');
     const iChk = Object.fromEntries(CHK.map((c) => [c, nombres.indexOf(c)]));
+    const idxCol = { ...iChk, 'PM OP': iPmop, 'DESCRIPCION': iDes, 'DECIMAL': iDec, 'VAL. INICIAL': iVI, 'VAL. FINAL': iVF, 'CLAVE MODELO': iClave, 'DEPENDE': iDep };
+    const valor = (tr, idx) => (idx >= 0 ? (inputDe(celda(tr, idx)) || {}).value || '' : undefined);   // undefined: la tabla no tiene esa columna
+    // procesos menores de cada paso, revisados sin abrir su ventana (se leen del modelo en segundo plano: revisarPMsDeLista)
+    if (esPasos && on('reglas')) revisarPMsDeLista(tabla, filas);
+    const pmDe = esPasos && tabla.__rmdPM && tabla.__rmdPM.porPaso;
+    tabla.querySelectorAll('td.rmd-pm-mal').forEach((td) => { td.classList.remove('rmd-pm-mal'); delete td.dataset.rmdPm; });
     const porOrden = {}, infoOrden = {};
     const iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO');
     filas.forEach((tr, k) => {
@@ -617,47 +683,16 @@
       [...tr.querySelectorAll('td.rmd-marcar,td.rmd-desmarcar,td.rmd-falta')].forEach(limpiarMarcas);
       if (!on('reglas') || !tdTipo) return;
       const avisos = [];
-      const regla = reglaCasillas(tipo, esPM);
-      // Procesos menores que son INSUMOS de la receta (llevan Cantidad Insumos / UM): nunca llevan Edit.
-      if (esPM && regla) {
-        const cant = iCant >= 0 ? norm((inputDe(celda(tr, iCant)) || {}).value) : '', um = iUM >= 0 ? norm(celda(tr, iUM) && celda(tr, iUM).textContent) : '';
-        if (cant || um) regla.EDIT = false;
-      }
       const tdDes = iDes >= 0 ? celda(tr, iDes) : null, desc = SIN_ACENTOS(tdDes && tdDes.textContent);
-      // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
-      // muestreo (cantidad / fecha-hora de muestreo, exactamente) llevan Estado CC; los de muestreo, además, Edit.
-      // Excepciones vistas en RMD autorizados: CONDICIONES AMBIENTALES (Realizado por + V.B. cuando el proceso lleva luz inactínica),
-      // CONTRAMUESTRA (MuestraCC solo con Edit) y la verificación del jefe/supervisor ("...VERIFICA EL PROCESO DE MUESTREO..."),
-      // que solo menciona "muestreo" de paso pero no es a Control de Calidad a quien le toca verificarla.
-      if (regla && t === 'REALIZADO POR' && /^CONDICIONES AMBIENTALES/.test(desc)) delete regla['V.B.'];
-      if (regla && t === 'MUESTRACC' && /CONTRAMUESTRA/.test(desc)) delete regla['ESTADO CC'];
-      if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
-      if (esPM && regla && /^CANTIDAD MUESTREADA|^FECHA\s*\/?\s*HORA DE MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
-      if (regla) for (const [c, debe] of Object.entries(regla)) {
-        const i = iChk[c]; if (i == null || i < 0 || !celda(tr, i)) continue;
-        if (marcada(celda(tr, i)) !== debe) {
-          const td = celda(tr, i);
-          td.classList.add(debe ? 'rmd-marcar' : 'rmd-desmarcar');
-          td.dataset.rmdAviso = `${debe ? 'MARCAR' : 'DESMARCAR'} ${NOMBRE_CASILLA[c]} (Tipo Dato: ${tipo})` +
-            (t === 'REALIZADO POR' && c === 'V.B.' && !debe ? ' — o cambiar el tipo a "Realizado por y Visto bueno"' : '');
-          td.title = td.dataset.rmdAviso;
-          avisos.push(td.dataset.rmdAviso);
-        }
-      }
-      // obligatorios por tipo
-      const vacio = (idx) => idx >= 0 && !norm((inputDe(celda(tr, idx)) || {}).value);
+      const chk = {}; Object.entries({ ...iChk, 'PM OP': iPmop }).forEach(([c, i]) => { if (i >= 0 && celda(tr, i)) chk[c] = marcada(celda(tr, i)); });
+      const f = { esPM, tipo, desc: tdDes ? tdDes.textContent : null, chk, dec: valor(tr, iDec), vi: valor(tr, iVI), vf: valor(tr, iVF), clave: valor(tr, iClave), dep: valor(tr, iDep),
+        cant: iCant >= 0 ? norm((inputDe(celda(tr, iCant)) || {}).value) : '', um: iUM >= 0 ? norm(celda(tr, iUM) && celda(tr, iUM).textContent) : '' };
+      reglasDeFila(f).forEach(({ col, clase, msg }) => {
+        const td = celda(tr, idxCol[col]); if (!td) return;
+        td.classList.add(clase); td.title = msg; if (clase !== 'rmd-falta') td.dataset.rmdAviso = msg;
+        avisos.push(msg);
+      });
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
-      if (tdDes) {
-        if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) marcarFalta(iDes, 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"');
-        else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(sinCalidadCorrecta(desc))) marcarFalta(iDes, 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)');
-      }
-      if (NUMERICOS.has(t) && vacio(iDec)) marcarFalta(iDec, `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar`);
-      if (t === 'RANGO') { if (vacio(iVI)) marcarFalta(iVI, 'Rango: falta Val. Inicial'); if (vacio(iVF)) marcarFalta(iVF, 'Rango: falta Val. Final'); }
-      if (t === 'NOTIFICACION' && iClave >= 0) {
-        const clave = SIN_ACENTOS((inputDe(celda(tr, iClave)) || {}).value || '');
-        if (!CLAVES.includes(clave)) marcarFalta(iClave, 'Notificación: falta Clave Modelo (Setup Pre Proceso, Proceso o Setup Post Proceso)');
-      }
-      if (t === 'SIN TIPO DE DATO' && iDep >= 0 && norm((inputDe(celda(tr, iDep)) || {}).value)) marcarFalta(iDep, 'Sin tipo de dato no lleva predecesor: vaciar Depende');
       if (t !== 'SIN TIPO DE DATO' && iDep >= 0) {
         const v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
         if (v && !mm) marcarFalta(iDep, 'Predecesor colgante (sin orden): reasignar Depende');
@@ -669,7 +704,15 @@
             (cc ? ' Ojo: el portal vacía este campo al marcar Estado CC; asígnalo después de marcarla.' : ''));
         }
       }
-      if (avisos.length) { alertas += avisos.length; primeras.push({ tr, texto: avisos[0], todos: avisos.slice() }); }   // todos: para "Documentos citados"
+      // procesos menores del paso con incoherencias (sin abrir su ventana): la celda "Proc. Men." se marca con cuántas son y el detalle
+      // queda en su tooltip; cuentan en el aviso de incoherencias de la lista y "ir a la siguiente" también se detiene en este paso.
+      const pmMal = pmDe ? pmDe.get((objetoDeFila(tr) || {}).mdEstructuraPasoId) || [] : [];
+      const avisosPM = pmMal.flatMap((x) => x.avisos.map((a) => `Proceso menor ${x.orden} (${x.codigo} ${x.desc.slice(0, 40)}): ${a}`));
+      const tdPM = iProcMen >= 0 ? celda(tr, iProcMen) : null;
+      if (avisosPM.length && tdPM) { tdPM.classList.add('rmd-pm-mal'); tdPM.dataset.rmdPm = String(avisosPM.length); tdPM.title = 'Procesos menores con incoherencias (ábrelos para ver dónde):\n' + avisosPM.join('\n'); }
+      else if (tdPM && tdPM.title && /^Procesos menores con incoherencias/.test(tdPM.title)) tdPM.removeAttribute('title');
+      // todos: solo las del propio paso ("Documentos citados" revisa los procesos menores aparte); pm: las de sus procesos menores
+      if (avisos.length || avisosPM.length) { alertas += avisos.length + avisosPM.length; primeras.push({ tr, texto: avisos[0] || avisosPM[0], todos: avisos.slice(), pm: avisosPM }); }
     });
     const previo = tabla.__rmdAlertas;
     tabla.__rmdAlertas = { n: alertas, filas: primeras, sig: previo ? previo.sig : 0 };
@@ -678,6 +721,8 @@
     else if (esPasos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); filas.forEach((tr) => tr.style.removeProperty('display')); }
     if (esPasos && on('copiar')) instalarBotonesCopia(d);
     else if (esPasos) d.querySelectorAll('.rmd-copia-grupo, .rmd-clip').forEach((e) => e.remove());
+    if ((esPasos || esPM) && on('pasominusculas')) instalarBotonMinusculas(d, tabla);
+    else if (esPasos || esPM) d.querySelectorAll('.rmd-minusculas').forEach((e) => e.remove());
     else if (esPM && on('reglas')) filtroLocal(tabla, false);
     else if (esPM) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); }
     actualizarBarra(d, tabla);
@@ -1118,7 +1163,7 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -1127,15 +1172,60 @@
     document.querySelectorAll('.sapMDialog').forEach((d) => quitarEdicionEspec(d));
     document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => {
       c.style.removeProperty('display'); if (c.tagName === 'TH') { c.style.removeProperty('width'); c.style.removeProperty('min-width'); }
-      c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto');
+      c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto', 'rmd-pm-mal'); delete c.dataset.rmdPm;
     });
     document.querySelectorAll('.sapMDialog tbody tr').forEach((r) => r.style.removeProperty('display'));
     document.querySelectorAll('.sapMDialog table.sapMListTbl').forEach((t) => t.style.removeProperty('width'));
     document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'));
   }
+  // ---- El "latido" de la lista principal: prolongar la sesión sin el error al volver ----
+  // Cada 30 s el propio portal vuelve a buscar la lista principal (intervalTriggerActualizar -> onSearch() sin evento, y luego
+  // escribe "Actualizado!" en la consola). Si esa lectura falla porque la red o la sesión aún se están recuperando (al volver de
+  // una ausencia o de suspender el equipo), el portal muestra un error que hay que cerrar, aunque la siguiente vuelta ya funcione.
+  // Con "Prolongar la sesión" activo, SOLO el error de ese refresco automático se omite (queda en la consola y en
+  // __rmdStats.latido) si la persona no hizo clic ni tecleó desde que empezó; los errores de lo que ella haga se ven igual.
+  const latido = { enCurso: 0, inicio: 0, fin: 0, esLatido: false, interaccion: 0, omitidos: 0, ultimo: '' };
+  window.__rmdStats.latido = latido;
+  ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { latido.interaccion = Date.now(); }, true));
+  (() => { const log0 = console.log; console.log = function (...a) { if (a[0] === 'Actualizado!' && Date.now() - latido.inicio < 1500) latido.esLatido = true; return log0.apply(this, a); }; })();
+  function instalarFiltroLatido() {
+    try {
+      const btn = [...document.querySelectorAll('button')].find((b) => b.title === 'Exportar'), c = btn && ctlDe(btn);
+      const reg = c && c.mEventRegistry && c.mEventRegistry.press && c.mEventRegistry.press[0], ctrl = reg && reg.oListener;
+      [ctrl, ctrl && Object.getPrototypeOf(ctrl)].forEach((obj) => {
+        if (!obj || !Object.prototype.hasOwnProperty.call(obj, 'onSearch') || typeof obj.onSearch !== 'function' || obj.onSearch.__rmd) return;
+        const original = obj.onSearch;
+        const envuelto = async function (ev) {
+          if (ev) return original.apply(this, arguments);                         // búsqueda pedida por la persona ("Ir")
+          latido.enCurso++; latido.inicio = Date.now(); latido.esLatido = false;
+          try { return await original.apply(this, arguments); } finally { latido.enCurso = Math.max(0, latido.enCurso - 1); latido.fin = Date.now(); }
+        };
+        envuelto.__rmd = true; obj.onSearch = envuelto;
+      });
+      const MB = sap.ui.require && sap.ui.require('sap/m/MessageBox');
+      if (MB && MB.error && !MB.error.__rmd) {
+        const error0 = MB.error;
+        const filtrado = function () {
+          const ahora = Date.now(), delLatido = latido.esLatido && (latido.enCurso > 0 || ahora - latido.fin < 3000) && latido.interaccion < latido.inicio;
+          if (on('sesion') && delLatido) {
+            latido.omitidos++; latido.ultimo = String(arguments[0]).slice(0, 300);
+            try { console.info('[RMD] Error del refresco automático de la lista omitido (la próxima vuelta, en 30 s, vuelve a intentarlo):', arguments[0]); } catch (e) { /* sin consola */ }
+            return undefined;
+          }
+          return error0.apply(this, arguments);
+        };
+        filtrado.__rmd = true; MB.error = filtrado;
+      }
+    } catch (e) { /* el portal aún no está listo: se reintenta en el próximo ajuste */ }
+  }
+
+  let habiaVentanaPM = false;
   function ajustarTodo() {
     if (!opc.activo) { limpiezaTotal(); return; }
     window.__rmdStats.ajustes++;
+    // al cerrarse una ventana de procesos menores (pudo corregirse algo) se vuelven a revisar los de la lista de pasos
+    const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
+    if (on('sesion')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
     decorarCabeceras();
     gestionarVerOP();
@@ -1425,10 +1515,92 @@
     await hasta(() => !dialogos().includes(d), 8000); await esperar(400);
   }
   const filasPMde = (d) => { const t = tablaDe(d); return t ? filasPrincipales(t).filter((tr) => tr.querySelector('input,[role=checkbox]')).slice(0) : []; };
+
+  // ---- Procesos menores leídos del modelo, sin abrir su ventana ----
+  // El portal los carga con onGetMdPasoInsumoPaso: entidad MD_ES_PASO_INSUMO_PASO de su modelo mainModelv2, filtrada por RMD,
+  // estructura y etiqueta (y por paso). Aquí se hace la misma lectura (mismo modelo, misma entidad y filtros; solo lectura) para
+  // toda la lista de una vez: es exacta (cada fila trae su paso en pasoId_mdEstructuraPasoId) y tarda un segundo, mientras que
+  // abrir la ventana de cada paso tarda varios y a veces muestra un instante los procesos de toda la etiqueta.
+  const modeloDe = (tabla) => { const c = tabla && nucleo().byId(tabla.id.replace(/-listUl$/, '')); return (c && c.getModel && c.getModel('mainModelv2')) || modeloListaPrincipal(); };
+  const TIPOS_POR_ID = new Map();                                     // iMaestraId del Tipo Dato -> su texto (de los combos del portal)
+  function nombreTipo(id, tabla) {
+    if (id == null || id === '') return '';
+    if (!TIPOS_POR_ID.has(String(id)) && tabla) {
+      const i = columnas(tabla).indexOf('TIPO DATO');
+      for (const tr of filasPrincipales(tabla)) {
+        const c = i >= 0 && ctlDe(inputDe(celda(tr, i))); if (!c || !c.getItems) continue;
+        c.getItems().forEach((it) => TIPOS_POR_ID.set(String(it.getKey()), it.getText())); if (TIPOS_POR_ID.size) break;
+      }
+    }
+    return TIPOS_POR_ID.get(String(id)) || '';
+  }
+  async function leerPMsModelo(modelo, filtrosPor) {
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const filtros = Object.entries(filtrosPor).filter(([, v]) => v != null && v !== '').map(([k, v]) => new Filtro(k, 'EQ', v));
+    const leer = (skip) => new Promise((ok, mal) => modelo.read('/MD_ES_PASO_INSUMO_PASO', {
+      filters: filtros, urlParameters: { $expand: 'pasoHijoId,estructuraRecetaInsumoId', $top: '1000', $skip: String(skip) },
+      success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`el servidor no devolvió los procesos menores (${(e && e.statusCode) || 'sin código'})`)),
+    }));
+    const todos = []; for (let skip = 0; skip < 20000; skip += 1000) { const p = await leer(skip); todos.push(...p); if (p.length < 1000) break; }
+    return todos;
+  }
+  // Un proceso menor del modelo con los mismos datos que muestra su fila (el portal arma código/descripción/UM igual: onObtenerProcMenores).
+  function pmNormalizado(x, tabla) {
+    const obj = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null), hijo = obj(x.pasoHijoId), ins = obj(x.estructuraRecetaInsumoId);
+    const s = (v) => (v == null ? '' : String(v));
+    const codigo = hijo ? hijo.codigo : ins ? ins.Component : x.Component, desc = hijo ? hijo.descripcion : ins ? ins.Maktx : x.Maktx, um = hijo ? '' : ins ? ins.CompUnit : x.CompUnit;
+    return { paso: x.pasoId_mdEstructuraPasoId, orden: s(x.orden), codigo: s(codigo), desc: norm(desc), tipo: nombreTipo(x.tipoDatoId_iMaestraId, tabla), cant: s(x.cantidadInsumo), um: s(um), insumo: !hijo,
+      vi: s(x.valorInicial), vf: s(x.valorFinal), mg: s(x.margen), dec: s(x.decimales), chk: { 'TAB': !!x.tab, 'EDIT': !!x.edit, 'GEN PP': !!x.genpp, 'ESTADO CC': !!x.estadoCC } };
+  }
+  // Las mismas reglas que se ven al abrir la ventana de procesos menores (su tabla tiene las casillas Edit y Estado CC).
+  const avisosDePM = (q) => reglasDeFila({ esPM: true, tipo: q.tipo, desc: q.desc, chk: { 'EDIT': q.chk.EDIT, 'ESTADO CC': q.chk['ESTADO CC'] }, cant: q.cant, um: q.um, dec: q.dec, vi: q.vi, vf: q.vf }).map((x) => x.msg);
+  // Todos los procesos menores de la lista que muestra `tabla` (por paso), leídos del modelo. null si no se pueden leer.
+  async function pmsDeLista(tabla, filas) {
+    const objs = filas.map(objetoDeFila).filter(Boolean), o = objs[0]; if (!o || !o.mdId_mdId) return null;
+    const modelo = modeloDe(tabla); if (!modelo) return null;
+    const todos = await leerPMsModelo(modelo, { mdId_mdId: o.mdId_mdId, mdEstructuraId_mdEstructuraId: o.mdEstructuraId_mdEstructuraId, mdEsEtiquetaId_mdEsEtiquetaId: o.mdEsEtiquetaId_mdEsEtiquetaId });
+    const porPaso = new Map();
+    todos.forEach((x) => { const q = pmNormalizado(x, tabla); if (!porPaso.has(q.paso)) porPaso.set(q.paso, []); porPaso.get(q.paso).push(q); });
+    porPaso.forEach((l) => l.sort((a, b) => (+a.orden || 0) - (+b.orden || 0)));
+    return porPaso;
+  }
+  // Revisión en segundo plano de los procesos menores de la lista abierta: se hace una vez por lista y se repite cuando se cierra
+  // una ventana de procesos menores (pudo haberse corregido algo). Al terminar se vuelve a pintar la tabla con los avisos.
+  let pmSucio = 0;
+  function revisarPMsDeLista(tabla, filas) {
+    const c = tabla.__rmdPM, o = objetoDeFila(filas[0]); if (!o) return;
+    const clave = [o.mdId_mdId, o.mdEstructuraId_mdEstructuraId, o.mdEsEtiquetaId_mdEsEtiquetaId, filas.length].join('|');
+    if (c && c.clave === clave && (c.cargando || c.t >= pmSucio)) return;
+    const estado = { clave, cargando: true, t: Date.now(), porPaso: c && c.clave === clave ? c.porPaso : null };
+    tabla.__rmdPM = estado;
+    pmsDeLista(tabla, filas).then((porPaso) => {
+      if (tabla.__rmdPM !== estado) return;
+      const conAvisos = new Map();
+      if (porPaso) porPaso.forEach((l, paso) => { const mal = l.map((q) => ({ ...q, avisos: avisosDePM(q) })).filter((q) => q.avisos.length); if (mal.length) conAvisos.set(paso, mal); });
+      estado.porPaso = conAvisos; estado.cargando = false;
+      if (tabla.isConnected) ajustarTabla(tabla);
+    }).catch((e) => { estado.cargando = false; estado.error = e.message; try { console.info('[RMD] no se pudieron revisar los procesos menores de la lista:', e.message); } catch (e2) { /* sin consola */ } });
+  }
+
+  // Procesos menores de UN paso con los datos que usa Copiar/Pegar (los de leerPMfila). Primero del modelo (exacto y rápido); si no
+  // se puede, abriendo su ventana y quedándose solo con las filas de ese paso.
   async function leerPMsDe(tabla, trId) {
-    const d = await abrirPM(tabla, trId), t = tablaDe(d);
-    const fs = filasPMde(d).filter((tr) => celda(tr, columnas(t).indexOf('ORDEN')) && inputDe(celda(tr, columnas(t).indexOf('ORDEN'))));
-    const lista = fs.map((tr) => leerPMfila(t, tr));
+    const tr = document.getElementById(trId), o = objetoDeFila(tr);
+    if (o && o.mdEstructuraPasoId) {
+      try {
+        const modelo = modeloDe(tabla);
+        if (modelo) {
+          const lista = (await leerPMsModelo(modelo, { mdId_mdId: o.mdId_mdId, mdEstructuraId_mdEstructuraId: o.mdEstructuraId_mdEstructuraId, pasoId_mdEstructuraPasoId: o.mdEstructuraPasoId }))
+            .map((x) => pmNormalizado(x, tabla)).filter((q) => q.paso === o.mdEstructuraPasoId).sort((a, b) => (+a.orden || 0) - (+b.orden || 0));
+          if (lista.every((q) => q.tipo || q.insumo)) return lista;   // (sin el nombre del tipo no se podría pegar: se usa la ventana)
+        }
+      } catch (e) { /* se lee abriendo la ventana */ }
+    }
+    const d = await abrirPM(tabla, trId), t = tablaDe(d), idPaso = o && o.mdEstructuraPasoId;
+    const delPaso = (x) => { const q = idPaso && objetoDeFila(x); return !q || !('pasoId_mdEstructuraPasoId' in q) || q.pasoId_mdEstructuraPasoId === idPaso; };
+    await hasta(() => !ocupado() && filasPMde(d).every(delPaso), 4000);
+    const fs = filasPMde(d).filter(delPaso).filter((x) => celda(x, columnas(t).indexOf('ORDEN')) && inputDe(celda(x, columnas(t).indexOf('ORDEN'))));
+    const lista = fs.map((x) => leerPMfila(t, x));
     await cerrarDialogo(d);
     return lista;
   }
@@ -1459,8 +1631,17 @@
   function limpiarPortapapeles() { portapapeles = null; pintarEstadoPortapapeles(); }
   function pintarEstadoPortapapeles() {
     document.querySelectorAll('.rmd-clip').forEach((sp) => {
-      const t = portapapeles ? `Copiado: #${portapapeles.paso.orden} ${portapapeles.paso.desc.slice(0, 60)}${portapapeles.paso.desc.length > 60 ? '…' : ''} — ${portapapeles.pms.filter((x) => !x.insumo).length} proceso(s) menor(es)` : '';
-      setTxt(sp, t); sp.title = portapapeles ? `RMD ${portapapeles.rmd || ''}: ${portapapeles.paso.desc}` : '';
+      if (!portapapeles) { sp.innerHTML = ''; sp.title = ''; delete sp.dataset.texto; return; }
+      const n = portapapeles.pms.filter((x) => !x.insumo).length, desc = portapapeles.paso.desc;
+      const texto = `Copiado: #${portapapeles.paso.orden} ${desc.slice(0, 60)}${desc.length > 60 ? '…' : ''} — ${n} proceso(s) menor(es)`;
+      if (sp.dataset.texto !== texto) {
+        sp.dataset.texto = texto; sp.innerHTML = '';
+        const t = document.createElement('span'); t.textContent = texto;
+        const x = document.createElement('button'); x.type = 'button'; x.className = 'rmd-clip-x'; x.textContent = '×'; x.title = 'Vaciar el portapapeles';
+        x.addEventListener('click', (e) => { e.stopPropagation(); limpiarPortapapeles(); });
+        sp.append(t, x);
+      }
+      sp.title = `RMD ${portapapeles.rmd || ''}: ${desc}`;
     });
     document.querySelectorAll('.rmd-pegar').forEach((b) => { b.disabled = !portapapeles; });
   }
@@ -1473,37 +1654,53 @@
       if (sel.length !== 1) { toast('Marca la casilla de UN solo paso (el de referencia) y pulsa "Copiar configuración".', true); return; }
       const paso = leerPaso(tabla, sel[0]);
       toast('Leyendo la configuración y los procesos menores del paso…');
-      let pms = [];
-      const b = [...sel[0].querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
-      if (b) pms = await leerPMsDe(tabla, sel[0].id);
+      const pms = botonPM(sel[0]) ? await leerPMsDe(tabla, sel[0].id) : [];
       const rmd = (d.querySelector('h2') || {}).textContent || '';
       portapapeles = { paso, pms, rmd: norm(rmd).split(' - ')[0], dialogoId: d.id, trId: sel[0].id }; pintarEstadoPortapapeles();
       const ins = pms.filter((x) => x.insumo).length;
-      toast(`Copiado el paso #${paso.orden} con ${pms.length - ins} proceso(s) menor(es)${ins ? ` (${ins} insumo(s) no se copian: se agregan con "Agregar Insumo")` : ''}. Ahora marca el paso nuevo y pulsa "Pegar".`);
+      toast(`Copiado el paso #${paso.orden} con ${pms.length - ins} proceso(s) menor(es)${ins ? ` (${ins} insumo(s) no se copian: se agregan con "Agregar Insumo")` : ''}. Ahora marca uno o varios pasos destino y pulsa "Pegar".`);
     } catch (e) { toast('No se pudo copiar: ' + e.message, true); } finally { ocupadoCopia = false; }
   }
 
-  // la vista previa devuelve las opciones elegidas o null si se cancela
-  function vistaPrevia(destino, pmDestino) {
+  // Qué cambiaría en un proceso menor que ya existe en el destino (tipo, valores y casillas), en texto: "Edit: no → sí".
+  const CAMPOS_PM = [['tipo', 'Tipo'], ['vi', 'Val. Inicial'], ['vf', 'Val. Final'], ['mg', 'Margen'], ['dec', 'Decimal']];
+  function cambiosPM(o, a) {
+    const c = CAMPOS_PM.filter(([k]) => norm(o[k]) !== norm(a[k])).map(([k, et]) => `${et}: ${norm(a[k]) || '—'} → ${norm(o[k]) || '—'}`);
+    Object.keys(o.chk || {}).forEach((k) => { if (!!o.chk[k] !== !!(a.chk || {})[k]) c.push(`${NOMBRE_CASILLA[k] || k}: ${a.chk && a.chk[k] ? 'sí' : 'no'} → ${o.chk[k] ? 'sí' : 'no'}`); });
+    return c;
+  }
+  const resumenValores = (vals) => { const m = new Map(); vals.forEach((x) => { const k = norm(x) || '—'; m.set(k, (m.get(k) || 0) + 1); }); return [...m].map(([k, n]) => (vals.length > 1 ? `${k} (${n})` : k)).join(' · '); };
+
+  // La vista previa (uno o varios destinos) devuelve las opciones elegidas o null si se cancela. En los procesos menores que ya
+  // existen en el destino muestra exactamente qué cambiaría; los que no cambiarían nada vienen desmarcados.
+  function vistaPrevia(destinos) {
     return new Promise((resolver) => {
-      const o = portapapeles.paso, v = ventana('Pegar configuración y procesos menores', { cancelar: () => { v.cerrar(); resolver(null); } });
+      const o = portapapeles.paso, varios = destinos.length > 1;
+      const v = ventana(varios ? `Pegar en ${destinos.length} pasos` : 'Pegar configuración y procesos menores', { cancelar: () => { v.cerrar(); resolver(null); } });
       const campos = [['tipo', 'Tipo Dato'], ['clave', 'Clave Modelo'], ['puesto', 'Puesto Trabajo'], ['vi', 'Val. Inicial'], ['vf', 'Val. Final'], ['mg', 'Margen'], ['dec', 'Decimal']];
-      const filasCfg = campos.map(([k, et]) => { const a = destino[k], n = o[k], dif = String(a) !== String(n); return `<tr><td><input type="checkbox" data-c="${k}" ${dif ? 'checked' : ''}></td><td>${et}</td><td>${esc(a) || '—'}</td><td class="${dif ? 'rmd-dif' : ''}">${esc(n) || '—'}</td></tr>`; }).join('');
-      const filasChk = Object.keys(o.chk).map((k) => { const a = destino.chk[k], n = o.chk[k], dif = a !== n; return `<tr><td><input type="checkbox" data-x="${k}" ${dif ? 'checked' : ''}></td><td>Casilla ${NOMBRE_CASILLA[k]}</td><td>${a ? 'marcada' : 'no'}</td><td class="${dif ? 'rmd-dif' : ''}">${n ? 'marcada' : 'no'}</td></tr>`; }).join('');
-      const existentes = new Map(pmDestino.map((x) => [x.codigo, x]));
+      const filasCfg = campos.map(([k, et]) => { const vals = destinos.map((x) => x.paso[k]), dif = vals.some((a) => String(a) !== String(o[k]));
+        return `<tr><td><input type="checkbox" data-c="${k}" ${dif ? 'checked' : ''}></td><td>${et}</td><td>${esc(resumenValores(vals))}</td><td class="${dif ? 'rmd-dif' : ''}">${esc(o[k]) || '—'}</td></tr>`; }).join('');
+      const filasChk = Object.keys(o.chk).map((k) => { const vals = destinos.map((x) => (x.paso.chk[k] ? 'marcada' : 'no')), dif = destinos.some((x) => x.paso.chk[k] !== o.chk[k]);
+        return `<tr><td><input type="checkbox" data-x="${k}" ${dif ? 'checked' : ''}></td><td>Casilla ${NOMBRE_CASILLA[k]}</td><td>${esc(resumenValores(vals))}</td><td class="${dif ? 'rmd-dif' : ''}">${o.chk[k] ? 'marcada' : 'no'}</td></tr>`; }).join('');
       const filasPM = portapapeles.pms.map((x, i) => {
         if (x.insumo) return `<tr class="rmd-atenuada"><td></td><td>${esc(x.orden)}</td><td>${esc(x.codigo)} · ${esc(x.desc)}</td><td>insumo de la receta: no se copia (usa "Agregar Insumo")</td></tr>`;
-        const ya = existentes.has(x.codigo);
-        return `<tr><td><input type="checkbox" data-p="${i}" checked></td><td>${esc(x.orden)}</td><td>${esc(x.codigo)} · ${esc(x.desc)}</td><td>${esc(x.tipo || '(sin tipo)')} · ${esc(resumenCasillas(x.chk))}${x.dec !== '' ? ' · dec ' + esc(x.dec) : ''} — <b>${ya ? 'ya existe: se actualiza su configuración' : 'se agrega'}</b></td></tr>`;
+        const efectos = destinos.map((dd) => { const ya = dd.pms.find((q) => q.codigo === x.codigo); if (!ya) return { tipo: 'agrega' }; const c = cambiosPM(x, ya); return c.length ? { tipo: 'cambia', c } : { tipo: 'igual' }; });
+        const n = (t) => efectos.filter((e) => e.tipo === t).length, e0 = efectos[0];
+        const que = !varios ? (e0.tipo === 'agrega' ? '<b>se agrega</b>' : e0.tipo === 'igual' ? 'ya existe, sin cambios' : `<b>ya existe: se actualiza</b> — ${esc(e0.c.join(' · '))}`)
+          : [[n('agrega'), 'se agrega'], [n('cambia'), 'se actualiza'], [n('igual'), 'sin cambios']].filter(([k]) => k).map(([k, t]) => `${t} en ${k}`).join(' · ');
+        return `<tr><td><input type="checkbox" data-p="${i}" ${efectos.some((e) => e.tipo !== 'igual') ? 'checked' : ''}></td><td>${esc(x.orden)}</td><td>${esc(x.codigo)} · ${esc(x.desc)}<br><span class="rmd-nota">${esc(x.tipo || '(sin tipo)')} · ${esc(resumenCasillas(x.chk))}${x.dec !== '' ? ' · dec ' + esc(x.dec) : ''}</span></td><td>${que}</td></tr>`;
       }).join('');
+      const listaDest = destinos.map((dd) => `#${esc(dd.paso.orden)} · ${esc(dd.paso.codigo)} · ${esc(dd.paso.desc.slice(0, 80))}${dd.paso.desc.length > 80 ? '…' : ''}`).join('<br>');
       v.cuerpo.innerHTML = `
-        <p><b>Origen</b> (RMD ${esc(portapapeles.rmd)}): #${esc(o.orden)} · ${esc(o.codigo)} · ${esc(o.desc)}<br><b>Destino</b>: #${esc(destino.orden)} · ${esc(destino.codigo)} · ${esc(destino.desc)}</p>
-        <table class="rmd-tabla"><thead><tr><th></th><th>Configuración del paso</th><th>Destino ahora</th><th>Se copiará</th></tr></thead><tbody>${filasCfg}${filasChk}</tbody></table>
-        <table class="rmd-tabla"><thead><tr><th></th><th>Orden</th><th>Procesos menores del origen</th><th>Qué pasará</th></tr></thead><tbody>${filasPM || '<tr><td colspan="4">El paso de origen no tiene procesos menores.</td></tr>'}</tbody></table>
-        <p class="rmd-nota">No se copian Orden, Depende, Código ni Descripción.${portapapeles.pms.length ? ` El destino tiene ${pmDestino.length} proceso(s) menor(es).` : ''}</p>
-        <label><input type="checkbox" id="rmd-op-guardar" checked> Guardar el paso al terminar de aplicar la configuración</label><br>
+        <p><b>Origen</b> (RMD ${esc(portapapeles.rmd)}): #${esc(o.orden)} · ${esc(o.codigo)} · ${esc(o.desc)}<br><b>${varios ? `Destinos (${destinos.length})` : 'Destino'}</b>:<br>${listaDest}</p>
+        <table class="rmd-tabla"><thead><tr><th></th><th>Configuración del paso</th><th>${varios ? 'Destinos ahora' : 'Destino ahora'}</th><th>Se copiará</th></tr></thead><tbody>${filasCfg}${filasChk}</tbody></table>
+        <table class="rmd-tabla"><thead><tr><th><input type="checkbox" class="rmd-todos-pm" title="Marcar o desmarcar todos"></th><th>Orden</th><th>Procesos menores del origen</th><th>Qué pasará</th></tr></thead><tbody>${filasPM || '<tr><td colspan="4">El paso de origen no tiene procesos menores.</td></tr>'}</tbody></table>
+        <p class="rmd-nota">No se copian Orden, Depende, Código ni Descripción. Solo se tocan los procesos menores marcados${varios ? '; la configuración se aplica a todos los destinos y se guarda una vez' : ''}.</p>
+        <label><input type="checkbox" id="rmd-op-guardar" checked> Guardar al terminar de aplicar la configuración</label><br>
         <label><input type="checkbox" id="rmd-op-actualizar" checked> Actualizar la configuración de los procesos menores que ya existan en el destino</label>`;
-      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal('Aplicar', 'primario', () => {
+      const todos = v.cuerpo.querySelector('.rmd-todos-pm'), cajas = () => [...v.cuerpo.querySelectorAll('input[data-p]')];
+      if (todos) { todos.checked = cajas().length > 0 && cajas().every((i) => i.checked); todos.addEventListener('change', () => cajas().forEach((i) => { i.checked = todos.checked; })); }
+      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal(varios ? `Aplicar en ${destinos.length} pasos` : 'Aplicar', 'primario', () => {
         const q = (s) => [...v.cuerpo.querySelectorAll(s)];
         const opciones = {
           campos: q('input[data-c]:checked').map((i) => i.dataset.c), casillas: q('input[data-x]:checked').map((i) => i.dataset.x),
@@ -1514,65 +1711,75 @@
     });
   }
 
+  async function guardarYConfirmar(dlg, log, que) {
+    const g = botonPorTitulo(dlg, 'Guardar'); if (!g) throw new Error(`No encuentro el botón Guardar de ${que}`);
+    log(`Guardando ${que}…`); pulsar(g); rebase(dlg);
+    const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log(`✔ ${que[0].toUpperCase() + que.slice(1)} guardado(s)${r.vistos.length ? ` (${r.vistos.join(' | ')})` : ''}`);
+    else log(`⚠ El portal no mostró el mensaje de éxito: verifica que ${que} se guardaron.`);
+  }
+
+  // Pega en UNO o VARIOS pasos marcados: la configuración se aplica a todos y se guarda una vez; los procesos menores, paso por paso.
   async function pegarPaso(d, tabla) {
     if (ocupadoCopia) return; ocupadoCopia = true;
     try {
       if (!portapapeles) { toast('Primero copia un paso de referencia.', true); return; }
-      const sel = seleccionadas(tabla);
-      if (sel.length !== 1) { toast('Marca la casilla de UN solo paso (el destino) y pulsa "Pegar".', true); return; }
+      let sel = seleccionadas(tabla);
+      if (!sel.length) { toast('Marca la casilla de uno o varios pasos destino y pulsa "Pegar".', true); return; }
       const rmdActual = norm((d.querySelector('h2') || {}).textContent).split(' - ')[0], estado = estadoDelRmd();
       if (portapapeles.rmd && rmdActual && portapapeles.rmd !== rmdActual) { toast(`El paso copiado es del RMD ${portapapeles.rmd}; este es el ${rmdActual}. Copia de nuevo en este RMD.`, true); limpiarPortapapeles(); return; }
       if (estado && !/ingres/i.test(estado)) { toast(`El RMD está ${estado}: solo se puede pegar en versiones Ingresadas.`, true); return; }
-      if (sel[0].id === portapapeles.trId && d.id === portapapeles.dialogoId) { toast('El paso marcado es el mismo que se copió: marca el paso destino.', true); return; }
-      const trId = sel[0].id, destino = leerPaso(tabla, sel[0]);
-      toast('Leyendo el paso destino…');
-      const btnPM = [...sel[0].querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
-      const pmDestino = btnPM && portapapeles.pms.length ? await leerPMsDe(tabla, trId) : [];
-      const op = await vistaPrevia(destino, pmDestino);
+      if (d.id === portapapeles.dialogoId && sel.some((tr) => tr.id === portapapeles.trId)) {
+        sel = sel.filter((tr) => tr.id !== portapapeles.trId);
+        if (!sel.length) { toast('El paso marcado es el mismo que se copió: marca el paso destino.', true); return; }
+      }
+      toast(sel.length > 1 ? `Leyendo los ${sel.length} pasos destino…` : 'Leyendo el paso destino…');
+      const destinos = [];
+      for (const tr of sel) {
+        const pms = botonPM(tr) && portapapeles.pms.length ? await leerPMsDe(tabla, tr.id) : [];
+        destinos.push({ trId: tr.id, paso: leerPaso(tabla, tr), pms, id: (objetoDeFila(tr) || {}).mdEstructuraPasoId });
+      }
+      const op = await vistaPrevia(destinos);
       if (!op) return;
 
       const v = ventana('Aplicando…', { cancelar: () => { if (!listo.disabled) v.cerrar(); } }); const lineas = [];
       const log = (t) => { lineas.push(t); v.cuerpo.innerHTML = '<pre class="rmd-log">' + esc(lineas.join('\n')) + '</pre>'; v.cuerpo.scrollTop = v.cuerpo.scrollHeight; };
       const listo = botonModal('Cerrar', 'primario', () => v.cerrar()); listo.disabled = true; v.pie.append(listo);
       try {
-        // 1) configuración del paso mayor
+        // 1) configuración de los pasos mayores (todos los destinos) y un solo Guardar
         const cfg = {}; for (const k of op.campos) cfg[k] = portapapeles.paso[k];
         cfg.chk = {}; for (const k of op.casillas) cfg.chk[k] = portapapeles.paso.chk[k];
-        log(`Paso #${destino.orden} · ${destino.desc}`);
-        if (op.campos.length || op.casillas.length) { await aplicarFila(tabla, trId, cfg, columnas(tabla), log); d.__rmdInter = true; }   // lo aplicado por el script cuenta como cambio sin guardar hasta que se guarde
-        if (op.guardar && (op.campos.length || op.casillas.length)) {
-          const g = botonPorTitulo(d, 'Guardar'); if (!g) throw new Error('No encuentro el botón Guardar del paso');
-          log('Guardando el paso…'); pulsar(g); rebase(d);
-          const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
-          if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log(`✔ Paso guardado (${r.vistos.join(' | ')})`);
-          else log('⚠ El portal no mostró el mensaje de éxito: verifica que el paso se guardó.');
-          await esperar(1200);
-        } else if (op.campos.length || op.casillas.length) log('ℹ Configuración aplicada sin guardar: revisa y pulsa Guardar.');
-
-        // 2) procesos menores
+        const hayCfg = op.campos.length || op.casillas.length;
+        if (hayCfg) {
+          for (const dd of destinos) { log(`Paso #${dd.paso.orden} · ${dd.paso.desc}`); await aplicarFila(tabla, dd.trId, cfg, columnas(tabla), log); }
+          d.__rmdInter = true;   // lo aplicado por el script cuenta como cambio sin guardar hasta que se guarde
+          if (op.guardar) { await guardarYConfirmar(d, log, destinos.length > 1 ? 'los pasos' : 'el paso'); await esperar(1200); }
+          else log('ℹ Configuración aplicada sin guardar: revisa y pulsa Guardar.');
+        }
+        // 2) procesos menores, paso por paso (en su ventana solo se miran las filas de ESE paso: a veces el portal muestra toda la etiqueta)
         const elegidos = op.pms.map((i) => portapapeles.pms[i]).filter((x) => !x.insumo);
-        if (elegidos.length) {
-          log(`Abriendo los procesos menores del destino (${elegidos.length} por aplicar)…`);
-          const dPM = await abrirPM(tabla, trId), tPM = tablaDe(dPM);
-          const codigos = () => new Set(filasPMde(dPM).map((tr) => leerPMfila(tPM, tr).codigo));
-          for (const x of elegidos) {
-            if (!codigos().has(x.codigo)) { await agregarPM(dPM, x, log); }
-            else log(`= ${x.codigo} ya estaba en el destino`);
-          }
+        if (elegidos.length) for (const dd of destinos) {
+          log(`\nProcesos menores del paso #${dd.paso.orden} (${elegidos.length} por revisar)…`);
+          if (!botonPM(document.getElementById(dd.trId) || document.createElement('tr'))) { log('⚠ Este paso no tiene el botón "Procesos Menores": se omite'); continue; }
+          const dPM = await abrirPM(tabla, dd.trId), tPM = tablaDe(dPM);
+          const delDestino = (x) => { const q = dd.id && objetoDeFila(x); return !q || !('pasoId_mdEstructuraPasoId' in q) || q.pasoId_mdEstructuraPasoId === dd.id; };
+          await hasta(() => !ocupado() && filasPMde(dPM).every(delDestino), 4000);
+          const propias = () => filasPMde(dPM).filter(delDestino);
+          const codigos = () => new Set(propias().map((tr) => leerPMfila(tPM, tr).codigo));
+          let cambios = 0;
+          for (const x of elegidos) { if (!codigos().has(x.codigo)) { await agregarPM(dPM, x, log, delDestino); cambios++; } else log(`= ${x.codigo} ya estaba en el destino`); }
           const n = columnas(tPM);
           for (const x of elegidos) {
-            if (!op.actualizar && codigosPrevios(pmDestino).has(x.codigo)) continue;
-            const fs = filasPMde(dPM).filter((tr) => leerPMfila(tPM, tr).codigo === x.codigo); const tr = fs[fs.length - 1];
+            const previo = dd.pms.find((q) => q.codigo === x.codigo);
+            if (previo && !op.actualizar) continue;
+            if (previo && !cambiosPM(x, previo).length) { log(`= ${x.codigo} sin cambios`); continue; }
+            const fs = propias().filter((tr) => leerPMfila(tPM, tr).codigo === x.codigo); const tr = fs[fs.length - 1];
             if (!tr) { log(`⚠ No encuentro ${x.codigo} para configurarlo`); continue; }
             log(`Configurando ${x.codigo} · ${x.desc}`);
-            await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log); dPM.__rmdInter = true;
+            await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log); dPM.__rmdInter = true; cambios++;
           }
-          const g = botonPorTitulo(dPM, 'Guardar'); if (!g) throw new Error('No encuentro el botón Guardar de procesos menores');
-          log('Guardando los procesos menores…'); pulsar(g); rebase(dPM);
-          const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
-          if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log('✔ Procesos menores guardados');
-          else log('⚠ El portal no mostró el mensaje de éxito: verifica que los procesos menores se guardaron.');
-          await esperar(1000);
+          if (cambios) { await guardarYConfirmar(dPM, log, 'los procesos menores'); await esperar(1000); }
+          else log('ℹ Sin cambios en sus procesos menores.');
           await cerrarDialogo(dPM);
         }
         const conAvisos = lineas.filter((l) => l.startsWith('⚠')).length;
@@ -1584,12 +1791,11 @@
       } finally { listo.disabled = false; }
     } catch (e) { toast('No se pudo pegar: ' + e.message, true); } finally { ocupadoCopia = false; ajustarTodo(); }
   }
-  const codigosPrevios = (lista) => new Set(lista.map((x) => x.codigo));
 
-  // agrega un proceso menor (por código de paso) desde el selector "Adicionar Pasos RMD"
-  async function agregarPM(dPM, x, log) {
+  // agrega un proceso menor (por código de paso) desde el selector "Adicionar Pasos RMD"; filtro: filas que son del paso abierto
+  async function agregarPM(dPM, x, log, filtro = () => true) {
     const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
-    const tPM = tablaDe(dPM), antes = filasPMde(dPM).length, previos = new Set(dialogos());
+    const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
     log(`+ Agregando ${x.codigo} · ${x.desc}`); pulsar(btn);
     const picker = await hasta(() => dialogos().find((y) => !previos.has(y) && /^Adicionar Pasos/i.test(cabeceraDe(y))), 25000);
     if (!picker) throw new Error('No se abrió el selector de pasos');
@@ -1617,7 +1823,8 @@
     const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
     await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000); await esperar(800);
     await cargarTodo(tPM);
-    if (filasPMde(dPM).length <= antes) throw new Error(`No apareció ${x.codigo} en la lista de procesos menores`);
+    await hasta(() => propias().length > antes, 6000);
+    if (propias().length <= antes) throw new Error(`No apareció ${x.codigo} en la lista de procesos menores`);
     log(`✔ ${x.codigo} agregado`);
   }
 
@@ -1644,7 +1851,7 @@
     const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
-  const objetoDeFila = (tr) => { const it = tr && sap.ui.getCore().byId(tr.id); if (!it || !it.oBindingContexts) return null; const n = Object.keys(it.oBindingContexts); const c = n.length && it.getBindingContext(n[0] === 'undefined' ? undefined : n[0]); return c && c.getObject(); };
+  const objetoDeFila = (tr) => { const it = tr && typeof sap !== 'undefined' && sap.ui && sap.ui.getCore().byId(tr.id); if (!it || !it.oBindingContexts) return null; const n = Object.keys(it.oBindingContexts); const c = n.length && it.getBindingContext(n[0] === 'undefined' ? undefined : n[0]); return c && c.getObject(); };
   // Recorre TODAS las páginas de "Ver OP" con la flecha "▷" del propio portal y junta lo que va mostrando cada una.
   // Productos con mucho histórico (muchas campañas a lo largo de los años) pueden tener bastantes OP asociadas: se avisa el
   // avance (por si tarda) y, pasadas 40 páginas (200 OP), se pregunta si seguir en vez de quedarse cargando sin más.
@@ -1684,25 +1891,84 @@
     modelo.setProperty(ruta, filas);
     await hasta(() => filasPrincipales(t).length >= filas.length, 8000);
   }
-  async function verTodasOP(d, t, boton) {
-    boton.disabled = true; const texto0 = boton.querySelector('span').textContent;
+  // Carga rápida de TODAS las OP (v1.21): las mismas 10 lecturas que hace el portal por página (onGetRMDVerOP: la OP con su estado,
+  // receta, estructura, equipos, pasos, procesos menores, utensilios, especificaciones, insumos y etiquetas; mismo modelo, entidad,
+  // filtros, tamaño de página y orden) pero en paralelo y 3 páginas a la vez, sin el aviso "Cargando" de 8 s que el portal abre en
+  // cada página; al final se unen igual que lo hace el portal, así los botones de cada fila (Ver datos OP, Ver Registros,
+  // Desasociar) reciben lo mismo de siempre. Si algo falla, se usa la carga anterior (la flecha "▷" del portal, página por página).
+  const EXPANDS_VER_OP = ['mdId/estadoIdRmd,estadoIdRmd', 'aReceta/recetaId', 'aEstructura/estructuraId', 'aEstructura/aEquipo/equipoId', 'aEstructura/aPaso/pasoId',
+    'aEstructura/aPasoInsumoPaso/pasoHijoId,aEstructura/aPasoInsumoPaso/rmdEstructuraRecetaInsumoId', 'aEstructura/aUtensilio/utensilioId,aEstructura/aUtensilio/agrupadorId',
+    'aEstructura/aEspecificacion', 'aEstructura/aInsumo', 'aEstructura/aEtiqueta/etiquetaId'];
+  async function cargarTodasOPRapido(d, t, avisar, detenido) {
+    const ctl = ctlDe(t); let c = ctl; while (c && !c.getController) c = c.getParent && c.getParent();
+    const ctrl = c && c.getController(), vista = ctrl && ctrl.getView && ctrl.getView();
+    const modelo = vista && vista.getModel('mainModelv2'), asociar = vista && vista.getModel('asociarDatos'), local = vista && vista.getModel('localModel');
+    const mdId = asociar && asociar.getData() && asociar.getData().mdId;
+    if (!modelo || !local || !mdId) throw new Error('No encuentro los datos de esta ventana');
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const filtros = [new Filtro('mdId_mdId', 'EQ', mdId), new Filtro('estadoIdRmd_iMaestraId', 'NE', null)];
+    const fOP = local.getProperty('/filterOP'), fLote = local.getProperty('/filterLote');
+    if (fOP) filtros.push(new Filtro('ordenSAP', 'EQ', fOP)); if (fLote) filtros.push(new Filtro('lote', 'EQ', fLote));
+    const leer = (ruta, params) => new Promise((ok, mal) => modelo.read(ruta, { filters: filtros, urlParameters: params, success: ok, error: (e) => mal(new Error(`el servidor no respondió (${(e && e.statusCode) || 'sin código'})`)) }));
+    const total = Number(await leer('/RMD/$count', {})) || 0, TAM = 5, paginas = Math.ceil(total / TAM), resultado = new Array(paginas);
+    const pagina = async (k) => {
+      const skip = k * TAM, [i, r, s, n, dd, l, cc, g, f, p] = await Promise.all(EXPANDS_VER_OP.map((x) => leer('/RMD', { $expand: x, $top: String(TAM), $skip: String(skip) })));
+      s.results.forEach((e, j) => { e.aEstructura.results.forEach((e2, a) => { const de = (x) => x.results[j].aEstructura.results[a];
+        e2.aEquipo = de(n).aEquipo; e2.aPaso = de(dd).aPaso; e2.aPasoInsumoPaso = de(l).aPasoInsumoPaso; e2.aUtensilio = de(cc).aUtensilio; e2.aEspecificacion = de(g).aEspecificacion; e2.aInsumo = de(f).aInsumo; e2.aEtiqueta = de(p).aEtiqueta; }); });
+      i.results.forEach((e, j) => { if (e.estadoIdRmd_iMaestraId === 478) e.fechaCierre = e.fechaActualiza; e.aReceta = r.results[j].aReceta; e.aEstructura = s.results[j].aEstructura; e.item = skip + j + 1; });
+      return i.results;
+    };
+    let siguiente = 0, cargadas = 0;
+    const trabajador = async () => { while (siguiente < paginas && !(detenido && detenido())) { const k = siguiente++; resultado[k] = await pagina(k); cargadas += resultado[k].length; if (avisar) avisar(cargadas, total); } };
+    await Promise.all(Array.from({ length: Math.min(3, paginas) }, trabajador));
+    const filas = resultado.filter(Boolean).flat();
+    return { ctrl, modelo: local, ruta: '/Estructura', filas, total };
+  }
+  // Aviso de avance encima de la tabla de "Ver OP" (barra, cuántas van y "Detener"): la tabla no parpadea página a página.
+  function avanceVerOP(d, alDetener) {
+    const cont = d.querySelector('.sapMDialogSection') || d, o = document.createElement('div'); o.className = 'rmd-op-avance';
+    o.innerHTML = '<div class="rmd-op-caja"><b>Cargando todas las OP…</b><div class="rmd-op-barra"><div></div></div><span class="rmd-op-txt">Contando las OP…</span></div>';
+    const b = botonModal('Detener', '', () => { b.disabled = true; setTxt(b, 'Deteniendo…'); alDetener(); }); o.querySelector('.rmd-op-caja').appendChild(b);
+    if (getComputedStyle(cont).position === 'static') cont.style.position = 'relative';
+    cont.appendChild(o);
+    return {
+      poner: (n, total) => { setTxt(o.querySelector('.rmd-op-txt'), total ? `${n} de ${total} OP` : `${n} OP`); o.querySelector('.rmd-op-barra > div').style.width = (total ? Math.min(100, Math.round(100 * n / total)) : 30) + '%'; },
+      texto: (x) => setTxt(o.querySelector('.rmd-op-txt'), x), quitar: () => o.remove(),
+    };
+  }
+  async function obtenerTodasOP(d, t) {
+    let detenido = false; const av = avanceVerOP(d, () => { detenido = true; });
     try {
-      const { modelo, ruta, filas } = await cargarTodasOP(d, t, (n) => setTxt(boton.querySelector('span'), `Cargando… ${n}`));
-      await pintarTodasEnTabla(t, modelo, ruta, filas);
-      toast(`Se muestran las ${filas.length} OP asociadas.`);
+      try { return { ...(await cargarTodasOPRapido(d, t, (n, total) => av.poner(n, total), () => detenido)), detenido }; }
+      catch (e) {
+        try { console.info('[RMD] Ver todas: carga rápida no disponible (' + e.message + '); se usa la paginación del portal.'); } catch (e2) { /* sin consola */ }
+        av.texto('Cargando página por página…');
+        return { ...(await cargarTodasOP(d, t, (n) => av.poner(n, 0))), detenido };
+      }
+    } finally { av.quitar(); }
+  }
+  // tras mostrar todas, el rótulo de página del portal ("1 - 5") pasa a decir cuántas se ven
+  const rotuloTodas = (r) => { try { const m = r.ctrl.getView().getModel('oModelTemp'); if (m) m.setProperty('/pageRange', `1 - ${r.filas.length}${r.detenido ? ' (detenido)' : ''}`); } catch (e) { /* sin rótulo */ } };
+  async function verTodasOP(d, t, boton) {
+    boton.disabled = true;
+    try {
+      const t0 = Date.now(), r = await obtenerTodasOP(d, t);
+      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r);
+      toast(r.detenido ? `Detenido: se muestran ${r.filas.length} de ${r.total || '?'} OP.` : `Se muestran las ${r.filas.length} OP asociadas (${Math.max(1, Math.round((Date.now() - t0) / 1000))} s).`);
     } catch (e) { toast('No se pudieron cargar todas las OP: ' + e.message, true); }
-    finally { boton.disabled = false; setTxt(boton.querySelector('span'), texto0); }
+    finally { boton.disabled = false; }
   }
   async function exportarVerOP(d, t, boton) {
-    boton.disabled = true; const texto0 = boton.querySelector('span').textContent;
+    boton.disabled = true;
     try {
-      const { modelo, ruta, filas } = await cargarTodasOP(d, t, (n) => setTxt(boton.querySelector('span'), `Cargando… ${n}`));
-      await pintarTodasEnTabla(t, modelo, ruta, filas);                   // así el CSV (que lee de la tabla ya pintada) las incluye todas
+      const r = await obtenerTodasOP(d, t);
+      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r);   // así el CSV (que lee de la tabla ya pintada) las incluye todas
       const rmd = (/RMD:\s*(\d+)/.exec(cabecera(d)) || [])[1] || 'rmd';
       descargarTexto(`OP_asociadas_${rmd}.csv`, csvVerOP(t));
     } catch (e) { toast('No se pudo exportar: ' + e.message, true); }
-    finally { boton.disabled = false; setTxt(boton.querySelector('span'), texto0); }
+    finally { boton.disabled = false; }
   }
+  window.__rmdStats.cargarTodasOPRapido = (d, t) => cargarTodasOPRapido(d, t);   // (diagnóstico)
   window.__rmdStats.csvVerOP = csvVerOP;   // diagnóstico: genera el CSV sin descargarlo
   // Filtro por columna al estilo Excel: un icono de embudo junto a cada encabezado abre un desplegable con los valores
   // únicos de esa columna (con buscador y casillas, como el AutoFiltro de Excel); desmarcar valores oculta esas filas.
@@ -2604,8 +2870,8 @@
     if (leer().length > n) await hasta(() => leer().length === n, 5000);           // filas de la ventana anterior aún sin retirar
     return { filas: leer(), esperadas: n };
   }
-  async function revisarRMD(dRaiz, avisar, detenido) {
-    const r = { listas: [], incoherencias: [], citas: [], avisos: [], reglas: on('reglas'), pasos: 0, pms: 0, t0: Date.now() };
+  async function revisarRMD(dRaiz, avisar, detenido, op = {}) {
+    const r = { listas: [], incoherencias: [], citas: [], avisos: [], reglas: on('reglas'), pasos: 0, pms: 0, t0: Date.now(), porVentana: !!op.porVentana, fuentePM: 'ventana' };
     const parar = () => { if (detenido()) throw new Error('Revisión detenida a pedido.'); };
     const citasDe = (lugar, desc) => { const rx = new RegExp(PATRON_REFERENCIA_JS.source, 'g'); let m; while ((m = rx.exec(desc || ''))) r.citas.push({ ...lugar, codigo: m[0] }); };
     // las alertas de la tabla, ya calculadas por ajustarTabla (todas las de cada fila, no solo la primera)
@@ -2631,13 +2897,28 @@
       else if (!ajenas && esperadas != null && filas.length !== esperadas) r.avisos.push(`${lista}: se leyeron ${filas.length} de ${esperadas} pasos`);
       const alertas = alertasDe(t), info = { lista, pasos: filas.length, pms: 0, incoherencias: 0, citas: 0, detalle: [] };
       const citas0 = r.citas.length;
+      // los procesos menores de toda la lista, del modelo (sin abrir la ventana de cada paso); si no se pueden leer, se abre cada una
+      let porPaso = null;
+      if (!r.porVentana) { avisar(`${lista}: procesos menores`); try { porPaso = await pmsDeLista(t, filas); } catch (e) { porPaso = null; } }
+      if (porPaso) r.fuentePM = 'modelo';
       for (let k = 0; k < filas.length; k++) {
         parar();
         const tr = filas[k], p = leerPaso(t, tr), idPaso = (objetoDeFila(tr) || {}).mdEstructuraPasoId;
         const lugar = { lista, paso: norm(p.orden) || String(k + 1), codigoPaso: norm(p.codigo), descPaso: norm(p.desc), pm: '', codigoPM: '', descPM: '' };
         citasDe(lugar, lugar.descPaso);
         (alertas.get(tr) || []).forEach((aviso) => { r.incoherencias.push({ ...lugar, aviso }); info.incoherencias++; });
-        if (!tienePM(botonPM(tr))) continue;
+        const delModelo = porPaso && idPaso ? porPaso.get(idPaso) : null;
+        if (delModelo) {
+          info.detalle.push({ paso: lugar.paso, codigo: lugar.codigoPaso, leidos: delModelo.length, esperados: delModelo.length, ajenas: 0, fuente: 'modelo' });
+          delModelo.forEach((q) => {
+            const lugarPM = { ...lugar, pm: q.orden, codigoPM: q.codigo, descPM: q.desc };
+            citasDe(lugarPM, q.desc);
+            avisosDePM(q).forEach((aviso) => { r.incoherencias.push({ ...lugarPM, aviso }); info.incoherencias++; });
+            r.pms++; info.pms++;
+          });
+          continue;
+        }
+        if (!tienePM(botonPM(tr)) || (porPaso && idPaso)) continue;   // con el modelo leído, un paso que no aparece no tiene procesos menores
         avisar(`${lista} › paso ${lugar.paso} (${k + 1} de ${filas.length}): procesos menores`);
         const dPM = await abrirPM(t, tr.id);
         try {
@@ -2766,7 +3047,7 @@
     const previos = new Set(dialogos()); let detenido = false;
     const detener = () => { if (detenido) return; detenido = true; bDet.disabled = true; setTxt(bDet, 'Deteniendo…'); };
     const v = ventana('Revisando el RMD…', { cancelar: detener });
-    v.cuerpo.innerHTML = '<p class="rmd-nota">Se abre cada lista de pasos (Precauciones, Notas importantes, Condiciones ambientales y cada etiqueta de Procedimiento) y los procesos menores de los pasos que los tienen, con los botones del portal: no se cambia nada. Puede tardar unos minutos en un RMD grande.</p><p class="rmd-progreso"></p>';
+    v.cuerpo.innerHTML = '<p class="rmd-nota">Se abre cada lista de pasos (Precauciones, Notas importantes, Condiciones ambientales y cada etiqueta de Procedimiento) con los botones del portal y sus procesos menores se leen sin abrir sus ventanas: no se cambia nada.</p><p class="rmd-progreso"></p>';
     const bDet = botonModal('Detener', '', detener); v.pie.appendChild(bDet);
     try {
       const r = await revisarRMD(dRaiz, (donde) => { setTxt(boton.querySelector('span'), 'Revisando…'); setTxt(v.cuerpo.querySelector('.rmd-progreso'), 'Leyendo: ' + donde + '…'); }, () => detenido);
@@ -2788,7 +3069,7 @@
     if (ref) ref.insertAdjacentElement('afterend', b); else hdr.appendChild(b);
   }
   // diagnóstico: la revisión sin ventana, y su Excel en base64 (sin descargarlo)
-  window.__rmdStats.revisarRMD = (detenido) => revisarRMD(dialogos()[0], () => {}, detenido || (() => false));
+  window.__rmdStats.revisarRMD = (detenido, op) => revisarRMD(dialogos()[0], () => {}, detenido || (() => false), op || {});
   window.__rmdStats.excelRevision = async (r) => aBase64(await armarRevisionExcel(dialogos()[0], r, agruparCitas(r.citas)).libro.generar());
 
   // ---- Lectura del maestro de RMD con sus recetas, para "Enviar a Status RMD" (junto al icono nativo "Exportar"): ese
@@ -3052,29 +3333,35 @@
     ir.insertAdjacentElement('afterend', grupo);
   }
   function quitarBotonNuevoPaso(d) { d.querySelectorAll('.rmd-nuevo-paso-grupo').forEach((x) => x.remove()); }
+  // Abre Configuración Maestra (con el botón "Configurar" de la lista principal), cambia a la pestaña "Paso" y pulsa "Nuevo Paso":
+  // devuelve la ventana "Nuevo Paso", apilada encima de lo que esté abierto. No pulsa "Agregar".
+  async function abrirVentanaNuevoPaso() {
+    const previos = new Set(dialogos());
+    const btnConfigurar = botonPorTitulo(document, 'Configurar'); if (!btnConfigurar) throw new Error('No encuentro el botón "Configurar" de la lista principal');
+    pulsar(btnConfigurar);
+    const maestra = await hasta(() => dialogos().find((x) => !previos.has(x) && /^Configuraci[oó]n Maestra/i.test(cabecera(x))), 15000);
+    if (!maestra) throw new Error('No se abrió "Configuración Maestra"');
+    await hasta(() => !ocupado(), 15000); await esperar(500);
+    const tab = [...maestra.querySelectorAll('[role=tab]')].find((x) => /(^|\s)Paso(\s|$)/.test(norm(x.textContent)));
+    if (!tab) throw new Error('No encuentro la pestaña "Paso" de Configuración Maestra');
+    // Los filtros de esta barra (IconTabBar en modo filtro) no reaccionan a un .click() sintético: hace falta la secuencia real de eventos de puntero.
+    const opts = { bubbles: true, cancelable: true, view: window };
+    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((tipo) => { const Ctor = tipo.startsWith('pointer') ? PointerEvent : MouseEvent; tab.dispatchEvent(new Ctor(tipo, opts)); });
+    await esperar(1200); await hasta(() => !ocupado(), 15000);
+    const btnNuevo = botonPorTitulo(maestra, 'Nuevo Paso') || [...maestra.querySelectorAll('button')].find((b) => visible(b) && /^Nuevo Paso/i.test(norm(b.textContent)));
+    if (!btnNuevo) throw new Error('No encuentro el botón "Nuevo Paso"');
+    const previos2 = new Set(dialogos());
+    pulsar(btnNuevo);
+    const dlg = await hasta(() => dialogos().find((x) => !previos2.has(x) && /^Nuevo Paso/i.test(cabecera(x))), 15000);
+    if (!dlg) throw new Error('No se abrió la ventana "Nuevo Paso"');
+    await esperar(500);
+    return dlg;
+  }
   async function abrirNuevoPasoMaestro(d) {
     if (window.__rmdAbriendoNuevoPaso) return; window.__rmdAbriendoNuevoPaso = true;
     try {
       const estructura = valorDeCampo(d, 'Estructura'), etiqueta = valorDeCampo(d, 'Etiqueta');
-      const previos = new Set(dialogos());
-      const btnConfigurar = botonPorTitulo(document, 'Configurar'); if (!btnConfigurar) throw new Error('No encuentro el botón "Configurar" de la lista principal');
-      pulsar(btnConfigurar);
-      const maestra = await hasta(() => dialogos().find((x) => !previos.has(x) && /^Configuraci[oó]n Maestra/i.test(cabecera(x))), 15000);
-      if (!maestra) throw new Error('No se abrió "Configuración Maestra"');
-      await hasta(() => !ocupado(), 15000); await esperar(500);
-      const tab = [...maestra.querySelectorAll('[role=tab]')].find((x) => /(^|\s)Paso(\s|$)/.test(norm(x.textContent)));
-      if (!tab) throw new Error('No encuentro la pestaña "Paso" de Configuración Maestra');
-      // Los filtros de esta barra (IconTabBar en modo filtro) no reaccionan a un .click() sintético: hace falta la secuencia real de eventos de puntero.
-      const opts = { bubbles: true, cancelable: true, view: window };
-      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((tipo) => { const Ctor = tipo.startsWith('pointer') ? PointerEvent : MouseEvent; tab.dispatchEvent(new Ctor(tipo, opts)); });
-      await esperar(1200); await hasta(() => !ocupado(), 15000);
-      const btnNuevo = botonPorTitulo(maestra, 'Nuevo Paso') || [...maestra.querySelectorAll('button')].find((b) => visible(b) && /^Nuevo Paso/i.test(norm(b.textContent)));
-      if (!btnNuevo) throw new Error('No encuentro el botón "Nuevo Paso"');
-      const previos2 = new Set(dialogos());
-      pulsar(btnNuevo);
-      const dlg = await hasta(() => dialogos().find((x) => !previos2.has(x) && /^Nuevo Paso/i.test(cabecera(x))), 15000);
-      if (!dlg) throw new Error('No se abrió la ventana "Nuevo Paso"');
-      await esperar(500);
+      const dlg = await abrirVentanaNuevoPaso();
       const fijar = async (etiquetaCampo, texto) => {
         if (!texto) return false;
         const el = campoDe(dlg, etiquetaCampo), c = el && ctlDe(el); if (!c || !c.getItems) return false;
@@ -3091,6 +3378,128 @@
     } finally { window.__rmdAbriendoNuevoPaso = false; }
   }
 
+  // ---- "En minúsculas": a partir de un paso existente en MAYÚSCULAS abre "Nuevo Paso" de Configuración Maestra con todo lo del paso
+  // copiado (estructura, etiqueta, numeración, tipo de dato, clave modelo, valores, decimales y lapso, del paso maestro que trae la
+  // propia fila) y la descripción ya redactada en minúsculas. La persona revisa y pulsa "Agregar": el script no guarda nada.
+  // Descripción en MAYÚSCULAS -> minúsculas con mayúscula al iniciar oración, tildes (diccionario), unidades (mL, mg, kg, g, L, °C,
+  // pH, rpm…), códigos con números (PV1-PHM-09, FPRO-201) y siglas conocidas tal cual, y punto final salvo que ya termine en un
+  // signo (":" en "FECHA / HORA INICIO:"). "ADICION DE CLOROCRESOL.-" -> "Adición de clorocresol."
+  const UNIDADES_MIN = { ML: 'mL', MG: 'mg', MCG: 'mcg', KG: 'kg', G: 'g', L: 'L', RPM: 'rpm', MM: 'mm', CM: 'cm', NM: 'nm', MBAR: 'mbar', BAR: 'bar', PSI: 'psi', KPA: 'kPa', HPA: 'hPa', HRS: 'h', HR: 'h', H: 'h', MIN: 'min', SEG: 's', S: 's', UI: 'UI' };
+  function pasoEnMinusculas(texto) {
+    const guardados = [], ini = String.fromCharCode(3), fin = String.fromCharCode(4);
+    const guardar = (m) => { guardados.push(m); return ini + (guardados.length - 1) + fin; };
+    let t = norm(texto);
+    t = t.replace(/(\d)\s*(MCG|MBAR|KPA|HPA|RPM|ML|MG|KG|MM|CM|NM|PSI|BAR|HRS|HR|MIN|SEG|UI|G|L|H|S)\b/g, (m, n, u) => n + ' ' + guardar(UNIDADES_MIN[u]));
+    t = t.replace(/°\s*C\b/g, () => guardar('°C')).replace(/\bPH\b/g, () => guardar('pH'));
+    // códigos con letras y números (equipos, salas, documentos) tal cual; los ordinales ("2DA", "1ER") van en minúsculas
+    t = t.replace(/\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]+(?:[-/.][A-Z0-9]+)*\b/g, (m) => (/^\d+(ER|RA|DA|DO|TO|TA|MO|MA|VO|VA|NO|NA)$/.test(m) ? m.toLowerCase() : guardar(m)));
+    t = mejorarTexto(t);
+    t = t.replace(new RegExp(ini + '(\\d+)' + fin, 'g'), (_, i) => guardados[+i]);
+    t = t.replace(/\s*\.\s*-+\s*$/, '.').replace(/\s+-+\s*$/, '').trim();
+    if (t && !/[.:;!?…]$/.test(t)) t += '.';
+    return t;
+  }
+  window.__rmdStats.pasoEnMinusculas = pasoEnMinusculas;   // (diagnóstico y pruebas)
+  const objetoCargado = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null);
+  // Datos del paso maestro de una fila (paso mayor: pasoId; proceso menor: pasoHijoId), con los nombres que muestran los combos.
+  function pasoMaestroDeFila(tr, tabla) {
+    const o = objetoDeFila(tr) || {}, m = objetoCargado(o.pasoId) || objetoCargado(o.pasoHijoId);
+    if (!m || !m.descripcion) return { error: o.estructuraRecetaInsumoId || o.Maktx ? 'Esa fila es un insumo de la receta, no un paso.' : 'No encuentro los datos del paso maestro de esa fila.' };
+    const est = objetoCargado(o.mdEstructuraId) && objetoCargado(o.mdEstructuraId.estructuraId);
+    const nombres = {
+      estructuraId_estructuraId: est && est.estructuraId === m.estructuraId_estructuraId ? est.descripcion : '',
+      etiquetaId_etiquetaId: (objetoCargado(m.etiquetaId) || {}).descripcion || '',
+      tipoDatoId_iMaestraId: (objetoCargado(m.tipoDatoId) || {}).contenido || nombreTipo(m.tipoDatoId_iMaestraId, tabla),
+      tipoLapsoId_motivoLapsoId: (objetoCargado(m.tipoLapsoId) || {}).descripcion || '',
+    };
+    const datos = { estructuraId_estructuraId: m.estructuraId_estructuraId, etiquetaId_etiquetaId: m.etiquetaId_etiquetaId, numeracion: !!m.numeracion, tipoDatoId_iMaestraId: m.tipoDatoId_iMaestraId,
+      clvModelo: m.clvModelo, valorInicial: m.valorInicial, valorFinal: m.valorFinal, margen: m.margen, decimales: m.decimales, tipoLapsoId_motivoLapsoId: m.tipoLapsoId_motivoLapsoId };
+    // cómo está configurado en ESTE RMD (puede diferir del paso maestro: p. ej. maestro "Texto", aquí "Realizado por")
+    const enRmd = o.pasoId ? { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, clvModelo: o.clvModelo, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales }
+      : { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales };
+    return { codigo: m.codigo, descripcion: m.descripcion, datos, nombres, enRmd };
+  }
+  const vacioM = (v) => v == null || v === '';
+  function vistaMinusculas(p, tabla) {
+    return new Promise((resolver) => {
+      const v = ventana('Crear el paso en minúsculas', { cancelar: () => { v.cerrar(); resolver(null); } });
+      const difiere = Object.keys(p.enRmd).filter((k) => String(vacioM(p.enRmd[k]) ? '' : p.enRmd[k]) !== String(vacioM(p.datos[k]) ? '' : p.datos[k]));
+      const nom = (k, x) => (k === 'tipoDatoId_iMaestraId' ? nombreTipo(x, tabla) || x : x);
+      const fila = (et, valor, k) => `<tr><td>${et}</td><td>${esc(vacioM(valor) ? '—' : valor)}</td><td class="rmd-nota">${k && difiere.includes(k) ? 'en este RMD: ' + esc(vacioM(p.enRmd[k]) ? '—' : nom(k, p.enRmd[k])) : ''}</td></tr>`;
+      const d0 = p.datos, n0 = p.nombres;
+      v.cuerpo.innerHTML = `<p><b>Paso de origen</b>: ${esc(p.codigo)} · ${esc(p.descripcion)}</p>
+        <p><b>Descripción del paso nuevo</b> (puedes corregirla aquí o en "Nuevo Paso"):</p>
+        <textarea class="rmd-min-texto" spellcheck="true"></textarea>
+        <table class="rmd-tabla"><thead><tr><th>Se copia del paso maestro</th><th>Valor</th><th></th></tr></thead><tbody>
+          ${fila('Estructura', n0.estructuraId_estructuraId || d0.estructuraId_estructuraId)}${fila('Etiqueta', n0.etiquetaId_etiquetaId || d0.etiquetaId_etiquetaId)}
+          ${fila('Flag Numeración', d0.numeracion ? 'Sí' : 'No')}${fila('Tipo de Dato', n0.tipoDatoId_iMaestraId || d0.tipoDatoId_iMaestraId, 'tipoDatoId_iMaestraId')}
+          ${fila('Clave Modelo', d0.clvModelo, 'clvModelo')}${fila('Valor inicial', d0.valorInicial, 'valorInicial')}${fila('Valor final', d0.valorFinal, 'valorFinal')}
+          ${fila('Margen', d0.margen, 'margen')}${fila('Decimales', d0.decimales, 'decimales')}${fila('Lapso', n0.tipoLapsoId_motivoLapsoId || d0.tipoLapsoId_motivoLapsoId)}
+        </tbody></table>
+        ${difiere.length ? '<label><input type="checkbox" class="rmd-min-rmd"> Usar la configuración que tiene en este RMD (tipo de dato, clave, valores y decimales) en lugar de la del paso maestro</label>' : ''}
+        <p class="rmd-nota">Se abrirá "Nuevo Paso" de Configuración Maestra con todo esto ya puesto: revísalo y pulsa <b>Agregar</b> (el script no guarda nada). Luego podrás añadir el paso nuevo al RMD.</p>`;
+      v.cuerpo.querySelector('.rmd-min-texto').value = p.nueva;
+      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal('Abrir "Nuevo Paso"', 'primario', () => {
+        const usarRmd = !!(v.cuerpo.querySelector('.rmd-min-rmd') || {}).checked;
+        const datos = { ...p.datos, ...(usarRmd ? p.enRmd : {}), descripcion: norm(v.cuerpo.querySelector('.rmd-min-texto').value) };
+        v.cerrar(); resolver({ datos });
+      }));
+    });
+  }
+  // Pone un valor en el control de "Nuevo Paso" ligado a /newPaso/<campo> (con los mismos eventos que al elegirlo a mano, para que
+  // el portal habilite lo que depende de él: la Etiqueta según la Estructura, los valores según el Tipo de Dato).
+  async function llenarNuevoPaso(dlg, datos) {
+    const core = nucleo(), rutas = ['value', 'selectedKey', 'state', 'selected'];
+    const controles = () => [...new Set([...dlg.querySelectorAll('[id]')].map((el) => core.byId(el.id)).filter((c) => c && c.getBinding))];
+    const porCampo = (campo) => controles().find((c) => rutas.some((r) => { const b = c.getBinding(r); return b && b.getPath && b.getPath() === '/newPaso/' + campo; }));
+    const fallidos = [];
+    const poner = async (campo, valor, etiqueta) => {
+      if (vacioM(valor) && valor !== false) return;
+      const c = porCampo(campo); if (!c) { fallidos.push(etiqueta); return; }
+      try {
+        if (c.setSelectedKey && c.getItems) {
+          const k = String(valor), ok = await hasta(() => c.getItems().some((it) => String(it.getKey()) === k), 6000, 200);
+          if (!ok) { fallidos.push(etiqueta); return; }
+          c.setSelectedKey(k); const it = c.getSelectedItem();
+          if (c.fireSelectionChange) c.fireSelectionChange({ selectedItem: it }); if (c.fireChange) c.fireChange({ value: c.getValue(), newValue: c.getValue(), itemPressed: true });
+        } else if (c.setState) { c.setState(!!valor); if (c.fireChange) c.fireChange({ state: !!valor }); }
+        else if (c.setValue) { c.setValue(String(valor)); if (c.fireLiveChange) c.fireLiveChange({ value: String(valor), newValue: String(valor) }); if (c.fireChange) c.fireChange({ value: String(valor) }); }
+        await esperar(250);
+      } catch (e) { fallidos.push(etiqueta); }
+    };
+    await poner('estructuraId_estructuraId', datos.estructuraId_estructuraId, 'Estructura'); await esperar(500);
+    await poner('etiquetaId_etiquetaId', datos.etiquetaId_etiquetaId, 'Etiqueta');
+    await poner('numeracion', datos.numeracion, 'Flag Numeración');
+    await poner('tipoDatoId_iMaestraId', datos.tipoDatoId_iMaestraId, 'Tipo de Dato'); await esperar(500);
+    for (const [k, et] of [['clvModelo', 'Clave Modelo'], ['valorInicial', 'Valor inicial'], ['valorFinal', 'Valor final'], ['margen', 'Margen'], ['decimales', 'Decimales'], ['tipoLapsoId_motivoLapsoId', 'Lapso']]) await poner(k, datos[k], et);
+    await poner('descripcion', datos.descripcion, 'Descripción Paso');
+    return fallidos;
+  }
+  async function crearEnMinusculas(tabla) {
+    if (window.__rmdMinusculas) return;
+    const sel = seleccionadas(tabla);
+    if (sel.length !== 1) { toast('Marca la casilla de UN solo paso (el que está en MAYÚSCULAS) y pulsa "En minúsculas".', true); return; }
+    const p = pasoMaestroDeFila(sel[0], tabla);
+    if (p.error) { toast(p.error, true); return; }
+    p.nueva = pasoEnMinusculas(p.descripcion);
+    const op = await vistaMinusculas(p, tabla); if (!op) return;
+    window.__rmdMinusculas = true;
+    try {
+      toast('Abriendo "Nuevo Paso" de Configuración Maestra…');
+      const dlg = await abrirVentanaNuevoPaso();
+      const fallidos = await llenarNuevoPaso(dlg, op.datos);
+      toast(`Se abrió "Nuevo Paso" con el paso en minúsculas y su configuración copiada${fallidos.length ? ` (no se pudo poner: ${fallidos.join(', ')}; complétalo a mano)` : ''}. Revísalo y pulsa Agregar.`, fallidos.length > 0);
+    } catch (e) { toast('No se pudo preparar "Nuevo Paso": ' + e.message, true); }
+    finally { window.__rmdMinusculas = false; }
+  }
+  // diagnóstico: el mismo flujo sin vista previa (para las pruebas de solo lectura: abre "Nuevo Paso" lleno, NO pulsa Agregar)
+  window.__rmdStats.nuevoPasoEnMinusculas = async (tr, usarRmd) => {
+    const tabla = tr.closest('table'), p = pasoMaestroDeFila(tr, tabla); if (p.error) throw new Error(p.error);
+    const datos = { ...p.datos, ...(usarRmd ? p.enRmd : {}), descripcion: pasoEnMinusculas(p.descripcion) };
+    const dlg = await abrirVentanaNuevoPaso(); const fallidos = await llenarNuevoPaso(dlg, datos);
+    return { origen: p.descripcion, datos, fallidos, dialogo: dlg.id };
+  };
+
   const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
   const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
@@ -3102,11 +3511,20 @@
     const bc = botonIcono(ICONO_COPIAR, 'Copiar configuración', 'rmd-copiar', () => copiarPaso(d, tablaDe(d)));
     bc.title = 'Marca la casilla del paso de referencia y pulsa aquí: copia su configuración y sus procesos menores.';
     const bp = botonIcono(ICONO_PEGAR, 'Pegar', 'rmd-pegar', () => pegarPaso(d, tablaDe(d)));
-    bp.title = 'Marca la casilla del paso nuevo y pulsa aquí: muestra una vista previa y aplica la configuración y los procesos menores copiados.';
+    bp.title = 'Marca la casilla de uno o varios pasos destino y pulsa aquí: muestra una vista previa (qué cambia en cada uno) y aplica la configuración y los procesos menores copiados.';
     grupo.append(bc, bp);
     const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((b) => b.title === 'Imprimir');
     if (ref) hdr.insertBefore(grupo, ref); else hdr.appendChild(grupo);
     pintarEstadoPortapapeles();
+  }
+  // "En minúsculas" en la barra de la tabla de Pasos y de Procesos menores (a la izquierda del icono de impresora)
+  function instalarBotonMinusculas(d, tabla) {
+    const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-minusculas')) return;
+    const b = botonIcono(ICONO_AA, 'En minúsculas', 'rmd-minusculas', () => crearEnMinusculas(tablaDe(d) || tabla));
+    b.title = 'Marca la casilla de un paso en MAYÚSCULAS y pulsa aquí: abre "Nuevo Paso" con el mismo paso (estructura, etiqueta, tipo de dato, valores, decimales…) ya redactado en minúsculas, listo para pulsar Agregar.';
+    const grupo = hdr.querySelector('.rmd-copia-grupo');
+    if (grupo) grupo.appendChild(b);
+    else { const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((x) => x.title === 'Imprimir'); b.style.marginRight = '10px'; if (ref) hdr.insertBefore(b, ref); else hdr.appendChild(b); }
   }
 
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
@@ -3114,7 +3532,7 @@
   const GRUPOS_PANEL = [
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
     ['Alertas', ['reglas', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'espec', 'nuevopaso', 'verop', 'documentos', 'statusrmd', 'indicadores', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'statusrmd', 'indicadores', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
     ['Experimental', ['minusculas', 'ortografia']],
   ];
   function panel() {

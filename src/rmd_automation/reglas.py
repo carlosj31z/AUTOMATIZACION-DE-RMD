@@ -176,6 +176,9 @@ def revisar(snap: dict) -> List[Hallazgo]:
             h.extend(_avisos_texto(nombre, o, desc))
             if td in TIPOS_SIN_EDIT and "Edit" in chk and nombre.startswith("PROCEDIMIENTO"):
                 h.append(Hallazgo("AVISO", nombre, o, f"{td} con Edit marcado (no es habitual)"))
+            # PM OP no debe marcarse en ningún paso (indicación del equipo, septiembre de 2026; igual que el userscript v1.21)
+            if "PM OP" in chk:
+                h.append(Hallazgo("AVISO", nombre, o, "PM OP marcada: ningún paso debe llevarla"))
 
             if td == "Notificacion":
                 if p.get("ck") not in CLAVES_MODELO:

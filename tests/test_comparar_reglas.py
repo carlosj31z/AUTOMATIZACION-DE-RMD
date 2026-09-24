@@ -179,6 +179,15 @@ def test_entrega_del_formato_de_inspeccion_a_control_de_calidad_no_se_alerta():
     assert len([m for m in mensajes(s) if "reemplazar" in m and "CONTROL DE CALIDAD" in m]) == 2
 
 
+def test_pm_op_marcada_se_avisa():
+    """PM OP no debe marcarse en ningún paso (indicación del equipo, septiembre de 2026)."""
+    s = snap_base()
+    assert not [m for m in mensajes(s) if "PM OP" in m]
+    s["structs"][3]["etq"][1]["p"][3]["chk"] = "R. Por,PM OP"
+    avisos = [h for h in reglas.revisar(s) if "PM OP" in h.mensaje]
+    assert [(h.lista, h.orden) for h in avisos] == [("PROCEDIMIENTO>FABRICACION", "4")]
+
+
 def sin_predecesor(snap):
     return [(h.lista, h.orden) for h in reglas.revisar(snap) if "sin predecesor" in h.mensaje and h.nivel == "AVISO"]
 

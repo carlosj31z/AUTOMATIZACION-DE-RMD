@@ -46,8 +46,8 @@ Descripción, Cant. Receta, Cant. en RMD, UM) porque sale de la receta asociada.
 
 Casillas asociadas al tipo (constantes en los 2.460 pasos): Realizado por → R. Por · Realizado por y
 Visto bueno → R. Por + V.B. · Visto bueno → V.B. · Notificacion / Fecha y Hora / Fórmula / Números /
-Entrega → Edit · MuestraCC → Estado CC + Edit · Múltiple check y Sin tipo de dato → ninguna. "PM OP"
-y "Gen PP" aparecen en muy pocos pasos. Decimal: Fórmula/Entrega/MuestraCC/Números usan 3 (o 0
+Entrega → Edit · MuestraCC → Estado CC + Edit · Múltiple check y Sin tipo de dato → ninguna. "Gen PP"
+aparece en muy pocos pasos; "PM OP" no debe marcarse en ninguno (indicación del equipo, septiembre de 2026). Decimal: Fórmula/Entrega/MuestraCC/Números usan 3 (o 0
 cuando la unidad es entera: cajas, folios); "Sin tipo de dato" usa 0. **Decimal es obligatorio para guardar.**
 
 ### Rendimiento (plantilla casi fija)
@@ -160,7 +160,7 @@ Salen del **tipo de dato**, con estas excepciones observadas en los 2.460 pasos:
 | **R. Por** | Tipo "Realizado por" y "Realizado por y Visto bueno" (firma de quien ejecuta). |
 | **V.B.** | "Visto bueno" y "Realizado por y Visto bueno" (firma del jefe/supervisor: pasos críticos como despejes, adiciones de insumo, trasvases). Excepciones raras: "Realizado por" o "Múltiple check" con R. Por + V.B. cuando el paso exige visto bueno. |
 | **Estado CC** | Pasos de **Control de Calidad**: "EL PERSONAL DE CALIDAD … INGRESA…" y "CALIDAD … REGISTRA LOS RESULTADOS" (Realizado por + Estado CC, 34 casos), MuestraCC (Estado CC + Edit) y, en procesos menores, "CANTIDAD MUESTREADA" y "FECHA / HORA DE MUESTREO" (Edit + Estado CC). |
-| **PM OP** | Paso **opcional** según la OP ("ELIJA LA OPCION SEGUN CORRESPONDA", "REALIZAR LA PRUEBA DE INTEGRIDAD… SEGÚN CORRESPONDA", "COLOCAR LAS CHAQUETAS…", "REGISTRAR LA MATERIA PRIMA…"): 3–7 casos en 33 RMD. |
+| **PM OP** | Paso **opcional** según la OP ("ELIJA LA OPCION SEGUN CORRESPONDA", "REALIZAR LA PRUEBA DE INTEGRIDAD… SEGÚN CORRESPONDA", "COLOCAR LAS CHAQUETAS…", "REGISTRAR LA MATERIA PRIMA…"): 3–7 casos en 33 RMD. **Indicación del equipo (septiembre de 2026): no debe marcarse en ningún paso**; el userscript (v1.21) la muestra y pide desmarcarla, y `reglas.py` la avisa. |
 | **Gen PP** | Muy raro (1 caso: preparar la máquina codificadora); genera datos de producto en proceso. |
 | **Estado Mov.** | No aparece marcada en ninguno de los RMD leídos. |
 

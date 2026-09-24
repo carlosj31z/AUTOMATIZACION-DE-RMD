@@ -55,13 +55,13 @@ window.__maq = {
     const cuerpo = filas.map((f, k) => `<tr class="sapMLIB sapMListTblRow" id="__item${window.__maq.n}-${k}"><td class="sapMListTblHighlightCell"></td>
       <td class="sapMListTblSelCol"><div role="checkbox" class="sapMCb" tabindex="0" aria-checked="false"><div class="sapMCbBg"></div></div></td>
       ${entrada(f.orden != null ? f.orden : k + 1)}${entrada(f.dep || '')}<td class="sapMListTblCell">${esc(f.cod || 1000 + k)}</td><td class="sapMListTblCell"><span class="sapMText">${esc(f.desc)}</span></td>
-      ${entrada(f.tipo, false)}${entrada(f.decimal || '')}${casilla(f.cc)}${casilla(f.edit)}</tr>`).join('');
+      ${entrada(f.tipo, false)}${entrada(f.decimal || '')}${casilla(f.cc)}${casilla(f.edit)}${opciones.pmop ? casilla(f.pmop) : ''}</tr>`).join('');
     d.innerHTML = `<header><div class="sapMBar"><div class="sapMBarMiddle"><h2 class="sapMTitle">${esc(titulo)}</h2></div></div></header>
       <section class="sapMDialogSection"><div class="sapMDialogScrollCont">
         <div class="sapMListHdr sapMTB"><div class="sapMTitle"><span>Pasos (${filas.length})</span></div><div class="sapMTBSpacer"></div><div class="sapMTBSeparator"></div>
           <button title="Imprimir">P</button><button title="Adicionar Pasos RMD">+</button><button title="Guardar">G</button><button title="Eliminar">X</button></div>
         <table class="sapMListTbl sapMListUl sapMListModeMultiSelect" id="__tbl${window.__maq.n}-listUl"><thead><tr><th class="sapMListTblHighlightCol"></th><th class="sapMListTblSelCol"></th>
-          <th>Orden</th><th>Depende</th><th>Código</th><th>Descripción</th><th>Tipo Dato</th><th>Decimal</th><th>Estado CC</th><th>Edit</th></tr></thead><tbody>${cuerpo}</tbody></table>
+          <th>Orden</th><th>Depende</th><th>Código</th><th>Descripción</th><th>Tipo Dato</th><th>Decimal</th><th>Estado CC</th><th>Edit</th>${opciones.pmop ? '<th>PM OP</th>' : ''}</tr></thead><tbody>${cuerpo}</tbody></table>
       </div></section><footer><button id="cancelar${window.__maq.n}">Cancelar</button></footer>`;
     d.addEventListener('click', (e) => {                                  // comportamiento mínimo de UI5: casillas y botones (en fase de burbuja, como UI5)
       const c = e.target.closest('[role=checkbox]'); if (c) { c.setAttribute('aria-checked', c.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); return; }
@@ -251,6 +251,26 @@ with sync_playwright() as p:
                  {"desc": "MOLER LA MEZCLA", "tipo": "Realizado por"}]
         abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
         return (a["filas"][1]["falta"] and "al marcar Estado CC" in a["filas"][1]["aviso"] and a["filas"][2]["falta"] and "Estado CC" not in a["filas"][2]["aviso"]), f"{a['filas'][1]['aviso'][-70:]!r} | {a['filas'][2]['aviso'][-40:]!r}"
+
+    @prueba("LN6 PM OP: si algún paso la tiene marcada, la columna deja de ocultarse y la celda pide DESMARCAR (cuenta en el aviso); sin ninguna marcada sigue oculta")
+    def _():
+        filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}, {"desc": "MOLER LA MEZCLA", "tipo": "Verificación Check", "dep": "1000 (1)", "pmop": True},
+                 {"desc": "TAMIZAR LA MEZCLA", "tipo": "Verificación Check", "dep": "1001 (2)"}]
+        LEER = """() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(); const ths = [...d.querySelectorAll('thead th')]; const i = ths.findIndex(x => x.textContent.trim().toUpperCase() === 'PM OP');
+          const trs = [...d.querySelectorAll('tbody tr')]; return { visible: i >= 0 && getComputedStyle(ths[i]).display !== 'none', marcadas: trs.map(tr => tr.children[i].classList.contains('rmd-desmarcar')), aviso: (trs[1].children[i].title || ''), cuenta: (d.querySelector('#rmd-filtro-bar .rmd-alerta') || {}).textContent }; }"""
+        abrir(pg, filas, pmop=True); a = pg.evaluate(LEER); cerrar_todo(pg)
+        filas[1]["pmop"] = False
+        abrir(pg, filas, pmop=True); b_ = pg.evaluate(LEER); cerrar_todo(pg)
+        ok = a["visible"] and a["marcadas"] == [False, True, False] and "DESMARCAR PM OP" in a["aviso"] and "incoherencia" in (a["cuenta"] or "") and not b_["visible"] and not any(b_["marcadas"])
+        return ok, f"marcada={a} | sin marcar={b_}"
+    @prueba("LN7 'En minúsculas': la descripción se redacta con mayúscula inicial, tildes, unidades, códigos tal cual y punto final")
+    def _():
+        casos = [("ADICION DE CLOROCRESOL.-", "Adición de clorocresol."), ("FECHA / HORA INICIO:", "Fecha / hora inicio:"),
+                 ("VERIFICAR EN LA ETIQUETA DE LIMPIO (FPRO-201 VIGENTE) LA FECHA DE LIMPIEZA", "Verificar en la etiqueta de limpio (FPRO-201 vigente) la fecha de limpieza."),
+                 ("MEDIR 1000ML DE AGUA A 25 °C CON PH 7 EN EL EQUIPO PV1-PHM-09", "Medir 1000 mL de agua a 25 °C con pH 7 en el equipo PV1-PHM-09."),
+                 ("NITROGENACION DE LA SOLUCION EN LA 2DA ETAPA. VERIFICAR LA PRESION", "Nitrogenación de la solución en la 2da etapa. Verificar la presión.")]
+        obtenido = [pg.evaluate("(t) => window.__rmdStats.pasoEnMinusculas(t)", t) for t, _ in casos]
+        return obtenido == [e for _, e in casos], str(obtenido)
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]

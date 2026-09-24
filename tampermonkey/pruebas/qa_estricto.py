@@ -1,13 +1,14 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
   K botón de mejoras y panel · L el botón no desaparece al cargar la página (inyección temprana, como Tampermonkey)
   M aviso de cambios sin guardar (sin falsos avisos tras guardar; aviso propio centrado) · N predecesor obligatorio en pasos con tipo de dato y texto
   'CONTROL DE CALIDAD O CALIDAD EN OPERACIONES' · O Indicadores del mes (libro armado desde SAP, sin descargar) y Documentos
-  citados con procesos menores, incoherencias y Excel (solo abre y cierra ventanas) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  citados con procesos menores, incoherencias y Excel (solo abre y cierra ventanas) · Q v1.21: procesos menores marcados sin abrirlos, PM OP,
+  Pegar en varios pasos, "En minúsculas" (hasta "Nuevo Paso", sin Agregar), latido y Ver todas las OP (solo lectura) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -30,9 +31,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNO).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -982,6 +983,80 @@ with sync_playwright() as p:
             quedan = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length")
             ok = bool(r and r["listas"] >= 5 and r["pms"] > 0 and not r["avisos"] and r["completas"] and hojas == ["Resumen", "Incoherencias", "Documentos citados", "Citas"] and quedan == 1)
             return ok, f"{r}; hojas={hojas}; ventanas abiertas al terminar={quedan}; {round(time.time() - t0)} s"
+        cerrar_seguro()
+
+    # ───────────────────────── Q. v1.21: procesos menores sin abrirlos, PM OP, Pegar en varios pasos, "En minúsculas", latido y Ver todas las OP — solo lectura ─────────────────────────
+    if "Q" in SOLO:
+        RMD_REV = os.environ.get("RMD_REVISION", "2202506829"); RMD_VER_OP = os.environ.get("RMD_OP", "2202504865")
+        ORIGEN = int(os.environ.get("FILA_ORIGEN", "14")); DESTINOS = [int(x) for x in os.environ.get("DESTINOS", "32,33").split(",")]
+        TOPQ = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
+        cerrar_seguro(); pg.set_viewport_size({"width": 1415, "height": 886}); pg.wait_for_timeout(1200)
+        def abrir_fab_q():
+            RmdAutomation(pg).editor_de_rmd(RMD_REV); pg.wait_for_timeout(4000)
+            abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(5000)
+        abrir_fab_q()
+        @prueba("Q1 Procesos menores mal configurados se marcan en la lista de pasos (celda Proc. Men. con contador), sin abrirlos")
+        def _():
+            marcados = fr.evaluate("() => { const d=" + TOPQ + "; return [...d.querySelector('table').querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)).map((tr,k)=>{ const td=tr.querySelector('td.rmd-pm-mal'); return td ? [k, +td.dataset.rmdPm] : null; }).filter(Boolean); }")
+            return (bool(marcados) and all(n > 0 for _k, n in marcados)), f"filas marcadas (fila, incoherencias): {marcados}"
+        @prueba("Q2 PM OP marcada: la columna deja de ocultarse y pide desmarcar; al desmarcarla vuelve a ocultarse (cambio solo en memoria)")
+        def _():
+            def pmop(v):
+                fr.evaluate("(v) => { const d=" + TOPQ + "; const t=d.querySelector('table'); const i=[...t.querySelectorAll('thead th')].findIndex(x=>x.textContent.trim().toUpperCase()==='PM OP'); const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[1];"
+                            " const cb=tr.children[i].querySelector('[role=checkbox]'); const c=sap.ui.getCore().byId(cb.id)||sap.ui.getCore().byId(cb.id.replace(/-CB$/,'')); c.setSelected(v); c.fireSelect({selected:v}); }", v)
+                pg.wait_for_timeout(1500)
+                return fr.evaluate("() => { const d=" + TOPQ + "; const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')]; const i=ths.findIndex(x=>x.textContent.trim().toUpperCase()==='PM OP'); const tr=[...t.querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className))[1];"
+                                   " return [getComputedStyle(ths[i]).display!=='none', tr.children[i].classList.contains('rmd-desmarcar')]; }")
+            a, b_ = pmop(True), pmop(False)
+            return (a == [True, True] and b_ == [False, False]), f"marcada={a} desmarcada={b_}"
+        cerrar_seguro(); abrir_fab_q()
+        @prueba("Q3 Copiar lee los procesos menores del modelo y Pegar en 2 pasos muestra qué pasará en cada uno (se cancela: no escribe)")
+        def _():
+            marcar_fila(fr, pg, ORIGEN); fr.locator(".rmd-copiar").click(); pg.wait_for_timeout(4000)
+            clip = fr.evaluate("(document.querySelector('#rmd-filtro-bar .rmd-clip')||{}).textContent || ''")
+            marcar_fila(fr, pg, ORIGEN)
+            for k in DESTINOS: marcar_fila(fr, pg, k)
+            fr.locator(".rmd-pegar").click(); fr.wait_for_selector(".rmd-modal", timeout=60000); pg.wait_for_timeout(600)
+            v = fr.evaluate("() => { const m=[...document.querySelectorAll('.rmd-modal')].pop(); return { titulo: m.querySelector('h3').textContent, aplicar: [...m.querySelectorAll('.rmd-modal-pie button')].map(x=>x.textContent).pop() }; }")
+            fr.locator(".rmd-modal-pie button", has_text="Cancelar").last.click(); pg.wait_for_timeout(700)
+            return (clip.startswith("Copiado:") and v["titulo"] == f"Pegar en {len(DESTINOS)} pasos" and v["aplicar"] == f"Aplicar en {len(DESTINOS)} pasos" and not fr.evaluate("!!document.querySelector('.rmd-modal')")), f"{clip[:70]!r} {v}"
+        cerrar_seguro(); abrir_fab_q()
+        @prueba("Q4 'En minúsculas' abre 'Nuevo Paso' con el paso redactado y su configuración copiada (se cancela: nunca Agregar)")
+        def _():
+            marcar_fila(fr, pg, ORIGEN)
+            fr.locator(".rmd-minusculas").first.click(); fr.wait_for_selector(".rmd-modal", timeout=30000); pg.wait_for_timeout(500)
+            nueva = fr.evaluate("document.querySelector('.rmd-min-texto').value")
+            fr.locator(".rmd-modal-pie button", has_text="Nuevo Paso").click()
+            fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Nuevo Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=60000); pg.wait_for_timeout(6000)
+            campos = fr.evaluate("() => { const d=" + TOPQ + "; const core=sap.ui.getCore(); const out={}; [...new Set([...d.querySelectorAll('[id]')].map(el=>core.byId(el.id)).filter(c=>c&&c.getBinding))].forEach(c=>{ ['value','selectedKey','state'].forEach(r=>{ const b=c.getBinding(r); if(b&&b.getPath&&/^\\/newPaso\\//.test(b.getPath())) out[b.getPath().slice(9)]=c.getValue ? c.getValue() : (c.getSelectedKey ? c.getSelectedKey() : (c.getState ? c.getState() : null)); }); }); return out; }")
+            for _i in range(2):
+                fr.evaluate("() => { const d=" + TOPQ + "; if(!d||!/^(Nuevo Paso|Configuraci)/.test((d.querySelector('h2')||{}).textContent||'')) return; const b=[...d.querySelectorAll('button')].find(x=>x.getClientRects().length && /^(Cancelar|Cerrar)$/.test(x.textContent.trim())); if(b) sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); }")
+                pg.wait_for_timeout(1800)
+            quedan = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d=>d.getClientRects().length).map(d=>(d.querySelector('h2')||{}).textContent).filter(t=>/^(Nuevo Paso|Configuraci)/.test(t)).length")
+            return (bool(nueva) and campos.get("descripcion") == nueva and bool(campos.get("estructuraId_estructuraId")) and bool(campos.get("etiquetaId_etiquetaId")) and bool(campos.get("tipoDatoId_iMaestraId")) and quedan == 0), f"{nueva!r} {campos}"
+        cerrar_seguro(); RmdAutomation(pg).editor_de_rmd(RMD_REV); pg.wait_for_timeout(4000)
+        @prueba("Q5 Documentos citados lee los procesos menores del modelo (sin abrir sus ventanas): sin avisos de lectura y en menos de 90 s")
+        def _():
+            t0 = time.time(); r = fr.evaluate("async () => { const r = await window.__rmdStats.revisarRMD(); return { fuente: r.fuentePM, avisos: r.avisos, pms: r.pms, inc: r.incoherencias.length }; }"); s_ = round(time.time() - t0)
+            return (r["fuente"] == "modelo" and not r["avisos"] and r["pms"] > 0 and s_ < 90), f"{r} en {s_} s"
+        cerrar_seguro()
+        @prueba("Q6 Latido: el error del refresco automático se omite; los demás errores se muestran")
+        def _():
+            fr.evaluate("(() => { const l=window.__rmdStats.latido; l.enCurso=1; l.esLatido=true; l.inicio=Date.now(); l.interaccion=0; sap.ui.require('sap/m/MessageBox').error('PRUEBA RMD: refresco automático'); })()"); pg.wait_for_timeout(1200)
+            oculto = not fr.evaluate("[...document.querySelectorAll('.sapMMessageDialog')].some(x=>x.getClientRects().length && /PRUEBA RMD/.test(x.textContent))")
+            fr.evaluate("(() => { const l=window.__rmdStats.latido; l.enCurso=0; l.fin=0; l.esLatido=false; sap.ui.require('sap/m/MessageBox').error('PRUEBA RMD: error normal'); })()"); pg.wait_for_timeout(1200)
+            visible = fr.evaluate("[...document.querySelectorAll('.sapMMessageDialog')].some(x=>x.getClientRects().length && /PRUEBA RMD: error normal/.test(x.textContent))")
+            fr.evaluate("(() => { const m=[...document.querySelectorAll('.sapMMessageDialog')].filter(x=>x.getClientRects().length).pop(); if(m){ const b=m.querySelector('footer button'); if(b) sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); } })()"); pg.wait_for_timeout(600)
+            return (oculto and visible), f"omitido={oculto} normal visible={visible}"
+        @prueba("Q7 Ver todas las OP: carga rápida con la misma primera página del portal y los datos de cada fila completos")
+        def _():
+            ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_VER_OP)); pg.wait_for_timeout(2500); ra.configuracion.elegir_accion("Ver OP")
+            fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /Ordenes de Producci/.test((d.querySelector('h2')||{}).textContent||''))", timeout=60000); pg.wait_for_timeout(9000)
+            leer = "() => { const d=" + TOPQ + "; const t=d.querySelector('table.sapMListTbl'); const c=sap.ui.getCore().byId(t.id.replace(/-listUl$/,'')); return c.getItems().map(it=>it.getBindingContext('localModel').getObject()).map(o=>[o.ordenSAP, !!(o.aEstructura&&o.aEstructura.results)]); }"
+            primera = [x[0] for x in fr.evaluate(leer)]; t0 = time.time()
+            fr.locator(".rmd-exportar-op", has_text="Ver todas").click(); fr.wait_for_function("() => !document.querySelector('.rmd-op-avance')", timeout=600000); pg.wait_for_timeout(800)
+            todas = fr.evaluate(leer); s_ = round(time.time() - t0, 1); igual = [x[0] for x in todas][:len(primera)] == primera
+            return (bool(primera) and igual and all(x[1] for x in todas) and s_ < 60), f"{len(todas)} OP en {s_} s; primera página igual={igual}"
         cerrar_seguro()
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
