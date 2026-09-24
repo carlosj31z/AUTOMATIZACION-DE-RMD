@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.19.1
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable a CSV, Documentos citados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente y más.
+// @version      1.20.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5, filtrable y exportable a CSV, Documentos citados e incoherencias de todo el RMD (con procesos menores, en Excel), Indicadores del mes (BD RMD con tablas dinámicas), envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.19.1';                                                       // mantener igual a @version
+  const VERSION = '1.20.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -25,8 +25,9 @@
     ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando")'],
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
     ['verop', 'Ver OP: ver todas y exportar a CSV'],
-    ['documentos', 'Documentos citados (Procedimientos/Formatos/Instructivos)'],
+    ['documentos', 'Documentos citados e incoherencias de todo el RMD (con procesos menores; Excel)'],
     ['statusrmd', 'Botón "Enviar a Status RMD" (maestro completo sin archivo)'],
+    ['indicadores', 'Botón "Indicadores" (Excel del mes con tablas dinámicas)'],
     ['minusculas', 'Pasar MAYÚSCULAS a minúsculas con redacción correcta (experimental)'],
     ['ortografia', 'Avisar ortografía y concordancia en MAYÚSCULAS, tildes y puntuación en minúsculas (experimental)'],
   ];
@@ -242,6 +243,12 @@
   .rmd-tabla th { padding: 6px 8px; border-bottom: 1px solid var(--rmd-borde); text-align: left; font: 600 11px var(--rmd-fuente); letter-spacing: .5px; text-transform: uppercase; color: var(--rmd-apagado); }
   .rmd-tabla td { padding: 6px 8px; border-bottom: 1px solid rgba(128,140,155,.16); text-align: left; vertical-align: top; }
   .rmd-dif { color: var(--rmd-acento-texto); font-weight: 600; } .rmd-atenuada { opacity: .5; } .rmd-nota { color: var(--rmd-apagado); font-size: 13px; }
+  .rmd-modal h4 { margin: 16px 0 4px; font-size: 14px; font-weight: 600; } .rmd-tabla td.rmd-nowrap { white-space: nowrap; }
+  .rmd-progreso { min-height: 1.4em; margin: 0 0 8px; color: var(--rmd-acento-texto); font-size: 13px; } .rmd-progreso.error { color: var(--rmd-rojo); }
+  .rmd-ind-form { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 6px 0 12px; }
+  .rmd-ind-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .rmd-ind-form select, .rmd-ind-form input[type=file] { min-height: 30px; padding: 3px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
+  .rmd-resumen-ind { margin: 4px 0 0 18px; padding: 0; } .rmd-resumen-ind li { margin: 3px 0; }
   .rmd-log { margin: 0; white-space: pre-wrap; font: 12.5px/1.5 ui-monospace, Consolas, monospace; color: var(--rmd-texto); }
   .rmd-toast { position: fixed; left: 50%; bottom: 28px; z-index: 100001; max-width: min(640px, 86vw); transform: translateX(-50%); padding: 10px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-verde); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font: 14px/1.4 var(--rmd-fuente); }
   .rmd-toast.error { border-left-color: var(--rmd-rojo); }
@@ -662,7 +669,7 @@
             (cc ? ' Ojo: el portal vacía este campo al marcar Estado CC; asígnalo después de marcarla.' : ''));
         }
       }
-      if (avisos.length) { alertas += avisos.length; primeras.push({ tr, texto: avisos[0] }); }
+      if (avisos.length) { alertas += avisos.length; primeras.push({ tr, texto: avisos[0], todos: avisos.slice() }); }   // todos: para "Documentos citados"
     });
     const previo = tabla.__rmdAlertas;
     tabla.__rmdAlertas = { n: alertas, filas: primeras, sig: previo ? previo.sig : 0 };
@@ -1111,7 +1118,7 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -1134,6 +1141,7 @@
     gestionarVerOP();
     gestionarDocumentosCitados();
     gestionarBotonStatusRmd();
+    gestionarBotonIndicadores();
     gestionarTextosMayusculas();
   }
   new MutationObserver(() => {
@@ -1798,94 +1806,973 @@
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
   }
 
-  // ---- "Documentos citados" (Procedimientos, Formatos, Instructivos): recorre PRECAUCIONES, NOTAS IMPORTANTES DURANTE EL
-  // PROCESO, CONDICIONES AMBIENTALES y las etiquetas de PROCEDIMIENTO abriendo cada lista de pasos con los mismos botones del
-  // portal (nunca escribe nada), lee la columna Descripción y busca el patrón <Tipo I/P/F><Área>-<sufijo NNN obligatorio>
-  // (mismo criterio que src/rmd_automation/referencias.py). Los procesos menores no se recorren (habría que abrir cada uno).
+  // ==XLSX-INICIO== (no quitar esta marca ni la de cierre: las pruebas extraen este bloque para correrlo fuera del portal)
+  // Libro .xlsx propio, sin librerías (el portal no trae ninguna que escriba tablas dinámicas): celdas con estilo, fórmulas con
+  // su valor ya calculado, autofiltro, paneles fijos y TABLAS DINÁMICAS reales: su caché lleva los registros y la tabla va ya
+  // pintada, así se ven y se pueden filtrar apenas se abre el archivo, en Excel de escritorio o en Excel para la web. También
+  // lee .xlsx (para tomar las listas del mes anterior). Comprime con CompressionStream (deflate-raw), del propio navegador.
+  const Xlsx = (() => {
+    const utf8 = new TextEncoder(), deUtf8 = new TextDecoder();
+    const TABLA_CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+    const crc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = TABLA_CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    const porTubo = async (u8, transformador) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(transformador)).arrayBuffer());
+    const comprimir = (u8) => (typeof CompressionStream === 'undefined' ? null : porTubo(u8, new CompressionStream('deflate-raw')));
+    const descomprimir = (u8) => porTubo(u8, new DecompressionStream('deflate-raw'));
+    const unir = (partes) => { const n = partes.reduce((s, p) => s + p.length, 0), out = new Uint8Array(n); let o = 0; partes.forEach((p) => { out.set(p, o); o += p.length; }); return out; };
+
+    // ---- ZIP (el contenedor del .xlsx) ----
+    async function zip(archivos) {
+      const partes = [], central = []; let desplazamiento = 0;
+      const d = new Date(), hora = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), fecha = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+      for (const a of archivos) {
+        const datos = typeof a.datos === 'string' ? utf8.encode(a.datos) : a.datos, nombre = utf8.encode(a.nombre), crc = crc32(datos);
+        const comp = datos.length > 64 ? await comprimir(datos) : null, usa = !!comp && comp.length < datos.length, cuerpo = usa ? comp : datos;
+        const lh = new DataView(new ArrayBuffer(30));
+        [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, usa ? 8 : 0, 2], [10, hora, 2], [12, fecha, 2], [14, crc, 4], [18, cuerpo.length, 4], [22, datos.length, 4], [26, nombre.length, 2], [28, 0, 2]]
+          .forEach(([o, v, t]) => (t === 4 ? lh.setUint32(o, v, true) : lh.setUint16(o, v, true)));
+        partes.push(new Uint8Array(lh.buffer), nombre, cuerpo);
+        const ch = new DataView(new ArrayBuffer(46));
+        [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, usa ? 8 : 0, 2], [12, hora, 2], [14, fecha, 2], [16, crc, 4], [20, cuerpo.length, 4], [24, datos.length, 4], [28, nombre.length, 2], [42, desplazamiento, 4]]
+          .forEach(([o, v, t]) => (t === 4 ? ch.setUint32(o, v, true) : ch.setUint16(o, v, true)));
+        central.push(new Uint8Array(ch.buffer), nombre);
+        desplazamiento += 30 + nombre.length + cuerpo.length;
+      }
+      const tamCentral = central.reduce((s, x) => s + x.length, 0), fin = new DataView(new ArrayBuffer(22));
+      fin.setUint32(0, 0x06054b50, true); fin.setUint16(8, archivos.length, true); fin.setUint16(10, archivos.length, true); fin.setUint32(12, tamCentral, true); fin.setUint32(16, desplazamiento, true);
+      return unir([...partes, ...central, new Uint8Array(fin.buffer)]);
+    }
+    async function leerZip(u8) {
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      let e = u8.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+      if (e < 0) throw new Error('el archivo no es un .xlsx');
+      const n = dv.getUint16(e + 10, true), archivos = {}; let p = dv.getUint32(e + 16, true);
+      for (let i = 0; i < n; i++) {
+        const metodo = dv.getUint16(p + 10, true), tam = dv.getUint32(p + 20, true), ln = dv.getUint16(p + 28, true), le = dv.getUint16(p + 30, true), lc = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+        const nombre = deUtf8.decode(u8.subarray(p + 46, p + 46 + ln)), ini = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+        archivos[nombre] = { metodo, datos: u8.subarray(ini, ini + tam) };
+        p += 46 + ln + le + lc;
+      }
+      return { nombres: Object.keys(archivos), leer: async (nombre) => { const a = archivos[nombre]; if (!a) return null; return deUtf8.decode(a.metodo === 8 ? await descomprimir(a.datos) : a.datos); } };
+    }
+
+    // ---- XML ----
+    const escXml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    // Caracteres que XML no admite (y, dentro de atributos, los saltos de línea) van como _xHHHH_, igual que los escribe Excel.
+    const escX = (s, enAtributo) => escXml(String(s).replace(/_x([0-9A-Fa-f]{4})_/g, '_x005F_x$1_')
+      .replace(enAtributo ? /[\u0000-\u001F\uFFFE\uFFFF]/g : /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, (c) => '_x' + c.charCodeAt(0).toString(16).padStart(4, '0') + '_'));
+    const desX = (s) => String(s).replace(/&(lt|gt|quot|apos|amp|#(\d+)|#x([0-9a-f]+));/gi, (m, n, dec, hex) => (dec ? String.fromCodePoint(+dec) : hex ? String.fromCodePoint(parseInt(hex, 16)) : { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' }[n.toLowerCase()]))
+      .replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+    const letra = (c) => { let s = ''; for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s; };
+    const ref = (c, r) => letra(c) + (r + 1);                                            // columna y fila desde 0
+    const deRef = (x) => { const m = /^([A-Z]+)(\d+)$/.exec(x); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return { c: c - 1, r: +m[2] - 1 }; };
+    const numXml = (n) => (Number.isInteger(n) ? String(n) : String(+n.toPrecision(15)));
+
+    // ---- fechas de Excel (sistema 1900) ----
+    // Una fecha se escribe con su hora UTC, igual que el "Exportar" nativo del portal (sap.ui.export escribe las fechas en UTC):
+    // así el archivo muestra lo mismo que el exportado a mano, en cualquier zona horaria. Para un día sin hora: Date.UTC(a, m, d).
+    const serialDeFecha = (d) => d.getTime() / 86400000 + 25569;
+    const isoFecha = (d) => d.toISOString().slice(0, 19);
+    const ERRORES = new Set(['#NULL!', '#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#NUM!', '#N/A']);
+    const esError = (v) => !!v && typeof v === 'object' && !!v.error;
+    const error = (codigo) => ({ error: codigo });
+
+    // ---- estilos (índices fijos que usan las hojas) ----
+    // [nombre, formato de número, fuente, relleno, borde, alineación]. Fuentes: 0 normal, 1 negrita, 2 título, 3 nota, 4 negrita
+    // blanca, 5 negrita roja, 6 negrita 10. Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo,
+    // 9 amarillo claro. Formatos propios: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0, 167 dd/mm/aaaa, 168 0.0%; 17 = mmm-aa.
+    const ESTILOS = [['normal', 0, 0, 0, 0], ['cabecera', 0, 1, 2, 0], ['cabeceraVerde', 0, 0, 3, 0, 'horizontal="center"'],
+      ['cabeceraVerdeFecha', 165, 0, 3, 0, 'horizontal="center" wrapText="1"'], ['cabeceraAmbar', 0, 1, 4, 0, 'horizontal="center"'],
+      ['cabeceraGris', 0, 1, 5, 0, 'horizontal="center"'], ['fecha', 164, 0, 0, 0], ['texto', 0, 0, 0, 0, 'horizontal="left"'],
+      ['centrado', 0, 0, 0, 0, 'horizontal="center"'], ['titulo', 0, 2, 0, 0], ['nota', 0, 3, 0, 0], ['encabezado', 0, 1, 6, 1, 'vertical="center" wrapText="1"'],
+      ['decimal', 166, 0, 0, 1], ['porcentaje', 168, 0, 0, 1], ['fechaDia', 167, 0, 0, 0], ['alerta', 0, 5, 0, 0], ['tituloAzul', 0, 1, 7, 0],
+      ['negrita', 0, 1, 0, 0], ['mesAnio', 17, 1, 0, 0, 'horizontal="left"'], ['entrada', 0, 0, 8, 1], ['sugerido', 0, 0, 9, 0], ['nombre', 0, 6, 0, 0],
+      ['decimal1', 166, 0, 0, 0], ['envuelto', 0, 0, 0, 1, 'vertical="top" wrapText="1"'], ['celda', 0, 0, 0, 1, 'vertical="top"'],
+      ['notaAmarilla', 0, 1, 8, 0, 'horizontal="center"'], ['entero', 0, 0, 0, 1]];
+    const S = Object.fromEntries(ESTILOS.map(([n], i) => [n, i]));
+    const fuente = (b, i, sz, color) => `<font>${b ? '<b/>' : ''}${i ? '<i/>' : ''}<sz val="${sz}"/><color rgb="FF${color}"/><name val="Arial"/><family val="2"/></font>`;
+    const relleno = (rgb) => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
+    const XML_ESTILOS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="5"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="yyyy\\-mm\\-dd;@"/><numFmt numFmtId="166" formatCode="0.0"/><numFmt numFmtId="167" formatCode="dd/mm/yyyy"/><numFmt numFmtId="168" formatCode="0.0%"/></numFmts>
+<fonts count="7">${fuente(0, 0, 11, '000000')}${fuente(1, 0, 11, '000000')}${fuente(1, 0, 12, '1F3A5F')}${fuente(0, 1, 9, '595959')}${fuente(1, 0, 11, 'FFFFFF')}${fuente(1, 0, 11, 'C00000')}${fuente(1, 0, 10, '000000')}</fonts>
+<fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['F7F7F7', '00B050', 'FFC000', 'C9C9C9', 'DDEBF7', '00B0F0', 'FFFF00', 'FFF2CC'].map(relleno).join('')}</fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="${ESTILOS.length}">${ESTILOS.map(([, nf, fo, fi, bo, al]) => `<xf numFmtId="${nf}" fontId="${fo}" fillId="${fi}" borderId="${bo}" xfId="0"${nf ? ' applyNumberFormat="1"' : ''}${fo ? ' applyFont="1"' : ''}${fi ? ' applyFill="1"' : ''}${bo ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1"><alignment ${al}/></xf>` : '/>'}`).join('')}</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+
+    // ---- libro ----
+    // hoja.celdas: Map "fila,columna" -> { v, f, s }; v puede ser texto, número, Date, booleano, null o error('#VALUE!').
+    function crearLibro() {
+      const hojas = [], cachés = [], dinamicas = [];
+      const hoja = (nombre, op = {}) => {
+        // tabla: { nombre, ref } convierte ese rango (con su fila de encabezados) en una tabla de Excel, con su propio autofiltro.
+        const h = { nombre, filas: new Map(), cols: op.cols || [], congelar: op.congelar || null, filtro: op.tabla ? null : op.filtro || null, tabla: op.tabla || null, activa: !!op.activa, dinamicas: [], combinadas: [] };
+        h.poner = (celda, v, s, f) => { const { c, r } = typeof celda === 'string' ? deRef(celda) : celda; let fila = h.filas.get(r); if (!fila) { fila = new Map(); h.filas.set(r, fila); } fila.set(c, { v, s: s == null ? undefined : (typeof s === 'string' ? S[s] : s), f }); };
+        h.combinar = (rango) => { h.combinadas.push(rango); };
+        hojas.push(h); return h;
+      };
+      // Caché de tabla dinámica: los datos de origen tal como los ve Excel (una fila por registro, un valor por campo). extras:
+      // { campo: [valores] } que no están en los datos pero que los filtros deben conocer (Excel los guarda como elementos "sin
+      // uso"): así, si alguien escribe luego ese valor en la hoja y actualiza, el filtro ya sabe si lo muestra o lo oculta.
+      // op.tabla: nombre de la tabla de Excel de origen (así, al actualizar, la tabla dinámica toma también las filas agregadas).
+      const cache = (hojaOrigen, campos, registros, rango, op = {}) => { const c = { id: cachés.length + 1, hoja: hojaOrigen, campos, registros, rango, tabla: op.tabla || null, usados: new Set(), extras: op.extras || {} }; cachés.push(c); return c; };
+      // La tabla se calcula y se pinta en el momento (así quien la crea sabe cuánto ocupa y dónde poner lo siguiente).
+      const dinamica = (hojaDestino, cacheDinamica, def) => {
+        const d = { ...def, cache: cacheDinamica, hoja: hojaDestino }; [...def.filas, ...(def.columnas || []), ...(def.paginas || []).map((p) => p.campo)].forEach((n) => cacheDinamica.usados.add(n));
+        d.pintada = pintarDinamica(d); hojaDestino.dinamicas.push(d); dinamicas.push(d); return d.pintada;
+      };
+      return { hoja, cache, dinamica, generar: () => generarLibro(hojas, cachés, dinamicas), hojas };
+    }
+
+    // Orden de Excel para los elementos de una tabla dinámica: números, textos (sin distinguir mayúsculas), lógicos, errores y
+    // al final el vacío "(en blanco)".
+    const claseOrden = (v) => (v == null || v === '' ? 4 : typeof v === 'number' ? 0 : v instanceof Date ? 0 : typeof v === 'boolean' ? 2 : esError(v) ? 3 : 1);
+    const comparar = (a, b) => {
+      const ca = claseOrden(a), cb = claseOrden(b); if (ca !== cb) return ca - cb;
+      if (ca === 0) return (a instanceof Date ? a.getTime() : a) - (b instanceof Date ? b.getTime() : b);
+      if (ca === 1) return String(a).localeCompare(String(b), 'es', { sensitivity: 'base' }) || (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
+      if (ca === 2) return (a ? 1 : 0) - (b ? 1 : 0);
+      if (ca === 3) return a.error < b.error ? -1 : a.error > b.error ? 1 : 0;
+      return 0;
+    };
+    const claveElemento = (v) => (v == null || v === '' ? (v === '' ? 's:' : 'm') : typeof v === 'number' ? 'n:' + v : v instanceof Date ? 'd:' + v.getTime() : typeof v === 'boolean' ? 'b:' + v : esError(v) ? 'e:' + v.error : 's:' + String(v).toLowerCase());
+    // Celda vacía: "(en blanco)"; texto vacío (una fórmula que devuelve ""): elemento sin rótulo, como lo muestra Excel.
+    const rotulo = (v) => (v == null ? '(en blanco)' : v === '' ? '' : v instanceof Date ? isoFecha(v).slice(0, 10) : esError(v) ? v.error : v);
+
+    function xmlCelda(c, r, x) {
+      const at = `r="${ref(c, r)}"${x.s != null ? ` s="${x.s}"` : ''}`;
+      const v = x.v, f = x.f != null ? `<f>${escX(x.f)}</f>` : '';
+      if (x.f != null) {
+        if (esError(v)) return `<c ${at} t="e">${f}<v>${v.error}</v></c>`;
+        if (typeof v === 'number') return `<c ${at}>${f}<v>${numXml(v)}</v></c>`;
+        if (typeof v === 'boolean') return `<c ${at} t="b">${f}<v>${v ? 1 : 0}</v></c>`;
+        const t = v == null ? '' : String(v);
+        return `<c ${at} t="str">${f}<v${/^\s|\s$|\n/.test(t) ? ' xml:space="preserve"' : ''}>${escX(t)}</v></c>`;
+      }
+      if (v == null || v === '') return x.s != null ? `<c ${at}/>` : '';
+      if (typeof v === 'number') return `<c ${at}><v>${numXml(v)}</v></c>`;
+      if (v instanceof Date) return `<c ${at}><v>${numXml(serialDeFecha(v))}</v></c>`;
+      if (typeof v === 'boolean') return `<c ${at} t="b"><v>${v ? 1 : 0}</v></c>`;
+      if (esError(v)) return `<c ${at} t="e"><v>${v.error}</v></c>`;
+      return null;                                                                           // texto: va a las cadenas compartidas
+    }
+
+    async function generarLibro(hojas, cachés, dinamicas) {
+      const compartidas = new Map(), lista = [];
+      const idTexto = (t) => { let i = compartidas.get(t); if (i === undefined) { i = lista.length; compartidas.set(t, i); lista.push(t); } return i; };
+      const archivos = [];
+      const pintadas = dinamicas.map((d) => d.pintada), tablas = [];                         // (las dinámicas se pintaron al crearlas)
+      hojas.forEach((h, ih) => {
+        const filas = [...h.filas.keys()].sort((a, b) => a - b); let maxC = 0, maxR = 0;
+        const cuerpo = filas.map((r) => {
+          const fila = h.filas.get(r), cols = [...fila.keys()].sort((a, b) => a - b); maxR = Math.max(maxR, r); maxC = Math.max(maxC, cols[cols.length - 1] || 0);
+          return `<row r="${r + 1}">` + cols.map((c) => { const x = fila.get(c), xml = xmlCelda(c, r, x); return xml !== null ? xml : `<c r="${ref(c, r)}"${x.s != null ? ` s="${x.s}"` : ''} t="s"><v>${idTexto(String(x.v))}</v></c>`; }).join('') + '</row>';
+        }).join('');
+        const cong = h.congelar ? (() => { const { c, r } = deRef(h.congelar); const zona = c && r ? 'bottomRight' : c ? 'topRight' : 'bottomLeft';
+          return `<pane${c ? ` xSplit="${c}"` : ''}${r ? ` ySplit="${r}"` : ''} topLeftCell="${h.congelar}" activePane="${zona}" state="frozen"/><selection pane="${zona}" activeCell="${h.congelar}" sqref="${h.congelar}"/>`; })() : '';
+        const cols = h.cols.length ? `<cols>${h.cols.map(([a, b, w]) => `<col min="${a}" max="${b}" width="${w}" customWidth="1"/>`).join('')}</cols>` : '';
+        const rels = h.dinamicas.map((d, k) => `<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable${dinamicas.indexOf(d) + 1}.xml"/>`);
+        let partesTabla = '';
+        if (h.tabla) {
+          const id = tablas.length + 1, rid = `rId${rels.length + 1}`, { c: c1 } = deRef(h.tabla.ref.split(':')[1]), { c: c0 } = deRef(h.tabla.ref.split(':')[0]), enc = h.filas.get(0) || new Map();
+          const columnas = []; for (let c = c0; c <= c1; c++) columnas.push(`<tableColumn id="${c - c0 + 1}" name="${escXml(String((enc.get(c) || {}).v || 'Columna' + (c - c0 + 1)))}"/>`);
+          tablas.push({ nombre: `xl/tables/table${id}.xml`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="${id}" name="${escXml(h.tabla.nombre)}" displayName="${escXml(h.tabla.nombre)}" ref="${h.tabla.ref}" totalsRowShown="0"><autoFilter ref="${h.tabla.ref}"/><tableColumns count="${columnas.length}">${columnas.join('')}</tableColumns><tableStyleInfo showFirstColumn="0" showLastColumn="0" showRowStripes="0" showColumnStripes="0"/></table>` });
+          rels.push(`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" Target="../tables/table${id}.xml"/>`);
+          partesTabla = `<tableParts count="1"><tablePart r:id="${rid}"/></tableParts>`;
+        }
+        archivos.push({ nombre: `xl/worksheets/sheet${ih + 1}.xml`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${ref(maxC, maxR)}"/><sheetViews><sheetView${h.activa ? ' tabSelected="1"' : ''} workbookViewId="0">${cong}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="14.25"/>${cols}<sheetData>${cuerpo}</sheetData>${h.filtro ? `<autoFilter ref="${h.filtro}"/>` : ''}${h.combinadas.length ? `<mergeCells count="${h.combinadas.length}">${h.combinadas.map((x) => `<mergeCell ref="${x}"/>`).join('')}</mergeCells>` : ''}<pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/>${partesTabla}</worksheet>` });
+        if (rels.length) archivos.push({ nombre: `xl/worksheets/_rels/sheet${ih + 1}.xml.rels`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>` });
+      });
+      archivos.push(...tablas);
+      cachés.forEach((c) => archivos.push(...xmlCache(c)));
+      pintadas.forEach((p, k) => {
+        archivos.push({ nombre: `xl/pivotTables/pivotTable${k + 1}.xml`, datos: p.xml });
+        archivos.push({ nombre: `xl/pivotTables/_rels/pivotTable${k + 1}.xml.rels`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition${p.cache.id}.xml"/></Relationships>` });
+      });
+      archivos.push({ nombre: 'xl/sharedStrings.xml', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${lista.length}" uniqueCount="${lista.length}">${lista.map((t) => `<si><t${/^\s|\s$|\n/.test(t) ? ' xml:space="preserve"' : ''}>${escX(t)}</t></si>`).join('')}</sst>` });
+      archivos.push({ nombre: 'xl/styles.xml', datos: XML_ESTILOS });
+      const nombresDef = hojas.map((h, i) => (h.filtro ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${h.nombre.replace(/'/g, "''")}'!$${h.filtro.replace(':', ':$').replace(/([A-Z]+)(\d+)/g, '$1$$$2')}</definedName>` : '')).join('');
+      archivos.push({ nombre: 'xl/workbook.xml', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="${Math.max(0, hojas.findIndex((h) => h.activa))}"/></bookViews><sheets>${hojas.map((h, i) => `<sheet name="${escXml(h.nombre)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${nombresDef ? `<definedNames>${nombresDef}</definedNames>` : ''}<calcPr calcId="191029" fullCalcOnLoad="1"/>${cachés.length ? `<pivotCaches>${cachés.map((c) => `<pivotCache cacheId="${c.id}" r:id="rId${hojas.length + 2 + c.id}"/>`).join('')}</pivotCaches>` : ''}</workbook>` });
+      archivos.push({ nombre: 'xl/_rels/workbook.xml.rels', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${hojas.map((h, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${hojas.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId${hojas.length + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>${cachés.map((c) => `<Relationship Id="rId${hojas.length + 2 + c.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition${c.id}.xml"/>`).join('')}</Relationships>` });
+      archivos.push({ nombre: '[Content_Types].xml', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${hojas.map((h, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>${cachés.map((c) => `<Override PartName="/xl/pivotCache/pivotCacheDefinition${c.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/><Override PartName="/xl/pivotCache/pivotCacheRecords${c.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>`).join('')}${pintadas.map((p, k) => `<Override PartName="/xl/pivotTables/pivotTable${k + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>`).join('')}${tablas.map((t) => `<Override PartName="/${t.nombre}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>`).join('')}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>` });
+      archivos.push({ nombre: '_rels/.rels', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>` });
+      const ahora = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+      archivos.push({ nombre: 'docProps/core.xml', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>RMD · mejoras de interfaz</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${ahora}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${ahora}</dcterms:modified></cp:coreProperties>` });
+      archivos.push({ nombre: 'docProps/app.xml', datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application></Properties>` });
+      return zip(archivos);
+    }
+
+    // ---- tablas dinámicas ----
+    // Por cada campo usado en alguna tabla: sus elementos únicos (sin distinguir mayúsculas, como Excel), en el orden en que
+    // aparecen; y el orden en que se muestran (ascendente).
+    function elementosDe(c, nombre) {
+      c.elementos = c.elementos || {};
+      if (c.elementos[nombre]) return c.elementos[nombre];
+      const i = c.campos.indexOf(nombre); if (i < 0) throw new Error('campo inexistente: ' + nombre);
+      const valores = [], indice = new Map(), sinUso = new Set();
+      c.registros.forEach((reg) => { const v = reg[i], k = claveElemento(v); if (!indice.has(k)) { indice.set(k, valores.length); valores.push(v == null ? null : v); } });
+      (c.extras[nombre] || []).forEach((v) => { const k = claveElemento(v); if (!indice.has(k)) { indice.set(k, valores.length); sinUso.add(valores.length); valores.push(v); } });
+      const orden = valores.map((_, k) => k).sort((a, b) => comparar(valores[a], valores[b]) || a - b);
+      const posicion = new Map(orden.map((k, p) => [k, p]));
+      return (c.elementos[nombre] = { i, valores, indice, orden, posicion, sinUso });
+    }
+    const tipoCampo = (valores) => {
+      const t = { blanco: false, texto: false, numero: false, entero: true, fecha: false, error: false, logico: false, largo: false, min: Infinity, max: -Infinity, minF: null, maxF: null };
+      valores.forEach((v) => {
+        if (v == null || v === '') { if (v === '') t.texto = true; else t.blanco = true; return; }
+        if (typeof v === 'number') { t.numero = true; if (!Number.isInteger(v)) t.entero = false; t.min = Math.min(t.min, v); t.max = Math.max(t.max, v); return; }
+        if (v instanceof Date) { t.fecha = true; if (!t.minF || v < t.minF) t.minF = v; if (!t.maxF || v > t.maxF) t.maxF = v; return; }
+        if (typeof v === 'boolean') { t.logico = true; return; }
+        if (esError(v)) { t.error = true; return; }
+        t.texto = true; if (String(v).length > 255) t.largo = true;
+      });
+      return t;
+    };
+    function atributosElementos(t, cuenta) {
+      const a = [], tipos = [t.texto || t.error, t.numero, t.fecha, t.logico].filter(Boolean).length;
+      if (!t.texto && !t.error && !t.logico && !t.blanco && (t.numero || t.fecha)) a.push('containsSemiMixedTypes="0"');
+      if (!t.texto && !t.error && !t.logico && !t.numero) a.push('containsNonDate="0"');
+      if (t.fecha) a.push('containsDate="1"');
+      if (!t.texto && !t.error) a.push('containsString="0"');
+      if (t.blanco) a.push('containsBlank="1"');
+      if (tipos > 1) a.push('containsMixedTypes="1"');
+      if (t.numero) { a.push('containsNumber="1"'); if (t.entero) a.push('containsInteger="1"'); a.push(`minValue="${numXml(t.min)}" maxValue="${numXml(t.max)}"`); }
+      if (t.fecha) a.push(`minDate="${isoFecha(t.minF)}" maxDate="${isoFecha(t.maxF)}"`);
+      if (t.largo) a.push('longText="1"');
+      if (cuenta != null) a.push(`count="${cuenta}"`);
+      return a.join(' ');
+    }
+    const xmlValorCache = (v, sinUso) => (v == null ? '<m/>' : typeof v === 'number' ? `<n v="${numXml(v)}"/>` : v instanceof Date ? `<d v="${isoFecha(v)}"/>`
+      : typeof v === 'boolean' ? `<b v="${v ? 1 : 0}"/>` : esError(v) ? `<e v="${v.error}"/>` : `<s v="${escX(v, true)}"${sinUso ? ' u="1"' : ''}/>`);
+    function xmlCache(c) {
+      const conElementos = new Set(c.usados);
+      const campos = c.campos.map((nombre, i) => {
+        const valores = c.registros.map((r) => r[i]), t = tipoCampo(valores);
+        if (!conElementos.has(nombre)) return `<cacheField name="${escXml(nombre)}" numFmtId="0"><sharedItems ${atributosElementos(t)}/></cacheField>`;
+        const e = elementosDe(c, nombre), te = e.sinUso.size ? tipoCampo(e.valores) : t;         // los elementos sin uso también cuentan
+        return `<cacheField name="${escXml(nombre)}" numFmtId="0"><sharedItems ${atributosElementos(te, e.valores.length)}>${e.valores.map((v, k) => xmlValorCache(v, e.sinUso.has(k))).join('')}</sharedItems></cacheField>`;
+      });
+      const idx = c.campos.map((n) => (conElementos.has(n) ? elementosDe(c, n) : null));
+      const registros = c.registros.map((r) => '<r>' + r.map((v, i) => (idx[i] ? `<x v="${idx[i].indice.get(claveElemento(v))}"/>` : xmlValorCache(v === '' ? '' : v))).join('') + '</r>').join('');
+      return [
+        { nombre: `xl/pivotCache/pivotCacheDefinition${c.id}.xml`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1" refreshedBy="RMD · mejoras de interfaz" refreshedDate="${numXml(serialDeFecha(new Date()))}" createdVersion="8" refreshedVersion="8" minRefreshableVersion="3" recordCount="${c.registros.length}"><cacheSource type="worksheet">${c.tabla ? `<worksheetSource name="${escXml(c.tabla)}"/>` : `<worksheetSource ref="${c.rango}" sheet="${escXml(c.hoja.nombre)}"/>`}</cacheSource><cacheFields count="${c.campos.length}">${campos.join('')}</cacheFields></pivotCacheDefinition>` },
+        { nombre: `xl/pivotCache/_rels/pivotCacheDefinition${c.id}.xml.rels`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords" Target="pivotCacheRecords${c.id}.xml"/></Relationships>` },
+        { nombre: `xl/pivotCache/pivotCacheRecords${c.id}.xml`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" count="${c.registros.length}">${registros}</pivotCacheRecords>` },
+      ];
+    }
+
+    // Calcula y pinta una tabla dinámica en formato tabular (como las del archivo de indicadores): filtros de página arriba, una
+    // fila de encabezados, las filas con sus subtotales ("Total …") y el "Total general". def: { nombre, celda, filas[], columnas[],
+    // paginas[{ campo, visible(v) }], ocultar{ campo: fn(v) }, valor{ campo, funcion 'count'|'sum', nombre } }.
+    function pintarDinamica(d) {
+      const c = d.cache, h = d.hoja, cols = d.columnas || [], pags = d.paginas || [];
+      const E = {}; [...d.filas, ...cols, ...pags.map((p) => p.campo)].forEach((n) => { E[n] = elementosDe(c, n); });
+      const visibleEn = (n) => { const p = pags.find((x) => x.campo === n), o = d.ocultar && d.ocultar[n]; return (v) => (!p || p.visible(v)) && (!o || !o(v)); };
+      const filtros = Object.keys(E).map((n) => ({ i: E[n].i, ok: visibleEn(n) }));
+      const iValor = c.campos.indexOf(d.valor.campo);
+      // registros que pasan todos los filtros
+      const regs = c.registros.filter((r) => filtros.every((f) => f.ok(r[f.i])));
+      const posDe = (n, v) => E[n].posicion.get(E[n].indice.get(claveElemento(v)));
+      const acumular = (acc, v) => {
+        if (d.valor.funcion === 'count') { if (v != null && v !== '') acc.n++; return; }
+        if (esError(v)) acc.err = acc.err || v.error; else if (typeof v === 'number') { acc.s += v; acc.hay = true; }
+        acc.n++;
+      };
+      const nuevo = () => ({ n: 0, s: 0, err: null, hay: false });
+      const final = (acc) => (d.valor.funcion === 'count' ? (acc.n ? acc.n : null) : acc.err ? error(acc.err) : acc.n ? +acc.s.toPrecision(15) : null);
+      // árbol de filas y columnas con los agregados
+      const R = d.filas.length, iF = d.filas.map((n) => E[n].i), iC = cols.map((n) => E[n].i);
+      const raiz = { hijos: new Map(), acc: nuevo(), porCol: new Map() }, totalCol = new Map(), colsVistas = new Set();
+      regs.forEach((reg) => {
+        const v = reg[iValor], kc = cols.length ? posDe(cols[0], reg[iC[0]]) : null;
+        if (kc != null) colsVistas.add(kc);
+        let nodo = raiz;
+        const sumar = (x) => { acumular(x.acc, v); if (kc != null) { let a = x.porCol.get(kc); if (!a) { a = nuevo(); x.porCol.set(kc, a); } acumular(a, v); } };
+        sumar(nodo);
+        for (let k = 0; k < R; k++) {
+          const p = posDe(d.filas[k], reg[iF[k]]); let hijo = nodo.hijos.get(p);
+          if (!hijo) { hijo = { hijos: new Map(), acc: nuevo(), porCol: new Map() }; nodo.hijos.set(p, hijo); }
+          nodo = hijo; sumar(nodo);
+        }
+      });
+      const colsOrden = [...colsVistas].sort((a, b) => a - b);
+      // geometría
+      const { c: c0, r: r0 } = deRef(d.celda), encab = cols.length ? 2 : 1, ancho = R + (cols.length ? colsOrden.length + 1 : 1);
+      const lineas = [];                                                                     // { tipo, nivel, ruta[], nodo, r }
+      const recorrer = (nodo, nivel, ruta, rep) => {
+        const hijos = [...nodo.hijos.keys()].sort((a, b) => a - b);
+        hijos.forEach((p, j) => {
+          const hijo = nodo.hijos.get(p), r = j === 0 ? rep : nivel;
+          if (nivel < R - 1) { recorrer(hijo, nivel + 1, [...ruta, p], r); lineas.push({ tipo: 'sub', nivel, ruta: [...ruta, p], nodo: hijo }); }
+          else lineas.push({ tipo: 'dato', nivel, ruta: [...ruta, p], nodo: hijo, r });
+        });
+      };
+      recorrer(raiz, 0, [], 0);
+      lineas.push({ tipo: 'total', nodo: raiz });
+      const valorDe = (nodo, kc) => final(kc == null ? nodo.acc : nodo.porCol.get(kc) || nuevo());
+      const poner = (cc, rr, v, s) => { if (v != null) h.poner({ c: cc, r: rr }, v, s); };
+      const valorCampo = (n, p) => rotulo(E[n].valores[E[n].orden[p]]);
+      // filtros de página: rótulo y lo que muestra ("(Todas)", "(Varios elementos)", el único elemento o "(en blanco)"); como en
+      // Excel, solo cuentan los elementos que están en los datos (no los "sin uso").
+      pags.forEach((p, k) => {
+        const e = E[p.campo], usados = e.orden.filter((x) => !e.sinUso.has(x)), vis = usados.filter((x) => p.visible(e.valores[x]));
+        const texto = vis.length === usados.length ? '(Todas)' : vis.length === 1 ? rotulo(e.valores[vis[0]]) : '(Varios elementos)';
+        h.poner({ c: c0, r: r0 - 1 - pags.length + k }, p.campo); h.poner({ c: c0 + 1, r: r0 - 1 - pags.length + k }, texto);
+      });
+      if (cols.length) { h.poner({ c: c0, r: r0 }, d.valor.nombre); h.poner({ c: c0 + R, r: r0 }, cols[0]); }
+      const rEnc = r0 + encab - 1;
+      d.filas.forEach((n, k) => h.poner({ c: c0 + k, r: rEnc }, n));
+      if (cols.length) { colsOrden.forEach((p, k) => h.poner({ c: c0 + R + k, r: rEnc }, valorCampo(cols[0], p))); h.poner({ c: c0 + R + colsOrden.length, r: rEnc }, 'Total general'); }
+      else h.poner({ c: c0 + R, r: rEnc }, d.valor.nombre);
+      lineas.forEach((L, j) => {
+        const rr = rEnc + 1 + j;
+        if (L.tipo === 'dato') for (let k = L.r; k < R; k++) h.poner({ c: c0 + k, r: rr }, valorCampo(d.filas[k], L.ruta[k]));
+        else if (L.tipo === 'sub') h.poner({ c: c0 + L.nivel, r: rr }, 'Total ' + valorCampo(d.filas[L.nivel], L.ruta[L.nivel]));
+        else h.poner({ c: c0, r: rr }, 'Total general');
+        if (cols.length) { colsOrden.forEach((p, k) => poner(c0 + R + k, rr, valorDe(L.nodo, p))); poner(c0 + R + colsOrden.length, rr, valorDe(L.nodo, null)); }
+        else poner(c0 + R, rr, valorDe(L.nodo, null));
+      });
+      const rFin = rEnc + lineas.length;
+      // XML de la tabla
+      const x = (p) => (p ? `<x v="${p}"/>` : '<x/>');
+      const rowItems = lineas.map((L) => (L.tipo === 'dato' ? `<i${L.r ? ` r="${L.r}"` : ''}>${L.ruta.slice(L.r).map(x).join('')}</i>`
+        : L.tipo === 'sub' ? `<i t="default"${L.nivel ? ` r="${L.nivel}"` : ''}>${x(L.ruta[L.nivel])}</i>` : '<i t="grand"><x/></i>')).join('');
+      const colItems = cols.length ? colsOrden.map((p) => `<i>${x(p)}</i>`).join('') + '<i t="grand"><x/></i>' : '<i/>';
+      const campos = c.campos.map((n, i) => {
+        const e = E[n], esFila = d.filas.includes(n), esCol = cols.includes(n), pag = pags.find((p) => p.campo === n), esDato = i === iValor;
+        const base = `compact="0" outline="0" showAll="0"${esDato ? ' dataField="1"' : ''}`;
+        if (!e) return `<pivotField ${base}/>`;
+        const vis = visibleEn(n);
+        const items = e.orden.map((k) => `<item${vis(e.valores[k]) ? '' : ' h="1"'}${e.sinUso.has(k) ? ' m="1"' : ''} x="${k}"/>`).join('') + '<item t="default"/>';
+        const eje = esFila ? 'axisRow' : esCol ? 'axisCol' : 'axisPage';
+        return `<pivotField axis="${eje}" compact="0" outline="0"${pag ? ' multipleItemSelectionAllowed="1"' : ''} showAll="0"${esDato ? ' dataField="1"' : ''}><items count="${e.orden.length + 1}">${items}</items></pivotField>`;
+      });
+      const ubic = `<location ref="${ref(c0, r0)}:${ref(c0 + ancho - 1, rFin)}" firstHeaderRow="1" firstDataRow="${cols.length ? 2 : 1}" firstDataCol="${R}"${pags.length ? ` rowPageCount="${pags.length}" colPageCount="1"` : ''}/>`;
+      const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="${escXml(d.nombre)}" cacheId="${c.id}" applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Valores" updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" createdVersion="8" indent="0" compact="0" compactData="0" multipleFieldFilters="0">${ubic}<pivotFields count="${campos.length}">${campos.join('')}</pivotFields><rowFields count="${R}">${d.filas.map((n) => `<field x="${E[n].i}"/>`).join('')}</rowFields><rowItems count="${lineas.length}">${rowItems}</rowItems>${cols.length ? `<colFields count="1"><field x="${E[cols[0]].i}"/></colFields>` : ''}<colItems count="${cols.length ? colsOrden.length + 1 : 1}">${colItems}</colItems>${pags.length ? `<pageFields count="${pags.length}">${pags.map((p) => `<pageField fld="${E[p.campo].i}" hier="-1"/>`).join('')}</pageFields>` : ''}<dataFields count="1"><dataField name="${escXml(d.valor.nombre)}" fld="${iValor}"${d.valor.funcion === 'count' ? ' subtotal="count"' : ''} baseField="0" baseItem="0"/></dataFields><pivotTableStyleInfo name="PivotStyleLight16" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/></pivotTableDefinition>`;
+      // valorDe(['PLANTA ATE', 'NC']) -> el total de esa fila (o de ese subtotal) tal como queda en la tabla; null si no aparece.
+      const valorDeFila = (etiquetas) => {
+        let nodo = raiz;
+        for (let k = 0; k < etiquetas.length; k++) {
+          const p = [...nodo.hijos.keys()].find((q) => String(valorCampo(d.filas[k], q)).toUpperCase() === String(etiquetas[k]).toUpperCase());
+          if (p == null) return null; nodo = nodo.hijos.get(p);
+        }
+        return final(nodo.acc);
+      };
+      return { xml, cache: c, celda: ref(c0, r0), rango: `${ref(c0, r0)}:${ref(c0 + ancho - 1, rFin)}`, filaIni: r0, filaFin: rFin, colIni: c0, colFin: c0 + ancho - 1, lineas: lineas.length, valorDe: valorDeFila };
+    }
+
+    // ---- lectura mínima de un .xlsx (valores de las hojas) ----
+    async function leerLibro(u8) {
+      const z = await leerZip(u8);
+      const wb = await z.leer('xl/workbook.xml'), rels = await z.leer('xl/_rels/workbook.xml.rels');
+      if (!wb || !rels) throw new Error('el archivo no es un libro de Excel');
+      const destino = {}; for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) { const id = /\bId="([^"]+)"/.exec(m[0]), t = /\bTarget="([^"]+)"/.exec(m[0]); if (id && t) destino[id[1]] = t[1]; }
+      const hojas = []; for (const m of wb.matchAll(/<sheet\b[^>]*>/g)) { const nom = /\bname="([^"]*)"/.exec(m[0]), rid = /\br:id="([^"]+)"/.exec(m[0]); if (nom && rid) hojas.push({ nombre: desX(nom[1]), ruta: 'xl/' + destino[rid[1]].replace(/^\/?xl\//, '').replace(/^\//, '') }); }
+      const ss = await z.leer('xl/sharedStrings.xml'), compartidas = [];
+      if (ss) for (const m of ss.matchAll(/<si>([\s\S]*?)<\/si>/g)) compartidas.push([...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*?(?:\/>|>([\s\S]*?)<\/t>)/g)].map((t) => desX(t[1] || '')).join(''));
+      return {
+        hojas: hojas.map((h) => h.nombre),
+        async filas(nombre) {                                                                   // [[valor…]…], con los huecos en null
+          const h = hojas.find((x) => x.nombre === nombre); if (!h) return null;
+          const xml = await z.leer(h.ruta); if (!xml) return null;
+          const filas = [];
+          for (const m of xml.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+            const at = m[1], cont = m[2] || '', r = /\br="([A-Z]+\d+)"/.exec(at); if (!r) continue;
+            const { c, r: fila } = deRef(r[1]), t = (/\bt="([^"]+)"/.exec(at) || [])[1], v = /<v>([\s\S]*?)<\/v>/.exec(cont);
+            let val = null;
+            if (t === 's') val = v ? compartidas[+v[1]] : null;
+            else if (t === 'inlineStr') val = [...cont.matchAll(/<t\b[^>]*?(?:\/>|>([\s\S]*?)<\/t>)/g)].map((x) => desX(x[1] || '')).join('');
+            else if (t === 'str') val = v ? desX(v[1]) : '';
+            else if (t === 'b') val = v ? v[1] === '1' : null;
+            else if (t === 'e') val = v ? error(v[1]) : null;
+            else if (v) val = +v[1];
+            (filas[fila] || (filas[fila] = []))[c] = val;
+          }
+          return filas;
+        },
+      };
+    }
+
+    return { crearLibro, leerLibro, zip, leerZip, ref, deRef, letra, error, esError, ERRORES, serialDeFecha, isoFecha, S };
+  })();
+  // ==XLSX-FIN==
+
+  // ==INDICADORES-INICIO== (no quitar esta marca ni la de cierre: las pruebas extraen este bloque para correrlo fuera del portal)
+  // Indicadores del mes: arma "BD RMD <MES> <AÑO> - P1-P2.xlsx" igual al que el equipo prepara a mano cada mes a partir del
+  // "Exportar" nativo: hoja "Exportación SAPUI5" (las 18 columnas del Exportar + las 12 calculadas, con las mismas fórmulas),
+  // PEND PL1, PEND PL2, RESUMEN (las 7 tablas dinámicas en las mismas celdas y con los mismos filtros) y Hoja1 (productividad
+  // por persona). Este bloque solo calcula: los RMD los lee de SAP quien lo llama (la misma lectura de "Enviar a Status RMD").
+  const Indicadores = (() => {
+    const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+    const HOJA_DATOS = 'Exportación SAPUI5', REF_DATOS = "'Exportación SAPUI5'", TABLA_DATOS = 'DatosRMD';
+    const CAMPOS = ['Código', 'Código de Solicitud', 'Versión', 'Estado', 'Código por Defecto', 'Código Agrupador', 'Descripción', 'Etapa', 'Fecha Registro',
+      'Usuario Registro', 'Fecha Autorización', 'Usuario Autorización', 'A/F', 'Fecha Solicitud', 'Planta', 'Sección', 'Motivo', 'Observación',
+      'Fec Ingreso Real', 'F.I Real', 'Dias', 'Usuario', 'Prioridad', 'No contar', 'FC', 'FI', 'FA', 'Por revisar', 'RMD ING', 'RMD APR'];
+    const C = Object.fromEntries(CAMPOS.map((n, i) => [n, i]));
+    const L = Object.fromEntries(CAMPOS.map((n, i) => [n, Xlsx.letra(i)]));
+    // Las columnas calculadas llevan las mismas fórmulas del archivo del equipo (n = fila de Excel); su valor se calcula aquí
+    // con las mismas reglas de Excel, para que el archivo se vea completo aun sin recalcular y las tablas dinámicas coincidan.
+    const FORMULAS = {
+      'Fec Ingreso Real': (n) => `MID(R${n},1,8)`, 'F.I Real': (n) => `TEXT(S${n},"0000-00-00")`, Dias: (n) => `NETWORKDAYS(T${n},K${n})`,
+      Usuario: (n) => `MID(R${n},9,2)`, Prioridad: (n) => `MID(R${n},12,1)`, FC: (n) => `MID(R${n},15,3)`, FI: (n) => `MID(R${n},21,3)`,
+      FA: (n) => `MID(R${n},27,3)`, 'RMD ING': (n) => `Y${n}*Z${n}`, 'RMD APR': (n) => `Y${n}*AA${n}`,
+    };
+    const ESTILO_CAB = { 'Fec Ingreso Real': 'cabeceraVerdeFecha', 'F.I Real': 'cabeceraVerde', Dias: 'cabeceraVerde', Usuario: 'cabeceraVerde', Prioridad: 'cabeceraVerde',
+      'No contar': 'cabeceraAmbar', FC: 'cabeceraGris', FI: 'cabeceraGris', FA: 'cabeceraGris' };
+    const ANCHOS_DATOS = [[1, 1, 11.375], [2, 2, 15.375], [3, 3, 6.125], [4, 4, 10.75], [5, 5, 12.75], [6, 6, 10.875], [7, 7, 30.75], [8, 8, 17.375], [9, 9, 17.25],
+      [10, 10, 19.25], [11, 11, 11.625], [12, 12, 10.125], [13, 13, 10.75], [14, 14, 18.25], [15, 15, 23.875], [16, 16, 10.75], [17, 17, 21], [18, 18, 97.25],
+      [19, 19, 11.5], [20, 23, 9], [24, 24, 12.375], [25, 27, 7], [28, 28, 34], [29, 30, 10]];
+    const ANCHOS_RESUMEN = [[1, 1, 18.75], [2, 2, 21.25], [3, 7, 7], [16, 16, 17.25], [17, 17, 22.75], [18, 18, 18.375], [30, 30, 15.375], [31, 31, 19.5],
+      [32, 32, 17.75], [52, 52, 13.375], [53, 53, 19.5], [54, 54, 21.75], [67, 67, 26.375], [68, 68, 12]];
+    // Personas de Hoja1 (las del archivo de agosto): planta, nombre, iniciales en la Observación y usuario de SAP que autoriza.
+    const PERSONAS = [['PLANTA 1', 'CUELLAR LOYOLA NOELIA ROSA', 'NC', 'NCUELLARL'], ['PLANTA 1', 'QUISPE JIMENA', 'JQ', 'JQUISPEP'],
+      ['PLANTA 2', 'MORENO KARLA VANESSA', 'VM', 'KMORENOM'], ['PLANTA 2', 'DINA  VALDERRAMA', 'DV', '']];
+    // Plazos del "% dentro de plazo" (días hábiles de ingreso a autorización), los mismos con que se calculó "% PRIO" en julio.
+    const PLAZOS = [['1', 5], ['2', 10], ['3', 30]];
+    const PLANTAS = ['PLANTA ATE', 'PLANTA LIMA'];
+    const NO_CONTAR_CONOCIDOS = ['PEND CC', 'PEND JEFE/GER', 'NO CONTAR', 'REVISAR', 'POR INGRESAR'];
+
+    const limpio = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+    const clave = (t) => limpio(t).toUpperCase().normalize('NFD').replace(/\p{M}/gu, '');
+    const texto = (v) => (v == null ? '' : Xlsx.esError(v) ? v.error : limpio(v));
+    const vacio = (v) => v == null || v === '';
+
+    // ---- funciones de Excel que usan las columnas calculadas ----
+    const VALOR = Xlsx.error('#VALUE!');
+    const mid = (t, ini, n) => (t == null ? '' : String(t)).substr(ini - 1, n);                          // MID
+    // Texto -> número como lo convierte Excel (en español) al operar: ignora solo espacios (un salto de línea da #VALUE!), signo
+    // (también "- 2"), miles con coma, punto decimal, exponente y %; y también fechas y horas cortas: AAAA-MM-DD, d-m, d/m/aa
+    // (día primero; sin año, el año en curso) y h:mm. Comprobado contra lo que calculó Excel en las 11 013 filas de agosto.
+    const DIA_CERO = Date.UTC(1899, 11, 30), ANIO_ACTUAL = new Date().getFullYear();
+    const serialDe = (a, me, d) => { if (a < 1900 || a > 9999 || me < 1 || me > 12 || d < 1) return null; const x = Date.UTC(a, me - 1, d); return new Date(x).getUTCDate() === d ? (x - DIA_CERO) / 86400000 : null; };
+    function aNumero(v) {
+      if (typeof v === 'number') return v;
+      if (v == null) return null;
+      const t = String(v).replace(/^ +| +$/g, '');
+      let m = /^([+-]?) *(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?(%?)$/.exec(t);
+      if (m && (m[2] || m[3])) {
+        let n = Number((m[2] || '0').replace(/,/g, '') + '.' + (m[3] || '0') + (m[4] ? 'e' + m[4] : ''));
+        if (m[1] === '-') n = -n; if (m[5]) n /= 100;
+        return isFinite(n) ? n : null;
+      }
+      if ((m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(t))) return serialDe(+m[1], +m[2], +m[3]);
+      if ((m = /^(\d{1,2})[-/](\d{1,2})(?:[-/](\d{4}|\d{2}))?$/.exec(t))) { let a = m[3] == null ? ANIO_ACTUAL : +m[3]; if (m[3] && m[3].length === 2) a += a < 30 ? 2000 : 1900; return serialDe(a, +m[2], +m[1]); }
+      if ((m = /^(\d{1,2}):(\d{0,2})(?::(\d{1,2}))?$/.exec(t)) && +m[1] < 24) return (+m[1] + (+m[2] || 0) / 60 + (+m[3] || 0) / 3600) / 24;
+      return null;
+    }
+    // TEXT(v;"0000-00-00"): un texto que Excel lee como número (o fecha) se escribe con ese formato; otro texto queda igual.
+    function texto0000(v) {
+      if (v == null || v === '') return '';
+      const n = aNumero(v);
+      if (n == null) return String(v);
+      const r = Math.round(Math.abs(n)), s = String(r).padStart(8, '0');
+      return (n < 0 && r ? '-' : '') + s.slice(0, s.length - 4) + '-' + s.slice(-4, -2) + '-' + s.slice(-2);
+    }
+    // NETWORKDAYS: días de lunes a viernes entre dos fechas, ambas incluidas (negativo si la primera es posterior). Una celda
+    // vacía vale 0 (el "sábado 00/01/1900" de Excel: por eso sin Fecha Autorización sale un número negativo muy grande).
+    const aSerial = (v) => (v == null ? 0 : aNumero(v));
+    const diaSemana = (s) => (((s - 1) % 7) + 7) % 7;                                                  // 0 = domingo (serie 1)
+    function diasHabiles(a, b) {
+      a = Math.floor(a); b = Math.floor(b);
+      const x = Math.min(a, b), y = Math.max(a, b), semanas = Math.floor((y - x + 1) / 7); let n = semanas * 5;
+      for (let s = x + semanas * 7; s <= y; s++) { const d = diaSemana(s); if (d !== 0 && d !== 6) n++; }
+      return a <= b ? n : -n;
+    }
+    const networkdays = (ini, fin) => { const a = aSerial(ini), b = aSerial(fin); return a == null || b == null ? VALOR : a < 0 || b < 0 ? Xlsx.error('#NUM!') : diasHabiles(a, b); };
+    const producto = (a, b) => { const x = aNumero(a), y = aNumero(b); return x == null || y == null ? VALOR : x * y; };
+    // Las 10 columnas con fórmula de una fila (la Observación trae "AAAAMMDD" + iniciales + prioridad + FC/FI/FA en posiciones fijas).
+    function calculadas(obs, fechaAut) {
+      const S = mid(obs, 1, 8), T = texto0000(S), Y = mid(obs, 15, 3), Z = mid(obs, 21, 3), AA = mid(obs, 27, 3);
+      return { S, T, U: networkdays(T, fechaAut || null), V: mid(obs, 9, 2), W: mid(obs, 12, 1), Y, Z, AA, AC: producto(Y, Z), AD: producto(Y, AA) };
+    }
+
+    // ---- A/F: el mes si el RMD se registró, se autorizó o ingresó (fecha al inicio de la Observación) en el mes, o si sin
+    // registro se solicitó en el mes; "ANTIGUO" si sigue abierto (Ingresado, Solicitado o Solicitud Aprobada) y ya existía al
+    // cierre del mes; si no, el valor de SAP. Es lo que el equipo marca a mano (coincide en 11 011 de 11 013 filas de agosto).
+    const ABIERTOS = /^(Ingresado|Solicitado|Solicitud Aprobada)$/i;
+    const fechaOk = (d) => (d instanceof Date && !isNaN(d) ? d : null);
+    function afDelMes(f, mes, anio) {
+      const pref = `${anio}-${String(mes).padStart(2, '0')}`, prefS = pref.replace('-', '');
+      const reg = fechaOk(f.fechaRegistro), sol = fechaOk(f.fechaSolicitud), enMes = (d) => !!d && d.toISOString().slice(0, 7) === pref;
+      if (enMes(reg) || String(f.fechaAut || '').slice(0, 7) === pref || mid(f.observacion, 1, 6) === prefS || (!reg && enMes(sol))) return MESES[mes - 1];
+      const fin = Date.UTC(anio, mes, 1), existia = (!reg && !sol) || [reg, sol].some((d) => d && d.getTime() < fin);
+      if (ABIERTOS.test(limpio(f.estado)) && existia) return 'ANTIGUO';
+      return limpio(f.af);
+    }
+
+    // ---- "No contar": el equipo lo llena a mano. Se sugiere (marcado para revisar) solo en las filas que entran a los
+    // indicadores (A/F del mes o ANTIGUO), con los mismos criterios que se ven en los archivos de julio y agosto: NO CONTAR si
+    // su RMD ING/APR da #VALUE! (Observación sin el formato AAAAMMDD-II-P-C…-FI…-FA…) y entraría a una suma del mes (dejaría
+    // el total en error); lo que ya estaba marcado el mes anterior; NO CONTAR / PEND JEFE/GER / PEND CC si la Observación lo
+    // dice; y PEND CC si sigue abierto pese a tener fecha de autorización del mes. Nunca se sugiere un PEND en un RMD ya
+    // Autorizado o Suspendido (lo sacaría de los autorizados del mes).
+    const RX_NO_CONTAR = /\bNO\s+CONTAR(?![A-ZÁÉÍÓÚÑ])/i;
+    const RX_PEND_JEFE = /\bPEND(?:IENTE|\.)?\s*(?:DE\s+)?(?:APROB(?:ACI[OÓ]N)?\s+(?:DEL?\s+)?)?(?:JEF|GER)/i;
+    const RX_PEND_CC = /\bPEND(?:IENTE|\.)?\s*(?:DE\s+)?(?:APROB(?:ACI[OÓ]N)?\s+(?:DEL?\s+)?)?(?:CC\b|C\.C|CALIDAD)/i;
+    function normalizarNoContar(v) {
+      const t = limpio(v).toUpperCase(); if (!t) return '';
+      if (/^PEND\.?\s*JEF/.test(t)) return 'PEND JEFE/GER';                                      // PEND JEF/GER, PEND JEFE/GEREN…
+      if (/^PEND\.?\s*(CC|NC|C\.C\.?)$/.test(t)) return 'PEND CC';
+      return t;
+    }
+    const claveFila = (codigo, solicitud, version) => (limpio(codigo) ? 'C:' + limpio(codigo) : 'S:' + limpio(solicitud) + '|' + limpio(version));
+    // x: { errorEnSuma, autEnMes } (los calcula construir con el A/F y las columnas calculadas de la fila)
+    function sugerirNoContar(f, anteriores, x = {}) {
+      const abierto = ABIERTOS.test(limpio(f.estado)), obs = f.observacion || '';
+      if (x.errorEnSuma) return { valor: 'NO CONTAR', origen: 'formato', nota: 'la Observación no tiene el formato AAAAMMDD-II-P-C…-FI…-FA… y su RMD ING/APR da #VALUE! (dejaría el total en error)' };
+      const ant = anteriores ? normalizarNoContar(anteriores.get(claveFila(f.codigo, f.codigoSolicitud, f.version))) : '';
+      if (ant && (abierto || ant === 'NO CONTAR' || ant === 'REVISAR')) return { valor: ant, origen: 'anterior', nota: 'copiado del mes anterior' };
+      if (RX_NO_CONTAR.test(obs)) return { valor: 'NO CONTAR', origen: 'observacion', nota: 'la Observación dice "NO CONTAR"' };
+      if (abierto && x.autEnMes) return { valor: 'PEND CC', origen: 'estado', nota: `sigue "${limpio(f.estado)}" aunque tiene fecha de autorización del mes` };
+      if (abierto && RX_PEND_JEFE.test(obs)) return { valor: 'PEND JEFE/GER', origen: 'observacion', nota: 'la Observación indica pendiente de jefe o gerencia' };
+      if (abierto && RX_PEND_CC.test(obs)) return { valor: 'PEND CC', origen: 'observacion', nota: 'la Observación indica pendiente de CC' };
+      return null;
+    }
+
+    // ---- archivo del mes anterior (opcional): sus listas PEND PL1 / PEND PL2 y los "No contar" que el equipo ya marcó ----
+    async function leerListaPend(libro, nombre) {
+      const filas = await libro.filas(nombre); if (!filas) return [];
+      const r = filas.findIndex((f) => f && f.some((x) => clave(x) === 'DESCRIPCION') && f.some((x) => clave(x) === 'ESTADO')); if (r < 0) return [];
+      const cab = filas[r].map(clave), ix = (n) => cab.indexOf(n);
+      const campos = { estado: ix('ESTADO'), descripcion: ix('DESCRIPCION'), presentacion: ix('PRESENTACION'), etapa: ix('ETAPA'), af: ix('A/F'),
+        seccion: ix('SECCION'), observacion: ix('OBSERVACION'), noContar: ix('NO CONTAR') };
+      return filas.slice(r + 1).filter((f) => f && texto(f[campos.descripcion]))
+        .map((f) => Object.fromEntries(Object.entries(campos).map(([k, i]) => [k, i >= 0 ? texto(f[i]) : ''])));
+    }
+    async function leerPrevio(u8) {
+      const libro = await Xlsx.leerLibro(u8), previo = { noContar: new Map(), pl1: [], pl2: [], hojas: libro.hojas };
+      const datos = await libro.filas(HOJA_DATOS);
+      if (datos && datos[0]) {
+        const cab = datos[0].map(limpio), ix = (n) => cab.indexOf(n);
+        const iCod = ix('Código'), iSol = ix('Código de Solicitud'), iVer = ix('Versión'), iNC = ix('No contar');
+        if (iNC >= 0) datos.slice(1).forEach((fila) => {
+          const v = fila && normalizarNoContar(texto(fila[iNC])); if (!v) return;
+          const cod = texto(fila[iCod]), sol = texto(fila[iSol]); if (!cod && !sol) return;
+          previo.noContar.set(claveFila(cod, sol, texto(fila[iVer])), v);
+        });
+      }
+      previo.pl1 = await leerListaPend(libro, 'PEND PL1'); previo.pl2 = await leerListaPend(libro, 'PEND PL2');
+      if (!datos && !previo.pl1.length && !previo.pl2.length) throw new Error(`no tiene la hoja "${HOJA_DATOS}" ni las listas PEND PL1 / PEND PL2`);
+      return previo;
+    }
+
+    const nombreArchivo = (mes, anio) => `BD RMD ${MESES[mes - 1]} ${anio} - P1-P2.xlsx`;
+    const dd = (n) => String(n).padStart(2, '0');
+    const fechaHora = (d) => `${dd(d.getDate())}/${dd(d.getMonth() + 1)}/${d.getFullYear()} ${dd(d.getHours())}:${dd(d.getMinutes())}`;
+
+    // op: { filas: [datosBaseDeMD…], mes: 1-12, anio, previo: leerPrevio() | null, sugerir: true, generado: Date,
+    //       ajustar: (fila) => ({ af, noContar }) solo para pruebas (reproducir a mano un mes ya cerrado) }
+    function construir(op) {
+      const { mes, anio } = op, MES = MESES[mes - 1], pref = `${anio}-${dd(mes)}`, prefS = `${anio}${dd(mes)}`;
+      const previo = op.previo || null, libro = Xlsx.crearLibro();
+      // como el "Exportar" nativo (onExportXLS): sin filtro de estado, el portal deja fuera los RMD Cancelados
+      op = { ...op, filas: op.filas.filter((f) => !/^CANCELAD/.test(clave(f.estado))) };
+      const est = { sap: 0, mes: 0, antiguo: 0, sugeridos: { formato: 0, anterior: 0, observacion: 0, estado: 0 }, pl1: 0, pl2: 0, posibles: 0 };
+      const nulo = (x) => (vacio(x) ? null : x);
+      // 1) filas de SAP
+      const registros = [];
+      op.filas.forEach((f) => {
+        let af = afDelMes(f, mes, anio), noContar = null, nota = null;
+        const k = calculadas(f.observacion, f.fechaAut);
+        if (af === MES || af === 'ANTIGUO') {
+          const autEnMes = String(f.fechaAut || '').slice(0, 7) === pref;
+          const errorEnSuma = af === MES && ((autEnMes && Xlsx.esError(k.AD)) || (k.S.slice(0, 6) === prefS && Xlsx.esError(k.AC)));
+          const s = op.sugerir === false ? null : sugerirNoContar(f, previo && previo.noContar, { errorEnSuma, autEnMes });
+          if (s) { noContar = s.valor; nota = `Revisar "No contar": ${s.nota}`; est.sugeridos[s.origen]++; }
+        }
+        if (op.ajustar) { const a = op.ajustar(f) || {}; if ('af' in a) af = a.af; if ('noContar' in a) { noContar = nulo(a.noContar); nota = null; } }
+        if (af === MES) est.mes++; else if (af === 'ANTIGUO') est.antiguo++;
+        const obs = f.observacion ? String(f.observacion).slice(0, 32767) : null;
+        registros.push([nulo(f.codigo), nulo(f.codigoSolicitud), nulo(f.version), nulo(f.estado), nulo(f.codDefecto), nulo(f.codAgrupador), nulo(f.descripcion), nulo(f.etapa),
+          fechaOk(f.fechaRegistro), nulo(f.usuarioRegistro), nulo(f.fechaAut), nulo(f.usuarioAutorizacion), nulo(af), fechaOk(f.fechaSolicitud), nulo(f.planta), nulo(f.seccion),
+          nulo(f.motivo), obs, k.S, k.T, k.U, k.V, k.W, noContar, k.Y, k.Z, k.AA, nota, k.AC, k.AD]);
+        est.sap++;
+      });
+      // 2) listas PEND del mes anterior, agregadas al final de los datos como hace el equipo (sin fórmulas; Fecha Solicitud =
+      // día 30 del mes; A/F del mes si la lista lo dice, si no ANTIGUO). PL1 ("Por hacer solicitud") es de Planta Ate y PL2
+      // ("solicitado", por ingresar) de Planta Lima. PL1 entra ahora a TOTAL DE RMD con su propio estado (en julio contaba
+      // como "solicitado"; en agosto quedó fuera del rango de la tabla dinámica).
+      const pl1 = previo ? previo.pl1 : [], pl2 = previo ? previo.pl2 : [];
+      const fechaPend = new Date(Date.UTC(anio, mes - 1, Math.min(30, new Date(Date.UTC(anio, mes, 0)).getUTCDate())));
+      const filaPend = (p, planta, estado) => {
+        const r = new Array(CAMPOS.length).fill(null);
+        r[C.Estado] = p.estado || estado; r[C['Descripción']] = p.descripcion || null; r[C.Etapa] = p.etapa || null;
+        r[C['A/F']] = limpio(p.af).toUpperCase() === MES ? MES : 'ANTIGUO'; r[C['Fecha Solicitud']] = fechaPend; r[C.Planta] = planta;
+        return r;
+      };
+      pl2.forEach((p) => registros.push(filaPend(p, 'PLANTA LIMA', 'solicitado')));
+      pl1.forEach((p) => registros.push(filaPend(p, 'PLANTA ATE', 'Por hacer solicitud')));
+      est.pl1 = pl1.length; est.pl2 = pl2.length;
+
+      // 3) hoja de datos (una tabla de Excel: al agregar filas y "Actualizar todo", las tablas dinámicas las toman solas)
+      const ultima = registros.length + 1, rango = `A1:AD${ultima}`;
+      const hd = libro.hoja(HOJA_DATOS, { cols: ANCHOS_DATOS, congelar: 'H1', tabla: { nombre: TABLA_DATOS, ref: rango } });
+      CAMPOS.forEach((n, c) => hd.poner({ c, r: 0 }, n, ESTILO_CAB[n] || 'cabecera'));
+      registros.forEach((reg, i) => {
+        const r = i + 1, n = r + 1, sap = i < est.sap;
+        reg.forEach((v, c) => {
+          const campo = CAMPOS[c];
+          if (sap && FORMULAS[campo]) hd.poner({ c, r }, v, null, FORMULAS[campo](n));
+          else if (v != null) hd.poner({ c, r }, v, v instanceof Date ? 'fecha' : campo === 'No contar' && reg[C['Por revisar']] ? 'sugerido' : null);
+        });
+      });
+      const cache = libro.cache(hd, CAMPOS, registros, rango, { tabla: TABLA_DATOS, extras: { 'No contar': NO_CONTAR_CONOCIDOS } });
+
+      // 4) RESUMEN: las 7 tablas dinámicas del archivo del equipo, en sus mismas celdas (las de abajo bajan si las de arriba crecen)
+      const hr = libro.hoja('RESUMEN', { activa: true, cols: ANCHOS_RESUMEN });
+      const nc = (v) => limpio(v).toUpperCase(), esMes = (v) => nc(v) === MES, esMesOAnt = (v) => esMes(v) || nc(v) === 'ANTIGUO';
+      const autEnMes = (v) => typeof v === 'string' && v.slice(0, 7) === pref, ingEnMes = (v) => typeof v === 'string' && v.slice(0, 6) === prefS;
+      const pendOVacio = (v) => vacio(v) || nc(v) === 'PEND CC' || nc(v) === 'PEND JEFE/GER';
+      const cuenta = { campo: 'Descripción', funcion: 'count', nombre: 'Cuenta de Descripción' };
+      const titulo = (celda, t, combinar) => { hr.poner(celda, t, 'tituloAzul'); if (combinar) hr.combinar(combinar); };
+      titulo('A1', 'RMD AUTORIZADOS POR COMPLEJIDAD (SIN MULTIPLICAR)', 'A1:C1'); hr.poner('F1', 'INFORMATIVO', 'negrita'); hr.combinar('F1:H1');
+      titulo('P1', 'RMD AUTORIZADOS TOTAL', 'P1:R1');
+      titulo('AD1', 'RMD INGRESADOS POR COMPLEJIDAD (SIN MULTIPLICAR)', 'AD1:AH1'); hr.poner('AJ1', '(INFORMATIVO)', 'negrita');
+      titulo('AZ1', ' TOTAL DE RMD ', 'AZ1:BB1');
+      titulo('BO1', 'DÍAS HÁBILES DE INGRESO A AUTORIZACIÓN, POR PRIORIDAD', 'BO1:BT1');
+      hr.poner('A2', `Generado desde SAP el ${fechaHora(op.generado || new Date())} (estados de ese momento) · Mes: ${MES} ${anio} · Si cambias "No contar" o "A/F" en la hoja de datos, pulsa Datos › Actualizar todo.`, 'nota');
+      const t1 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica2', celda: 'A8', filas: ['Planta', 'Usuario Autorización'], columnas: ['FC'],
+        paginas: [{ campo: 'A/F', visible: esMesOAnt }, { campo: 'No contar', visible: vacio }, { campo: 'Fecha Autorización', visible: autEnMes }], valor: cuenta });
+      const t2 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica1', celda: 'P9', filas: ['Planta', 'Usuario Autorización'],
+        paginas: [{ campo: 'Fecha Autorización', visible: autEnMes }, { campo: 'No contar', visible: (v) => vacio(v) || nc(v) === 'REVISAR' }, { campo: 'A/F', visible: esMes }],
+        valor: { campo: 'RMD APR', funcion: 'sum', nombre: 'Suma de RMD APR' } });
+      const t3 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica4', celda: 'AD10', filas: ['Planta', 'Usuario'], columnas: ['FC'],
+        paginas: [{ campo: 'Fec Ingreso Real', visible: ingEnMes }, { campo: 'A/F', visible: esMes }, { campo: 'No contar', visible: pendOVacio }], valor: cuenta });
+      const f4 = Math.max(36, t3.filaFin + 9);                                                    // (filas desde 0: AD37 en agosto)
+      titulo(Xlsx.ref(29, f4 - 6), 'RMD INGRESADOS TOTAL', `AD${f4 - 5}:AF${f4 - 5}`);
+      const t4 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica5', celda: Xlsx.ref(29, f4), filas: ['Planta', 'Usuario'],
+        paginas: [{ campo: 'A/F', visible: esMes }, { campo: 'Fec Ingreso Real', visible: ingEnMes }, { campo: 'No contar', visible: pendOVacio }],
+        valor: { campo: 'RMD ING', funcion: 'sum', nombre: 'Suma de RMD ING' } });
+      const t5 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica6', celda: 'AZ8', filas: ['Planta', 'Estado'],
+        paginas: [{ campo: 'A/F', visible: esMesOAnt }, { campo: 'No contar', visible: (v) => nc(v) !== 'NO CONTAR' && nc(v) !== 'POR INGRESAR' }],
+        ocultar: { Estado: (v) => /^SOLICITUD (APROBADA|RECHAZADA)$/.test(nc(v)) }, valor: cuenta });
+      const f6 = Math.max(28, t5.filaFin + 10);                                                   // título en AZ29 en agosto
+      titulo(Xlsx.ref(51, f6), 'ESTATUS DE TOTAL DE RMD  POR MOTIVO(NO CONTAR)', `AZ${f6 + 1}:BB${f6 + 1}`); hr.poner(Xlsx.ref(54, f6), 'INFORMATIVO', 'negrita');
+      libro.dinamica(hr, cache, { nombre: 'Tabla dinámica7', celda: Xlsx.ref(51, f6 + 6), filas: ['Planta', 'A/F', 'No contar'],
+        ocultar: { 'A/F': (v) => vacio(v) || nc(v) === 'SI' }, valor: cuenta });
+      const t7 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica8', celda: 'BO8', filas: ['Planta', 'Prioridad'], columnas: ['Dias'],
+        paginas: [{ campo: 'A/F', visible: esMesOAnt }, { campo: 'No contar', visible: vacio }, { campo: 'Estado', visible: (v) => /^(AUTORIZADO|SUSPENDIDO)$/.test(nc(v)) }], valor: cuenta });
+      // "% dentro de plazo" (el "% PRIO" del archivo de julio, que en agosto quedó con #REF!): con CONTAR.SI.CONJUNTO sobre la hoja
+      // de datos, así no depende de en qué columna de la tabla dinámica cae cada número de días.
+      const fP = t7.filaFin + 3, D = (campo) => `${REF_DATOS}!$${L[campo]}:$${L[campo]}`;
+      titulo(Xlsx.ref(66, fP), '% DENTRO DE PLAZO (AUTORIZADOS Y SUSPENDIDOS DEL MES)', `BO${fP + 1}:BT${fP + 1}`);
+      ['Planta', 'Prioridad', 'Plazo (días hábiles)', 'Dentro de plazo', 'Total', '%'].forEach((t, k) => hr.poner({ c: 66 + k, r: fP + 1 }, t, 'encabezado'));
+      const enPlazo = registros.filter((r) => /^(AUTORIZADO|SUSPENDIDO)$/.test(nc(r[C.Estado])) && esMesOAnt(r[C['A/F']]) && vacio(r[C['No contar']]));
+      let fila = fP + 2;
+      PLANTAS.forEach((planta) => PLAZOS.forEach(([prio, dias]) => {
+        const n = fila + 1, base = `${D('Planta')},"${planta}",${D('Prioridad')},"${prio}",${D('Estado')},{"Autorizado","Suspendido"},${D('A/F')},{"${MES}";"ANTIGUO"},${D('No contar')},""`;
+        const grupo = enPlazo.filter((r) => nc(r[C.Planta]) === planta && String(r[C.Prioridad]) === prio);
+        const dentro = grupo.filter((r) => typeof r[C.Dias] === 'number' && r[C.Dias] >= 0 && r[C.Dias] <= dias).length;
+        hr.poner({ c: 66, r: fila }, planta, 'celda'); hr.poner({ c: 67, r: fila }, prio, 'celda'); hr.poner({ c: 68, r: fila }, dias, 'entrada');
+        hr.poner({ c: 69, r: fila }, dentro, 'entero', `SUMPRODUCT(COUNTIFS(${base},${D('Dias')},">=0",${D('Dias')},"<="&BQ${n}))`);
+        hr.poner({ c: 70, r: fila }, grupo.length, 'entero', `SUMPRODUCT(COUNTIFS(${base}))`);
+        hr.poner({ c: 71, r: fila }, grupo.length ? dentro / grupo.length : '', 'porcentaje', `IF(BS${n}>0,BR${n}/BS${n},"")`);
+        fila++;
+      }));
+      hr.poner({ c: 66, r: fila }, 'Plazo: días hábiles desde la fecha de ingreso (inicio de la Observación) hasta la autorización; puedes cambiarlo en la columna amarilla.', 'nota');
+
+      // 5) Hoja1: productividad por persona, tomada de las tablas "TOTAL" (RMD ING por iniciales, RMD APR por usuario de SAP)
+      const h1 = libro.hoja('Hoja1', { cols: [[2, 2, 11], [3, 3, 30], [4, 7, 12.5], [8, 8, 14]] });
+      h1.poner('D3', `DLAB.: COMPLETAR LOS DÍAS LABORADOS EN ${MES}`, 'notaAmarilla'); h1.combinar('D3:H3');
+      h1.poner('C5', new Date(Date.UTC(anio, mes - 1, 1)), 'mesAnio');
+      ['PLANTA ', 'Nombre', 'Ingresados', 'Autorizados', 'Total', 'DLAB.', 'Promedio/Día'].forEach((t, k) => h1.poner({ c: 1 + k, r: 5 }, t, 'encabezado'));
+      const celdaTabla = (t) => `RESUMEN!$${Xlsx.letra(t.colIni)}$${t.filaIni + 1}`;
+      const dePersona = (t, dato, campo, usuario) => {
+        if (!usuario) return { valor: 0, formula: null };
+        const valor = PLANTAS.reduce((s, p) => { const v = t.valorDe([p, usuario]); return s + (typeof v === 'number' ? v : 0); }, 0);
+        return { valor, formula: PLANTAS.map((p) => `IFERROR(GETPIVOTDATA("${dato}",${celdaTabla(t)},"Planta","${p}","${campo}","${usuario}"),0)`).join('+') };
+      };
+      const i0 = 7;
+      PERSONAS.forEach(([planta, nombre, ini, usuarioSap], k) => {
+        const r = 6 + k, n = r + 1, ing = dePersona(t4, 'Suma de RMD ING', 'Usuario', ini), aut = dePersona(t2, 'Suma de RMD APR', 'Usuario Autorización', usuarioSap);
+        h1.poner({ c: 1, r }, planta, 'celda'); h1.poner({ c: 2, r }, nombre, 'nombre');
+        h1.poner({ c: 3, r }, ing.valor, 'decimal', ing.formula); h1.poner({ c: 4, r }, aut.valor, 'decimal', aut.formula);
+        h1.poner({ c: 5, r }, ing.valor + aut.valor, 'decimal', `SUM(D${n}:E${n})`); h1.poner({ c: 6, r }, null, 'entrada');
+        h1.poner({ c: 7, r }, '', 'decimal', `IF(N(G${n})>0,F${n}/G${n},"")`);
+      });
+      const rT = 6 + PERSONAS.length, nT = rT + 1, i1 = rT;
+      h1.poner({ c: 2, r: rT }, 'Total', 'encabezado');
+      ['D', 'E', 'F', 'G'].forEach((col, k) => {
+        const suma = k === 3 ? 0 : [...Array(PERSONAS.length).keys()].reduce((s, j) => { const x = h1.filas.get(6 + j).get(3 + k).v; return s + (typeof x === 'number' ? x : 0); }, 0);
+        h1.poner({ c: 3 + k, r: rT }, suma, 'decimal', `SUM(${col}${i0}:${col}${i1})`);
+      });
+      h1.poner({ c: 7, r: rT }, '', 'decimal', `IF(N(G${nT})>0,F${nT}/G${nT},"")`);
+      [`Ingresados = Suma de RMD ING (tabla "RMD INGRESADOS TOTAL" de RESUMEN) de sus iniciales en la Observación, en ambas plantas.`,
+        'Autorizados = Suma de RMD APR (tabla "RMD AUTORIZADOS TOTAL") de su usuario de SAP.',
+        'Promedio/Día = Total / DLAB. Meta: no menos de 3 RMD por día.'].forEach((t, k) => h1.poner({ c: 1, r: rT + 2 + k }, t, 'nota'));
+
+      // 6) PEND PL1 / PEND PL2 (mismas columnas; se agrega "Posible registro en SAP" para limpiar la lista: un RMD con la misma
+      // descripción y etapa que entró a SAP desde el mes anterior, que ya no debería seguir como pendiente)
+      const desde = Date.UTC(anio, mes - 2, 1), porDescripcion = new Map();
+      op.filas.forEach((f) => {
+        const d = [fechaOk(f.fechaSolicitud), fechaOk(f.fechaRegistro)].filter(Boolean).map((x) => x.getTime()); if (!d.length || Math.max(...d) < desde) return;
+        const k = clave(f.descripcion) + '|' + clave(f.etapa); if (!porDescripcion.has(k)) porDescripcion.set(k, f);
+      });
+      const posible = (p) => {
+        const f = porDescripcion.get(clave(p.descripcion) + '|' + clave(p.etapa)); if (!f) return '';
+        est.posibles++;
+        const fecha = (fechaOk(f.fechaRegistro) || fechaOk(f.fechaSolicitud)).toISOString().slice(0, 10);
+        return `${f.codigo ? 'RMD ' + f.codigo : 'Solicitud ' + f.codigoSolicitud} · ${f.estado} · ${fecha}`;
+      };
+      const listaPend = (nombre, filaCab, cols, lista, extra) => {
+        const h = libro.hoja(nombre, { cols: extra.anchos });
+        [...cols.map((x) => x[0]), 'Posible registro en SAP (revisar)'].forEach((t, k) => h.poner({ c: k, r: filaCab }, t, 'encabezado'));
+        lista.forEach((p, i) => {
+          const r = filaCab + 1 + i;
+          cols.forEach(([, campo], k) => { const v = campo === 'n' ? i + 1 : p[campo]; if (!vacio(v)) h.poner({ c: k, r }, v, 'celda'); });
+          const x = posible(p); if (x) h.poner({ c: cols.length, r }, x, 'sugerido');
+        });
+        if (!lista.length) h.poner({ c: 1, r: filaCab + 1 }, 'Sin lista: al generar los indicadores, elige el archivo del mes anterior para traerla (o complétala aquí y agrega las filas al final de la hoja de datos).', 'nota');
+        return h;
+      };
+      const hp1 = listaPend('PEND PL1', 2, [['N', 'n'], ['Estado', 'estado'], ['Descripción', 'descripcion'], ['Presentación', 'presentacion'], ['Etapa', 'etapa'], ['A/F', 'af'], ['Sección', 'seccion'], ['No contar', 'noContar']], pl1,
+        { anchos: [[1, 1, 5], [2, 2, 19], [3, 3, 50], [4, 4, 13], [5, 5, 17], [6, 6, 11], [7, 7, 12], [8, 8, 14], [9, 9, 44]] });
+      hp1.poner('C1', 'Total', 'negrita'); hp1.poner('D1', pl1.length, 'negrita', `COUNTA(C4:C${pl1.length + 503})`);
+      listaPend('PEND PL2', 1, [['N', 'n'], ['Estado', 'estado'], ['Descripción', 'descripcion'], ['Etapa', 'etapa'], ['A/F', 'af'], ['Sección', 'seccion'], ['Observación', 'observacion'], ['No contar', 'noContar']], pl2,
+        { anchos: [[1, 1, 5], [2, 2, 13], [3, 3, 50], [4, 4, 17], [5, 5, 11], [6, 6, 10], [7, 7, 30], [8, 8, 15], [9, 9, 44]] });
+      // mismo orden de hojas que el archivo del equipo
+      const orden = [HOJA_DATOS, 'PEND PL1', 'PEND PL2', 'RESUMEN', 'Hoja1'];
+      libro.hojas.sort((a, b) => orden.indexOf(a.nombre) - orden.indexOf(b.nombre));
+
+      const total = (t) => { const v = t.valorDe([]); return typeof v === 'number' ? v : 0; };
+      return { libro, nombre: nombreArchivo(mes, anio), resumen: { ...est, autorizados: total(t2), autorizadosCuenta: total(t1), ingresados: total(t4), ingresadosCuenta: total(t3), totalRmd: total(t5) } };
+    }
+
+    return { MESES, CAMPOS, nombreArchivo, construir, leerPrevio, afDelMes, calculadas, sugerirNoContar, normalizarNoContar, texto0000, networkdays, aNumero };
+  })();
+  // ==INDICADORES-FIN==
+
+  // ---- "Documentos citados" e incoherencias de todo el RMD: recorre PRECAUCIONES, NOTAS IMPORTANTES DURANTE EL PROCESO,
+  // CONDICIONES AMBIENTALES y TODAS las etiquetas de PROCEDIMIENTO abriendo cada lista de pasos con los mismos botones del
+  // portal (nunca escribe nada) y, desde v1.20, también los procesos menores de cada paso que los tiene. En cada tabla:
+  //  - busca en la Descripción el patrón <Tipo I/P/F><Área>-<sufijo NNN obligatorio> (mismo criterio que
+  //    src/rmd_automation/referencias.py), y
+  //  - junta TODAS las incoherencias que marcan las alertas (casillas, Calidad en Operaciones, predecesor, decimales…) con su
+  //    lista, paso y proceso menor, para corregirlas sin tener que abrir paso por paso.
+  // El resultado se ve en la misma ventana y se descarga en Excel (Resumen, Incoherencias, Documentos citados y Citas).
   const ICONO_DOCUMENTOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h6l2.5 2.5V14a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-12a.5.5 0 0 1 .5-.5Z"/><path d="M9.5 1.5V4h2.5M5.5 8h5M5.5 10.5h5"/></svg>';
   const TIPOS_DOC = { I: 'Instructivo', P: 'Procedimiento', F: 'Formato' };
-  const ETIQUETAS_PROCEDIMIENTO_CONOCIDAS = ['DOCUMENTACION', 'PREPARACION DE LAS MAQUINAS O EQUIPOS', 'PREPARACION DEL MATERIAL DE ENVASE', 'PREPARACION DEL MATERIAL', 'FABRICACION', 'ENVASE', 'ACONDICIONADO', 'RECUBRIMIENTO', 'RENDIMIENTO'];
-  function leerDescripcionesTabla(t) {
-    if (!t) return [];
-    const ths = [...t.querySelectorAll('thead th')].map((th) => NORM(th.textContent));
-    const iDes = ths.findIndex((n) => /^DESCRIPCI/.test(n)); if (iDes < 0) return [];
-    return filasPrincipales(t).map((tr) => norm(celda(tr, iDes) && celda(tr, iDes).textContent)).filter(Boolean);
+  const LISTAS_DE_PASOS = ['PRECAUCIONES', 'NOTAS IMPORTANTES DURANTE EL PROCESO', 'CONDICIONES AMBIENTALES'];
+  const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  function descargarArchivo(nombre, datos, tipo) {
+    const blob = new Blob([datos], { type: tipo || 'application/octet-stream' }), url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
-  async function abrirAccionFila(dPadre, textoFila, tituloBoton) {
-    const t = tablaDe(dPadre); if (!t) return null;
-    const tr = filasPrincipales(t).find((f) => SIN_ACENTOS(f.textContent).includes(SIN_ACENTOS(textoFila))); if (!tr) return null;
-    const btn = [...tr.querySelectorAll('button')].find((b) => visible(b) && b.title === tituloBoton); if (!btn) return null;
+  // Abre la ventana que abre el botón `tituloBoton` de esa fila y espera a que cargue TODAS sus filas (la tabla crece de 20 en 20).
+  async function abrirBotonDeFila(tr, tituloBoton) {
+    const btn = tr && [...tr.querySelectorAll('button')].find((b) => visible(b) && b.title === tituloBoton); if (!btn) return null;
     const previos = new Set(dialogos());
     pulsar(btn);
     const d = await hasta(() => dialogos().find((x) => !previos.has(x)), 20000);
-    if (d) { await hasta(() => !ocupado(), 20000); await esperar(600); }
+    if (d) { await hasta(() => !ocupado(), 20000); await esperar(600); const t = tablaDe(d); if (t) await cargarTodo(t); }
     return d;
   }
-  async function documentosCitadosRMD(dRaiz, avisar) {
-    const textos = [];   // [ [origen, descripción], … ]
-    for (const estructura of ['PRECAUCIONES', 'NOTAS IMPORTANTES DURANTE EL PROCESO', 'CONDICIONES AMBIENTALES']) {
-      avisar && avisar(estructura);
-      const d = await abrirAccionFila(dRaiz, estructura, 'Adicionar Pasos RMD');
-      if (d) { leerDescripcionesTabla(tablaDe(d)).forEach((desc) => textos.push([estructura, desc])); await cerrarDialogo(d); }
+  async function abrirAccionFila(dPadre, textoFila, tituloBoton) {
+    const t = tablaDe(dPadre); if (!t) return null;
+    return abrirBotonDeFila(filasPrincipales(t).find((f) => SIN_ACENTOS(f.textContent).includes(SIN_ACENTOS(textoFila))), tituloBoton);
+  }
+  // El botón "Procesos Menores" de un paso se ve resaltado (tipo Ghost) cuando el paso tiene procesos menores: mismo criterio
+  // del lector de solo lectura src/rmd_automation/js/extraer.js. Así no se abren las ventanas de los pasos que no tienen.
+  const botonPM = (tr) => [...tr.querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
+  const tienePM = (b) => !!b && /Ghost/.test((b.querySelector('.sapMBtnInner') || {}).className || '');
+  // Total que muestra el encabezado de la tabla ("Pasos (47)", "Procesos (27)"): con él se comprueba que se leyeron todas
+  // las filas (las tablas cargan de 20 en 20).
+  const totalEncabezado = (d, palabra) => {
+    for (const x of d.querySelectorAll('.sapMTitle')) { const t = norm(x.textContent), m = /\((\d+)\)$/.exec(t); if (m && t.toUpperCase().startsWith(palabra)) return +m[1]; }
+    return null;
+  };
+  async function filasCompletas(d, t, palabra, leer) {
+    const n = totalEncabezado(d, palabra);
+    if (n == null) return { filas: leer(), esperadas: null };
+    for (let i = 0; i < 3 && leer().length < n; i++) { await cargarTodo(t); await hasta(() => leer().length >= n, 4000); }
+    if (leer().length > n) await hasta(() => leer().length === n, 5000);           // filas de la ventana anterior aún sin retirar
+    return { filas: leer(), esperadas: n };
+  }
+  async function revisarRMD(dRaiz, avisar, detenido) {
+    const r = { listas: [], incoherencias: [], citas: [], avisos: [], reglas: on('reglas'), pasos: 0, pms: 0, t0: Date.now() };
+    const parar = () => { if (detenido()) throw new Error('Revisión detenida a pedido.'); };
+    const citasDe = (lugar, desc) => { const rx = new RegExp(PATRON_REFERENCIA_JS.source, 'g'); let m; while ((m = rx.exec(desc || ''))) r.citas.push({ ...lugar, codigo: m[0] }); };
+    // las alertas de la tabla, ya calculadas por ajustarTabla (todas las de cada fila, no solo la primera)
+    const alertasDe = (t) => { ajustarTabla(t); return new Map(((t.__rmdAlertas || {}).filas || []).map((a) => [a.tr, a.todos || [a.texto]])); };
+    // La ventana de procesos menores a veces se queda mostrando TODOS los procesos menores de la etiqueta (p. ej. 151 en vez de
+    // los 4 del paso: el portal reutiliza el mismo modelo), con su encabezado "Procesos (151)". Cada fila trae en el modelo a qué
+    // paso pertenece (pasoId_mdEstructuraPasoId), así que se leen todas las páginas y se quedan solo las del paso: el resultado es
+    // exacto (comprobado en el portal: dos recorridos seguidos dan lo mismo). Igual con los pasos de cada lista (mdEstructuraId /
+    // mdEsEtiquetaId). pertenece(objeto de la fila) -> true/false; si la fila no trae objeto no se puede comprobar y se cuenta.
+    const deLista = (pertenece) => (tr) => { if (!pertenece) return true; const o = objetoDeFila(tr); return !o || pertenece(o); };
+    async function propiasCompletas(d, t, palabra, leer, pertenece) {
+      const ok = deLista(pertenece);
+      await hasta(() => !ocupado() && leer().every(ok), 4000);
+      const { filas, esperadas } = await filasCompletas(d, t, palabra, leer);
+      const propias = filas.filter(ok);
+      return { filas: propias, esperadas, ajenas: filas.length - propias.length };
     }
-    avisar && avisar('PROCEDIMIENTO');
+    async function revisarLista(d, lista, pertenece) {
+      const t = tablaDe(d); if (!t) return;
+      await cargarTodo(t);
+      const { filas, esperadas, ajenas } = await propiasCompletas(d, t, 'PASOS', () => filasPrincipales(t), pertenece);
+      if (ajenas && !filas.length) r.avisos.push(`${lista}: la ventana mostraba pasos de otra lista y no se pudieron leer los suyos`);
+      else if (!ajenas && esperadas != null && filas.length !== esperadas) r.avisos.push(`${lista}: se leyeron ${filas.length} de ${esperadas} pasos`);
+      const alertas = alertasDe(t), info = { lista, pasos: filas.length, pms: 0, incoherencias: 0, citas: 0, detalle: [] };
+      const citas0 = r.citas.length;
+      for (let k = 0; k < filas.length; k++) {
+        parar();
+        const tr = filas[k], p = leerPaso(t, tr), idPaso = (objetoDeFila(tr) || {}).mdEstructuraPasoId;
+        const lugar = { lista, paso: norm(p.orden) || String(k + 1), codigoPaso: norm(p.codigo), descPaso: norm(p.desc), pm: '', codigoPM: '', descPM: '' };
+        citasDe(lugar, lugar.descPaso);
+        (alertas.get(tr) || []).forEach((aviso) => { r.incoherencias.push({ ...lugar, aviso }); info.incoherencias++; });
+        if (!tienePM(botonPM(tr))) continue;
+        avisar(`${lista} › paso ${lugar.paso} (${k + 1} de ${filas.length}): procesos menores`);
+        const dPM = await abrirPM(t, tr.id);
+        try {
+          const tPM = tablaDe(dPM), delPaso = typeof idPaso === 'string' ? (o) => !('pasoId_mdEstructuraPasoId' in o) || o.pasoId_mdEstructuraPasoId === idPaso : null;
+          const { filas: filasPM, esperadas: nPM, ajenas: ajenasPM } = await propiasCompletas(dPM, tPM, 'PROCESOS', () => filasPMde(dPM), delPaso);
+          info.detalle.push({ paso: lugar.paso, codigo: lugar.codigoPaso, leidos: filasPM.length, esperados: nPM, ajenas: ajenasPM, titulo: cabeceraDe(dPM).slice(0, 80) });
+          if (ajenasPM && !filasPM.length) r.avisos.push(`${lista} › paso ${lugar.paso}: la ventana mostraba procesos menores de otros pasos y no se encontraron los suyos`);
+          else if (!ajenasPM && nPM != null && filasPM.length !== nPM) r.avisos.push(`${lista} › paso ${lugar.paso}: se leyeron ${filasPM.length} de ${nPM} procesos menores`);
+          const aPM = tPM ? alertasDe(tPM) : new Map();
+          filasPM.forEach((trPM) => {
+            const q = leerPMfila(tPM, trPM), lugarPM = { ...lugar, pm: norm(q.orden), codigoPM: norm(q.codigo), descPM: norm(q.desc) };
+            citasDe(lugarPM, lugarPM.descPM);
+            (aPM.get(trPM) || []).forEach((aviso) => { r.incoherencias.push({ ...lugarPM, aviso }); info.incoherencias++; });
+            r.pms++; info.pms++;
+          });
+        } finally { await cerrarDialogo(dPM); }
+      }
+      info.citas = r.citas.length - citas0;
+      r.pasos += filas.length; r.listas.push(info);
+    }
+    // los pasos de una estructura traen su mdEstructuraId, y los de una etiqueta de Procedimiento, su mdEsEtiquetaId
+    const idDe = (tr, clave) => { const o = tr && objetoDeFila(tr), v = o && o[clave]; return typeof v === 'string' ? v : null; };
+    const conId = (id, clave) => (id ? (o) => !(clave in o) || o[clave] === id : null);
+    const filaDe = (dPadre, texto) => { const t = tablaDe(dPadre); return t && filasPrincipales(t).find((f) => SIN_ACENTOS(f.textContent).includes(SIN_ACENTOS(texto))); };
+    for (const estructura of LISTAS_DE_PASOS) {
+      parar(); avisar(estructura);
+      const tr = filaDe(dRaiz, estructura), d = await abrirBotonDeFila(tr, 'Adicionar Pasos RMD');
+      if (d) { try { await revisarLista(d, estructura, conId(idDe(tr, 'mdEstructuraId'), 'mdEstructuraId_mdEstructuraId')); } finally { await cerrarDialogo(d); } }
+    }
+    parar(); avisar('PROCEDIMIENTO');
     const dEtq = await abrirAccionFila(dRaiz, 'PROCEDIMIENTO', 'Adicionar Etiqueta');
     if (dEtq) {
-      const filasEtq = filasPrincipales(tablaDe(dEtq));
-      const nombres = filasEtq.map((tr) => ETIQUETAS_PROCEDIMIENTO_CONOCIDAS.find((n) => SIN_ACENTOS(tr.textContent).includes(n))).filter(Boolean);
-      for (const nombre of nombres) {
-        avisar && avisar('PROCEDIMIENTO › ' + nombre);
-        const d = await abrirAccionFila(dEtq, nombre, 'Adicionar Pasos RMD');
-        if (d) { leerDescripcionesTabla(tablaDe(d)).forEach((desc) => textos.push(['PROCEDIMIENTO › ' + nombre, desc])); await cerrarDialogo(d); }
-      }
-      await cerrarDialogo(dEtq);
+      try {
+        const etiquetas = () => { const t = tablaDe(dEtq); return t ? filasPrincipales(t) : []; };
+        const n = etiquetas().length;
+        for (let k = 0; k < n; k++) {
+          parar();
+          const tr = etiquetas()[k]; if (!tr) break;
+          const lista = 'PROCEDIMIENTO › ' + (norm(leerPaso(tablaDe(dEtq), tr).desc) || `etiqueta ${k + 1}`), idEtq = idDe(tr, 'mdEsEtiquetaId');
+          avisar(lista);
+          const d = await abrirBotonDeFila(tr, 'Adicionar Pasos RMD');
+          if (d) { try { await revisarLista(d, lista, conId(idEtq, 'mdEsEtiquetaId_mdEsEtiquetaId')); } finally { await cerrarDialogo(d); } }
+        }
+      } finally { await cerrarDialogo(dEtq); }
     }
-    const hallados = new Map();
-    textos.forEach(([origen, desc]) => {
-      const rx = new RegExp(PATRON_REFERENCIA_JS.source, 'g'); let m;
-      while ((m = rx.exec(desc))) {
-        const cod = m[0]; let r = hallados.get(cod);
-        if (!r) { r = { codigo: cod, tipo: cod[0], apariciones: 0, ejemplos: [] }; hallados.set(cod, r); }
-        r.apariciones++; if (r.ejemplos.length < 2) r.ejemplos.push(`${origen}: ${desc.slice(0, 80)}`);
-      }
-    });
-    return { lista: [...hallados.values()].sort((a, b) => a.codigo < b.codigo ? -1 : 1) };
+    r.segundos = Math.round((Date.now() - r.t0) / 1000);
+    return r;
   }
-  // Si la búsqueda se detiene a mitad de camino, cierra las ventanas que ella misma abrió (nunca las que ya estaban).
+  function agruparCitas(citas) {
+    const m = new Map();
+    citas.forEach((c) => { let x = m.get(c.codigo); if (!x) { x = { codigo: c.codigo, tipo: c.codigo[0], citas: 0, lugares: [] }; m.set(c.codigo, x); } x.citas++; x.lugares.push(c); });
+    return [...m.values()].sort((a, b) => (a.codigo < b.codigo ? -1 : 1));
+  }
+  const lugarTexto = (x) => `${x.lista} › paso ${x.paso}${x.pm ? ' › proceso menor ' + x.pm : ''}`;
+  // Si la revisión se detiene a mitad de camino, cierra las ventanas que ella misma abrió (nunca las que ya estaban).
   async function cerrarLoAbiertoDesde(previos) {
     for (let i = 0; i < 20; i++) {
       const extra = dialogos().filter((x) => !previos.has(x)); if (!extra.length) return;
       await cerrarDialogo(extra[extra.length - 1]);
     }
   }
+  const MAX_EN_PANTALLA = 400;
+  function pintarRevision(v, dRaiz, r) {
+    const docs = agruparCitas(r.citas); window.__rmdStats.ultimaRevision = r;
+    v.fondo.querySelector('h3').textContent = `Documentos citados e incoherencias — ${cabecera(dRaiz)}`;
+    const porLista = r.listas.map((l) => `<tr><td>${esc(l.lista)}</td><td>${l.pasos}</td><td>${l.pms}</td><td${l.incoherencias ? ' class="rmd-dif"' : ''}>${l.incoherencias}</td><td>${l.citas}</td></tr>`).join('');
+    const filasInc = r.incoherencias.slice(0, MAX_EN_PANTALLA).map((x) => `<tr><td>${esc(x.lista)}</td><td>${esc(x.paso)}${x.pm ? ' › ' + esc(x.pm) : ''}</td><td>${esc((x.pm ? x.descPM : x.descPaso).slice(0, 90))}</td><td>${esc(x.aviso)}</td></tr>`).join('');
+    const filasDocs = docs.map((x) => `<tr><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(TIPOS_DOC[x.tipo] || x.tipo)}</td><td>${x.citas}</td><td class="rmd-nota">${esc(x.lugares.slice(0, 2).map(lugarTexto).join('; '))}${x.lugares.length > 2 ? '…' : ''}</td></tr>`).join('');
+    v.cuerpo.innerHTML = `<p>Se revisaron <b>${r.listas.length}</b> listas, <b>${r.pasos}</b> pasos y <b>${r.pms}</b> procesos menores en ${r.segundos} s (no se cambió nada).</p>
+      ${r.reglas ? '' : '<p class="rmd-nota">Las alertas están apagadas en Ajustes ("Alertas de casillas incoherentes"): esta vez no se buscaron incoherencias.</p>'}
+      ${r.avisos.length ? `<p class="rmd-progreso error">Revisa a mano (no se pudieron leer completas): ${esc(r.avisos.join(' · '))}</p>` : ''}
+      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Pasos</th><th>Procesos menores</th><th>Incoherencias</th><th>Citas</th></tr></thead><tbody>${porLista}</tbody></table>
+      <h4>Incoherencias (${r.incoherencias.length})</h4>
+      ${r.incoherencias.length ? `<table class="rmd-tabla"><thead><tr><th>Lista</th><th>Paso › PM</th><th>Descripción</th><th>Qué corregir</th></tr></thead><tbody>${filasInc}</tbody></table>
+        ${r.incoherencias.length > MAX_EN_PANTALLA ? `<p class="rmd-nota">Se muestran las primeras ${MAX_EN_PANTALLA}; el Excel las trae todas.</p>` : ''}` : `<p>${r.reglas ? '✓ Sin incoherencias.' : '—'}</p>`}
+      <h4>Documentos citados (${docs.length})</h4>
+      ${docs.length ? `<table class="rmd-tabla"><thead><tr><th>Código</th><th>Tipo</th><th>Citas</th><th>Dónde</th></tr></thead><tbody>${filasDocs}</tbody></table>`
+        : '<p>No se encontró ningún código con el formato &lt;I/P/F&gt;Área-sufijo (ej. IPRO-P123) en las descripciones de los pasos ni de los procesos menores.</p>'}`;
+    v.pie.innerHTML = '';
+    const bX = botonModal('Descargar Excel', '', async () => {
+      bX.disabled = true;
+      try { await descargarRevisionExcel(dRaiz, r, docs); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } finally { bX.disabled = false; }
+    });
+    v.pie.append(bX, botonModal('Cerrar', 'primario', () => v.cerrar()));
+  }
+  async function descargarRevisionExcel(dRaiz, r, docs) {
+    const { libro, rmd } = armarRevisionExcel(dRaiz, r, docs);
+    descargarArchivo(`Documentos_citados_${rmd}.xlsx`, await libro.generar(), TIPO_XLSX);
+  }
+  function armarRevisionExcel(dRaiz, r, docs) {
+    const rmd = (/\d{6,}/.exec(cabecera(dRaiz)) || ['rmd'])[0], hoy = new Date(), dd = (n) => String(n).padStart(2, '0');
+    const libro = Xlsx.crearLibro();
+    const hR = libro.hoja('Resumen', { activa: true, cols: [[1, 1, 46], [2, 5, 16]] });
+    hR.poner('A1', 'Revisión del RMD: incoherencias y documentos citados', 'titulo');
+    hR.poner('A2', cabecera(dRaiz), 'negrita');
+    hR.poner('A3', `Generado el ${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} · ${r.pasos} pasos y ${r.pms} procesos menores revisados (no se cambió nada en SAP)`, 'nota');
+    if (!r.reglas) hR.poner('A4', 'Las alertas estaban apagadas en Ajustes: no se buscaron incoherencias.', 'alerta');
+    else if (r.avisos.length) hR.poner('A4', 'Revisar a mano (no se pudieron leer completas): ' + r.avisos.join(' · '), 'alerta');
+    ['Lista', 'Pasos', 'Procesos menores', 'Incoherencias', 'Citas de documentos'].forEach((t, c) => hR.poner({ c, r: 5 }, t, 'encabezado'));
+    r.listas.forEach((l, i) => [l.lista, l.pasos, l.pms, l.incoherencias, l.citas].forEach((x, c) => hR.poner({ c, r: 6 + i }, x, c ? 'entero' : 'celda')));
+    const fT = 6 + r.listas.length;
+    hR.poner({ c: 0, r: fT }, 'Total', 'encabezado');
+    [r.pasos, r.pms, r.incoherencias.length, r.citas.length].forEach((x, k) => hR.poner({ c: 1 + k, r: fT }, x, 'encabezado', r.listas.length ? `SUM(${Xlsx.letra(1 + k)}7:${Xlsx.letra(1 + k)}${fT})` : null));
+    hR.poner({ c: 0, r: fT + 2 }, 'Detalle en las hojas "Incoherencias" (qué corregir, en qué paso y proceso menor), "Documentos citados" y "Citas" (dónde aparece cada código). Todas tienen filtro.', 'nota');
+    const tabla = (nombre, cab, anchos, filas, estilos) => {
+      const h = libro.hoja(nombre, { congelar: 'A2', filtro: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, filas.length + 1)}`, cols: anchos.map((w, i) => [i + 1, i + 1, w]) });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
+      filas.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'celda'); }));
+      return h;
+    };
+    const num = (t) => (/^\d+$/.test(t || '') ? +t : t);
+    tabla('Incoherencias', ['Lista', 'Paso', 'Código del paso', 'Descripción del paso', 'Proceso menor', 'Código del proceso menor', 'Descripción del proceso menor', 'Qué corregir'],
+      [34, 7, 13, 60, 9, 13, 48, 72], r.incoherencias.map((x) => [x.lista, num(x.paso), x.codigoPaso, x.descPaso, num(x.pm), x.codigoPM, x.descPM, x.aviso]),
+      { 3: 'envuelto', 6: 'envuelto', 7: 'envuelto' });
+    tabla('Documentos citados', ['Código', 'Tipo', 'Citas', 'Dónde aparece'], [14, 15, 8, 110],
+      docs.map((x) => [x.codigo, TIPOS_DOC[x.tipo] || x.tipo, x.citas, x.lugares.map(lugarTexto).join('\n').slice(0, 32000)]), { 3: 'envuelto' });
+    tabla('Citas', ['Código', 'Tipo', 'Lista', 'Paso', 'Proceso menor', 'Descripción donde aparece'], [14, 15, 34, 7, 9, 90],
+      r.citas.map((x) => [x.codigo, TIPOS_DOC[x.codigo[0]] || x.codigo[0], x.lista, num(x.paso), num(x.pm), x.pm ? x.descPM : x.descPaso]), { 5: 'envuelto' });
+    return { libro, rmd };
+  }
+  // (diagnóstico) bytes de un .xlsx en base64, para que las pruebas lo revisen sin descargarlo en el navegador
+  const aBase64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   async function mostrarDocumentosCitados(dRaiz, boton) {
     if (window.__rmdBuscandoDocs) return; window.__rmdBuscandoDocs = true;
     boton.disabled = true; const texto0 = boton.querySelector('span').textContent;
-    const previos = new Set(dialogos());
-    const v = ventana('Buscando documentos citados…', { cancelar: () => v.cerrar() });
-    v.cuerpo.innerHTML = '<p class="rmd-nota">Recorriendo Precauciones, Notas importantes, Condiciones ambientales y las etiquetas de Procedimiento (no se cambia nada)…</p>';
+    const previos = new Set(dialogos()); let detenido = false;
+    const detener = () => { if (detenido) return; detenido = true; bDet.disabled = true; setTxt(bDet, 'Deteniendo…'); };
+    const v = ventana('Revisando el RMD…', { cancelar: detener });
+    v.cuerpo.innerHTML = '<p class="rmd-nota">Se abre cada lista de pasos (Precauciones, Notas importantes, Condiciones ambientales y cada etiqueta de Procedimiento) y los procesos menores de los pasos que los tienen, con los botones del portal: no se cambia nada. Puede tardar unos minutos en un RMD grande.</p><p class="rmd-progreso"></p>';
+    const bDet = botonModal('Detener', '', detener); v.pie.appendChild(bDet);
     try {
-      const { lista } = await documentosCitadosRMD(dRaiz, (donde) => { setTxt(boton.querySelector('span'), 'Buscando…'); v.cuerpo.querySelector('p').textContent = 'Leyendo: ' + donde + '…'; });
-      if (!lista.length) {
-        v.fondo.querySelector('h3').textContent = 'Documentos citados';
-        v.cuerpo.innerHTML = '<p>No se encontró ningún código con el formato &lt;I/P/F&gt;Área-sufijo (ej. IPRO-P123) en las descripciones de los pasos.</p><p class="rmd-nota">Los procesos menores no se recorrieron: habría que abrir cada uno.</p>';
-        v.pie.innerHTML = ''; v.pie.appendChild(botonModal('Cerrar', 'primario', () => v.cerrar()));
-        return;
-      }
-      v.fondo.querySelector('h3').textContent = `Documentos citados (${lista.length})`;
-      const filas = lista.map((r) => `<tr><td>${esc(r.codigo)}</td><td>${esc(TIPOS_DOC[r.tipo] || r.tipo)}</td><td>${r.apariciones}</td><td class="rmd-nota">${esc(r.ejemplos[0] || '')}</td></tr>`).join('');
-      v.cuerpo.innerHTML = `<p class="rmd-nota">Procedimientos, Formatos e Instructivos citados en las descripciones de los pasos (no incluye procesos menores).</p>
-        <table class="rmd-tabla"><thead><tr><th>Código</th><th>Tipo</th><th>Citas</th><th>Ejemplo</th></tr></thead><tbody>${filas}</tbody></table>`;
-      v.pie.innerHTML = '';
-      const bDesc = botonModal('Descargar .txt', '', () => {
-        const porTipo = { I: [], P: [], F: [] }; lista.forEach((r) => { (porTipo[r.tipo] || (porTipo[r.tipo] = [])).push(r); });
-        const lineas = [`Documentos citados — ${cabecera(dRaiz)}`, ''];
-        Object.keys(TIPOS_DOC).forEach((t) => { if (!porTipo[t] || !porTipo[t].length) return; lineas.push(`${TIPOS_DOC[t]} (${porTipo[t].length}):`); porTipo[t].forEach((r) => lineas.push(`  ${r.codigo} — ${r.apariciones} cita(s)`)); lineas.push(''); });
-        descargarTexto(`documentos_citados_${(/\d{6,}/.exec(cabecera(dRaiz)) || ['rmd'])[0]}.txt`, lineas.join(String.fromCharCode(13, 10)));
-      });
-      v.pie.append(bDesc, botonModal('Cerrar', 'primario', () => v.cerrar()));
+      const r = await revisarRMD(dRaiz, (donde) => { setTxt(boton.querySelector('span'), 'Revisando…'); setTxt(v.cuerpo.querySelector('.rmd-progreso'), 'Leyendo: ' + donde + '…'); }, () => detenido);
+      pintarRevision(v, dRaiz, r);
     } catch (e) {
-      v.fondo.querySelector('h3').textContent = 'No se pudo completar la búsqueda';
+      v.fondo.querySelector('h3').textContent = detenido ? 'Revisión detenida' : 'No se pudo completar la revisión';
       v.cuerpo.innerHTML = `<p>${esc(e.message)}</p><p class="rmd-nota">Cerrando las ventanas que se hayan quedado abiertas…</p>`;
       v.pie.innerHTML = ''; v.pie.appendChild(botonModal('Cerrar', 'primario', () => v.cerrar()));
       try { await cerrarLoAbiertoDesde(previos); } catch (e2) { /* se deja para que la persona las cierre a mano */ }
@@ -1896,10 +2783,13 @@
     const dRaiz = dialogos()[0]; if (!dRaiz || !/^\d{6,}\s*-/.test(cabecera(dRaiz))) return;
     const hdr = dRaiz.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-documentos-citados')) return;
     const b = botonIcono(ICONO_DOCUMENTOS, 'Documentos citados', 'rmd-documentos-citados', () => mostrarDocumentosCitados(dRaiz, b));
-    b.title = 'Recorre Precauciones, Notas importantes, Condiciones ambientales y Procedimiento buscando Procedimientos, Formatos e Instructivos citados en las descripciones (no cambia nada; tarda varios segundos).';
+    b.title = 'Revisa todo el RMD (Precauciones, Notas importantes, Condiciones ambientales, cada etiqueta de Procedimiento y sus procesos menores): documentos citados e incoherencias de configuración, con descarga a Excel. No cambia nada; tarda unos minutos.';
     const ref = hdr.querySelector('.sapMTBSpacer') || hdr.firstElementChild;
     if (ref) ref.insertAdjacentElement('afterend', b); else hdr.appendChild(b);
   }
+  // diagnóstico: la revisión sin ventana, y su Excel en base64 (sin descargarlo)
+  window.__rmdStats.revisarRMD = (detenido) => revisarRMD(dialogos()[0], () => {}, detenido || (() => false));
+  window.__rmdStats.excelRevision = async (r) => aBase64(await armarRevisionExcel(dialogos()[0], r, agruparCitas(r.citas)).libro.generar());
 
   // ---- Lectura del maestro de RMD con sus recetas, para "Enviar a Status RMD" (junto al icono nativo "Exportar"): ese
   // botón del portal solo trae "Código por Defecto" (codDefectoReceta), un único código, pero un RMD puede tener VARIAS
@@ -2034,6 +2924,85 @@
     }
   }
 
+  // ---- "Indicadores" (junto al icono nativo "Exportar"): lee aquí el maestro completo (la misma lectura de "Enviar a Status
+  // RMD") y arma "BD RMD <MES> <AÑO> - P1-P2.xlsx" con el bloque INDICADORES de arriba: las mismas hojas y tablas dinámicas del
+  // archivo que el equipo prepara a mano cada mes. Si se elige el archivo del mes anterior, trae sus listas PEND PL1 / PEND PL2
+  // y los "No contar" ya marcados. No envía nada a ningún lado: el archivo se arma en el navegador y se descarga.
+  const ICONO_INDICADORES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 14.5h12"/><path d="M4 12V8.5M7 12V5M10 12V7M13 12V3"/></svg>';
+  // Filas para el libro, iguales a las del "Exportar" nativo: su "Fecha Autorización" es el texto de la fecha LOCAL
+  // (formatDateExcel del portal), mientras Fecha Registro y Fecha Solicitud van como fecha con hora UTC (sap.ui.export).
+  // (Los Cancelados, que el Exportar tampoco trae, los quita el propio bloque INDICADORES.)
+  const fechaLocalTexto = (f) => (f instanceof Date && !isNaN(f) ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}` : '');
+  const filaIndicadores = (md) => ({ ...datosBaseDeMD(md), fechaAut: fechaLocalTexto(md.fechaAutorizacion) });
+  // Mes por defecto: el anterior durante la primera quincena (se cierra el mes que acaba de terminar); si no, el actual.
+  function mesPorDefecto(hoy = new Date()) { const d = new Date(hoy.getFullYear(), hoy.getMonth() - (hoy.getDate() <= 15 ? 1 : 0), 1); return { mes: d.getMonth() + 1, anio: d.getFullYear() }; }
+  function abrirIndicadores() {
+    if (window.__rmdIndicadores) return;
+    let trabajando = false;
+    const v = ventana('Indicadores del mes', { cancelar: () => { if (!trabajando) v.cerrar(); } });
+    const def = mesPorDefecto(), hoy = new Date(), meses = [];
+    for (let k = 0; k < 14; k++) { const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1); meses.push({ mes: d.getMonth() + 1, anio: d.getFullYear() }); }
+    v.cuerpo.innerHTML = `<p>Arma <b class="rmd-ind-nombre"></b> con las mismas hojas del archivo que el equipo prepara cada mes: la hoja de datos con sus columnas calculadas, PEND PL1, PEND PL2, RESUMEN con las 7 tablas dinámicas y Hoja1.</p>
+      <div class="rmd-ind-form">
+        <label>Mes<select class="rmd-ind-mes">${meses.map((m) => `<option value="${m.anio}-${m.mes}"${m.mes === def.mes && m.anio === def.anio ? ' selected' : ''}>${Indicadores.MESES[m.mes - 1]} ${m.anio}</option>`).join('')}</select></label>
+        <label>Archivo del mes anterior (opcional)<input type="file" class="rmd-ind-previo" accept=".xlsx"></label>
+      </div>
+      <p class="rmd-nota">Del archivo anterior se traen las listas PEND PL1 / PEND PL2 y los "No contar" ya marcados. El A/F se asigna con la misma regla del equipo; los "No contar" sugeridos quedan en amarillo claro, con el motivo en "Por revisar". Genéralo al cierre del mes: los estados son los que tiene SAP en este momento.</p>
+      <p class="rmd-progreso"></p><div class="rmd-ind-resultado"></div>`;
+    const sel = v.cuerpo.querySelector('.rmd-ind-mes'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-ind-resultado');
+    const elegido = () => { const [anio, mes] = sel.value.split('-').map(Number); return { mes, anio }; };
+    const pintarNombre = () => { const { mes, anio } = elegido(); setTxt(v.cuerpo.querySelector('.rmd-ind-nombre'), Indicadores.nombreArchivo(mes, anio)); };
+    sel.addEventListener('change', pintarNombre); pintarNombre();
+    const avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const bGen = botonModal('Generar Excel', 'primario', async () => {
+      if (window.__rmdIndicadores) return;
+      window.__rmdIndicadores = true; trabajando = true; bGen.disabled = true; res.innerHTML = '';
+      try {
+        const { mes, anio } = elegido(), archivo = v.cuerpo.querySelector('.rmd-ind-previo').files[0];
+        let previo = null;
+        if (archivo) {
+          avance(`Leyendo "${archivo.name}"…`);
+          try { previo = await Indicadores.leerPrevio(new Uint8Array(await archivo.arrayBuffer())); } catch (e) { throw new Error(`no se pudo leer "${archivo.name}": ${e.message}`); }
+        }
+        const modelo = modeloListaPrincipal(); if (!modelo) throw new Error('abre la lista "Configuración Manufactura Digital" para poder leer el maestro');
+        const datos = await leerMDPaginado(modelo, [], (h, t) => avance(`Leyendo SAP… página ${h} de ${t}`));
+        avance(`Armando el libro con ${datos.length} RMD…`); await esperar(40);
+        const { libro, nombre, resumen: x } = Indicadores.construir({ filas: datos.map(filaIndicadores), mes, anio, previo, generado: new Date() });
+        const u8 = await libro.generar();
+        descargarArchivo(nombre, u8, TIPO_XLSX);
+        const s = x.sugeridos, nSug = s.anterior + s.observacion + s.formato + s.estado, fmt = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
+        avance(`✓ Descargado "${nombre}" (${(u8.length / 1048576).toFixed(1)} MB).`);
+        res.innerHTML = `<ul class="rmd-resumen-ind">
+          <li><b>${x.sap}</b> RMD leídos de SAP; A/F: <b>${x.mes}</b> del mes y <b>${x.antiguo}</b> ANTIGUO.</li>
+          <li>Autorizados del mes: <b>${fmt(x.autorizados)}</b> (${x.autorizadosCuenta} RMD) · Ingresados: <b>${fmt(x.ingresados)}</b> (${x.ingresadosCuenta} RMD) · TOTAL DE RMD: <b>${x.totalRmd}</b>.</li>
+          <li>"No contar" sugeridos para revisar: <b>${nSug}</b>${nSug ? ` (${[[s.anterior, 'del mes anterior'], [s.observacion, 'por la Observación'], [s.formato, 'por Observación sin formato'], [s.estado, 'abiertos con fecha de autorización']].filter(([n]) => n).map(([n, t]) => `${n} ${t}`).join(', ')})` : ''}.</li>
+          <li>${previo ? `PEND PL1: <b>${x.pl1}</b> · PEND PL2: <b>${x.pl2}</b>${x.posibles ? ` · <b>${x.posibles}</b> quizá ya están en SAP (columna "Posible registro en SAP")` : ''}.` : 'Sin archivo del mes anterior: PEND PL1 y PEND PL2 quedan vacías.'}</li>
+          <li>DLAB. (días laborados) se completa a mano en Hoja1; el promedio por día se calcula solo.</li></ul>`;
+      } catch (e) { avance('No se pudo generar: ' + e.message, true); }
+      finally { window.__rmdIndicadores = false; trabajando = false; bGen.disabled = false; }
+    });
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
+  }
+  function gestionarBotonIndicadores() {
+    if (!on('indicadores')) { document.querySelectorAll('.rmd-indicadores').forEach((e) => e.remove()); return; }
+    const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return;
+    const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra || barra.querySelector('.rmd-indicadores')) return;
+    const b = botonIcono(ICONO_INDICADORES, 'Indicadores', 'rmd-indicadores', () => abrirIndicadores());
+    b.title = 'Arma el Excel de indicadores del mes ("BD RMD <MES> <AÑO> - P1-P2.xlsx") con sus tablas dinámicas, leyendo aquí el maestro completo de SAP. No cambia nada en SAP.';
+    btnExportar.insertAdjacentElement('afterend', b);
+  }
+  // diagnóstico: el maestro tal como lo recibe el libro de indicadores (datosBaseDeMD), para compararlo con un exportado
+  window.__rmdStats.maestro = async () => (await leerMDPaginado(modeloListaPrincipal(), [])).map((md) => { const f = datosBaseDeMD(md);
+    return { ...f, fechaAutLocal: fechaLocalTexto(md.fechaAutorizacion), fechaAutorizacion: md.fechaAutorizacion && md.fechaAutorizacion.toISOString(), fechaRegistro: f.fechaRegistro && f.fechaRegistro.toISOString(), fechaSolicitud: f.fechaSolicitud && f.fechaSolicitud.toISOString() }; });
+  // diagnóstico: arma el libro de un mes sin descargarlo (para las pruebas de solo lectura en el portal)
+  window.__rmdStats.indicadoresSinDescargar = async (mes, anio, op = {}) => {
+    const datos = await leerMDPaginado(modeloListaPrincipal(), []);
+    const { libro, nombre, resumen } = Indicadores.construir({ filas: datos.map(filaIndicadores), mes, anio, previo: null, generado: new Date() });
+    const u8 = await libro.generar();
+    return { nombre, bytes: u8.length, resumen, base64: op.base64 ? aBase64(u8) : undefined,
+      muestra: op.muestra ? datos.filter((md) => op.muestra.includes(md.codigo)).map((md) => ({ codigo: md.codigo, reg: md.fechaRegistro && md.fechaRegistro.toISOString(), sol: md.fechaSolicitud && md.fechaSolicitud.toISOString(), aut: md.fechaAutorizacion && md.fechaAutorizacion.toISOString() })) : undefined };
+  };
+
   // ---- Experimental: aplicar "Aa" (minúsculas con redacción correcta) y el aviso de ortografía sobre los textarea editables
   // ya existentes (Descripción Paso de "Nuevo Paso", Descripción/Especificaciones de Especificaciones). Nunca escriben solas.
   const ICONO_AA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11 5 3l3 8M2.8 8.5h4.4"/><path d="M9.5 11c0-1.4 1.1-2.3 2.5-2.3s2.4.8 2.4 2c0 1-.7 1.3-1.8 1.6-1.2.3-2.7.6-2.7 2 0 .9.8 1.2 1.7 1.2 1.1 0 2-.5 2.4-1.3"/></svg>';
@@ -2145,7 +3114,7 @@
   const GRUPOS_PANEL = [
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
     ['Alertas', ['reglas', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'espec', 'nuevopaso', 'verop', 'documentos', 'statusrmd', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Herramientas', ['filtro', 'copiar', 'espec', 'nuevopaso', 'verop', 'documentos', 'statusrmd', 'indicadores', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
     ['Experimental', ['minusculas', 'ortografia']],
   ];
   function panel() {

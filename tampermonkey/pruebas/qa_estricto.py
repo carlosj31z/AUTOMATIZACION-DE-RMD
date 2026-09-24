@@ -1,12 +1,13 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
   K botón de mejoras y panel · L el botón no desaparece al cargar la página (inyección temprana, como Tampermonkey)
   M aviso de cambios sin guardar (sin falsos avisos tras guardar; aviso propio centrado) · N predecesor obligatorio en pasos con tipo de dato y texto
-  'CONTROL DE CALIDAD O CALIDAD EN OPERACIONES' · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  'CONTROL DE CALIDAD O CALIDAD EN OPERACIONES' · O Indicadores del mes (libro armado desde SAP, sin descargar) y Documentos
+  citados con procesos menores, incoherencias y Excel (solo abre y cierra ventanas) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -29,9 +30,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMND"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMN).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNO).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -936,6 +937,52 @@ with sync_playwright() as p:
                 a = fr.evaluate(LEER_PRED); tipados = [f for f in a["filas"] if f["tipo"] and "sin tipo" not in f["tipo"].lower()]
                 return (bool(tipados) and not any(f["falta"] for f in a["filas"])), f"lista={a['lista']!r} pasos con tipo={len(tipados)} marcados={sum(1 for f in a['filas'] if f['falta'])}"
             cerrar_seguro()
+
+    # ───────────────────────── O. Indicadores del mes y Documentos citados (procesos menores, incoherencias, Excel) — solo lectura ─────────────────────────
+    if "O" in SOLO:
+        import base64, datetime, io, zipfile
+        cerrar_seguro(); pg.set_viewport_size({"width": 1415, "height": 886}); pg.wait_for_timeout(1200)
+        hoy = datetime.date.today(); ant = hoy.replace(day=1) - datetime.timedelta(days=1)
+        por_defecto = f"{ant.year}-{ant.month}" if hoy.day <= 15 else f"{hoy.year}-{hoy.month}"
+        def xlsx(b64):
+            z = zipfile.ZipFile(io.BytesIO(base64.b64decode(b64)))
+            return z, re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
+        @prueba("O1 Indicadores: botón junto a 'Exportar'; la ventana propone el mes (el anterior en la 1ª quincena) y el archivo del mes anterior es opcional; abrirla no genera nada")
+        def _():
+            b_ = fr.evaluate("() => { const b = document.querySelector('.rmd-indicadores'); return b && { anterior: (b.previousElementSibling || {}).title, visible: b.getClientRects().length > 0 }; }")
+            fr.locator(".rmd-indicadores").click(); pg.wait_for_timeout(700)
+            v = fr.evaluate("""() => { const m = [...document.querySelectorAll('.rmd-modal')].pop(); const s = m && m.querySelector('.rmd-ind-mes');
+              return m && { mes: s.value, meses: s.options.length, nombre: m.querySelector('.rmd-ind-nombre').textContent, archivo: !!m.querySelector('input[type=file]') }; }""")
+            fr.locator(".rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(500)
+            ok = bool(b_ and b_["anterior"] == "Exportar" and b_["visible"] and v and v["mes"] == por_defecto and v["meses"] == 14 and v["archivo"]
+                      and re.match(r"^BD RMD [A-Z]+ \d{4} - P1-P2\.xlsx$", v["nombre"]) and not fr.evaluate("!!document.querySelector('.rmd-modal')"))
+            return ok, f"{b_} {v}"
+        @prueba("O2 Indicadores: el libro del mes anterior se arma con los datos de SAP (sin descargarlo): 5 hojas del archivo del equipo, 7 tablas dinámicas sobre la tabla DatosRMD y sin RMD Cancelados")
+        def _():
+            r = fr.evaluate("(m) => window.__rmdStats.indicadoresSinDescargar(m[0], m[1], { base64: true })", [ant.month, ant.year])
+            z, hojas = xlsx(r.pop("base64"))
+            tablas = [n for n in z.namelist() if re.match(r"xl/pivotTables/pivotTable\d+\.xml$", n)]
+            cache = z.read("xl/pivotCache/pivotCacheDefinition1.xml").decode("utf-8")
+            estados = re.search(r'<cacheField name="Estado"[^>]*><sharedItems[^>]*>(.*?)</sharedItems>', cache, re.S).group(1)
+            ok = (hojas == ["Exportación SAPUI5", "PEND PL1", "PEND PL2", "RESUMEN", "Hoja1"] and len(tablas) == 7 and 'worksheetSource name="DatosRMD"' in cache
+                  and "Cancelado" not in estados and r["resumen"]["sap"] > 1000)
+            lista_estados = re.findall(r'v="([^"]+)"', estados)
+            return ok, f"{r['nombre']} {r['bytes']} bytes; tablas={len(tablas)}; estados={lista_estados}; resumen={r['resumen']}"
+        RmdAutomation(pg).editor_de_rmd(RMD_PRUEBA); pg.wait_for_timeout(4000)
+        @prueba("O3 Documentos citados: recorre todas las listas y los procesos menores de los pasos que los tienen (sin avisos de lectura: filas = total del encabezado, o solo las del paso si la ventana muestra toda la etiqueta), junta incoherencias y citas, y arma el Excel de 4 hojas")
+        def _():
+            fr.locator(".rmd-documentos-citados").click(); t0 = time.time()
+            while time.time() - t0 < 1500:
+                pg.wait_for_timeout(3000)
+                if fr.evaluate("(() => { const m = [...document.querySelectorAll('.rmd-modal')].pop(); return !m || !/^Revisando/.test(m.querySelector('h3').textContent); })()"): break
+            r = fr.evaluate("""() => { const r = window.__rmdStats.ultimaRevision; return r && { listas: r.listas.length, pasos: r.pasos, pms: r.pms, avisos: r.avisos, incoherencias: r.incoherencias.length,
+              citas: r.citas.length, citasEnPM: r.citas.filter(c => c.pm).length, completas: r.listas.every(l => l.detalle.every(x => x.esperados == null || x.leidos === x.esperados || (x.ajenas > 0 && x.leidos > 0))) }; }""")
+            z, hojas = xlsx(fr.evaluate("() => window.__rmdStats.excelRevision(window.__rmdStats.ultimaRevision)"))
+            fr.locator(".rmd-modal-pie button", has_text="Cerrar").last.click(); pg.wait_for_timeout(700)
+            quedan = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length")
+            ok = bool(r and r["listas"] >= 5 and r["pms"] > 0 and not r["avisos"] and r["completas"] and hojas == ["Resumen", "Incoherencias", "Documentos citados", "Citas"] and quedan == 1)
+            return ok, f"{r}; hojas={hojas}; ventanas abiertas al terminar={quedan}; {round(time.time() - t0)} s"
+        cerrar_seguro()
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

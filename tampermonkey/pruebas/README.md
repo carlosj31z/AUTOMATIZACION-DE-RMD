@@ -17,17 +17,19 @@
 | L | **El botón de mejoras no desaparece al cargar la página**: el script se inyecta *antes* de que la app se monte (como Tampermonkey con `document-idle`), se simula el apartado de nodos del `<body>` que hace UI5 y se comprueba que el botón sigue encima de todo, que se vuelve a colgar si algo lo retira y que recupera su hoja de estilos. |
 | M | **Aviso de cambios sin guardar**: el aviso propio sale centrado y con botones claros (no el cuadro del navegador); *Seguir editando*, Escape y Enter conservan el trabajo; **tras Guardar / Ctrl+S no avisa aunque el portal cambie valores**; una Advertencia del portal deja la ventana sin guardar; el Éxito la limpia; marcar filas, el filtro local y los cambios del portal sin tocar nada no cuentan; con la opción apagada no avisa. El Guardar del portal se sustituye por una acción vacía (no se escribe). |
 | N | **Predecesor obligatorio** en pasos con tipo de dato (Precauciones, Fabricación…; excepciones: cabeza de Precauciones, Rendimiento, pasos condicionales/en paralelo, Sin tipo de dato) y textos correctos con "CONTROL DE CALIDAD" ("…CONTROL DE CALIDAD O CALIDAD EN OPERACIONES…" y "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA…"; los demás "CONTROL DE CALIDAD" siguen alertando). Los casos se crean en memoria. |
+| O | **Indicadores del mes** (botón junto a "Exportar", ventana con el mes y el archivo opcional; el libro del mes anterior se arma con los datos de SAP *sin descargarlo*: 5 hojas, 7 tablas dinámicas sobre la tabla `DatosRMD`, sin RMD Cancelados) y **Documentos citados** con procesos menores e incoherencias (recorre todo `RMD_PRUEBA`, lee todas las filas que dice cada encabezado o solo las del paso cuando la ventana muestra toda la etiqueta, arma el Excel de 4 hojas y cierra lo que abrió). Solo abre y cierra ventanas. |
 | D | **Escribe** en el RMD de prueba y lo restaura: Enter = Ir en el selector, Ctrl+S y cierre solo del mensaje de éxito, aviso de cambios sin guardar, pegar (paso 9 → 19) con procesos menores, segundo pegado sin duplicar, vista previa sin nada marcado, y restauración. |
 
 ```bash
 export RMD_PRUEBA=<RMD de PRUEBA Ingresado>   # solo el bloque D lo modifica (y lo restaura)
 python tampermonkey/pruebas/qa_estricto.py                # todos los bloques (incluido D, que escribe: exige RMD_PRUEBA)
-python tampermonkey/pruebas/qa_estricto.py ABCEFGHIJKLMN  # sin escribir (sin RMD_PRUEBA usa el RMD Ingresado 2202609081)
+python tampermonkey/pruebas/qa_estricto.py ABCEFGHIJKLMNO # sin escribir (sin RMD_PRUEBA usa el RMD Ingresado 2202609081)
 ```
 **Sin sesión del portal**, ambos lanzan su propio Chrome (headless) sobre una *maqueta* del DOM del portal; no escriben nada y no necesitan el Chrome del puerto 9222:
 ```bash
 python tampermonkey/pruebas/qa_local.py           # aviso sin guardar, predecesor obligatorio, texto "CONTROL DE CALIDAD..."
 python tampermonkey/pruebas/qa_local_sesion.py    # aviso de sesión por inactividad ("Continuar trabajando")
+node tampermonkey/pruebas/qa_indicadores.mjs      # libro de indicadores y Excel propio (fórmulas con la semántica de Excel, A/F, "No contar", 7 tablas dinámicas, lectura de vuelta)
 ```
 Complementan a `qa_estricto.py`, que sigue siendo la referencia contra el portal real.
 
