@@ -179,6 +179,22 @@ def test_entrega_del_formato_de_inspeccion_a_control_de_calidad_no_se_alerta():
     assert len([m for m in mensajes(s) if "reemplazar" in m and "CONTROL DE CALIDAD" in m]) == 2
 
 
+def test_pasos_mayores_de_biocarga_no_alertan_control_de_calidad():
+    """El análisis de biocarga es de Control de Calidad (usuario, 2026-09-23): ningún paso mayor que mencione biocarga se alerta,
+    en mayúsculas o en minúsculas. Otro paso con "CONTROL DE CALIDAD" y un proceso menor de biocarga siguen alertándose."""
+    biocarga = "EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA, SEGUN LO INDICADO EN EL PROCEDIMIENTO PCMB-200 VIGENTE."
+    for texto in (biocarga, "El personal de Control de Calidad muestrea (100 mL) para análisis de biocarga, según lo indicado en el procedimiento PCMB-200 vigente."):
+        s = snap_base()
+        s["structs"][3]["etq"][1]["p"].append(paso(6, texto, "Realizado por", chk="R. Por,Estado CC", dep="1005 (5)"))
+        assert not [m for m in mensajes(s) if "CONTROL DE CALIDAD" in m]
+    s = snap_base()
+    s["structs"][3]["etq"][1]["p"].append(paso(6, biocarga, "Realizado por", chk="R. Por,Estado CC", dep="1005 (5)"))
+    s["structs"][3]["etq"][1]["p"].append(paso(7, "ESPERAR RESULTADOS DE CONTROL DE CALIDAD PARA CONTINUAR.", dep="1006 (6)"))
+    s["structs"][3]["etq"][1]["pm"] = {"6": ["1|/83022/MUESTRA DE BIOCARGA PARA CONTROL DE CALIDAD (mL):||Números|||||Edit,Estado CC"]}
+    avisos = [(h.lista, h.orden) for h in reglas.revisar(s) if "reemplazar" in h.mensaje and "CONTROL DE CALIDAD" in h.mensaje]
+    assert avisos == [("PROCEDIMIENTO>FABRICACION", "7"), ("PROCEDIMIENTO>FABRICACION #6 (menor 1)", "-")]
+
+
 def test_pm_op_marcada_se_avisa():
     """PM OP no debe marcarse en ningún paso (indicación del equipo, septiembre de 2026)."""
     s = snap_base()

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.21.0
+// @version      1.21.1
 // @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados e incoherencias de todo el RMD (con procesos menores, en Excel), Indicadores del mes (BD RMD con tablas dinámicas), envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.21.0';                                                       // mantener igual a @version
+  const VERSION = '1.21.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -309,6 +309,9 @@
   const ALTERNATIVA_CALIDAD = /CONTROL DE CALIDAD\s+O\s+CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES\s+O\s+CONTROL DE CALIDAD/g;
   const ENTREGA_FORMATO_INSPECCION = /FINALMENTE\s+ENTREGAR\s+EL\s+FORMATO\s+DE\s+INSPECCION\s+EN\s+LINEAS\s+DE\s+PRODUCCION\s*\(FPRO-\d+(?:\s+VIGENTE)?\)\s*A\s+CONTROL\s+DE\s+CALIDAD\s+PARA\s+SU\s+APROBACION\s+EN\s+EL\s+SISTEMA/g;
   const sinCalidadCorrecta = (d) => d.replace(ALTERNATIVA_CALIDAD, 'CALIDAD EN OPERACIONES').replace(ENTREGA_FORMATO_INSPECCION, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION');
+  // - Pasos mayores de BIOCARGA ("EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA, SEGUN LO INDICADO EN EL
+  //   PROCEDIMIENTO PCMB-200 VIGENTE."): el análisis de biocarga es de Control de Calidad; ningún paso mayor que mencione biocarga se alerta.
+  const BIOCARGA = /\bBIOCARGA\b/;
   // Pasos que por su redacción pueden ir sin predecesor (condicionales, en paralelo o de cierre; ver docs/como_se_configura_un_rmd.md §5)
   const INDEPENDIENTES = /\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA/;
   const LISTAS_SIN_PREDECESOR = /^(RENDIMIENTO|CONDICIONES AMBIENTALES)/;
@@ -354,7 +357,7 @@
     }
     // PM OP: ningún paso debe llevarla marcada (indicación del equipo, septiembre de 2026).
     if (chk['PM OP']) out.push({ col: 'PM OP', clase: 'rmd-desmarcar', msg: 'DESMARCAR PM OP: ningún paso debe llevarla marcada' });
-    if (f.desc != null) {
+    if (f.desc != null && (f.esPM || !BIOCARGA.test(desc))) {
       if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"' });
       else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(sinCalidadCorrecta(desc))) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)' });
     }
@@ -411,6 +414,10 @@
     'desinfección', 'rotulación', 'lubricación', 'homogenización', 'homogeneización', 'dilución', 'emulsión', 'purificación', 'clarificación',
     'vacío', 'térmico', 'térmica', 'hermético', 'hermética', 'estéril', 'estériles', 'depósito', 'depósitos', 'nitrógeno', 'oxígeno', 'ácido',
     'hidróxido', 'cápsula', 'cápsulas', 'fármaco', 'químicamente', 'ámbar', 'polietileno', 'última', 'sólido', 'sólidos', 'líquido', 'líquidos',
+    'eléctrico', 'eléctrica', 'eléctricos', 'eléctricas', 'teórico', 'teórica', 'teóricos', 'teóricas', 'supervisión', 'cálculo', 'cálculos',
+    'óptimo', 'óptima', 'plástico', 'plástica', 'plásticos', 'plásticas', 'metálico', 'metálica', 'metálicos', 'metálicas', 'magnético',
+    'magnética', 'volumétrico', 'volumétrica', 'cámara', 'cámaras', 'lámpara', 'lámparas', 'balón', 'almacén', 'vía', 'vías', 'energía',
+    'pérdida', 'pérdidas',
   ].map((p) => [SIN_ACENTOS(p), p]));
   delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // "mas" (cantidad, con tilde) es ambiguo con "mas" (pero, sin tilde): no se acentua solo
   // Palabras "conocidas" para el aviso de ortografia: nexos y palabras cortas muy frecuentes, mas los terminos propios
@@ -434,7 +441,8 @@
   const PATRON_REFERENCIA_JS = /\b[IPF][A-Z0-9]{3}-[A-Z]?\d{3}\b/;
   // siglas que se conservan tal cual (no se protege ninguna otra secuencia en mayusculas: el texto de entrada ya viene
   // todo en mayusculas, asi que "proteger cualquier palabra en mayusculas" dejaria todo el texto sin tocar)
-  const SIGLAS_CONOCIDAS = new Set(['RMD', 'CC', 'UM', 'OP', 'PM', 'SAP', 'GMP', 'ID', 'OK', 'CT']);
+  const SIGLAS_CONOCIDAS = new Set(['RMD', 'CC', 'UM', 'OP', 'PM', 'SAP', 'GMP', 'ID', 'OK', 'CT', 'POE', 'EPP', 'HEPA', 'UV', 'CIP', 'SIP', 'BPM',
+    'BPF', 'WFI', 'USP', 'LAL', 'IPC', 'PVC', 'AISI', 'FEFO', 'FIFO', 'QR']);
   const MARCA = (i) => String.fromCharCode(1) + i + String.fromCharCode(2);
   const RX_MARCA = new RegExp(String.fromCharCode(1) + '(\\d+)' + String.fromCharCode(2), 'g');
   function capitalizarOracion(texto) {
@@ -1160,7 +1168,7 @@
   }
 
   let pendiente = false;
-  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || '') };   // (diagnóstico)
+  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila };   // (diagnóstico y pruebas)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
     document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
@@ -3287,7 +3295,15 @@
   // ---- Experimental: aplicar "Aa" (minúsculas con redacción correcta) y el aviso de ortografía sobre los textarea editables
   // ya existentes (Descripción Paso de "Nuevo Paso", Descripción/Especificaciones de Especificaciones). Nunca escriben solas.
   const ICONO_AA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11 5 3l3 8M2.8 8.5h4.4"/><path d="M9.5 11c0-1.4 1.1-2.3 2.5-2.3s2.4.8 2.4 2c0 1-.7 1.3-1.8 1.6-1.2.3-2.7.6-2.7 2 0 .9.8 1.2 1.7 1.2 1.1 0 2-.5 2.4-1.3"/></svg>';
-  const casiTodoMayus = (t) => { const letras = (t || '').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, ''); return letras.length > 4 && letras === letras.toUpperCase() && letras !== letras.toLowerCase(); };
+  // "Casi todo en MAYÚSCULAS": no cuentan los símbolos y unidades que se escriben con minúsculas dentro de un texto en mayúsculas
+  // ("RESULTADO DE pH", "(100 mL)", "25 mg") y del resto se admite hasta un 10 % de minúsculas. Antes bastaba una sola minúscula
+  // para no ofrecer "Aa", y los pasos con "pH" o "mL" se quedaban sin el botón.
+  const MINUSCULAS_DE_UNIDAD = /(?<!\p{L})(?:\p{Ll}+\p{Lu}\p{L}*|mg|mcg|kg|g|ml|nm|mm|cm|rpm|min|seg|h|s|mbar|psi|bar)(?!\p{L})/gu;
+  const casiTodoMayus = (t) => {
+    const letras = (t || '').replace(MINUSCULAS_DE_UNIDAD, ' ').replace(/[^\p{L}]/gu, ''), minus = (letras.match(/\p{Ll}/gu) || []).length;
+    return letras.length > 4 && minus <= letras.length * 0.1 && /\p{Lu}/u.test(letras);
+  };
+  window.__rmdStats.casiTodoMayus = casiTodoMayus;   // (diagnóstico y pruebas)
   function gestionarTextosMayusculas() {
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) textarea').forEach((ta) => {
       // "Nuevo Paso" y "Editar Paso" (Configuración Maestra) no siempre se llaman igual: se detectan por el campo "Descripción Paso"
@@ -3299,10 +3315,14 @@
       else if (casiTodoMayus(ta.value) && ta.parentElement && !ta.parentElement.querySelector(':scope > .rmd-aa')) {
         getComputedStyle(ta.parentElement).position === 'static' && (ta.parentElement.style.position = 'relative');
         const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-aa'; b.innerHTML = ICONO_AA;
-        b.title = 'Pasar a minúsculas con mayúscula al iniciar oración (experimental: revisa el resultado antes de guardar).';
+        b.title = 'Pasar a minúsculas con mayúscula al iniciar oración, tildes, unidades (pH, mL) y códigos tal cual (experimental: revisa el resultado antes de guardar).';
         b.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
-          ta.value = mejorarTexto(ta.value); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.dispatchEvent(new Event('change', { bubbles: true })); ta.focus();
+          // la Descripción de un paso se redacta como en "En minúsculas" (con punto final); los demás textos, sin tocar su puntuación
+          ta.value = campoDe(d, 'Descripción Paso') ? pasoEnMinusculas(ta.value) : redactarEnMinusculas(ta.value);
+          ta.dispatchEvent(new Event('input', { bubbles: true })); ta.dispatchEvent(new Event('change', { bubbles: true })); ta.focus();
+          if (/^Editar Paso/i.test(cabecera(d))) toast('Si este paso ya está en RMD autorizados, el portal no deja grabarlo ("El paso se encuentra en RMDs Autorizados no se puede actualizar."). ' +
+            'En ese caso cierra esta ventana, marca el paso en la lista y usa "En minúsculas": crea un paso nuevo con todo copiado.');
         });
         ta.parentElement.appendChild(b);
       }
@@ -3385,16 +3405,28 @@
   // pH, rpm…), códigos con números (PV1-PHM-09, FPRO-201) y siglas conocidas tal cual, y punto final salvo que ya termine en un
   // signo (":" en "FECHA / HORA INICIO:"). "ADICION DE CLOROCRESOL.-" -> "Adición de clorocresol."
   const UNIDADES_MIN = { ML: 'mL', MG: 'mg', MCG: 'mcg', KG: 'kg', G: 'g', L: 'L', RPM: 'rpm', MM: 'mm', CM: 'cm', NM: 'nm', MBAR: 'mbar', BAR: 'bar', PSI: 'psi', KPA: 'kPa', HPA: 'hPa', HRS: 'h', HR: 'h', H: 'h', MIN: 'min', SEG: 's', S: 's', UI: 'UI' };
-  function pasoEnMinusculas(texto) {
+  // Redacción en minúsculas de un texto en MAYÚSCULAS, sin tocar lo que debe quedar como está: símbolos que ya vienen con
+  // minúsculas ("pH", "mL"), unidades tras un número ("100ML" -> "100 mL"), °C, códigos con letras y números completos
+  // (PV1-PHM-09, IPRO-P202, PCMB-200), siglas conocidas (POE, RMD…) y las áreas de la empresa, que son nombres propios
+  // ("Calidad en Operaciones", "Control de Calidad", "Aseguramiento de la Calidad").
+  function redactarEnMinusculas(texto) {
     const guardados = [], ini = String.fromCharCode(3), fin = String.fromCharCode(4);
     const guardar = (m) => { guardados.push(m); return ini + (guardados.length - 1) + fin; };
     let t = norm(texto);
-    t = t.replace(/(\d)\s*(MCG|MBAR|KPA|HPA|RPM|ML|MG|KG|MM|CM|NM|PSI|BAR|HRS|HR|MIN|SEG|UI|G|L|H|S)\b/g, (m, n, u) => n + ' ' + guardar(UNIDADES_MIN[u]));
-    t = t.replace(/°\s*C\b/g, () => guardar('°C')).replace(/\bPH\b/g, () => guardar('pH'));
-    // códigos con letras y números (equipos, salas, documentos) tal cual; los ordinales ("2DA", "1ER") van en minúsculas
-    t = t.replace(/\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]+(?:[-/.][A-Z0-9]+)*\b/g, (m) => (/^\d+(ER|RA|DA|DO|TO|TA|MO|MA|VO|VA|NO|NA)$/.test(m) ? m.toLowerCase() : guardar(m)));
+    t = t.replace(/\b[a-z]+[A-Z][A-Za-z]*\b/g, (m) => guardar(m));
+    t = t.replace(/(\d)\s*(MCG|MBAR|KPA|HPA|RPM|ML|MG|KG|MM|CM|NM|PSI|BAR|HRS|HR|MIN|SEG|UI|G|L|H|S)\b/gi, (m, n, u) => n + ' ' + guardar(UNIDADES_MIN[u.toUpperCase()]));
+    t = t.replace(/°\s*C\b/g, () => guardar('°C')).replace(/\bPH\b/gi, () => guardar('pH'));
+    t = t.replace(/\bCALIDAD EN OPERACIONES\b/gi, () => guardar('Calidad en Operaciones')).replace(/\bCONTROL DE CALIDAD\b/gi, () => guardar('Control de Calidad'))
+      .replace(/\bASEGURAMIENTO DE (LA )?CALIDAD\b/gi, (m, la) => guardar('Aseguramiento de ' + (la ? 'la ' : '') + 'Calidad'));
+    // códigos: todo el código si en alguna parte lleva letras y números; los ordinales ("2DA", "1ER") van en minúsculas
+    t = t.replace(/\b[A-Z0-9]+(?:[-/.][A-Z0-9]+)*\b/g, (m) => (!/\d/.test(m) || !/[A-Z]/.test(m) ? m
+      : /^\d+(ER|RA|DA|DO|TO|TA|MO|MA|VO|VA|NO|NA)$/.test(m) ? m.toLowerCase() : guardar(m)));
     t = mejorarTexto(t);
-    t = t.replace(new RegExp(ini + '(\\d+)' + fin, 'g'), (_, i) => guardados[+i]);
+    return t.replace(new RegExp(ini + '(\\d+)' + fin, 'g'), (_, i) => guardados[+i]);
+  }
+  // Descripción de un paso: además, punto final (salvo que ya termine en un signo: ":" en "FECHA / HORA INICIO:") y sin ".-".
+  function pasoEnMinusculas(texto) {
+    let t = redactarEnMinusculas(texto);
     t = t.replace(/\s*\.\s*-+\s*$/, '.').replace(/\s+-+\s*$/, '').trim();
     if (t && !/[.:;!?…]$/.test(t)) t += '.';
     return t;
@@ -3430,6 +3462,8 @@
       v.cuerpo.innerHTML = `<p><b>Paso de origen</b>: ${esc(p.codigo)} · ${esc(p.descripcion)}</p>
         <p><b>Descripción del paso nuevo</b> (puedes corregirla aquí o en "Nuevo Paso"):</p>
         <textarea class="rmd-min-texto" spellcheck="true"></textarea>
+        <p class="rmd-nota rmd-min-igual" hidden>Solo cambian las mayúsculas: al pulsar Agregar el portal dirá "El Paso ya se encuentra registrado para esta
+          Estructura y Etiqueta. ¿Desea crear o actualizar el Paso?". Responde <b>Sí</b>: crea el paso nuevo (el original no cambia).</p>
         <table class="rmd-tabla"><thead><tr><th>Se copia del paso maestro</th><th>Valor</th><th></th></tr></thead><tbody>
           ${fila('Estructura', n0.estructuraId_estructuraId || d0.estructuraId_estructuraId)}${fila('Etiqueta', n0.etiquetaId_etiquetaId || d0.etiquetaId_etiquetaId)}
           ${fila('Flag Numeración', d0.numeracion ? 'Sí' : 'No')}${fila('Tipo de Dato', n0.tipoDatoId_iMaestraId || d0.tipoDatoId_iMaestraId, 'tipoDatoId_iMaestraId')}
@@ -3438,7 +3472,10 @@
         </tbody></table>
         ${difiere.length ? '<label><input type="checkbox" class="rmd-min-rmd"> Usar la configuración que tiene en este RMD (tipo de dato, clave, valores y decimales) en lugar de la del paso maestro</label>' : ''}
         <p class="rmd-nota">Se abrirá "Nuevo Paso" de Configuración Maestra con todo esto ya puesto: revísalo y pulsa <b>Agregar</b> (el script no guarda nada). Luego podrás añadir el paso nuevo al RMD.</p>`;
-      v.cuerpo.querySelector('.rmd-min-texto').value = p.nueva;
+      const ta = v.cuerpo.querySelector('.rmd-min-texto'), igual = v.cuerpo.querySelector('.rmd-min-igual');
+      // el portal busca un paso con la misma descripción en minúsculas (tolower) en la misma Estructura y Etiqueta antes de crearlo
+      const revisarIgual = () => { igual.hidden = norm(ta.value).toLowerCase() !== String(p.descripcion || '').toLowerCase(); };
+      ta.value = p.nueva; revisarIgual(); ta.addEventListener('input', revisarIgual);
       v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal('Abrir "Nuevo Paso"', 'primario', () => {
         const usarRmd = !!(v.cuerpo.querySelector('.rmd-min-rmd') || {}).checked;
         const datos = { ...p.datos, ...(usarRmd ? p.enRmd : {}), descripcion: norm(v.cuerpo.querySelector('.rmd-min-texto').value) };
@@ -3487,8 +3524,13 @@
     try {
       toast('Abriendo "Nuevo Paso" de Configuración Maestra…');
       const dlg = await abrirVentanaNuevoPaso();
-      const fallidos = await llenarNuevoPaso(dlg, op.datos);
-      toast(`Se abrió "Nuevo Paso" con el paso en minúsculas y su configuración copiada${fallidos.length ? ` (no se pudo poner: ${fallidos.join(', ')}; complétalo a mano)` : ''}. Revísalo y pulsa Agregar.`, fallidos.length > 0);
+      const fallidos = await llenarNuevoPaso(dlg, op.datos), x = op.datos;
+      // lo que el portal va a pedir al pulsar Agregar (validaciones de su propio botón)
+      const rangoIncompleto = String(x.tipoDatoId_iMaestraId) === '443' && [x.valorInicial, x.valorFinal, x.margen].some(vacioM);
+      const soloMayus = x.descripcion.toLowerCase() === String(p.descripcion || '').toLowerCase();
+      toast(`Se abrió "Nuevo Paso" con el paso en minúsculas y su configuración copiada${fallidos.length ? ` (no se pudo poner: ${fallidos.join(', ')}; complétalo a mano)` : ''}.` +
+        (rangoIncompleto ? ' Para Rango el portal exige Valor inicial, Valor final y Margen: complétalos.' : '') +
+        (soloMayus ? ' Al pulsar Agregar el portal preguntará si desea crear el paso: responde Sí.' : '') + ' Revísalo y pulsa Agregar.', fallidos.length > 0 || rangoIncompleto);
     } catch (e) { toast('No se pudo preparar "Nuevo Paso": ' + e.message, true); }
     finally { window.__rmdMinusculas = false; }
   }
@@ -3499,6 +3541,7 @@
     const dlg = await abrirVentanaNuevoPaso(); const fallidos = await llenarNuevoPaso(dlg, datos);
     return { origen: p.descripcion, datos, fallidos, dialogo: dlg.id };
   };
+  window.__rmdStats.abrirVentanaNuevoPaso = abrirVentanaNuevoPaso;   // (diagnóstico: abre "Nuevo Paso" vacío; no pulsa Agregar)
 
   const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
   const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';

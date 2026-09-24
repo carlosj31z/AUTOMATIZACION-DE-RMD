@@ -50,6 +50,9 @@ INDEPENDIENTES = re.compile(r"\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAM
 ALTERNATIVA_CALIDAD = re.compile(r"CONTROL DE CALIDAD\s+O\s+CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES\s+O\s+CONTROL DE CALIDAD")
 ENTREGA_FORMATO_INSPECCION = re.compile(r"FINALMENTE\s+ENTREGAR\s+EL\s+FORMATO\s+DE\s+INSPECCION\s+EN\s+LINEAS\s+DE\s+PRODUCCION\s*"
                                         r"\(FPRO-\d+(?:\s+VIGENTE)?\)\s*A\s+CONTROL\s+DE\s+CALIDAD\s+PARA\s+SU\s+APROBACION\s+EN\s+EL\s+SISTEMA")
+# - Pasos mayores de BIOCARGA ("EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA, SEGUN LO INDICADO EN EL
+#   PROCEDIMIENTO PCMB-200 VIGENTE."): el análisis de biocarga es de Control de Calidad; ningún paso mayor que mencione biocarga se alerta.
+BIOCARGA = re.compile(r"\bBIOCARGA\b")
 
 
 def _sin_acentos(texto: str) -> str:
@@ -67,9 +70,11 @@ class Hallazgo:
         return f"[{self.nivel}] {self.lista} #{self.orden}: {self.mensaje}"
 
 
-def _avisos_texto(donde: str, orden: str, desc: str) -> List["Hallazgo"]:
+def _avisos_texto(donde: str, orden: str, desc: str, mayor: bool = True) -> List["Hallazgo"]:
     """Textos que la operación cambió: "CONTROL DE CALIDAD" pasó a "CALIDAD EN OPERACIONES"; en Rendimiento la
-    "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA"."""
+    "MUESTRA PARA CONTROL DE CALIDAD" pasó a "CANTIDAD MUESTREADA". Los pasos mayores de biocarga no se alertan."""
+    if mayor and BIOCARGA.search(_sin_acentos(desc)):
+        return []
     if re.search(r"MUESTRA PARA (EL )?CONTROL DE CALIDAD", desc):
         return [Hallazgo("AVISO", donde, orden, 'debe figurar "CANTIDAD MUESTREADA" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"')]
     desc = ALTERNATIVA_CALIDAD.sub("CALIDAD EN OPERACIONES", _sin_acentos(desc))   # "CONTROL DE CALIDAD O CALIDAD EN OPERACIONES" es correcto
@@ -264,7 +269,7 @@ def revisar(snap: dict) -> List[Hallazgo]:
                 if tipo == "Rango" and not (vi.strip() and vf.strip()):
                     h.append(Hallazgo("ERROR", donde, "-", f"Rango sin valores: {descripcion_pm(fila)[:50]}"))
                 desc_pm = normalizar(descripcion_pm(fila))
-                h.extend(_avisos_texto(donde, "-", desc_pm))
+                h.extend(_avisos_texto(donde, "-", desc_pm, mayor=False))
                 chk_pm = {c.strip() for c in chk.split(",") if c.strip()}
                 if cantidad.strip() and "Edit" in chk_pm:
                     h.append(Hallazgo("AVISO", donde, "-", f"los insumos no llevan Edit: {descripcion_pm(fila)[:50]}"))

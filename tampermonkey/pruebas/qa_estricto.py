@@ -1058,6 +1058,34 @@ with sync_playwright() as p:
             todas = fr.evaluate(leer); s_ = round(time.time() - t0, 1); igual = [x[0] for x in todas][:len(primera)] == primera
             return (bool(primera) and igual and all(x[1] for x in todas) and s_ < 60), f"{len(todas)} OP en {s_} s; primera página igual={igual}"
         cerrar_seguro()
+        RMD_PH = os.environ.get("RMD_PH", "2202609126")   # RMD con algún paso de Fabricación en MAYÚSCULAS que lleve "pH" o "mL"
+        @prueba("Q8 'Aa' sale en 'Editar Paso' de un paso en MAYÚSCULAS con 'pH'/'mL' (v1.21.1) y redacta sin tocarlos (se cancela: nunca Grabar)")
+        def _():
+            previa = fr.evaluate("localStorage.getItem('rmdUiMejoras')"); estaba = fr.evaluate("document.querySelector(\"#rmd-ui-panel input[data-k='minusculas']\").checked")
+            try:
+                RmdAutomation(pg).editor_de_rmd(RMD_PH); pg.wait_for_timeout(4000)
+                abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(5000)
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").check()
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = false"); pg.wait_for_timeout(300)
+                # el portal abre "Editar Paso" al pulsar la fila (tipo Navigation)
+                k = fr.evaluate("() => { const d=" + TOPQ + "; const trs=[...d.querySelector('table').querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)); const it=trs.findIndex(tr=>{ const o=(sap.ui.getCore().byId(tr.id).getBindingContext('aListPasoAssignResponsive')||{getObject:()=>({})}).getObject(); const t=(o.pasoId||{}).descripcion||''; return /\\b(pH|mL)\\b/.test(t) && window.__rmdStats.casiTodoMayus(t); });"
+                                " if (it >= 0) sap.ui.getCore().byId(trs[it].id).firePress(); return it; }")
+                if k < 0: return False, f"no hay pasos en MAYÚSCULAS con pH/mL en {RMD_PH} (define RMD_PH)"
+                fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=30000); pg.wait_for_timeout(1500)
+                antes = fr.evaluate("(" + TOPQ + ".querySelector('textarea')||{}).value"); hay = fr.evaluate("!!" + TOPQ + ".querySelector('.rmd-aa')")
+                if hay: fr.evaluate("() => { " + TOPQ + ".querySelector('.rmd-aa').click(); }"); pg.wait_for_timeout(800)
+                despues = fr.evaluate("(" + TOPQ + ".querySelector('textarea')||{}).value")
+                fr.evaluate("() => { const d=" + TOPQ + "; if (!/^Editar Paso/.test((d.querySelector('h2')||{}).textContent||'')) return; const b=[...d.querySelectorAll('button')].find(x=>x.getClientRects().length && /^Cancelar$/.test(x.textContent.trim())); sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); }")
+                pg.wait_for_timeout(1500)
+                sigue = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))")
+                conserva = all(u in despues for u in re.findall(r"\b(?:pH|mL)\b", antes))
+                return (hay and despues != antes and despues[:1].isupper() and conserva and not sigue), f"fila {k + 1}: {antes[:50]!r} -> {despues[:60]!r}"
+            finally:   # la opción experimental vuelve a como estaba (en la pestaña y en el almacenamiento)
+                if not estaba:
+                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").uncheck()
+                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                fr.evaluate("(v) => { if (v === null) localStorage.removeItem('rmdUiMejoras'); else localStorage.setItem('rmdUiMejoras', v); }", previa)
+        cerrar_seguro()
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

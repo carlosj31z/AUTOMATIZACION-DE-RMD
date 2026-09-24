@@ -264,6 +264,9 @@ Verificación Check sí lleva Edit (41 de 41).
   EN EL SISTEMA, ASI COMO EL SOBRE TECNICO CON LA DOCUMENTACION AL AREA DE ASEGURAMIENTO DE LA CALIDAD."** (cierre de Acondicionado)
   también es **correcto** (la operación lo confirmó): no se alerta, ni con tildes. Solo se exceptúa esa frase: si el mismo paso trae otro
   "CONTROL DE CALIDAD", ese sí se alerta.
+- **Biocarga**: los pasos mayores que mencionan biocarga, como **"EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE
+  BIOCARGA, SEGUN LO INDICADO EN EL PROCEDIMIENTO PCMB-200 VIGENTE."**, son **correctos**: el análisis de biocarga lo hace Control de Calidad
+  (indicación del usuario, septiembre de 2026). No se alertan; en los procesos menores sí se sigue alertando "CONTROL DE CALIDAD".
 - "ESPERAR RESULTADOS DE CONTROL DE CALIDAD…" (Fabricación) todavía aparece con el texto antiguo incluso en RMD autorizados
   de septiembre de 2026: hay que actualizarlo.
 - Los RMD **Ingresados** revisados aún traían: paso de muestra "MUESTRA PARA CONTROL DE CALIDAD (FOLIOS):" (Envase),

@@ -263,14 +263,49 @@ with sync_playwright() as p:
         abrir(pg, filas, pmop=True); b_ = pg.evaluate(LEER); cerrar_todo(pg)
         ok = a["visible"] and a["marcadas"] == [False, True, False] and "DESMARCAR PM OP" in a["aviso"] and "incoherencia" in (a["cuenta"] or "") and not b_["visible"] and not any(b_["marcadas"])
         return ok, f"marcada={a} | sin marcar={b_}"
-    @prueba("LN7 'En minúsculas': la descripción se redacta con mayúscula inicial, tildes, unidades, códigos tal cual y punto final")
+    @prueba("LN7 'En minúsculas': la descripción se redacta con mayúscula inicial, tildes, unidades (también 'pH'/'mL' ya escritos así), códigos completos, siglas, áreas con mayúscula y punto final")
     def _():
         casos = [("ADICION DE CLOROCRESOL.-", "Adición de clorocresol."), ("FECHA / HORA INICIO:", "Fecha / hora inicio:"),
                  ("VERIFICAR EN LA ETIQUETA DE LIMPIO (FPRO-201 VIGENTE) LA FECHA DE LIMPIEZA", "Verificar en la etiqueta de limpio (FPRO-201 vigente) la fecha de limpieza."),
                  ("MEDIR 1000ML DE AGUA A 25 °C CON PH 7 EN EL EQUIPO PV1-PHM-09", "Medir 1000 mL de agua a 25 °C con pH 7 en el equipo PV1-PHM-09."),
-                 ("NITROGENACION DE LA SOLUCION EN LA 2DA ETAPA. VERIFICAR LA PRESION", "Nitrogenación de la solución en la 2da etapa. Verificar la presión.")]
+                 ("NITROGENACION DE LA SOLUCION EN LA 2DA ETAPA. VERIFICAR LA PRESION", "Nitrogenación de la solución en la 2da etapa. Verificar la presión."),
+                 ("ESPERAR LA CONFORMIDAD DEL RESULTADO DE pH PARA PROCEDER CON LA FILTRACION DEL PRODUCTO.", "Esperar la conformidad del resultado de pH para proceder con la filtración del producto."),
+                 ("EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA, SEGUN LO INDICADO EN EL PROCEDIMIENTO PCMB-200 VIGENTE.",
+                  "El personal de Control de Calidad muestrea (100 mL) para análisis de biocarga, según lo indicado en el procedimiento PCMB-200 vigente."),
+                 ("ELIMINAR LOS PRIMEROS 200 mL DEL FILTRADO SEGUN EL INSTRUCTIVO IPRO-P202 VIGENTE", "Eliminar los primeros 200 mL del filtrado según el instructivo IPRO-P202 vigente."),
+                 ("EL PERSONAL DE CALIDAD EN OPERACIONES REALIZA EL MUESTREO SEGUN POE PCPR-202 VIGENTE.", "El personal de Calidad en Operaciones realiza el muestreo según POE PCPR-202 vigente."),
+                 ("PROVISTO DE UN AGITADOR ELECTRICO, AGREGAR:", "Provisto de un agitador eléctrico, agregar:")]
         obtenido = [pg.evaluate("(t) => window.__rmdStats.pasoEnMinusculas(t)", t) for t, _ in casos]
-        return obtenido == [e for _, e in casos], str(obtenido)
+        return obtenido == [e for _, e in casos], str([o for o, (_, e) in zip(obtenido, casos) if o != e] or obtenido[-5:])
+    @prueba("LN8 Botón 'Aa' en 'Editar Paso': aparece aunque el texto en MAYÚSCULAS lleve 'pH' o 'mL' (antes no salía), redacta como 'En minúsculas' y recuerda que el portal no deja grabar pasos de RMD autorizados")
+    def _():
+        texto = "ESPERAR LA CONFORMIDAD DEL RESULTADO DE pH PARA PROCEDER CON LA FILTRACION DEL PRODUCTO."
+        detector = pg.evaluate("(ts) => ts.map(t => window.__rmdStats.casiTodoMayus(t))", [texto, "EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS", "FECHA / HORA INICIO:", "Esperar la conformidad del resultado de pH.", "Adición de clorocresol."])
+        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").check(); pg.wait_for_timeout(300)
+        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+        pg.evaluate("""(t) => { const d = document.createElement('div'); d.className = 'sapMDialog sapMDialogOpen'; d.setAttribute('role', 'dialog'); d.id = '__dialogEditar';
+          d.innerHTML = `<header><div class="sapMBar"><div class="sapMBarMiddle"><h2 class="sapMTitle">Editar Paso</h2></div></div></header><section class="sapMDialogSection"><div class="sapMDialogScrollCont">
+            <label for="taDescPaso">Descripción Paso:</label><div class="sapMInputBase"><textarea id="taDescPaso" rows="3" style="width:600px"></textarea></div></div></section><footer><button>Cancelar</button></footer>`;
+          d.querySelector('textarea').value = t; document.getElementById('app').appendChild(d); }""", texto)
+        pg.wait_for_timeout(1500)
+        hay = pg.evaluate("!!document.querySelector('#__dialogEditar .rmd-aa')")
+        if hay: pg.locator("#__dialogEditar .rmd-aa").click(); pg.wait_for_timeout(400)
+        valor = pg.evaluate("document.getElementById('taDescPaso').value"); aviso_ = pg.evaluate("[...document.querySelectorAll('.rmd-toast')].map(t => t.textContent).join(' ')")
+        pg.evaluate("document.getElementById('__dialogEditar').remove()")
+        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").uncheck(); pg.wait_for_timeout(300)
+        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+        ok = detector == [True, True, True, False, False] and hay and valor == "Esperar la conformidad del resultado de pH para proceder con la filtración del producto." and "RMDs Autorizados" in aviso_
+        return ok, f"detector={detector} botón={hay} {valor!r} aviso={'RMDs Autorizados' in aviso_}"
+    @prueba("LN9 Biocarga: un paso mayor que la menciona no alerta 'CONTROL DE CALIDAD' (lo hace Control de Calidad); otro paso sí, y un proceso menor también")
+    def _():
+        filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"},
+                 {"desc": "EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA, SEGUN LO INDICADO EN EL PROCEDIMIENTO PCMB-200 VIGENTE.", "tipo": "Realizado por", "dep": "1000 (1)"},
+                 {"desc": "ESPERAR RESULTADOS DE CONTROL DE CALIDAD PARA CONTINUAR.", "tipo": "Realizado por", "dep": "1001 (2)"}]
+        abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
+        pm = pg.evaluate("""() => { const r = (esPM) => window.__rmdStats.reglasDeFila({ esPM, tipo: 'Números', desc: 'MUESTRA DE BIOCARGA PARA CONTROL DE CALIDAD (mL):', chk: {}, dec: '2' }).filter(x => x.col === 'DESCRIPCION').length;
+          return [r(true), r(false)]; }""")
+        obtenido = [f["faltaDes"] for f in a["filas"]]
+        return (obtenido == [False, False, True] and pm == [1, 0]), f"lista={obtenido} proceso menor/paso mayor={pm}"
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
