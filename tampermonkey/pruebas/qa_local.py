@@ -277,12 +277,10 @@ with sync_playwright() as p:
                  ("PROVISTO DE UN AGITADOR ELECTRICO, AGREGAR:", "Provisto de un agitador eléctrico, agregar:")]
         obtenido = [pg.evaluate("(t) => window.__rmdStats.pasoEnMinusculas(t)", t) for t, _ in casos]
         return obtenido == [e for _, e in casos], str([o for o, (_, e) in zip(obtenido, casos) if o != e] or obtenido[-5:])
-    @prueba("LN8 Botón 'Aa' en 'Editar Paso': aparece aunque el texto en MAYÚSCULAS lleve 'pH' o 'mL' (antes no salía), redacta como 'En minúsculas' y recuerda que el portal no deja grabar pasos de RMD autorizados")
+    @prueba("LN8 Botón 'Aa' en 'Editar Paso' (va con 'Pasar a minúsculas', activa por defecto; ya no es experimental): aparece aunque el texto en MAYÚSCULAS lleve 'pH' o 'mL' (antes no salía), redacta como 'En minúsculas' y recuerda que el portal no deja grabar pasos de RMD autorizados")
     def _():
         texto = "ESPERAR LA CONFORMIDAD DEL RESULTADO DE pH PARA PROCEDER CON LA FILTRACION DEL PRODUCTO."
         detector = pg.evaluate("(ts) => ts.map(t => window.__rmdStats.casiTodoMayus(t))", [texto, "EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS", "FECHA / HORA INICIO:", "Esperar la conformidad del resultado de pH.", "Adición de clorocresol."])
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").check(); pg.wait_for_timeout(300)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false")
         pg.evaluate("""(t) => { const d = document.createElement('div'); d.className = 'sapMDialog sapMDialogOpen'; d.setAttribute('role', 'dialog'); d.id = '__dialogEditar';
           d.innerHTML = `<header><div class="sapMBar"><div class="sapMBarMiddle"><h2 class="sapMTitle">Editar Paso</h2></div></div></header><section class="sapMDialogSection"><div class="sapMDialogScrollCont">
             <label for="taDescPaso">Descripción Paso:</label><div class="sapMInputBase"><textarea id="taDescPaso" rows="3" style="width:600px"></textarea></div></div></section><footer><button>Cancelar</button></footer>`;
@@ -292,8 +290,6 @@ with sync_playwright() as p:
         if hay: pg.locator("#__dialogEditar .rmd-aa").click(); pg.wait_for_timeout(400)
         valor = pg.evaluate("document.getElementById('taDescPaso').value"); aviso_ = pg.evaluate("[...document.querySelectorAll('.rmd-toast')].map(t => t.textContent).join(' ')")
         pg.evaluate("document.getElementById('__dialogEditar').remove()")
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").uncheck(); pg.wait_for_timeout(300)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false")
         ok = detector == [True, True, True, False, False] and hay and valor == "Esperar la conformidad del resultado de pH para proceder con la filtración del producto." and "RMDs Autorizados" in aviso_
         return ok, f"detector={detector} botón={hay} {valor!r} aviso={'RMDs Autorizados' in aviso_}"
     @prueba("LN9 Biocarga: un paso mayor que la menciona no alerta 'CONTROL DE CALIDAD' (lo hace Control de Calidad); otro paso sí, y un proceso menor también")

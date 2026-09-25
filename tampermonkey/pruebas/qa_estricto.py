@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -9,7 +9,8 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   'CONTROL DE CALIDAD O CALIDAD EN OPERACIONES' · O Indicadores del mes (libro armado desde SAP, sin descargar) y Documentos
   citados con procesos menores, incoherencias y Excel (solo abre y cierra ventanas) · Q v1.21: procesos menores marcados sin abrirlos, PM OP,
   Pegar en varios pasos, "En minúsculas" (hasta "Nuevo Paso", sin Agregar), latido y Ver todas las OP (solo lectura) · R v1.22: ventana raíz con el ancho del portal, orden de estructuras
-  y Equipos por master (solo lectura) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  y Equipos por master (solo lectura) · T v1.23: menú Exportar, Buscar por equipo y Suspensión masiva con el guardado SIMULADO
+  y un cortafuegos (no escribe) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -32,9 +33,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQR).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRT).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -940,7 +941,7 @@ with sync_playwright() as p:
                 return (bool(tipados) and not any(f["falta"] for f in a["filas"])), f"lista={a['lista']!r} pasos con tipo={len(tipados)} marcados={sum(1 for f in a['filas'] if f['falta'])}"
             cerrar_seguro()
 
-    # ───────────────────────── O. Indicadores del mes y Documentos citados (procesos menores, incoherencias, Excel) — solo lectura ─────────────────────────
+    # ───────────────────────── O. Indicadores del mes y Documentos citados (solo documentos, del modelo; Excel) — solo lectura ─────────────────────────
     if "O" in SOLO:
         import base64, datetime, io, zipfile
         cerrar_seguro(); pg.set_viewport_size({"width": 1415, "height": 886}); pg.wait_for_timeout(1200)
@@ -949,10 +950,11 @@ with sync_playwright() as p:
         def xlsx(b64):
             z = zipfile.ZipFile(io.BytesIO(base64.b64decode(b64)))
             return z, re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
-        @prueba("O1 Indicadores: botón junto a 'Exportar'; la ventana propone el mes (el anterior en la 1ª quincena) y el archivo del mes anterior es opcional; abrirla no genera nada")
+        @prueba("O1 Indicadores: en el menú del icono 'Exportar'; la ventana propone el mes (el anterior en la 1ª quincena) y el archivo del mes anterior es opcional; abrirla no genera nada")
         def _():
-            b_ = fr.evaluate("() => { const b = document.querySelector('.rmd-indicadores'); return b && { anterior: (b.previousElementSibling || {}).title, visible: b.getClientRects().length > 0 }; }")
-            fr.locator(".rmd-indicadores").click(); pg.wait_for_timeout(700)
+            fr.locator("button[title='Exportar']").first.click(); pg.wait_for_timeout(600)
+            b_ = fr.evaluate("() => { const m = document.querySelector('.rmd-menu'); return m && { anterior: 'Exportar', visible: true, items: [...m.querySelectorAll('.rmd-menu-item b')].map(x => x.textContent) }; }")
+            fr.locator(".rmd-menu-item", has_text="Indicadores del mes").click(); pg.wait_for_timeout(700)
             v = fr.evaluate("""() => { const m = [...document.querySelectorAll('.rmd-modal')].pop(); const s = m && m.querySelector('.rmd-ind-mes');
               return m && { mes: s.value, meses: s.options.length, nombre: m.querySelector('.rmd-ind-nombre').textContent, archivo: !!m.querySelector('input[type=file]') }; }""")
             fr.locator(".rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(500)
@@ -971,19 +973,18 @@ with sync_playwright() as p:
             lista_estados = re.findall(r'v="([^"]+)"', estados)
             return ok, f"{r['nombre']} {r['bytes']} bytes; tablas={len(tablas)}; estados={lista_estados}; resumen={r['resumen']}"
         RmdAutomation(pg).editor_de_rmd(RMD_PRUEBA); pg.wait_for_timeout(4000)
-        @prueba("O3 Documentos citados: recorre todas las listas y los procesos menores de los pasos que los tienen (sin avisos de lectura: filas = total del encabezado, o solo las del paso si la ventana muestra toda la etiqueta), junta incoherencias y citas, y arma el Excel de 4 hojas")
+        @prueba("O3 Documentos citados (v1.23): solo documentos, leídos del modelo en segundos (todas las listas, pasos y procesos menores); Excel Resumen / Documentos citados / Citas; no abre ventanas del portal")
         def _():
+            antes = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length")
             fr.locator(".rmd-documentos-citados").click(); t0 = time.time()
-            while time.time() - t0 < 1500:
-                pg.wait_for_timeout(3000)
-                if fr.evaluate("(() => { const m = [...document.querySelectorAll('.rmd-modal')].pop(); return !m || !/^Revisando/.test(m.querySelector('h3').textContent); })()"): break
-            r = fr.evaluate("""() => { const r = window.__rmdStats.ultimaRevision; return r && { listas: r.listas.length, pasos: r.pasos, pms: r.pms, avisos: r.avisos, incoherencias: r.incoherencias.length,
-              citas: r.citas.length, citasEnPM: r.citas.filter(c => c.pm).length, completas: r.listas.every(l => l.detalle.every(x => x.esperados == null || x.leidos === x.esperados || (x.ajenas > 0 && x.leidos > 0))) }; }""")
-            z, hojas = xlsx(fr.evaluate("() => window.__rmdStats.excelRevision(window.__rmdStats.ultimaRevision)"))
-            fr.locator(".rmd-modal-pie button", has_text="Cerrar").last.click(); pg.wait_for_timeout(700)
-            quedan = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length")
-            ok = bool(r and r["listas"] >= 5 and r["pms"] > 0 and not r["avisos"] and r["completas"] and hojas == ["Resumen", "Incoherencias", "Documentos citados", "Citas"] and quedan == 1)
-            return ok, f"{r}; hojas={hojas}; ventanas abiertas al terminar={quedan}; {round(time.time() - t0)} s"
+            fr.wait_for_function("() => !!window.__rmdStats.ultimasCitas && ![...document.querySelectorAll('.rmd-modal .rmd-progreso')].some(p => /Leyendo/.test(p.textContent))", timeout=60000)
+            seg = round(time.time() - t0, 1)
+            r = fr.evaluate("() => { const r = window.__rmdStats.ultimasCitas; return { listas: r.listas.length, pasos: r.pasos, pms: r.pms, citas: r.citas.length, texto: [...document.querySelectorAll('.rmd-modal h4, .rmd-modal th')].map(x => x.textContent).join('|') }; }")
+            z, hojas = xlsx(fr.evaluate("() => window.__rmdStats.excelCitas(window.__rmdStats.ultimasCitas)"))
+            fr.locator(".rmd-modal-pie button", has_text="Cerrar").last.click(); pg.wait_for_timeout(500)
+            despues = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length")
+            ok = bool(r["listas"] >= 5 and r["pasos"] > 0 and hojas == ["Resumen", "Documentos citados", "Citas"] and "Incoherencias" not in r["texto"] and seg < 15 and despues == antes)
+            return ok, f"{r}; hojas={hojas}; {seg} s; ventanas {antes}->{despues}"
         cerrar_seguro()
 
     # ───────────────────────── Q. v1.21: procesos menores sin abrirlos, PM OP, Pegar en varios pasos, "En minúsculas", latido y Ver todas las OP — solo lectura ─────────────────────────
@@ -1036,10 +1037,10 @@ with sync_playwright() as p:
             quedan = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d=>d.getClientRects().length).map(d=>(d.querySelector('h2')||{}).textContent).filter(t=>/^(Nuevo Paso|Configuraci)/.test(t)).length")
             return (bool(nueva) and campos.get("descripcion") == nueva and bool(campos.get("estructuraId_estructuraId")) and bool(campos.get("etiquetaId_etiquetaId")) and bool(campos.get("tipoDatoId_iMaestraId")) and quedan == 0), f"{nueva!r} {campos}"
         cerrar_seguro(); RmdAutomation(pg).editor_de_rmd(RMD_REV); pg.wait_for_timeout(4000)
-        @prueba("Q5 Documentos citados lee los procesos menores del modelo (sin abrir sus ventanas): sin avisos de lectura y en menos de 90 s")
+        @prueba("Q5 Documentos citados lee pasos y procesos menores del modelo (sin abrir ventanas) en menos de 10 s")
         def _():
-            t0 = time.time(); r = fr.evaluate("async () => { const r = await window.__rmdStats.revisarRMD(); return { fuente: r.fuentePM, avisos: r.avisos, pms: r.pms, inc: r.incoherencias.length }; }"); s_ = round(time.time() - t0)
-            return (r["fuente"] == "modelo" and not r["avisos"] and r["pms"] > 0 and s_ < 90), f"{r} en {s_} s"
+            t0 = time.time(); r = fr.evaluate("async () => { const r = await window.__rmdStats.citasRMD(); return { pasos: r.pasos, pms: r.pms, citas: r.citas.length, listas: r.listas.length }; }"); s_ = round(time.time() - t0, 1)
+            return (r["pasos"] > 50 and r["pms"] > 0 and r["citas"] > 0 and s_ < 10), f"{r} en {s_} s"
         cerrar_seguro()
         @prueba("Q6 Latido: el error del refresco automático se omite; los demás errores se muestran")
         def _():
@@ -1062,30 +1063,21 @@ with sync_playwright() as p:
         RMD_PH = os.environ.get("RMD_PH", "2202609126")   # RMD con algún paso de Fabricación en MAYÚSCULAS que lleve "pH" o "mL"
         @prueba("Q8 'Aa' sale en 'Editar Paso' de un paso en MAYÚSCULAS con 'pH'/'mL' (v1.21.1) y redacta sin tocarlos (se cancela: nunca Grabar)")
         def _():
-            previa = fr.evaluate("localStorage.getItem('rmdUiMejoras')"); estaba = fr.evaluate("document.querySelector(\"#rmd-ui-panel input[data-k='minusculas']\").checked")
-            try:
-                RmdAutomation(pg).editor_de_rmd(RMD_PH); pg.wait_for_timeout(4000)
-                abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(5000)
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").check()
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = false"); pg.wait_for_timeout(300)
-                # el portal abre "Editar Paso" al pulsar la fila (tipo Navigation)
-                k = fr.evaluate("() => { const d=" + TOPQ + "; const trs=[...d.querySelector('table').querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)); const it=trs.findIndex(tr=>{ const o=(sap.ui.getCore().byId(tr.id).getBindingContext('aListPasoAssignResponsive')||{getObject:()=>({})}).getObject(); const t=(o.pasoId||{}).descripcion||''; return /\\b(pH|mL)\\b/.test(t) && window.__rmdStats.casiTodoMayus(t); });"
-                                " if (it >= 0) sap.ui.getCore().byId(trs[it].id).firePress(); return it; }")
-                if k < 0: return False, f"no hay pasos en MAYÚSCULAS con pH/mL en {RMD_PH} (define RMD_PH)"
-                fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=30000); pg.wait_for_timeout(1500)
-                antes = fr.evaluate("(" + TOPQ + ".querySelector('textarea')||{}).value"); hay = fr.evaluate("!!" + TOPQ + ".querySelector('.rmd-aa')")
-                if hay: fr.evaluate("() => { " + TOPQ + ".querySelector('.rmd-aa').click(); }"); pg.wait_for_timeout(800)
-                despues = fr.evaluate("(" + TOPQ + ".querySelector('textarea')||{}).value")
-                fr.evaluate("() => { const d=" + TOPQ + "; if (!/^Editar Paso/.test((d.querySelector('h2')||{}).textContent||'')) return; const b=[...d.querySelectorAll('button')].find(x=>x.getClientRects().length && /^Cancelar$/.test(x.textContent.trim())); sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); }")
-                pg.wait_for_timeout(1500)
-                sigue = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))")
-                conserva = all(u in despues for u in re.findall(r"\b(?:pH|mL)\b", antes))
-                return (hay and despues != antes and despues[:1].isupper() and conserva and not sigue), f"fila {k + 1}: {antes[:50]!r} -> {despues[:60]!r}"
-            finally:   # la opción experimental vuelve a como estaba (en la pestaña y en el almacenamiento)
-                if not estaba:
-                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").uncheck()
-                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
-                fr.evaluate("(v) => { if (v === null) localStorage.removeItem('rmdUiMejoras'); else localStorage.setItem('rmdUiMejoras', v); }", previa)
+            RmdAutomation(pg).editor_de_rmd(RMD_PH); pg.wait_for_timeout(4000)
+            abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(5000)
+            # el portal abre "Editar Paso" al pulsar la fila (tipo Navigation)
+            k = fr.evaluate("() => { const d=" + TOPQ + "; const trs=[...d.querySelector('table').querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)); const it=trs.findIndex(tr=>{ const o=(sap.ui.getCore().byId(tr.id).getBindingContext('aListPasoAssignResponsive')||{getObject:()=>({})}).getObject(); const t=(o.pasoId||{}).descripcion||''; return /\\b(pH|mL)\\b/.test(t) && window.__rmdStats.casiTodoMayus(t); });"
+                            " if (it >= 0) sap.ui.getCore().byId(trs[it].id).firePress(); return it; }")
+            if k < 0: return False, f"no hay pasos en MAYÚSCULAS con pH/mL en {RMD_PH} (define RMD_PH)"
+            fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=30000); pg.wait_for_timeout(1500)
+            antes = fr.evaluate("(" + TOPQ + ".querySelector('textarea')||{}).value"); hay = fr.evaluate("!!" + TOPQ + ".querySelector('.rmd-aa')")
+            if hay: fr.evaluate("() => { " + TOPQ + ".querySelector('.rmd-aa').click(); }"); pg.wait_for_timeout(800)
+            despues = fr.evaluate("(" + TOPQ + ".querySelector('textarea')||{}).value")
+            fr.evaluate("() => { const d=" + TOPQ + "; if (!/^Editar Paso/.test((d.querySelector('h2')||{}).textContent||'')) return; const b=[...d.querySelectorAll('button')].find(x=>x.getClientRects().length && /^Cancelar$/.test(x.textContent.trim())); sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); }")
+            pg.wait_for_timeout(1500)
+            sigue = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))")
+            conserva = all(u in despues for u in re.findall(r"\b(?:pH|mL)\b", antes))
+            return (hay and despues != antes and despues[:1].isupper() and conserva and not sigue), f"fila {k + 1}: {antes[:50]!r} -> {despues[:60]!r}"
         cerrar_seguro()
 
     # ───────────────────────── R. v1.22: ventana raíz con el tamaño del portal, orden de estructuras y Equipos por master — solo lectura ─────────────────────────
@@ -1106,11 +1098,67 @@ with sync_playwright() as p:
             pg.wait_for_timeout(3000); m = fr.evaluate(MEDIR)
             return (bool(m["aviso"]) and "INSUMOS" in m["aviso"] and m["marcadas"] == 1), f"{m['aviso'][:160] if m['aviso'] else None} marcadas={m['marcadas']}"
         cerrar_seguro()
-        @prueba("R3 Botón 'Equipos por master' y su Excel armado leyendo SAP (sin descargarlo): master, filas master × equipo y equipos distintos, en menos de 2 min")
+        @prueba("R3 'Equipos por master' en el menú Exportar y su Excel armado leyendo SAP (sin descargarlo): master, filas master × equipo y equipos distintos, en menos de 2 min")
         def _():
             r = fr.evaluate("window.__rmdStats.equiposSinDescargar(['Autorizado', 'Ingresado']).then(x => { delete x.base64; return x; })")
-            boton = fr.evaluate("!!document.querySelector('.rmd-equipos-master')")
+            fr.locator("button[title='Exportar']").first.click(); pg.wait_for_timeout(500); boton = fr.evaluate("[...document.querySelectorAll('.rmd-menu .rmd-menu-item b')].some(x => x.textContent === 'Equipos por master')"); pg.keyboard.press("Escape")
             return (boton and r["masters"] > 1000 and r["filas"] > 10000 and r["equipos"] > 500 and r["segundos"] < 120), str(r)
+        cerrar_seguro()
+
+    # ───────────────────────── T. v1.23: menú Exportar (+ Producción Estado), Buscar por equipo y Suspensión masiva con el guardado SIMULADO — no escribe ─────────────────────────
+    if "T" in SOLO:
+        RMD_SUSP = os.environ.get("RMD_SUSP", "2202608939")   # un RMD AUTORIZADO: la suspensión se simula (nada sale del navegador)
+        cerrar_seguro(); pg.wait_for_timeout(1000)
+        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
+        def _():
+            fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
+              if (S) S.prototype.build = function () { const st = this._mSettings || this.mSettings || {}, ds = st.dataSource, arr = Array.isArray(ds) ? ds : (ds && (ds.data || ds.dataSource)) || [];
+                window.__exp.push({ cols: st.workbook.columns.map(c => c.label), ultima: st.workbook.columns[st.workbook.columns.length - 1], filas: arr.length }); return Promise.resolve(); }; return !!S; }""")
+            fr.locator("button[title='Exportar']").first.click(); pg.wait_for_timeout(600)
+            items = fr.evaluate("[...document.querySelectorAll('.rmd-menu .rmd-menu-item b')].map(x => x.textContent)")
+            if "Exportado original" not in items: return False, f"menú={items}"
+            fr.locator(".rmd-menu-item", has_text="Exportado original").click()
+            fr.wait_for_function("() => (window.__exp || []).length > 0", timeout=120000)
+            e = fr.evaluate("window.__exp.pop()")
+            fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
+            vm = (e["ultima"] or {}).get("valueMap") or {}
+            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+                  and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
+            return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
+        @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
+        def _():
+            a = fr.evaluate("window.__rmdStats.buscarPorEquipo('PL1-LIQ-E023')"); b2 = fr.evaluate("window.__rmdStats.buscarPorEquipo('tamiz 20')")
+            estados = sorted({f[3] for f in a["filas"]})
+            return (len(a["items"]) == 1 and len(a["filas"]) > 20 and "Autorizado" in estados and len(b2["items"]) >= 3 and len(b2["filas"]) > 20), f"PL1-LIQ-E023: {a['items']} {len(a['filas'])} master {estados}; 'tamiz 20': {len(b2['items'])} equipos, {len(b2['filas'])} master"
+        @prueba("T3 Suspensión (guardado SIMULADO + cortafuegos): el Guardar del portal pide Estado Suspendido con el motivo como línea nueva, registra la trazabilidad y anula el DMS; en SAP no cambia nada")
+        def _():
+            bloq = []
+            def guardia(route):
+                if route.request.method not in ("GET", "HEAD"): bloq.append(route.request.method); route.abort()
+                else: route.continue_()
+            pg.route("**/*", guardia)
+            try:
+                antes = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_SUSP)
+                if not antes or antes[0][0] != "Autorizado": return False, f"{RMD_SUSP} no está Autorizado: {antes} (define RMD_SUSP)"
+                fr.evaluate("""() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar'); const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener;
+                  const m = ctrl.mainModelv2; window.__capt = []; window.__rest = [];
+                  const cambiar = (o, k, f) => { window.__rest.push([o, k, Object.prototype.hasOwnProperty.call(o, k), o[k]]); o[k] = f; };
+                  const sim = (tipo) => function (ruta, datos, params) { window.__capt.push({ tipo, ruta: String(ruta), datos: datos && JSON.parse(JSON.stringify(datos)) }); const p2 = tipo === 'remove' ? datos : params; setTimeout(() => { if (p2 && p2.success) p2.success({}); }, 30); };
+                  cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
+                  cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS', a: a.filter(x => typeof x === 'string') }); return {}; });
+                  cambiar(ctrl, 'onTratarInformacionDMS', async (...a) => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
+                r = fr.evaluate("(c) => window.__rmdStats.suspenderUno(c, 'PRUEBA SIMULADA: no se guarda').then(x => x, e => ({ error: e.message }))", RMD_SUSP)
+                capt = fr.evaluate("window.__capt")
+            finally:
+                fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
+                pg.unroute("**/*", guardia)
+            despues = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_SUSP)
+            upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
+            traz = [c for c in capt if c["tipo"] == "create" and "TRAZABILIDAD" in c["ruta"]]
+            dms = [c for c in capt if c["tipo"] == "DMS" and "ANULAR" in c["a"]]
+            obs_ok = bool(upd) and upd[0]["datos"]["observacion"] == (antes[0][1] or "").rstrip() + "\nPRUEBA SIMULADA: no se guarda"
+            ok = (not r.get("error") and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and obs_ok and bool(traz) and bool(dms) and despues == antes and not bloq)
+            return ok, f"estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} trazabilidad={bool(traz)} DMS={[c['a'] for c in dms]} SAP igual={despues == antes} bloqueadas={bloq} {r.get('error', '')}"
         cerrar_seguro()
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
