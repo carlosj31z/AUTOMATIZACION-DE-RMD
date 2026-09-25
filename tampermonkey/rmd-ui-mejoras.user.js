@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.23.0
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.24.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP, Agregar el mismo paso varias veces, RMD en vivo (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.23.0';                                                       // mantener igual a @version
+  const VERSION = '1.24.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -33,10 +33,16 @@
     ['equipos', '"Equipos por master" en el menú Exportar (Excel de todos los master con sus equipos, instrumentos y materiales)'],
     ['buscarequipo', 'Botón "Buscar por equipo" (RMD que tienen un equipo, instrumento o material)'],
     ['suspension', 'Botón "Suspensión masiva" (varios RMD autorizados a la vez, con el Guardar de Asociar fórmulas)'],
+    ['citastodos', '"Documentos citados en todos los master" en el menú Exportar'],
+    ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (y botón "Revisar recetas" en Asociar fórmulas)'],
+    ['repetirpaso', 'Adicionar Pasos: Agregar se puede pulsar varias veces (agrega otra copia del paso)'],
+    ['vivo', 'RMD en vivo: el PDF del RMD a la derecha, actualizado tras cada cambio guardado (las ventanas pasan a la mitad izquierda)'],
     ['ordenest', 'Orden de las estructuras del RMD según los últimos autorizados de su sección y etapa'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
+  // Apagadas por defecto: "RMD en vivo" cambia la disposición de las ventanas; solo se activa si la persona lo elige.
+  ['vivo'].forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
   // Por defecto apagadas: pasar a minúsculas es una redacción automática y la ortografía usa un diccionario reducido; ambas piden revisar el resultado.
 
   // ---- 0. Shell de Fiori (fuera del iframe de la app): solo el aviso de sesión por inactividad -------------------------------
@@ -174,6 +180,15 @@
   .rmd-link { border: 0; background: none; padding: 0; color: var(--rmd-acento-texto); text-decoration: underline; cursor: pointer; font: inherit; }
   .rmd-orden-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid #ff4d4d; border-radius: 3px; background: rgba(255,77,77,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-orden-aviso b { color: var(--rmd-rojo); }
+  .rmd-receta-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid var(--rmd-ambar); border-radius: 3px; background: rgba(240,180,90,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-receta-aviso b { color: var(--rmd-ambar); }
+  html.rmd-ui .sapMDialog.rmd-medio.rmd-selector-ancho { width: min(1480px, 96vw) !important; }
+  .rmd-nota-repetir { margin-right: auto; padding-left: 12px; align-self: center; }
+  html.rmd-vivo .sapMDialog:not(.sapMMessageDialog) { position: fixed !important; left: 8px !important; top: 8px !important; transform: none !important; width: calc(50vw - 16px) !important; max-width: calc(50vw - 16px) !important; max-height: calc(100vh - 16px) !important; }
+  html.rmd-vivo .sapMDialog.sapMMessageDialog { left: 25vw !important; }
+  .rmd-vivo-panel { position: fixed; top: 0; right: 0; width: 50vw; height: 100vh; z-index: 5000; display: flex; flex-direction: column; background: var(--rmd-superficie); border-left: 1px solid var(--rmd-borde); box-shadow: -6px 0 18px rgba(0,0,0,.25); }
+  .rmd-vivo-cab { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--rmd-borde); color: var(--rmd-texto); font: 13px var(--rmd-fuente); } .rmd-vivo-estado { flex: 1; color: var(--rmd-apagado); }
+  .rmd-vivo-pdf { flex: 1; width: 100%; border: 0; background: #525659; }
   /* paso con procesos menores mal configurados (revisados sin abrir su ventana): la celda "Proc. Men." con un contador rojo */
   html.rmd-reglas td.rmd-pm-mal { position: relative; outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.14) !important; }
   html.rmd-reglas td.rmd-pm-mal::after { content: attr(data-rmd-pm); position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #ff4d4d; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; pointer-events: none; }
@@ -569,7 +584,7 @@
     // Ventana raíz del RMD ("Estructura de RMD"): se deja con el ancho y las filas del portal (90 % de la pantalla), que es como
     // la conocen los usuarios; solo se revisa el orden de sus estructuras.
     if (/^Estructura de RMD\b/i.test(norm((barraDeLista(tabla) || {}).textContent))) {
-      d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); return;
+      d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla); return;
     }
     d.classList.add('rmd-g');
     const ths = [...tabla.querySelectorAll('thead th')];
@@ -1131,7 +1146,8 @@
   function limpiezaTotal() {
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-vivo-panel, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -1201,6 +1217,9 @@
     gestionarBotonStatusRmd();
     gestionarMenuExportar();
     gestionarBotonesLista();
+    gestionarRecetasAsociar();
+    gestionarSelectorPasos();
+    gestionarVivo();
     gestionarTextosMayusculas();
   }
   new MutationObserver(() => {
@@ -3059,7 +3078,7 @@
     if (!barra.querySelector('.rmd-status-rmd')) {
       const s = botonIcono(ICONO_ENVIAR, 'Enviar a Status RMD', 'rmd-status-rmd', () => enviarAStatusRmd(s));
       s.title = 'Lee aquí el maestro completo de RMD con sus recetas y se lo pasa directo a Status RMD (status-rmd.vercel.app) en otra pestaña, sin descargar ni subir archivos. Allí queda registrado con tu usuario de SAP (sin DNI).';
-      btnExportar.insertAdjacentElement('afterend', s);
+      colocarEnBarra(barra, s);
     }
   }
 
@@ -3341,6 +3360,7 @@
       ['Exportado original', 'El Excel del portal con los filtros aplicados, más la columna "Producción Estado"', () => exportadoOriginal(ctrl, fnOrig)],
       on('equipos') && ['Equipos por master', 'Todos los master con sus equipos, instrumentos y materiales', () => abrirEquiposPorMaster()],
       on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
+      on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada instructivo, procedimiento o formato (1-2 min)', () => abrirCitasDeTodos()],
     ].filter(Boolean);
     const m = document.createElement('div'); m.className = 'rmd-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Exportar');
     opciones.forEach(([t, sub, fn]) => {
@@ -3661,11 +3681,270 @@
       if (!on(op)) { if (ya) ya.remove(); return; }
       if (ya) return;
       const x = botonIcono(icono, texto, cls, fn); x.title = titulo;
-      const ref = barra.querySelector('.rmd-suspension, .rmd-buscar-equipo, .rmd-status-rmd') ? [...barra.querySelectorAll('.rmd-status-rmd, .rmd-buscar-equipo, .rmd-suspension')].pop() : b;
-      ref.insertAdjacentElement('afterend', x);
+      colocarEnBarra(barra, x);
     };
     poner('buscarequipo', 'rmd-buscar-equipo', ICONO_BUSCAR_EQUIPO, 'Buscar por equipo', 'Busca los RMD que tienen un equipo, instrumento o material (por código o descripción) y permite exportarlos o filtrarlos en la lista.', () => abrirBuscarPorEquipo());
     poner('suspension', 'rmd-suspension', ICONO_SUSPENDER, 'Suspensión masiva', 'Suspende varios RMD autorizados a la vez (pegando sus códigos) con el Guardar de "Asociar fórmulas", agrega el motivo a sus Observaciones y exporta el detalle.', () => abrirSuspensionMasiva());
+  }
+  // ---- Botones del script en la barra de la lista principal (v1.24): a la IZQUIERDA de la barra vertical que separa los iconos
+  // del portal (Nuevo RMD, Configurar, Exportar), siempre en este orden.
+  const ORDEN_BARRA = ['rmd-status-rmd', 'rmd-buscar-equipo', 'rmd-suspension'];
+  function colocarEnBarra(barra, x) {
+    const nativo = [...barra.querySelectorAll('button')].find((y) => visible(y) && /^Nuevo RMD$/i.test(y.title || '')) || botonExportar(); if (!nativo) return;
+    const sep = [...barra.querySelectorAll('.sapMTBSeparator')].filter((s) => s.compareDocumentPosition(nativo) & Node.DOCUMENT_POSITION_FOLLOWING).pop();
+    let ancla = sep || nativo;
+    while (ancla.parentElement && ancla.parentElement !== barra && !ancla.parentElement.contains(nativo.parentElement === ancla.parentElement ? nativo : ancla)) ancla = ancla.parentElement;
+    const i = ORDEN_BARRA.findIndex((c) => x.classList.contains(c));
+    const siguiente = ORDEN_BARRA.slice(i + 1).map((c) => barra.querySelector('.' + c)).find(Boolean);
+    if (siguiente) siguiente.insertAdjacentElement('beforebegin', x); else ancla.insertAdjacentElement('beforebegin', x);
+  }
+
+  // ---- Documentos citados en TODOS los master (v1.24, en el menú Exportar) ----
+  // Para no leer 1,1 millones de pasos: se lee el catálogo de pasos (PASO, ~91 mil) y se quedan los que citan un documento; luego se
+  // piden solo sus apariciones en los master (MD_ES_PASO y, como proceso menor, MD_ES_PASO_INSUMO_PASO) en bloques de 40.
+  const ESTADOS_SIN_MARCAR_DOCS = ['Suspendido', 'Cancelado'];
+  async function leerPorIds(modelo, entidad, campo, ids, params, extra, avisar) {
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, out = [], bloques = [];
+    for (let i = 0; i < ids.length; i += 40) bloques.push(ids.slice(i, i + 40));
+    let sig = 0, hechos = 0;
+    const trabajador = async () => {
+      while (sig < bloques.length) {
+        const parte = bloques[sig++], o = new Filtro({ filters: parte.map((id) => new Filtro(campo, 'EQ', id)), and: false });
+        out.push(...await leerTodoDe(modelo, entidad, [extra ? new Filtro({ filters: [o, extra], and: true }) : o], params));
+        hechos++; if (avisar) avisar(hechos, bloques.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, bloques.length) }, trabajador));
+    return out;
+  }
+  async function citasDeTodos(modelo, estados, avisar) {
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, t0 = Date.now();
+    avisar('Leyendo el catálogo de pasos…');
+    const [pasos, masters, estructuras, etiquetas] = await Promise.all([
+      leerEntidadCompleta(modelo, 'PASO', { $select: 'pasoId,codigo,descripcion' }, 'pasoId', (h, t) => avisar(`Leyendo el catálogo de pasos… ${h} de ${t}`)),
+      leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId', $select: SELECT_MD_EQ + ',estadoIdRmd_iMaestraId' }, 'mdId'),
+      leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' }),
+      leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion' }),
+    ]);
+    const rx = new RegExp(PATRON_REFERENCIA_JS.source, 'g'), citados = new Map();
+    pasos.forEach((p) => { const cod = [...new Set((String(p.descripcion || '').match(rx)) || [])]; if (cod.length) citados.set(p.pasoId, { codigo: p.codigo, desc: norm(p.descripcion), docs: cod }); });
+    const md = new Map(masters.map((m) => [m.mdId, mdParaEquipos(m)])), est = new Map(estructuras.map((e) => [e.estructuraId, norm(e.descripcion)])), etq = new Map(etiquetas.map((e) => [e.etiquetaId, norm(e.descripcion)]));
+    const ids = [...citados.keys()], vale = (m) => m && estados.includes(m.estado || '(sin estado)');
+    const idsEstados = [...new Set(masters.filter((m) => vale(mdParaEquipos(m))).map((m) => m.estadoIdRmd_iMaestraId).filter((x) => x != null))];
+    const deEstados = idsEstados.length ? new Filtro({ filters: idsEstados.map((k) => new Filtro('mdId/estadoIdRmd_iMaestraId', 'EQ', k)), and: false }) : null;
+    const filasP = await leerPorIds(modelo, 'MD_ES_PASO', 'pasoId_pasoId', ids, { $expand: 'mdEsEtiquetaId', $select: 'mdId_mdId,pasoId_pasoId,orden,estructuraId_estructuraId,activo,mdEsEtiquetaId/etiquetaId_etiquetaId' }, deEstados,
+      (h, t) => avisar(`Buscando los pasos que citan documentos en los master… ${h} de ${t}`));
+    const filasPM = await leerPorIds(modelo, 'MD_ES_PASO_INSUMO_PASO', 'pasoHijoId_pasoId', ids, { $select: 'mdId_mdId,pasoHijoId_pasoId,orden,estructuraId_estructuraId,etiquetaId_etiquetaId,activo' }, null,
+      (h, t) => avisar(`Buscando los procesos menores que citan documentos… ${h} de ${t}`));
+    const citas = [];
+    const agregar = (x, pasoId, esPM, etiquetaId) => {
+      const m = md.get(x.mdId_mdId), c = citados.get(pasoId); if (!vale(m) || !c || x.activo === false) return;
+      const lista = (est.get(x.estructuraId_estructuraId) || '') + (etiquetaId && etq.get(etiquetaId) ? ' › ' + etq.get(etiquetaId) : '');
+      c.docs.forEach((doc) => citas.push({ doc, md: m, lista, esPM, orden: x.orden, codigoPaso: c.codigo, desc: c.desc }));
+    };
+    filasP.forEach((x) => agregar(x, x.pasoId_pasoId, false, x.mdEsEtiquetaId && x.mdEsEtiquetaId.etiquetaId_etiquetaId));
+    filasPM.forEach((x) => agregar(x, x.pasoHijoId_pasoId, true, x.etiquetaId_etiquetaId));
+    return { citas, pasosCitados: citados.size, catalogo: pasos.length, masters: new Set(citas.map((c) => c.md.mdId)).size, segundos: Math.round((Date.now() - t0) / 1000) };
+  }
+  function armarCitasTodosExcel(r, estados) {
+    const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro(), nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
+    const cs = [...r.citas].sort((a, b) => nat(a.doc, b.doc) || nat(a.md.codigo, b.md.codigo) || (+a.orden || 0) - (+b.orden || 0));
+    const porDoc = new Map(); cs.forEach((c) => { let x = porDoc.get(c.doc); if (!x) porDoc.set(c.doc, x = { masters: new Set(), aut: new Set(), citas: 0, etapas: new Set() }); x.masters.add(c.md.mdId); if (c.md.estado === 'Autorizado') x.aut.add(c.md.mdId); x.citas++; if (c.md.etapa) x.etapas.add(c.md.etapa); });
+    const tabla = (nombre, nt, cab, anchos, datos, estilos = {}, op = {}) => {
+      const h = libro.hoja(nombre, { activa: !!op.activa, congelar: op.congelar || 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+      datos.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'normal'); }));
+    };
+    tabla('Documentos', 'Documentos', ['Documento', 'Tipo', 'Masters', 'Autorizados', 'Citas', 'Etapas'], [16, 15, 10, 12, 9, 50],
+      [...porDoc].map(([doc, x]) => [doc, TIPOS_DOC[doc[0]] || doc[0], x.masters.size, x.aut.size, x.citas, [...x.etapas].sort().join(', ')]), {}, { activa: true });
+    tabla('Citas', 'CitasDocumentos', ['Documento', 'Tipo', 'Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Área (sección)', 'Planta', 'Lista', 'Paso / proceso menor', 'Orden', 'Código del paso', 'Descripción donde aparece'],
+      [16, 15, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90], cs.map((c) => [c.doc, TIPOS_DOC[c.doc[0]] || c.doc[0], c.md.codigo, c.md.version, c.md.descripcion, c.md.estado, c.md.etapa, c.md.seccion, c.md.planta, c.lista, c.esPM ? 'Proceso menor' : 'Paso', c.orden, c.codigoPaso, c.desc]), { 13: 'envuelto' }, { congelar: 'B2' });
+    const hI = libro.hoja('Información', { cols: [[1, 1, 30], [2, 2, 90]] });
+    hI.poner('A1', 'Documentos citados en todos los master', 'titulo');
+    [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} (leído de SAP en ${r.segundos} s)`], ['Estados incluidos', estados.join(', ')],
+      ['Documentos distintos', porDoc.size], ['Masters con citas', r.masters], ['Citas', cs.length], ['Pasos del catálogo que citan documentos', `${r.pasosCitados} de ${r.catalogo}`],
+      ['Criterio', 'Código con el formato <I/P/F><Área>-<sufijo NNN> (ej. IPRO-P123, PCPR-202, FPRO-250) en la descripción de los pasos y procesos menores.']]
+      .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return { libro, nombre: `Documentos citados en todos los master ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, documentos: porDoc.size };
+  }
+  async function abrirCitasDeTodos() {
+    if (window.__rmdCitasTodos) return;
+    const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
+    let trabajando = false;
+    const v = ventana('Documentos citados en todos los master', { cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.cuerpo.innerHTML = `<p>Excel con cada documento (instructivo, procedimiento o formato) citado en los pasos y procesos menores de los master: en cuáles aparece y dónde. Tarda alrededor de 1 a 2 minutos.</p>
+      <div class="rmd-eq-estados"></div><p class="rmd-progreso"></p>`;
+    const prog = v.cuerpo.querySelector('.rmd-progreso'), caja = v.cuerpo.querySelector('.rmd-eq-estados'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const bGen = botonModal('Exportar Excel', 'primario', async () => {
+      const estados = [...caja.querySelectorAll('input:checked')].map((x) => x.value); if (!estados.length) { avance('Marca al menos un estado.', true); return; }
+      window.__rmdCitasTodos = true; trabajando = true; bGen.disabled = true;
+      try {
+        const r = await citasDeTodos(modelo, estados, avance);
+        avance(`Armando el Excel con ${r.citas.length.toLocaleString('es-PE')} citas…`); await esperar(40);
+        const { libro, nombre, documentos } = armarCitasTodosExcel(r, estados), u8 = await libro.generar();
+        descargarArchivo(nombre, u8, TIPO_XLSX);
+        avance(`✓ Descargado "${nombre}" (${(u8.length / 1048576).toFixed(1)} MB, ${r.segundos} s): ${documentos.toLocaleString('es-PE')} documentos en ${r.masters.toLocaleString('es-PE')} master (${r.citas.length.toLocaleString('es-PE')} citas).`);
+      } catch (e) { avance('No se pudo exportar: ' + e.message, true); }
+      finally { window.__rmdCitasTodos = false; trabajando = false; bGen.disabled = false; }
+    });
+    bGen.disabled = true;
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
+    const nombres = ['Autorizado', 'Ingresado', 'Solicitado', 'Solicitud Aprobada', 'Solicitud Rechazada', 'Suspendido', 'Cancelado'];
+    caja.innerHTML = '<p><b>Estados a incluir</b> (los Suspendidos son versiones anteriores ya reemplazadas):</p>' + nombres.map((e) => `<label class="rmd-fila"><input type="checkbox" value="${esc(e)}" ${ESTADOS_SIN_MARCAR_DOCS.includes(e) ? '' : 'checked'}> ${esc(e)}</label>`).join('');
+    avance('Elige los estados y pulsa "Exportar Excel".'); bGen.disabled = false;
+  }
+  window.__rmdStats.citasDeTodos = async (estados = ['Autorizado', 'Ingresado']) => {
+    const r = await citasDeTodos(modeloListaPrincipal(), estados, () => {}), x = armarCitasTodosExcel(r, estados), u8 = await x.libro.generar();
+    return { segundos: r.segundos, citas: r.citas.length, masters: r.masters, documentos: x.documentos, pasosCitados: r.pasosCitados, bytes: u8.length, nombre: x.nombre, muestra: r.citas.slice(0, 3).map((c) => [c.doc, c.md.codigo, c.lista, c.esPM, c.orden]) };
+  };
+
+  // ---- Recetas con la lista de materiales desactualizada (v1.24) ----
+  // Al asociar una receta, el portal copia su lista de materiales de SAP (MaterialSet del ERP: Matnr + Werks + Stlal) en el RMD
+  // (MD_ES_RE_INSUMO) y esa copia ya no cambia: si en SAP se modifica la lista, no se sabía hasta eliminar la receta y volver a
+  // asociarla. Aquí se compara la copia con lo que devuelve hoy la misma lectura del portal. Solo AVISA: no impide autorizar.
+  const recetasRevisadas = new Map();                                     // mdId -> { t, p: Promise<resultado> }
+  const cantidadNum = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
+  function leerErp(erp, entidad, filtros) {
+    return new Promise((ok, mal) => erp.read('/' + entidad, { filters: filtros, success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no respondió la lista de materiales (${(e && e.statusCode) || 'sin código'})`)) }));
+  }
+  function diferenciasBom(sap, rmd) {
+    const agrupar = (filas) => { const m = new Map(); filas.forEach((x) => { const k = norm(x.Component); if (!k) return; const g = m.get(k) || { comp: k, desc: norm(x.ItemText1 || x.Maktx || ''), q: 0, u: norm(x.CompUnit), n: 0 }; g.q += cantidadNum(x.CompQty) || 0; g.n++; m.set(k, g); }); return m; };
+    const a = agrupar(sap), b = agrupar(rmd), dif = [];
+    a.forEach((x, k) => { const y = b.get(k); if (!y) dif.push({ tipo: 'nuevo', texto: `+ ${k} ${x.q} ${x.u}`.trim() }); else if (Math.abs(x.q - y.q) > 1e-6 || x.u.toUpperCase() !== y.u.toUpperCase()) dif.push({ tipo: 'cambia', texto: `${k}: ${y.q} ${y.u} → ${x.q} ${x.u}` }); });
+    b.forEach((y, k) => { if (!a.has(k)) dif.push({ tipo: 'quitado', texto: `− ${k} (ya no está en la lista de SAP)` }); });
+    return dif;
+  }
+  async function revisarRecetasDe(ctrl, asoc) {
+    const erp = ctrl.oModelErpNec, modelo = ctrl.getView().getModel('mainModelv2'), Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    if (!erp || !modelo) throw new Error('no se encontró la conexión a SAP del portal');
+    const recetas = ((asoc.aReceta && asoc.aReceta.results) || []).filter((r) => r && r.recetaId && r.activo !== false), werks = asoc.sucursalId && asoc.sucursalId.codigo;
+    const out = [];
+    for (const r of recetas) {
+      const rc = r.recetaId, stlal = String(parseInt(rc.Stlal, 10));
+      const [bom, copia] = await Promise.all([
+        leerErp(erp, 'MaterialSet', [new Filtro('Matnr', 'EQ', rc.Matnr), new Filtro('Werks', 'EQ', werks), new Filtro('Stlal', 'EQ', stlal)]),
+        leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new Filtro('mdRecetaId_mdRecetaId', 'EQ', r.mdRecetaId)], {}),
+      ]);
+      const dif = diferenciasBom(bom, copia.filter((x) => x.activo !== false));
+      out.push({ receta: `${rc.Matnr} / ${rc.Verid}`, texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif });
+    }
+    return { codigo: asoc.codigo, recetas: out, desactualizadas: out.filter((x) => x.dif.length) };
+  }
+  function recetasDelRmd(ctrl, asoc, forzar) {
+    const g = recetasRevisadas.get(asoc.mdId);
+    if (!forzar && g && Date.now() - g.t < 30 * 60000) return g.p;
+    const p = revisarRecetasDe(ctrl, asoc); p.catch(() => recetasRevisadas.delete(asoc.mdId));
+    recetasRevisadas.set(asoc.mdId, { t: Date.now(), p }); return p;
+  }
+  const textoRecetas = (r) => r.desactualizadas.map((x) => `${x.receta}${x.texto ? ' (' + x.texto + ')' : ''}: ${x.dif.slice(0, 6).map((d) => d.texto).join(' · ')}${x.dif.length > 6 ? ` · y ${x.dif.length - 6} más` : ''}`).join(' | ');
+  function pintarAvisoRecetas(contenedor, antesDe, r) {
+    let a = contenedor.querySelector(':scope .rmd-receta-aviso');
+    if (!r || !r.desactualizadas.length) { if (a) a.remove(); return; }
+    const html = `⚠ <b>Lista de materiales actualizada en SAP</b> en ${r.desactualizadas.length} receta(s): ${esc(textoRecetas(r))}. Para traer la nueva: <b>Eliminar Receta</b> → <b>Agregar Producto</b> → asociarla de nuevo. (Es solo un aviso: no impide autorizar.)`;
+    if (!a) { a = document.createElement('div'); a.className = 'rmd-receta-aviso'; if (antesDe) antesDe.insertAdjacentElement('beforebegin', a); else contenedor.prepend(a); }
+    if (a.dataset.html !== html) { a.dataset.html = html; a.innerHTML = html; }
+  }
+  // Ventana "Asociar Fórmula": botón "Revisar recetas" y revisión automática al abrirla (una vez por RMD cada 30 min)
+  function gestionarRecetasAsociar() {
+    if (!on('recetas')) { document.querySelectorAll('.rmd-revisar-recetas, .rmd-receta-aviso').forEach((e) => e.remove()); return; }
+    const d = dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x))); const ctrl = d && controladorPrincipal(); if (!ctrl) return;
+    const asoc = ctrl.getView().getModel('asociarDatos').getData(); if (!asoc || !asoc.mdId) return;
+    const tabla = [...d.querySelectorAll('table.sapMListTbl')].pop(), lista = tabla && tabla.closest('.sapMList'), barra = lista && lista.querySelector('.sapMTB, .sapMListHdr');
+    if (barra && !barra.querySelector('.rmd-revisar-recetas')) {
+      const b = botonIcono(ICONO_DOCUMENTOS, 'Revisar recetas', 'rmd-revisar-recetas', async () => {
+        b.disabled = true;
+        try { const r = await recetasDelRmd(ctrl, asoc, true); pintarAvisoRecetas(lista, tabla, r); toast(r.desactualizadas.length ? `${r.desactualizadas.length} receta(s) con la lista de materiales cambiada en SAP: mira el aviso.` : `✓ Las ${r.recetas.length} receta(s) asociadas coinciden con la lista de materiales de SAP.`, r.desactualizadas.length > 0); }
+        catch (e) { toast('No se pudieron revisar las recetas: ' + e.message, true); } finally { b.disabled = false; }
+      });
+      b.title = 'Compara la lista de materiales que se copió al asociar cada receta con la que tiene hoy SAP (solo avisa; no cambia nada ni impide autorizar).';
+      const ref = barra.querySelector('.sapMTBSpacer'); if (ref) ref.insertAdjacentElement('afterend', b); else barra.appendChild(b);
+    }
+    if (d.__rmdRecetas !== asoc.mdId) { d.__rmdRecetas = asoc.mdId; recetasDelRmd(ctrl, asoc).then((r) => { if (d.isConnected && lista) pintarAvisoRecetas(lista, tabla, r); }, () => {}); }
+    else { const g = recetasRevisadas.get(asoc.mdId); if (g && lista) g.p.then((r) => { if (d.isConnected) pintarAvisoRecetas(lista, tabla, r); }, () => {}); }
+  }
+  // También en la ventana raíz del RMD (aviso junto al del orden de estructuras)
+  function avisoRecetasRaiz(d, tabla) {
+    if (!on('recetas') || typeof sap === 'undefined') return;
+    const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), ctrl = controladorPrincipal();
+    if (!md || !md.mdId || !ctrl || !md.aReceta) return;
+    recetasDelRmd(ctrl, md).then((r) => { const barra = barraDeLista(tabla); if (d.isConnected && barra) pintarAvisoRecetas(barra.parentElement, tabla, r); }, () => {});
+  }
+  window.__rmdStats.revisarRecetas = async (codigo) => {
+    const ctrl = controladorPrincipal(), md = (await leerMDPorCodigos(ctrl.getView().getModel('mainModelv2'), [codigo]))[0]; if (!md) throw new Error('no existe ' + codigo);
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const recs = await leerTodoDe(ctrl.getView().getModel('mainModelv2'), 'MD_RECETA', [new Filtro('mdId_mdId', 'EQ', md.mdId)], { $expand: 'recetaId' });
+    const suc = await leerTodoDe(ctrl.getView().getModel('mainModelv2'), 'MD', [new Filtro('mdId', 'EQ', md.mdId)], { $expand: 'sucursalId', $select: 'mdId,sucursalId/codigo' });
+    return revisarRecetasDe(ctrl, { mdId: md.mdId, codigo, aReceta: { results: recs }, sucursalId: suc[0] && suc[0].sucursalId });
+  };
+
+  // ---- "Adicionar Pasos": Agregar se puede pulsar varias veces (v1.24) ----
+  // Tras Agregar, el portal cerraba el selector (onCancelAddEditarRM) y se perdía la selección: para repetir un paso había que
+  // abrirlo, buscarlo y marcarlo otra vez. Ahora, SOLO cuando el cierre viene de un Agregar ya confirmado, el selector se queda
+  // abierto con la misma selección: cada Agregar (con el OK del portal) agrega otra copia. Cancelar sigue cerrando como siempre.
+  function gestionarSelectorPasos() {
+    const d = dialogos().find((x) => /^Adicionar Pasos/i.test(cabecera(x))); if (!d) return;
+    d.classList.toggle('rmd-selector-ancho', on('ancho'));
+    const bAgregar = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((x) => x && x.getText && x.getText() === 'Agregar');
+    const reg = bAgregar && ((bAgregar.mEventRegistry || {}).press || [])[0], M = reg && reg.oListener;
+    if (!M || typeof M.onAsignPasoToEstructura !== 'function' || typeof M.onCancelAddEditarRM !== 'function') return;
+    if (!on('repetirpaso')) { if (M.__rmdRepetir) { const r = M.__rmdRepetir; M.onAsignPasoToEstructura = r.asignar; M.onCancelAddEditarRM = r.cerrar; delete M.__rmdRepetir; } return; }
+    if (!M.__rmdRepetir) {
+      const asignar = M.onAsignPasoToEstructura, cerrar = M.onCancelAddEditarRM; let mantener = false, veces = 0;
+      M.onAsignPasoToEstructura = function () { const p = asignar.apply(this, arguments); if (p && p.then) p.then(() => { mantener = true; veces++; }, () => {}); return p; };
+      M.onCancelAddEditarRM = function () {
+        if (mantener) { mantener = false; toast(`Agregado (${veces} en esta ventana). Pulsa Agregar otra vez para agregar otra copia, o Cancelar para cerrar.`); return undefined; }
+        veces = 0; return cerrar.apply(this, arguments);
+      };
+      M.__rmdRepetir = { asignar, cerrar };
+    }
+    const pie = d.querySelector('footer'); if (pie && !pie.querySelector('.rmd-nota-repetir')) { const n = document.createElement('span'); n.className = 'rmd-nota rmd-nota-repetir'; n.textContent = 'Agregar se puede pulsar varias veces: cada vez agrega otra copia de los pasos marcados.'; pie.prepend(n); }
+  }
+
+  // ---- RMD en vivo (v1.24, opción apagada por defecto) ----
+  // Con la configuración de un RMD abierta, la mitad derecha de la pantalla muestra el PDF del RMD (el mismo que genera el portal
+  // con "Imprimir" / "Ver master", con pdfMake) y se vuelve a generar solo después de cada cambio guardado. Las ventanas de
+  // configuración pasan a la mitad izquierda.
+  const vivo = { url: null, panel: null, pendiente: null, generando: false, mdId: null, t: 0 };
+  function panelVivo() {
+    if (vivo.panel && vivo.panel.isConnected) return vivo.panel;
+    const p = document.createElement('div'); p.className = 'rmd-vivo-panel';
+    p.innerHTML = '<div class="rmd-vivo-cab"><b>RMD en vivo</b><span class="rmd-vivo-estado"></span><button type="button" class="rmd-btn rmd-vivo-act">Actualizar</button></div><iframe class="rmd-vivo-pdf" title="RMD en vivo"></iframe>';
+    p.querySelector('.rmd-vivo-act').addEventListener('click', () => generarVivo(true));
+    document.documentElement.appendChild(p); vivo.panel = p; return p;
+  }
+  async function generarVivo(recargar) {
+    const ctrl = controladorPrincipal(); if (!ctrl || vivo.generando) return;
+    const asoc = ctrl.getView().getModel('asociarDatos'), md = asoc && asoc.getData(); if (!md || !md.mdId || !md.aEstructura) return;
+    vivo.generando = true; const p = panelVivo(), est = p.querySelector('.rmd-vivo-estado'); setTxt(est, 'Generando…');
+    const open0 = window.open, cou0 = URL.createObjectURL; let blob = null;
+    try {
+      if (recargar) { try { await ctrl.onGetDataEstructuraMD(); } catch (e) { /* se genera con lo que hay */ } }
+      window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
+      URL.createObjectURL = function (b) { if (b && b.type === 'application/pdf') blob = b; return cou0.apply(this, arguments); };
+      await ctrl.onCompletarAsociarDatos(); await ctrl.tratarInformacion(false, true);
+      await hasta(() => blob, 20000, 150);
+    } catch (e) { setTxt(est, 'No se pudo generar: ' + e.message); }
+    finally {
+      window.open = open0; URL.createObjectURL = cou0; vivo.generando = false;
+      try { sap.ui.core.BusyIndicator.hide(); } catch (e) { /* sin UI5 */ }
+    }
+    if (blob) {
+      const u = cou0.call(URL, blob), f = p.querySelector('.rmd-vivo-pdf');
+      f.src = u + '#view=FitH'; if (vivo.url) setTimeout(((v) => () => URL.revokeObjectURL(v))(vivo.url), 5000); vivo.url = u; vivo.mdId = md.mdId; vivo.t = Date.now();
+      const h = new Date(); setTxt(est, `${md.codigo || ''} · actualizado ${String(h.getHours()).padStart(2, '0')}:${String(h.getMinutes()).padStart(2, '0')}:${String(h.getSeconds()).padStart(2, '0')}`);
+    }
+  }
+  function programarVivo() { clearTimeout(vivo.pendiente); vivo.pendiente = setTimeout(async () => { await hasta(() => !ocupadoGlobal(), 20000); generarVivo(false); }, 2500); }
+  function gestionarVivo() {
+    const raiz = dialogos().find((x) => /^\d{6,}\s*-/.test(cabecera(x)) && /^Estructura de RMD\b/i.test(norm((barraDeLista(tablaDe(x) || x) || {}).textContent)));
+    const activo = on('vivo') && !!raiz;
+    html.classList.toggle('rmd-vivo', activo);
+    if (!activo) { if (vivo.panel) { vivo.panel.remove(); vivo.panel = null; } if (vivo.url) { URL.revokeObjectURL(vivo.url); vivo.url = null; } vivo.mdId = null; return; }
+    raiz.classList.add('rmd-raiz');
+    const ctrl = controladorPrincipal(), m = ctrl && ctrl.getView().getModel('mainModelv2'), md = ctrl && ctrl.getView().getModel('asociarDatos').getData();
+    if (m && !m.__rmdVivo) { m.__rmdVivo = true; m.attachRequestCompleted((e) => { const met = String((e.getParameter('method') || '')).toUpperCase(); if (on('vivo') && html.classList.contains('rmd-vivo') && met && met !== 'GET' && met !== 'HEAD') programarVivo(); }); }
+    panelVivo();
+    if (md && md.mdId && vivo.mdId !== md.mdId && !vivo.generando) generarVivo(false);
   }
   // diagnóstico: el libro de equipos sin descargarlo (pruebas de solo lectura en el portal)
   window.__rmdStats.equiposSinDescargar = async (estados = ['Autorizado', 'Ingresado']) => {
@@ -3960,8 +4239,8 @@
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
-    ['Alertas', ['reglas', 'ordenest', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'exportar', 'statusrmd', 'indicadores', 'equipos', 'buscarequipo', 'suspension', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Alertas', ['reglas', 'ordenest', 'recetas', 'sintipo', 'puesto']],
+    ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'exportar', 'statusrmd', 'indicadores', 'equipos', 'citastodos', 'buscarequipo', 'suspension', 'recetas', 'repetirpaso', 'vivo', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
   ];
   function panel() {
     const etiqueta = Object.fromEntries(OPC);
