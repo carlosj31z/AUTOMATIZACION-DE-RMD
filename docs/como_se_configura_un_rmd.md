@@ -254,6 +254,10 @@ Otros pasos que mencionan a Calidad en Operaciones **no** llevan Estado CC: "SOL
 **Precauciones y Notas importantes** ahora usan **Múltiple check** (sin casillas), no Verificación Check. En procesos menores,
 Verificación Check sí lleva Edit (41 de 41).
 
+**Orden de las estructuras**: el habitual es el de los últimos autorizados de la misma planta, sección y etapa (Precauciones, Notas importantes,
+Equipos / Instrumentos / Materiales, **Insumos**, Condiciones ambientales, Procedimiento, Especificaciones, Verificación de firmas, con variaciones
+por etapa). Por error hubo autorizados con INSUMOS al final (7 en el historial, 6 por INSUMOS): el userscript v1.22 lo avisa en la ventana raíz.
+
 **Textos que cambiaron** (la operación pidió reemplazar todo "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES"):
 - Nota del granel (Envase, Notas importantes): antes "…APROBACION DE CONTROL DE CALIDAD O CONTROL DE PROCESO, SEGUN APLIQUE" (se alerta:
   hay que cambiarla). La redacción vigente **"VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES,

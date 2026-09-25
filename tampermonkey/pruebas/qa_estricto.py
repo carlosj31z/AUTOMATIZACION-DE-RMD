@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -8,7 +8,8 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   M aviso de cambios sin guardar (sin falsos avisos tras guardar; aviso propio centrado) · N predecesor obligatorio en pasos con tipo de dato y texto
   'CONTROL DE CALIDAD O CALIDAD EN OPERACIONES' · O Indicadores del mes (libro armado desde SAP, sin descargar) y Documentos
   citados con procesos menores, incoherencias y Excel (solo abre y cierra ventanas) · Q v1.21: procesos menores marcados sin abrirlos, PM OP,
-  Pegar en varios pasos, "En minúsculas" (hasta "Nuevo Paso", sin Agregar), latido y Ver todas las OP (solo lectura) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  Pegar en varios pasos, "En minúsculas" (hasta "Nuevo Paso", sin Agregar), latido y Ver todas las OP (solo lectura) · R v1.22: ventana raíz con el ancho del portal, orden de estructuras
+  y Equipos por master (solo lectura) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -31,9 +32,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQ).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQR).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -1085,6 +1086,31 @@ with sync_playwright() as p:
                     fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Pasar MAYÚSCULAS a minúsculas') input").uncheck()
                     fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
                 fr.evaluate("(v) => { if (v === null) localStorage.removeItem('rmdUiMejoras'); else localStorage.setItem('rmdUiMejoras', v); }", previa)
+        cerrar_seguro()
+
+    # ───────────────────────── R. v1.22: ventana raíz con el tamaño del portal, orden de estructuras y Equipos por master — solo lectura ─────────────────────────
+    if "R" in SOLO:
+        RMD_RAIZ = os.environ.get("RMD_RAIZ", "2202609132")
+        TOPR = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
+        cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
+        RmdAutomation(pg).editor_de_rmd(RMD_RAIZ); pg.wait_for_timeout(8000)
+        MEDIR = "() => { const d=" + TOPR + "; const r=d.getBoundingClientRect(); return { w: Math.round(r.width), vw: innerWidth, clases: [...d.classList].filter(c=>c.startsWith('rmd-')), aviso: (d.querySelector('.rmd-orden-aviso')||{}).textContent||null, marcadas: d.querySelectorAll('td.rmd-orden-mal').length }; }"
+        @prueba("R1 La ventana raíz ('Estructura de RMD') conserva el ancho del portal (90 % de la pantalla) y sin aviso de orden si el orden es el habitual")
+        def _():
+            m = fr.evaluate(MEDIR); ref = fr.evaluate("window.__rmdStats.ordenEstructuras")
+            return (abs(m["w"] - round(m["vw"] * 0.9)) <= 2 and not m["clases"] and not m["aviso"] and bool(ref and len(ref["referencias"]) >= 2)), f"{m} ref={ref and ref['alcance']}"
+        @prueba("R2 Con INSUMOS movido al final (solo en memoria, sin guardar) avisa y marca INSUMOS con su lugar habitual")
+        def _():
+            fr.evaluate("""() => { const d=""" + TOPR + """; const t=d.querySelector('table.sapMListTbl'); const m=sap.ui.getCore().byId(t.id.replace(/-listUl$/,'')).getBinding('items').getModel(); const x=m.getData();
+              const i=x.findIndex(e=>/^INSUMOS/.test(e.descripcion_est)); const max=Math.max(...x.map(e=>e.orden)); x.forEach(e=>{ if (e.orden>x[i].orden) e.orden--; }); x[i].orden=max; x.sort((a,b)=>a.orden-b.orden); m.refresh(true); }""")
+            pg.wait_for_timeout(3000); m = fr.evaluate(MEDIR)
+            return (bool(m["aviso"]) and "INSUMOS" in m["aviso"] and m["marcadas"] == 1), f"{m['aviso'][:160] if m['aviso'] else None} marcadas={m['marcadas']}"
+        cerrar_seguro()
+        @prueba("R3 Botón 'Equipos por master' y su Excel armado leyendo SAP (sin descargarlo): master, filas master × equipo y equipos distintos, en menos de 2 min")
+        def _():
+            r = fr.evaluate("window.__rmdStats.equiposSinDescargar(['Autorizado', 'Ingresado']).then(x => { delete x.base64; return x; })")
+            boton = fr.evaluate("!!document.querySelector('.rmd-equipos-master')")
+            return (boton and r["masters"] > 1000 and r["filas"] > 10000 and r["equipos"] > 500 and r["segundos"] < 120), str(r)
         cerrar_seguro()
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────

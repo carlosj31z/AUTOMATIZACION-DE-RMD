@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.21.1
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados e incoherencias de todo el RMD (con procesos menores, en Excel), Indicadores del mes (BD RMD con tablas dinámicas), envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.22.0
+// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados e incoherencias de todo el RMD (con procesos menores, en Excel), Indicadores del mes (BD RMD con tablas dinámicas), Equipos por master (Excel), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.21.1';                                                       // mantener igual a @version
+  const VERSION = '1.22.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -29,6 +29,8 @@
     ['documentos', 'Documentos citados e incoherencias de todo el RMD (con procesos menores; Excel)'],
     ['statusrmd', 'Botón "Enviar a Status RMD" (maestro completo sin archivo)'],
     ['indicadores', 'Botón "Indicadores" (Excel del mes con tablas dinámicas)'],
+    ['equipos', 'Botón "Equipos por master" (Excel de todos los master con sus equipos, instrumentos y materiales)'],
+    ['ordenest', 'Orden de las estructuras del RMD según los últimos autorizados de su sección y etapa'],
     ['minusculas', 'Pasar MAYÚSCULAS a minúsculas con redacción correcta (experimental)'],
     ['ortografia', 'Avisar ortografía y concordancia en MAYÚSCULAS, tildes y puntuación en minúsculas (experimental)'],
   ];
@@ -162,6 +164,9 @@
   html.rmd-reglas td.rmd-marcar    { outline: 2px dashed #ffb02e; outline-offset: -3px; background: rgba(255,176,46,.18) !important; }
   html.rmd-reglas td.rmd-desmarcar { outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.20) !important; }
   html.rmd-reglas td.rmd-falta     { outline: 2px solid #ff4d4d; outline-offset: -3px; }
+  td.rmd-orden-mal { outline: 2px solid #ff4d4d; outline-offset: -3px; }
+  .rmd-orden-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid #ff4d4d; border-radius: 3px; background: rgba(255,77,77,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-orden-aviso b { color: var(--rmd-rojo); }
   /* paso con procesos menores mal configurados (revisados sin abrir su ventana): la celda "Proc. Men." con un contador rojo */
   html.rmd-reglas td.rmd-pm-mal { position: relative; outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.14) !important; }
   html.rmd-reglas td.rmd-pm-mal::after { content: attr(data-rmd-pm); position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #ff4d4d; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; pointer-events: none; }
@@ -613,6 +618,11 @@
   }
   function ajustarTabla(tabla) {
     const d = enDialogo(tabla); if (!d || !gestionada(d)) return;
+    // Ventana raíz del RMD ("Estructura de RMD"): se deja con el ancho y las filas del portal (90 % de la pantalla), que es como
+    // la conocen los usuarios; solo se revisa el orden de sus estructuras.
+    if (/^Estructura de RMD\b/i.test(norm((barraDeLista(tabla) || {}).textContent))) {
+      d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); return;
+    }
     d.classList.add('rmd-g');
     const ths = [...tabla.querySelectorAll('thead th')];
     if (ths.length < 5) return;
@@ -1171,7 +1181,7 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila };   // (diagnóstico y pruebas)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-orden-aviso, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -1180,7 +1190,7 @@
     document.querySelectorAll('.sapMDialog').forEach((d) => quitarEdicionEspec(d));
     document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => {
       c.style.removeProperty('display'); if (c.tagName === 'TH') { c.style.removeProperty('width'); c.style.removeProperty('min-width'); }
-      c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto', 'rmd-pm-mal'); delete c.dataset.rmdPm;
+      c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto', 'rmd-pm-mal', 'rmd-orden-mal'); delete c.dataset.rmdPm;
     });
     document.querySelectorAll('.sapMDialog tbody tr').forEach((r) => r.style.removeProperty('display'));
     document.querySelectorAll('.sapMDialog table.sapMListTbl').forEach((t) => t.style.removeProperty('width'));
@@ -1240,6 +1250,7 @@
     gestionarDocumentosCitados();
     gestionarBotonStatusRmd();
     gestionarBotonIndicadores();
+    gestionarBotonEquipos();
     gestionarTextosMayusculas();
   }
   new MutationObserver(() => {
@@ -2179,7 +2190,8 @@
     function crearLibro() {
       const hojas = [], cachés = [], dinamicas = [];
       const hoja = (nombre, op = {}) => {
-        // tabla: { nombre, ref } convierte ese rango (con su fila de encabezados) en una tabla de Excel, con su propio autofiltro.
+        // tabla: { nombre, ref } convierte ese rango (con su fila de encabezados) en una tabla de Excel, con su propio autofiltro;
+        // con estilo (p. ej. 'TableStyleMedium2') lleva ese diseño de Excel con filas en franjas.
         const h = { nombre, filas: new Map(), cols: op.cols || [], congelar: op.congelar || null, filtro: op.tabla ? null : op.filtro || null, tabla: op.tabla || null, activa: !!op.activa, dinamicas: [], combinadas: [] };
         h.poner = (celda, v, s, f) => { const { c, r } = typeof celda === 'string' ? deRef(celda) : celda; let fila = h.filas.get(r); if (!fila) { fila = new Map(); h.filas.set(r, fila); } fila.set(c, { v, s: s == null ? undefined : (typeof s === 'string' ? S[s] : s), f }); };
         h.combinar = (rango) => { h.combinadas.push(rango); };
@@ -2251,7 +2263,7 @@
           const id = tablas.length + 1, rid = `rId${rels.length + 1}`, { c: c1 } = deRef(h.tabla.ref.split(':')[1]), { c: c0 } = deRef(h.tabla.ref.split(':')[0]), enc = h.filas.get(0) || new Map();
           const columnas = []; for (let c = c0; c <= c1; c++) columnas.push(`<tableColumn id="${c - c0 + 1}" name="${escXml(String((enc.get(c) || {}).v || 'Columna' + (c - c0 + 1)))}"/>`);
           tablas.push({ nombre: `xl/tables/table${id}.xml`, datos: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="${id}" name="${escXml(h.tabla.nombre)}" displayName="${escXml(h.tabla.nombre)}" ref="${h.tabla.ref}" totalsRowShown="0"><autoFilter ref="${h.tabla.ref}"/><tableColumns count="${columnas.length}">${columnas.join('')}</tableColumns><tableStyleInfo showFirstColumn="0" showLastColumn="0" showRowStripes="0" showColumnStripes="0"/></table>` });
+<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="${id}" name="${escXml(h.tabla.nombre)}" displayName="${escXml(h.tabla.nombre)}" ref="${h.tabla.ref}" totalsRowShown="0"><autoFilter ref="${h.tabla.ref}"/><tableColumns count="${columnas.length}">${columnas.join('')}</tableColumns><tableStyleInfo${h.tabla.estilo ? ` name="${escXml(h.tabla.estilo)}"` : ''} showFirstColumn="0" showLastColumn="0" showRowStripes="${h.tabla.estilo ? 1 : 0}" showColumnStripes="0"/></table>` });
           rels.push(`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" Target="../tables/table${id}.xml"/>`);
           partesTabla = `<tableParts count="1"><tablePart r:id="${rid}"/></tableParts>`;
         }
@@ -3280,6 +3292,208 @@
     b.title = 'Arma el Excel de indicadores del mes ("BD RMD <MES> <AÑO> - P1-P2.xlsx") con sus tablas dinámicas, leyendo aquí el maestro completo de SAP. No cambia nada en SAP.';
     btnExportar.insertAdjacentElement('afterend', b);
   }
+  // ---- Orden de las estructuras del RMD (ventana raíz "Estructura de RMD") ----
+  // barra con el título de la lista ("Estructura de RMD (8)"): va dentro de la propia lista, no en la cabecera de la ventana
+  const barraDeLista = (tabla) => { const l = tabla.closest('.sapMList'); return l && l.querySelector(':scope > .sapMTB, :scope > .sapMListHdr, .sapMListHdr'); };
+  // Hubo RMD autorizados con INSUMOS al final por error. El orden habitual se toma de los últimos autorizados de la misma
+  // planta, sección y etapa (si hay menos de 2, de la misma planta y etapa): la posición de cada estructura es la mediana de su
+  // posición relativa en esas referencias, y las que rompen la secuencia más larga coherente con ese orden son las que están
+  // fuera de lugar. Probado con todo el maestro (septiembre de 2026): ningún Ingresado sale marcado; con INSUMOS al final se
+  // marca solo INSUMOS en 252 de 252 casos simulados; en el historial marca 7 autorizados (6 por INSUMOS).
+  const N_REFS_ORDEN = 5, refsOrden = new Map();
+  async function referenciasDeOrden(modelo, md) {
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const leer = (ruta, filtros, u) => new Promise((ok, mal) => modelo.read(ruta, { filters: filtros, urlParameters: u, success: ok, error: () => mal(new Error('sin respuesta')) }));
+    const buscar = async (filtros) => ((await leer('/MD', [...filtros, new Filtro('fechaAutorizacion', 'NE', null)],
+      { $expand: 'estadoIdRmd', $select: 'mdId,codigo,version,estadoIdRmd/contenido', $orderby: 'fechaAutorizacion desc', $top: '60' })).results || [])
+      .filter((x) => x.mdId !== md.mdId && x.estadoIdRmd && x.estadoIdRmd.contenido === 'Autorizado').slice(0, N_REFS_ORDEN);
+    const base = [new Filtro('sucursalId_iMaestraId', 'EQ', md.sucursalId_iMaestraId), new Filtro('nivelTxt', 'EQ', md.nivelTxt)];
+    let refs = md.areaRmdTxt ? await buscar([...base, new Filtro('areaRmdTxt', 'EQ', md.areaRmdTxt)]) : [], alcance = `${md.areaRmdTxt} · ${md.nivelTxt}`;
+    if (refs.length < 2) { refs = await buscar(base); alcance = `${md.nivelTxt} (toda la planta)`; }
+    if (refs.length < 2) return null;
+    const es = (await leer('/MD_ESTRUCTURA', [new Filtro({ filters: refs.map((r) => new Filtro('mdId_mdId', 'EQ', r.mdId)), and: false })],
+      { $select: 'mdId_mdId,estructuraId_estructuraId,orden,activo', $top: '1000' })).results || [];
+    const secuencias = refs.map((r) => es.filter((x) => x.mdId_mdId === r.mdId && x.activo !== false).sort((a, b) => a.orden - b.orden).map((x) => x.estructuraId_estructuraId)).filter((x) => x.length);
+    return secuencias.length >= 2 ? { secuencias, alcance, codigos: refs.map((r) => `${r.codigo} v${r.version}`) } : null;
+  }
+  // ids: estructuras del RMD en su orden; devuelve las que están fuera de lugar y el orden esperado (de las que tienen referencia)
+  function estructurasFueraDeOrden(ids, secuencias) {
+    const mediana = (a) => { const x = [...a].sort((p, q) => p - q), m = x.length >> 1; return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; };
+    const pos = new Map();
+    ids.forEach((id) => { const ps = secuencias.filter((q) => q.includes(id)).map((q) => q.indexOf(id) / Math.max(1, q.length - 1)); if (ps.length) pos.set(id, mediana(ps)); });
+    const c = ids.filter((id) => pos.has(id)), n = c.length, largo = new Array(n).fill(1), previo = new Array(n).fill(-1);
+    for (let i = 0; i < n; i++) for (let j = 0; j < i; j++) if (pos.get(c[j]) <= pos.get(c[i]) && largo[j] + 1 > largo[i]) { largo[i] = largo[j] + 1; previo[i] = j; }
+    const quedan = new Set(); for (let i = n ? largo.indexOf(Math.max(...largo)) : -1; i >= 0; i = previo[i]) quedan.add(i);
+    const esperado = c.map((id, i) => ({ id, p: pos.get(id), i })).sort((a, b) => a.p - b.p || a.i - b.i).map((x) => x.id);
+    return { fuera: [...new Set(c.filter((_, i) => !quedan.has(i)))], esperado };
+  }
+  window.__rmdStats.estructurasFueraDeOrden = estructurasFueraDeOrden;   // (pruebas)
+  async function revisarOrdenEstructuras(d, tabla) {
+    const quitar = () => {
+      tabla.querySelectorAll('td.rmd-orden-mal').forEach((td) => { td.classList.remove('rmd-orden-mal'); td.removeAttribute('title'); });
+      d.querySelectorAll('.rmd-orden-aviso').forEach((x) => x.remove());
+    };
+    if (!on('ordenest') || typeof sap === 'undefined') { quitar(); return; }
+    const lista = sap.ui.getCore().byId(tabla.id.replace(/-listUl$/, '')); let vista = lista;
+    while (vista && !vista.getController) vista = vista.getParent && vista.getParent();
+    const asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
+    const filas = filasPrincipales(tabla).map((tr) => ({ tr, o: objetoDeFila(tr) })).filter((x) => x.o && x.o.estructuraId_estructuraId).sort((a, b) => a.o.orden - b.o.orden);
+    if (!md || !md.mdId || !modelo || filas.length < 3) { quitar(); return; }
+    const clave = [md.sucursalId_iMaestraId, md.areaRmdTxt, md.nivelTxt].join('|'), guardada = refsOrden.get(clave);
+    if (!guardada || Date.now() - guardada.t > 30 * 60000) refsOrden.set(clave, { t: Date.now(), p: referenciasDeOrden(modelo, md).catch(() => null) });
+    const ref = await refsOrden.get(clave).p;
+    if (!ref || !tabla.isConnected) { quitar(); return; }
+    const ids = filas.map((x) => x.o.estructuraId_estructuraId), { fuera, esperado } = estructurasFueraDeOrden(ids, ref.secuencias);
+    const nombre = (id) => norm((filas.find((x) => x.o.estructuraId_estructuraId === id) || { o: {} }).o.descripcion_est || '');
+    const avisos = fuera.map((id) => {
+      const k = esperado.indexOf(id), ant = esperado.slice(0, k).reverse().find((x) => !fuera.includes(x)), sig = esperado.slice(k + 1).find((x) => !fuera.includes(x));
+      const donde = [ant && `después de ${nombre(ant)}`, sig && `antes de ${nombre(sig)}`].filter(Boolean).join(' y ');
+      return { id, texto: `${nombre(id)} está en el lugar ${ids.indexOf(id) + 1}; en los últimos autorizados va ${donde || 'en otro lugar'} (lugar ${k + 1})` };
+    });
+    window.__rmdStats.ordenEstructuras = { rmd: md.codigo, alcance: ref.alcance, referencias: ref.codigos, fuera: avisos.map((a) => a.texto) };
+    const iOrden = columnas(tabla).indexOf('ORDEN');
+    filas.forEach(({ tr, o }) => {
+      const td = celda(tr, Math.max(0, iOrden)), a = avisos.find((x) => x.id === o.estructuraId_estructuraId); if (!td) return;
+      if (a) { td.classList.add('rmd-orden-mal'); const t = `Orden de estructuras: ${a.texto} (${ref.alcance}: ${ref.codigos.join(', ')}).`; if (td.title !== t) td.title = t; }
+      else if (td.classList.contains('rmd-orden-mal')) { td.classList.remove('rmd-orden-mal'); td.removeAttribute('title'); }
+    });
+    let aviso = d.querySelector('.rmd-orden-aviso');
+    if (!avisos.length) { if (aviso) aviso.remove(); return; }
+    const html = `⚠ <b>Orden de las estructuras</b>: ${avisos.map((a) => esc(a.texto)).join('; ')}. Referencia: últimos autorizados de ${esc(ref.alcance)} (${esc(ref.codigos.join(', '))}).`;
+    if (!aviso) {
+      aviso = document.createElement('div'); aviso.className = 'rmd-orden-aviso';
+      const barra = barraDeLista(tabla); if (barra) barra.insertAdjacentElement('afterend', aviso); else tabla.insertAdjacentElement('beforebegin', aviso);
+    }
+    if (aviso.dataset.html !== html) { aviso.dataset.html = html; aviso.innerHTML = html; }   // (reescribirlo sin cambios dispararía otro ajuste)
+  }
+
+  // ---- Equipos por master (v1.22): todos los master con sus EQUIPOS / INSTRUMENTOS / MATERIALES en un Excel ----
+  // Se lee con el modelo del portal (las mismas entidades que usa al abrir esa estructura: MD_ES_EQUIPO y MD_ES_UTENSILIO) en
+  // páginas de 1000, 6 a la vez. Una fila por master y equipo, con los datos del equipo a la izquierda para filtrar por él.
+  const ICONO_EQUIPOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M6.5 6.2v7.3"/></svg>';
+  async function leerEntidadCompleta(modelo, entidad, params, clave, avisar) {
+    const leer = (ruta, u) => new Promise((ok, mal) => modelo.read(ruta, { urlParameters: u, success: ok, error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
+    const POR = 1000, total = Number(await leer(`/${entidad}/$count`, {})) || 0, paginas = Math.max(1, Math.ceil(total / POR)), out = new Array(paginas);
+    const pagina = async (i) => ((await leer(`/${entidad}`, { ...params, $orderby: clave, $top: String(POR), $skip: String(i * POR) })).results || []);
+    let sig = 0, hechas = 0;
+    const trabajador = async () => { while (sig < paginas) { const i = sig++; out[i] = await pagina(i); hechas++; if (avisar) avisar(hechas, paginas); } };
+    await Promise.all(Array.from({ length: Math.min(6, paginas) }, trabajador));
+    for (let i = paginas; out[i - 1] && out[i - 1].length === POR; i++) out.push(await pagina(i));
+    const vistos = new Set(); return out.flat().filter((x) => x && !vistos.has(x[clave]) && vistos.add(x[clave]));
+  }
+  const diaLocal = (f) => (f instanceof Date && !isNaN(f) ? new Date(Date.UTC(f.getFullYear(), f.getMonth(), f.getDate())) : null);
+  function equiposDeFilas(eqs, uts) {
+    const out = [];
+    eqs.forEach((x) => { const e = x.equipoId || {}; out.push({ mdId: x.mdId_mdId, orden: x.orden, tipo: (e.tipoId && e.tipoId.contenido) || 'EQUIPO', codigo: norm(e.CodigoGaci || e.equnr || ''), desc: norm(e.denom || e.eqktx || ''), sap: norm(e.equnr || ''), ubic: norm(e.pltxt || '') }); });
+    uts.forEach((x) => {
+      const u = x.utensilioId, g = x.agrupadorId;
+      if (u) out.push({ mdId: x.mdId_mdId, orden: x.orden, tipo: (u.tipoId && u.tipoId.contenido) || 'UTENSILIO', codigo: norm(u.codigo || x.utensilioId_utensilioId || ''), desc: norm(u.descripcion || ''), sap: '', ubic: '' });
+      else if (g) { const desc = norm(g.descripcion || ''), m = /\s-\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*$/.exec(desc); out.push({ mdId: x.mdId_mdId, orden: x.orden, tipo: 'AGRUPADOR', codigo: m ? m[1] : '', desc, sap: '', ubic: '' }); }
+    });
+    return out;
+  }
+  function armarEquiposExcel(masters, items, estados) {
+    const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
+    const porMd = new Map(masters.map((m) => [m.mdId, m])), filas = items.filter((x) => porMd.has(x.mdId)).map((x) => ({ ...x, md: porMd.get(x.mdId) }));
+    const nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
+    filas.sort((a, b) => nat(a.codigo || '~' + a.desc, b.codigo || '~' + b.desc) || nat(a.md.codigo, b.md.codigo) || (b.md.version || 0) - (a.md.version || 0) || (a.orden || 0) - (b.orden || 0));
+    const tabla = (nombre, nombreTabla, cab, anchos, datos, estilos = {}, op = {}) => {
+      const h = libro.hoja(nombre, { activa: !!op.activa, congelar: op.congelar || 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nombreTabla, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+      datos.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'normal'); }));
+      return h;
+    };
+    const datosMd = (m) => [m.codigo, m.version, m.descripcion, m.codDefecto, m.estado, m.seccion, m.etapa, m.planta, m.fechaAut];
+    tabla('Equipos por master', 'EquiposPorMaster',
+      ['Código equipo', 'Equipo / instrumento / material', 'Tipo', 'N.º SAP', 'Ubicación técnica', 'Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Orden en el RMD'],
+      [18, 52, 13, 12, 20, 13, 9, 46, 17, 13, 26, 16, 14, 16, 10], filas.map((x) => [x.codigo, x.desc, x.tipo, x.sap, x.ubic, ...datosMd(x.md), x.orden]), { 13: 'fechaDia' }, { activa: true, congelar: 'C2' });
+    const resumen = new Map();
+    filas.forEach((x) => {
+      const k = (x.codigo || '') + '|' + x.desc + '|' + x.tipo; let r = resumen.get(k);
+      if (!r) resumen.set(k, r = { codigo: x.codigo, desc: x.desc, tipo: x.tipo, masters: new Set(), aut: new Set(), ing: new Set(), etapas: new Set(), secciones: new Set() });
+      r.masters.add(x.mdId); if (x.md.estado === 'Autorizado') r.aut.add(x.mdId); if (x.md.estado === 'Ingresado') r.ing.add(x.mdId);
+      if (x.md.etapa) r.etapas.add(x.md.etapa); if (x.md.seccion) r.secciones.add(x.md.seccion);
+    });
+    const res = [...resumen.values()].sort((a, b) => b.masters.size - a.masters.size || nat(a.codigo, b.codigo));
+    tabla('Resumen por equipo', 'ResumenPorEquipo', ['Código equipo', 'Equipo / instrumento / material', 'Tipo', 'Masters', 'Autorizados', 'Ingresados', 'Etapas', 'Áreas (secciones)'],
+      [18, 52, 13, 10, 12, 11, 40, 60], res.map((r) => [r.codigo, r.desc, r.tipo, r.masters.size, r.aut.size, r.ing.size, [...r.etapas].sort().join(', '), [...r.secciones].sort().join(', ')]), { 6: 'envuelto', 7: 'envuelto' });
+    const cuenta = new Map(); filas.forEach((x) => { const c = cuenta.get(x.mdId) || { eq: 0, ut: 0 }; if (x.tipo === 'EQUIPO') c.eq++; else c.ut++; cuenta.set(x.mdId, c); });
+    const ms = [...masters].sort((a, b) => nat(a.codigo, b.codigo) || (b.version || 0) - (a.version || 0));
+    tabla('Masters', 'Masters', ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Equipos', 'Utensilios y agrupadores', 'Total'],
+      [13, 9, 46, 17, 13, 26, 16, 14, 16, 10, 14, 9], ms.map((m) => { const c = cuenta.get(m.mdId) || { eq: 0, ut: 0 }; return [...datosMd(m), c.eq, c.ut, c.eq + c.ut]; }), { 8: 'fechaDia' });
+    const hI = libro.hoja('Información', { cols: [[1, 1, 30], [2, 2, 90]] });
+    hI.poner('A1', 'Equipos, instrumentos y materiales por master', 'titulo');
+    [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} (leído de SAP; no se cambió nada)`],
+      ['Estados incluidos', estados.join(', ')], ['Masters', masters.length], ['Filas (master × equipo)', filas.length], ['Equipos distintos', res.length],
+      ['Masters sin equipos', ms.filter((m) => !cuenta.has(m.mdId)).length],
+      ['Cómo filtrar', 'Hoja "Equipos por master": filtra la columna "Código equipo" o "Equipo / instrumento / material" para ver en qué master está; "Resumen por equipo" cuenta los master de cada uno.'],
+      ['Tipos', 'EQUIPO (código GACI y N.º SAP), UTENSILIO y AGRUPADOR (grupo de utensilios: el código sale del final de su descripción cuando lo trae).']]
+      .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return { libro, nombre: `Equipos por master RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, filas: filas.length, equipos: res.length };
+  }
+  const SELECT_MD_EQ = 'mdId,codigo,version,descripcion,codDefectoReceta,nivelTxt,areaRmdTxt,fechaAutorizacion,estadoIdRmd/contenido,sucursalId/contenido';
+  const mdParaEquipos = (m) => ({ mdId: m.mdId, codigo: m.codigo || '', version: m.version, descripcion: m.descripcion || '', codDefecto: m.codDefectoReceta || '', estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '',
+    seccion: m.areaRmdTxt || '', etapa: m.nivelTxt || '', planta: (m.sucursalId && m.sucursalId.contenido) || '', fechaAut: diaLocal(m.fechaAutorizacion) });
+  async function leerEquiposDeTodos(modelo, avisar) {
+    const avance = { eq: [0, 1], ut: [0, 1] }, pintar = () => avisar && avisar(avance.eq[0] + avance.ut[0], avance.eq[1] + avance.ut[1]);
+    const [eqs, uts] = await Promise.all([
+      leerEntidadCompleta(modelo, 'MD_ES_EQUIPO', { $expand: 'equipoId,equipoId/tipoId', $select: 'mdEstructuraEquipoId,mdId_mdId,orden,equipoId/CodigoGaci,equipoId/eqktx,equipoId/denom,equipoId/equnr,equipoId/pltxt,equipoId/tipoId/contenido' }, 'mdEstructuraEquipoId', (h, t) => { avance.eq = [h, t]; pintar(); }),
+      leerEntidadCompleta(modelo, 'MD_ES_UTENSILIO', { $expand: 'utensilioId,utensilioId/tipoId,agrupadorId', $select: 'mdEstructuraUtensilioId,mdId_mdId,orden,utensilioId_utensilioId,utensilioId/codigo,utensilioId/descripcion,utensilioId/tipoId/contenido,agrupadorId/descripcion' }, 'mdEstructuraUtensilioId', (h, t) => { avance.ut = [h, t]; pintar(); }),
+    ]);
+    return equiposDeFilas(eqs, uts);
+  }
+  const ESTADOS_SIN_MARCAR = ['Suspendido', 'Cancelado'];
+  async function abrirEquiposPorMaster() {
+    if (window.__rmdEquipos) return;
+    const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
+    let trabajando = true; window.__rmdEquipos = true;
+    const v = ventana('Equipos por master', { cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.cuerpo.innerHTML = `<p>Exporta a Excel cada master con sus <b>EQUIPOS / INSTRUMENTOS / MATERIALES</b> (equipos, utensilios y agrupadores): una fila por master y equipo, con el equipo a la izquierda para filtrarlo, más un resumen por equipo. No cambia nada en SAP.</p>
+      <div class="rmd-eq-estados"></div><p class="rmd-progreso">Leyendo los master de SAP…</p><div class="rmd-ind-resultado"></div>`;
+    const prog = v.cuerpo.querySelector('.rmd-progreso'), caja = v.cuerpo.querySelector('.rmd-eq-estados'), res = v.cuerpo.querySelector('.rmd-ind-resultado');
+    const avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const bGen = botonModal('Exportar Excel', 'primario', () => {}); bGen.disabled = true;
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
+    let masters = [];
+    try {
+      masters = (await leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId', $select: SELECT_MD_EQ }, 'mdId', (h, t) => avance(`Leyendo los master de SAP… página ${h} de ${t}`))).map(mdParaEquipos);
+      const n = new Map(); masters.forEach((m) => n.set(m.estado || '(sin estado)', (n.get(m.estado || '(sin estado)') || 0) + 1));
+      caja.innerHTML = '<p><b>Estados a incluir</b> (los Suspendidos son versiones anteriores ya reemplazadas):</p>' + [...n.entries()].sort((a, b) => b[1] - a[1])
+        .map(([e, k]) => `<label class="rmd-fila"><input type="checkbox" value="${esc(e)}" ${ESTADOS_SIN_MARCAR.includes(e) ? '' : 'checked'}> ${esc(e)} <span class="rmd-nota">(${k.toLocaleString('es-PE')})</span></label>`).join('');
+      avance(`${masters.length.toLocaleString('es-PE')} master leídos. Elige los estados y pulsa "Exportar Excel".`); bGen.disabled = false;
+    } catch (e) { avance('No se pudieron leer los master: ' + e.message, true); }
+    finally { trabajando = false; window.__rmdEquipos = false; }
+    bGen.addEventListener('click', async () => {
+      if (window.__rmdEquipos) return;
+      const estados = [...caja.querySelectorAll('input:checked')].map((x) => x.value); if (!estados.length) { avance('Marca al menos un estado.', true); return; }
+      window.__rmdEquipos = true; trabajando = true; bGen.disabled = true; res.innerHTML = '';
+      try {
+        const t0 = Date.now(), items = await leerEquiposDeTodos(modelo, (h, t) => avance(`Leyendo equipos, instrumentos y materiales… página ${h} de ${t}`));
+        const elegidos = masters.filter((m) => estados.includes(m.estado || '(sin estado)'));
+        avance(`Armando el Excel con ${elegidos.length.toLocaleString('es-PE')} master…`); await esperar(40);
+        const { libro, nombre, filas, equipos } = armarEquiposExcel(elegidos, items, estados), u8 = await libro.generar();
+        descargarArchivo(nombre, u8, TIPO_XLSX);
+        avance(`✓ Descargado "${nombre}" (${(u8.length / 1048576).toFixed(1)} MB, ${Math.round((Date.now() - t0) / 1000)} s): ${elegidos.length.toLocaleString('es-PE')} master, ${filas.toLocaleString('es-PE')} filas y ${equipos.toLocaleString('es-PE')} equipos distintos.`);
+      } catch (e) { avance('No se pudo exportar: ' + e.message, true); }
+      finally { window.__rmdEquipos = false; trabajando = false; bGen.disabled = false; }
+    });
+  }
+  function gestionarBotonEquipos() {
+    if (!on('equipos')) { document.querySelectorAll('.rmd-equipos-master').forEach((e) => e.remove()); return; }
+    const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return;
+    const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra || barra.querySelector('.rmd-equipos-master')) return;
+    const b = botonIcono(ICONO_EQUIPOS, 'Equipos por master', 'rmd-equipos-master', () => abrirEquiposPorMaster());
+    b.title = 'Exporta a Excel todos los master con sus EQUIPOS / INSTRUMENTOS / MATERIALES (una fila por master y equipo, para filtrar por equipo). No cambia nada en SAP.';
+    (barra.querySelector('.rmd-indicadores') || btnExportar).insertAdjacentElement('afterend', b);
+  }
+  // diagnóstico: el libro de equipos sin descargarlo (pruebas de solo lectura en el portal)
+  window.__rmdStats.equiposSinDescargar = async (estados = ['Autorizado', 'Ingresado']) => {
+    const modelo = modeloListaPrincipal(), t0 = Date.now();
+    const masters = (await leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId', $select: SELECT_MD_EQ }, 'mdId')).map(mdParaEquipos);
+    const items = await leerEquiposDeTodos(modelo), elegidos = masters.filter((m) => estados.includes(m.estado));
+    const { libro, nombre, filas, equipos } = armarEquiposExcel(elegidos, items, estados), u8 = await libro.generar();
+    return { nombre, masters: elegidos.length, items: items.length, filas, equipos, bytes: u8.length, segundos: Math.round((Date.now() - t0) / 1000), base64: aBase64(u8) };
+  };
   // diagnóstico: el maestro tal como lo recibe el libro de indicadores (datosBaseDeMD), para compararlo con un exportado
   window.__rmdStats.maestro = async () => (await leerMDPaginado(modeloListaPrincipal(), [])).map((md) => { const f = datosBaseDeMD(md);
     return { ...f, fechaAutLocal: fechaLocalTexto(md.fechaAutorizacion), fechaAutorizacion: md.fechaAutorizacion && md.fechaAutorizacion.toISOString(), fechaRegistro: f.fechaRegistro && f.fechaRegistro.toISOString(), fechaSolicitud: f.fechaSolicitud && f.fechaSolicitud.toISOString() }; });
@@ -3574,8 +3788,8 @@
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
-    ['Alertas', ['reglas', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'statusrmd', 'indicadores', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Alertas', ['reglas', 'ordenest', 'sintipo', 'puesto']],
+    ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'statusrmd', 'indicadores', 'equipos', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
     ['Experimental', ['minusculas', 'ortografia']],
   ];
   function panel() {

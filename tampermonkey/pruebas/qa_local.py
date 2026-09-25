@@ -307,6 +307,27 @@ with sync_playwright() as p:
         obtenido = [f["faltaDes"] for f in a["filas"]]
         return (obtenido == [False, False, True] and pm == [1, 0]), f"lista={obtenido} proceso menor/paso mayor={pm}"
 
+    @prueba("LN10 Orden de estructuras: con INSUMOS al final se marca solo INSUMOS (y se dice dónde va); un orden igual al de los autorizados no marca nada")
+    def _():
+        refs = [["PRE", "NOTAS", "EQUIPOS", "INSUMOS", "COND", "PROC", "ESPEC", "FIRMAS"]] * 3 + [["PRE", "NOTAS", "EQUIPOS", "INSUMOS", "PROC", "COND", "FIRMAS"], ["PRE", "EQUIPOS", "INSUMOS", "PROC", "ESPEC", "FIRMAS"]]
+        mal = pg.evaluate("([r]) => window.__rmdStats.estructurasFueraDeOrden(['PRE', 'NOTAS', 'EQUIPOS', 'COND', 'PROC', 'ESPEC', 'FIRMAS', 'INSUMOS'], r)", [refs])
+        bien = pg.evaluate("([r]) => window.__rmdStats.estructurasFueraDeOrden(['PRE', 'NOTAS', 'EQUIPOS', 'INSUMOS', 'COND', 'PROC', 'ESPEC', 'FIRMAS'], r).fuera", [refs])
+        nueva = pg.evaluate("([r]) => window.__rmdStats.estructurasFueraDeOrden(['PRE', 'EQUIPOS', 'INSUMOS', 'OTRA', 'PROC'], r).fuera", [refs])   # una estructura sin referencia no cuenta
+        e = mal["esperado"]; i = e.index("INSUMOS")
+        return (mal["fuera"] == ["INSUMOS"] and e[i - 1] == "EQUIPOS" and e[i + 1] == "COND" and bien == [] and nueva == []), f"fuera={mal['fuera']} esperado={e} bien={bien} nueva={nueva}"
+    @prueba("LN11 La ventana raíz del RMD ('Estructura de RMD') conserva el tamaño del portal: sin las clases de tamaño del script")
+    def _():
+        pg.evaluate("""() => { const d = document.createElement('div'); d.className = 'sapMDialog sapMDialogOpen'; d.setAttribute('role', 'dialog'); d.id = '__dialogRaiz';
+          d.innerHTML = `<header><div class="sapMBar"><div class="sapMBarMiddle"><h2 class="sapMTitle">2202609081 - PRODUCTO DE PRUEBA</h2></div></div></header><section class="sapMDialogSection"><div class="sapMDialogScrollCont">
+            <div class="sapMList"><div class="sapMTB"><h2 class="sapMTitle"><span>Estructura de RMD (3)</span></h2></div><table class="sapMListTbl" id="__raiz-listUl"><thead><tr><th>Orden</th><th>Descripción</th><th>Código</th><th>Items</th><th>Repite</th><th>Num.</th><th>Acc.</th></tr></thead>
+            <tbody>${['PRECAUCIONES', 'INSUMOS', 'PROCEDIMIENTO'].map((t, k) => `<tr class="sapMLIB sapMListTblRow"><td>${k + 1}</td><td>${t}</td><td>${k + 1}</td><td>3</td><td>Ingresado</td><td>SI</td><td></td></tr>`).join('')}</tbody></table></div></div></section><footer><button>Cerrar</button></footer>`;
+          document.getElementById('app').appendChild(d); }""")
+        pg.wait_for_timeout(1200)
+        clases = pg.evaluate("[...document.getElementById('__dialogRaiz').classList].filter(c => c.startsWith('rmd-'))")
+        pasos = abrir(pg, PRECAUCIONES); clasesPasos = pg.evaluate("(id) => [...document.getElementById(id).classList].filter(c => c.startsWith('rmd-'))", pasos)
+        pg.evaluate("document.getElementById('__dialogRaiz').remove()"); cerrar_todo(pg)
+        return (clases == [] and "rmd-g" in clasesPasos), f"raíz={clases} pasos={clasesPasos}"
+
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
     print(f"{len(RES) - len(fallas)}/{len(RES)} pruebas pasan")
