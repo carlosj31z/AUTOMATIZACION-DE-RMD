@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W X Y; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W X Y Z; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -14,7 +14,8 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   citados de todos los master (no escribe) · W v1.25: revisores, Editar Paso usado en otros RMD, fórmulas, varias recetas, puesto de trabajo y RMD en vivo
   que salta al cambio (escrituras simuladas + cortafuegos: no escribe) · X v1.26: saludo, Ir a… (Ctrl+K), recientes, título de la pestaña
   y rendimiento del script (solo abre y cierra ventanas; cortafuegos) · Y v1.27: recetas frente a SAP en Asociar fórmulas (⚠ con el detalle,
-  aviso al día al quitar una receta, hoja de ruta; cambios solo en memoria + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  aviso al día al quitar una receta, hoja de ruta; cambios solo en memoria + cortafuegos) · Z v1.28: filtro Equipo en la barra de filtros,
+  Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -37,9 +38,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWXYD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWXYZD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVWXY).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -1112,6 +1113,7 @@ with sync_playwright() as p:
     # ───────────────────────── T. v1.23: menú Exportar (+ Producción Estado), Buscar por equipo y Suspensión masiva con el guardado SIMULADO — no escribe ─────────────────────────
     if "T" in SOLO:
         RMD_SUSP = os.environ.get("RMD_SUSP", "2202608939")   # un RMD AUTORIZADO: la suspensión se simula (nada sale del navegador)
+        RMD_ING = os.environ.get("RMD_ING", "2202609126")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
         cerrar_seguro(); pg.wait_for_timeout(1000)
         @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
@@ -1163,18 +1165,71 @@ with sync_playwright() as p:
             obs_ok = bool(upd) and upd[0]["datos"]["observacion"] == (antes[0][1] or "").rstrip() + "\nPRUEBA SIMULADA: no se guarda"
             ok = (not r.get("error") and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and obs_ok and bool(traz) and bool(dms) and despues == antes and not bloq)
             return ok, f"estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} trazabilidad={bool(traz)} DMS={[c['a'] for c in dms]} SAP igual={despues == antes} bloqueadas={bloq} {r.get('error', '')}"
+        @prueba("T4 Observación masiva (guardado SIMULADO + cortafuegos) en un Ingresado: el Guardar del portal envía la observación con la línea nueva y el MISMO Estado, sin trazabilidad ni DMS; en SAP no cambia nada")
+        def _():
+            bloq = []
+            def guardia(route):
+                if route.request.method not in ("GET", "HEAD"): bloq.append(route.request.method); route.abort()
+                else: route.continue_()
+            pg.route("**/*", guardia)
+            try:
+                antes = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_ING)
+                fr.evaluate("""() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener;
+                  const m = ctrl.mainModelv2; window.__capt = []; window.__rest = [];
+                  const cambiar = (o, k, f) => { window.__rest.push([o, k, Object.prototype.hasOwnProperty.call(o, k), o[k]]); o[k] = f; };
+                  const sim = (tipo) => function (ruta, datos, params) { window.__capt.push({ tipo, ruta: String(ruta), datos: datos && JSON.parse(JSON.stringify(datos)) }); const p2 = tipo === 'remove' ? datos : params; setTimeout(() => { if (p2 && p2.success) p2.success(datos || {}); }, 30); };
+                  cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
+                  cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS', a: a.filter(x => typeof x === 'string') }); return {}; });
+                  cambiar(ctrl, 'onTratarInformacionDMS', async (...a) => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
+                r = fr.evaluate("(c) => window.__rmdStats.observacionUno(c, 'PRUEBA SIMULADA: no se guarda').then(x => x, e => ({ error: e.message }))", RMD_ING)
+                capt = fr.evaluate("window.__capt")
+            finally:
+                fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
+                pg.unroute("**/*", guardia)
+            despues = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_ING)
+            upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
+            otros = [c["tipo"] + " " + c["ruta"][:30] for c in capt if not (c["tipo"] == "update" and c["ruta"].startswith("/MD("))]
+            obs_ok = bool(upd) and upd[0]["datos"]["observacion"] == (antes[0][1] or "").rstrip() + ("\n" if (antes[0][1] or "").strip() else "") + "PRUEBA SIMULADA: no se guarda"
+            ok = (not r.get("error") and antes[0][0] == "Ingresado" and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 467 and obs_ok and not otros and despues == antes and not bloq)
+            return ok, f"estado enviado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} otras escrituras={otros} SAP igual={despues == antes} {r.get('error', '')}"
+        @prueba("T5 Suspender un INGRESADO (guardado SIMULADO + cortafuegos): el portal lo acepta con Estado 468, el motivo como línea nueva y la trazabilidad; en SAP no cambia nada")
+        def _():
+            bloq = []
+            def guardia(route):
+                if route.request.method not in ("GET", "HEAD"): bloq.append(route.request.method); route.abort()
+                else: route.continue_()
+            pg.route("**/*", guardia)
+            try:
+                antes = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_ING)
+                fr.evaluate("""() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener;
+                  const m = ctrl.mainModelv2; window.__capt = []; window.__rest = [];
+                  const cambiar = (o, k, f) => { window.__rest.push([o, k, Object.prototype.hasOwnProperty.call(o, k), o[k]]); o[k] = f; };
+                  const sim = (tipo) => function (ruta, datos, params) { window.__capt.push({ tipo, ruta: String(ruta), datos: datos && JSON.parse(JSON.stringify(datos)) }); const p2 = tipo === 'remove' ? datos : params; setTimeout(() => { if (p2 && p2.success) p2.success(datos || {}); }, 30); };
+                  cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
+                  cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS', a: a.filter(x => typeof x === 'string') }); return {}; });
+                  cambiar(ctrl, 'onTratarInformacionDMS', async (...a) => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
+                r = fr.evaluate("(c) => window.__rmdStats.suspenderUno(c, 'PRUEBA SIMULADA: no se guarda').then(x => x, e => ({ error: e.message }))", RMD_ING)
+                capt = fr.evaluate("window.__capt")
+            finally:
+                fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
+                pg.unroute("**/*", guardia)
+            despues = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_ING)
+            upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
+            traz = [c for c in capt if c["tipo"] == "create" and "TRAZABILIDAD" in c["ruta"]]
+            ok = (not r.get("error") and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and bool(traz) and despues == antes and not bloq)
+            return ok, f"estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} trazabilidad={bool(traz)} DMS={[c['tipo'] for c in capt if 'DMS' in c['tipo']]} SAP igual={despues == antes} {r.get('error', '')}"
         cerrar_seguro()
 
     # ───────────────────────── V. v1.24: barra, selector de pasos (Agregar varias veces, SIMULADO), recetas desactualizadas, RMD en vivo y documentos citados de todos — no escribe ─────────────────────────
     if "V" in SOLO:
-        RMD_SEL = os.environ.get("RMD_SEL", "2202609126"); RMD_REC = os.environ.get("RMD_REC", "2202609132")   # RMD_REC: uno con la lista de materiales cambiada en SAP
+        RMD_SEL = os.environ.get("RMD_SEL", "2202609126"); RMD_REC = os.environ.get("RMD_REC", "2202609107")   # RMD_REC: uno con la lista de materiales cambiada en SAP
         TOPV = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
         cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
-        @prueba("V1 Barra principal: Enviar a Status RMD, Buscar por equipo y Suspensión masiva a la izquierda de la barra vertical de los iconos del portal")
+        @prueba("V1 Barra principal: Enviar a Status RMD a la izquierda de la barra vertical de los iconos del portal (Buscar por equipo es un filtro y Modificaciones masivas está en el panel)")
         def _():
             orden = fr.evaluate("() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar'); const barra = b.closest('.sapMBar, .sapMOTB, .sapMToolbar'); return [...barra.querySelectorAll('button, .sapMTBSeparator')].filter(x => x.getClientRects().length).map(x => x.classList.contains('sapMTBSeparator') ? '|' : (x.textContent.trim() || x.title)); }")
             i = orden.index("|") if "|" in orden else -1
-            return (orden[:i] == ["Enviar a Status RMD", "Buscar por equipo", "Suspensión masiva"] and orden[i + 1] == "Nuevo RMD"), str(orden)
+            return (orden[:i] == ["Enviar a Status RMD"] and orden[i + 1] == "Nuevo RMD"), str(orden)
         RmdAutomation(pg).editor_de_rmd(RMD_SEL); pg.wait_for_timeout(4000)
         abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(4000)
         fr.evaluate("() => { const d=" + TOPV + "; const b=[...d.querySelectorAll('button')].find(x=>/Agregar Estructura/.test(x.title)); sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); }"); pg.wait_for_timeout(6000)
@@ -1224,7 +1279,7 @@ with sync_playwright() as p:
         def _():
             r = fr.evaluate("(c) => window.__rmdStats.revisarRecetas(c)", RMD_REC)
             RmdAutomation(pg).editor_de_rmd(RMD_REC); pg.wait_for_timeout(8000)
-            aviso = fr.evaluate("(document.querySelector('.rmd-receta-aviso') || {}).textContent || ''"); cerrar_seguro()
+            aviso = fr.evaluate("(() => { const a = document.querySelector('.rmd-receta-aviso'); return a ? a.textContent + ' | ' + a.title : ''; })()"); cerrar_seguro()
             ok = bool(r["desactualizadas"]) and "Lista de materiales actualizada en SAP" in aviso and "no impide autorizar" in aviso
             return ok, f"{[(x['receta'], [d['texto'] for d in x['dif']][:3]) for x in r['desactualizadas']]} aviso={aviso[:90]!r}"
         @prueba("V5 RMD en vivo (apagado por defecto): al activarlo, la configuración va a la mitad izquierda y el PDF del RMD a la derecha; al cerrar el RMD todo vuelve")
@@ -1323,6 +1378,8 @@ with sync_playwright() as p:
                 return (r["modo"] == "MultiSelect" and r["filas"] >= 2 and "Eliminar seleccionadas" in (r["boton"] or "") and len(borradas) == r["filas"]), f"{r} borradas (simulado)={borradas}"
             @prueba("W5 Asociar fórmulas: una receta con un puesto de trabajo distinto al de las ya asociadas no se deja asociar (receta simulada en memoria)")
             def _():
+                cerrar_seguro(); pg.wait_for_timeout(1500)                                     # (W4 dejó en memoria la tabla sin recetas: se vuelve a abrir con los datos reales)
+                ra2 = RmdAutomation(pg); ra2.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_RECS)); pg.wait_for_timeout(3000); ra2.configuracion.elegir_accion("Asociar fórmulas"); pg.wait_for_timeout(7000)
                 fr.evaluate("() => { const d=" + TOPW + "; const b=[...d.querySelectorAll('button')].map(x=>sap.ui.getCore().byId(x.id.replace(/-inner$/,''))).find(x=>x&&((x.getTooltip&&x.getTooltip())||(x.getText&&x.getText())||'')==='Agregar Producto'); b.firePress(); }")
                 fr.wait_for_function("() => { const t=sap.ui.getCore().byId('frgAsocRecetas--idTblRecetas'); return t && t.getDomRef() && t.getDomRef().getClientRects().length; }", timeout=90000); pg.wait_for_timeout(4000)
                 r = fr.evaluate("""() => { const ctrl=""" + CTRL + """; const t=sap.ui.getCore().byId('frgAsocRecetas--idTblRecetas'); const J=sap.ui.require('sap/ui/model/json/JSONModel');
@@ -1354,7 +1411,9 @@ with sync_playwright() as p:
                     c = fr.evaluate("(() => { const c=window.__rmdStats.vivo.cambio(); return { pagina: c.pagina, resaltado: !!c.urlResaltado, frag: c.fragmento, texto: c.texto.slice(-20) }; })()")
                     fr.wait_for_function("() => ((document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo')||{}).src || '').includes('#page=')", timeout=20000)   # el visor nuevo ya se fundió encima
                     src1 = fr.evaluate("(document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo')||{}).src || ''")
-                    pg.wait_for_timeout(5500); src2 = fr.evaluate("(document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo')||{}).src || ''")
+                    try: fr.wait_for_function("(s1) => { const f = document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo'); return f && f.src.split('#')[0] !== s1.split('#')[0]; }", arg=src1, timeout=15000)
+                    except Exception: pass
+                    pg.wait_for_timeout(800); src2 = fr.evaluate("(document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo')||{}).src || ''")
                     fr.evaluate(AVISO); pg.wait_for_timeout(3000)
                     fr.wait_for_function("() => !/Generando/.test((document.querySelector('.rmd-vivo-estado')||{}).textContent||'')", timeout=60000); pg.wait_for_timeout(500)
                     sin = fr.evaluate("(document.querySelector('.rmd-vivo-estado')||{}).textContent || ''"); src3 = fr.evaluate("(document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo')||{}).src || ''")
@@ -1390,7 +1449,7 @@ with sync_playwright() as p:
                 pg.wait_for_timeout(8000); sigue = fr.evaluate("!!document.querySelector('.rmd-saludo')")
                 ok = (re.match(r"^(Buenos días|Buenas tardes|Buenas noches)(, \w+)?\n", s_["texto"]) and "RMD en Ingresado" in s_["texto"] and s_["izq"] < 120 and s_["abajo"] < 40 and s_["ancho"] < 500 and not sigue)
                 return ok, f"{s_} ¿sigue a los 10 s?={sigue}"
-            @prueba("X2 Ctrl+K → escribir un código → Enter abre 'Configurar el RMD' (el mismo menú de la fila); la pestaña lleva el código y vuelve a su título al cerrar; queda en Recientes")
+            @prueba("X2 Ctrl+K → escribir un código → Enter abre 'Configurar el RMD' (el mismo menú de la fila); la pestaña lleva la etapa abreviada y la descripción ('FAB - …') y vuelve a su título al cerrar; queda en Recientes")
             def _():
                 t0 = pg.title()
                 fr.get_by_text("Configuración Manufactura Digital").first.click(); pg.keyboard.press("Control+k"); pg.wait_for_timeout(700)
@@ -1398,7 +1457,7 @@ with sync_playwright() as p:
                 fr.wait_for_function(RAIZ_ABIERTA, timeout=60000); pg.wait_for_timeout(1500)
                 t1 = pg.title(); rec = fr.evaluate("window.__rmdStats.productividad.leerRecientes().map(x => x.codigo)")
                 cerrar_seguro(); pg.wait_for_timeout(1500); t2 = pg.title()
-                return (foco == "rmd-paleta-q" and t1.startswith(RMD_IR + " · ") and t2 == t0 and rec[:1] == [RMD_IR]), f"foco={foco} pestaña abierta={t1[:70]!r} cerrada={t2!r} (antes {t0!r}) recientes={rec[:3]}"
+                return (foco == "rmd-paleta-q" and re.match(r"^(FAB|ENV|ACO|INS|REC|[A-Z]{3}) - \S", t1) is not None and t2 == t0 and rec[:1] == [RMD_IR]), f"foco={foco} pestaña abierta={t1[:70]!r} cerrada={t2!r} (antes {t0!r}) recientes={rec[:3]}"
             @prueba("X3 Recientes arriba y Alt+Enter = Asociar fórmulas; con una ventana de SAP abierta se puede escribir en la paleta y Esc cierra solo la paleta")
             def _():
                 pg.keyboard.press("Control+k"); pg.wait_for_timeout(900)
@@ -1436,7 +1495,7 @@ with sync_playwright() as p:
     if "Y" in SOLO:
         RMD_BOM = os.environ.get("RMD_BOM", "2202609113")   # RMD con una receta cuya lista de materiales cambió en SAP
         CTRLY = "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar'); return sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener; })()"
-        ESTADOY = "() => { const d = [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).pop(); return { aviso: ((d.querySelector('.rmd-receta-aviso') || {}).innerText || ''), iconos: [...d.querySelectorAll('.rmd-rec-icono')].length }; }"
+        ESTADOY = "() => { const d = [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).pop(); const a = d.querySelector('.rmd-receta-aviso'); return { aviso: a ? a.innerText + ' | ' + a.title : '', iconos: [...d.querySelectorAll('.rmd-rec-icono')].length }; }"
         bloq_y = []
         def guardia_y(route):
             if route.request.method not in ("GET", "HEAD"): bloq_y.append(route.request.method + " " + route.request.url[:80]); route.abort()
@@ -1485,6 +1544,70 @@ with sync_playwright() as p:
         @prueba("Y4 Ninguna petición de escritura salió del navegador durante el bloque Y")
         def _():
             return (not bloq_y), str(bloq_y[:5])
+
+    # ───────────────────────── Z. v1.28: filtro "Equipo" en la barra de filtros y ajustes de la lista (no escribe: cortafuegos) ─────────────────────────
+    if "Z" in SOLO:
+        EQ_Z = os.environ.get("EQ_Z", "PL1-LIQ-E023")
+        CTRLZ = "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar' && !x.closest('.sapMDialog')); return sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener; })()"
+        bloq_z = []
+        def guardia_z(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_z.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_z)
+        cerrar_seguro(); pg.set_viewport_size({"width": 1728, "height": 860}); pg.wait_for_timeout(2500)   # ≈ una pantalla de 1920 al 100 %
+        try:
+            @prueba("Z1 Barra de filtros: 'Agrupador' (antes 'Código Agrupador'), tarjeta 'Equipo', las 10 tarjetas en una sola fila y ⟳ rojo en lugar de 'Restablecer'")
+            def _():
+                b_ = fr.evaluate("""() => { const fb = [...document.querySelectorAll('.sapUiCompFilterBar')].find(x => !x.closest('.sapMDialog')); const tj = [...fb.querySelectorAll('.sapUiAFLayoutItem')].filter(x => x.getClientRects().length && x.querySelector('label'));
+                  const r = fb.querySelector("button[title='Restablecer los filtros']"), ic = r && r.querySelector('.sapUiIcon');
+                  return { vw: innerWidth, tarjetas: tj.map(t => [t.querySelector('label').textContent.trim(), Math.round(t.getBoundingClientRect().top)]), restablecer: r && { texto: ((r.querySelector('.sapMBtnContent') || {}).textContent || '').trim(), color: ic && getComputedStyle(ic).color } }; }""")
+                nombres = [t[0] for t in b_["tarjetas"]]; filas = {t[1] for t in b_["tarjetas"]}; rs = b_["restablecer"] or {}
+                rojo = bool(re.match(r"rgb\((\d+), (\d+), (\d+)", rs.get("color") or "")) and int(re.match(r"rgb\((\d+)", rs["color"]).group(1)) > 180
+                return ("Agrupador" in nombres and "Código Agrupador" not in nombres and "Equipo" in nombres and len(nombres) == 10 and len(filas) == 1 and rs and "Restablecer" not in rs.get("texto", "") and rojo), str(b_)
+            @prueba("Z2 Filtro 'Equipo' (con sugerencias del catálogo): Ir deja solo los master que tienen ese equipo (con los demás filtros) y Restablecer lo vacía")
+            def _():
+                fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(5000)   # sin filtros de pruebas anteriores
+                inp = fr.locator("input[placeholder='Código o nombre']").first
+                inp.click(); pg.keyboard.type(EQ_Z[:8]); pg.wait_for_timeout(3500)
+                sug = fr.evaluate("[...document.querySelectorAll('.sapMPopover li, .sapMPopover .sapMLIB')].filter(x => x.getClientRects().length).length")
+                pend = {}; pg.on("request", lambda rq: pend.__setitem__(rq, rq.method + " " + rq.url.split("/browse/")[-1][:110])); pg.on("requestfinished", lambda rq: pend.pop(rq, None)); pg.on("requestfailed", lambda rq: pend.__setitem__(rq, "FALLÓ " + pend.get(rq, rq.url[:80]) + " " + str(rq.failure)))
+                inp.fill(EQ_Z); pg.wait_for_timeout(400); t0z = fr.evaluate("Date.now()")
+                pg.keyboard.press("Tab"); pg.wait_for_timeout(500); fr.locator(".sapUiCompFilterBar button:has-text('Ir')").first.click()   # Tab cierra las sugerencias y confirma el valor
+                try: fr.wait_for_function("(t0) => (window.__rmdStats.filtroEquipo || {}).t > t0 && ![...document.querySelectorAll('#sapUiBusyIndicator, .sapUiLocalBusyIndicator')].some(e => e.getClientRects().length)", arg=t0z, timeout=90000)
+                except Exception: return False, "pendientes=" + str(list(pend.values())[:8]) + " | sin el aviso del filtro: " + str(fr.evaluate("({ toasts: [...document.querySelectorAll('.rmd-toast')].map(t => t.textContent), valor: (document.querySelector(\"input[placeholder='Código o nombre']\") || {}).value, errores: window.__rmdStats.errores || [], inicio: window.__rmdStats.filtroEquipoInicio, pasos: window.__rmdStats.filtroEquipoPasos, t0: " + str(t0z) + ", busqueda: (() => { const fb = sap.ui.getCore().byId([...document.querySelectorAll('.sapUiCompFilterBar')].find(x => !x.closest('.sapMDialog')).id); return ((fb.mEventRegistry || {}).search || []).map(r => !!r.fFunction.__rmdEquipo); })(), ocupado: [...document.querySelectorAll('#sapUiBusyIndicator, .sapUiLocalBusyIndicator')].filter(e => e.getClientRects().length).map(e => e.id || e.className) })"))
+                pg.wait_for_timeout(1500)
+                r = fr.evaluate("(async () => { const c = " + CTRLZ + "; const filas = c.getView().getModel('listMD').getData(); const eq = await window.__rmdStats.buscarPorEquipo('" + EQ_Z + "'); const ids = new Set(eq.filas.map(x => x[1] + '|' + x[2])); const sinCanc = new Set(eq.filas.filter(x => x[3] !== 'Cancelado').map(x => x[1] + '|' + x[2])); return { filas: filas.length, todos: filas.every(x => ids.has(x.codigo + '|' + x.version)), esperados: sinCanc.size }; })()")
+                fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)
+                tras = fr.evaluate("(() => { const c = " + CTRLZ + "; return { filas: c.getView().getModel('listMD').getData().length, valor: document.querySelector(\"input[placeholder='Código o nombre']\").value }; })()")
+                return (sug > 0 and r["filas"] == r["esperados"] and r["todos"] and tras["valor"] == "" and tras["filas"] > 0), f"sugerencias={sug} filtrado={r} tras Restablecer={tras}"
+            @prueba("Z3 Columna Etapa en una sola línea ('ACONDICIONADO' completo) y nada del script en Configuración Maestra")
+            def _():
+                e = fr.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find(x => x.getClientRects().length && !x.closest('.sapMDialog')); const ths = [...t.querySelectorAll('thead th')]; const i = ths.findIndex(h => h.textContent.trim() === 'Etapa');
+                  const cs = [...t.querySelectorAll('tbody tr')].slice(0, 15).map(r => r.children[i]).filter(Boolean).map(c => c.querySelector('.sapMText, span')).filter(Boolean); return { alturas: [...new Set(cs.map(c => Math.round(c.getBoundingClientRect().height)))], textos: [...new Set(cs.map(c => c.textContent.trim()))] }; }""")
+                fr.evaluate("() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Configurar' && !x.closest('.sapMDialog')); sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }"); pg.wait_for_timeout(6000)
+                m = fr.evaluate("() => { const d = [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).pop(); return d && { titulo: ((d.querySelector('h2, .sapMTitle') || {}).textContent || '').trim(), delScript: d.querySelectorAll('.rmd-status-rmd, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu').length }; }")
+                cerrar_seguro()
+                return (len(e["alturas"]) == 1 and e["alturas"][0] < 26 and bool(m) and "Maestra" in m["titulo"] and m["delScript"] == 0), f"etapa={e} maestra={m}"
+            @prueba("Z5 'Modificaciones masivas' desde el panel de mejoras (no en la barra): pestañas Suspender / Agregar observación; Revisar dice qué master aplica según su estado (sin ejecutar)")
+            def _():
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel .rmd-mod-masivas").click(); pg.wait_for_timeout(800)
+                tabs = fr.evaluate("[...document.querySelectorAll('.rmd-mm-modo')].map(b => b.textContent + (b.classList.contains('activo') ? '*' : ''))")
+                fr.locator(".rmd-susp-codigos").fill("2202609126 2202609130 2202609133"); fr.locator(".rmd-modal-pie button", has_text="Revisar").click()
+                fr.wait_for_function("document.querySelectorAll('.rmd-susp-res tbody tr').length === 3", timeout=60000)
+                sus = fr.evaluate("[...document.querySelectorAll('.rmd-susp-res tbody tr')].map(r => r.children[4].textContent + ':' + r.children[5].textContent)")
+                fr.locator(".rmd-mm-modo", has_text="Agregar observación").click(); fr.locator(".rmd-modal-pie button", has_text="Revisar").click()
+                fr.wait_for_function("document.querySelectorAll('.rmd-susp-res tbody tr').length === 3", timeout=60000)
+                obs = fr.evaluate("[...document.querySelectorAll('.rmd-susp-res tbody tr')].map(r => r.children[4].textContent + ':' + r.children[5].textContent)")
+                boton = fr.evaluate("[...document.querySelectorAll('.rmd-modal-pie button')].map(b => b.textContent)")
+                fr.locator(".rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(400)
+                ok = (tabs == ["Suspender*", "Agregar observación"] and sus[0].startswith("Ingresado:Se suspenderá") and sus[1].startswith("Autorizado:Se suspenderá") and "Cancelado" in sus[2] and "No se modifica" in sus[2]
+                      and obs[0].endswith("Se agregará la observación") and obs[1].endswith("Se agregará la observación") and "No se modifica" in obs[2] and any("Agregar la observación a 2 RMD" in b for b in boton))
+                return ok, f"pestañas={tabs} suspender={sus} observación={obs} botones={boton}"
+        finally:
+            pg.unroute("**/*", guardia_z); pg.set_viewport_size({"width": 1920, "height": 945})
+        @prueba("Z4 Ninguna petición de escritura salió del navegador durante el bloque Z")
+        def _():
+            return (not bloq_z), str(bloq_z[:5])
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

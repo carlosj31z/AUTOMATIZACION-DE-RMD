@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.27.0
-// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), código del RMD en la pestaña, Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), un mismo paso varias veces en la barra de seleccionados (en su orden), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.28.0
+// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), un mismo paso varias veces en la barra de seleccionados (en su orden), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.27.0';                                                       // mantener igual a @version
+  const VERSION = '1.28.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -31,8 +31,9 @@
     ['indicadores', '"Indicadores del mes" en el menú Exportar (Excel del mes con tablas dinámicas)'],
     ['exportar', 'Exportar: menú en el icono del portal (exportado original con "Producción Estado", Equipos por master e Indicadores)'],
     ['equipos', '"Equipos por master" en el menú Exportar (Excel de todos los master con sus equipos, instrumentos y materiales)'],
-    ['buscarequipo', 'Botón "Buscar por equipo" (RMD que tienen un equipo, instrumento o material)'],
-    ['suspension', 'Botón "Suspensión masiva" (varios RMD autorizados a la vez, con el Guardar de Asociar fórmulas)'],
+    ['buscarequipo', 'Filtro "Equipo" en la barra de filtros de la lista (master con un equipo, instrumento, utensilio o agrupador)'],
+    ['barrafiltros', 'Barra de filtros compacta: "Agrupador", ⟳ rojo en lugar de "Restablecer" y todas las tarjetas en una fila'],
+    ['suspension', 'Modificaciones masivas: suspender Autorizados o Ingresados y agregar una observación a varios master (desde este panel o Ctrl+K)'],
     ['citastodos', '"Documentos citados en todos los master" en el menú Exportar'],
     ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (⚠ con el detalle junto al código y botón "Revisar recetas" en Asociar fórmulas)'],
     ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (lo más resaltante frente a la asociada y a la versión anterior)'],
@@ -190,7 +191,7 @@
   .rmd-orden-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid #ff4d4d; border-radius: 3px; background: rgba(255,77,77,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-orden-aviso b { color: var(--rmd-rojo); }
   .rmd-receta-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid var(--rmd-ambar); border-radius: 3px; background: rgba(240,180,90,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
-  .rmd-receta-aviso b { color: var(--rmd-ambar); } .rmd-receta-aviso .rmd-link { font-weight: 600; }
+  .rmd-receta-aviso b { color: var(--rmd-ambar); } .rmd-receta-aviso .rmd-receta-cod { cursor: pointer; } .rmd-receta-aviso .rmd-receta-cod:hover { text-decoration: underline; }
   .rmd-rec-icono { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; padding: 0 6px; height: 18px; border: 1px solid var(--rmd-ambar); border-radius: 9px; background: rgba(240,180,90,.14); color: var(--rmd-ambar); font: 700 11px var(--rmd-fuente); cursor: pointer; vertical-align: middle; }
   .rmd-rec-icono:hover { background: var(--rmd-ambar); color: #1d232a; }
   .rmd-rec-detalle { position: fixed; z-index: 100002; max-height: min(70vh, 620px); overflow: auto; padding: 12px 14px 10px; border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-top: 3px solid var(--rmd-ambar); box-shadow: 0 14px 40px rgba(0,0,0,.45); font: 12.5px/1.4 var(--rmd-fuente); }
@@ -208,6 +209,10 @@
   .rmd-rec-pie { margin-top: 10px; color: var(--rmd-apagado); font-size: 12px; }
   html.rmd-ui .sapMDialog.rmd-medio.rmd-selector-ancho { width: min(1480px, 96vw) !important; }
   .sapMToken.rmd-token-rep { display: inline-flex !important; align-items: center; }
+  .rmd-restablecer-ui5 .sapMBtnIcon, .rmd-restablecer-ui5 .sapUiIcon { color: var(--rmd-rojo) !important; } .rmd-restablecer-ui5 .sapMBtnInner { border-color: transparent !important; background: transparent !important; }
+  #rmd-ui-panel .rmd-panel-acciones { margin: 8px 0 2px; } #rmd-ui-panel .rmd-mod-masivas { width: 100%; border-color: var(--rmd-rojo); color: var(--rmd-rojo); } #rmd-ui-panel .rmd-mod-masivas:hover { background: var(--rmd-rojo); color: #fff; }
+  .rmd-mm-modos { display: flex; gap: 0; margin: 0 0 10px; border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-mm-modo { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-mm-modo.activo { color: var(--rmd-texto); border-bottom-color: var(--rmd-acento); }
   .rmd-token-mas { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; margin: 0 2px 0 6px; border-radius: 3px; background: var(--rmd-acento); color: #fff; font: 700 12px/1 var(--rmd-fuente); cursor: pointer; }
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
   .rmd-btn.exito { background: #2e7d32; border-color: #2e7d32; color: #fff; } .rmd-btn.exito:hover { background: #276c2b; }
@@ -1283,7 +1288,7 @@
     gestionarBotonesLista();
     gestionarRecetasAsociar();
     // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
-    [registrarExternosUI5, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto].forEach((f) => {
+    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnaEtapa, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
     gestionarTextosMayusculas();
@@ -3139,7 +3144,8 @@
   }
   function gestionarBotonStatusRmd() {
     if (!on('statusrmd')) { document.querySelectorAll('.rmd-status-rmd').forEach((e) => e.remove()); return; }
-    const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return;
+    document.querySelectorAll('.sapMDialog .rmd-status-rmd, .sapMDialog .rmd-suspension, .sapMDialog .rmd-buscar-equipo').forEach((e) => e.remove());   // nunca en ventanas (Configuración Maestra)
+    const btnExportar = botonExportar(); if (!btnExportar) return;
     const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra) return;
     if (!barra.querySelector('.rmd-status-rmd')) {
       const s = botonIcono(ICONO_ENVIAR, 'Enviar a Status RMD', 'rmd-status-rmd', () => enviarAStatusRmd(s));
@@ -3396,7 +3402,8 @@
   // ---- Menú de exportados en el icono nativo "Exportar" (v1.23) ----
   // El icono del portal ya no exporta directo: abre un menú con el exportado original (el mismo Excel del portal, con sus filtros,
   // y la columna "Producción Estado" al final para no mover las demás), Equipos por master e Indicadores del mes.
-  const botonExportar = () => [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar');
+  // (el de la lista principal: Configuración Maestra y otras ventanas del portal también tienen un "Exportar" y ahí no va nada del script)
+  const botonExportar = () => [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar' && !b.closest('.sapMDialog'));
   const ctlExportar = () => { const b = botonExportar(); return b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); };
   // Controlador de la lista principal (el mismo al que responde el botón Exportar)
   function controladorPrincipal() {
@@ -3487,6 +3494,7 @@
   const ICONO_BUSCAR_EQUIPO = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.3"/><path d="m10 10 4 4"/><path d="M5 6.8h3.6"/></svg>';
   let catalogoEquipos = null;
   function cargarCatalogoEquipos(modelo, avisar) {
+    if (catalogoEquipos && catalogoEquipos.__modelo !== modelo) catalogoEquipos = null;   // (otro modelo: el del arranque ya no responde)
     if (!catalogoEquipos) catalogoEquipos = Promise.all([
       leerEntidadCompleta(modelo, 'EQUIPO', { $select: 'equipoId,CodigoGaci,denom,eqktx,equnr,pltxt' }, 'equipoId', avisar),
       leerEntidadCompleta(modelo, 'UTENSILIO', { $select: 'utensilioId,codigo,descripcion' }, 'utensilioId'),
@@ -3496,6 +3504,7 @@
       ...ut.map((u) => ({ tipo: 'UTENSILIO', id: u.utensilioId, codigo: norm(u.codigo || u.utensilioId || ''), desc: norm(u.descripcion || ''), extra: '' })),
       ...ag.map((g) => { const desc = norm(g.descripcion || ''), m = /\s-\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*$/.exec(desc); return { tipo: 'AGRUPADOR', id: g.clasificacionUtensilioId, codigo: m ? m[1] : '', desc, extra: '' }; }),
     ])).catch((e) => { catalogoEquipos = null; throw e; });
+    if (catalogoEquipos) catalogoEquipos.__modelo = modelo;
     return catalogoEquipos;
   }
   // un equipo del catálogo = todos los registros con el mismo tipo, código y descripción (EQUIPO trae varios por código GACI)
@@ -3524,6 +3533,7 @@
   }
   function filtrarListaPrincipal(codigo) {
     const ctrl = controladorPrincipal(); if (!ctrl) return;
+    if (filtroEquipo.input) filtroEquipo.input.setValue(''); filtroEquipo.ids = null; filtroEquipo.texto = '';   // se busca ese código, sin el filtro de equipo
     ctrl.getView().getModel('oDataFilter').setProperty('/code', codigo); ctrl.onSearch();
   }
   function abrirBuscarPorEquipo() {
@@ -3583,7 +3593,7 @@
     return { catalogo: cat.length, items: items.map((x) => x.tipo + ' ' + x.codigo + ' ' + x.desc), filas: filas.map((x) => [x.equipo.codigo, x.md.codigo, x.md.version, x.md.estado, x.md.etapa]) };
   };
 
-  // ---- Suspensión masiva de RMD autorizados (v1.23) ----
+  // ---- Modificaciones masivas de RMD (v1.23 "Suspensión masiva"; ver más abajo) ----
   // La persona pega los códigos de los master y, si quiere, un motivo. Para CADA uno se hace exactamente lo que haría a mano: se
   // filtra la lista, se abre su "Asociar fórmulas", se elige Estado "Suspendido", el motivo va como una línea nueva al final de
   // Observaciones y se pulsa el Guardar del portal (con sus validaciones, la trazabilidad y la anulación del documento de cada
@@ -3625,28 +3635,50 @@
     await esperar(600); await hasta(() => !ocupadoGlobal(), 40000);
     return d;
   }
-  // Suspende UN RMD con el Guardar del portal. Devuelve la observación que quedó; lanza un error con el motivo si no se pudo.
-  async function suspenderUno(ctrl, codigo, motivo) {
+  // ---- Modificaciones masivas (v1.23 "Suspensión masiva"; v1.28: también Ingresados y observaciones en cualquier master) ----
+  // Cada master se modifica igual que a mano, con la ventana "Asociar fórmulas" del portal y su botón Guardar (sus validaciones,
+  // la trazabilidad y, al suspender, la anulación del documento de cada receta en el DMS):
+  //  · Suspender: Estado "Suspendido" (el combo del portal lo ofrece a Autorizados e Ingresados) + el motivo, opcional, como una
+  //    línea nueva al final de Observaciones.
+  //  · Agregar observación: solo la línea nueva en Observaciones, sin cambiar el Estado. Sirve para cualquier estado salvo
+  //    Cancelado (el Guardar del portal no graba nada en un master cancelado). En un Autorizado de Fabricación / Envase el portal
+  //    compara antes las cantidades de insumos y, si difieren, abre el "Comparador de fórmula" en vez de guardar: se informa.
+  // Se abre desde el panel de mejoras o con Ctrl+K (no está en la barra de la lista: se usa poco y cambia muchos RMD a la vez).
+  const MODOS_MASIVOS = {
+    suspender: { titulo: 'Suspender', estados: ['Autorizado', 'Ingresado'], verbo: 'Suspender', hecho: 'Suspendido' },
+    observacion: { titulo: 'Agregar observación', estados: ['Autorizado', 'Ingresado', 'Suspendido', 'Solicitado', 'Solicitud Aprobada', 'Solicitud Rechazada'], verbo: 'Agregar la observación a', hecho: 'Observación agregada' },
+  };
+  // Modifica UN master con el Guardar del portal. Devuelve { obs, mensajes }; lanza un error con el motivo si no se pudo.
+  async function modificarUno(ctrl, codigo, { suspender, linea }) {
     const d = await abrirAsociarFormulas(ctrl, codigo), vista = ctrl.getView(), asoc = vista.getModel('asociarDatos');
+    const previos = new Set(dialogos());
     try {
       const a = asoc.getData(); if (a.codigo !== codigo) throw new Error(`se abrió otro RMD (${a.codigo})`);
       const ctls = controlesDe(d), combo = ctls.find((c) => rutaDe(c, 'selectedKey') === '/estadoIdRmd_iMaestraIdBK');
-      if (!combo || !combo.getItems) throw new Error('no se encontró el campo Estado');
-      if (combo.getEditable && !combo.getEditable()) throw Object.assign(new Error('tu usuario no puede cambiar el Estado en "Asociar fórmulas" (en el portal solo lo permite el rol Jefe DT)'), { sinPermiso: true });
-      const item = (t) => combo.getItems().find((i) => SIN_ACENTOS(i.getText()) === t), sus = item('SUSPENDIDO'), aut = item('AUTORIZADO');
-      if (!sus) throw new Error('el Estado no ofrece "Suspendido"');
-      if (aut && String(a.estadoIdRmd_iMaestraId) !== String(aut.getKey())) throw new Error('no está Autorizado');
+      if (suspender) {
+        if (!combo || !combo.getItems) throw new Error('no se encontró el campo Estado');
+        if (combo.getEditable && !combo.getEditable()) throw Object.assign(new Error('tu usuario no puede cambiar el Estado en "Asociar fórmulas" (en el portal solo lo permite el rol Jefe DT)'), { sinPermiso: true });
+        const item = (t) => combo.getItems().find((i) => SIN_ACENTOS(i.getText()) === t), sus = item('SUSPENDIDO');
+        if (!sus) throw new Error('el Estado no ofrece "Suspendido"');
+        const actual = combo.getItems().find((i) => String(i.getKey()) === String(a.estadoIdRmd_iMaestraId));
+        if (!actual || !['AUTORIZADO', 'INGRESADO'].includes(SIN_ACENTOS(actual.getText()))) throw new Error(`no está Autorizado ni Ingresado (${actual ? actual.getText() : 'estado desconocido'})`);
+        combo.setSelectedKey(sus.getKey()); combo.fireSelectionChange({ selectedItem: sus }); combo.fireChange({ value: sus.getText(), newValue: sus.getText(), itemPressed: true });
+        asoc.setProperty('/estadoIdRmd_iMaestraIdBK', isNaN(+sus.getKey()) ? sus.getKey() : +sus.getKey());
+        if (ctrl.localModel) ctrl.localModel.setProperty('/flagEstadoFormula', true);
+      } else if (!linea) throw new Error('falta el texto de la observación');
       const antes = String(a.observacionBK != null ? a.observacionBK : a.observacion || '').replace(/\s+$/, '');
-      const obs = motivo ? (antes ? antes + '\n' : '') + motivo : antes;
-      combo.setSelectedKey(sus.getKey()); combo.fireSelectionChange({ selectedItem: sus }); combo.fireChange({ value: sus.getText(), newValue: sus.getText(), itemPressed: true });
-      asoc.setProperty('/estadoIdRmd_iMaestraIdBK', isNaN(+sus.getKey()) ? sus.getKey() : +sus.getKey());
+      const obs = linea ? (antes ? antes + '\n' : '') + linea : antes;
       asoc.setProperty('/observacionBK', obs);
-      if (ctrl.localModel) ctrl.localModel.setProperty('/flagEstadoFormula', true);
       // el mismo manejador que el botón Guardar de la ventana (se espera a que termine: guarda, trazabilidad y DMS)
       const bGuardar = ctls.find((c) => c.getMetadata().getName() === 'sap.m.Button' && c.getText && c.getText() === 'Guardar' && c.getDomRef() && visible(c.getDomRef()));
       const reg = bGuardar && ((bGuardar.mEventRegistry || {}).press || [])[0]; if (!reg) throw new Error('no se encontró el botón Guardar');
       await reg.fFunction.call(reg.oListener, { getSource: () => bGuardar, getParameter: () => undefined, getParameters: () => ({}) });
       await esperar(400); await hasta(() => !ocupadoGlobal(), 60000);
+      const comparador = dialogos().find((x) => !previos.has(x) && x !== d && /compar/i.test(cabecera(x)));
+      if (comparador) {
+        const c = [...comparador.querySelectorAll('button')].find((x) => visible(x) && /^(Cancelar|Cerrar)$/.test(x.textContent.trim())); if (c) pulsar(c); await esperar(500);
+        throw new Error('el portal pidió revisar las cantidades de insumos (Comparador de fórmula) y no guardó: hazlo a mano en este master');
+      }
       const mensajes = (await cerrarMensajesPortal()).filter((t) => !/guardaron los cambios correctamente/i.test(t));
       return { obs, mensajes };
     } finally {
@@ -3655,90 +3687,111 @@
       await esperar(500);
     }
   }
-  function abrirSuspensionMasiva() {
+  const suspenderUno = (ctrl, codigo, motivo) => modificarUno(ctrl, codigo, { suspender: true, linea: motivo });
+  function abrirModificacionesMasivas(modoInicial = 'suspender') {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
-    if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para suspender.', true); return; }
-    if (dialogos().length) { toast('Cierra las ventanas abiertas del portal antes de la suspensión masiva.', true); return; }
-    let trabajando = false, detenido = false, plan = [], resultados = [];
-    const v = ventana('Suspensión masiva de RMD', { cancelar: () => { if (!trabajando) v.cerrar(); } });
-    v.cuerpo.innerHTML = `<p>Pega los códigos de los master <b>autorizados</b> que quieres suspender (uno por línea o separados por espacios o comas).</p>
+    if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para las modificaciones masivas.', true); return; }
+    if (dialogos().length) { toast('Cierra las ventanas abiertas del portal antes de las modificaciones masivas.', true); return; }
+    let trabajando = false, detenido = false, plan = [], resultados = [], modo = MODOS_MASIVOS[modoInicial] ? modoInicial : 'suspender';
+    const v = ventana('Modificaciones masivas de RMD', { cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.cuerpo.innerHTML = `<div class="rmd-mm-modos" role="tablist">${Object.entries(MODOS_MASIVOS).map(([k, m]) => `<button type="button" role="tab" class="rmd-mm-modo" data-modo="${k}">${esc(m.titulo)}</button>`).join('')}</div>
+      <p class="rmd-mm-ayuda"></p>
       <textarea class="rmd-min-texto rmd-susp-codigos" placeholder="2202608939&#10;2202607784"></textarea>
-      <p><b>Motivo de la suspensión</b> (opcional): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas".</p>
-      <input type="text" class="rmd-susp-motivo" maxlength="400" placeholder="Ej.: 20260924 Suspendido por actualización de fórmula (CC 26-300)">
-      <p class="rmd-nota">Cada RMD se suspende igual que a mano: "Asociar fórmulas" → Estado "Suspendido" → Guardar del portal (con sus validaciones, la trazabilidad y la anulación del documento de cada receta en el DMS). Requiere el permiso para cambiar el Estado (rol Jefe DT).</p>
+      <p class="rmd-mm-rotulo"></p>
+      <input type="text" class="rmd-susp-motivo" maxlength="400">
+      <p class="rmd-nota rmd-mm-nota"></p>
       <p class="rmd-progreso"></p><div class="rmd-susp-res"></div>`;
     const ta = v.cuerpo.querySelector('.rmd-susp-codigos'), mot = v.cuerpo.querySelector('.rmd-susp-motivo'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-susp-res');
+    const puede = (est) => MODOS_MASIVOS[modo].estados.includes(est);
+    const pintarModo = () => {
+      v.cuerpo.querySelectorAll('.rmd-mm-modo').forEach((b) => { const s = b.dataset.modo === modo; b.classList.toggle('activo', s); b.setAttribute('aria-selected', String(s)); });
+      const sus = modo === 'suspender';
+      v.cuerpo.querySelector('.rmd-mm-ayuda').innerHTML = sus ? 'Pega los códigos de los master <b>Autorizados o Ingresados</b> que quieres suspender (uno por línea o separados por espacios o comas).'
+        : 'Pega los códigos de los master (en <b>cualquier estado</b> salvo Cancelado) a los que quieres agregar una observación.';
+      v.cuerpo.querySelector('.rmd-mm-rotulo').innerHTML = sus ? '<b>Motivo de la suspensión</b> (opcional): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas".'
+        : '<b>Observación</b> (obligatoria): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas".';
+      mot.placeholder = sus ? 'Ej.: 20260924 Suspendido por actualización de fórmula (CC 26-300)' : 'Ej.: 20260925CJ Revisado en auditoría interna (sin cambios)';
+      v.cuerpo.querySelector('.rmd-mm-nota').textContent = sus ? 'Cada RMD se suspende igual que a mano: "Asociar fórmulas" → Estado "Suspendido" → Guardar del portal (con sus validaciones, la trazabilidad y la anulación del documento de cada receta en el DMS). Requiere el permiso para cambiar el Estado (rol Jefe DT).'
+        : 'Cada RMD se modifica igual que a mano: "Asociar fórmulas" → Observaciones → Guardar del portal. El Estado no cambia. Los Cancelados no se pueden modificar (el portal no guarda nada en un master cancelado).';
+      plan = []; resultados = []; res.innerHTML = ''; setTxt(prog, ''); bEje.disabled = true; setTxt(bEje, MODOS_MASIVOS[modo].verbo);
+    };
+    v.cuerpo.querySelector('.rmd-mm-modos').addEventListener('click', (e) => { const b = e.target.closest('.rmd-mm-modo'); if (!b || trabajando) return; modo = b.dataset.modo; pintarModo(); });
     const tablaPlan = () => {
       res.innerHTML = `<table class="rmd-tabla"><thead><tr><th>Código</th><th>Versión</th><th>Descripción</th><th>Etapa</th><th>Estado</th><th>Resultado</th></tr></thead><tbody>${plan.map((x) => {
         const r = resultados.find((y) => y.codigo === x.codigo);
-        return `<tr><td>${esc(x.codigo)}</td><td>${esc(x.md ? x.md.version : '')}</td><td>${esc(x.md ? x.md.descripcion : '')}</td><td>${esc(x.md ? x.md.nivelTxt : '')}</td><td>${esc(x.estadoTxt)}</td><td class="${r && !r.ok ? 'rmd-dif' : ''}">${esc(r ? r.resultado : x.suspender ? 'Se suspenderá' : x.motivoNo)}</td></tr>`; }).join('')}</tbody></table>`;
+        return `<tr><td>${esc(x.codigo)}</td><td>${esc(x.md ? x.md.version : '')}</td><td>${esc(x.md ? x.md.descripcion : '')}</td><td>${esc(x.md ? x.md.nivelTxt : '')}</td><td>${esc(x.estadoTxt)}</td><td class="${r && !r.ok ? 'rmd-dif' : ''}">${esc(r ? r.resultado : x.aplica ? (modo === 'suspender' ? 'Se suspenderá' : 'Se agregará la observación') : x.motivoNo)}</td></tr>`; }).join('')}</tbody></table>`;
     };
     const bRev = botonModal('Revisar', 'primario', async () => {
       const codigos = [...new Set((ta.value.match(/\d{6,}/g) || []))];
       if (!codigos.length) { setTxt(prog, 'No se encontró ningún código (números de 6 o más cifras).'); return; }
       bRev.disabled = true; resultados = []; setTxt(prog, `Leyendo ${codigos.length} código(s) en SAP…`);
       try {
-        const mds = await leerMDPorCodigos(modelo, codigos), porCod = new Map(mds.map((m) => [m.codigo, m]));
+        const mds = await leerMDPorCodigos(modelo, codigos), porCod = new Map();
+        mds.forEach((m) => { const y = porCod.get(m.codigo); if (!y || m.version > y.version) porCod.set(m.codigo, m); });   // la versión más reciente
         plan = codigos.map((c) => { const md = porCod.get(c), est = md && md.estadoIdRmd ? md.estadoIdRmd.contenido : '';
-          return { codigo: c, md, estadoTxt: md ? est : '—', suspender: !!md && est === 'Autorizado', motivoNo: !md ? 'No existe' : est === 'Autorizado' ? '' : `No se suspende: está ${est}` }; });
-        const n = plan.filter((x) => x.suspender).length;
-        setTxt(prog, `${n} de ${codigos.length} se pueden suspender (solo los Autorizados).`); tablaPlan();
-        bSus.disabled = !n; setTxt(bSus, n ? `Suspender ${n} RMD` : 'Suspender');
+          return { codigo: c, md, estadoTxt: md ? est : '—', aplica: !!md && puede(est), motivoNo: !md ? 'No existe' : puede(est) ? '' : `No se modifica: está ${est}` }; });
+        const n = plan.filter((x) => x.aplica).length;
+        setTxt(prog, `${n} de ${codigos.length} se pueden ${modo === 'suspender' ? 'suspender (Autorizados o Ingresados)' : 'modificar (todos menos Cancelados)'}.`); tablaPlan();
+        bEje.disabled = !n; setTxt(bEje, n ? `${MODOS_MASIVOS[modo].verbo} ${n} RMD` : MODOS_MASIVOS[modo].verbo);
       } catch (e) { setTxt(prog, 'No se pudieron leer los códigos: ' + e.message); } finally { bRev.disabled = false; }
     });
-    const bSus = botonModal('Suspender', 'peligro', async () => {
-      const lista = plan.filter((x) => x.suspender), motivo = norm(mot.value);
+    const bEje = botonModal('Suspender', 'peligro', async () => {
+      const lista = plan.filter((x) => x.aplica), linea = norm(mot.value), sus = modo === 'suspender';
       if (!lista.length) return;
-      const ok = await confirmar(`¿Suspender ${lista.length} RMD?`, `Se cambiará a "Suspendido" el Estado de ${lista.length} RMD autorizado(s) en SAP${motivo ? ` y se agregará a sus Observaciones la línea: "${motivo}"` : ''}.`,
-        'El portal además anula en el DMS el documento de sus recetas, como al suspender a mano. No se puede deshacer desde aquí.', { si: `Suspender ${lista.length}`, no: 'Cancelar', peligro: true });
+      if (!sus && !linea) { setTxt(prog, 'Escribe la observación que se agregará.'); mot.focus(); return; }
+      const ok = await confirmar(sus ? `¿Suspender ${lista.length} RMD?` : `¿Agregar la observación a ${lista.length} RMD?`,
+        sus ? `Se cambiará a "Suspendido" el Estado de ${lista.length} RMD en SAP${linea ? ` y se agregará a sus Observaciones la línea: "${linea}"` : ''}.` : `Se agregará al final de las Observaciones de ${lista.length} RMD la línea: "${linea}". El Estado no cambia.`,
+        sus ? 'El portal además anula en el DMS el documento de sus recetas, como al suspender a mano. No se puede deshacer desde aquí.' : 'Se guarda con el Guardar de "Asociar fórmulas" de cada master. Para quitarla habría que editarla a mano.',
+        { si: sus ? `Suspender ${lista.length}` : `Agregar a ${lista.length}`, no: 'Cancelar', peligro: sus });
       if (!ok) return;
-      trabajando = true; detenido = false; bSus.disabled = true; bRev.disabled = true; ta.readOnly = true; mot.readOnly = true;
+      trabajando = true; detenido = false; bEje.disabled = true; bRev.disabled = true; ta.readOnly = true; mot.readOnly = true;
       const bDet = botonModal('Detener', '', () => { detenido = true; bDet.disabled = true; setTxt(bDet, 'Se detiene tras el actual…'); }); v.pie.prepend(bDet);
       const filtroAntes = ctrl.getView().getModel('oDataFilter').getProperty('/code') || '', usuario = usuarioSapActual(), quien = usuario ? (usuario.nombre || usuario.id) : '';
       try {
         for (let i = 0; i < lista.length && !detenido; i++) {
-          const x = lista[i]; setTxt(prog, `Suspendiendo ${i + 1} de ${lista.length}: ${x.codigo}…`);
-          const r = { codigo: x.codigo, md: x.md, estadoAntes: x.estadoTxt, motivo, fecha: new Date(), usuario: quien, ok: false, obs: '', estadoDespues: '', resultado: '' };
+          const x = lista[i]; setTxt(prog, `${sus ? 'Suspendiendo' : 'Agregando la observación'} ${i + 1} de ${lista.length}: ${x.codigo}…`);
+          const r = { codigo: x.codigo, md: x.md, modo: MODOS_MASIVOS[modo].titulo, estadoAntes: x.estadoTxt, motivo: linea, fecha: new Date(), usuario: quien, ok: false, obs: '', estadoDespues: '', resultado: '' };
           try {
-            const s = await suspenderUno(ctrl, x.codigo, motivo);
-            const md2 = (await leerMDPorCodigos(modelo, [x.codigo]))[0];
+            const s = await modificarUno(ctrl, x.codigo, { suspender: sus, linea });
+            const md2 = (await leerMDPorCodigos(modelo, [x.codigo])).sort((p, q) => q.version - p.version)[0];
             r.estadoDespues = md2 && md2.estadoIdRmd ? md2.estadoIdRmd.contenido : ''; r.obs = md2 ? md2.observacion || '' : s.obs;
-            r.ok = r.estadoDespues === 'Suspendido';
-            r.resultado = r.ok ? 'Suspendido' : `No se suspendió${s.mensajes.length ? ': ' + s.mensajes.join(' · ') : ` (quedó ${r.estadoDespues || 'sin cambio'})`}`;
+            r.ok = sus ? r.estadoDespues === 'Suspendido' : String(r.obs).replace(/\s+$/, '').endsWith(linea);
+            r.resultado = r.ok ? MODOS_MASIVOS[modo].hecho : `No se guardó${s.mensajes.length ? ': ' + s.mensajes.join(' · ') : sus ? ` (quedó ${r.estadoDespues || 'sin cambio'})` : ' (la observación no quedó en SAP)'}`;
           } catch (e) {
-            r.resultado = 'No se suspendió: ' + e.message; r.obs = x.md ? x.md.observacion || '' : '';
+            r.resultado = 'No se guardó: ' + e.message; r.obs = x.md ? x.md.observacion || '' : '';
             if (e.sinPermiso) { resultados.push(r); tablaPlan(); detenido = true; break; }
           }
           resultados.push(r); tablaPlan();
         }
-        plan.filter((x) => !x.suspender).forEach((x) => resultados.push({ codigo: x.codigo, md: x.md, estadoAntes: x.estadoTxt, estadoDespues: x.estadoTxt, motivo: '', fecha: new Date(), usuario: quien, ok: false, obs: x.md ? x.md.observacion || '' : '', resultado: x.motivoNo }));
+        plan.filter((x) => !x.aplica).forEach((x) => resultados.push({ codigo: x.codigo, md: x.md, modo: MODOS_MASIVOS[modo].titulo, estadoAntes: x.estadoTxt, estadoDespues: x.estadoTxt, motivo: '', fecha: new Date(), usuario: quien, ok: false, obs: x.md ? x.md.observacion || '' : '', resultado: x.motivoNo }));
         const hechos = resultados.filter((y) => y.ok).length;
-        setTxt(prog, `${detenido ? 'Detenido. ' : ''}Suspendidos: ${hechos} de ${lista.length}. Descarga el detalle con "Exportar Excel".`);
+        setTxt(prog, `${detenido ? 'Detenido. ' : ''}${sus ? 'Suspendidos' : 'Con la observación agregada'}: ${hechos} de ${lista.length}. Descarga el detalle con "Exportar Excel".`);
       } finally {
         trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; mot.readOnly = false; bX.disabled = !resultados.length;
         try { ctrl.getView().getModel('oDataFilter').setProperty('/code', filtroAntes); await ctrl.onSearch(); } catch (e) { /* la lista se actualiza al próximo "Ir" */ }
       }
     });
-    bSus.disabled = true;
     const bX = botonModal('Exportar Excel', '', async () => {
       const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
-      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Etapa', 'Área (sección)', 'Planta', 'Estado anterior', 'Estado actual', 'Resultado', 'Motivo agregado', 'Observaciones', 'Fecha y hora', 'Usuario'];
-      const h = libro.hoja('Suspensión masiva', { activa: true, congelar: 'B2', cols: [13, 9, 44, 17, 16, 24, 14, 14, 14, 40, 40, 70, 18, 28].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'SuspensionMasiva', ref: `A1:N${Math.max(2, resultados.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Etapa', 'Área (sección)', 'Planta', 'Modificación', 'Estado anterior', 'Estado actual', 'Resultado', 'Línea agregada', 'Observaciones', 'Fecha y hora', 'Usuario'];
+      const h = libro.hoja('Modificaciones masivas', { activa: true, congelar: 'B2', cols: [13, 9, 44, 17, 16, 24, 14, 20, 14, 14, 40, 40, 70, 18, 28].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'ModificacionesMasivas', ref: `A1:O${Math.max(2, resultados.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
       resultados.forEach((x, i) => { const m = x.md || {};
-        [x.codigo, m.version, m.descripcion, m.codDefectoReceta, m.nivelTxt, m.areaRmdTxt, m.sucursalId && m.sucursalId.contenido, x.estadoAntes, x.estadoDespues, x.resultado, x.motivo, x.obs, x.fecha, x.usuario]
-          .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, c === 12 ? new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), val.getHours(), val.getMinutes())) : val, c === 11 ? 'envuelto' : c === 12 ? 'fechaHora' : 'normal'); }); });
-      descargarArchivo(`Suspensión masiva RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())} ${dd(hoy.getHours())}${dd(hoy.getMinutes())}.xlsx`, await libro.generar(), TIPO_XLSX);
+        [x.codigo, m.version, m.descripcion, m.codDefectoReceta, m.nivelTxt, m.areaRmdTxt, m.sucursalId && m.sucursalId.contenido, x.modo, x.estadoAntes, x.estadoDespues, x.resultado, x.motivo, x.obs, x.fecha, x.usuario]
+          .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, c === 13 ? new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), val.getHours(), val.getMinutes())) : val, c === 12 ? 'envuelto' : c === 13 ? 'fechaHora' : 'normal'); }); });
+      descargarArchivo(`Modificaciones masivas RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())} ${dd(hoy.getHours())}${dd(hoy.getMinutes())}.xlsx`, await libro.generar(), TIPO_XLSX);
     });
     bX.disabled = true;
-    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bX, bRev, bSus);
-    setTimeout(() => ta.focus(), 40);
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bX, bRev, bEje);
+    pintarModo(); setTimeout(() => ta.focus(), 40);
   }
+  const abrirSuspensionMasiva = () => abrirModificacionesMasivas('suspender');
   // diagnóstico (pruebas con el guardado SIMULADO): suspende uno con el mismo flujo, sin ventana
   window.__rmdStats.suspenderUno = (codigo, motivo) => suspenderUno(controladorPrincipal(), codigo, motivo);
+  window.__rmdStats.observacionUno = (codigo, linea) => modificarUno(controladorPrincipal(), codigo, { suspender: false, linea });
   window.__rmdStats.leerMDPorCodigos = (codigos) => leerMDPorCodigos(controladorPrincipal().getView().getModel('mainModelv2'), codigos);
 
-  // Botones de la barra principal: "Buscar por equipo" y "Suspensión masiva" (junto a Exportar / Enviar a Status RMD)
+  // Botones de la barra principal (v1.28: ya ninguno propio aquí; "Buscar por equipo" es un filtro y "Modificaciones masivas" está en el panel)
   function gestionarBotonesLista() {
     const b = botonExportar(); if (!b) return;
     const barra = b.closest('.sapMBar, .sapMOTB, .sapMToolbar') || b.parentElement; if (!barra) return;
@@ -3749,8 +3802,9 @@
       const x = botonIcono(icono, texto, cls, fn); x.title = titulo;
       colocarEnBarra(barra, x);
     };
-    poner('buscarequipo', 'rmd-buscar-equipo', ICONO_BUSCAR_EQUIPO, 'Buscar por equipo', 'Busca los RMD que tienen un equipo, instrumento o material (por código o descripción) y permite exportarlos o filtrarlos en la lista.', () => abrirBuscarPorEquipo());
-    poner('suspension', 'rmd-suspension', ICONO_SUSPENDER, 'Suspensión masiva', 'Suspende varios RMD autorizados a la vez (pegando sus códigos) con el Guardar de "Asociar fórmulas", agrega el motivo a sus Observaciones y exporta el detalle.', () => abrirSuspensionMasiva());
+    const viejoEq = barra.querySelector('.rmd-buscar-equipo'); if (viejoEq) viejoEq.remove();   // (v1.23-1.27: botón; ahora es el filtro "Equipo" de la barra de filtros)
+    const viejoSus = barra.querySelector('.rmd-suspension'); if (viejoSus) viejoSus.remove();   // (v1.23-1.27: botón; ahora "Modificaciones masivas" en el panel de mejoras y Ctrl+K)
+    void poner;
   }
   // ---- Botones del script en la barra de la lista principal (v1.24): a la IZQUIERDA de la barra vertical que separa los iconos
   // del portal (Nuevo RMD, Configurar, Exportar), siempre en este orden.
@@ -3979,14 +4033,16 @@
     let a = contenedor.querySelector(':scope > .rmd-receta-aviso') || contenedor.querySelector('.rmd-receta-aviso');
     const hay = r && (r.desactualizadas.length || r.conRuta.length);
     if (!hay) { if (a) a.remove(); return; }
-    const partes = [];
-    if (r.desactualizadas.length) partes.push(`⚠ <b>Lista de materiales actualizada en SAP</b> en ${r.desactualizadas.length} receta(s): ${r.desactualizadas.map((x) => `<b>${esc(x.receta)}</b> (${esc(resumenDif(x.dif))})`).join(' · ')}. Para traer la nueva: <b>Eliminar Receta</b> → <b>Agregar Producto</b> → asociarla de nuevo.`);
-    if (r.conRuta.length) partes.push(`⚠ <b>Hoja de ruta o puesto de trabajo distinto en SAP</b> en ${r.conRuta.length} receta(s): ${r.conRuta.map((x) => `<b>${esc(x.receta)}</b>`).join(' · ')}.`);
-    const html = partes.join('<br>') + ` <button type="button" class="rmd-link rmd-receta-detalle">Ver el detalle</button> <span class="rmd-nota">(también con el ⚠ junto al código). Es solo un aviso: no impide autorizar.</span>`;
+    // solo el resumen: el detalle está en el ⚠ junto al código (y con clic en el código de la receta del aviso)
+    const cod = (x) => `<b class="rmd-receta-cod" data-id="${esc(x.mdRecetaId)}">${esc(x.receta)}</b>`, partes = [];
+    if (r.desactualizadas.length) partes.push(`⚠ <b>Lista de materiales actualizada en SAP</b> en ${r.desactualizadas.length} receta(s): ${r.desactualizadas.map(cod).join(', ')}`);
+    if (r.conRuta.length) partes.push(`⚠ <b>Hoja de ruta o puesto de trabajo distinto en SAP</b> en ${r.conRuta.length} receta(s): ${r.conRuta.map(cod).join(', ')}`);
+    const html = partes.join('<br>');
     if (!a) { a = document.createElement('div'); a.className = 'rmd-receta-aviso'; if (antesDe) antesDe.insertAdjacentElement('beforebegin', a); else contenedor.prepend(a); }
     if (a.dataset.html !== html) { a.dataset.html = html; a.innerHTML = html; }
+    a.title = 'Es solo un aviso: no impide autorizar. El detalle está en el ⚠ junto al código de la receta (o haz clic en el código aquí).';
     a.__rmdRes = r;
-    const bd = a.querySelector('.rmd-receta-detalle'); if (bd && !bd.__rmd) { bd.__rmd = true; bd.addEventListener('click', (e) => { e.stopPropagation(); abrirDetalleRecetas(bd, a.__rmdRes.recetas.filter((x) => x.dif.length || x.rutaAvisa), true); }); }
+    if (!a.__rmdClic) { a.__rmdClic = true; a.addEventListener('click', (e) => { const b = e.target.closest('.rmd-receta-cod'); if (!b) return; e.stopPropagation(); const x = a.__rmdRes.recetas.find((y) => y.mdRecetaId === b.dataset.id); if (x) abrirDetalleRecetas(b, [x], true); }); }
   }
   // Detalle: tarjeta flotante junto al icono (o al botón del aviso), con una tabla por receta
   function detalleRecetaHtml(x) {
@@ -4659,8 +4715,10 @@
     const ctrl = controladorPrincipal(), lista = !!(ctrl && botonExportar());
     const clic = (sel) => () => { const b = document.querySelector(sel); if (b) b.click(); };
     return [
-      lista && on('buscarequipo') && ['Buscar por equipo', 'RMD que tienen un equipo, instrumento o material', () => abrirBuscarPorEquipo()],
-      lista && on('suspension') && ['Suspensión masiva', 'Suspender varios RMD autorizados a la vez', () => abrirSuspensionMasiva()],
+      lista && on('buscarequipo') && ['Filtrar por equipo', 'Ir a la tarjeta "Equipo" de la barra de filtros', () => enfocarFiltroEquipo()],
+      lista && on('buscarequipo') && ['Buscar por equipo (detalle y Excel)', 'Qué master tienen un equipo, con su etapa, área y planta', () => abrirBuscarPorEquipo()],
+      lista && on('suspension') && ['Modificaciones masivas', 'Suspender varios master o agregarles una observación', () => abrirModificacionesMasivas('suspender')],
+      lista && on('suspension') && ['Observación masiva', 'Agregar una línea a las Observaciones de varios master', () => abrirModificacionesMasivas('observacion')],
       lista && on('exportar') && ['Exportar…', 'Exportado original, Equipos por master, Indicadores, Documentos citados', () => { const b = botonExportar(); const c = b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); if (c) c.firePress(); }],
       lista && on('equipos') && ['Equipos por master', 'Excel de todos los master con sus equipos', () => abrirEquiposPorMaster()],
       lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
@@ -4740,6 +4798,7 @@
     e.preventDefault(); e.stopPropagation(); abrirPaleta();
   }, true);
   // RMD abierto: se anota en recientes y la pestaña del navegador lleva su código (útil con varias pestañas del portal)
+  const abrevEtapa = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);   // FABRICACION → FAB
   let rmdAbiertoId = null, tituloOriginal = null, tituloPuesto = null;
   function gestionarRmdAbierto() {
     const raiz = dialogos().find((x) => /^\d{6,}\s*-/.test(cabecera(x)) || /^Asociar F[oó]rmula/i.test(cabecera(x)));
@@ -4749,7 +4808,7 @@
       if (rmdAbiertoId !== md.mdId) { rmdAbiertoId = md.mdId; if (on('paleta') || on('saludo')) anotarReciente(md); }
       if (on('titulo')) {
         if (norm(doc.title) !== tituloPuesto) tituloOriginal = doc.title;                 // el título del portal (o el que puso el launchpad después)
-        const t = norm(`${md.codigo} · ${String(md.descripcion || '').slice(0, 40)} — ${tituloOriginal}`);   // (el navegador junta los espacios del título)
+        const t = norm(`${abrevEtapa(md.nivelTxt) || md.codigo} - ${String(md.descripcion || '').slice(0, 45)} — ${tituloOriginal}`);   // FAB / ENV / ACO / INS / REC - descripción (el navegador junta los espacios)
         if (norm(doc.title) !== t) doc.title = t;
         tituloPuesto = t; return;
       }
@@ -4759,6 +4818,135 @@
   }
   window.__rmdStats.productividad = { leerRecientes, primerNombre, codigoUsuario: () => codigoUsuario(controladorPrincipal()), misRmd: () => misRmd(controladorPrincipal()), resumen: () => resumenPersonal(controladorPrincipal()), abrirPaleta, abrirRmdPorCodigo, saludoDelMomento,
     saludar: () => { saludoHecho = false; try { localStorage.removeItem(CLAVE_SALUDO); } catch (e) { /* sin almacenamiento */ } document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove()); gestionarSaludo(); } };   // (pruebas)
+  // ---- Filtro "Equipo" en la barra de filtros de la lista principal (v1.28; reemplaza al botón "Buscar por equipo") ----
+  // Es una tarjeta más del FilterBar del portal (FilterGroupItem, como Código RMD o Planta): se escribe el código o el nombre de un
+  // equipo, instrumento, utensilio o agrupador (con sugerencias del catálogo) y "Ir" muestra solo los master que lo tienen, junto con
+  // los demás filtros. Cómo: la lista la lee el portal con onGetMd(filtros) de 100 en 100; con el filtro activo se hace la MISMA lectura
+  // (mismos filtros, mismo $expand y orden) añadiendo los mdId de los master con ese equipo, en bloques de 30 (la URL no debe crecer),
+  // y se devuelve todo de una vez. "Restablecer" lo vacía. También: "Código Agrupador" pasa a "Agrupador" y las tarjetas se estrechan
+  // para que entren todas en una fila.
+  const EXPAND_LISTA_MD = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,destinatariosMD/usuarioId,aStatusProceso/estadoIdProceso,aStatusProceso/mdId,aReceta/recetaId,aTrazabilidad/estadoTrazab';
+  const filtroEquipo = { item: null, input: null, ids: null, texto: '', resumen: '' };
+  function barraFiltrosPrincipal() {
+    const lab = [...document.querySelectorAll('.sapUiCompFilterBar label, .sapUiCompFilterBar .sapMLabel')].find((l) => !l.closest('.sapMDialog') && /^Codigo RMD/i.test(norm(l.textContent)));
+    const fbDom = lab && lab.closest('.sapUiCompFilterBar'); return fbDom ? sap.ui.getCore().byId(fbDom.id) : null;
+  }
+  // lo escrito en la tarjeta (el valor del control de UI5 solo se actualiza al salir del campo o con Enter)
+  const valorEquipo = () => { const i = filtroEquipo.input; if (!i) return ''; const d = i.getDomRef('inner'), v = norm(d ? d.value : i.getValue()); if (v !== i.getValue()) i.setValue(v); return v; };
+  async function prepararFiltroEquipo(modelo) {
+    const texto = valorEquipo();
+    if (!texto) { filtroEquipo.ids = null; filtroEquipo.texto = ''; filtroEquipo.resumen = ''; return; }
+    if (texto === filtroEquipo.texto && filtroEquipo.ids) return;       // misma búsqueda: se reutiliza
+    const pasos = window.__rmdStats.filtroEquipoPasos = ['catálogo ' + Date.now()];
+    const cat = await cargarCatalogoEquipos(modelo), q = SIN_ACENTOS(texto.replace(/\s+·\s+.*$/, '')).trim(), palabras = q.split(/\s+/);
+    pasos.push('catálogo listo ' + cat.length);
+    const exacto = cat.filter((x) => SIN_ACENTOS(x.codigo) === q);
+    const coinciden = exacto.length ? exacto : cat.filter((x) => { const t = SIN_ACENTOS(x.codigo + ' ' + x.desc + ' ' + x.extra); return palabras.every((w) => t.includes(w)); });
+    const items = coinciden.slice(0, MAX_EQUIPOS_BUSQUEDA), filas = items.length ? await mastersConEquipos(modelo, items) : [];
+    filtroEquipo.ids = [...new Set(filas.map((x) => x.md.mdId).filter(Boolean))]; filtroEquipo.texto = texto; pasos.push('master ' + filtroEquipo.ids.length);
+    filtroEquipo.resumen = !coinciden.length ? `Ningún equipo, utensilio o agrupador coincide con "${texto}".`
+      : `Equipo "${texto}": ${items.length} coincidencia(s)${coinciden.length > items.length ? ` (de ${coinciden.length}; afina la búsqueda)` : ''} en ${filtroEquipo.ids.length} master.`;
+  }
+  async function leerListaConEquipo(ctrl, filtros, ocupado_) {
+    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, ids = filtroEquipo.ids || [];
+    if (!filtros || !filtros.length) return { results: [] };            // "Growing" (más filas): ya se trajo todo de una vez
+    if (ocupado_) sap.ui.core.BusyIndicator.show(0);
+    try {
+      const partes = []; for (let i = 0; i < ids.length; i += 30) partes.push(ids.slice(i, i + 30));
+      const res = (await Promise.all(partes.map((p) => new Promise((ok, mal) => modelo.read('/MD', {
+        filters: filtros.concat([new F({ filters: p.map((id) => new F('mdId', 'EQ', id)), and: false })]),
+        urlParameters: { $expand: EXPAND_LISTA_MD, $top: '1000', $orderby: 'fechaRegistro desc' }, success: (d) => ok((d && d.results) || []), error: mal,
+      }))))).flat();
+      res.sort((a, b) => b.codigo - a.codigo || b.version - a.version);
+      (window.__rmdStats.filtroEquipoPasos || []).push('lista ' + res.length);
+      return { results: res };
+    } finally { if (ocupado_) sap.ui.core.BusyIndicator.hide(); }
+  }
+  function gestionarFiltroEquipo() {
+    if (typeof sap === 'undefined') return;
+    const ctrl = controladorPrincipal(), fb = ctrl && barraFiltrosPrincipal(); if (!fb || !fb.getFilterGroupItems) return;
+    const items = fb.getFilterGroupItems();
+    compactarBarraFiltros(fb, items);
+    if (!on('buscarequipo')) {
+      if (filtroEquipo.item) { fb.removeFilterGroupItem(filtroEquipo.item); filtroEquipo.item.destroy(); filtroEquipo.item = filtroEquipo.input = null; filtroEquipo.ids = null; }
+      return;
+    }
+    if (!filtroEquipo.item || filtroEquipo.item.bIsDestroyed || !items.includes(filtroEquipo.item)) {
+      const FGI = sap.ui.require('sap/ui/comp/filterbar/FilterGroupItem'), Input = sap.ui.require('sap/m/Input'), ListItem = sap.ui.require('sap/ui/core/ListItem');
+      if (!FGI || !Input || !ListItem) return;
+      const inp = new Input({ placeholder: 'Código o nombre', showSuggestion: true, filterSuggests: false, width: '100%', tooltip: 'Equipo, instrumento, material, utensilio o agrupador: código o parte del nombre. "Ir" muestra solo los master que lo tienen (con los demás filtros).' });
+      let pedido = 0;
+      inp.attachSuggest((e) => {
+        const q = SIN_ACENTOS(e.getParameter('suggestValue') || '').trim(), n = ++pedido; if (q.length < 2) return;
+        cargarCatalogoEquipos((controladorPrincipal() || ctrl).getView().getModel('mainModelv2')).then((cat) => {
+          if (n !== pedido) return; const palabras = q.split(/\s+/);
+          const c = cat.filter((x) => { const t = SIN_ACENTOS(x.codigo + ' ' + x.desc + ' ' + x.extra); return palabras.every((w) => t.includes(w)); }).slice(0, 15);
+          inp.destroySuggestionItems(); c.forEach((x) => inp.addSuggestionItem(new ListItem({ key: x.codigo || x.desc, text: x.codigo ? `${x.codigo} · ${x.desc}` : x.desc, additionalText: x.tipo.toLowerCase() })));
+        }, () => {});
+      });
+      inp.attachSuggestionItemSelected((e) => { const it = e.getParameter('selectedItem'); if (it) inp.setValue(it.getKey()); });
+      const it = new FGI({ groupName: 'MANGROUP', name: 'RMDEQUIPO', label: 'Equipo', labelTooltip: 'Master que tienen este equipo, instrumento, material, utensilio o agrupador', visibleInFilterBar: true, control: inp });
+      fb.addFilterGroupItem(it);                                          // (insertFilterGroupItem no la dibuja: el FilterBar solo actualiza su barra con add)
+      filtroEquipo.item = it; filtroEquipo.input = inp;
+    }
+    // "Ir": antes de la búsqueda del portal se calculan los master con el equipo; la lectura de la lista los incluye (onGetMd)
+    const regS = ((fb.mEventRegistry || {}).search || [])[0];
+    if (regS && !regS.fFunction.__rmdEquipo) {
+      const orig = regS.fFunction;
+      const w = async function (e) {
+        const modelo = (controladorPrincipal() || ctrl).getView().getModel('mainModelv2');   // el modelo vigente (el portal lo reemplaza al arrancar)
+        const yo = this, fuente = e && e.getSource && e.getSource(), ev = { sId: 'search', getSource: () => fuente, getParameter: () => undefined, getParameters: () => ({}) };
+        window.__rmdStats.filtroEquipoInicio = Date.now();   // (pruebas)
+        if (valorEquipo()) {
+          sap.ui.core.BusyIndicator.show(0);
+          try { await prepararFiltroEquipo(modelo); } catch (err) { filtroEquipo.ids = null; toast('No se pudo filtrar por equipo: ' + err.message, true); } finally { sap.ui.core.BusyIndicator.hide(); }
+        } else await prepararFiltroEquipo(modelo);
+        const r = await orig.call(yo, ev);
+        window.__rmdStats.filtroEquipo = { texto: filtroEquipo.texto, masters: filtroEquipo.ids ? filtroEquipo.ids.length : null, t: Date.now() };   // (pruebas)
+        if (filtroEquipo.ids) toast(filtroEquipo.resumen + ' La lista muestra los que cumplen también los demás filtros.', !filtroEquipo.ids.length);
+        return r;
+      };
+      w.__rmdEquipo = orig; regS.fFunction = w;
+    }
+    const regR = ((fb.mEventRegistry || {}).reset || [])[0];
+    if (regR && !regR.fFunction.__rmdEquipo) {
+      const orig = regR.fFunction; const w = function () { if (filtroEquipo.input) filtroEquipo.input.setValue(''); filtroEquipo.ids = null; filtroEquipo.texto = ''; return orig.apply(this, arguments); };
+      w.__rmdEquipo = orig; regR.fFunction = w;
+    }
+    if (!ctrl.__rmdOnGetMd && typeof ctrl.onGetMd === 'function') {
+      const orig = ctrl.onGetMd; ctrl.__rmdOnGetMd = orig;
+      ctrl.onGetMd = function (filtros, formula, valor, ocupado_) { return filtroEquipo.ids ? leerListaConEquipo(ctrl, filtros, ocupado_) : orig.apply(this, arguments); };
+    }
+  }
+  // "Código Agrupador" → "Agrupador", "Restablecer" → ⟳ rojo (se usa poco) y tarjetas más estrechas para que entren todas en una fila
+  function compactarBarraFiltros(fb, items) {
+    const agr = items.find((x) => x.getName() === 'D'), dom = fb.getDomRef(), layout = dom && sap.ui.getCore().byId((dom.querySelector('.sapUiAFLayout') || {}).id);
+    const rest = dom && [...dom.querySelectorAll('button')].map((b) => sap.ui.getCore().byId(b.id.replace(/-(inner|img)$/, ''))).find((c) => c && c.getText && (c.getText() === 'Restablecer' || c.__rmdRestablecer));
+    if (!on('barrafiltros')) {
+      if (agr && agr.getLabel() === 'Agrupador') agr.setLabel('Código Agrupador');
+      if (layout && layout.__rmdAncho) { layout.setMinItemWidth(layout.__rmdAncho); delete layout.__rmdAncho; }
+      if (rest && rest.__rmdRestablecer) { rest.setText('Restablecer'); rest.setIcon(''); rest.setTooltip(''); rest.removeStyleClass('rmd-restablecer-ui5'); delete rest.__rmdRestablecer; }
+      return;
+    }
+    if (agr && agr.getLabel() === 'Código Agrupador') { agr.setLabel('Agrupador'); if (agr.getControl().setPlaceholder) agr.getControl().setPlaceholder('Agrupador'); }
+    if (layout && layout.setMinItemWidth && !layout.__rmdAncho) { layout.__rmdAncho = layout.getMinItemWidth(); layout.setMinItemWidth('9rem'); }
+    if (rest && !rest.__rmdRestablecer) { rest.__rmdRestablecer = true; rest.setText(''); rest.setIcon('sap-icon://refresh'); rest.setTooltip('Restablecer los filtros'); rest.addStyleClass('rmd-restablecer-ui5'); }
+  }
+  function enfocarFiltroEquipo() {
+    if (!filtroEquipo.input || !filtroEquipo.input.getDomRef()) { toast('Activa "Filtro Equipo" en el panel de mejoras y abre la lista principal.', true); return; }
+    filtroEquipo.input.focus();
+  }
+  // Columna "Etapa" de la lista principal: el portal la deja en 70 px y "ACONDICIONADO" se partía en tres líneas
+  function gestionarColumnaEtapa() {
+    const ctrl = controladorPrincipal(), lista = ctrl && ctrl.getView().byId('idTblConfigurationRmd'); if (!lista || !lista.getColumns) return;
+    const col = lista.getColumns().find((c) => { const h = c.getHeader && c.getHeader(); return h && h.getText && h.getText() === 'Etapa'; }); if (!col) return;
+    if (!on('columnas')) { if (col.__rmdAncho) { col.setWidth(col.__rmdAncho); delete col.__rmdAncho; } return; }
+    if (col.__rmdAncho) return;
+    const celda = lista.getDomRef() && lista.getDomRef().querySelector('tbody td'); if (!celda) return;
+    const cv = document.createElement('canvas').getContext('2d'); cv.font = `600 ${getComputedStyle(celda).fontSize} ${getComputedStyle(celda).fontFamily}`;
+    const ancho = Math.ceil(Math.max(...['ACONDICIONADO', 'FABRICACION', 'ENVASE'].map((t) => cv.measureText(t).width))) + 24;
+    col.__rmdAncho = col.getWidth(); col.setWidth(ancho + 'px');
+  }
   // diagnóstico: el libro de equipos sin descargarlo (pruebas de solo lectura en el portal)
   window.__rmdStats.equiposSinDescargar = async (estados = ['Autorizado', 'Ingresado']) => {
     const modelo = modeloListaPrincipal(), t0 = Date.now();
@@ -5051,7 +5239,7 @@
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
-    ['Productividad', ['saludo', 'paleta', 'titulo']],
+    ['Productividad', ['saludo', 'paleta', 'titulo', 'barrafiltros']],
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
     ['Alertas', ['reglas', 'ordenest', 'recetas', 'recetaruta', 'sintipo', 'puesto']],
     ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'exportar', 'statusrmd', 'indicadores', 'equipos', 'citastodos', 'buscarequipo', 'suspension', 'recetas', 'recetasvarias', 'puestoreceta', 'repetirpaso', 'editarpaso', 'formulas', 'revisor', 'vivo', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
@@ -5062,6 +5250,7 @@
     const p = document.createElement('details'); p.id = 'rmd-ui-panel';
     p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
       '<div class="rmd-panel-cab"><b>Mejoras de interfaz</b><span>v' + VERSION + '</span></div>' + fila('activo', 'maestro') +
+      '<div class="rmd-panel-acciones"><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
       GRUPOS_PANEL.map(([t, ks]) => `<div class="rmd-grupo">${t}</div>` + ks.map((k) => fila(k)).join('')).join('') +
       '<div class="rmd-panel-pie"><span>Ctrl+K = Ir a… · Ctrl+S = Guardar</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
     const refrescar = () => p.querySelectorAll('input[data-k]').forEach((i) => { i.checked = !!opc[i.dataset.k]; });
@@ -5071,6 +5260,7 @@
       document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => { if (c.style.display === 'none') c.style.display = ''; });
       ajustarTodo();
     });
+    p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { p.open = false; abrirModificacionesMasivas('suspender'); });
     p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = true; }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
     panelEl = p; montarPanel();
   }
