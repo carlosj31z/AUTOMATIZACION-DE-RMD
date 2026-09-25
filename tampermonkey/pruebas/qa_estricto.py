@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W X; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W X Y; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -13,7 +13,8 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   y un cortafuegos (no escribe) · V v1.24: barra, pasos repetidos en la barra de seleccionados (simulado), recetas desactualizadas, RMD en vivo y documentos
   citados de todos los master (no escribe) · W v1.25: revisores, Editar Paso usado en otros RMD, fórmulas, varias recetas, puesto de trabajo y RMD en vivo
   que salta al cambio (escrituras simuladas + cortafuegos: no escribe) · X v1.26: saludo, Ir a… (Ctrl+K), recientes, título de la pestaña
-  y rendimiento del script (solo abre y cierra ventanas; cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  y rendimiento del script (solo abre y cierra ventanas; cortafuegos) · Y v1.27: recetas frente a SAP en Asociar fórmulas (⚠ con el detalle,
+  aviso al día al quitar una receta, hoja de ruta; cambios solo en memoria + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -36,9 +37,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWXD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWXYD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVWX).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVWXY).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -1430,6 +1431,60 @@ with sync_playwright() as p:
         @prueba("X6 Ninguna petición de escritura salió del navegador durante el bloque X")
         def _():
             return (not bloq_x), str(bloq_x[:5])
+
+    # ───────────────────────── Y. v1.27: recetas frente a SAP en "Asociar fórmulas" (no escribe: cambios SOLO EN MEMORIA + cortafuegos) ─────────────────────────
+    if "Y" in SOLO:
+        RMD_BOM = os.environ.get("RMD_BOM", "2202609113")   # RMD con una receta cuya lista de materiales cambió en SAP
+        CTRLY = "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar'); return sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener; })()"
+        ESTADOY = "() => { const d = [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).pop(); return { aviso: ((d.querySelector('.rmd-receta-aviso') || {}).innerText || ''), iconos: [...d.querySelectorAll('.rmd-rec-icono')].length }; }"
+        bloq_y = []
+        def guardia_y(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_y.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_y)
+        cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
+        def opcion_y(etiqueta, marcar):
+            fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); loc = fr.locator(f"#rmd-ui-panel label:has-text('{etiqueta}') input")
+            (loc.check() if marcar else loc.uncheck()); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+        try:
+            ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_BOM)); pg.wait_for_timeout(3000); ra.configuracion.elegir_accion("Asociar fórmulas")
+            @prueba("Y1 Receta con la lista de materiales cambiada: aviso compacto y ⚠ junto al código; al pasar el ratón, tabla con componente, descripción, en el RMD → en SAP hoy (reemplazos agrupados)")
+            def _():
+                fr.wait_for_selector(".rmd-rec-icono", timeout=60000); pg.wait_for_timeout(1200)
+                e = fr.evaluate(ESTADOY)
+                fr.locator(".rmd-rec-icono").first.hover(); pg.wait_for_timeout(900)
+                t = fr.evaluate("(() => { const t = document.querySelector('.rmd-rec-detalle'); return t && { filas: t.querySelectorAll('tbody tr').length, cab: [...t.querySelectorAll('thead th')].map(x => x.textContent), texto: t.innerText.slice(0, 300) }; })()")
+                pg.mouse.move(5, 5); pg.wait_for_timeout(700); cierra = not fr.evaluate("!!document.querySelector('.rmd-rec-detalle')")
+                ok = ("Lista de materiales actualizada en SAP" in e["aviso"] and "no impide autorizar" in e["aviso"] and e["iconos"] >= 1 and t and t["filas"] >= 1
+                      and t["cab"][1:] == ["Componente", "Descripción", "En el RMD", "En SAP hoy"] and cierra)
+                return ok, f"{e['aviso'][:160]!r} iconos={e['iconos']} detalle={t} se cierra al salir={cierra}"
+            @prueba("Y2 Al quitar la receta de la tabla (como hace el portal al eliminarla; aquí SOLO EN MEMORIA) el aviso y el ⚠ desaparecen sin cerrar la ventana, y vuelven si la receta vuelve")
+            def _():
+                fr.evaluate("() => { const m = " + CTRLY + ".getView().getModel('listMdReceta'); window.__recY = m.getData().slice(); const des = document.querySelector('.rmd-rec-icono').__rmdRes.mdRecetaId; m.setData(m.getData().filter(x => x.mdRecetaId !== des)); }")
+                pg.wait_for_timeout(2500); sin = fr.evaluate(ESTADOY)
+                fr.evaluate("() => { " + CTRLY + ".getView().getModel('listMdReceta').setData(window.__recY); }"); pg.wait_for_timeout(2500); con = fr.evaluate(ESTADOY)
+                return (sin["aviso"] == "" and sin["iconos"] == 0 and "Lista de materiales" in con["aviso"] and con["iconos"] >= 1), f"sin la receta={sin} con la receta={{'iconos': {con['iconos']}}}"
+            @prueba("Y3 Hoja de ruta / puesto (opción apagada por defecto): con la opción y un puesto y hoja de ruta distintos en la receta asociada (SOLO EN MEMORIA), el detalle muestra asociada → SAP hoy")
+            def _():
+                por_defecto = fr.evaluate("document.querySelector(\"#rmd-ui-panel input[data-k='recetaruta']\").checked")
+                opcion_y("hoja de ruta o puesto", True); pg.wait_for_timeout(600)
+                try:
+                    fr.evaluate("() => { const r = " + CTRLY + ".getView().getModel('listMdReceta').getData()[0].recetaId; window.__rcY = { Mdv01: r.Mdv01, Plnnr: r.Plnnr }; r.Mdv01 = 'PUESTOVIEJO'; r.Plnnr = '999'; }")
+                    fr.locator(".rmd-revisar-recetas").click(); pg.wait_for_timeout(9000)
+                    e = fr.evaluate(ESTADOY); fr.locator(".rmd-rec-icono").first.click(); pg.wait_for_timeout(900)
+                    t = fr.evaluate("(() => { const t = document.querySelector('.rmd-rec-detalle'); return t && { fijo: t.classList.contains('fijo'), filas: [...t.querySelectorAll('tbody tr')].map(r => r.innerText.replace(/\\s+/g, ' ')).filter(x => /Puesto de trabajo|Hoja de ruta/.test(x)) }; })()")
+                    pg.keyboard.press("Escape"); pg.wait_for_timeout(400)
+                finally:
+                    fr.evaluate("() => { try { Object.assign(" + CTRLY + ".getView().getModel('listMdReceta').getData()[0].recetaId, window.__rcY || {}); } catch (e) {} }")
+                    opcion_y("hoja de ruta o puesto", False)
+                ok = (not por_defecto and "Hoja de ruta o puesto de trabajo distinto en SAP" in e["aviso"] and t and t["fijo"] and any("PUESTOVIEJO" in x for x in t["filas"]) and any(x.startswith("Hoja de ruta 999") for x in t["filas"]))
+                return ok, f"por defecto={por_defecto} detalle={t}"
+            cerrar_seguro()
+        finally:
+            pg.unroute("**/*", guardia_y)
+        @prueba("Y4 Ninguna petición de escritura salió del navegador durante el bloque Y")
+        def _():
+            return (not bloq_y), str(bloq_y[:5])
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

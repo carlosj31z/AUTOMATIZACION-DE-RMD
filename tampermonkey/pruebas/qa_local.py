@@ -352,6 +352,19 @@ with sync_playwright() as p:
         ok = (a["abierta"] and a["foco"] == "rmd-paleta-q" and any("Mejoras de interfaz" in x for x in a["items"]) and b_ and all("Mejoras" in x for x in b_)
               and not c["paleta"] and c["dialogos"] == 1 and h == ["Buenos días", "Buenos días", "Buenas tardes", "Buenas tardes", "Buenas noches", "Buenas noches", "Buenas noches"])
         return ok, f"{a} filtrado={b_} tras Esc={c} saludos={h}"
+    @prueba("LN14 Recetas: la comparación con SAP separa cantidad cambiada, material reemplazado por otra versión ('… x25' → '… x25 H v.1'), nuevo y quitado, y el detalle lo muestra en tabla")
+    def _():
+        r = pg.evaluate("""() => { const S = window.__rmdStats;
+          const rmd = [{ Component: '100', Maktx: 'CJA PRODUCTO x25', CompQty: '0.34', CompUnit: 'MLL' }, { Component: '200', Maktx: 'FOLLETO PRODUCTO', CompQty: '0.34', CompUnit: 'MLL' },
+                       { Component: '300', Maktx: 'GRANEL', CompQty: '500', CompUnit: 'kg' }, { Component: '400', Maktx: 'TAPA VIEJA', CompQty: '1', CompUnit: 'UN' }];
+          const sap = [{ Component: '110', Maktx: 'CJA PRODUCTO x25 H v.1', CompQty: '0.34', CompUnit: 'MLL' }, { Component: '200', Maktx: 'FOLLETO PRODUCTO', CompQty: '0.34', CompUnit: 'MLL' },
+                       { Component: '300', Maktx: 'GRANEL', CompQty: '520', CompUnit: 'kg' }, { Component: '500', Maktx: 'CINTA EMBALAJE', CompQty: '0.5', CompUnit: 'ROL' }];
+          const d = S.diferenciasBom(sap, rmd);
+          const html = S.detalleRecetaHtml({ receta: 'X / 1', texto: 'PRUEBA', dif: d, sap: 4, rmd: 4, ruta: null, rutaAvisa: false });
+          const div = document.createElement('div'); div.innerHTML = html;
+          return { tipos: d.map(x => x.tipo + ':' + x.comp + (x.compAntes ? '<' + x.compAntes : '')), filas: div.querySelectorAll('tbody tr').length, delta: (div.querySelector('.rmd-rec-delta') || {}).textContent, reemplazo: (div.querySelector('tr.rmd-rec-reemplazo') || {}).innerText }; }""")
+        ok = (r["tipos"] == ["cambia:300", "reemplazo:110<100", "nuevo:500", "quitado:400"] and r["filas"] == 4 and r["delta"] == "(+20)" and "100" in (r["reemplazo"] or "") and "110" in (r["reemplazo"] or ""))
+        return ok, json.dumps(r, ensure_ascii=False)
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
