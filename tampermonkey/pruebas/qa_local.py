@@ -323,6 +323,21 @@ with sync_playwright() as p:
         pasos = abrir(pg, PRECAUCIONES); clasesPasos = pg.evaluate("(id) => [...document.getElementById(id).classList].filter(c => c.startsWith('rmd-'))", pasos)
         pg.evaluate("document.getElementById('__dialogRaiz').remove()"); cerrar_todo(pg)
         return (clases == [] and "rmd-g" in clasesPasos), f"raíz={clases} pasos={clasesPasos}"
+    @prueba("LN12 RMD en vivo: se detecta el tramo cambiado (paso agregado con renumeración = su fila entera, número cambiado, minúsculas, contenido quitado) y no una fecha")
+    def _():
+        r = pg.evaluate("""() => { const V = window.__rmdStats.vivo;
+          const doc = (pasos, fecha) => ({ content: [{ text: 'PROCEDIMIENTO' }, { text: 'Impreso ' + (fecha || '01/09/2026 10:00') }, { table: { body: pasos.map((p, i) => ['4.' + (i + 1), p, { text: '' }]) } }, 'FIN'] });
+          const base = ['PESAR 10 kg', 'MEZCLAR', 'TAMIZAR', 'ENVASAR'], s = (d) => V.bloquesDoc(d.content).map(b => b.s);
+          const t = (a, b) => V.tramoCambiado(s(a), s(b));
+          const agregado = t(doc(base), doc(['PESAR 10 kg', 'MEZCLAR', 'PASO NUEVO', 'TAMIZAR', 'ENVASAR']));
+          const bl = s(doc(['PESAR 10 kg', 'MEZCLAR', 'PASO NUEVO', 'TAMIZAR', 'ENVASAR']));
+          return { agregado, textoAgregado: bl.slice(agregado.desde, agregado.hasta), numero: t(doc(base), doc(['PESAR 12 kg', 'MEZCLAR', 'TAMIZAR', 'ENVASAR'])),
+            quitado: t(doc(base), doc(['PESAR 10 kg', 'TAMIZAR', 'ENVASAR'])), soloFecha: t(doc(base), doc(base, '02/09/2026 11:30')), igual: t(doc(base), doc(base)),
+            minusculas: t(doc(base), doc(['PESAR 10 kg', 'Mezclar', 'TAMIZAR', 'ENVASAR'])) }; }""")
+        ok = (r["agregado"]["tipo"] == "nuevo" and r["textoAgregado"] == ["4.3", "PASO NUEVO"]
+              and r["numero"] and r["numero"]["tipo"] == "cambio" and r["quitado"] and r["quitado"]["tipo"] == "borrado"
+              and r["soloFecha"] is None and r["igual"] is None and r["minusculas"] and r["minusculas"]["tipo"] == "cambio")
+        return ok, json.dumps(r, ensure_ascii=False)[:600]
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]

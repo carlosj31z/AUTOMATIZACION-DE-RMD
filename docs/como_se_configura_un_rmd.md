@@ -62,7 +62,8 @@ cuando la unidad es entera: cajas, folios); "Sin tipo de dato" usa 0. **Decimal 
 
 Diálogo "Fórmulas": lista de pasos disponibles y lista de la fórmula; el select "Seleccionar signo"
 ofrece `( ) + - * /` y `CT`; hay un campo "Ingrese Cantidad" para constantes (`* 100`). La fórmula se
-arma **por orden de inserción** (no se reordena) y una vista previa muestra p. ej.
+arma **por orden de inserción** (el portal no la reordena; el Guardar graba el orden de cada término según
+su posición en la lista, así que el userscript v1.25 añade Subir / Bajar) y una vista previa muestra p. ej.
 `5275 / 5533 * 100`. Sin signos entre pasos la fórmula queda mal (`5224  181147`).
 
 ## 4. Notificaciones (Tipo Dato = Notificacion)
@@ -293,3 +294,23 @@ Cada fila de la ventana **Especificaciones** es un registro `MD_ES_ESPECIFICACIO
 - El userscript añade a esa misma actualización de cada fila los textos y el orden que el usuario haya cambiado (`model.update` del propio portal, sin otra vía), y solo
   permite reordenar cuando ninguna fila viene de SAP. Los objetos de las filas se comparten en memoria con el resto del portal, por eso, si se cierra la ventana sin guardar,
   el script restablece lo último guardado.
+
+## 5 octies. Pasos compartidos entre RMD, selector de pasos y recetas (leído del código de la app, solo lectura)
+
+- Un **PASO** (catálogo) puede estar en muchos RMD: MD_ES_PASO (paso mayor) y MD_ES_PASO_INSUMO_PASO (proceso
+  menor) apuntan a él. **Editar Paso → Grabar** (`onGrabarPasoPadre`): si el paso está en otro RMD
+  **Autorizado o Suspendido**, pregunta "El paso se encuentra en otro RMD. ¿Desea generar uno nuevo?" y crea
+  un PASO nuevo con el siguiente código **aunque ya exista otro con la misma descripción** (de ahí los pasos
+  duplicados con distinto código). Si no, pregunta "¿Está seguro de editar el Paso?" y **sobrescribe** el
+  PASO: el cambio aparece también en los demás RMD **Ingresados** que lo usan, sin avisar. El userscript v1.25
+  pregunta antes (generar nuevo / sobrescribir, con los RMD afectados) y reutiliza el paso existente si ya
+  hay uno con esa descripción.
+- **Adicionar Pasos → Agregar** (`onAsignPasoToEstructura`) agrega, en orden, un paso por cada elemento de la
+  barra de seleccionados (modelo `aSeleccionadoPaso`), con orden = pasos actuales + posición. El portal acepta
+  el mismo paso varias veces en una etiqueta (hay RMD así); lo que lo impedía era la barra, que quitaba los
+  repetidos al marcar otra fila.
+- **Recetas y puesto de trabajo**: en los RMD leídos, todas las recetas asociadas a un mismo RMD tienen el
+  mismo puesto de trabajo principal (`Mdv01` de la receta); el portal no lo comprueba al asociar (v1.25 sí).
+- **Producción Estatus**: los destinatarios del envío a revisión están en `destinatariosMD` del RMD (tipo
+  DJEFPROD = jefe de producción, DGERPROD = gerente, DJEFDOCT = jefe de documentación) con el id de usuario;
+  el nombre sale del catálogo USUARIO.
