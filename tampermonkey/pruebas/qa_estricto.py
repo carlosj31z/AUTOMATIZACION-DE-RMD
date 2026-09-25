@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W X; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -12,7 +12,8 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   y Equipos por master (solo lectura) · T v1.23: menú Exportar, Buscar por equipo y Suspensión masiva con el guardado SIMULADO
   y un cortafuegos (no escribe) · V v1.24: barra, pasos repetidos en la barra de seleccionados (simulado), recetas desactualizadas, RMD en vivo y documentos
   citados de todos los master (no escribe) · W v1.25: revisores, Editar Paso usado en otros RMD, fórmulas, varias recetas, puesto de trabajo y RMD en vivo
-  que salta al cambio (escrituras simuladas + cortafuegos: no escribe) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  que salta al cambio (escrituras simuladas + cortafuegos: no escribe) · X v1.26: saludo, Ir a… (Ctrl+K), recientes, título de la pestaña
+  y rendimiento del script (solo abre y cierra ventanas; cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -35,9 +36,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWXD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVW).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVWX).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -1249,7 +1250,7 @@ with sync_playwright() as p:
     # ───────────────────────── W. v1.25 (no escribe: escrituras SIMULADAS + cortafuegos) ─────────────────────────
     if "W" in SOLO:
         RMD_EDIT = os.environ.get("RMD_EDIT", "2202609126"); FILA_EDIT = int(os.environ.get("FILA_EDIT", "18"))   # fila de Fabricación con un paso usado en otro RMD Ingresado
-        RMD_RECS = os.environ.get("RMD_RECS", "2202609131"); RMD_VIVO = os.environ.get("RMD_VIVO", "2202609133")    # RMD con 2+ recetas · RMD para el PDF en vivo
+        RMD_RECS = os.environ.get("RMD_RECS", "2202609131"); RMD_VIVO = os.environ.get("RMD_VIVO", "2202609126")    # RMD con 2+ recetas · RMD para el PDF en vivo
         RMD_REVISADO = os.environ.get("RMD_REVISADO", "2202609124")                                                    # RMD enviado a revisión (Producción Estatus con jefe)
         TOPW = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
         CTRL = "(() => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar'); return sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener; })()"
@@ -1332,9 +1333,12 @@ with sync_playwright() as p:
                 pg.wait_for_timeout(1500)
                 msg = fr.evaluate("[...document.querySelectorAll('.sapMMessageDialog')].filter(x=>x.getClientRects().length).map(x=>x.innerText.slice(0, 200))")
                 return (r["parche"] and any("Puesto de trabajo distinto" in m for m in msg)), f"{r} {msg}"
-            for _k in range(3):                                                                            # mensaje de error, "Agregar Producto" y "Asociar fórmulas"
+            for _k in range(6):                                                                            # mensaje de error, "Agregar Producto" y "Asociar fórmulas"
                 cerrar_seguro(); pg.wait_for_timeout(1200)
-                if not fr.evaluate("[...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length)"): break
+                quedan = fr.evaluate("() => { const c = document.getElementById('sap-ui-blocklayer-popup'); return { d: [...document.querySelectorAll('.sapMDialog, .sapMPopover')].filter(x => x.getClientRects().length).map(x => (((x.querySelector('h2, header') || {}).textContent) || x.id).trim().slice(0, 40)), capa: !!(c && c.getClientRects().length && getComputedStyle(c).visibility !== 'hidden') }; }")
+                if not quedan["d"] and not quedan["capa"]: break
+                pg.keyboard.press("Escape"); pg.wait_for_timeout(800)
+            print("   (antes de W6 quedaba:", quedan, ")")
             @prueba("W6 RMD en vivo: tras un cambio (hecho SOLO EN MEMORIA) el PDF salta a la página del paso, lo resalta, luego lo muestra normal; sin cambios no recarga")
             def _():
                 fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").check(); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
@@ -1365,6 +1369,67 @@ with sync_playwright() as p:
         @prueba("W7 Ninguna petición de escritura salió del navegador durante el bloque W")
         def _():
             return (not bloq_w), str(bloq_w[:5])
+
+    # ───────────────────────── X. v1.26: saludo, Ir a… (Ctrl+K), recientes y título de la pestaña (no escribe: cortafuegos) ─────────────────────────
+    if "X" in SOLO:
+        RMD_IR = os.environ.get("RMD_IR", "2202609126")
+        bloq_x = []
+        def guardia_x(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_x.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_x)
+        cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
+        RAIZ_ABIERTA = "() => [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^\\d{6,}\\s*-/.test(((d.querySelector('h2') || {}).textContent || '').trim()))"
+        try:
+            @prueba("X1 Saludo discreto abajo a la izquierda ('Buenos días/Buenas tardes/Buenas noches, <nombre>') con el resumen de tus RMD en Ingresado; se desvanece solo")
+            def _():
+                fr.evaluate("window.__rmdStats.productividad.saludar()")
+                fr.wait_for_selector(".rmd-saludo.visible", timeout=20000); pg.wait_for_timeout(2500)
+                s_ = fr.evaluate("() => { const e = document.querySelector('.rmd-saludo'), q = e.getBoundingClientRect(); return { texto: e.innerText, izq: Math.round(q.left), abajo: Math.round(innerHeight - q.bottom), ancho: Math.round(q.width) }; }")
+                pg.wait_for_timeout(8000); sigue = fr.evaluate("!!document.querySelector('.rmd-saludo')")
+                ok = (re.match(r"^(Buenos días|Buenas tardes|Buenas noches)(, \w+)?\n", s_["texto"]) and "RMD en Ingresado" in s_["texto"] and s_["izq"] < 120 and s_["abajo"] < 40 and s_["ancho"] < 500 and not sigue)
+                return ok, f"{s_} ¿sigue a los 10 s?={sigue}"
+            @prueba("X2 Ctrl+K → escribir un código → Enter abre 'Configurar el RMD' (el mismo menú de la fila); la pestaña lleva el código y vuelve a su título al cerrar; queda en Recientes")
+            def _():
+                t0 = pg.title()
+                fr.get_by_text("Configuración Manufactura Digital").first.click(); pg.keyboard.press("Control+k"); pg.wait_for_timeout(700)
+                foco = fr.evaluate("document.activeElement.className"); pg.keyboard.type(RMD_IR); pg.wait_for_timeout(500); pg.keyboard.press("Enter")
+                fr.wait_for_function(RAIZ_ABIERTA, timeout=60000); pg.wait_for_timeout(1500)
+                t1 = pg.title(); rec = fr.evaluate("window.__rmdStats.productividad.leerRecientes().map(x => x.codigo)")
+                cerrar_seguro(); pg.wait_for_timeout(1500); t2 = pg.title()
+                return (foco == "rmd-paleta-q" and t1.startswith(RMD_IR + " · ") and t2 == t0 and rec[:1] == [RMD_IR]), f"foco={foco} pestaña abierta={t1[:70]!r} cerrada={t2!r} (antes {t0!r}) recientes={rec[:3]}"
+            @prueba("X3 Recientes arriba y Alt+Enter = Asociar fórmulas; con una ventana de SAP abierta se puede escribir en la paleta y Esc cierra solo la paleta")
+            def _():
+                pg.keyboard.press("Control+k"); pg.wait_for_timeout(900)
+                secs = fr.evaluate("[...document.querySelectorAll('.rmd-paleta-sec')].map(x => x.textContent)"); primero = fr.evaluate("(document.querySelector('.rmd-paleta-it.activo .cod') || {}).textContent")
+                pg.keyboard.press("Alt+Enter")
+                fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^Asociar F/.test(((d.querySelector('h2') || {}).textContent || '').trim()))", timeout=60000); pg.wait_for_timeout(1200)
+                pg.keyboard.press("Control+k"); pg.wait_for_timeout(700); pg.keyboard.type("equi"); pg.wait_for_timeout(400)
+                sobre = fr.evaluate("({ valor: (document.querySelector('.rmd-paleta-q') || {}).value, foco: document.activeElement.className })")
+                pg.keyboard.press("Escape"); pg.wait_for_timeout(500)
+                tras = fr.evaluate("({ paleta: !!document.querySelector('.rmd-paleta-fondo'), asociar: [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^Asociar F/.test(((d.querySelector('h2') || {}).textContent || '').trim())) })")
+                cerrar_seguro()
+                return (secs[:1] == ["Recientes en este navegador"] and primero == RMD_IR and sobre == {"valor": "equi", "foco": "rmd-paleta-q"} and tras == {"paleta": False, "asociar": True}), f"secciones={secs} primero={primero} sobre ventana={sobre} tras Esc={tras}"
+            @prueba("X4 Herramientas desde Ctrl+K (Buscar por equipo) y 'Continuar con' del saludo abre el último RMD")
+            def _():
+                pg.keyboard.press("Control+k"); pg.wait_for_timeout(600); pg.keyboard.type("buscar por equipo"); pg.wait_for_timeout(300); pg.keyboard.press("Enter"); pg.wait_for_timeout(1200)
+                h3 = fr.evaluate("(document.querySelector('.rmd-modal h3') || {}).textContent"); pg.keyboard.press("Escape"); pg.wait_for_timeout(600)
+                fr.evaluate("window.__rmdStats.productividad.saludar()")
+                fr.wait_for_selector(".rmd-saludo.visible .rmd-saludo-continuar", timeout=20000); txt = fr.evaluate("document.querySelector('.rmd-saludo-continuar').textContent")
+                fr.locator(".rmd-saludo-continuar").click(); fr.wait_for_function(RAIZ_ABIERTA, timeout=60000); pg.wait_for_timeout(1000)
+                abierta = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).map(d => ((d.querySelector('h2') || {}).textContent || '').trim().slice(0, 30))")
+                cerrar_seguro()
+                return (h3 == "Buscar RMD por equipo" and RMD_IR in txt and any(a.startswith(RMD_IR) for a in abierta)), f"herramienta={h3!r} continuar={txt!r} abierta={abierta}"
+            @prueba("X5 Rendimiento del script: cada ajuste de pantalla tarda poco (media < 15 ms, máximo < 150 ms) y sin errores internos")
+            def _():
+                r = fr.evaluate("({ max: window.__rmdStats.ajusteMax, total: window.__rmdStats.ajusteTotalMs, n: window.__rmdStats.ajustes, errores: window.__rmdStats.errores || [] })")
+                media = r["total"] / max(1, r["n"])
+                return (media < 15 and r["max"] < 150 and not r["errores"]), f"media={media:.1f} ms en {r['n']} ajustes, máximo={r['max']} ms, errores={r['errores']}"
+        finally:
+            pg.unroute("**/*", guardia_x)
+        @prueba("X6 Ninguna petición de escritura salió del navegador durante el bloque X")
+        def _():
+            return (not bloq_x), str(bloq_x[:5])
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

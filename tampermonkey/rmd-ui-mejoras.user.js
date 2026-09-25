@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.25.0
-// @description  Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP, un mismo paso varias veces en la barra de seleccionados (en su orden), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.26.0
+// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), código del RMD en la pestaña, Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP, un mismo paso varias veces en la barra de seleccionados (en su orden), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.25.0';                                                       // mantener igual a @version
+  const VERSION = '1.26.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -43,6 +43,9 @@
     ['revisor', 'Producción Estatus: nombre del jefe (y gerente) a quien se envió a revisión'],
     ['vivo', 'RMD en vivo: el PDF del RMD a la derecha, actualizado tras cada cambio guardado (las ventanas pasan a la mitad izquierda)'],
     ['ordenest', 'Orden de las estructuras del RMD según los últimos autorizados de su sección y etapa'],
+    ['saludo', 'Saludo al entrar ("Buenos días, …") con tus RMD en Ingresado y "Continuar con" el último RMD; se desvanece solo'],
+    ['paleta', 'Ctrl+K = Ir a…: abrir un RMD (recientes, los tuyos o por código) o una herramienta sin buscarla'],
+    ['titulo', 'La pestaña del navegador muestra el código del RMD abierto'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
@@ -206,6 +209,26 @@
   .rmd-vivo-barra { height: 2px; background: transparent; overflow: hidden; position: relative; }
   .rmd-vivo-panel.generando .rmd-vivo-barra::after { content: ''; position: absolute; top: 0; left: -40%; width: 40%; height: 100%; background: var(--rmd-acento); animation: rmd-vivo-carga 1.1s ease-in-out infinite; }
   @keyframes rmd-vivo-carga { from { left: -40%; } to { left: 100%; } }
+  .rmd-saludo { position: fixed; left: 62px; bottom: 14px; z-index: 99998; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: min(460px, 70vw); padding: 9px 14px 10px; border-radius: 10px;
+    background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); box-shadow: 0 8px 24px rgba(0,0,0,.28); font: 13px/1.35 var(--rmd-fuente);
+    opacity: 0; transform: translateY(10px); transition: opacity .7s ease, transform .7s ease; pointer-events: none; }
+  .rmd-saludo.visible { opacity: 1; transform: none; pointer-events: auto; }
+  .rmd-saludo b { font-size: 14.5px; font-weight: 600; } .rmd-saludo-resumen:empty { display: none; } .rmd-saludo-resumen, .rmd-saludo-tip { color: var(--rmd-apagado); font-size: 12px; } .rmd-saludo-tip { opacity: .8; }
+  .rmd-saludo-continuar { margin: 2px 0 1px; padding: 0; border: 0; background: none; color: var(--rmd-acento-texto); font: 600 12.5px var(--rmd-fuente); cursor: pointer; text-align: left; } .rmd-saludo-continuar:hover { text-decoration: underline; }
+  .rmd-paleta-fondo { position: fixed; inset: 0; z-index: 100000; display: flex; justify-content: center; align-items: flex-start; padding-top: 11vh; background: rgba(0,0,0,.34); }
+  .rmd-paleta { width: min(720px, 92vw); overflow: hidden; border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); box-shadow: 0 18px 50px rgba(0,0,0,.45); font: 13px var(--rmd-fuente); animation: rmd-paleta-entra .14s ease-out; }
+  @keyframes rmd-paleta-entra { from { opacity: 0; transform: translateY(-6px) scale(.985); } to { opacity: 1; transform: none; } }
+  .rmd-paleta-q { display: block; width: 100%; box-sizing: border-box; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--rmd-borde); outline: none; background: transparent; color: inherit; font: 15px var(--rmd-fuente); }
+  .rmd-paleta-res { max-height: 56vh; overflow: auto; padding: 4px 0 6px; }
+  .rmd-paleta-sec { padding: 9px 16px 4px; color: var(--rmd-apagado); font: 600 11px var(--rmd-fuente); letter-spacing: .6px; text-transform: uppercase; }
+  .rmd-paleta-it { display: flex; align-items: center; gap: 10px; padding: 7px 16px; cursor: pointer; }
+  .rmd-paleta-it.activo { background: rgba(27,141,236,.18); box-shadow: inset 3px 0 0 var(--rmd-acento); }
+  .rmd-paleta-it .cod { min-width: 88px; font-weight: 600; } .rmd-paleta-it .ver { min-width: 26px; color: var(--rmd-apagado); font-size: 12px; }
+  .rmd-paleta-it .desc { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .rmd-paleta-it .meta { color: var(--rmd-apagado); font-size: 12px; white-space: nowrap; }
+  .rmd-paleta-acc { display: none; gap: 4px; } .rmd-paleta-it.activo .rmd-paleta-acc { display: inline-flex; }
+  .rmd-paleta-acc button { padding: 2px 8px; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: var(--rmd-acento-texto); font: 12px var(--rmd-fuente); cursor: pointer; } .rmd-paleta-acc button:hover { background: var(--rmd-acento); color: #fff; }
+  .rmd-paleta-vacio { padding: 16px; color: var(--rmd-apagado); }
+  .rmd-paleta-pie { display: flex; justify-content: space-between; gap: 12px; padding: 7px 16px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font-size: 12px; }
   .rmd-vivo-estado { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .rmd-vivo-ir[hidden] { display: none; }
   /* paso con procesos menores mal configurados (revisados sin abrir su ventana): la celda "Proc. Men." con un contador rojo */
   html.rmd-reglas td.rmd-pm-mal { position: relative; outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.14) !important; }
@@ -1165,7 +1188,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -1222,7 +1245,14 @@
   }
 
   let habiaVentanaPM = false;
+  // cuánto tarda cada ajuste (diagnóstico de rendimiento: __rmdStats.ajusteMs / ajusteMax / ajusteTotalMs)
   function ajustarTodo() {
+    const t0 = performance.now();
+    try { ajustarTodoCuerpo(); } finally {
+      const s = window.__rmdStats, ms = performance.now() - t0; s.ajusteMs = Math.round(ms * 10) / 10; s.ajusteMax = Math.max(s.ajusteMax || 0, s.ajusteMs); s.ajusteTotalMs = Math.round((s.ajusteTotalMs || 0) + ms);
+    }
+  }
+  function ajustarTodoCuerpo() {
     if (!opc.activo) { limpiezaTotal(); return; }
     window.__rmdStats.ajustes++;
     // al cerrarse una ventana de procesos menores (pudo corregirse algo) se vuelven a revisar los de la lista de pasos
@@ -1237,7 +1267,7 @@
     gestionarBotonesLista();
     gestionarRecetasAsociar();
     // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
-    [gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos].forEach((f) => {
+    [registrarExternosUI5, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
     gestionarTextosMayusculas();
@@ -4367,6 +4397,202 @@
     w.__rmdGrabar = orig; reg.fFunction = w;
   }
   window.__rmdStats.usoDelPaso = (pasoId, mdId) => usoDelPaso(controladorPrincipal().getView().getModel('mainModelv2'), pasoId, mdId);
+  // ---- Productividad (v1.26): saludo, "Ir a…" (Ctrl+K), RMD recientes y título de la pestaña ----
+  // Saludo: al cargar la lista principal, abajo a la izquierda (junto al botón de mejoras), "Buenos días, Carlos" con un resumen de
+  // los RMD de la persona en Ingresado y "Continuar con <el último RMD abierto>"; se desvanece solo (pasar el ratón lo detiene).
+  // El nombre sale del launchpad (sap.ushell.Container.getUser) y el código de usuario (el de usuarioRegistro de MD) del modelo del
+  // portal; del registro de usuario solo se lee ese campo. Recientes: los RMD abiertos en este navegador (localStorage, solo códigos).
+  const CLAVE_RECIENTES = 'rmdUiRecientes', CLAVE_SALUDO = 'rmdUiSaludo';
+  const leerRecientes = () => { try { const a = JSON.parse(localStorage.getItem(CLAVE_RECIENTES)); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+  function anotarReciente(md) {
+    if (!md || !md.codigo) return;
+    try {
+      const a = leerRecientes().filter((x) => x.codigo !== md.codigo);
+      a.unshift({ codigo: String(md.codigo), version: md.version, descripcion: String(md.descripcion || '').slice(0, 120), etapa: md.nivelTxt || '', t: Date.now() });
+      localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(a.slice(0, 12)));
+    } catch (e) { /* sin almacenamiento: sin recientes */ }
+  }
+  const capitalizar = (t) => String(t || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  function primerNombre() {
+    for (const w of [window, window.parent, window.top]) {
+      try { const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
+        const n = (u.getFirstName && u.getFirstName()) || (u.getFullName && u.getFullName()) || ''; if (n) return capitalizar(n.trim().split(/\s+/)[0]); } catch (e) { /* otro origen */ }
+    }
+    return '';
+  }
+  function codigoUsuario(ctrl) {
+    try { const c = ctrl && ctrl.localModel && ctrl.localModel.getProperty('/oInfoUsuario/data/usuario'); if (c) return String(c).toUpperCase(); } catch (e) { /* sin modelo */ }
+    const u = usuarioSapActual(); return u && u.email ? u.email.split('@')[0].toUpperCase() : '';
+  }
+  const saludoDelMomento = (h = new Date().getHours()) => (h >= 5 && h < 12 ? 'Buenos días' : h >= 12 && h < 19 ? 'Buenas tardes' : 'Buenas noches');
+  // RMD en Ingresado registrados o actualizados por la persona (una lectura de MD, solo los campos necesarios)
+  let misRmdCache = null;
+  async function misRmd(ctrl) {
+    if (misRmdCache && Date.now() - misRmdCache.t < 60000) return misRmdCache.lista;
+    const m = ctrl && ctrl.getView().getModel('mainModelv2'), cod = codigoUsuario(ctrl); if (!m || !cod) return [];
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const filas = await leerTodoDe(m, 'MD', [new F({ filters: [new F('usuarioRegistro', 'EQ', cod), new F('usuarioActualiza', 'EQ', cod)], and: false }), new F('estadoIdRmd_iMaestraId', 'EQ', 467)],
+      { $select: 'mdId,codigo,version,descripcion,nivelTxt,estadoIdProceso_iMaestraId,fechaActualiza,fechaRegistro' });
+    const f = (x) => Math.max(+new Date(x.fechaActualiza || 0) || 0, +new Date(x.fechaRegistro || 0) || 0);
+    const lista = filas.sort((a, b) => f(b) - f(a));
+    misRmdCache = { t: Date.now(), lista }; return lista;
+  }
+  async function resumenPersonal(ctrl) {
+    const lista = await misRmd(ctrl); if (!lista.length) return 'No tienes RMD en Ingresado.';
+    let mapa = {}; try { mapa = await mapaProduccionEstado(ctrl); } catch (e) { /* sin textos del estado de producción */ }
+    const cuenta = (re) => lista.filter((x) => re.test(String(mapa[x.estadoIdProceso_iMaestraId] || ''))).length;
+    const rech = cuenta(/RECHAZ/i), env = cuenta(/ENVIADO/i);
+    return `Tienes ${lista.length} RMD en Ingresado` + (env ? ` · ${env} en revisión` : '') + (rech ? ` · ${rech} con la revisión rechazada` : '') + '.';
+  }
+  let saludoHecho = false;
+  function gestionarSaludo() {
+    if (saludoHecho || !on('saludo')) return;
+    const ctrl = controladorPrincipal(); if (!ctrl || !botonExportar()) return;           // cuando ya se ve la lista principal
+    saludoHecho = true;
+    try { const u = +localStorage.getItem(CLAVE_SALUDO) || 0; if (Date.now() - u < 10 * 60000) return; localStorage.setItem(CLAVE_SALUDO, String(Date.now())); } catch (e) { /* sin almacenamiento: se saluda */ }
+    const nombre = primerNombre(), ult = leerRecientes()[0], reciente = ult && Date.now() - ult.t < 14 * 86400000 ? ult : null;
+    const el = document.createElement('div'); el.className = 'rmd-saludo'; el.setAttribute('role', 'status');
+    el.innerHTML = `<b>${esc(saludoDelMomento())}${nombre ? ', ' + esc(nombre) : ''}</b><span class="rmd-saludo-resumen"></span>` +
+      (reciente ? `<button type="button" class="rmd-saludo-continuar" title="Abrir la configuración de este RMD">Continuar con ${esc(reciente.codigo)} · ${esc(reciente.descripcion.slice(0, 38))}</button>` : '') +
+      `<span class="rmd-saludo-tip">Ctrl+K: ir a un RMD o a una herramienta</span>`;
+    html.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+    let t = null;
+    const ocultar = () => { el.classList.remove('visible'); setTimeout(() => el.remove(), 800); };
+    const programar = (ms) => { clearTimeout(t); t = setTimeout(ocultar, ms); };
+    programar(7000);
+    el.addEventListener('mouseenter', () => clearTimeout(t)); el.addEventListener('mouseleave', () => programar(2500));
+    const bc = el.querySelector('.rmd-saludo-continuar'); if (bc) bc.addEventListener('click', () => { ocultar(); abrirRmdPorCodigo(reciente.codigo, 'configurar', reciente.version); });
+    resumenPersonal(ctrl).then((r) => { setTxt(el.querySelector('.rmd-saludo-resumen'), r); }, () => {});
+  }
+  // Abrir un RMD como a mano: filtra la lista principal por su código y elige la acción en el menú de su fila (el mismo manejador del portal)
+  const ACCIONES_FILA = { configurar: 'Configurar el RMD', asociar: 'Asociar fórmulas', master: 'Ver master', op: 'Ver OP', trazabilidad: 'Trazabilidad RMD' };
+  async function abrirRmdPorCodigo(codigo, accion = 'configurar', version) {
+    const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para ir a un RMD.', true); return false; }
+    if (dialogos().length && accion !== 'filtrar') { toast('Cierra primero las ventanas abiertas del portal para abrir otro RMD (el RMD quedó filtrado en la lista).', true); filtrarListaPrincipal(codigo); return false; }
+    filtrarListaPrincipal(codigo);
+    if (accion === 'filtrar') return true;
+    const lista = ctrl.getView().byId('idTblConfigurationRmd'); if (!lista) return false;
+    await esperar(350);
+    const fila = await hasta(() => {
+      if (ocupadoGlobal()) return null;
+      const its = lista.getItems().map((i) => ({ i, o: i.getBindingContext('listMD') && i.getBindingContext('listMD').getObject() })).filter((x) => x.o && String(x.o.codigo) === String(codigo));
+      if (!its.length) return null;
+      const exacta = version != null && its.find((x) => +x.o.version === +version);
+      return exacta || its.sort((a, b) => ((a.o.estadoIdRmd_iMaestraId === 466) - (b.o.estadoIdRmd_iMaestraId === 466)) || (b.o.version - a.o.version))[0];
+    }, 20000, 200);
+    if (!fila) { toast(`No se encontró el RMD ${codigo} en la lista (revisa los filtros de la lista).`, true); return false; }
+    const mb = [...fila.i.getDomRef().querySelectorAll('[data-sap-ui]')].map((x) => sap.ui.getCore().byId(x.id)).find((c) => c && c.getMenu && c.getMenu());
+    const menu = mb && mb.getMenu(), item = menu && menu.getItems().find((x) => x.getText() === ACCIONES_FILA[accion]);
+    if (!item) { toast(`No se encontró "${ACCIONES_FILA[accion]}" en el menú del RMD ${codigo}.`, true); return false; }
+    menu.fireItemSelected({ item });
+    return true;
+  }
+  // ---- "Ir a…" (Ctrl+K) ----
+  function herramientasPaleta() {
+    const ctrl = controladorPrincipal(), lista = !!(ctrl && botonExportar());
+    const clic = (sel) => () => { const b = document.querySelector(sel); if (b) b.click(); };
+    return [
+      lista && on('buscarequipo') && ['Buscar por equipo', 'RMD que tienen un equipo, instrumento o material', () => abrirBuscarPorEquipo()],
+      lista && on('suspension') && ['Suspensión masiva', 'Suspender varios RMD autorizados a la vez', () => abrirSuspensionMasiva()],
+      lista && on('exportar') && ['Exportar…', 'Exportado original, Equipos por master, Indicadores, Documentos citados', () => { const b = botonExportar(); const c = b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); if (c) c.firePress(); }],
+      lista && on('equipos') && ['Equipos por master', 'Excel de todos los master con sus equipos', () => abrirEquiposPorMaster()],
+      lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
+      lista && on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada documento', () => abrirCitasDeTodos()],
+      lista && on('statusrmd') && document.querySelector('.rmd-status-rmd') && ['Enviar a Status RMD', 'Maestro completo a Status RMD', clic('.rmd-status-rmd')],
+      ['Mejoras de interfaz', 'Activar o desactivar funciones del script', () => { const p = document.getElementById('rmd-ui-panel'); if (p) p.open = true; }],
+    ].filter(Boolean);
+  }
+  // Con una ventana de SAP abierta, UI5 (Popup modal) devuelve el foco a esa ventana si pasa a un elemento ajeno: la paleta, los
+  // avisos propios, el panel y el menú Exportar se declaran "contenido externo" de sus popups para poder escribir y usar el teclado ahí.
+  let externosUI5 = false;
+  function registrarExternosUI5() {
+    if (externosUI5 || typeof sap === 'undefined') return;
+    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-menu', '.rmd-saludo'], true); externosUI5 = true; } } catch (e) { /* versión de UI5 sin esta función */ }
+  }
+  function abrirPaleta() {
+    if (document.querySelector('.rmd-paleta-fondo')) return;
+    registrarExternosUI5();
+    const ctrl = controladorPrincipal(), hayVentanas = dialogos().length > 0;
+    const fondo = document.createElement('div'); fondo.className = 'rmd-paleta-fondo';
+    fondo.innerHTML = `<div class="rmd-paleta" role="dialog" aria-label="Ir a"><input type="search" class="rmd-paleta-q" autocomplete="off" spellcheck="false" placeholder="Código o descripción de un RMD, o una herramienta" aria-label="Ir a un RMD o a una herramienta">
+      <div class="rmd-paleta-res" role="listbox"></div><div class="rmd-paleta-pie"><span>↑↓ elegir · Enter configurar el RMD · Alt+Enter asociar fórmulas · Esc cerrar</span><span class="rmd-paleta-estado"></span></div></div>`;
+    document.body.appendChild(fondo);
+    const q = fondo.querySelector('.rmd-paleta-q'), res = fondo.querySelector('.rmd-paleta-res'), estado = fondo.querySelector('.rmd-paleta-estado');
+    let mios = null, items = [], activo = 0;
+    const cerrar = () => { document.removeEventListener('keydown', teclas, true); fondo.remove(); };
+    const n = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const pintar = () => {
+      const t = n(q.value.trim()), coincide = (x) => !t || n(x.codigo + ' ' + x.descripcion + ' ' + (x.etapa || x.nivelTxt || '')).includes(t);
+      const recientes = leerRecientes().filter(coincide).slice(0, 6), vistos = new Set(recientes.map((x) => x.codigo));
+      const propios = (mios || []).filter((x) => !vistos.has(String(x.codigo)) && coincide(x)).slice(0, 8);
+      const tools = herramientasPaleta().filter(([tt, sub]) => !t || n(tt + ' ' + sub).includes(t));
+      items = []; let h = '';
+      const seccion = (titulo) => { h += `<div class="rmd-paleta-sec">${esc(titulo)}</div>`; };
+      const rmd = (x, meta) => { items.push({ tipo: 'rmd', codigo: String(x.codigo), version: x.version }); const k = items.length - 1;
+        h += `<div class="rmd-paleta-it" role="option" data-k="${k}"><span class="cod">${esc(x.codigo)}</span><span class="ver">${x.version ? 'v' + esc(x.version) : ''}</span><span class="desc">${esc(x.descripcion)}</span><span class="meta">${esc(meta)}</span>` +
+          `<span class="rmd-paleta-acc"><button type="button" data-a="asociar" title="Asociar fórmulas (Alt+Enter)">Fórmulas</button><button type="button" data-a="master" title="Ver master (PDF)">Master</button><button type="button" data-a="filtrar" title="Solo filtrar la lista">Filtrar</button></span></div>`; };
+      const cod = q.value.trim();
+      if (/^\d{6,}$/.test(cod) && ![...recientes, ...propios].some((x) => String(x.codigo) === cod)) { seccion('Código'); rmd({ codigo: cod, version: '', descripcion: 'Abrir este RMD' }, ''); }
+      if (recientes.length) { seccion('Recientes en este navegador'); recientes.forEach((x) => rmd(x, x.etapa + ' · ' + haceCuanto(x.t))); }
+      if (propios.length) { seccion('Tus RMD en Ingresado'); propios.forEach((x) => rmd(x, x.nivelTxt || '')); }
+      if (tools.length) { seccion('Herramientas'); tools.forEach(([tt, sub, fn]) => { items.push({ tipo: 'tool', fn }); h += `<div class="rmd-paleta-it" role="option" data-k="${items.length - 1}"><span class="desc"><b>${esc(tt)}</b> <span class="meta">${esc(sub)}</span></span></div>`; }); }
+      if (!items.length) h = `<div class="rmd-paleta-vacio">Sin resultados${mios == null ? ' (cargando tus RMD…)' : ''}.</div>`;
+      res.innerHTML = h; activo = Math.min(activo, Math.max(0, items.length - 1)); marcar();
+    };
+    const marcar = () => res.querySelectorAll('.rmd-paleta-it').forEach((e) => { const on_ = +e.dataset.k === activo; e.classList.toggle('activo', on_); if (on_) e.scrollIntoView({ block: 'nearest' }); });
+    const ejecutar = (k, accion) => {
+      const it = items[k]; if (!it) return; cerrar();
+      if (it.tipo === 'tool') { it.fn(); return; }
+      if (hayVentanas && accion !== 'filtrar') { toast('Cierra primero las ventanas abiertas del portal para abrir otro RMD.', true); return; }
+      abrirRmdPorCodigo(it.codigo, accion || 'configurar', it.version || undefined);
+    };
+    const teclas = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); if (items.length) { activo = (activo + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length; marcar(); } return; }
+      if (e.key === 'Enter' && e.target === q) { e.preventDefault(); e.stopPropagation(); ejecutar(activo, e.altKey ? 'asociar' : 'configurar'); }
+    };
+    document.addEventListener('keydown', teclas, true);
+    fondo.addEventListener('mousedown', (e) => { if (e.target === fondo) cerrar(); });
+    res.addEventListener('mousemove', (e) => { const it = e.target.closest('.rmd-paleta-it'); if (it && +it.dataset.k !== activo) { activo = +it.dataset.k; marcar(); } });
+    res.addEventListener('click', (e) => { const it = e.target.closest('.rmd-paleta-it'); if (!it) return; const b = e.target.closest('button[data-a]'); ejecutar(+it.dataset.k, b ? b.dataset.a : 'configurar'); });
+    q.addEventListener('input', () => { activo = 0; pintar(); });
+    if (hayVentanas) setTxt(estado, 'Con ventanas abiertas solo se puede filtrar la lista.');
+    pintar(); q.focus();
+    // UI5 devuelve el foco a su control un instante después (su gestor de foco): se recupera para que lo tecleado vaya a la paleta
+    [0, 60, 200].forEach((ms) => setTimeout(() => { if (fondo.isConnected && document.activeElement !== q) q.focus(); }, ms));
+    fondo.addEventListener('focusout', () => setTimeout(() => { if (fondo.isConnected && !fondo.contains(document.activeElement)) q.focus(); }, 0));
+    if (ctrl) misRmd(ctrl).then((l) => { mios = l; if (fondo.isConnected) pintar(); }, () => { mios = []; if (fondo.isConnected) { setTxt(estado, 'No se pudieron leer tus RMD.'); pintar(); } });
+    else mios = [];
+  }
+  function haceCuanto(t) {
+    const m = Math.round((Date.now() - t) / 60000);
+    return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (!on('paleta') || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'k') return;
+    e.preventDefault(); e.stopPropagation(); abrirPaleta();
+  }, true);
+  // RMD abierto: se anota en recientes y la pestaña del navegador lleva su código (útil con varias pestañas del portal)
+  let rmdAbiertoId = null, tituloOriginal = null, tituloPuesto = null;
+  function gestionarRmdAbierto() {
+    const raiz = dialogos().find((x) => /^\d{6,}\s*-/.test(cabecera(x)) || /^Asociar F[oó]rmula/i.test(cabecera(x)));
+    const ctrl = raiz && controladorPrincipal(), md = ctrl && ctrl.getView().getModel('asociarDatos') && ctrl.getView().getModel('asociarDatos').getData();
+    let doc = null; try { doc = window.top.document; } catch (e) { doc = document; }
+    if (md && md.mdId && md.codigo) {
+      if (rmdAbiertoId !== md.mdId) { rmdAbiertoId = md.mdId; if (on('paleta') || on('saludo')) anotarReciente(md); }
+      if (on('titulo')) {
+        if (norm(doc.title) !== tituloPuesto) tituloOriginal = doc.title;                 // el título del portal (o el que puso el launchpad después)
+        const t = norm(`${md.codigo} · ${String(md.descripcion || '').slice(0, 40)} — ${tituloOriginal}`);   // (el navegador junta los espacios del título)
+        if (norm(doc.title) !== t) doc.title = t;
+        tituloPuesto = t; return;
+      }
+    } else rmdAbiertoId = null;
+    if (tituloPuesto && norm(doc.title) === tituloPuesto && tituloOriginal != null) doc.title = tituloOriginal;   // RMD cerrado u opción apagada: título del portal
+    tituloPuesto = null;
+  }
+  window.__rmdStats.productividad = { leerRecientes, primerNombre, codigoUsuario: () => codigoUsuario(controladorPrincipal()), misRmd: () => misRmd(controladorPrincipal()), resumen: () => resumenPersonal(controladorPrincipal()), abrirPaleta, abrirRmdPorCodigo, saludoDelMomento,
+    saludar: () => { saludoHecho = false; try { localStorage.removeItem(CLAVE_SALUDO); } catch (e) { /* sin almacenamiento */ } document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove()); gestionarSaludo(); } };   // (pruebas)
   // diagnóstico: el libro de equipos sin descargarlo (pruebas de solo lectura en el portal)
   window.__rmdStats.equiposSinDescargar = async (estados = ['Autorizado', 'Ingresado']) => {
     const modelo = modeloListaPrincipal(), t0 = Date.now();
@@ -4659,6 +4885,7 @@
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
+    ['Productividad', ['saludo', 'paleta', 'titulo']],
     ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
     ['Alertas', ['reglas', 'ordenest', 'recetas', 'sintipo', 'puesto']],
     ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'exportar', 'statusrmd', 'indicadores', 'equipos', 'citastodos', 'buscarequipo', 'suspension', 'recetas', 'recetasvarias', 'puestoreceta', 'repetirpaso', 'editarpaso', 'formulas', 'revisor', 'vivo', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
@@ -4670,7 +4897,7 @@
     p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
       '<div class="rmd-panel-cab"><b>Mejoras de interfaz</b><span>v' + VERSION + '</span></div>' + fila('activo', 'maestro') +
       GRUPOS_PANEL.map(([t, ks]) => `<div class="rmd-grupo">${t}</div>` + ks.map((k) => fila(k)).join('')).join('') +
-      '<div class="rmd-panel-pie"><span>Ctrl+S = Guardar el diálogo abierto</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
+      '<div class="rmd-panel-pie"><span>Ctrl+K = Ir a… · Ctrl+S = Guardar</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
     const refrescar = () => p.querySelectorAll('input[data-k]').forEach((i) => { i.checked = !!opc[i.dataset.k]; });
     p.addEventListener('change', (e) => {
       const k = e.target.dataset && e.target.dataset.k; if (!k) return;

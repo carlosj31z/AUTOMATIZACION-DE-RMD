@@ -338,6 +338,20 @@ with sync_playwright() as p:
               and r["numero"] and r["numero"]["tipo"] == "cambio" and r["quitado"] and r["quitado"]["tipo"] == "borrado"
               and r["soloFecha"] is None and r["igual"] is None and r["minusculas"] and r["minusculas"]["tipo"] == "cambio")
         return ok, json.dumps(r, ensure_ascii=False)[:600]
+    @prueba("LN13 Ctrl+K abre 'Ir a…' con el foco en su buscador (también sobre una ventana abierta), escribir filtra, Esc cierra solo la paleta; saludo según la hora")
+    def _():
+        abrir(pg, PRECAUCIONES)
+        pg.keyboard.press("Control+k"); pg.wait_for_timeout(500)
+        a = pg.evaluate("() => ({ abierta: !!document.querySelector('.rmd-paleta-fondo'), foco: document.activeElement.className, items: [...document.querySelectorAll('.rmd-paleta-it')].map(x => x.innerText.split('\\n')[0]) })")
+        pg.keyboard.type("mejoras"); pg.wait_for_timeout(300)
+        b_ = pg.evaluate("[...document.querySelectorAll('.rmd-paleta-it')].map(x => x.innerText.split('\\n')[0].trim())")
+        pg.keyboard.press("Escape"); pg.wait_for_timeout(400)
+        c = pg.evaluate("({ paleta: !!document.querySelector('.rmd-paleta-fondo'), dialogos: [...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length })")
+        h = pg.evaluate("[5, 11, 12, 18, 19, 23, 2].map(x => window.__rmdStats.productividad.saludoDelMomento(x))")
+        cerrar_todo(pg)
+        ok = (a["abierta"] and a["foco"] == "rmd-paleta-q" and any("Mejoras de interfaz" in x for x in a["items"]) and b_ and all("Mejoras" in x for x in b_)
+              and not c["paleta"] and c["dialogos"] == 1 and h == ["Buenos días", "Buenos días", "Buenas tardes", "Buenas tardes", "Buenas noches", "Buenas noches", "Buenas noches"])
+        return ok, f"{a} filtrado={b_} tras Esc={c} saludos={h}"
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
