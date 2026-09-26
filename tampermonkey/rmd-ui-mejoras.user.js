@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.28.0
-// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), un mismo paso varias veces en la barra de seleccionados (en su orden), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.29.0
+// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,34 +10,34 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.28.0';                                                       // mantener igual a @version
+  const VERSION = '1.29.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   const OPC = [
-    ['activo', 'Mejoras activas'], ['enter', 'Enter = Ir'], ['ancho', 'Diálogos a medida'], ['columnas', 'Columnas ordenadas'],
+    ['activo', 'Mejoras activas'], ['enter', 'Enter en un filtro = pulsar "Ir"'], ['ancho', 'Diálogos a medida'], ['columnas', 'Columnas ordenadas (y la Etapa de la lista principal en una línea)'],
     ['ocultar', 'Ocultar Estado Mov., Imagen, Formato, PM OP, Gen PP'], ['grupos', 'Tooltips en las cabeceras'],
     ['depende', 'Depende: tooltip con el paso'], ['sintipo', '"Sin tipo de dato" en rojo y negrita'],
     ['puesto', 'Puesto de Trabajo faltante parpadea'], ['reglas', 'Alertas de casillas incoherentes'],
     ['estado', 'Estado del RMD en la cabecera'], ['pmtitulo', 'Título completo del paso menor'],
-    ['filtro', 'Filtro local de pasos'], ['copiar', 'Botones Copiar / Pegar configuración'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior y validar la 1ª línea de Observaciones'],
+    ['filtro', 'Filtro local en las listas de pasos (por texto, código u orden)'], ['copiar', 'Copiar / Pegar la configuración de un paso en uno o varios pasos'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior y validar la 1ª línea de Observaciones'],
     ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'], ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
     ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando" y sin el error del refresco automático al volver)'],
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
     ['pasominusculas', 'Pasar a minúsculas: botón "En minúsculas" (crea el paso en minúsculas a partir de uno en MAYÚSCULAS, con "Nuevo Paso" ya lleno) y botón "Aa" en la Descripción de "Nuevo Paso" / "Editar Paso"'],
-    ['verop', 'Ver OP: ver todas y exportar a CSV'],
-    ['documentos', 'Documentos citados e incoherencias de todo el RMD (con procesos menores; Excel)'],
-    ['statusrmd', 'Botón "Enviar a Status RMD" (maestro completo sin archivo)'],
+    ['verop', 'Ver OP: ver todas (rápido), filtrar por columna y exportar a CSV'],
+    ['documentos', 'Botón "Documentos citados" en el RMD: instructivos, procedimientos y formatos citados en sus pasos y procesos menores (Excel)'],
+    ['statusrmd', 'Botón "Enviar a Status RMD" (maestro completo, sin archivo)'],
     ['indicadores', '"Indicadores del mes" en el menú Exportar (Excel del mes con tablas dinámicas)'],
-    ['exportar', 'Exportar: menú en el icono del portal (exportado original con "Producción Estado", Equipos por master e Indicadores)'],
+    ['exportar', 'Menú en el icono "Exportar": exportado original con "Producción Estado", Equipos por master, Indicadores y Documentos citados en todos los master'],
     ['equipos', '"Equipos por master" en el menú Exportar (Excel de todos los master con sus equipos, instrumentos y materiales)'],
     ['buscarequipo', 'Filtro "Equipo" en la barra de filtros de la lista (master con un equipo, instrumento, utensilio o agrupador)'],
     ['barrafiltros', 'Barra de filtros compacta: "Agrupador", ⟳ rojo en lugar de "Restablecer" y todas las tarjetas en una fila'],
     ['suspension', 'Modificaciones masivas: suspender Autorizados o Ingresados y agregar una observación a varios master (desde este panel o Ctrl+K)'],
     ['citastodos', '"Documentos citados en todos los master" en el menú Exportar'],
     ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (⚠ con el detalle junto al código y botón "Revisar recetas" en Asociar fórmulas)'],
-    ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (lo más resaltante frente a la asociada y a la versión anterior)'],
-    ['repetirpaso', 'Adicionar Pasos: repetir un paso en la barra de seleccionados (+) y ordenarlos arrastrando; Agregar los agrega en ese orden'],
+    ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (apagado por defecto)'],
+    ['repetirpaso', 'Adicionar Pasos (también en procesos menores): panel "Pasos a agregar" con la cantidad de cada paso (− n +) y su orden (↑ ↓); Agregar los agrega así'],
     ['editarpaso', 'Editar Paso: si el paso está en otros RMD, elegir entre generar uno nuevo (sin duplicar) o sobrescribirlo, con confirmación de 5 s'],
     ['formulas', 'Fórmulas: subir / bajar los términos sin eliminarlos (Alt+↑ / Alt+↓)'],
     ['recetasvarias', 'Asociar fórmulas: marcar varias recetas y eliminarlas de una vez'],
@@ -47,12 +47,13 @@
     ['ordenest', 'Orden de las estructuras del RMD según los últimos autorizados de su sección y etapa'],
     ['saludo', 'Saludo al entrar ("Buenos días, …") con tus RMD en Ingresado y "Continuar con" el último RMD; se desvanece solo'],
     ['paleta', 'Ctrl+K = Ir a…: abrir un RMD (recientes, los tuyos o por código) o una herramienta sin buscarla'],
-    ['titulo', 'La pestaña del navegador muestra el código del RMD abierto'],
+    ['titulo', 'La pestaña del navegador muestra la etapa y la descripción del RMD abierto ("FAB - …")'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
   // Apagadas por defecto: "RMD en vivo" cambia la disposición de las ventanas; solo se activa si la persona lo elige.
-  ['vivo', 'recetaruta'].forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
+  const APAGADAS_POR_DEFECTO = ['vivo', 'recetaruta'];
+  APAGADAS_POR_DEFECTO.forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
   // Por defecto apagadas: pasar a minúsculas es una redacción automática y la ortografía usa un diccionario reducido; ambas piden revisar el resultado.
 
   // ---- 0. Shell de Fiori (fuera del iframe de la app): solo el aviso de sesión por inactividad -------------------------------
@@ -129,6 +130,7 @@
     if (!(t instanceof HTMLInputElement) || t.type === 'checkbox' || t.type === 'radio' || t.readOnly) return;
     if (t.getAttribute('aria-expanded') === 'true') return;                        // lista desplegada: Enter elige la opción
     if (t.closest('table') || t.classList.contains('rmd-filtro')) return;         // dentro de la tabla de pasos: no buscar
+    if (t.closest('.rmd-sel-panel, .rmd-modal, .rmd-paleta, .rmd-vivo-panel, #rmd-ui-panel')) return;   // campos del propio script (p. ej. la cantidad de "Pasos a agregar")
     const btn = botonIr(t);
     if (!btn) return;
     e.preventDefault(); e.stopPropagation();
@@ -213,6 +215,15 @@
   #rmd-ui-panel .rmd-panel-acciones { margin: 8px 0 2px; } #rmd-ui-panel .rmd-mod-masivas { width: 100%; border-color: var(--rmd-rojo); color: var(--rmd-rojo); } #rmd-ui-panel .rmd-mod-masivas:hover { background: var(--rmd-rojo); color: #fff; }
   .rmd-mm-modos { display: flex; gap: 0; margin: 0 0 10px; border-bottom: 1px solid var(--rmd-borde); }
   .rmd-mm-modo { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-mm-modo.activo { color: var(--rmd-texto); border-bottom-color: var(--rmd-acento); }
+  .rmd-sel-panel { margin: 6px 16px 8px; padding: 8px 10px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: rgba(27,141,236,.07); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
+  .rmd-sel-cab { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; } .rmd-sel-cab span { color: var(--rmd-apagado); font-size: 12px; }
+  .rmd-sel-lista { margin: 0; padding: 0; list-style: none; max-height: 190px; overflow: auto; }
+  .rmd-sel-lista li { display: flex; align-items: center; gap: 10px; padding: 3px 4px; border-bottom: 1px solid rgba(128,128,128,.18); }
+  .rmd-sel-pos { min-width: 44px; color: var(--rmd-apagado); font-size: 12px; } .rmd-sel-cod { min-width: 70px; font-weight: 600; } .rmd-sel-desc { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .rmd-sel-cant, .rmd-sel-mov { display: inline-flex; align-items: center; gap: 3px; }
+  .rmd-sel-panel button { min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid var(--rmd-borde); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-acento-texto); font: 700 14px var(--rmd-fuente); cursor: pointer; }
+  .rmd-sel-panel button:hover:not(:disabled) { background: var(--rmd-acento); color: #fff; } .rmd-sel-panel button:disabled { opacity: .35; cursor: default; } .rmd-sel-panel .rmd-sel-quitar { color: var(--rmd-rojo); }
+  .rmd-sel-cant input { width: 44px; height: 22px; text-align: center; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: inherit; font: 600 13px var(--rmd-fuente); }
   .rmd-token-mas { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; margin: 0 2px 0 6px; border-radius: 3px; background: var(--rmd-acento); color: #fff; font: 700 12px/1 var(--rmd-fuente); cursor: pointer; }
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
   .rmd-btn.exito { background: #2e7d32; border-color: #2e7d32; color: #fff; } .rmd-btn.exito:hover { background: #276c2b; }
@@ -1209,7 +1220,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-sel-panel, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -4149,13 +4160,14 @@
   };
   window.__rmdStats.diferenciasBom = diferenciasBom; window.__rmdStats.detalleRecetaHtml = detalleRecetaHtml; window.__rmdStats.contextoRmd = (mdId) => contextoRmd(controladorPrincipal(), mdId).then((c) => ({ puestos: [...c.puestos.entries()], anterior: c.anterior }));   // (pruebas)
 
-  // ---- "Adicionar Pasos": un mismo paso n veces en la barra de seleccionados (v1.25) ----
-  // La barra de arriba de la tabla (tokens) es el modelo aSeleccionadoPaso y el Agregar del portal (onAsignPasoToEstructura) agrega
-  // sus pasos EN ESE ORDEN, uno por elemento: basta con que el mismo paso pueda estar varias veces. Cada token lleva un "+" que pone
-  // otra copia justo a su lado (3 | 2 | 2 | 2 | 2 | 204) y los tokens se pueden arrastrar para cambiar el orden. El portal quitaba
-  // los repetidos al marcar otra fila y desmarcaba la fila al quitar una sola copia: se conservan las copias.
-  // (v1.24 dejaba la ventana abierta tras Agregar y ponía una nota en el pie que empujaba los botones fuera de la pantalla: retirado)
-  const RUTA_SEL = 'aSeleccionadoPaso';
+  // ---- "Adicionar Pasos": el mismo paso varias veces y en el orden que se quiera (v1.25; v1.29: panel "Pasos a agregar") ----
+  // El Agregar del portal agrega, EN ORDEN, un paso por cada elemento del modelo aSeleccionadoPaso (la barra de etiquetas de arriba
+  // de la tabla): basta con que un paso pueda estar varias veces. Tanto en el selector de pasos (frgAdicNewMdPasos) como en el de
+  // procesos menores (frgAddPasoPM). v1.29: en lugar del "+" dentro de cada etiqueta y de arrastrarlas (poco visibles y frágiles),
+  // un panel "Pasos a agregar" encima de la tabla, dibujado siempre desde ese modelo: una fila por paso con su cantidad (− n +),
+  // subir / bajar y quitar; lo que se ve ahí es exactamente lo que se agrega y en ese orden. Marcar una fila de la tabla lo agrega
+  // (cantidad 1); desmarcarla lo quita. El portal quitaba los repetidos al marcar otra fila: se conservan.
+  const RUTA_SEL = 'aSeleccionadoPaso', TABLAS_SELECTOR = ['frgAdicNewMdPasos--idTblPaso', 'frgAddPasoPM--idTblPaso'];
   function modeloSel(c) { return c && c.getModel && c.getModel(RUTA_SEL); }
   function fijarSel(m, arr) { arr.forEach((x, i) => { x.pos = i + 1; }); m.setData(arr); m.refresh(true); }
   function parchearEvento(c, evento, hacer) {
@@ -4164,59 +4176,90 @@
     if (reg.fFunction.__rmdOrig) return;
     const orig = reg.fFunction, w = function () { return hacer.call(this, orig, arguments); }; w.__rmdOrig = orig; reg.fFunction = w;
   }
+  // grupos consecutivos del mismo paso: [{ codigo, desc, n, items }]
+  function gruposSel(arr) {
+    const g = []; arr.forEach((x) => { const u = g[g.length - 1]; if (u && u.codigo === x.codigo) { u.n++; u.items.push(x); } else g.push({ codigo: x.codigo, desc: x.descripcion || '', n: 1, items: [x] }); });
+    return g;
+  }
+  function pintarPanelPasos(d, tabla, m) {
+    const arr = (m.getData() || []), grupos = gruposSel(arr);
+    let p = d.querySelector('.rmd-sel-panel');
+    const lista = tabla.getDomRef(); if (!lista) return;
+    if (!p) {
+      p = document.createElement('div'); p.className = 'rmd-sel-panel'; lista.insertAdjacentElement('beforebegin', p);
+      ['pointerdown', 'mousedown', 'click', 'keydown'].forEach((ev) => p.addEventListener(ev, (e) => e.stopPropagation()));
+      p.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-a]'); if (!b) return; e.preventDefault();
+        const mm = p.__modelo, gs = gruposSel(mm.getData() || []), gi = +b.dataset.g, g = gs[gi]; if (!g) return;
+        const a = b.dataset.a;
+        if (a === 'mas') g.items.push(Object.assign({}, g.items[0]));
+        else if (a === 'menos') { if (g.items.length > 1) g.items.pop(); else return; }
+        else if (a === 'quitar') { gs.splice(gi, 1); desmarcarFila(p.__tabla, g.codigo, gs); }
+        else if (a === 'subir' && gi > 0) gs.splice(gi - 1, 2, gs[gi], gs[gi - 1]);
+        else if (a === 'bajar' && gi < gs.length - 1) gs.splice(gi, 2, gs[gi + 1], gs[gi]);
+        if (a !== 'quitar' && !['mas', 'menos', 'subir', 'bajar'].includes(a)) return;
+        fijarSel(mm, gs.flatMap((x) => x.items)); pintarPanelPasos(p.__d, p.__tabla, mm);
+      });
+      p.addEventListener('change', (e) => {
+        const inp = e.target.closest('input[data-g]'); if (!inp) return;
+        const mm = p.__modelo, gs = gruposSel(mm.getData() || []), g = gs[+inp.dataset.g]; if (!g) return;
+        const n = Math.max(1, Math.min(50, parseInt(inp.value, 10) || 1));
+        while (g.items.length < n) g.items.push(Object.assign({}, g.items[0])); g.items.length = n;
+        fijarSel(mm, gs.flatMap((x) => x.items)); pintarPanelPasos(p.__d, p.__tabla, mm);
+      });
+    } else if (p.nextElementSibling !== lista) lista.insertAdjacentElement('beforebegin', p);
+    p.__modelo = m; p.__tabla = tabla; p.__d = d;
+    const firma = JSON.stringify(grupos.map((g) => [g.codigo, g.n]));
+    if (p.dataset.firma === firma) return; p.dataset.firma = firma;
+    p.hidden = !grupos.length;
+    const total = arr.length;
+    p.innerHTML = `<div class="rmd-sel-cab"><b>Pasos a agregar (${total})</b><span>Se agregan en este orden. Cambia la cantidad para repetir un paso; marca más filas en la tabla para sumar otros.</span></div>` +
+      `<ol class="rmd-sel-lista">${grupos.map((g, gi) => `<li><span class="rmd-sel-pos">${grupos.slice(0, gi).reduce((a, x) => a + x.n, 0) + 1}${g.n > 1 ? '–' + (grupos.slice(0, gi).reduce((a, x) => a + x.n, 0) + g.n) : ''}</span>` +
+        `<span class="rmd-sel-cod">${esc(g.codigo)}</span><span class="rmd-sel-desc" title="${esc(g.desc)}">${esc(g.desc)}</span>` +
+        `<span class="rmd-sel-cant"><button type="button" data-a="menos" data-g="${gi}" title="Una vez menos" ${g.n <= 1 ? 'disabled' : ''}>−</button><input type="number" min="1" max="50" value="${g.n}" data-g="${gi}" aria-label="Veces que se agrega"><button type="button" data-a="mas" data-g="${gi}" title="Una vez más">+</button></span>` +
+        `<span class="rmd-sel-mov"><button type="button" data-a="subir" data-g="${gi}" title="Subir" ${gi === 0 ? 'disabled' : ''}>↑</button><button type="button" data-a="bajar" data-g="${gi}" title="Bajar" ${gi === grupos.length - 1 ? 'disabled' : ''}>↓</button><button type="button" data-a="quitar" data-g="${gi}" title="Quitar de la lista" class="rmd-sel-quitar">×</button></span></li>`).join('')}</ol>`;
+  }
+  function desmarcarFila(tabla, codigo, quedan) {
+    if (!tabla || quedan.some((g) => g.codigo === codigo)) return;
+    const bi = tabla.getBindingInfo('items'), mod = bi && bi.model;
+    tabla.getItems().forEach((it) => { const c = it.getBindingContext(mod), o = c && c.getObject(); if (o && o.codigo === codigo) it.setSelected(false); });
+  }
   function gestionarSelectorPasos() {
-    const d = dialogos().find((x) => /^Adicionar Pasos/i.test(cabecera(x))); if (!d || typeof sap === 'undefined') return;
-    d.classList.toggle('rmd-selector-ancho', on('ancho'));
-    d.querySelectorAll('.rmd-nota-repetir').forEach((n) => n.remove());
-    const core = sap.ui.getCore(), tabla = core.byId('frgAdicNewMdPasos--idTblPaso');
+    if (typeof sap === 'undefined') return;
+    const core = sap.ui.getCore();
+    const tabla = TABLAS_SELECTOR.map((id) => core.byId(id)).find((t) => t && t.getDomRef() && visible(t.getDomRef())); if (!tabla) return;
+    const d = tabla.getDomRef().closest('.sapMDialog'); if (!d) return;
+    if (tabla.getId() === TABLAS_SELECTOR[0]) d.classList.toggle('rmd-selector-ancho', on('ancho'));
+    d.querySelectorAll('.rmd-nota-repetir, .rmd-token-mas').forEach((n) => n.remove());
+    d.querySelectorAll('.sapMToken[draggable]').forEach((t) => { t.removeAttribute('draggable'); t.classList.remove('rmd-token-rep'); });
+    const m = modeloSel(tabla); if (!m) return;
+    const modTabla = (tabla.getBindingInfo('items') || {}).model;
     const mi = [...d.querySelectorAll('.sapMMultiInput')].map((x) => core.byId(x.id)).find((c) => c && c.getBindingInfo && (c.getBindingInfo('tokens') || {}).model === RUTA_SEL);
-    if (!tabla || !mi) return;
     // marcar / desmarcar filas: el portal deja un solo elemento por paso; aquí se conservan las copias y su orden
     parchearEvento(tabla, 'selectionChange', function (orig, args) {
-      const m = modeloSel(tabla), antes = ((m && m.getData()) || []).slice(), e = args[0];
-      const it = e && e.getParameter && e.getParameter('listItem'), sel = it && it.getSelected(), ctx = it && it.getBindingContext('aListPaso'), o = ctx && ctx.getObject();
-      const r = orig.apply(this, args); if (!m) return r;
-      const despues = m.getData() || [];
+      const mm = modeloSel(tabla), antes = ((mm && mm.getData()) || []).slice(), e = args[0];
+      const it = e && e.getParameter && e.getParameter('listItem'), sel = it && it.getSelected(), ctx = it && it.getBindingContext(modTabla), o = ctx && ctx.getObject();
+      const r = orig.apply(this, args); if (!mm) return r;
+      const despues = mm.getData() || [];
       let lista;
-      if (o && !sel) lista = antes.filter((x) => x.codigo !== o.codigo);                       // desmarcar la fila quita todas sus copias
+      if (o && !sel) lista = antes.filter((x) => x.codigo !== o.codigo);
       else { const cods = new Set(despues.map((x) => x.codigo)), quedan = antes.filter((x) => cods.has(x.codigo)), ya = new Set(quedan.map((x) => x.codigo)); lista = quedan.concat(despues.filter((x) => !ya.has(x.codigo))); }
-      if (lista.length !== despues.length || lista.some((x, i) => x !== despues[i])) fijarSel(m, lista);
+      if (lista.length !== despues.length || lista.some((x, i) => x !== despues[i])) fijarSel(mm, lista);
       return r;
     });
-    // quitar un token (×): se quita esa copia; la fila sigue marcada mientras quede otra copia del paso
-    parchearEvento(mi, 'tokenUpdate', function (orig, args) {
+    // quitar una etiqueta (×) de la barra: se quita esa copia; la fila sigue marcada mientras quede otra
+    if (mi) parchearEvento(mi, 'tokenUpdate', function (orig, args) {
       const e = args[0], quitados = ((e && e.getParameter && e.getParameter('removedTokens')) || []).map((t) => Number(t.getKey()));
-      const r = orig.apply(this, args), m = modeloSel(mi); if (!m) return r;
-      const arr = (m.getData() || []).slice(), quedan = new Set(arr.map((x) => x.codigo));
-      tabla.getItems().forEach((it) => { const c = it.getBindingContext('aListPaso'), ob = c && c.getObject(); if (ob && quitados.includes(ob.codigo) && quedan.has(ob.codigo)) it.setSelected(true); });
-      fijarSel(m, arr); return r;
+      const r = orig.apply(this, args), mm = modeloSel(mi); if (!mm) return r;
+      const arr = (mm.getData() || []).slice(), quedan = new Set(arr.map((x) => x.codigo));
+      tabla.getItems().forEach((it) => { const c = it.getBindingContext(modTabla), ob = c && c.getObject(); if (ob && quitados.includes(ob.codigo) && quedan.has(ob.codigo)) it.setSelected(true); });
+      fijarSel(mm, arr); return r;
     });
-    if (!on('repetirpaso')) { d.querySelectorAll('.rmd-token-mas').forEach((b) => b.remove()); d.querySelectorAll('.sapMToken[draggable]').forEach((t) => { t.removeAttribute('draggable'); t.classList.remove('rmd-token-rep'); }); return; }
-    const indice = (tokDom) => { const t = core.byId(tokDom.id), c = t && t.getBindingContext(RUTA_SEL); return c ? +String(c.getPath()).split('/').pop() : -1; };
-    d.querySelectorAll('.sapMToken').forEach((tk) => {
-      if (tk.querySelector('.rmd-token-mas')) return;
-      const b = document.createElement('span'); b.className = 'rmd-token-mas'; b.textContent = '+'; b.title = 'Repetir este paso: agrega otra copia justo a su lado'; b.setAttribute('role', 'button');
-      ['pointerdown', 'mousedown', 'touchstart', 'mouseup', 'dblclick'].forEach((ev) => b.addEventListener(ev, (x) => { x.stopPropagation(); x.preventDefault(); }));
-      b.addEventListener('click', (x) => {
-        x.stopPropagation(); x.preventDefault();
-        const m = modeloSel(mi), i = indice(tk); if (!m || i < 0) return;
-        const arr = (m.getData() || []).slice(); arr.splice(i + 1, 0, Object.assign({}, arr[i])); fijarSel(m, arr);
-        const n = arr.filter((y) => y.codigo === arr[i].codigo).length; toast(`Paso ${arr[i].codigo}: ${n} veces en la lista. Agregar los agrega en el orden de la barra.`);
-      });
-      const txt = tk.querySelector('.sapMTokenText'); if (txt) txt.after(b); else tk.appendChild(b); tk.classList.add('rmd-token-rep');
-      // arrastrar un token para cambiar el orden
-      tk.setAttribute('draggable', 'true');
-      tk.addEventListener('dragstart', (x) => { x.stopPropagation(); x.dataTransfer.effectAllowed = 'move'; x.dataTransfer.setData('text/plain', String(indice(tk))); tk.classList.add('rmd-token-arrastre'); });
-      tk.addEventListener('dragend', () => tk.classList.remove('rmd-token-arrastre'));
-      tk.addEventListener('dragover', (x) => { x.preventDefault(); x.dataTransfer.dropEffect = 'move'; tk.classList.add('rmd-token-destino'); });
-      tk.addEventListener('dragleave', () => tk.classList.remove('rmd-token-destino'));
-      tk.addEventListener('drop', (x) => {
-        x.preventDefault(); x.stopPropagation(); tk.classList.remove('rmd-token-destino');
-        const de = +x.dataTransfer.getData('text/plain'), a = indice(tk), m = modeloSel(mi); if (!m || de < 0 || a < 0 || de === a) return;
-        const arr = (m.getData() || []).slice(), [el] = arr.splice(de, 1); arr.splice(a, 0, el); fijarSel(m, arr);
-      });
-    });
+    if (!on('repetirpaso')) { d.querySelectorAll('.rmd-sel-panel').forEach((x) => x.remove()); return; }
+    pintarPanelPasos(d, tabla, m);
   }
+  window.__rmdStats.panelPasos = () => { const p = document.querySelector('.rmd-sel-panel'); return p && !p.hidden ? [...p.querySelectorAll('li')].map((li) => li.querySelector('.rmd-sel-cod').textContent + 'x' + li.querySelector('input').value) : []; };   // (pruebas)
+
   // ---- RMD en vivo (v1.24, opción apagada por defecto; v1.25: salta a lo que cambió, lo resalta un momento y recarga sin parpadeo) ----
   // Con la configuración de un RMD abierta, la mitad derecha de la pantalla muestra el PDF del RMD (el mismo que genera el portal
   // con "Imprimir" / "Ver master", con pdfMake) y se vuelve a generar solo después de cada cambio guardado. Las ventanas de
@@ -5239,10 +5282,11 @@
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
-    ['Productividad', ['saludo', 'paleta', 'titulo', 'barrafiltros']],
-    ['Ventanas y tablas', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende']],
-    ['Alertas', ['reglas', 'ordenest', 'recetas', 'recetaruta', 'sintipo', 'puesto']],
-    ['Herramientas', ['filtro', 'copiar', 'pasominusculas', 'espec', 'nuevopaso', 'verop', 'documentos', 'exportar', 'statusrmd', 'indicadores', 'equipos', 'citastodos', 'buscarequipo', 'suspension', 'recetas', 'recetasvarias', 'puestoreceta', 'repetirpaso', 'editarpaso', 'formulas', 'revisor', 'vivo', 'asociar', 'singuardar', 'exito', 'sesion', 'enter']],
+    ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion']],
+    ['Lista principal', ['barrafiltros', 'buscarequipo', 'revisor', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
+    ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
+    ['Asociar fórmulas', ['asociar', 'recetas', 'recetaruta', 'recetasvarias', 'puestoreceta']],
+    ['Alertas', ['reglas', 'ordenest', 'sintipo', 'puesto']],
   ];
   function panel() {
     const etiqueta = Object.fromEntries(OPC);
@@ -5261,7 +5305,7 @@
       ajustarTodo();
     });
     p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { p.open = false; abrirModificacionesMasivas('suspender'); });
-    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = true; }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
+    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
     panelEl = p; montarPanel();
   }
   // El botón cuelga de <html>, no de <body>: UI5 usa el <body> como zona de dibujo y, al montar la app (unos segundos después de cargar la página),

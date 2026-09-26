@@ -710,16 +710,16 @@ with sync_playwright() as p:
                 fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.wait_for_timeout(500)
                 r = fr.evaluate("""() => { const c=document.querySelector('#rmd-ui-panel .rmd-panel-cuerpo'); const q=c.getBoundingClientRect(); return {l:Math.round(q.left), t:Math.round(q.top), r:Math.round(q.right), b:Math.round(q.bottom), vw:innerWidth, vh:innerHeight, grupos:[...c.querySelectorAll('.rmd-grupo')].map(x=>x.textContent.trim()), filas:c.querySelectorAll('label.rmd-fila').length, ver:c.querySelector('.rmd-panel-cab span').textContent, scroll:c.scrollHeight>c.clientHeight}; }""")
                 pg.screenshot(path=f"data/panel_{w}x{h}.png"); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
-                return (r["l"] >= 0 and r["t"] >= 0 and r["r"] <= r["vw"] and r["b"] <= r["vh"] and len(r["grupos"]) == 4 and r["filas"] >= 18 and r["ver"].startswith("v")), str(r)
+                return (r["l"] >= 0 and r["t"] >= 0 and r["r"] <= r["vw"] and r["b"] <= r["vh"] and len(r["grupos"]) == 5 and r["filas"] >= 18 and r["ver"].startswith("v")), str(r)
         pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1000)
-        @prueba("K3 Cada interruptor cambia su opción y persiste; 'Restablecer' vuelve a activar todas")
+        @prueba("K3 Cada interruptor cambia su opción y persiste; 'Restablecer' vuelve a los valores por defecto (todas activas salvo RMD en vivo y hoja de ruta)")
         def _():
             fr.evaluate("document.querySelector('#rmd-ui-panel').open = true")
-            fr.locator("#rmd-ui-panel label:has-text('Enter = Ir') input").click(); pg.wait_for_timeout(500)
+            fr.locator("#rmd-ui-panel input[data-k=enter]").click(); pg.wait_for_timeout(500)
             a = fr.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')||'{}').enter"); marca = fr.evaluate("document.querySelector('#rmd-ui-panel input[data-k=enter]').checked")
             fr.locator("#rmd-ui-panel .rmd-restablecer").click(); pg.wait_for_timeout(500)
             b_ = fr.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')||'{}').enter"); marca2 = fr.evaluate("document.querySelector('#rmd-ui-panel input[data-k=enter]').checked")
-            todas = fr.evaluate("[...document.querySelectorAll('#rmd-ui-panel input[data-k]')].every(i=>i.checked)")
+            todas = fr.evaluate("[...document.querySelectorAll('#rmd-ui-panel input[data-k]')].every(i => i.checked === !['vivo', 'recetaruta'].includes(i.dataset.k))")
             fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
             return (a is False and marca is False and b_ is True and marca2 is True and todas), f"{a} {marca} {b_} {marca2} {todas}"
 
@@ -1239,41 +1239,47 @@ with sync_playwright() as p:
               const ir=[...d.querySelectorAll('button')].find(x=>x.textContent.trim()==='Ir'); const inp=d.querySelector('.sapUiAFLayoutItem input'); const nuevo=d.querySelector('.rmd-nuevo-paso');
               return { dialogo: r(d), ir: ir && r(ir), campo: inp && r(inp.closest('.sapMInputBase') || inp), nuevo: nuevo && r(nuevo) }; }""")
             return (l["dialogo"][2] == 1480 and l["ir"] and l["campo"] and abs(l["ir"][1] - l["campo"][1]) <= 8 and (not l["nuevo"] or abs(l["nuevo"][1] - l["ir"][1]) <= 2)), str(l)
-        @prueba("V3 Barra de seleccionados de 'Adicionar Pasos' (guardado SIMULADO + cortafuegos): '+' repite un paso junto a él, arrastrar cambia el orden, Agregar los envía en ese orden y el pie (Agregar/Cancelar) cabe en la pantalla")
+        def agregar_simulado_v(campo):
+            fr.evaluate("""(campo) => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar' && !x.closest('.sapMDialog')); const ctrl=sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener;
+              const cods = Object.fromEntries(ctrl.getView().getModel('aSeleccionadoPaso').getData().map(x => [x.pasoId, x.codigo]));
+              window.__capt=[]; window.__rest=[]; const m=ctrl.mainModelv2; window.__rest.push([m,'update',Object.prototype.hasOwnProperty.call(m,'update'),m.update]);
+              m.update=function(ruta,datos,prm){ window.__capt.push((datos[campo]||[]).map(x=>cods[x.pasoId_pasoId || x.pasoHijoId_pasoId])); setTimeout(()=>prm&&prm.success&&prm.success({}),30); }; }""", campo)
+            try:
+                fr.locator("footer button", has_text="Agregar").last.click(); pg.wait_for_timeout(1500)
+                fr.evaluate("() => { const m=[...document.querySelectorAll('.sapMMessageDialog')].filter(x=>x.getClientRects().length).pop(); const ok=m&&[...m.querySelectorAll('button')].find(x=>/^(OK|Aceptar)$/.test(x.textContent.trim())); if(ok) sap.ui.getCore().byId(ok.id.replace(/-inner$/,'')).firePress(); }")
+                pg.wait_for_timeout(8000); return fr.evaluate("window.__capt")
+            finally:
+                fr.evaluate("() => { (window.__rest||[]).reverse().forEach(([o,k,propio,v])=>{ if(propio) o[k]=v; else delete o[k]; }); window.__rest=[]; }")
+        def marcar_v(n, orden):
+            ids = fr.evaluate("() => [...(" + TOPV + ").querySelectorAll('table.sapMListTbl tbody tr')].filter(r => !/SubRow/.test(r.className) && r.querySelector('td.sapMListTblSelCol')).slice(0, " + str(n) + ").map(r => r.id)")
+            for k in orden: fr.locator(f"[id='{ids[k]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700)
+            return ids
+        PANEL = "window.__rmdStats.panelPasos()"
+        @prueba("V3 'Adicionar Pasos' (guardado SIMULADO + cortafuegos): panel 'Pasos a agregar' con cantidad (− n +, también escrita), ↑ ↓ y ×; marcar/desmarcar filas lo actualiza; Agregar envía exactamente ese orden y el pie cabe en la pantalla")
         def _():
             bloq = []
             def guardia(route):
                 if route.request.method not in ("GET", "HEAD"): bloq.append(route.request.method); route.abort()
                 else: route.continue_()
             pg.route("**/*", guardia)
-            TOK = "() => [...(" + TOPV + ").querySelectorAll('.sapMToken')].map(t => (t.querySelector('.sapMTokenText') || t).textContent.trim())"
             try:
-                ids = fr.evaluate("() => [...(" + TOPV + ").querySelectorAll('table.sapMListTbl tbody tr')].filter(r => !/SubRow/.test(r.className)).slice(0, 3).map(r => r.id)")
-                for k in [1, 0, 2]:
-                    fr.locator(f"[id='{ids[k]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700)
-                t0 = fr.evaluate(TOK)
-                for _i in range(3):
-                    fr.locator(".sapMToken").nth(1).locator(".rmd-token-mas").click(); pg.wait_for_timeout(600)
-                t1 = fr.evaluate(TOK)
-                fr.locator(f"[id='{ids[3 if len(ids) > 3 else 2]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700)   # marcar/desmarcar otra fila no quita las copias
-                fr.locator(f"[id='{ids[3 if len(ids) > 3 else 2]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700)
-                t2 = fr.evaluate(TOK)
-                fr.locator(".sapMToken").last.drag_to(fr.locator(".sapMToken").first, source_position={"x": 7, "y": 9}, target_position={"x": 5, "y": 9}); pg.wait_for_timeout(800)
-                t3 = fr.evaluate(TOK)
-                pie = fr.evaluate("() => { const d=" + TOPV + "; return [...d.querySelectorAll('footer button')].filter(x => x.getClientRects().length).every(x => x.getBoundingClientRect().bottom <= innerHeight) && !d.querySelector('.rmd-nota-repetir'); }")
-                fr.evaluate("""() => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar'); const ctrl=sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener;
-                  const cods = Object.fromEntries(ctrl.getView().getModel('aSeleccionadoPaso').getData().map(x => [x.pasoId, String(x.codigo)]));
-                  window.__capt=[]; window.__rest=[]; const m=ctrl.mainModelv2; window.__rest.push([m,'update',Object.prototype.hasOwnProperty.call(m,'update'),m.update]);
-                  m.update=function(ruta,datos,prm){ window.__capt.push((datos.aPaso||[]).map(x=>cods[x.pasoId_pasoId])); setTimeout(()=>prm&&prm.success&&prm.success({}),30); }; }""")
-                fr.locator("footer button", has_text="Agregar").last.click(); pg.wait_for_timeout(1500)
-                fr.evaluate("() => { const m=[...document.querySelectorAll('.sapMMessageDialog')].filter(x=>x.getClientRects().length).pop(); const ok=m&&[...m.querySelectorAll('button')].find(x=>/^(OK|Aceptar)$/.test(x.textContent.trim())); if(ok) sap.ui.getCore().byId(ok.id.replace(/-inner$/,'')).firePress(); }")
-                pg.wait_for_timeout(8000); env = fr.evaluate("window.__capt")
+                ids = marcar_v(4, [1, 0, 2]); a1 = fr.evaluate(PANEL)
+                for _i in range(3): fr.locator(".rmd-sel-panel li").nth(1).locator("button[data-a='mas']").click(); pg.wait_for_timeout(300)
+                a2 = fr.evaluate(PANEL)
+                c = fr.locator(".rmd-sel-panel li").nth(0).locator("input"); c.fill("2"); c.press("Enter"); pg.wait_for_timeout(500)
+                fr.locator(".rmd-sel-panel li").nth(2).locator("button[data-a='subir']").click(); pg.wait_for_timeout(400)
+                a3 = fr.evaluate(PANEL); marcadas = fr.evaluate("() => sap.ui.getCore().byId('frgAdicNewMdPasos--idTblPaso').getSelectedItems().length")
+                fr.locator(f"[id='{ids[3]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700); a4 = fr.evaluate(PANEL)
+                fr.locator(".rmd-sel-panel li").nth(3).locator("button[data-a='quitar']").click(); pg.wait_for_timeout(500); a5 = fr.evaluate(PANEL)
+                pie = fr.evaluate("() => { const d=" + TOPV + "; return [...d.querySelectorAll('footer button')].filter(x => x.getClientRects().length).every(x => x.getBoundingClientRect().bottom <= innerHeight); }")
+                modelo = fr.evaluate("() => sap.ui.getCore().byId('frgAdicNewMdPasos--idTblPaso').getModel('aSeleccionadoPaso').getData().map(x => String(x.codigo))")
+                env = agregar_simulado_v("aPaso")
             finally:
-                fr.evaluate("() => { (window.__rest||[]).reverse().forEach(([o,k,propio,v])=>{ if(propio) o[k]=v; else delete o[k]; }); window.__rest=[]; }")
                 pg.unroute("**/*", guardia)
-            esperado1 = t0[:2] + [t0[1]] * 3 + t0[2:]
-            ok = (len(t0) == 3 and t1 == esperado1 and t2 == t1 and t3 == [t1[-1]] + t1[:-1] and env == [t3] and pie and not bloq)
-            return ok, f"marcados={t0} +3={t1} tras marcar/desmarcar={t2} arrastrado={t3} enviado={env} pie ok={pie} bloqueadas={bloq}"
+            g = lambda l: [x.split("x")[1] for x in l]
+            ok = (len(a1) == 3 and g(a2) == ["1", "4", "1"] and g(a3) == ["2", "1", "4"] and marcadas == 3 and len(a4) == 4 and a5 == a3 and pie
+                  and env and [str(x) for x in env[0]] == modelo and len(modelo) == 7 and not bloq)
+            return ok, f"marcados={a1} +3={a2} cantidad/orden={a3} filas marcadas={marcadas} otra fila={a4} quitada={a5} enviado={env} pie={pie} bloqueadas={bloq}"
         cerrar_seguro()
         @prueba("V4 Receta con la lista de materiales cambiada en SAP: se detecta (comparando con la lectura del propio portal) y se avisa en la ventana raíz, sin impedir nada")
         def _():
