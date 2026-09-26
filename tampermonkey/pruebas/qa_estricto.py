@@ -1331,10 +1331,13 @@ with sync_playwright() as p:
                 return (all(re.match(r"^Jefe: [A-ZÁÉÍÓÚÑ]+( [A-ZÁÉÍÓÚÑ]+)+", x) for x in r)), str(r)
             RmdAutomation(pg).editor_de_rmd(RMD_EDIT); pg.wait_for_timeout(4000)
             abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(4000)
-            @prueba("W2 Editar Paso de un paso que está en otro RMD Ingresado: aviso con 'Generar un nuevo paso' (verde) y 'Sobrescribir' (ámbar); lo elegido se confirma solo a los 5 s y crea el paso nuevo solo para este RMD (SIMULADO)")
+            @prueba("W2 Editar Paso de un paso que está en otro RMD Ingresado: aviso al abrir; al Grabar, una ventana con antes → después y las opciones 'Solo en este RMD' / 'En este RMD y en N más'; la elegida se guarda a los 5 s en la misma ventana (SIMULADO: paso nuevo solo para este RMD)")
             def _():
                 fr.evaluate("(k) => { const d=" + TOPW + "; const trs=[...d.querySelector('table').querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)); sap.ui.getCore().byId(trs[k].id).firePress(); }", FILA_EDIT)
-                fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=30000); pg.wait_for_timeout(2500)
+                fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=30000)
+                try: fr.wait_for_selector(".rmd-ep-aviso", timeout=20000)
+                except Exception: pass
+                aviso = fr.evaluate("(document.querySelector('.rmd-ep-aviso') || {}).textContent || ''")
                 fr.evaluate("""() => { const ctrl=""" + CTRL + """; window.__capt=[]; window.__rest=[]; const cambiar=(o,k,f)=>{ window.__rest.push([o,k,Object.prototype.hasOwnProperty.call(o,k),o[k]]); o[k]=f; };
                   const sim=(tipo)=>function(ruta,datos,params){ window.__capt.push({ tipo, ruta:String(ruta) }); const p2=tipo==='remove'?datos:params; setTimeout(()=>{ if(p2&&p2.success) p2.success(datos||{}); },30); };
                   cambiar(ctrl.mainModelv2,'update',sim('update')); cambiar(ctrl.mainModelv2,'create',sim('create')); cambiar(ctrl.mainModelv2,'remove',sim('remove'));
@@ -1342,17 +1345,18 @@ with sync_playwright() as p:
                   const d=[...document.querySelectorAll('.sapMDialog')].filter(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||'')).pop();
                   const bG=[...d.querySelectorAll('button')].map(x=>sap.ui.getCore().byId(x.id.replace(/-inner$/,''))).find(x=>x&&x.getText&&x.getText()==='Grabar'); const M=bG.mEventRegistry.press[0].oListener;
                   cambiar(M,'getNextNumber',async()=>'PRUEBA-999'); bG.firePress(); }""")
-                fr.wait_for_selector(".rmd-modal", timeout=30000); pg.wait_for_timeout(700)
-                dlg = fr.evaluate("() => { const m=[...document.querySelectorAll('.rmd-modal')].pop(); return { titulo: m.querySelector('h3').textContent, botones: [...m.querySelectorAll('.rmd-modal-pie button')].map(x => [x.textContent, x.className.replace('rmd-btn', '').trim()]) }; }")
-                fr.locator(".rmd-modal-pie button", has_text="Generar un nuevo paso").last.click(); pg.wait_for_timeout(800)
-                conf = fr.evaluate("(document.querySelector('.rmd-modal .rmd-modal-cuerpo') || {}).innerText || ''")
-                pg.wait_for_timeout(6500); capt = fr.evaluate("window.__capt")
+                fr.wait_for_selector(".rmd-ep-opciones", timeout=30000); pg.wait_for_timeout(600)
+                dlg = fr.evaluate("() => { const m=[...document.querySelectorAll('.rmd-modal')].pop(); return { titulo: m.querySelector('h3').textContent, antes: m.querySelector('.rmd-ep-cambio').innerText, opciones: [...m.querySelectorAll('.rmd-ep-op')].map(b => [b.querySelector('b').textContent, b.className.replace('rmd-ep-op', '').trim(), b.disabled]) }; }")
+                pie = fr.evaluate("[...document.querySelectorAll('.rmd-modal-pie button')].filter(b => b.getClientRects().length).map(b => b.textContent)")
+                pg.screenshot(path="data/editar_paso_v130.png")
+                fr.locator(".rmd-ep-op.verde").click(); pg.wait_for_timeout(1200)
+                cuenta = fr.evaluate("(document.querySelector('.rmd-ep-cuenta p') || {}).textContent || ''")
+                pg.wait_for_timeout(6000); capt = fr.evaluate("window.__capt")
                 fr.evaluate("() => { (window.__rest||[]).reverse().forEach(([o,k,propio,v])=>{ if(propio) o[k]=v; else delete o[k]; }); window.__rest=[]; }")
                 fr.evaluate("() => { const d=[...document.querySelectorAll('.sapMDialog')].filter(d=>d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||'')).pop(); if (d) { const c=[...d.querySelectorAll('button')].find(x=>/^Cancelar$/.test(x.textContent.trim())); sap.ui.getCore().byId(c.id.replace(/-inner$/,'')).firePress(); } }")
-                cls = {b[0].split(" (")[0]: b[1] for b in dlg["botones"]}
-                ok = (cls.get("Generar un nuevo paso") == "exito" and cls.get("Sobrescribir el paso") == "ambar" and "Cancelar" in cls and "solo para este RMD" in conf
-                      and any(c["tipo"] == "create" and c["ruta"] == "/PASO" for c in capt) and any(c["tipo"] == "update" and "MD_ES_PASO" in c["ruta"] for c in capt))
-                return ok, f"{dlg} confirmación={conf[:80]!r} capturas={capt}"
+                ok = ("también lo usan" in aviso and dlg["titulo"] == "¿Dónde aplicar este cambio?" and "(PRUEBA)" in dlg["antes"] and dlg["opciones"][0][:2] == ["Solo en este RMD", "verde"] and dlg["opciones"][1][1] == "ambar" and dlg["opciones"][1][0].startswith("En este RMD y en") and pie == ["Cancelar"]
+                      and "solo para este RMD" in cuenta and "Se guarda en" in cuenta and any(c["tipo"] == "create" and c["ruta"] == "/PASO" for c in capt) and any(c["tipo"] == "update" and "MD_ES_PASO" in c["ruta"] for c in capt))
+                return ok, f"pie antes de elegir={pie} aviso={aviso[:90]!r} ventana={dlg} cuenta={cuenta[:90]!r} capturas={capt}"
             cerrar_seguro()
             RmdAutomation(pg).editor_de_rmd(RMD_EDIT); pg.wait_for_timeout(4000)
             abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "RENDIMIENTO", "Adicionar Pasos RMD"); pg.wait_for_timeout(4000)

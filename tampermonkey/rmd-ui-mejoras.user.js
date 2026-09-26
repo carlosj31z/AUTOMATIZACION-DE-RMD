@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.29.0
-// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Editar Paso sin afectar otros RMD ni duplicar pasos, reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.30.0
+// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.29.0';                                                       // mantener igual a @version
+  const VERSION = '1.30.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -38,7 +38,7 @@
     ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (⚠ con el detalle junto al código y botón "Revisar recetas" en Asociar fórmulas)'],
     ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (apagado por defecto)'],
     ['repetirpaso', 'Adicionar Pasos (también en procesos menores): panel "Pasos a agregar" con la cantidad de cada paso (− n +) y su orden (↑ ↓); Agregar los agrega así'],
-    ['editarpaso', 'Editar Paso: si el paso está en otros RMD, elegir entre generar uno nuevo (sin duplicar) o sobrescribirlo, con confirmación de 5 s'],
+    ['editarpaso', 'Editar Paso: avisa si el paso lo usan otros RMD y, al Grabar, deja elegir "Solo en este RMD" (paso nuevo o el ya existente, sin duplicar) o "En todos"'],
     ['formulas', 'Fórmulas: subir / bajar los términos sin eliminarlos (Alt+↑ / Alt+↓)'],
     ['recetasvarias', 'Asociar fórmulas: marcar varias recetas y eliminarlas de una vez'],
     ['puestoreceta', 'Asociar fórmulas: no asociar recetas con un puesto de trabajo distinto al de las ya asociadas'],
@@ -224,6 +224,15 @@
   .rmd-sel-panel button { min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid var(--rmd-borde); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-acento-texto); font: 700 14px var(--rmd-fuente); cursor: pointer; }
   .rmd-sel-panel button:hover:not(:disabled) { background: var(--rmd-acento); color: #fff; } .rmd-sel-panel button:disabled { opacity: .35; cursor: default; } .rmd-sel-panel .rmd-sel-quitar { color: var(--rmd-rojo); }
   .rmd-sel-cant input { width: 44px; height: 22px; text-align: center; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: inherit; font: 600 13px var(--rmd-fuente); }
+  .rmd-ep-aviso { margin: 8px 16px 0; padding: 7px 10px; border-left: 3px solid var(--rmd-acento); border-radius: 3px; background: rgba(27,141,236,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-ep-cambio { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; } .rmd-ep-cambio div { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; }
+  .rmd-ep-cambio span { color: var(--rmd-apagado); font-size: 12px; } .rmd-ep-cambio p { margin: 4px 0 0; } .rmd-ep-cambio div:first-child p { color: var(--rmd-apagado); }
+  .rmd-ep-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+  .rmd-ep-op { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 2px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); text-align: left; font: 13px/1.4 var(--rmd-fuente); cursor: pointer; }
+  .rmd-ep-op b { font-size: 14.5px; } .rmd-ep-op em { font-style: normal; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #2e7d32; } .rmd-ep-op span { color: var(--rmd-apagado); }
+  .rmd-ep-op.verde { border-color: #2e7d32; } .rmd-ep-op.verde:hover { background: rgba(46,125,50,.14); } .rmd-ep-op.ambar { border-color: #b26a00; } .rmd-ep-op.ambar:hover:not(:disabled) { background: rgba(178,106,0,.14); }
+  .rmd-ep-op:disabled { opacity: .5; cursor: not-allowed; }
+  .rmd-ep-barra { height: 6px; border-radius: 3px; background: rgba(128,128,128,.25); overflow: hidden; } .rmd-ep-barra i { display: block; height: 100%; width: 0; background: var(--rmd-acento); transition: width 1s linear; }
   .rmd-token-mas { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; margin: 0 2px 0 6px; border-radius: 3px; background: var(--rmd-acento); color: #fff; font: 700 12px/1 var(--rmd-fuente); cursor: pointer; }
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
   .rmd-btn.exito { background: #2e7d32; border-color: #2e7d32; color: #fff; } .rmd-btn.exito:hover { background: #276c2b; }
@@ -1220,7 +1229,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-sel-panel, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -4554,31 +4563,42 @@
   // "Generar un nuevo paso" (verde; si ya existe uno con la misma descripción, se usa ese en vez de duplicarlo) o "Sobrescribir el paso"
   // (ámbar; el Grabar del portal de siempre). Luego una confirmación que se acepta sola a los 5 s si no se pulsa Cancelar u OK.
   const ESTADOS_BLOQUEAN = ['465', '468'], ESTADOS_CERRADOS = ['465', '468', '466', '478'];
-  function confirmarConCuenta(titulo, mensaje, segundos = 5) {
-    return new Promise((resolver) => {
-      let n = segundos, hecho = false;
-      const fin = (v) => { if (hecho) return; hecho = true; clearInterval(reloj); v0.cerrar(); resolver(v); };
-      const v0 = ventana(titulo, { cancelar: () => fin(false) });
-      v0.cuerpo.innerHTML = `<p>${esc(mensaje)}</p><p class="rmd-nota rmd-cuenta"></p>`;
-      const cuenta = v0.cuerpo.querySelector('.rmd-cuenta'), pinta = () => setTxt(cuenta, `Se acepta automáticamente en ${n} s…`);
-      const reloj = setInterval(() => { n--; if (n <= 0) fin(true); else pinta(); }, 1000); pinta();
-      v0.pie.append(botonModal('Cancelar', '', () => fin(false)), botonModal('OK', 'primario', () => fin(true)));
-    });
-  }
+  // v1.30: una sola ventana que explica qué cambió y qué pasa con cada opción; la cuenta de 5 s va dentro (sin otra ventana)
+  const CAMPOS_PASO = [['descripcion', 'Descripción'], ['tipoDatoId_iMaestraId', 'Tipo de dato'], ['valorInicial', 'Valor inicial'], ['valorFinal', 'Valor final'], ['margen', 'Margen'],
+    ['decimales', 'Decimales'], ['numeracion', 'Numeración'], ['tipoLapsoId_motivoLapsoId', 'Lapso'], ['tipoCondicionId_iMaestraId', 'Condición']];
   function elegirEdicionPaso(info) {
     return new Promise((resolver) => {
-      const v0 = ventana('Este paso también está en otros RMD', { cancelar: () => { v0.cerrar(); resolver(null); } });
-      const lista = (xs) => xs.slice(0, 12).map((x) => `${x.codigo} v${x.version} (${x.estado})`).join(', ') + (xs.length > 12 ? ` y ${xs.length - 12} más` : '');
-      v0.cuerpo.innerHTML = `<p>El paso <b>${esc(info.codigo)}</b> — ${esc(info.descripcion)} —${info.enEste ? ' está en este RMD y' : ''} también está en:</p>
-        ${info.abiertos.length ? `<p><b>${info.abiertos.length} RMD en proceso</b> (Ingresado u otro estado abierto): ${esc(lista(info.abiertos))}.</p>` : ''}
-        ${info.bloquean.length ? `<p><b>${info.bloquean.length} RMD Autorizados o Suspendidos</b>: ${esc(lista(info.bloquean))}. Ahí no se puede sobrescribir.</p>` : ''}
-        ${info.dup ? `<p class="rmd-nota">Ya existe otro paso con la misma descripción: <b>${esc(info.dup.codigo)}</b>. "Generar un nuevo paso" usará ese paso en vez de crear un duplicado.</p>` : ''}`;
-      const verde = botonModal(info.dup ? `Usar el paso existente ${info.dup.codigo}` : 'Generar un nuevo paso', 'exito', () => { v0.cerrar(); resolver('nuevo'); });
-      verde.title = 'Solo este RMD cambia: los demás RMD siguen con el paso de siempre.';
-      const ambar = botonModal(`Sobrescribir el paso (afecta a ${info.abiertos.length} RMD)`, 'ambar', () => { v0.cerrar(); resolver('sobrescribir'); });
-      ambar.title = 'Cambia el paso maestro: se ve el cambio en todos los RMD en proceso que lo usan.';
-      if (info.bloquean.length) { ambar.disabled = true; ambar.title = 'El paso está en RMD Autorizados o Suspendidos: el portal no permite sobrescribirlo.'; }
-      v0.pie.append(botonModal('Cancelar', '', () => { v0.cerrar(); resolver(null); }), ambar, verde);
+      let reloj = null, hecho = false;
+      const fin = (v) => { if (hecho) return; hecho = true; clearInterval(reloj); v0.cerrar(); resolver(v); };
+      const v0 = ventana('¿Dónde aplicar este cambio?', { cancelar: () => fin(null) });
+      const lista = (xs) => xs.slice(0, 15).map((x) => `${x.codigo} v${x.version} (${x.estado})`).join(', ') + (xs.length > 15 ? ` y ${xs.length - 15} más` : '');
+      const otros = info.abiertos.length, bloq = info.bloquean.length;
+      const cambios = info.cambios.filter((c) => c.clave !== 'descripcion').map((c) => c.nombre);
+      const sobrescribible = !bloq && otros > 0;
+      v0.cuerpo.innerHTML = `<div class="rmd-ep-cambio"><div><span>Paso ${esc(info.codigo)} antes</span><p>${esc(info.antes)}</p></div><div><span>Después</span><p>${esc(info.descripcion)}</p></div></div>
+        ${cambios.length ? `<p class="rmd-nota">También cambia: ${esc(cambios.join(', '))}.</p>` : ''}
+        <p>Este paso no es solo de este RMD: ${otros ? `también lo usan <b>${otros} RMD en proceso</b>` : ''}${otros && bloq ? ' y ' : ''}${bloq ? `<b>${bloq} RMD autorizados o suspendidos</b>` : ''}${!otros && !bloq ? 'ya existe otro paso con esta misma descripción' : ''}. Elige dónde aplicar el cambio:</p>
+        <div class="rmd-ep-opciones">
+          <button type="button" class="rmd-ep-op verde" data-v="nuevo"><b>Solo en este RMD</b> <em>recomendado</em>
+            <span>${info.dup ? `Este RMD pasa a usar el paso que ya existe con esa descripción (<b>${esc(info.dup.codigo)}</b>): no se crea un duplicado.` : 'Se crea un paso nuevo (con otro código) solo para este RMD.'} Los demás RMD no cambian.</span></button>
+          <button type="button" class="rmd-ep-op ambar" data-v="sobrescribir" ${sobrescribible ? '' : 'disabled'}><b>En este RMD y en ${otros} RMD más</b>
+            <span>${bloq ? 'No disponible: el paso está en RMD autorizados o suspendidos y el portal no deja cambiarlo ahí.' : !otros ? 'No aplica: ningún otro RMD en proceso usa este paso.' : `Se cambia el paso ${esc(info.codigo)} para todos. El cambio se verá también en: ${esc(lista(info.abiertos))}. Después el portal pedirá su propia confirmación.`}</span></button>
+        </div>
+        ${bloq ? `<p class="rmd-nota">RMD autorizados o suspendidos que usan el paso: ${esc(lista(info.bloquean))}.</p>` : ''}
+        <div class="rmd-ep-cuenta"><p></p><div class="rmd-ep-barra"><i></i></div></div>`;
+      const opciones = v0.cuerpo.querySelector('.rmd-ep-opciones'), caja = v0.cuerpo.querySelector('.rmd-ep-cuenta'), txt = caja.querySelector('p'), barra = caja.querySelector('i');
+      const ver = (el, v) => { el.style.display = v ? '' : 'none'; };
+      const bCancelar = botonModal('Cancelar', '', () => fin(null)), bVolver = botonModal('Volver', '', () => { clearInterval(reloj); ver(caja, false); ver(opciones, true); ver(bVolver, false); ver(bAhora, false); ver(bCancelar, true); });
+      let elegida = null; const bAhora = botonModal('Guardar ahora', 'primario', () => fin(elegida));
+      ver(bVolver, false); ver(bAhora, false); ver(caja, false);
+      opciones.addEventListener('click', (e) => {
+        const b = e.target.closest('.rmd-ep-op'); if (!b || b.disabled) return;
+        elegida = b.dataset.v; ver(opciones, false); ver(caja, true); ver(bCancelar, false); ver(bVolver, true); ver(bAhora, true);
+        const que = elegida === 'nuevo' ? (info.dup ? `Este RMD usará el paso ${info.dup.codigo}; los demás no cambian.` : 'Se creará un paso nuevo solo para este RMD; los demás no cambian.') : `Se cambiará el paso ${info.codigo} en este RMD y en ${otros} RMD más.`;
+        let n = 5; const pinta = () => { setTxt(txt, `${que} Se guarda en ${n} s… (pulsa "Volver" para elegir otra opción)`); barra.style.width = `${(5 - n) * 20}%`; };
+        pinta(); clearInterval(reloj); reloj = setInterval(() => { n--; if (n <= 0) { barra.style.width = '100%'; fin(elegida); } else pinta(); }, 1000);
+      });
+      v0.pie.append(bCancelar, bVolver, bAhora);
     });
   }
   async function usoDelPaso(modelo, pasoId, mdIdActual) {
@@ -4625,12 +4645,30 @@
     if (comp === 'pasoHijo') M.oEditPasoHijoRM.close(); else M.oEditPasoRM.close();
     return codigo;
   }
+  // al abrir "Editar Paso": aviso arriba si el paso también está en otros RMD (así la pregunta al Grabar no sorprende)
+  function avisoUsoAlAbrir(d, bG) {
+    const b = controladorPrincipal(); if (!b) return;
+    const comp = bG.data && bG.data('component'), lm = b.getView().getModel('localModel');
+    const dd = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado'); if (!dd || !dd.pasoId) return;
+    if (d.__rmdUsoPaso === dd.pasoId) return; d.__rmdUsoPaso = dd.pasoId;
+    const md = b.getView().getModel('asociarDatos').getData();
+    usoDelPaso(b.getView().getModel('mainModelv2'), dd.pasoId, md.mdId).then((u) => {
+      if (!d.isConnected || d.__rmdUsoPaso !== dd.pasoId) return;
+      d.querySelectorAll('.rmd-ep-aviso').forEach((x) => x.remove());
+      const otros = u.abiertos.length, bloq = u.bloquean.length; if (!otros && !bloq) return;
+      const a = document.createElement('div'); a.className = 'rmd-ep-aviso';
+      a.innerHTML = `ℹ Este paso también lo usan ${otros ? `<b>${otros} RMD en proceso</b>` : ''}${otros && bloq ? ' y ' : ''}${bloq ? `<b>${bloq} RMD autorizados o suspendidos</b>` : ''}. Al pulsar <b>Grabar</b> podrás elegir si el cambio es <b>solo para este RMD</b> o para todos.`;
+      a.title = [...u.abiertos, ...u.bloquean].slice(0, 30).map((x) => `${x.codigo} v${x.version} (${x.estado})`).join('\n');
+      const sec = d.querySelector('.sapMDialogSection'); if (sec) sec.prepend(a);
+    }, () => {});
+  }
   function gestionarEdicionPasos() {
     const d = dialogos().find((x) => /^Editar Paso/i.test(cabecera(x))); if (!d || typeof sap === 'undefined') return;
     const bG = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((x) => x && x.getText && x.getText() === 'Grabar');
     const reg = bG && ((bG.mEventRegistry || {}).press || [])[0], M = reg && reg.oListener;
     if (!M || typeof M.onGrabarPasoPadre !== 'function' || (reg.fFunction !== M.onGrabarPasoPadre && !reg.fFunction.__rmdGrabar)) return;   // solo el Grabar del editor del RMD
     if (!on('editarpaso')) { if (reg.fFunction.__rmdGrabar) reg.fFunction = reg.fFunction.__rmdGrabar; return; }
+    avisoUsoAlAbrir(d, bG);
     if (reg.fFunction.__rmdGrabar) return;
     const orig = reg.fFunction;
     const w = async function (e) {
@@ -4646,12 +4684,9 @@
         const [uso, dup] = await Promise.all([usoDelPaso(modelo, dd.pasoId, md.mdId), pasoDuplicado(modelo, dd)]);
         const hayDup = dup && String(dd.descripcion || '').toLowerCase() !== String((nn || {}).descripcion || '').toLowerCase() ? dup : (uso.bloquean.length ? dup : null);
         if (!uso.abiertos.length && !uso.bloquean.length && !hayDup) return portal();   // solo este RMD: el Grabar de siempre
-        const eleccion = await elegirEdicionPaso({ codigo: (nn && nn.codigo) || dd.codigo, descripcion: norm(dd.descripcion), enEste: uso.enEste, abiertos: uso.abiertos, bloquean: uso.bloquean, dup: hayDup });
+        const cambios = CAMPOS_PASO.filter(([k]) => String((nn || {})[k] == null ? '' : nn[k]) !== String(dd[k] == null ? '' : dd[k])).map(([clave, nombre]) => ({ clave, nombre }));
+        const eleccion = await elegirEdicionPaso({ codigo: (nn && nn.codigo) || dd.codigo, antes: norm((nn || {}).descripcion), descripcion: norm(dd.descripcion), cambios, enEste: uso.enEste, abiertos: uso.abiertos, bloquean: uso.bloquean, dup: hayDup });
         if (!eleccion) return undefined;
-        const texto = eleccion === 'sobrescribir'
-          ? `Se sobrescribirá el paso ${(nn && nn.codigo) || ''}: el cambio se verá en este RMD y en ${uso.abiertos.length} RMD en proceso.`
-          : hayDup ? `Este RMD pasará a usar el paso existente ${hayDup.codigo} (no se crea un duplicado). Los demás RMD no cambian.` : 'Se creará un paso nuevo solo para este RMD. Los demás RMD no cambian.';
-        if (!(await confirmarConCuenta('Confirmar', texto))) return undefined;
         if (eleccion === 'sobrescribir') return portal();
         sap.ui.core.BusyIndicator.show(0);
         try { const cod = await nuevoPasoSoloEste(M, b, comp, dd, hayDup); toast(hayDup ? `Este RMD usa ahora el paso ${cod}.` : `Se creó el paso ${cod} solo para este RMD.`); }
