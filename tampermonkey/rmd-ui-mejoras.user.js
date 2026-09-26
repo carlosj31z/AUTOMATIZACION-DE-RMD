@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.32.0
-// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso mayor por otro código conservando su configuración y procesos menores, Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.33.0
+// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.32.0';                                                       // mantener igual a @version
+  const VERSION = '1.33.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -38,7 +38,7 @@
     ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (⚠ con el detalle junto al código y botón "Revisar recetas" en Asociar fórmulas)'],
     ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (apagado por defecto)'],
     ['repetirpaso', 'Adicionar Pasos (también en procesos menores): panel "Pasos a agregar" con la cantidad de cada paso (− n +) y su orden (↑ ↓); Agregar los agrega así'],
-    ['cambiarpaso', 'Botón "Cambiar paso": cambia un paso mayor por otro código de paso ya creado, sin tocar su configuración ni sus procesos menores'],
+    ['cambiarpaso', 'Botón "Cambiar paso" (pasos y procesos menores): cambia un paso por otro código de paso ya creado, sin tocar su configuración ni, en un paso mayor, sus procesos menores'],
     ['editarpaso', 'Editar Paso: avisa si el paso lo usan otros RMD y, al Grabar, deja elegir "Solo en este RMD" (paso nuevo o el ya existente, sin duplicar) o "En todos"'],
     ['formulas', 'Fórmulas: subir / bajar los términos sin eliminarlos (Alt+↑ / Alt+↓)'],
     ['recetasvarias', 'Asociar fórmulas: marcar varias recetas y eliminarlas de una vez'],
@@ -790,8 +790,8 @@
     else if (esPasos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); filas.forEach((tr) => tr.style.removeProperty('display')); }
     if (esPasos && on('copiar')) instalarBotonesCopia(d);
     else if (esPasos) d.querySelectorAll('.rmd-copia-grupo, .rmd-clip').forEach((e) => e.remove());
-    if (esPasos && on('cambiarpaso')) instalarBotonCambiarPaso(d, tabla);
-    else if (esPasos) d.querySelectorAll('.rmd-cambiar-paso').forEach((e) => e.remove());
+    if ((esPasos || esPM) && on('cambiarpaso')) instalarBotonCambiarPaso(d, tabla);
+    else if (esPasos || esPM) d.querySelectorAll('.rmd-cambiar-paso').forEach((e) => e.remove());
     if ((esPasos || esPM) && on('pasominusculas')) instalarBotonMinusculas(d, tabla);
     else if (esPasos || esPM) d.querySelectorAll('.rmd-minusculas').forEach((e) => e.remove());
     else if (esPM && on('reglas')) filtroLocal(tabla, false);
@@ -5346,32 +5346,31 @@
     if (window.__rmdCambiando) return;
     const sel = seleccionadas(tabla);
     if (sel.length !== 1) { toast('Marca la casilla de UN solo paso y pulsa "Cambiar paso".', true); return; }
-    const o = objetoDeFila(sel[0]) || {}, m = objetoCargado(o.pasoId);
-    if (!o.mdEstructuraPasoId || !m) { toast('Esa fila no es un paso del RMD (¿un insumo?).', true); return; }
-    const b = controladorPrincipal(), md = b && b.getView().getModel('asociarDatos').getData(), M = controladorPasos(d);
-    if (!b || !M) { toast('No se encontró el controlador del portal para esta lista.', true); return; }
+    const o = objetoDeFila(sel[0]) || {}, esMenor = !!o.pasoHijoId_pasoId, m = esMenor ? objetoCargado(o.pasoHijoId) : objetoCargado(o.pasoId);   // (en un proceso menor, pasoId es la fila del paso mayor)
+    if ((esMenor ? !o.mdEstructuraPasoInsumoPasoId : !o.mdEstructuraPasoId) || !m || !m.codigo) { toast('Esa fila no es un paso del RMD (¿un insumo de la receta?).', true); return; }
+    const origen = esMenor ? { tipo: 'menor', id: o.mdEstructuraPasoInsumoPasoId, orden: o.orden } : { tipo: 'mayor', id: o.mdEstructuraPasoId, orden: o.orden };
+    const b = controladorPrincipal(), md = b && b.getView().getModel('asociarDatos').getData();
+    if (!b) { toast('No se encontró el controlador del portal para esta lista.', true); return; }
     if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) { toast('Este RMD está autorizado o suspendido: sus pasos no se pueden cambiar.', true); return; }
     const modelo = b.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
-    const pms = await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('pasoId_mdEstructuraPasoId', 'EQ', o.mdEstructuraPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,activo' }).catch(() => []);
+    const pms = esMenor ? [] : await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('pasoId_mdEstructuraPasoId', 'EQ', o.mdEstructuraPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,activo' }).catch(() => []);
     const nPM = pms.filter((x) => x.activo !== false).length;
     const v = ventana('Cambiar el paso por otro código', { cancelar: () => v.cerrar() });
     const tipo = nombreTipo(o.tipoDatoId_iMaestraId, tabla) || '';
-    v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>Paso actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p></div>
-      <p class="rmd-nota">Solo cambia el paso maestro al que apunta esta fila. <b>Se conserva</b> toda su configuración en este RMD${tipo ? ` (tipo de dato ${esc(tipo)}` : ' ('}, decimales, valores, puesto de trabajo, clave modelo, casillas, depende y orden) y sus <b>${nPM} proceso(s) menor(es)</b>.</p>
+    v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>${esMenor ? 'Proceso menor' : 'Paso'} actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p></div>
+      <p class="rmd-nota">Solo cambia el paso maestro al que apunta esta fila. <b>Se conserva</b> toda su configuración en este RMD${tipo ? ` (tipo de dato ${esc(tipo)}` : ' ('}, decimales, valores, ${esMenor ? 'casillas y orden)' : `puesto de trabajo, clave modelo, casillas, depende y orden) y sus <b>${nPM} proceso(s) menor(es)</b>`}.</p>
       <div class="rmd-cp-busca"><input type="search" class="rmd-cp-q" placeholder="Código o palabras de la descripción del paso nuevo" aria-label="Paso nuevo"><button type="button" class="rmd-btn rmd-cp-buscar">Buscar</button></div>
       <p class="rmd-progreso"></p><div class="rmd-cp-res"></div>`;
     const q = v.cuerpo.querySelector('.rmd-cp-q'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-cp-res');
     let elegido = null, hallados = [];
     const bCambiar = botonModal('Cambiar paso', 'primario', async () => {
       if (!elegido) return;
-      const ok = await confirmar('¿Cambiar el paso?', `Orden ${o.orden}: el paso ${m.codigo} pasa a ser el ${elegido.codigo} — ${elegido.descripcion}.`, `Se conservan la configuración de esta fila y sus ${nPM} proceso(s) menor(es). Los demás RMD no cambian.`, { si: 'Cambiar', no: 'Cancelar' });
+      const ok = await confirmar('¿Cambiar el paso?', `Orden ${o.orden}: el ${esMenor ? 'proceso menor' : 'paso'} ${m.codigo} pasa a ser el ${elegido.codigo} — ${elegido.descripcion}.`, `Se conserva la configuración de esta fila${esMenor ? '' : ` y sus ${nPM} proceso(s) menor(es)`}. Los demás RMD no cambian.`, { si: 'Cambiar', no: 'Cancelar' });
       if (!ok) return;
       window.__rmdCambiando = true; bCambiar.disabled = true; sap.ui.core.BusyIndicator.show(0);
       try {
-        await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${o.mdEstructuraPasoId}')`, { pasoId_pasoId: elegido.pasoId });
-        await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
-        const etq = b.getView().getModel('headerAddEtiqueta'); if (etq && etq.getData().length !== 0) await M.onGetPasosToAssignProcess(); else await M.onGetPasosToAssign();
-        v.cerrar(); toast(`Orden ${o.orden}: ahora usa el paso ${elegido.codigo}. Configuración y procesos menores sin cambios.`);
+        await reemplazarPasoDeFila(origen, elegido);
+        v.cerrar(); toast(`Orden ${o.orden}: ahora usa el paso ${elegido.codigo}. ${esMenor ? 'Configuración sin cambios.' : 'Configuración y procesos menores sin cambios.'}`);
       } catch (e) { setTxt(prog, 'No se pudo cambiar: ' + e.message); bCambiar.disabled = false; }
       finally { window.__rmdCambiando = false; sap.ui.core.BusyIndicator.hide(); }
     });
