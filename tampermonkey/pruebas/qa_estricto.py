@@ -1436,6 +1436,29 @@ with sync_playwright() as p:
             cerrar_seguro()
         finally:
             pg.unroute("**/*", guardia_w)
+        @prueba("W8 'Cambiar paso' (SIMULADO + cortafuegos): cambia un paso mayor por otro código enviando SOLO pasoId_pasoId de su MD_ES_PASO (se conservan configuración y procesos menores)")
+        def _():
+            pg.route("**/*", guardia_w)
+            try:
+                RmdAutomation(pg).editor_de_rmd(RMD_EDIT); pg.wait_for_timeout(4000)
+                abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(5000)
+                marcar_fila(fr, pg, 3)
+                fr.evaluate("() => { const m = " + CTRL + ".mainModelv2; window.__u0 = m.update; window.__capt = []; m.update = function (ruta, datos, prm) { window.__capt.push({ ruta: String(ruta), datos }); setTimeout(() => prm && prm.success && prm.success({}), 30); }; }")
+                try:
+                    fr.locator(".rmd-cambiar-paso").click(); pg.wait_for_timeout(2500)
+                    nota = fr.evaluate("document.querySelector('.rmd-modal .rmd-nota').innerText")
+                    fr.locator(".rmd-cp-q").fill("fecha hora inicio"); fr.locator(".rmd-cp-q").press("Enter"); pg.wait_for_timeout(4000)
+                    fr.locator(".rmd-cp-res tbody tr").first.click(); pg.wait_for_timeout(300)
+                    fr.locator(".rmd-modal-pie button", has_text="Cambiar paso").click(); pg.wait_for_timeout(700)
+                    fr.locator(".rmd-modal-pie button", has_text="Cambiar").last.click(); pg.wait_for_timeout(8000)
+                    capt = fr.evaluate("window.__capt")
+                finally:
+                    fr.evaluate("() => { " + CTRL + ".mainModelv2.update = window.__u0; }")
+                cerrar_seguro()
+            finally:
+                pg.unroute("**/*", guardia_w)
+            ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
+            return ok, f"enviado={capt} nota={nota[:120]!r}"
         @prueba("W7 Ninguna petición de escritura salió del navegador durante el bloque W")
         def _():
             return (not bloq_w), str(bloq_w[:5])

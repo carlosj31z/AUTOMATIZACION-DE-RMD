@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.30.0
-// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.31.0
+// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso mayor por otro código conservando su configuración y procesos menores, Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.30.0';                                                       // mantener igual a @version
+  const VERSION = '1.31.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -38,6 +38,7 @@
     ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (⚠ con el detalle junto al código y botón "Revisar recetas" en Asociar fórmulas)'],
     ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (apagado por defecto)'],
     ['repetirpaso', 'Adicionar Pasos (también en procesos menores): panel "Pasos a agregar" con la cantidad de cada paso (− n +) y su orden (↑ ↓); Agregar los agrega así'],
+    ['cambiarpaso', 'Botón "Cambiar paso": cambia un paso mayor por otro código de paso ya creado, sin tocar su configuración ni sus procesos menores'],
     ['editarpaso', 'Editar Paso: avisa si el paso lo usan otros RMD y, al Grabar, deja elegir "Solo en este RMD" (paso nuevo o el ya existente, sin duplicar) o "En todos"'],
     ['formulas', 'Fórmulas: subir / bajar los términos sin eliminarlos (Alt+↑ / Alt+↓)'],
     ['recetasvarias', 'Asociar fórmulas: marcar varias recetas y eliminarlas de una vez'],
@@ -233,6 +234,9 @@
   .rmd-ep-op.verde { border-color: #2e7d32; } .rmd-ep-op.verde:hover { background: rgba(46,125,50,.14); } .rmd-ep-op.ambar { border-color: #b26a00; } .rmd-ep-op.ambar:hover:not(:disabled) { background: rgba(178,106,0,.14); }
   .rmd-ep-op:disabled { opacity: .5; cursor: not-allowed; }
   .rmd-ep-barra { height: 6px; border-radius: 3px; background: rgba(128,128,128,.25); overflow: hidden; } .rmd-ep-barra i { display: block; height: 100%; width: 0; background: var(--rmd-acento); transition: width 1s linear; }
+  .rmd-cp-actual { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; margin-bottom: 8px; } .rmd-cp-actual span { color: var(--rmd-apagado); font-size: 12px; } .rmd-cp-actual p { margin: 4px 0 0; }
+  .rmd-cp-busca { display: flex; gap: 8px; margin: 8px 0; } .rmd-cp-busca input { flex: 1; }
+  .rmd-cp-res tr[data-i] { cursor: pointer; } .rmd-cp-res tr.rmd-cp-sel td { background: rgba(27,141,236,.16); }
   .rmd-token-mas { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; margin: 0 2px 0 6px; border-radius: 3px; background: var(--rmd-acento); color: #fff; font: 700 12px/1 var(--rmd-fuente); cursor: pointer; }
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
   .rmd-btn.exito { background: #2e7d32; border-color: #2e7d32; color: #fff; } .rmd-btn.exito:hover { background: #276c2b; }
@@ -784,6 +788,8 @@
     else if (esPasos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); filas.forEach((tr) => tr.style.removeProperty('display')); }
     if (esPasos && on('copiar')) instalarBotonesCopia(d);
     else if (esPasos) d.querySelectorAll('.rmd-copia-grupo, .rmd-clip').forEach((e) => e.remove());
+    if (esPasos && on('cambiarpaso')) instalarBotonCambiarPaso(d, tabla);
+    else if (esPasos) d.querySelectorAll('.rmd-cambiar-paso').forEach((e) => e.remove());
     if ((esPasos || esPM) && on('pasominusculas')) instalarBotonMinusculas(d, tabla);
     else if (esPasos || esPM) d.querySelectorAll('.rmd-minusculas').forEach((e) => e.remove());
     else if (esPM && on('reglas')) filtroLocal(tabla, false);
@@ -1229,7 +1235,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
@@ -5287,6 +5293,7 @@
   };
   window.__rmdStats.abrirVentanaNuevoPaso = abrirVentanaNuevoPaso;   // (diagnóstico: abre "Nuevo Paso" vacío; no pulsa Agregar)
 
+  const ICONO_CAMBIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5h10M10 2.5 12.5 5 10 7.5"/><path d="M13.5 11h-10M6 8.5 3.5 11 6 13.5"/></svg>';
   const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
   const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
@@ -5314,12 +5321,87 @@
     else { const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((x) => x.title === 'Imprimir'); b.style.marginRight = '10px'; if (ref) hdr.insertBefore(b, ref); else hdr.appendChild(b); }
   }
 
+  // ---- "Cambiar paso" (v1.31): cambiar el paso maestro de un paso mayor por otro código, sin tocar su configuración ----
+  // En el RMD, cada paso es una fila de MD_ES_PASO con SU configuración (tipo de dato, decimales, puesto, clave, casillas, depende,
+  // orden…) que apunta al paso maestro (pasoId_pasoId); sus procesos menores cuelgan de esa fila (pasoId_mdEstructuraPasoId), no del
+  // paso maestro. Cambiar el paso = actualizar solo pasoId_pasoId de esa fila: todo lo demás queda igual. Solo en RMD que no estén
+  // autorizados ni suspendidos (el portal tampoco deja cambiarlos). Luego se refresca la lista como hace el portal.
+  function controladorPasos(d) {
+    const b = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((c) => c && c.mEventRegistry && c.mEventRegistry.press && c.mEventRegistry.press[0].oListener && typeof c.mEventRegistry.press[0].oListener.onGetPasosToAssign === 'function');
+    return b && b.mEventRegistry.press[0].oListener;
+  }
+  async function cambiarPasoMayor(d, tabla) {
+    if (window.__rmdCambiando) return;
+    const sel = seleccionadas(tabla);
+    if (sel.length !== 1) { toast('Marca la casilla de UN solo paso y pulsa "Cambiar paso".', true); return; }
+    const o = objetoDeFila(sel[0]) || {}, m = objetoCargado(o.pasoId);
+    if (!o.mdEstructuraPasoId || !m) { toast('Esa fila no es un paso del RMD (¿un insumo?).', true); return; }
+    const b = controladorPrincipal(), md = b && b.getView().getModel('asociarDatos').getData(), M = controladorPasos(d);
+    if (!b || !M) { toast('No se encontró el controlador del portal para esta lista.', true); return; }
+    if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) { toast('Este RMD está autorizado o suspendido: sus pasos no se pueden cambiar.', true); return; }
+    const modelo = b.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
+    const pms = await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('pasoId_mdEstructuraPasoId', 'EQ', o.mdEstructuraPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,activo' }).catch(() => []);
+    const nPM = pms.filter((x) => x.activo !== false).length;
+    const v = ventana('Cambiar el paso por otro código', { cancelar: () => v.cerrar() });
+    const tipo = nombreTipo(o.tipoDatoId_iMaestraId, tabla) || '';
+    v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>Paso actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p></div>
+      <p class="rmd-nota">Solo cambia el paso maestro al que apunta esta fila. <b>Se conserva</b> toda su configuración en este RMD${tipo ? ` (tipo de dato ${esc(tipo)}` : ' ('}, decimales, valores, puesto de trabajo, clave modelo, casillas, depende y orden) y sus <b>${nPM} proceso(s) menor(es)</b>.</p>
+      <div class="rmd-cp-busca"><input type="search" class="rmd-cp-q" placeholder="Código o palabras de la descripción del paso nuevo" aria-label="Paso nuevo"><button type="button" class="rmd-btn rmd-cp-buscar">Buscar</button></div>
+      <p class="rmd-progreso"></p><div class="rmd-cp-res"></div>`;
+    const q = v.cuerpo.querySelector('.rmd-cp-q'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-cp-res');
+    let elegido = null, hallados = [];
+    const bCambiar = botonModal('Cambiar paso', 'primario', async () => {
+      if (!elegido) return;
+      const ok = await confirmar('¿Cambiar el paso?', `Orden ${o.orden}: el paso ${m.codigo} pasa a ser el ${elegido.codigo} — ${elegido.descripcion}.`, `Se conservan la configuración de esta fila y sus ${nPM} proceso(s) menor(es). Los demás RMD no cambian.`, { si: 'Cambiar', no: 'Cancelar' });
+      if (!ok) return;
+      window.__rmdCambiando = true; bCambiar.disabled = true; sap.ui.core.BusyIndicator.show(0);
+      try {
+        await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${o.mdEstructuraPasoId}')`, { pasoId_pasoId: elegido.pasoId });
+        await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
+        const etq = b.getView().getModel('headerAddEtiqueta'); if (etq && etq.getData().length !== 0) await M.onGetPasosToAssignProcess(); else await M.onGetPasosToAssign();
+        v.cerrar(); toast(`Orden ${o.orden}: ahora usa el paso ${elegido.codigo}. Configuración y procesos menores sin cambios.`);
+      } catch (e) { setTxt(prog, 'No se pudo cambiar: ' + e.message); bCambiar.disabled = false; }
+      finally { window.__rmdCambiando = false; sap.ui.core.BusyIndicator.hide(); }
+    });
+    bCambiar.disabled = true;
+    const pintar = () => {
+      res.innerHTML = hallados.length ? `<table class="rmd-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th>Etiqueta</th><th>Tipo de dato (maestro)</th></tr></thead><tbody>${hallados.map((x, i) =>
+        `<tr class="${elegido === x ? 'rmd-cp-sel' : ''}" data-i="${i}"><td><input type="radio" name="rmd-cp" ${elegido === x ? 'checked' : ''}></td><td>${esc(x.codigo)}</td><td>${esc(x.descripcion)}</td><td>${esc((x.etiquetaId && x.etiquetaId.descripcion) || '')}${x.etiquetaId_etiquetaId !== m.etiquetaId_etiquetaId ? ' <span class="rmd-dif">(otra etiqueta)</span>' : ''}</td><td>${esc((x.tipoDatoId && x.tipoDatoId.contenido) || '')}</td></tr>`).join('')}</tbody></table>` : '';
+      bCambiar.disabled = !elegido;
+    };
+    res.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; elegido = hallados[+tr.dataset.i]; pintar(); });
+    const buscar = async () => {
+      const t = norm(q.value); if (t.length < 1) { setTxt(prog, 'Escribe un código o palabras de la descripción.'); return; }
+      setTxt(prog, 'Buscando…'); elegido = null;
+      const f = [new F('estructuraId_estructuraId', 'EQ', m.estructuraId_estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId)];
+      if (/^\d+$/.test(t)) f.push(new F('codigo', 'EQ', t)); else t.split(/\s+/).forEach((w) => f.push(new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
+      try {
+        hallados = (await new Promise((ok, mal) => modelo.read('/PASO', { filters: [new F({ filters: f, and: true })], urlParameters: { $expand: 'etiquetaId,tipoDatoId', $top: '60', $orderby: 'codigo' }, success: (r) => ok(r.results || []), error: mal })));
+        hallados.sort((a, c) => (a.etiquetaId_etiquetaId === m.etiquetaId_etiquetaId ? 0 : 1) - (c.etiquetaId_etiquetaId === m.etiquetaId_etiquetaId ? 0 : 1) || (+a.codigo || 0) - (+c.codigo || 0));
+        setTxt(prog, hallados.length ? `${hallados.length} paso(s) de la misma estructura${hallados.length === 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : 'Ningún paso de la misma estructura coincide.');
+      } catch (e) { hallados = []; setTxt(prog, 'No se pudo buscar: ' + ((e && e.message) || e)); }
+      pintar();
+    };
+    v.cuerpo.querySelector('.rmd-cp-buscar').addEventListener('click', buscar);
+    q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); buscar(); } });
+    v.pie.append(botonModal('Cancelar', '', () => v.cerrar()), bCambiar);
+    setTimeout(() => q.focus(), 40);
+  }
+  function instalarBotonCambiarPaso(d, tabla) {
+    const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-cambiar-paso')) return;
+    const b = botonIcono(ICONO_CAMBIAR, 'Cambiar paso', 'rmd-cambiar-paso', () => cambiarPasoMayor(d, tablaDe(d) || tabla));
+    b.title = 'Marca la casilla de un paso y pulsa aquí: lo cambia por otro código de paso (ya creado) conservando su configuración en este RMD y sus procesos menores.';
+    const grupo = hdr.querySelector('.rmd-copia-grupo');
+    if (grupo) grupo.appendChild(b); else { const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((x) => x.title === 'Imprimir'); b.style.marginRight = '10px'; if (ref) hdr.insertBefore(b, ref); else hdr.appendChild(b); }
+  }
+  window.__rmdStats.cambiarPasoMayor = (d, t) => cambiarPasoMayor(d, t);
+
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
     ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion']],
     ['Lista principal', ['barrafiltros', 'buscarequipo', 'revisor', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
-    ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
+    ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
     ['Asociar fórmulas', ['asociar', 'recetas', 'recetaruta', 'recetasvarias', 'puestoreceta']],
     ['Alertas', ['reglas', 'ordenest', 'sintipo', 'puesto']],
   ];
