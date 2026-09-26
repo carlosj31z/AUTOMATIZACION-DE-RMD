@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.31.0
+// @version      1.32.0
 // @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso mayor por otro código conservando su configuración y procesos menores, Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.31.0';                                                       // mantener igual a @version
+  const VERSION = '1.32.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -24,7 +24,7 @@
     ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'], ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
     ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando" y sin el error del refresco automático al volver)'],
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
-    ['pasominusculas', 'Pasar a minúsculas: botón "En minúsculas" (crea el paso en minúsculas a partir de uno en MAYÚSCULAS, con "Nuevo Paso" ya lleno) y botón "Aa" en la Descripción de "Nuevo Paso" / "Editar Paso"'],
+    ['pasominusculas', 'Pasar a minúsculas: botón "En minúsculas" en pasos y procesos menores (crea el paso en minúsculas con "Nuevo Paso" ya lleno; al crearlo, código copiado y opción de reemplazarlo en la fila) y botón "Aa" en la Descripción de "Nuevo Paso" / "Editar Paso"'],
     ['verop', 'Ver OP: ver todas (rápido), filtrar por columna y exportar a CSV'],
     ['documentos', 'Botón "Documentos citados" en el RMD: instructivos, procedimientos y formatos citados en sus pasos y procesos menores (Excel)'],
     ['statusrmd', 'Botón "Enviar a Status RMD" (maestro completo, sin archivo)'],
@@ -237,6 +237,8 @@
   .rmd-cp-actual { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; margin-bottom: 8px; } .rmd-cp-actual span { color: var(--rmd-apagado); font-size: 12px; } .rmd-cp-actual p { margin: 4px 0 0; }
   .rmd-cp-busca { display: flex; gap: 8px; margin: 8px 0; } .rmd-cp-busca input { flex: 1; }
   .rmd-cp-res tr[data-i] { cursor: pointer; } .rmd-cp-res tr.rmd-cp-sel td { background: rgba(27,141,236,.16); }
+  .rmd-creado { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100001; display: flex; flex-direction: column; gap: 4px; min-width: 380px; max-width: min(640px, 90vw); padding: 12px 16px; border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-verde); box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 13px/1.4 var(--rmd-fuente); }
+  .rmd-creado b { font-size: 14.5px; } .rmd-creado-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
   .rmd-token-mas { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; margin: 0 2px 0 6px; border-radius: 3px; background: var(--rmd-acento); color: #fff; font: 700 12px/1 var(--rmd-fuente); cursor: pointer; }
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
   .rmd-btn.exito { background: #2e7d32; border-color: #2e7d32; color: #fff; } .rmd-btn.exito:hover { background: #276c2b; }
@@ -4816,7 +4818,7 @@
   let externosUI5 = false;
   function registrarExternosUI5() {
     if (externosUI5 || typeof sap === 'undefined') return;
-    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle'], true); externosUI5 = true; } } catch (e) { /* versión de UI5 sin esta función */ }
+    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { /* versión de UI5 sin esta función */ }
   }
   function abrirPaleta() {
     if (document.querySelector('.rmd-paleta-fondo')) return;
@@ -5185,21 +5187,30 @@
   const objetoCargado = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null);
   // Datos del paso maestro de una fila (paso mayor: pasoId; proceso menor: pasoHijoId), con los nombres que muestran los combos.
   function pasoMaestroDeFila(tr, tabla) {
-    const o = objetoDeFila(tr) || {}, m = objetoCargado(o.pasoId) || objetoCargado(o.pasoHijoId);
+    const o = objetoDeFila(tr) || {}, esMenor = !!o.pasoHijoId_pasoId, m = esMenor ? objetoCargado(o.pasoHijoId) : objetoCargado(o.pasoId);   // (en un proceso menor, pasoId es la fila del paso mayor)
     if (!m || !m.descripcion) return { error: o.estructuraRecetaInsumoId || o.Maktx ? 'Esa fila es un insumo de la receta, no un paso.' : 'No encuentro los datos del paso maestro de esa fila.' };
     const est = objetoCargado(o.mdEstructuraId) && objetoCargado(o.mdEstructuraId.estructuraId);
     const nombres = {
-      estructuraId_estructuraId: est && est.estructuraId === m.estructuraId_estructuraId ? est.descripcion : '',
-      etiquetaId_etiquetaId: (objetoCargado(m.etiquetaId) || {}).descripcion || '',
+      estructuraId_estructuraId: (est && est.estructuraId === m.estructuraId_estructuraId ? est.descripcion : '') || nombreEstructura(m.estructuraId_estructuraId),
+      etiquetaId_etiquetaId: (objetoCargado(m.etiquetaId) || {}).descripcion || (() => { const e = objetoCargado(o.mdEsEtiquetaId); return (e && ((objetoCargado(e.etiquetaId) || {}).descripcion || e.descripcion)) || ''; })() || nombreEtiqueta(m.etiquetaId_etiquetaId),
       tipoDatoId_iMaestraId: (objetoCargado(m.tipoDatoId) || {}).contenido || nombreTipo(m.tipoDatoId_iMaestraId, tabla),
       tipoLapsoId_motivoLapsoId: (objetoCargado(m.tipoLapsoId) || {}).descripcion || '',
     };
     const datos = { estructuraId_estructuraId: m.estructuraId_estructuraId, etiquetaId_etiquetaId: m.etiquetaId_etiquetaId, numeracion: !!m.numeracion, tipoDatoId_iMaestraId: m.tipoDatoId_iMaestraId,
       clvModelo: m.clvModelo, valorInicial: m.valorInicial, valorFinal: m.valorFinal, margen: m.margen, decimales: m.decimales, tipoLapsoId_motivoLapsoId: m.tipoLapsoId_motivoLapsoId };
     // cómo está configurado en ESTE RMD (puede diferir del paso maestro: p. ej. maestro "Texto", aquí "Realizado por")
-    const enRmd = o.pasoId ? { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, clvModelo: o.clvModelo, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales }
+    const enRmd = !esMenor ? { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, clvModelo: o.clvModelo, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales }
       : { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales };
-    return { codigo: m.codigo, descripcion: m.descripcion, datos, nombres, enRmd };
+    const origen = esMenor ? { tipo: 'menor', id: o.mdEstructuraPasoInsumoPasoId, orden: o.orden } : { tipo: 'mayor', id: o.mdEstructuraPasoId, orden: o.orden };
+    return { codigo: m.codigo, descripcion: m.descripcion, datos, nombres, enRmd, origen };
+  }
+  // nombre de una etiqueta por su id, de lo que el portal ya tiene cargado (árbol de estructuras del RMD)
+  function nombreEstructura(id) {
+    try { const md = controladorPrincipal().getView().getModel('asociarDatos').getData(); const e = ((md.aEstructura && md.aEstructura.results) || []).map((x) => objetoCargado(x.estructuraId)).find((x) => x && x.estructuraId === id); return e ? e.descripcion : ''; } catch (e) { return ''; }
+  }
+  function nombreEtiqueta(id) {
+    try { const md = controladorPrincipal().getView().getModel('asociarDatos').getData(); for (const e of (md.aEstructura && md.aEstructura.results) || []) for (const t of (e.aEtiqueta && e.aEtiqueta.results) || []) { const et = objetoCargado(t.etiquetaId); if (t.etiquetaId_etiquetaId === id && et) return et.descripcion; } } catch (e) { /* sin datos */ }
+    return '';
   }
   const vacioM = (v) => v == null || v === '';
   function vistaMinusculas(p, tabla) {
@@ -5275,6 +5286,7 @@
       toast('Abriendo "Nuevo Paso" de Configuración Maestra…');
       const dlg = await abrirVentanaNuevoPaso();
       const fallidos = await llenarNuevoPaso(dlg, op.datos), x = op.datos;
+      vigilarPasoCreado(dlg, x, p.origen, p.codigo);
       // lo que el portal va a pedir al pulsar Agregar (validaciones de su propio botón)
       const rangoIncompleto = String(x.tipoDatoId_iMaestraId) === '443' && [x.valorInicial, x.valorFinal, x.margen].some(vacioM);
       const soloMayus = x.descripcion.toLowerCase() === String(p.descripcion || '').toLowerCase();
@@ -5395,6 +5407,64 @@
     if (grupo) grupo.appendChild(b); else { const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((x) => x.title === 'Imprimir'); b.style.marginRight = '10px'; if (ref) hdr.insertBefore(b, ref); else hdr.appendChild(b); }
   }
   window.__rmdStats.cambiarPasoMayor = (d, t) => cambiarPasoMayor(d, t);
+
+  // ---- Tras crear el paso en minúsculas (v1.32): código copiado al portapapeles y "Reemplazar en la fila" ----
+  // Mientras está abierta la ventana "Nuevo Paso" que llenó "En minúsculas" se guarda la descripción que tiene; al cerrarse, se busca
+  // en PASO el paso recién creado (misma descripción, estructura y etiqueta, registrado después de abrirla). Si existe: su código se
+  // copia al portapapeles y una tarjeta ofrece reemplazar el paso de la fila de origen (paso mayor o proceso menor) por el nuevo,
+  // cambiando solo el paso maestro al que apunta (se conserva su configuración y, en un paso mayor, sus procesos menores).
+  async function copiarAlPortapapeles(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch (e) { /* sin permiso: se intenta a la antigua */ }
+    try { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; html.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
+  }
+  function vigilarPasoCreado(dlg, datos, origen, codigoAntes) {
+    const t0 = Date.now(); let desc = datos.descripcion || '';
+    const campo = () => [...dlg.querySelectorAll('textarea, input')].map((el) => { const c = ctlDe(el); return c && rutaDe(c, 'value') && /descripcion/i.test(rutaDe(c, 'value')) ? el : null; }).find(Boolean);
+    const reloj = setInterval(async () => {
+      const f = dlg.isConnected && visible(dlg) ? campo() : null;
+      if (f && norm(f.value)) { desc = norm(f.value); return; }
+      if (dlg.isConnected && visible(dlg) && Date.now() - t0 < 30 * 60000) return;
+      clearInterval(reloj);
+      try {
+        const b = controladorPrincipal(), modelo = b.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
+        const r = await leerTodoDe(modelo, 'PASO', [new F('tolower(descripcion)', FO.EQ, "'" + desc.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', datos.estructuraId_estructuraId)], { $select: 'pasoId,codigo,descripcion,fechaRegistro,etiquetaId_etiquetaId' });
+        const nuevo = r.filter((x) => +new Date(x.fechaRegistro) >= t0 - 60000).sort((a, c) => +new Date(c.fechaRegistro) - +new Date(a.fechaRegistro))[0];
+        if (nuevo) await ofrecerPasoCreado(nuevo, origen, codigoAntes);
+      } catch (e) { /* no se pudo comprobar: sin tarjeta */ }
+    }, 700);
+  }
+  async function ofrecerPasoCreado(nuevo, origen, codigoAntes) {
+    const copiado = await copiarAlPortapapeles(String(nuevo.codigo));
+    document.querySelectorAll('.rmd-creado').forEach((x) => x.remove());
+    const c = document.createElement('div'); c.className = 'rmd-creado'; c.setAttribute('role', 'status');
+    const donde = origen ? `el ${origen.tipo === 'menor' ? 'proceso menor' : 'paso'} de orden ${origen.orden} (${codigoAntes})` : '';
+    c.innerHTML = `<b>✓ Paso ${esc(nuevo.codigo)} creado</b><span>${esc(nuevo.descripcion)}</span><span class="rmd-nota">${copiado ? 'Código copiado al portapapeles: pégalo en "Código Paso" de Adicionar Pasos.' : `Código: ${esc(nuevo.codigo)} (no se pudo copiar al portapapeles).`}</span>
+      <div class="rmd-creado-pie">${origen ? `<button type="button" class="rmd-btn primario rmd-creado-reemplazar" title="Cambia solo el paso maestro de esa fila: conserva su configuración${origen.tipo === 'mayor' ? ' y sus procesos menores' : ''}.">Reemplazar ${esc(donde)}</button>` : ''}<button type="button" class="rmd-btn rmd-creado-cerrar">Cerrar</button></div>`;
+    html.appendChild(c);
+    c.querySelector('.rmd-creado-cerrar').addEventListener('click', () => c.remove());
+    const br = c.querySelector('.rmd-creado-reemplazar');
+    if (br) br.addEventListener('click', async () => {
+      br.disabled = true;
+      try { await reemplazarPasoDeFila(origen, nuevo); c.remove(); toast(`Listo: ${donde} ahora usa el paso ${nuevo.codigo}, con su misma configuración.`); }
+      catch (e) { br.disabled = false; toast('No se pudo reemplazar: ' + e.message, true); }
+    });
+  }
+  async function reemplazarPasoDeFila(origen, nuevo) {
+    const b = controladorPrincipal(), md = b.getView().getModel('asociarDatos').getData(), modelo = b.getView().getModel('mainModelv2');
+    if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) throw new Error('el RMD está autorizado o suspendido');
+    sap.ui.core.BusyIndicator.show(0);
+    try {
+      if (origen.tipo === 'menor') await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${origen.id}')`, { pasoHijoId_pasoId: nuevo.pasoId });
+      else await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId });
+      await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
+      const d = dialogos().filter((x) => controladorPasos(x)).pop(), M = d && controladorPasos(d);
+      if (M) {
+        if (origen.tipo === 'menor') { await M.onGetPasosToAssignProcess('proceso'); if (M.onObtenerProcMenores) await M.onObtenerProcMenores(null); }
+        else { const etq = b.getView().getModel('headerAddEtiqueta'); if (etq && etq.getData().length !== 0) await M.onGetPasosToAssignProcess(); else await M.onGetPasosToAssign(); }
+      }
+    } finally { sap.ui.core.BusyIndicator.hide(); }
+  }
+  window.__rmdStats.ofrecerPasoCreado = (nuevo, origen, codigoAntes) => ofrecerPasoCreado(nuevo, origen, codigoAntes);   // (pruebas)
 
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
