@@ -329,3 +329,18 @@ Cada fila de la ventana **Especificaciones** es un registro `MD_ES_ESPECIFICACIO
   los códigos citados que no están en ella, lo avisa en la lista y en la ventana del RMD, y "Documentos
   citados" muestra la columna Vigente. Conviene volver a cargar la lista cuando el DMS cambie (el script
   avisa si tiene más de 30 días).
+
+## 5 decies. Equipos calificados (OQ / PQ) (userscript v1.35)
+
+- Los equipos de la estructura **EQUIPOS / INSTRUMENTOS / MATERIALES** (MD_ES_EQUIPO) tienen dos códigos: el
+  **"Código de referencia"** (CodigoGaci, p. ej. PL1-PV1-E025) y el **código SAP** (equnr, p. ej. 10000312).
+- Su calificación está en el **registro de áreas / sistemas / equipos a calificar (OQ y PQ)** de Garantía de la Calidad
+  (Calibración y Calificación): hoja **"Cronograma"**, encabezados en la fila 13; «CODIGO MIF» = Código de referencia,
+  «CÓDIGO SAP», estado de OQ, estado de PQ y **«ESTADO GENERAL» (columna AU)**. En septiembre de 2026: 1 338 filas
+  (1 285 códigos) — CALIFICADO 871, INOPERATIVO 187 (dados de baja), EN PROCESO 116, PENDIENTE 95, NO CUMPLE 32,
+  NO REQUIERE 29, COMPLETAR CAMPOS 6. Las salas aparecen dos veces con el mismo código (la sala y su HVAC); no
+  incluye utensilios ni instrumentos (balanzas, termómetros).
+- **Criterio del userscript:** un equipo está calificado si su ESTADO GENERAL es CALIFICADO o NO REQUIERE (se puede
+  cambiar); si no, "sin calificación". Con varias filas, lo está solo si lo están todas.
+- Ejemplo real (27/09/2026): TRAMEDIF 100 mg INY (2202609126) usa PL1-PV1-E030 (tanque reactor de 500 L; OQ
+  calificado, PQ por programar), PL1-PV1-E018 y PL1-PV1-E092 (módulos de flujo laminar): los tres EN PROCESO.

@@ -1657,6 +1657,7 @@ with sync_playwright() as p:
     if "S" in SOLO:
         RMD_REGLAS = os.environ.get("RMD_REGLAS", "2202609126")   # RMD Ingresado con documentos citados en Fabricación (y procesos menores)
         XLS_VIG = os.environ.get("VIGENTES_XLS", os.path.join(os.path.expanduser("~"), "Downloads", "Documents", "Lista_ Documento - 9ba171a9.xls"))
+        XLSX_CAL = os.environ.get("CALIFICADOS_XLSX", os.path.join(os.path.expanduser("~"), "Downloads", "Documents", "( OQ y PQ ) REGISTRO DE AREAS  SISTEMAS  EQUIPOS A CALIFICAR - PLANTA 1 Y PLANTA 2 (2).xlsx"))
         TOP_S = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x => x.getClientRects().length).pop()"
         def xlsx_s(b64):
             import base64 as b64m, io as iom, zipfile as zipm
@@ -1730,14 +1731,95 @@ with sync_playwright() as p:
                     barra_pm = fr.evaluate("() => { const d = " + TOP_S + "; return /^Procesos Menores/.test(((d.querySelector('h2') || {}).textContent || '').trim()) ? ((d.querySelector('#rmd-filtro-bar') || {}).innerText || '') : null; }")
                 cerrar_seguro()
                 return (bien and n_av == len(rojas) and bool(barra_pm) and "procesos menores" in barra_pm), f"rojas={[m['t'] for m in rojas]} barra={f['barra']!r} avisos={n_av} barra de procesos menores={barra_pm!r}"
+            # ── v1.35: columna Fase y columnas a medida; equipos calificados ──
+            LISTA_S = """() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog'));
+              const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener; const t = ctrl.getView().byId('idTblConfigurationRmd'); const tb = t.getDomRef().querySelector('table');
+              const ths = [...tb.querySelectorAll('thead th')].filter(th => th.getClientRects().length && th.textContent.trim()).map(th => [th.textContent.trim(), Math.round(th.getBoundingClientRect().width)]);
+              const R = window.__rmdStats.reglas.motor, filas = t.getItems().slice(0, 40).map(it => { const o = it.getBindingContext('listMD').getObject(); const c = it.getCells().find(x => x.data && x.data('rmdFase')); return [o.codigo, R.faseDeObservacion(o.observacion).texto, c ? c.getText() : null]; });
+              const altos = [...tb.querySelectorAll('tbody tr')].filter(tr => !/SubRow|NoData/.test(tr.className) && tr.getClientRects().length).slice(0, 20).map(tr => Math.round(tr.getBoundingClientRect().height)).sort((a, b) => a - b);
+              return { ths, filas, mediana: altos[Math.floor(altos.length / 2)] || 0, desborda: Math.round(tb.getBoundingClientRect().width) > t.getDomRef().clientWidth + 2 }; }"""
+            @prueba("S6 Lista principal: columna 'Fase' (de la 1ª línea de Observaciones) tras 'Estado', en el orden nuevo (Código, Versión, Descripción, Etapa, Estado, Fase, Producción…), sin desbordar la pantalla y con la Descripción más ancha")
+            def _():
+                cerrar_seguro(); pg.wait_for_timeout(1500)
+                r = fr.evaluate(LISTA_S)
+                nombres = [x[0] for x in r["ths"]]; ancho = dict(r["ths"])
+                esperado = ["Código", "Versión", "Descripción", "Etapa", "Estado", "Fase", "Producción Estado", "Producción Enviar", "Producción Estatus", "Fecha Autorización", "Usuario Autorización", "A/F", "Planta", "Accion"]
+                malas = [f for f in r["filas"] if f[1] != f[2]]
+                ok = (nombres == esperado and not malas and any(f[1] for f in r["filas"]) and ancho.get("Descripción", 0) >= 250 and ancho.get("Versión", 999) <= 80 and ancho.get("A/F", 999) <= 60 and not r["desborda"])
+                return ok, f"columnas={r['ths']} fases distintas={malas[:3]} ejemplo={r['filas'][:4]} alto mediano de fila={r['mediana']} desborda={r['desborda']}"
+            @prueba("S7 'Columnas ordenadas' apagado: la lista vuelve al orden y anchos del portal (con Fase tras Estado); 'Fase' apagado quita la columna y sus celdas; encendidos vuelven")
+            def _():
+                def conm(k):
+                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator(f"#rmd-ui-panel input[data-k={k}]").click(); pg.wait_for_timeout(1500); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                conm("columnas"); a = fr.evaluate(LISTA_S)
+                conm("fase"); b_ = fr.evaluate(LISTA_S)
+                conm("fase"); conm("columnas"); pg.wait_for_timeout(800); c = fr.evaluate(LISTA_S)
+                na, nb, nc = [x[0] for x in a["ths"]], [x[0] for x in b_["ths"]], [x[0] for x in c["ths"]]
+                ok = (na[:5] == ["Código", "Versión", "Estado", "Fase", "Producción Estado"] and "Fase" not in nb and all(f[2] is None for f in b_["filas"]) and nc[:6] == ["Código", "Versión", "Descripción", "Etapa", "Estado", "Fase"])
+                return ok, f"sin ordenar={na} | sin Fase={nb} | de nuevo={nc}"
+            @prueba("S8 Equipos calificados: el registro OQ / PQ (.xlsx, hoja Cronograma, columna ESTADO GENERAL) se carga desde su pestaña con vista previa y queda guardado")
+            def _():
+                real = os.path.exists(XLSX_CAL); ruta = XLSX_CAL
+                if not real:
+                    import tempfile
+                    ruta = os.path.join(tempfile.mkdtemp(), "calificados.csv"); open(ruta, "w", encoding="utf-8").write("CODIGO MIF;CÓDIGO SAP;DESCRIPCIÓN;ESTADO GENERAL\nPL1-PV1-E025;10000312;AUTOCLAVE;EN PROCESO\n")
+                fr.evaluate("window.__rmdStats.reglas.abrir('calificados')"); pg.wait_for_timeout(600)
+                with pg.expect_file_chooser() as fc:
+                    fr.locator(".rmd-reglas .rmd-rg-barra button[data-a=cargar-calif]").click()
+                fc.value.set_files(ruta); pg.wait_for_timeout(3000)
+                previa = fr.evaluate("document.querySelector('.rmd-reglas .rmd-modal-cuerpo').innerText")
+                fr.locator(".rmd-reglas .rmd-modal-pie button", has_text="Usar esta lista").click(); pg.wait_for_timeout(1500)
+                cal = fr.evaluate("window.__rmdStats.reglas.calificados()")
+                fr.locator(".rmd-reglas .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
+                ok = bool(cal) and (not real or (cal["n"] > 1300 and cal["hoja"] == "Cronograma" and cal["columna"] == "ESTADO GENERAL" and "EN PROCESO" in previa))
+                return ok, f"{os.path.basename(ruta)} → {cal} | {previa[:200]!r}"
+            @prueba("S9 Ventana del RMD y ventana EQUIPOS / INSTRUMENTOS / MATERIALES: los equipos sin calificación (según la lista) se avisan con su estado; los calificados no")
+            def _():
+                fr.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); }")
+                RmdAutomation(pg).editor_de_rmd(RMD_REGLAS)
+                fr.wait_for_function("(c) => !!window.__rmdStats.reglasRaiz && window.__rmdStats.reglasRaiz.rmd === c && window.__rmdStats.reglasRaiz.equipos > 0", arg=RMD_REGLAS, timeout=90000); pg.wait_for_timeout(1000)
+                raiz = fr.evaluate("window.__rmdStats.reglasRaiz"); aviso = fr.evaluate("(document.querySelector('.rmd-reglas-aviso') || {}).innerText || ''")
+                fr.evaluate("""() => { const d = """ + TOP_S + """; const tr = [...d.querySelectorAll('tbody tr')].find(r => /EQUIPOS/.test(r.textContent)); const bt = [...tr.querySelectorAll('button')].find(x => !/Eliminar|Borrar/i.test(x.title || ''));
+                  sap.ui.getCore().byId(bt.id.replace(/-inner$/, '')).firePress(); }"""); pg.wait_for_timeout(6000)
+                v_ = fr.evaluate("""() => { const d = """ + TOP_S + """; const t = d.querySelector('table.sapMListTbl'), ths = [...t.querySelectorAll('thead th')].map(x => x.textContent.trim().toUpperCase()), iR = ths.indexOf('CÓDIGO DE REFERENCIA'), iC = ths.indexOf('CÓDIGO');
+                  const S = window.__rmdStats.reglas; return { barra: (d.querySelector('#rmd-filtro-bar .rmd-alerta') || {}).textContent || '', filas: [...t.querySelectorAll('tbody tr')].filter(r => !/SubRow|NoData/.test(r.className)).map(tr => {
+                    const ref = (tr.children[iR] || {}).textContent.trim(), sap = (tr.children[iC] || {}).textContent.trim(), m = tr.querySelector('mark.rmd-regla'), info = S.infoEquipo(ref, sap);
+                    return [ref || sap, info ? info.estado : null, info ? info.ok : null, m ? m.dataset.etq || '' : null]; }) }; }""")
+                cerrar_seguro()
+                incoh = [f for f in v_["filas"] if (f[2] is False) != (f[3] is not None) or (f[3] is not None and f[3] != f[1])]
+                sin = [f[0] for f in v_["filas"] if f[2] is False]
+                n_av = int((re.search(r"(\d+) avisos? de reglas", v_["barra"]) or [0, 0])[1])
+                ok = (not incoh and n_av == len(sin) and sorted(x[0] for x in raiz["equiposConAviso"]) == sorted(sin) and (not sin or "Equipo sin calificación" in aviso))
+                return ok, f"sin calificación={sin} marcas incoherentes={incoh[:3]} barra={v_['barra']!r} raíz={raiz['equiposConAviso']} aviso={aviso[:180]!r}"
+            @prueba("S10 Lista principal quieta a 1366 y a 1728 px: no se redibuja sola (antes los anchos y los revisores oscilaban sin fin), los revisores siguen junto al icono y ninguna palabra se parte")
+            def _():
+                cerrar_seguro(); tam0 = pg.viewport_size; res = {}
+                fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(7000)   # la lista completa (con revisores), no solo el RMD de las pruebas
+                try:
+                    for (w, h) in [(1366, 768), (1728, 860)]:
+                        pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(3500)
+                        fr.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find(x => x.getClientRects().length && !x.closest('.sapMDialog')); const c = sap.ui.getCore().byId(t.id.replace(/-listUl$/, ''));
+                          window.__qaRender = 0; if (!c.__qaDelegado) { c.__qaDelegado = { onAfterRendering: () => { window.__qaRender++; } }; c.addEventDelegate(c.__qaDelegado); } }""")
+                        pg.wait_for_timeout(4000)
+                        res[w] = fr.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find(x => x.getClientRects().length && !x.closest('.sapMDialog'));
+                          const lienzo = document.createElement('canvas').getContext('2d'), mide = (el, s) => { const cs = getComputedStyle(el); lienzo.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; return lienzo.measureText(s).width; };
+                          const partidas = []; [...t.querySelectorAll('thead th, tbody td')].filter(c => c.getClientRects().length).forEach(c => c.querySelectorAll('.sapMText, .sapMObjStatusText, .sapMLabel, .rmd-revisor').forEach(el => {
+                            if (getComputedStyle(el).whiteSpace === 'nowrap') return; const w = el.getBoundingClientRect().width; (el.textContent || '').split(/\\s+/).filter(Boolean).forEach(p => { if (mide(el, p) > w + 0.25) partidas.push(p); }); }));
+                          const esperados = [...t.querySelectorAll('tbody tr')].filter(r => !/SubRow|NoData/.test(r.className)).filter(r => { const it = sap.ui.getCore().byId(r.id), c = it && it.getBindingContext('listMD'), o = c && c.getObject();
+                            return o && ((o.destinatariosMD && o.destinatariosMD.results) || []).some(x => x.activo !== false && /^DJEFPROD|^DGERPROD/.test(x.tipo || '')); }).length;
+                          return { redibujos: window.__qaRender, revisores: t.querySelectorAll('.rmd-revisor').length, esperados, partidas: [...new Set(partidas)].slice(0, 8), anchos: (window.__rmdStats.columnasLista || {}).anchos }; }""")
+                finally:
+                    pg.set_viewport_size(tam0); pg.wait_for_timeout(2500)
+                ok = all(r["redibujos"] == 0 and not r["partidas"] and r["revisores"] == r["esperados"] > 0 for r in res.values())
+                return ok, " | ".join(f"{w}: redibujos={r['redibujos']} revisores={r['revisores']} (esperados {r['esperados']}) partidas={r['partidas']} Producción Estatus={(r['anchos'] or {}).get('Producción Estatus')}" for w, r in res.items())
         finally:
             cerrar_seguro()
             fr.evaluate("(r) => window.__rmdStats.reglas.restaurar(r)", respaldo_s)
             pg.unroute("**/*", guardia_s)
         @prueba("S5 Ninguna petición de escritura salió del navegador durante el bloque S (y las reglas y la lista quedaron como estaban)")
         def _():
-            ahora = fr.evaluate("async () => { const r = await window.__rmdStats.reglas.respaldo(); return { ls: r.ls, vig: r.vig ? r.vig.docs.length : null }; }")
-            return (not bloq_s and ahora["ls"] == respaldo_s["ls"] and ahora["vig"] == (len(respaldo_s["vig"]["docs"]) if respaldo_s.get("vig") else None)), f"bloqueadas={bloq_s[:5]} estado final={ {'ls': (ahora['ls'] or '')[:60], 'vig': ahora['vig']} }"
+            ahora = fr.evaluate("async () => { const r = await window.__rmdStats.reglas.respaldo(); return { ls: r.ls, vig: r.vig ? r.vig.docs.length : null, cal: r.cal ? r.cal.equipos.length : null }; }")
+            return (not bloq_s and ahora["ls"] == respaldo_s["ls"] and ahora["vig"] == (len(respaldo_s["vig"]["docs"]) if respaldo_s.get("vig") else None) and ahora["cal"] == (len(respaldo_s["cal"]["equipos"]) if respaldo_s.get("cal") else None)), f"bloqueadas={bloq_s[:5]} estado final={ {'ls': (ahora['ls'] or '')[:60], 'vig': ahora['vig']} }"
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

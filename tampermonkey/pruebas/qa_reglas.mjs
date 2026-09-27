@@ -81,7 +81,8 @@ ok('Solo en la lista: por nombre, sin importar tildes ni el resto del nombre', b
 ok('Regla inactiva: no se aplica', busca('USAR EPP', [regla({ buscar: 'epp', activa: false })]).marcas.length === 0);
 
 // ---- marcas que se pisan ----
-const dos = busca('VER IPRO-P123', [Reglas.predeterminadas()[0], { ...Reglas.predeterminadas()[1], activa: true }], { vigentes: vig });
+const predDe = (k) => Reglas.predeterminadas().find((r) => r.predeterminada === k);
+const dos = busca('VER IPRO-P123', [predDe('novigente'), { ...predDe('documentos'), activa: true }], { vigentes: vig });
 ok('Marcas superpuestas: una sola, con el color de la de más prioridad y los dos motivos', dos.marcas.length === 1 && dos.marcas[0].color === 'rojo' && dos.marcas[0].titulo.split('\n').length === 2, J(dos.marcas));
 const orden = busca('B y A', [regla({ buscar: 'a' }), regla({ buscar: 'b' })]);
 ok('Marcas en el orden del texto', J(orden.marcas.map((m) => m.valor)) === '["B","A"]');
@@ -101,7 +102,7 @@ ok('Conjunto: cuenta advertencias y veces por regla', ev2.avisos === 4 && ev2.po
 const n = Reglas.normalizar({ tipo: 'raro', condicion: 'x', color: 'fucsia', buscar: 'uno; dos', etiqueta: 'una etiqueta demasiado larga para caber' });
 ok('Normalizar: valores desconocidos pasan a los de por defecto y se pone un nombre', n.tipo === 'frase' && n.condicion === 'marcar' && n.color === 'amarillo' && n.nombre === 'Palabra o frase: uno' && n.etiqueta.length === 18 && n.id);
 const pred = Reglas.predeterminadas();
-ok('Predeterminadas: "Documento no vigente" activa; el resto de ejemplo, inactivas', pred.length === 4 && pred[0].activa && pred.slice(1).every((r) => !r.activa) && pred.every((r) => r.predeterminada && r.id.startsWith('pred-')));
+ok('Predeterminadas: "Documento no vigente" y "Equipo sin calificación" activas; el resto de ejemplo, inactivas', pred.length === 5 && J(pred.filter((r) => r.activa).map((r) => r.predeterminada)) === '["novigente","sincalificar"]' && pred.every((r) => r.predeterminada && r.id.startsWith('pred-')), J(pred.map((r) => [r.predeterminada, r.activa])));
 ok('Resumen legible de la regla', Reglas.resumen(pred[0]) === 'Código de documento · los que no están en la lista de vigentes · No debe aparecer → mostrar advertencia', Reglas.resumen(pred[0]));
 
 // ---- exportar / importar ----
@@ -123,6 +124,8 @@ const lcsv = Reglas.listaVigentesDeFilas(csv);
 ok('Lista desde CSV: columnas por su encabezado y fecha dd/mm/aaaa a ISO', lcsv.docs.length === 2 && lcsv.columnas.codigo === 'Código' && J(lcsv.docs[0]) === J(['IPRO-P123', 'LIMPIEZA; SALAS', '', 'Aprobado', '', '', '2027-05-21']), J(lcsv));
 const suelta = Reglas.listaVigentesDeFilas(Reglas.csvAFilas('IPRO-P123\nFPRO-250\nPCPR-202\nFPRO-250\n'));
 ok('Lista sin encabezado: la columna con códigos (y sin repetidos)', suelta.docs.length === 3 && suelta.duplicados === 1, J(suelta));
+const hueca = []; hueca[2] = ['Código', 'Título']; hueca[4] = ['IPRO-P123', 'X']; hueca[5] = ['FPRO-250', 'Y'];   // (filas vacías = huecos, como las devuelven los lectores)
+ok('Lista con filas vacías (huecos del arreglo) no falla', Reglas.listaVigentesDeFilas(hueca).docs.length === 2);
 
 // ---- .xlsx propio: escribir y volver a leer una lista ----
 {
@@ -130,6 +133,65 @@ ok('Lista sin encabezado: la columna con códigos (y sin repetidos)', suelta.doc
   [['Identificador', 'Título', 'Revisión'], ['IPRO-P123', 'LIMPIEZA', '02'], ['POL-CAL-001', 'POLÍTICA', '00']].forEach((f, r) => f.forEach((x, c) => h.poner({ c, r }, x, 'celda')));
   const u8 = await lib.generar(), leidoX = await Xlsx.leerLibro(u8), lx = Reglas.listaVigentesDeFilas(await leidoX.filas('Documentos'));
   ok('Lista desde .xlsx: se lee con el lector de libros', lx.docs.length === 2 && lx.docs[1][0] === 'POL-CAL-001' && lx.docs[1][2] === '00', J(lx.docs));
+}
+
+// ---- v1.35: fase de la nomenclatura (1ª línea de Observaciones) ----
+const fase = (o) => Reglas.faseDeObservacion(o).texto;
+ok('Fase: F1, F2-R, F1R, F10 y sin nomenclatura', fase('20260925DV-1-C0.5-FI1.0-FA1.0-F1\nFASE 1.') === 'Fase 1' && fase('20260925JQ-2-C0.5-FI1.0-FA1.0-F2-R\nSe reordena') === 'Fase 2 R'
+  && fase('20260925DV-1-C0.5-FI1.0-FA1.0-F1R') === 'Fase 1 R' && fase('20260925DV-1-C0.5-FI1.0-FA1.0-F10') === 'Fase 10' && fase('2026-09-25 - N Ugarte\nse actualiza') === '' && fase('') === '' && fase(null) === '');
+ok('Fase: solo la primera palabra de la primera línea (lo que sigue es texto aparte)', fase('20260925DV-1-C0.5-FI1.0-FA1.0-F2 PENDIENTE CC') === 'Fase 2' && Reglas.faseDeObservacion('20260925DV-1-C0.5-FI1.0-FA1.0-F2-R x').corto === 'F2R');
+ok('Fase: "-FA1.0" no se confunde con una fase', fase('20260925DV-1-C0.5-FI1.0-FA1.0') === '' && fase('F3') === 'Fase 3');
+
+// ---- v1.35: lista de equipos calificados (hoja Cronograma, columna ESTADO GENERAL) ----
+const CAB = ['ITEM', 'RM', 'Columna1', 'CODIGO MIF', 'CÓDIGO SAP', 'DESCRIPCIÓN', 'ESTADO', 'TIPO EQUIPO', 'SUCURSAL', 'DEPARTAMENTO', 'SECCIÓN', '(OQ) - PRÓXIMA:', '(OQ) - ESTADO DE CALIFICACION:', '(PQ) - PROXIMA:', '(PQ) - ESTADO DE CALIFICACION:', 'ESTADO GENERAL', 'OBSERVACIONES'];
+const filasCal = [[null, 'DEPARTAMENTO: GARANTÍA DE LA CALIDAD'], [], ['', '', '', '', '', '', '', '', '', '', '', 'CALIFICACION DE OPERACIÓN (OQ)'], CAB,
+  [1, 'SI', 'PV1', 'PL1-PV1-E025', 10000312, 'AUTOCLAVE HOGNER', 'OPERATIVO', 'EQU', 'PLANTA 01', 'PRODUCCIÓN', 'PV1', 47000, 'CALIFICADO', 47100, 'PROGRAMAR PQ', 'EN PROCESO', ''],
+  [2, 'SI', 'PV1', 'PL1-PV1-E030', 10000234, 'TANQUE REACTOR 500 L', 'OPERATIVO', 'EQU', 'PLANTA 01', 'PRODUCCIÓN', 'PV1', 47000, 'CALIFICADO', 47100, 'CALIFICADO', 'CALIFICADO', ''],
+  [3, 'NO', 'CPE', 'PL1-CPE-SL01', 'COMPLETAR', 'SALA DE PESADAS', 'OPERATIVO', 'SAL', 'PLANTA 01', 'PRODUCCIÓN', 'CPE', '', 'CALIFICADO', '', 'CALIFICADO', 'CALIFICADO', ''],
+  [4, 'NO', 'CPE', 'PL1-CPE-SL01', 'COMPLETAR', 'SALA DE PESADAS', 'OPERATIVO', 'HVAC', 'PLANTA 01', 'PRODUCCIÓN', 'CPE', '', 'PENDIENTE', '', 'PENDIENTE', 'PENDIENTE', ''],
+  [5, 'NO', 'ACO', 'ACO-E091', '', 'ENCARTONADORA LPM', 'OPERATIVO', 'EQU', 'PLANTA 02', 'PRODUCCIÓN', 'ACO', '', '', '', '', 'NO REQUIERE', ''],
+  ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']];
+const lc = Reglas.listaCalificadosDeFilas(filasCal);
+ok('Calificados: encabezado en la fila de "ESTADO GENERAL" y sus columnas', lc.fila === 3 && lc.columnas.general === 'ESTADO GENERAL' && lc.columnas.codigo === 'CODIGO MIF' && lc.columnas.sap === 'CÓDIGO SAP' && lc.columnas.oq && lc.columnas.pq, J(lc.columnas));
+ok('Calificados: una fila por equipo (código MIF, SAP sin ceros, estado general, OQ, PQ, próxima OQ en fecha)', lc.equipos.length === 5 && J(lc.equipos[0].slice(0, 6)) === J(['PL1-PV1-E025', '10000312', 'AUTOCLAVE HOGNER', 'EN PROCESO', 'CALIFICADO', 'PROGRAMAR PQ']) && lc.equipos[0][6] === '2028-09-04' && lc.equipos[2][1] === '', J(lc.equipos[0]));
+const mc = Reglas.mapaCalificados(lc);
+ok('Mapa de calificados: por código MIF y por SAP; EN PROCESO no está calificado, NO REQUIERE sí', mc.porCodigo.get('PL1-PV1-E025').ok === false && mc.porCodigo.get('PL1-PV1-E025').estado === 'EN PROCESO' && mc.porSap.get('10000234').ok === true && mc.porCodigo.get('ACO-E091').ok === true);
+ok('Mapa de calificados: sala + HVAC con el mismo código → sin calificación si alguna fila no lo está (y el detalle trae las dos)', mc.porCodigo.get('PL1-CPE-SL01').ok === false && /SAL: CALIFICADO/.test(mc.porCodigo.get('PL1-CPE-SL01').detalle) && /HVAC: PENDIENTE/.test(mc.porCodigo.get('PL1-CPE-SL01').detalle), mc.porCodigo.get('PL1-CPE-SL01').detalle);
+ok('Mapa de calificados: los estados que cuentan como calificados se pueden cambiar', Reglas.mapaCalificados(lc, ['CALIFICADO', 'EN PROCESO']).porCodigo.get('PL1-PV1-E025').ok === true && Reglas.mapaCalificados(lc, ['CALIFICADO']).porCodigo.get('ACO-E091').ok === false);
+const ctxCal = { calificados: mc.porCodigo, calificadosSap: mc.porSap };
+const sinCal = predDe('sincalificar');
+const eqTexto = busca('CARGAR EN EL PL1-PV1-E025 Y PASAR AL PL1-PV1-E030; LUEGO PL1-XXX-E999', [sinCal], ctxCal);
+ok('Equipo sin calificación en un texto: marca solo el no calificado, con su estado como etiqueta y el motivo', J(vals(eqTexto)) === '["PL1-PV1-E025"]' && eqTexto.marcas[0].etiqueta === 'EN PROCESO' && eqTexto.marcas[0].color === 'rojo'
+  && eqTexto.avisos[0].texto === 'Equipo sin calificación: PL1-PV1-E025 (AUTOCLAVE HOGNER): sin calificación — EN PROCESO (OQ: CALIFICADO · PQ: PROGRAMAR PQ)', J(eqTexto));
+ok('Equipo sin calificación sin la lista cargada: espera la lista', Reglas.compilar([sinCal], {})[0].necesita === 'calificados');
+ok('Solo los calificados (regla propia) y códigos escritos con filtro', J(vals(busca('PL1-PV1-E025 Y PL1-PV1-E030', [regla({ tipo: 'equipo', calificacion: 'calificados' })], ctxCal))) === '["PL1-PV1-E030"]'
+  && J(vals(busca('PL1-PV1-E025 Y PL1-PV1-E030', [regla({ tipo: 'equipo', buscar: 'PL1-PV1-*', calificacion: 'sinCalificar' })], ctxCal))) === '["PL1-PV1-E025"]');
+const estructura = [{ codigo: 'PL1-PV1-E025', sap: '10000312', desc: 'AUTOCLAVE HOGNER', orden: 1 }, { codigo: '', sap: '000000000010000234', desc: 'TANQUE', orden: 2 }, { codigo: 'PL1-CPE-SL01', sap: '', desc: 'SALA', orden: 3 }, { codigo: 'PL1-ZZZ-E001', sap: '10009999', desc: 'OTRO', orden: 4 }];
+const ee = Reglas.evaluarEquipos(estructura, Reglas.compilar([sinCal], ctxCal), ctxCal);
+ok('Estructura de equipos: avisa los no calificados (por código MIF o por SAP) y no los que no figuran en la lista', J(ee.items.map((x) => [x.i, x.marcas[0].etiqueta])) === '[[0,"EN PROCESO"],[2,"PENDIENTE"]]' && ee.avisos === 2, J(ee.items));
+const eeNF = Reglas.evaluarEquipos(estructura, Reglas.compilar([{ ...sinCal, noFigura: true }], ctxCal), ctxCal);
+ok('Estructura de equipos: con "también los que no figuran" avisa el que no está en la lista', J(eeNF.items.map((x) => [x.i, x.marcas[0].etiqueta])) === '[[0,"EN PROCESO"],[2,"PENDIENTE"],[3,"NO FIGURA"]]', J(eeNF.items.map((x) => x.marcas[0])));
+ok('Estructura de equipos: una regla sin "revisar la estructura" no la revisa', Reglas.evaluarEquipos(estructura, Reglas.compilar([{ ...sinCal, estructura: false }], ctxCal), ctxCal).items.length === 0);
+const comp134 = Reglas.completarPredeterminadas([predDe('novigente'), regla({ nombre: 'Mía' })], ['novigente', 'documentos', 'equipos', 'provisional']);
+ok('Predeterminada nueva (v1.35) se agrega en su lugar a quien venía de la v1.34; la que se borró no vuelve', comp134.nuevas === 1 && comp134.reglas[1].predeterminada === 'sincalificar' && comp134.reglas.length === 3
+  && Reglas.completarPredeterminadas([predDe('novigente')], Reglas.CLAVES_PREDETERMINADAS).nuevas === 0);
+const expCal = Reglas.leerExportado(JSON.parse(JSON.stringify(Reglas.paraExportar([], null, { calificados: { archivo: 'cal.xlsx', estadosOk: ['CALIFICADO'], equipos: lc.equipos } }))));
+ok('Exportar / importar: la lista de equipos calificados y sus estados "calificados"', expCal.calificados && expCal.calificados.n === 5 && J(expCal.calificados.estadosOk) === '["CALIFICADO"]' && expCal.calificados.equipos[0][0] === 'PL1-PV1-E025');
+ok('Resumen de la regla de equipos sin calificación', Reglas.resumen(sinCal) === 'Código de equipo o utensilio · los que no están calificados · No debe aparecer → mostrar advertencia · y en la estructura de equipos del RMD', Reglas.resumen(sinCal));
+
+// ---- lista real de equipos calificados (.xlsx) ----
+{
+  const candidatosCal = [process.env.CALIFICADOS_XLSX, path.join(os.homedir(), 'Downloads', 'Documents', '( OQ y PQ ) REGISTRO DE AREAS  SISTEMAS  EQUIPOS A CALIFICAR - PLANTA 1 Y PLANTA 2 (2).xlsx')].filter(Boolean);
+  const xlsxCal = candidatosCal.find((f) => fs.existsSync(f));
+  if (!xlsxCal) salta('Lista real de equipos calificados', 'no se encontró el archivo (CALIFICADOS_XLSX)');
+  else {
+    const t0 = Date.now(), libro = await Xlsx.leerLibro(new Uint8Array(fs.readFileSync(xlsxCal))), hoja = libro.hojas.find((h) => /cronograma/i.test(h));
+    const l = Reglas.listaCalificadosDeFilas(await libro.filas(hoja)), ms = Date.now() - t0;
+    ok(`Lista real: hoja «${hoja}», columnas por su encabezado (${ms} ms)`, hoja === 'Cronograma' && l.columnas.general === 'ESTADO GENERAL' && l.columnas.codigo === 'CODIGO MIF' && l.columnas.sap === 'CÓDIGO SAP' && /\(OQ\)/.test(l.columnas.oq) && /\(PQ\)/.test(l.columnas.pq), J(l.columnas));
+    ok('Lista real: ~1336 equipos y los estados de la columna AU', l.equipos.length > 1300 && l.estados.CALIFICADO > 800 && l.estados['EN PROCESO'] > 50 && l.estados.PENDIENTE > 50 && l.estados['NO CUMPLE'] > 10, J(l.estados));
+    const m = Reglas.mapaCalificados(l);
+    ok('Lista real: ACO-E002 calificado, ACO-E089 EN PROCESO, sala + HVAC PL1-CPE-SL01 pendiente', m.porCodigo.get('ACO-E002').ok && m.porCodigo.get('ACO-E089').estado === 'EN PROCESO' && !m.porCodigo.get('PL1-CPE-SL01').ok && m.porSap.get('10001551').codigo === 'ACO-E002');
+  }
 }
 
 // ---- .xls real del DMS (Excel 97-2003) ----

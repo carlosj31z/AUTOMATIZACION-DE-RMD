@@ -467,8 +467,64 @@ with sync_playwright() as p:
               and despues == antes and "3 documentos" in previa and vig and vig["n"] == 3 and vig["archivo"] == "vigentes prueba.csv"
               and "IPRO-P999 no está en la lista" in no_esta and por_titulo == ["IPRO-P123"] and tras["reglas"] == antes and tras["vig"] and tras["vig"]["n"] == 3)
         return ok, json.dumps({"exportado": [len(exportado["reglas"]), exportado.get("vigentes", {}).get("n")], "antes": antes, "despues": despues, "previa": previa[:160], "vig": vig, "noEsta": no_esta[:80], "porTitulo": por_titulo, "tras": tras}, ensure_ascii=False)[:1200]
-    # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin lista)
-    pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); }")
+
+    @prueba("LN19 Equipos calificados (v1.35): la pestaña carga la lista (vista previa con estados y cuántos sin calificación), aplica los estados que cuentan como calificados y 'Restablecer' la quita; al soltar un archivo se reconoce solo")
+    def _():
+        import tempfile
+        tmp = tempfile.mkdtemp()
+        csv = os.path.join(tmp, "calificados prueba.csv")
+        open(csv, "w", encoding="utf-8").write("DEPARTAMENTO: GARANTÍA DE LA CALIDAD\n\nCODIGO MIF;CÓDIGO SAP;DESCRIPCIÓN;TIPO EQUIPO;(OQ) - ESTADO DE CALIFICACION:;(PQ) - ESTADO DE CALIFICACION:;ESTADO GENERAL\n"
+                                                "PL1-PV1-E025;10000312;AUTOCLAVE HOGNER;EQU;CALIFICADO;PROGRAMAR PQ;EN PROCESO\nPL1-PV1-E030;10000234;TANQUE REACTOR;EQU;CALIFICADO;CALIFICADO;CALIFICADO\n"
+                                                "PL1-CPE-SL01;;SALA DE PESADAS;SAL;CALIFICADO;CALIFICADO;CALIFICADO\nPL1-CPE-SL01;;SALA DE PESADAS;HVAC;PENDIENTE;PENDIENTE;PENDIENTE\n")
+        pg.evaluate("window.__rmdStats.reglas.abrir('calificados')"); pg.wait_for_timeout(500)
+        vacia = pg.evaluate("({ pestana: document.querySelector('.rmd-reglas .rmd-rg-tabs button.activa').dataset.p, restablecer: document.querySelector('.rmd-reglas [data-a=restablecer-calif]').disabled, todo: [...document.querySelectorAll('.rmd-reglas .rmd-modal-pie button')].map(b => b.textContent) })")
+        with pg.expect_file_chooser() as fc:
+            pg.locator(".rmd-reglas .rmd-rg-barra button[data-a=cargar-calif]").click()
+        fc.value.set_files(csv); pg.wait_for_timeout(700)
+        previa = pg.evaluate("document.querySelector('.rmd-reglas .rmd-modal-cuerpo').innerText")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Usar esta lista").click(); pg.wait_for_timeout(600)
+        cal = pg.evaluate("window.__rmdStats.reglas.calificados()")
+        info = pg.evaluate("[window.__rmdStats.reglas.infoEquipo('PL1-PV1-E025'), window.__rmdStats.reglas.infoEquipo('', '000010000234'), window.__rmdStats.reglas.infoEquipo('PL1-CPE-SL01')]")
+        regla_ok = pg.evaluate("window.__rmdStats.reglas.compiladas().find(c => c.id === 'pred-sincalificar')")
+        pg.locator(".rmd-reglas .rmd-rg-estados-ok").fill("CALIFICADO; NO REQUIERE; EN PROCESO"); pg.locator(".rmd-reglas button[data-a=estados-ok]").click(); pg.wait_for_timeout(500)
+        tras_ok = pg.evaluate("[window.__rmdStats.reglas.calificados().estadosOk, window.__rmdStats.reglas.infoEquipo('PL1-PV1-E025').ok]")
+        pg.locator(".rmd-reglas .rmd-rg-qcal").fill("PL1-CPE-SL01"); pg.wait_for_timeout(200)
+        busca_ = pg.evaluate("(document.querySelector('.rmd-reglas .rmd-rg-cal-res') || {}).innerText || ''")
+        pg.locator(".rmd-reglas [data-a=restablecer-calif]").click(); pg.wait_for_timeout(300)
+        pg.locator(".rmd-modal-aviso button", has_text="Restablecer").click(); pg.wait_for_timeout(600)
+        tras_rest = pg.evaluate("window.__rmdStats.reglas.calificados()")
+        # soltar el archivo en la pestaña Reglas: se reconoce como lista de calificados por su columna ESTADO GENERAL
+        pg.locator(".rmd-reglas .rmd-rg-tabs button[data-p=reglas]").click(); pg.wait_for_timeout(200)
+        b64 = __import__("base64").b64encode(open(csv, "rb").read()).decode()
+        pg.evaluate("""(b64) => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          const dt = new DataTransfer(); dt.items.add(new File([u8], 'soltado.csv', { type: 'text/csv' })); const fondo = document.querySelector('.rmd-reglas-fondo');
+          fondo.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true })); fondo.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); }""", b64)
+        pg.wait_for_timeout(800)
+        soltado = pg.evaluate("document.querySelector('.rmd-reglas h3').textContent")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Cancelar").click(); pg.wait_for_timeout(300)
+        ok = (vacia["pestana"] == "calificados" and vacia["restablecer"] and "Restablecer todo…" in vacia["todo"] and "4 filas de equipos" in previa and "EN PROCESO" in previa
+              and cal and cal["n"] == 4 and cal["codigos"] == 3 and info[0]["ok"] is False and info[0]["estado"] == "EN PROCESO" and info[1]["ok"] is True and info[2]["ok"] is False and "HVAC: PENDIENTE" in info[2]["detalle"]
+              and regla_ok["ok"] and tras_ok[1] is True and "sin calificación" in busca_ and tras_rest is None and soltado == "Cargar la lista de equipos calificados")
+        return ok, json.dumps({"vacia": vacia, "previa": previa[:220], "cal": cal, "info": info, "regla": regla_ok, "trasOk": tras_ok, "busca": busca_[:120], "trasRest": tras_rest, "soltado": soltado}, ensure_ascii=False)[:1500]
+    @prueba("LN20 'Restablecer esta regla' devuelve una predeterminada a su configuración (en el formulario, se guarda con Guardar) y 'Restablecer todo' deja solo las predeterminadas y sin listas")
+    def _():
+        pg.evaluate("""async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas().map(r => r.predeterminada === 'novigente' ? { ...r, color: 'azul', etiqueta: 'OJO' } : r).concat([{ nombre: 'Mía', buscar: 'x' }]));
+          await R.ponerVigentes(['FPRO-250']); await R.ponerCalificados([['PL1-PV1-E025', '10000312', 'AUTOCLAVE', 'EN PROCESO']]); }""")
+        pg.locator(".rmd-reglas .rmd-rg-tabs button[data-p=reglas]").click(); pg.wait_for_timeout(300)
+        fila = pg.locator(".rmd-rg-fila").filter(has=pg.locator("b", has_text=re.compile("^Documento no vigente$")))
+        fila.locator(".rmd-rg-info").click(); pg.wait_for_timeout(300)
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Restablecer esta regla").click(); pg.wait_for_timeout(300)
+        form = pg.evaluate("({ etq: document.querySelector('.rmd-reglas [data-k=etiqueta]').value, color: (document.querySelector('.rmd-reglas input[name=rmd-rg-color]:checked') || {}).value })")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Guardar regla").click(); pg.wait_for_timeout(500)
+        nv = pg.evaluate("window.__rmdStats.reglas.lista().find(r => r.predeterminada === 'novigente')")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Restablecer todo").click(); pg.wait_for_timeout(300)
+        pg.locator(".rmd-modal-aviso button", has_text="Restablecer todo").click(); pg.wait_for_timeout(700)
+        fin = pg.evaluate("({ reglas: window.__rmdStats.reglas.lista().map(r => r.nombre), vig: window.__rmdStats.reglas.vigentes(), cal: window.__rmdStats.reglas.calificados() })")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
+        ok = (form == {"etq": "no vigente", "color": "rojo"} and nv["color"] == "rojo" and nv["etiqueta"] == "no vigente" and "Mía" not in fin["reglas"] and len(fin["reglas"]) == 5 and fin["vig"] is None and fin["cal"] is None)
+        return ok, json.dumps({"form": form, "nv": [nv["color"], nv["etiqueta"]], "fin": fin}, ensure_ascii=False)
+    # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
+    pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
