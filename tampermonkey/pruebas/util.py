@@ -1,13 +1,13 @@
 """Utilidades de las pruebas del userscript: abren una pestaña propia en el Chrome ya autenticado (puerto de depuración 9222).
 
 Requisitos: Chrome abierto con `--remote-debugging-port=9222` y la sesión del portal iniciada por una persona.
-Variables opcionales: RMD_LAUNCHPAD_URL (por defecto la de .env.example), QA_W / QA_H (tamaño de la ventana).
+Variables opcionales: RMD_LAUNCHPAD_URL (por defecto la de .env.example), QA_W / QA_H (tamaño de la ventana), RMD_SCRIPT (otra versión del script).
 """
 import os
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
-SCRIPT = RAIZ / "tampermonkey" / "rmd-ui-mejoras.user.js"
+SCRIPT = Path(os.environ["RMD_SCRIPT"]) if os.environ.get("RMD_SCRIPT") else RAIZ / "tampermonkey" / "rmd-ui-mejoras.user.js"   # RMD_SCRIPT: otra versión (comparar)
 
 
 def url_portal() -> str:

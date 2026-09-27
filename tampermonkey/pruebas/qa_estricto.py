@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R T V W X Y Z; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R S T V W X Y Z; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -15,7 +15,9 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   que salta al cambio (escrituras simuladas + cortafuegos: no escribe) · X v1.26: saludo, Ir a… (Ctrl+K), recientes, título de la pestaña
   y rendimiento del script (solo abre y cierra ventanas; cortafuegos) · Y v1.27: recetas frente a SAP en Asociar fórmulas (⚠ con el detalle,
   aviso al día al quitar una receta, hoja de ruta; cambios solo en memoria + cortafuegos) · Z v1.28: filtro Equipo en la barra de filtros,
-  Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · S v1.34: reglas de revisión
+  y lista de documentos vigentes (carga del .xls del DMS, aviso del RMD, Documentos citados con Vigente, resaltado en las listas; cortafuegos;
+  VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -24,6 +26,7 @@ Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variable
   cambian datos EN MEMORIA de la pestaña de prueba (que se cierra al terminar) y las peticiones de guardado se simulan.
   Extra: RMD_ASOCIAR + ASOCIAR_DESC (RMD con versión anterior visible al buscar esa descripción), RMD_LAYOUT + ETQS_LISTAS (listas de Pasos).
 NUNCA apuntes RMD_PRUEBA a un RMD real si vas a ejecutar el bloque D: cambia y borra procesos menores del paso 19.
+QA_CORTAFUEGOS=1 (sin el bloque D): aborta durante toda la ejecución cualquier petición que no sea GET/HEAD, para correr A-C/E-K sobre un RMD real Ingresado sin ningún riesgo.
 """
 import json, os, re, sys, time, traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -38,9 +41,9 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRTVWXYZD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRSTVWXYZD"
 if "D" in SOLO and not RMD_PRUEBA:
-    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRTVWXYZ).")
+    raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
 RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
@@ -118,6 +121,13 @@ with sync_playwright() as p:
         try: cerrar_todo(fr, pg)
         finally: ACEPTAR[0] = False
     pg.on("dialog", on_dialog)
+    bloqueadas_global = []
+    if os.environ.get("QA_CORTAFUEGOS") == "1":   # (opcional) cortafuegos durante TODA la ejecución: se aborta todo lo que no sea GET/HEAD
+        if "D" in SOLO: raise SystemExit("QA_CORTAFUEGOS=1 no es compatible con el bloque D (que escribe).")
+        def guardia_global(route):
+            if route.request.method not in ("GET", "HEAD"): bloqueadas_global.append(route.request.method + " " + route.request.url[:90]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_global)
     fr.evaluate(src); fr.evaluate(JS_UTIL)
 
     def aviso_propio():
@@ -144,7 +154,7 @@ with sync_playwright() as p:
               const tit=h.querySelector('.sapMTitle'), sep=h.querySelector('.sapMTBSeparator'), imp=[...h.querySelectorAll('button')].find(x=>x.title==='Imprimir'), bs=[...g.querySelectorAll('button')];
               const cy=(el)=>{const q=el.getBoundingClientRect(); return (q.top+q.bottom)/2;};
               return {orden:[...h.children].indexOf(g) < [...h.children].indexOf(sep), gr:window.__q.r(g), sep:window.__q.r(sep), imp:window.__q.r(imp), tit:window.__q.r(tit), dy:Math.abs(cy(bs[0])-cy(tit)), dyImp:Math.abs(cy(bs[0])-cy(imp)), n:bs.length, textos:bs.map(x=>x.textContent.trim())}; }""")
-            ok = r and r["orden"] and r["gr"]["r"] <= r["sep"]["l"] and r["gr"]["l"] > r["tit"]["r"] and r["dy"] <= 8 and r["dyImp"] <= 8 and r["n"] == 2
+            ok = r and r["orden"] and r["gr"]["r"] <= r["sep"]["l"] and r["gr"]["l"] > r["tit"]["r"] and r["dy"] <= 8 and r["dyImp"] <= 8 and r["n"] >= 2 and r["textos"][:2] == ["Copiar configuración", "Pegar"]   # (v1.21+: también "Cambiar paso" y "En minúsculas")
             return ok, str(r)
         @prueba("A3 La barra fija ya no contiene los botones (solo filtro, contador, alertas y aviso)")
         def _():
@@ -319,7 +329,7 @@ with sync_playwright() as p:
         cuenta = lambda sel: fr.evaluate(f"window.__q.top().querySelectorAll('{sel}').length")
         @prueba("E1 Copiar/Pegar: apagar retira los botones y el aviso; encender los devuelve")
         def _():
-            a = cuenta('.rmd-copia-grupo'); conmutar('Botones Copiar'); b_ = cuenta('.rmd-copia-grupo'); conmutar('Botones Copiar'); c = cuenta('.rmd-copia-grupo')
+            a = cuenta('.rmd-copia-grupo'); conmutar('Copiar / Pegar la configuración'); b_ = cuenta('.rmd-copia-grupo'); conmutar('Copiar / Pegar la configuración'); c = cuenta('.rmd-copia-grupo')
             return (a == 1 and b_ == 0 and c == 1), f"{a}->{b_}->{c}"
         @prueba("E2 Filtro local apagado: desaparece el campo pero quedan las alertas; con filtro y alertas apagados desaparece la barra")
         def _():
@@ -350,7 +360,7 @@ with sync_playwright() as p:
         def _():
             f = "(()=>{ const d=window.__q.top(); return {extra:d.querySelectorAll('#rmd-filtro-bar,.rmd-copia-grupo,.rmd-estado,td.rmd-td-sintipo,td.rmd-marcar,td.rmd-desmarcar').length, ancho:Math.round(d.getBoundingClientRect().width), clases:[...d.classList].filter(c=>/^rmd-/.test(c)).join(' ')}; })()"
             a = fr.evaluate(f); conmutar('Mejoras activas'); b_ = fr.evaluate(f); conmutar('Mejoras activas'); pg.wait_for_timeout(1200); c = fr.evaluate(f)
-            return (a["extra"] > 10 and b_["extra"] == 0 and b_["clases"] == "" and b_["ancho"] < a["ancho"] and c["extra"] > 10 and c["ancho"] == a["ancho"]), f"{a} | {b_} | {c}"
+            return (a["extra"] >= 3 and b_["extra"] == 0 and b_["clases"] == "" and b_["ancho"] < a["ancho"] and c["extra"] == a["extra"] and c["ancho"] == a["ancho"]), f"{a} | {b_} | {c}"   # (cuántas casillas incoherentes hay depende del RMD)
         cerrar_seguro()
 
     # ───────────────────────── F. Otras listas de pasos, Escape y avisos ─────────────────────────
@@ -1117,6 +1127,7 @@ with sync_playwright() as p:
         cerrar_seguro(); pg.wait_for_timeout(1000)
         @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
+            fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)   # sin el filtro de código que dejan otros bloques (exporta la lista entera)
             fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
               if (S) S.prototype.build = function () { const st = this._mSettings || this.mSettings || {}, ds = st.dataSource, arr = Array.isArray(ds) ? ds : (ds && (ds.data || ds.dataSource)) || [];
                 window.__exp.push({ cols: st.workbook.columns.map(c => c.label), ultima: st.workbook.columns[st.workbook.columns.length - 1], filas: arr.length }); return Promise.resolve(); }; return !!S; }""")
@@ -1642,6 +1653,92 @@ with sync_playwright() as p:
         def _():
             return (not bloq_z), str(bloq_z[:5])
 
+    # ───────────────────────── S. v1.34: Reglas de revisión y documentos vigentes — solo lectura ─────────────────────────
+    if "S" in SOLO:
+        RMD_REGLAS = os.environ.get("RMD_REGLAS", "2202609126")   # RMD Ingresado con documentos citados en Fabricación (y procesos menores)
+        XLS_VIG = os.environ.get("VIGENTES_XLS", os.path.join(os.path.expanduser("~"), "Downloads", "Documents", "Lista_ Documento - 9ba171a9.xls"))
+        TOP_S = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x => x.getClientRects().length).pop()"
+        def xlsx_s(b64):
+            import base64 as b64m, io as iom, zipfile as zipm
+            z = zipm.ZipFile(iom.BytesIO(b64m.b64decode(b64)))
+            return z, re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
+        NOVIG_JS = "(c) => window.__rmdStats.reglas.evaluar(' ' + c + ' ').avisos.some(a => a.regla === 'pred-novigente')"   # ¿fuera de la lista? (con la regla predeterminada)
+        bloq_s = []
+        def guardia_s(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_s.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_s)
+        cerrar_seguro(); pg.wait_for_timeout(1500)
+        respaldo_s = fr.evaluate("async () => { await window.__rmdStats.reglas.listo(); return window.__rmdStats.reglas.respaldo(); }")
+        try:
+            @prueba("S1 Reglas de revisión: la lista de vigentes del DMS (.xls de Excel 97-2003) se carga desde la ventana (botón del panel) con vista previa (hoja, columna «Identificador», estados) y queda guardada en el navegador")
+            def _():
+                real = os.path.exists(XLS_VIG); ruta = XLS_VIG
+                if not real:   # sin la lista real: un CSV con los mismos encabezados
+                    import tempfile
+                    ruta = os.path.join(tempfile.mkdtemp(), "vigentes.csv"); open(ruta, "w", encoding="utf-8").write("S;Identificador;Título\nAprobado;PCPR-202;INSPECCION\n")
+                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(700)
+                fr.locator(".rmd-reglas .rmd-rg-tabs button[data-p=vigentes]").click(); pg.wait_for_timeout(300)
+                with pg.expect_file_chooser() as fc:
+                    fr.locator(".rmd-reglas .rmd-rg-barra button[data-a=cargar]").click()
+                fc.value.set_files(ruta); pg.wait_for_timeout(2000)
+                previa = fr.evaluate("document.querySelector('.rmd-reglas .rmd-modal-cuerpo').innerText")
+                fr.locator(".rmd-reglas .rmd-modal-pie button", has_text="Usar esta lista").click(); pg.wait_for_timeout(1500)
+                vig = fr.evaluate("window.__rmdStats.reglas.vigentes()"); db = fr.evaluate("window.__rmdStats.reglas.guardados().then(g => g.vigentesDB)")
+                fr.locator(".rmd-reglas .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
+                ok = bool(vig) and vig["n"] == db and (not real or (vig["n"] > 3000 and vig["columna"] == "Identificador" and "Identificador" in previa and "Aprobado" in previa))
+                return ok, f"archivo={os.path.basename(ruta)} lista={vig} en IndexedDB={db} vista previa={previa[:160]!r}"
+            @prueba("S2 Ventana del RMD: aviso 'Reglas de revisión' con los documentos citados que no están en la lista y la regla 'Debe estar presente' que falta; 'Ver detalle' los muestra resaltados")
+            def _():
+                fr.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas().concat([{ nombre: 'Debe citar un formato inexistente', tipo: 'documento', buscar: 'FZZZ-999', condicion: 'debe' }])); }")
+                RmdAutomation(pg).editor_de_rmd(RMD_REGLAS)
+                fr.wait_for_function("(c) => !!window.__rmdStats.reglasRaiz && window.__rmdStats.reglasRaiz.rmd === c", arg=RMD_REGLAS, timeout=60000); pg.wait_for_timeout(800)
+                raiz = fr.evaluate("window.__rmdStats.reglasRaiz")
+                cods = fr.evaluate("async () => { const r = await window.__rmdStats.citasRMD(); return r.citas.map(c => c.codigo); }")
+                fuera = fr.evaluate("(cs) => cs.filter(" + NOVIG_JS + ")", cods)
+                aviso = fr.evaluate("(document.querySelector('.rmd-reglas-aviso') || {}).innerText || ''")
+                fr.locator(".rmd-reglas-aviso button[data-a=ver]").click(); pg.wait_for_timeout(1200)
+                det = fr.evaluate("() => { const m = document.querySelector('.rmd-reglas-detalle'); return m && { filas: m.querySelectorAll('tbody tr').length, rojas: [...m.querySelectorAll('mark.rmd-regla.rmd-c-rojo')].map(x => x.textContent) }; }")
+                fr.locator(".rmd-reglas-detalle .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(400)
+                ok = (sorted(set(raiz["noVigentes"])) == sorted(set(fuera)) and raiz["avisos"] == len(fuera) and any("FZZZ-999" in f for f in raiz["faltan"])
+                      and "Reglas de revisión" in aviso and "Falta" in aviso and det and det["filas"] >= 1 + (1 if fuera else 0) and sorted(set(det["rojas"])) == sorted(set(fuera)))
+                return ok, f"raíz={raiz} fuera de la lista (según las citas)={sorted(set(fuera))} aviso={aviso[:160]!r} detalle={det}"
+            @prueba("S3 'Documentos citados': columna 'Vigente' (✓ Sí / ✗ No, coherente con la lista) y el Excel lleva 'Vigente' y 'Título en la lista de vigentes'")
+            def _():
+                fr.locator(".rmd-documentos-citados").click()
+                fr.wait_for_function("() => [...document.querySelectorAll('.rmd-modal th')].some(t => t.textContent === 'Vigente')", timeout=60000)
+                t = fr.evaluate("() => { const m = [...document.querySelectorAll('.rmd-modal')].pop(); const ths = [...m.querySelectorAll('thead th')].map(x => x.textContent), iV = ths.indexOf('Vigente'); return { ths, p: m.querySelector('.rmd-modal-cuerpo p').innerText, filas: [...m.querySelectorAll('tbody tr')].map(tr => [tr.children[0].textContent.trim(), tr.children[iV].textContent.trim()]) }; }")
+                malas = fr.evaluate("(fs) => fs.filter(([c, v]) => v.includes('Sí') === (" + NOVIG_JS + ")(c))", t["filas"])
+                z, hojas = xlsx_s(fr.evaluate("() => window.__rmdStats.excelCitas(window.__rmdStats.ultimasCitas)"))
+                con_vig = any("Título en la lista de vigentes" in z.read(n).decode("utf-8", "ignore") for n in z.namelist() if n.endswith(".xml"))
+                fr.locator(".rmd-modal-pie button", has_text="Cerrar").last.click(); pg.wait_for_timeout(400)
+                return (t["ths"][:3] == ["Código", "Tipo", "Vigente"] and len(t["filas"]) > 0 and not malas and con_vig and hojas == ["Resumen", "Documentos citados", "Citas"]), f"cabecera={t['ths']} filas={len(t['filas'])} incoherentes={malas[:3]} excel={hojas} con Vigente={con_vig} | {t['p'][:140]!r}"
+            @prueba("S4 Lista de Fabricación: los códigos fuera de la lista en rojo con 'no vigente' y su motivo, y la barra suma sus avisos ('aviso(s) de reglas'); la ventana de procesos menores tiene su barra (N procesos menores)")
+            def _():
+                abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(4000)
+                f = fr.evaluate("() => { const d = " + TOP_S + "; const t = d.querySelector('table.sapMListTbl'); return { barra: (d.querySelector('#rmd-filtro-bar .rmd-alerta') || {}).textContent || '', marcas: [...t.querySelectorAll('mark.rmd-regla')].map(m => ({ t: m.textContent, c: m.className, etq: m.dataset.etq || '', title: m.title })) }; }")
+                rojas = [m for m in f["marcas"] if "rmd-c-rojo" in m["c"]]
+                fuera = fr.evaluate("(cs) => cs.filter(" + NOVIG_JS + ")", [m["t"] for m in rojas])
+                bien = all(m["etq"] == "no vigente" and "no está en la lista de documentos vigentes" in m["title"] and "aviso" in m["c"] for m in rojas) and len(fuera) == len(rojas)
+                n_av = int((re.search(r"(\d+) avisos? de reglas", f["barra"]) or [0, 0])[1])
+                pm = fr.evaluate("""() => { const d = """ + TOP_S + """; const t = d.querySelector('table'); const ths = [...t.querySelectorAll('thead th')].map(x => x.textContent.trim().toUpperCase()); const i = ths.findIndex(h => /PROC/.test(h));
+                  const tr = [...t.querySelectorAll('tbody tr')].filter(r => !/SubRow/.test(r.className)).find(r => r.children[i] && r.children[i].querySelector('button')); if (!tr) return null;
+                  sap.ui.getCore().byId(tr.children[i].querySelector('button').id.replace(/-inner$/, '')).firePress(); return true; }""")
+                barra_pm = None
+                if pm:
+                    pg.wait_for_timeout(6000)
+                    barra_pm = fr.evaluate("() => { const d = " + TOP_S + "; return /^Procesos Menores/.test(((d.querySelector('h2') || {}).textContent || '').trim()) ? ((d.querySelector('#rmd-filtro-bar') || {}).innerText || '') : null; }")
+                cerrar_seguro()
+                return (bien and n_av == len(rojas) and bool(barra_pm) and "procesos menores" in barra_pm), f"rojas={[m['t'] for m in rojas]} barra={f['barra']!r} avisos={n_av} barra de procesos menores={barra_pm!r}"
+        finally:
+            cerrar_seguro()
+            fr.evaluate("(r) => window.__rmdStats.reglas.restaurar(r)", respaldo_s)
+            pg.unroute("**/*", guardia_s)
+        @prueba("S5 Ninguna petición de escritura salió del navegador durante el bloque S (y las reglas y la lista quedaron como estaban)")
+        def _():
+            ahora = fr.evaluate("async () => { const r = await window.__rmdStats.reglas.respaldo(); return { ls: r.ls, vig: r.vig ? r.vig.docs.length : null }; }")
+            return (not bloq_s and ahora["ls"] == respaldo_s["ls"] and ahora["vig"] == (len(respaldo_s["vig"]["docs"]) if respaldo_s.get("vig") else None)), f"bloqueadas={bloq_s[:5]} estado final={ {'ls': (ahora['ls'] or '')[:60], 'vig': ahora['vig']} }"
+
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:
         pg.wait_for_timeout(3500)
@@ -1772,4 +1869,5 @@ with sync_playwright() as p:
     print(f"{len(RES) - len(fallas)}/{len(RES)} pruebas pasan")
     for n, ok, d in fallas: print("  FALLA:", n, "—", d)
     print("errores de script:", errores[:5])
+    if os.environ.get("QA_CORTAFUEGOS") == "1": print("escrituras abortadas por QA_CORTAFUEGOS:", bloqueadas_global[:10] or "ninguna")
     pg.close()

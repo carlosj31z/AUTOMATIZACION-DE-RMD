@@ -314,3 +314,18 @@ Cada fila de la ventana **Especificaciones** es un registro `MD_ES_ESPECIFICACIO
 - **Producción Estatus**: los destinatarios del envío a revisión están en `destinatariosMD` del RMD (tipo
   DJEFPROD = jefe de producción, DGERPROD = gerente, DJEFDOCT = jefe de documentación) con el id de usuario;
   el nombre sale del catálogo USUARIO.
+
+## 5 nonies. Documentos citados y vigencia (userscript v1.34)
+
+- Los pasos y procesos menores citan documentos del DMS por su código: instructivos, procedimientos y formatos
+  `<I/P/F><Área>-<sufijo NNN>` (IPRO-P123, PCPR-202, FPRO-250), manuales `M<Área>-NNN` (MCAL-200) y políticas
+  `POL-<Área>-NNN` (POL-CAL-001). **SAP no comprueba si el documento citado sigue vigente.**
+- La referencia es la **lista de documentos vigentes del DMS** (exportación "Lista_ Documento", un `.xls` de
+  Excel 97-2003 con una hoja "Worksheet": columna `S` = estado — Aprobado / Emisión / Revisión —, Categoría
+  (F, I, P, M, POL), Identificador, Título, Revisión, Fecha y Validez; en septiembre de 2026, 3417 documentos).
+  **Criterio: si el código está en la lista, está vigente; si no está, no lo está** (el estado y la validez
+  son solo informativos).
+- El userscript carga esa lista en el navegador (Reglas de revisión → Documentos vigentes), resalta en rojo
+  los códigos citados que no están en ella, lo avisa en la lista y en la ventana del RMD, y "Documentos
+  citados" muestra la columna Vigente. Conviene volver a cargar la lista cuando el DMS cambie (el script
+  avisa si tiene más de 30 días).

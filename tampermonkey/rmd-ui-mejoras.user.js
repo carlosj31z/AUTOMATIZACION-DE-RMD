@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.33.0
-// @description  Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.34.0
+// @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos) y documentos no vigentes según tu lista del DMS, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.33.0';                                                       // mantener igual a @version
+  const VERSION = '1.34.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -49,6 +49,7 @@
     ['saludo', 'Saludo al entrar ("Buenos días, …") con tus RMD en Ingresado y "Continuar con" el último RMD; se desvanece solo'],
     ['paleta', 'Ctrl+K = Ir a…: abrir un RMD (recientes, los tuyos o por código) o una herramienta sin buscarla'],
     ['titulo', 'La pestaña del navegador muestra la etapa y la descripción del RMD abierto ("FAB - …")'],
+    ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   const on = (k) => opc.activo && opc[k];
@@ -120,6 +121,9 @@
 
   // ---- 1. Enter en un filtro = pulsar "Ir"; Ctrl+S = Guardar -----------------------------------
   document.addEventListener('keydown', (e) => {
+    if (e.key === 's' && (e.ctrlKey || e.metaKey) && opc.activo && document.querySelector('.rmd-modal-fondo')) {   // Ctrl+S es de la ventana del script (no guarda la de SAP de debajo)
+      const propia = [...document.querySelectorAll('.rmd-modal-fondo')].pop(); e.preventDefault(); e.stopPropagation(); if (propia.__ctrlS) propia.__ctrlS(); return;
+    }
     if (e.key === 's' && (e.ctrlKey || e.metaKey) && on('singuardar')) {
       const d = dialogos().pop();
       const g = d && botonPorTitulo(d, 'Guardar');
@@ -404,6 +408,58 @@
   #rmd-ui-panel input[type=checkbox]:checked { background: var(--rmd-acento); } #rmd-ui-panel input[type=checkbox]:checked::after { transform: translateX(15px); }
   #rmd-ui-panel input[type=checkbox]:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
   #rmd-ui-panel .rmd-panel-pie { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font-size: 12px; }
+  /* ── Reglas de revisión (v1.34): resaltado, aviso en la ventana del RMD y su ventana ── */
+  .rmd-c-amarillo { --rmd-c: #e0a100; --rmd-cf: rgba(242,176,30,.36); } .rmd-c-rojo { --rmd-c: #e53935; --rmd-cf: rgba(229,57,53,.24); } .rmd-c-azul { --rmd-c: #1e88e5; --rmd-cf: rgba(30,136,229,.24); }
+  .rmd-c-verde { --rmd-c: #2e9d4a; --rmd-cf: rgba(67,160,71,.26); } .rmd-c-morado { --rmd-c: #8e24aa; --rmd-cf: rgba(142,36,170,.24); }
+  mark.rmd-regla { padding: 0 1px; border-radius: 2px; background: var(--rmd-cf); color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  mark.rmd-regla.aviso { box-shadow: inset 0 -2px 0 var(--rmd-c); }
+  mark.rmd-regla[data-etq]::after { content: attr(data-etq); display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 8px; background: var(--rmd-c); color: #fff; font: 700 9.5px/15px var(--rmd-fuente); letter-spacing: .3px; text-transform: uppercase; vertical-align: 1px; white-space: nowrap; }
+  .rmd-reglas-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid #e53935; border-radius: 3px; background: rgba(229,57,53,.08); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-reglas-aviso b { color: var(--rmd-rojo); } .rmd-reglas-aviso.ok { padding: 3px 10px; border-left-color: var(--rmd-verde); background: transparent; color: var(--rmd-apagado); }
+  .rmd-reglas-aviso button { margin-left: 8px; padding: 0 2px; border: 0; background: none; color: var(--rmd-acento-texto); font: 600 13px var(--rmd-fuente); text-decoration: underline; cursor: pointer; }
+  .rmd-modal.rmd-reglas { width: min(1000px, 96vw); height: min(800px, 90vh); } .rmd-modal.rmd-reglas-detalle { width: min(1100px, 96vw); }
+  .rmd-rg-tabs { display: flex; gap: 4px; margin: -4px 0 12px; border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-rg-tabs button { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-rg-tabs button.activa { color: var(--rmd-acento-texto); border-bottom-color: var(--rmd-acento); } .rmd-rg-tabs button span { font-weight: 400; }
+  .rmd-rg-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 12px; } .rmd-rg-esp { flex: 1 1 auto; }
+  .rmd-rg-fila { display: flex; align-items: flex-start; gap: 10px; padding: 9px 8px; border-bottom: 1px solid rgba(128,140,155,.2); } .rmd-rg-fila:hover { background: rgba(27,141,236,.06); }
+  .rmd-rg-fila.inactiva .rmd-rg-info > div:first-child, .rmd-rg-fila.inactiva .rmd-rg-color { opacity: .5; }
+  .rmd-rg-info { flex: 1 1 auto; min-width: 0; cursor: pointer; } .rmd-rg-info b { font-weight: 600; }
+  .rmd-rg-color { flex: none; display: inline-block; width: 14px; height: 14px; margin-top: 3px; border-radius: 3px; background: var(--rmd-c); vertical-align: -2px; }
+  .rmd-rg-etq { display: inline-block; margin-left: 8px; padding: 0 6px; border-radius: 8px; background: var(--rmd-c); color: #fff; font: 700 10px/16px var(--rmd-fuente); text-transform: uppercase; vertical-align: 1px; }
+  .rmd-rg-pred { margin-left: 8px; color: var(--rmd-apagado); font-size: 11.5px; }
+  .rmd-rg-acc { display: flex; flex: none; gap: 4px; } .rmd-rg-acc button { width: 28px; height: 26px; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: var(--rmd-acento-texto); font: 14px var(--rmd-fuente); cursor: pointer; }
+  .rmd-rg-acc button:hover:not(:disabled) { background: var(--rmd-acento); border-color: var(--rmd-acento); color: #fff; } .rmd-rg-acc button:disabled { opacity: .3; cursor: default; }
+  .rmd-rg-acc button.peligro { color: var(--rmd-rojo); } .rmd-rg-acc button.peligro:hover { background: var(--rmd-rojo); border-color: var(--rmd-rojo); color: #fff; }
+  .rmd-rg-error, .rmd-rg-err { margin: 2px 0 0; color: var(--rmd-rojo); font-size: 12.5px; } .rmd-rg-err.aviso { color: var(--rmd-ambar); } .rmd-rg-falta { margin: 2px 0 0; color: var(--rmd-ambar); font-size: 12.5px; }
+  .rmd-rg-link { padding: 0; border: 0; background: none; color: var(--rmd-acento-texto); font: inherit; text-decoration: underline; cursor: pointer; }
+  .rmd-switch { position: relative; flex: none; display: inline-block; width: 34px; height: 19px; margin-top: 1px; cursor: pointer; }
+  .rmd-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .rmd-switch span { position: absolute; inset: 0; border-radius: 10px; background: var(--rmd-borde-campo); transition: background .15s; pointer-events: none; }
+  .rmd-switch span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .rmd-switch input:checked + span { background: var(--rmd-acento); } .rmd-switch input:checked + span::after { transform: translateX(15px); } .rmd-switch input:focus-visible + span { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
+  .rmd-modal-pie .rmd-rg-estado { margin-right: auto; align-self: center; color: var(--rmd-apagado); font-size: 12.5px; }
+  .rmd-rg-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 22px; align-items: start; }
+  .rmd-rg-form h4 { grid-column: 1 / -1; margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font: 600 11px var(--rmd-fuente); letter-spacing: .6px; text-transform: uppercase; }
+  .rmd-rg-form h4:first-child { margin-top: 0; padding-top: 0; border-top: 0; } .rmd-rg-form .ancho { grid-column: 1 / -1; }
+  .rmd-rg-campo { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .rmd-rg-form input[type=text], .rmd-rg-form select, .rmd-rg-form textarea, .rmd-rg-q { box-sizing: border-box; min-height: 30px; padding: 4px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
+  .rmd-rg-form input[type=text], .rmd-rg-form select, .rmd-rg-form textarea { width: 100%; } .rmd-rg-check input, .rmd-rg-imp input, .rmd-rd-todos { width: auto; flex: none; margin: 0; }
+  .rmd-rg-form textarea { resize: vertical; line-height: 1.4; } .rmd-rg-form input:focus, .rmd-rg-form select:focus, .rmd-rg-form textarea:focus, .rmd-rg-q:focus { outline: none; border-color: var(--rmd-acento); }
+  .rmd-rg-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; } .rmd-rg-abajo { align-self: end; min-height: 30px; }
+  .rmd-rg-colores { display: flex; gap: 10px; padding: 3px 0; } .rmd-rg-sw { position: relative; width: 22px; height: 22px; cursor: pointer; } .rmd-rg-sw input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .rmd-rg-sw span { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--rmd-c); pointer-events: none; }
+  .rmd-rg-sw input:checked + span { box-shadow: 0 0 0 2px var(--rmd-superficie), 0 0 0 4px var(--rmd-c); } .rmd-rg-sw input:focus-visible + span { outline: 2px solid var(--rmd-acento-texto); outline-offset: 4px; }
+  .rmd-rg-ayuda { margin: 0; color: var(--rmd-apagado); font-size: 12px; } .rmd-rg-res { min-height: 24px; }
+  .rmd-rg-texto { padding: 7px 10px; border: 1px dashed var(--rmd-borde); border-radius: 4px; white-space: pre-wrap; line-height: 1.65; }
+  .rmd-rg-vig-ok b { color: var(--rmd-verde); } .rmd-rg-buscar { margin: 10px 0 4px; } .rmd-rg-q { width: min(460px, 100%); }
+  .rmd-modal.rmd-rg-soltar { outline: 3px dashed var(--rmd-acento); outline-offset: -8px; }
+  .rmd-vig-si { color: var(--rmd-verde); font-weight: 600; white-space: nowrap; } .rmd-vig-no { color: var(--rmd-rojo); font-weight: 700; }
+  td.rmd-vig-no { white-space: nowrap; }
+  .rmd-rg-imp > label { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; cursor: pointer; } .rmd-rg-imp > label input { margin-top: 3px; }
+  .rmd-rg-imp-lista { margin: 6px 0 12px 26px; padding: 6px 10px; border-left: 2px solid var(--rmd-borde); } .rmd-rg-imp-lista > div { margin: 4px 0; }
+  #rmd-ui-panel .rmd-panel-acciones { display: flex; flex-direction: column; gap: 6px; } #rmd-ui-panel .rmd-abrir-reglas { width: 100%; justify-content: center; }
+  #rmd-ui-panel .rmd-mod-masivas { justify-content: center; }
   `;
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
@@ -533,8 +589,6 @@
     'pérdida', 'pérdidas',
   ].map((p) => [SIN_ACENTOS(p), p]));
   delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // "mas" (cantidad, con tilde) es ambiguo con "mas" (pero, sin tilde): no se acentua solo
-  // mismo patron que src/rmd_automation/referencias.py (Tipo I/P/F + Area + sufijo -NNN obligatorio)
-  const PATRON_REFERENCIA_JS = /\b[IPF][A-Z0-9]{3}-[A-Z]?\d{3}\b/;
   // siglas que se conservan tal cual (no se protege ninguna otra secuencia en mayusculas: el texto de entrada ya viene
   // todo en mayusculas, asi que "proteger cualquier palabra en mayusculas" dejaria todo el texto sin tocar)
   const SIGLAS_CONOCIDAS = new Set(['RMD', 'CC', 'UM', 'OP', 'PM', 'SAP', 'GMP', 'ID', 'OK', 'CT', 'POE', 'EPP', 'HEPA', 'UV', 'CIP', 'SIP', 'BPM',
@@ -544,7 +598,7 @@
   function capitalizarOracion(texto) {
     const CONSERVAR = [];
     let t = String(texto || '');
-    t = t.replace(new RegExp(PATRON_REFERENCIA_JS.source, 'g'), (m) => { CONSERVAR.push(m); return MARCA(CONSERVAR.length - 1); });
+    t = t.replace(new RegExp(Reglas.FUENTE_DOC, 'g'), (m) => { CONSERVAR.push(m); return MARCA(CONSERVAR.length - 1); });
     t = t.replace(/\b[A-ZÑ]{2,}\b/g, (m) => { if (!SIGLAS_CONOCIDAS.has(m)) return m; CONSERVAR.push(m); return MARCA(CONSERVAR.length - 1); });
     t = t.toLowerCase();
     t = t.replace(/(^\s*|[.!?¡¿]\s+|\n\s*)([a-záéíóúñ])/g, (m, pre, letra) => pre + letra.toUpperCase());
@@ -672,7 +726,9 @@
     // Ventana raíz del RMD ("Estructura de RMD"): se deja con el ancho y las filas del portal (90 % de la pantalla), que es como
     // la conocen los usuarios; solo se revisa el orden de sus estructuras.
     if (/^Estructura de RMD\b/i.test(norm((barraDeLista(tabla) || {}).textContent))) {
-      d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla); return;
+      d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla);
+      try { avisoReglasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoReglasRaiz: ' + e.message); }
+      return;
     }
     d.classList.add('rmd-g');
     const ths = [...tabla.querySelectorAll('thead th')];
@@ -783,10 +839,21 @@
       // todos: solo las del propio paso ("Documentos citados" revisa los procesos menores aparte); pm: las de sus procesos menores
       if (avisos.length || avisosPM.length) { alertas += avisos.length + avisosPM.length; primeras.push({ tr, texto: avisos[0] || avisosPM[0], todos: avisos.slice(), pm: avisosPM }); }
     });
+    // Reglas de revisión (v1.34): se resalta lo que encuentran en la descripción y sus advertencias se suman a las de la lista
+    let nReglas = 0;
+    if ((esPasos || esPM) && iDes >= 0) {
+      let rr = null;
+      try { rr = aplicarReglasLista(tabla, filas, iDes, { esPM, lista: esPasos ? lista : listaPadre(d) }); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('reglas: ' + e.message); }
+      if (rr && rr.n) {
+        nReglas = rr.n; alertas += rr.n;
+        rr.filas.forEach((x) => { const pr = primeras.find((y) => y.tr === x.tr); if (pr) pr.todos.push(...x.avisos); else primeras.push({ tr: x.tr, texto: x.avisos[0], todos: x.avisos.slice(), pm: [] }); });
+        primeras.sort((a, b) => filas.indexOf(a.tr) - filas.indexOf(b.tr));
+      }
+    }
     const previo = tabla.__rmdAlertas;
-    tabla.__rmdAlertas = { n: alertas, filas: primeras, sig: previo ? previo.sig : 0 };
+    tabla.__rmdAlertas = { n: alertas, reglas: nReglas, filas: primeras, sig: previo ? previo.sig : 0 };
 
-    if (esPasos && (on('filtro') || on('reglas'))) filtroLocal(tabla, true);
+    if (esPasos && (on('filtro') || on('reglas') || reglasVivas())) filtroLocal(tabla, true);
     else if (esPasos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); filas.forEach((tr) => tr.style.removeProperty('display')); }
     if (esPasos && on('copiar')) instalarBotonesCopia(d);
     else if (esPasos) d.querySelectorAll('.rmd-copia-grupo, .rmd-clip').forEach((e) => e.remove());
@@ -794,7 +861,7 @@
     else if (esPasos || esPM) d.querySelectorAll('.rmd-cambiar-paso').forEach((e) => e.remove());
     if ((esPasos || esPM) && on('pasominusculas')) instalarBotonMinusculas(d, tabla);
     else if (esPasos || esPM) d.querySelectorAll('.rmd-minusculas').forEach((e) => e.remove());
-    else if (esPM && on('reglas')) filtroLocal(tabla, false);
+    if (esPM && (on('reglas') || reglasVivas())) filtroLocal(tabla, false);
     else if (esPM) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); }
     actualizarBarra(d, tabla);
     if (esEspec) sincronizarEspec(d, tabla);
@@ -838,11 +905,12 @@
   }
   function actualizarBarra(d, tabla) {
     const barra = d.querySelector('#rmd-filtro-bar'); if (!barra || !tabla.__rmdAlertas) return;
-    const b = barra.querySelector('button.rmd-alerta'), n = tabla.__rmdAlertas.n;
-    if (!on('reglas')) { b.style.display = 'none'; return; }
+    const b = barra.querySelector('button.rmd-alerta'), a = tabla.__rmdAlertas, n = a.n, nR = a.reglas || 0, nI = n - nR;
+    if (!on('reglas') && !reglasVivas()) { b.style.display = 'none'; return; }
     b.style.display = '';
     b.classList.toggle('ok', n === 0);
-    setTxt(b, n === 0 ? '✓ Sin incoherencias' : `⚠ ${n} incoherencia${n === 1 ? '' : 's'} · ir a la siguiente ›`);
+    const inc = `${nI} incoherencia${nI === 1 ? '' : 's'}`, av = `${nR} aviso${nR === 1 ? '' : 's'} de reglas`;   // (avisos de las reglas de revisión)
+    setTxt(b, n === 0 ? (on('reglas') ? '✓ Sin incoherencias' : '✓ Sin avisos de reglas') : `⚠ ${nI && nR ? `${inc} + ${av}` : nI ? inc : av} · ir a la siguiente ›`);
   }
   function irAlSiguiente(d) {
     const tabla = d.querySelector('table.sapMListTbl'); const a = tabla && tabla.__rmdAlertas; if (!a || !a.filas.length) return;
@@ -1237,8 +1305,10 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
+    document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
+    document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
     document.querySelectorAll('textarea.rmd-ortografia').forEach((e) => { e.classList.remove('rmd-ortografia'); e.removeAttribute('data-rmd-dudosas'); });
     document.querySelectorAll('.rmd-con-estado, .rmd-pm-titulo').forEach((e) => e.classList.remove('rmd-con-estado', 'rmd-pm-titulo'));
@@ -1306,6 +1376,7 @@
     window.__rmdStats.ajustes++;
     // al cerrarse una ventana de procesos menores (pudo corregirse algo) se vuelven a revisar los de la lista de pasos
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
+    const nDlg = dialogos().length; if (nDlg < dialogosAntes) generacionRmd++; dialogosAntes = nDlg;   // (se cerró una ventana: el aviso de reglas del RMD se vuelve a leer)
     if (on('sesion')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
     decorarCabeceras();
@@ -1316,7 +1387,7 @@
     gestionarBotonesLista();
     gestionarRecetasAsociar();
     // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
-    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnaEtapa, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto].forEach((f) => {
+    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnaEtapa, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
     gestionarTextosMayusculas();
@@ -2569,7 +2640,93 @@
       };
     }
 
-    return { crearLibro, leerLibro, zip, leerZip, ref, deRef, letra, error, esError, ERRORES, serialDeFecha, isoFecha, S };
+    // ---- .xls de Excel 97-2003 (v1.34, para la lista de documentos vigentes que exporta el DMS): archivo compuesto (CFB) con el
+    // libro BIFF8 dentro. Solo lee valores: texto (tabla de cadenas compartidas SST y LABEL), números (NUMBER, RK, MULRK), lógicos y
+    // el valor ya calculado de las fórmulas. Misma forma que leerLibro: { hojas, filas(nombre) } con las filas en [[valor…]…].
+    function leerXls(u8) {
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), u16 = (o) => dv.getUint16(o, true), u32 = (o) => dv.getUint32(o, true);
+      if (![0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1].every((b, i) => u8[i] === b)) throw new Error('no es un archivo .xls de Excel 97-2003');
+      const tamSector = 1 << u16(30), tamMini = 1 << u16(32), nFat = u32(44), dirIni = u32(48), corteMini = u32(56), miniFatIni = u32(60), nMiniFat = u32(64), difatIni = u32(68), nDifat = u32(72);
+      const off = (s) => (s + 1) * tamSector, FIN = 0xFFFFFFFA;
+      const secFat = []; for (let i = 0; i < 109 && secFat.length < nFat; i++) { const s = u32(76 + i * 4); if (s < FIN) secFat.push(s); }
+      for (let d = difatIni, k = 0; k < nDifat && d < FIN; k++) { const por = tamSector / 4 - 1; for (let i = 0; i < por && secFat.length < nFat; i++) { const s = u32(off(d) + i * 4); if (s < FIN) secFat.push(s); } d = u32(off(d) + por * 4); }
+      const fat = []; secFat.forEach((s) => { for (let i = 0; i < tamSector / 4; i++) fat.push(u32(off(s) + i * 4)); });
+      const cadena = (ini, tabla) => { const out = []; for (let s = ini, g = 0; s < FIN && g < 1e6; g++) { out.push(s); s = tabla[s]; } return out; };
+      const leerCadena = (ini, tam) => { const sec = cadena(ini, fat), buf = new Uint8Array(sec.length * tamSector); sec.forEach((s, i) => buf.set(u8.subarray(off(s), off(s) + tamSector), i * tamSector)); return tam != null ? buf.subarray(0, tam) : buf; };
+      const dir = leerCadena(dirIni), dirV = new DataView(dir.buffer, dir.byteOffset, dir.byteLength), entradas = [];
+      for (let o = 0; o + 128 <= dir.length; o += 128) {
+        const lon = dirV.getUint16(o + 64, true); if (!lon) continue;
+        let nombre = ''; for (let i = 0; i < lon / 2 - 1; i++) nombre += String.fromCharCode(dirV.getUint16(o + i * 2, true));
+        entradas.push({ nombre, tipo: dir[o + 66], ini: dirV.getUint32(o + 116, true), tam: dirV.getUint32(o + 120, true) });
+      }
+      const raiz = entradas.find((e) => e.tipo === 5); let mini = null, miniFat = null;
+      const flujo = (e) => {
+        if (e.tam >= corteMini) return leerCadena(e.ini, e.tam);
+        if (!mini) { mini = leerCadena(raiz.ini, raiz.tam); const mf = nMiniFat ? leerCadena(miniFatIni) : new Uint8Array(0), mv = new DataView(mf.buffer, mf.byteOffset, mf.byteLength); miniFat = []; for (let i = 0; i + 4 <= mf.length; i += 4) miniFat.push(mv.getUint32(i, true)); }
+        const sec = cadena(e.ini, miniFat), buf = new Uint8Array(sec.length * tamMini); sec.forEach((s, i) => buf.set(mini.subarray(s * tamMini, s * tamMini + tamMini), i * tamMini)); return buf.subarray(0, e.tam);
+      };
+      const wbE = entradas.find((e) => /^(Workbook|Book)$/i.test(e.nombre)); if (!wbE) throw new Error('el .xls no trae un libro de Excel');
+      const wb = flujo(wbE), v = new DataView(wb.buffer, wb.byteOffset, wb.byteLength);
+      const regs = []; for (let o = 0; o + 4 <= wb.length;) { const tipo = v.getUint16(o, true), lon = v.getUint16(o + 2, true); regs.push({ tipo, o: o + 4, lon }); o += 4 + lon; }
+      if (!regs.length || regs[0].tipo !== 0x0809 || v.getUint16(regs[0].o, true) !== 0x0600) throw new Error('es un .xls de una versión antigua de Excel (anterior a 97): ábrelo y guárdalo como .xlsx');
+      const cp1252 = new TextDecoder('windows-1252'), utf16 = new TextDecoder('utf-16le');
+      // cadena Unicode de BIFF8, que puede seguir en registros CONTINUE (cada tramo trae su propio byte de opciones)
+      function lectorCadenas(partes) {
+        let p = 0, o = 0;
+        const byte = () => { if (o >= partes[p].lon) { p++; o = 0; } return wb[partes[p].o + o++]; };
+        const salto = (n) => { while (n > 0 && p < partes.length) { const q = Math.min(n, partes[p].lon - o); o += q; n -= q; if (n > 0) { p++; o = 0; } } };
+        const u16l = () => byte() | (byte() << 8), u32l = () => (u16l() | (u16l() << 16)) >>> 0;
+        return {
+          fin: () => p >= partes.length || (p === partes.length - 1 && o >= partes[p].lon),
+          cadena() {
+            const n = u16l(); let op = byte(); const rich = op & 8 ? u16l() : 0, ext = op & 4 ? u32l() : 0; let s = '', quedan = n;
+            while (quedan > 0) {
+              if (o >= partes[p].lon) { p++; o = 0; op = byte(); }
+              const ancho = op & 1 ? 2 : 1, cab = Math.min(quedan, Math.floor((partes[p].lon - o) / ancho)), trozo = wb.subarray(partes[p].o + o, partes[p].o + o + cab * ancho);
+              s += ancho === 2 ? utf16.decode(trozo) : cp1252.decode(trozo); o += cab * ancho; quedan -= cab;
+            }
+            salto(rich * 4 + ext); return s;
+          },
+        };
+      }
+      let sst = []; const hojas = [];
+      for (let i = 0; i < regs.length; i++) {
+        const r = regs[i];
+        if (r.tipo === 0x0085) {                                                           // BOUNDSHEET
+          const lon = wb[r.o + 6], op = wb[r.o + 7];
+          hojas.push({ nombre: op & 1 ? utf16.decode(wb.subarray(r.o + 8, r.o + 8 + lon * 2)) : cp1252.decode(wb.subarray(r.o + 8, r.o + 8 + lon)), pos: v.getUint32(r.o, true), tipo: wb[r.o + 5] });
+        } else if (r.tipo === 0x00FC) {                                                    // SST (+ CONTINUE)
+          const partes = [{ o: r.o + 8, lon: r.lon - 8 }]; for (let j = i + 1; j < regs.length && regs[j].tipo === 0x003C; j++) partes.push({ o: regs[j].o, lon: regs[j].lon });
+          const total = v.getUint32(r.o + 4, true), lc = lectorCadenas(partes); sst = [];
+          for (let k = 0; k < total && !lc.fin(); k++) sst.push(lc.cadena());
+        }
+      }
+      const rk = (x) => { let n; if (x & 2) n = x >> 2; else { const b = new DataView(new ArrayBuffer(8)); b.setUint32(4, x & 0xFFFFFFFC, true); n = b.getFloat64(0, true); } return x & 1 ? n / 100 : n; };
+      const porHoja = {};
+      hojas.filter((h) => h.tipo === 0).forEach((h) => {
+        const filas = [], pon = (f, c, val) => { (filas[f] || (filas[f] = []))[c] = val; };
+        let i = regs.findIndex((r) => r.o - 4 === h.pos), formula = null; if (i < 0) return;
+        for (i++; i < regs.length; i++) {
+          const r = regs[i], o = r.o;
+          if (r.tipo === 0x000A) break;                                                     // EOF de la hoja
+          if (r.tipo === 0x00FD) pon(u16o(o), u16o(o + 2), sst[v.getUint32(o + 6, true)]);   // LABELSST
+          else if (r.tipo === 0x0203) pon(u16o(o), u16o(o + 2), v.getFloat64(o + 6, true));   // NUMBER
+          else if (r.tipo === 0x027E) pon(u16o(o), u16o(o + 2), rk(v.getUint32(o + 6, true)));   // RK
+          else if (r.tipo === 0x00BD) { const n = (r.lon - 6) / 6; for (let k = 0; k < n; k++) pon(u16o(o), u16o(o + 2) + k, rk(v.getUint32(o + 4 + k * 6 + 2, true))); }   // MULRK
+          else if (r.tipo === 0x0204 || r.tipo === 0x00D6) pon(u16o(o), u16o(o + 2), lectorCadenas([{ o: o + 6, lon: r.lon - 6 }]).cadena());   // LABEL / RSTRING
+          else if (r.tipo === 0x0205) pon(u16o(o), u16o(o + 2), wb[o + 7] ? null : !!wb[o + 6]);   // BOOLERR
+          else if (r.tipo === 0x0006) {                                                     // FORMULA: su valor en caché
+            if (v.getUint16(o + 12, true) === 0xFFFF) { const t = wb[o + 6]; if (t === 0) formula = [u16o(o), u16o(o + 2)]; else if (t === 1) pon(u16o(o), u16o(o + 2), !!wb[o + 8]); }
+            else pon(u16o(o), u16o(o + 2), v.getFloat64(o + 6, true));
+          } else if (r.tipo === 0x0207 && formula) { pon(formula[0], formula[1], lectorCadenas([{ o, lon: r.lon }]).cadena()); formula = null; }   // STRING de la fórmula
+        }
+        porHoja[h.nombre] = filas;
+      });
+      function u16o(o) { return v.getUint16(o, true); }
+      return { hojas: Object.keys(porHoja), filas: (nombre) => porHoja[nombre] || null };
+    }
+
+    return { crearLibro, leerLibro, leerXls, zip, leerZip, ref, deRef, letra, error, esError, ERRORES, serialDeFecha, isoFecha, S };
   })();
   // ==XLSX-FIN==
 
@@ -2918,13 +3075,312 @@
   })();
   // ==INDICADORES-FIN==
 
+  // ==REGLAS-INICIO== (no quitar esta marca ni la de cierre: las pruebas extraen este bloque para correrlo fuera del portal)
+  // Reglas de revisión (v1.34): el motor, sin DOM ni SAP. Una regla busca en un texto (la descripción de un paso o de un proceso
+  // menor) palabras o frases, códigos de documento, códigos de equipo o un patrón, y dice qué hacer con lo que encuentra: marcarlo,
+  // avisar que no debe aparecer o avisar si falta en el RMD. La lista de documentos vigentes (la carga la persona) decide qué
+  // códigos citados están vigentes: los que están en la lista lo están; los que no están, no (SAP no lo compara por sí solo).
+  const Reglas = (() => {
+    const TIPOS = { frase: 'Palabra o frase', documento: 'Código de documento', equipo: 'Código de equipo o utensilio', patron: 'Patrón avanzado (expresión regular)' };
+    const VIGENCIAS = { todos: 'Cualquier documento', noVigentes: 'Solo los que NO están en la lista de vigentes', vigentes: 'Solo los que están en la lista de vigentes' };
+    const CONDICIONES = { marcar: 'Marcar donde aparezca', noDebe: 'No debe aparecer', debe: 'Debe estar presente en el RMD' };
+    const ACCIONES = { resaltar: 'Resaltar', advertencia: 'Mostrar advertencia' };
+    const COLORES = { amarillo: 'Amarillo', rojo: 'Rojo', azul: 'Azul', verde: 'Verde', morado: 'Morado' };
+    const DONDE = { todo: 'Pasos y procesos menores', pasos: 'Solo pasos', menores: 'Solo procesos menores' };
+    const BASE = { nombre: '', activa: true, tipo: 'frase', buscar: '', palabraCompleta: true, mayusculas: false, vigencia: 'todos', excepto: '',
+      condicion: 'marcar', accion: 'resaltar', basta: false, color: 'amarillo', etiqueta: '', donde: 'todo', lista: '', mensaje: '' };
+    const PREDETERMINADAS = [
+      { id: 'pred-novigente', predeterminada: 'novigente', nombre: 'Documento no vigente', tipo: 'documento', vigencia: 'noVigentes', condicion: 'noDebe', accion: 'advertencia', color: 'rojo', etiqueta: 'no vigente' },
+      { id: 'pred-documentos', predeterminada: 'documentos', nombre: 'Documentos citados', activa: false, tipo: 'documento', condicion: 'marcar', accion: 'resaltar', color: 'azul' },
+      { id: 'pred-equipos', predeterminada: 'equipos', nombre: 'Códigos de equipo en el texto', activa: false, tipo: 'equipo', condicion: 'marcar', accion: 'resaltar', color: 'verde' },
+      { id: 'pred-provisional', predeterminada: 'provisional', nombre: 'Textos provisionales (ejemplo)', activa: false, tipo: 'frase', buscar: 'XXX; POR DEFINIR; BORRADOR', condicion: 'noDebe', accion: 'advertencia', color: 'amarillo' },
+    ];
+    // Códigos de documento: los de siempre (<I/P/F><Área>-<sufijo NNN>, como src/rmd_automation/referencias.py) y, como en la lista
+    // de vigentes, los manuales (MCAL-200) y las políticas (POL-CAL-001).
+    const FUENTE_DOC = '\\b(?:POL-[A-Z]{3}-\\d{3}|M[A-Z]{3}-\\d{3}|[IPF][A-Z0-9]{3}-[A-Z]?\\d{3})\\b';
+    // Posibles códigos de equipo (PL1-GV1-E058, LIQ-E023, TAN-AAA-01…): se confirman contra el catálogo de equipos del portal.
+    const FUENTE_CANDIDATO = '(?<![A-Z0-9-])[A-Z0-9]{2,6}(?:-[A-Z0-9]{1,8}){1,3}(?![A-Z0-9])';
+    const TIPO_DOC = { I: 'Instructivo', P: 'Procedimiento', F: 'Formato', M: 'Manual' };
+    const GUIONES = /[‐-―−]/g;
+    const normalizarCodigo = (c) => String(c == null ? '' : c).normalize('NFKC').toUpperCase().replace(GUIONES, '-').replace(/\s+/g, '');
+    const tipoDocumento = (c) => { const x = normalizarCodigo(c); return /^POL-/.test(x) ? 'Política' : TIPO_DOC[x[0]] || 'Documento'; };
+    const codigosDocumento = (texto) => String(texto || '').match(new RegExp(FUENTE_DOC, 'g')) || [];
+    const partir = (s) => String(s == null ? '' : s).split(/[;\r\n]+/).map((x) => x.trim()).filter(Boolean);
+    const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nuevoId = () => 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+    // Texto sin tildes (y en mayúsculas, salvo que se distingan) y, por cada carácter del resultado, su posición en el original:
+    // así se busca sin importar tildes ni mayúsculas y se resalta exactamente lo que se ve.
+    const COMBINANTES = /[̀-ͯ]/g;
+    function plegar(texto, distinguir) {
+      const t = String(texto == null ? '' : texto), pos = []; let p = '';
+      for (let i = 0; i < t.length; i++) {
+        const c = t.charCodeAt(i);
+        if (c < 128) { p += distinguir ? t[i] : t[i].toUpperCase(); pos.push(i); continue; }
+        let f = t[i].normalize('NFD').replace(COMBINANTES, '').replace(GUIONES, '-'); if (!distinguir) f = f.toUpperCase();
+        for (let k = 0; k < f.length; k++) { p += f[k]; pos.push(i); }
+      }
+      pos.push(t.length);
+      return { p, pos };
+    }
+    function fuenteFrase(valor, completa, distinguir) {
+      const v = plegar(String(valor).trim(), distinguir).p; if (!v.replace(/\*/g, '').trim()) return '';
+      const cuerpo = v.split('*').map((x) => escapar(x).replace(/\s+/g, '\\s+')).join('[\\p{L}\\p{N}]*');
+      return completa ? '(?<![\\p{L}\\p{N}])' + cuerpo + '(?![\\p{L}\\p{N}])' : cuerpo;
+    }
+    function fuenteCodigo(valor) {
+      const v = normalizarCodigo(valor); if (!v.replace(/\*/g, '')) return '';
+      return '(?<![A-Z0-9])' + v.split('*').map(escapar).join('[A-Z0-9-]*') + '(?![A-Z0-9])';
+    }
+
+    function normalizar(x) {
+      const o = { ...BASE, ...(x && typeof x === 'object' ? x : {}) }, s = (v) => String(v == null ? '' : v);
+      const r = {
+        id: s(o.id).trim().slice(0, 60) || nuevoId(), nombre: s(o.nombre).replace(/\s+/g, ' ').trim().slice(0, 80), activa: o.activa !== false,
+        tipo: TIPOS[o.tipo] ? o.tipo : 'frase', buscar: s(o.buscar).slice(0, 4000), palabraCompleta: o.palabraCompleta !== false, mayusculas: o.mayusculas === true,
+        vigencia: VIGENCIAS[o.vigencia] ? o.vigencia : 'todos', excepto: s(o.excepto).slice(0, 1000),
+        condicion: CONDICIONES[o.condicion] ? o.condicion : 'marcar', accion: ACCIONES[o.accion] ? o.accion : 'resaltar', basta: o.basta === true,
+        color: COLORES[o.color] ? o.color : 'amarillo', etiqueta: s(o.etiqueta).replace(/\s+/g, ' ').trim().slice(0, 18), donde: DONDE[o.donde] ? o.donde : 'todo',
+        lista: s(o.lista).replace(/\s+/g, ' ').trim().slice(0, 80), mensaje: s(o.mensaje).replace(/\s+/g, ' ').trim().slice(0, 200),
+      };
+      if (PREDETERMINADAS.some((p) => p.predeterminada === o.predeterminada)) r.predeterminada = o.predeterminada;
+      if (!r.nombre) r.nombre = partir(r.buscar)[0] ? `${TIPOS[r.tipo]}: ${partir(r.buscar)[0].slice(0, 40)}` : TIPOS[r.tipo];
+      return r;
+    }
+    const predeterminadas = () => PREDETERMINADAS.map(normalizar);
+    // ids únicos (al importar o duplicar podrían repetirse)
+    function sinIdsRepetidos(lista) { const vistos = new Set(); return lista.map((r) => { if (!vistos.has(r.id)) { vistos.add(r.id); return r; } const n = { ...r, id: nuevoId() }; vistos.add(n.id); return n; }); }
+
+    // ctx: { vigentes: Map(código -> info) | null, catalogo: Map(código -> descripción) | null }
+    function compilar(reglas, ctx = {}) {
+      return (reglas || []).map((x, prioridad) => {
+        const r = normalizar(x), c = { regla: r, prioridad, ok: false, error: '', necesita: '', valores: [], excepto: null };
+        try {
+          const vals = partir(r.buscar);
+          if (r.tipo === 'frase') {
+            c.valores = vals.map((v) => [v, fuenteFrase(v, r.palabraCompleta, r.mayusculas)]).filter((y) => y[1]).map(([v, f]) => ({ etiqueta: v, rx: new RegExp(f, 'gu'), plegado: true, distinguir: r.mayusculas }));
+            if (!c.valores.length) throw new Error('escribe al menos una palabra o frase');
+          } else if (r.tipo === 'documento' || r.tipo === 'equipo') {
+            c.valores = vals.map((v) => [normalizarCodigo(v), fuenteCodigo(v)]).filter((y) => y[1]).map(([v, f]) => ({ etiqueta: v, rx: new RegExp(f, 'g'), plegado: true }));
+            if (vals.length && !c.valores.length) throw new Error('los códigos escritos no son válidos');
+            if (!vals.length && r.tipo === 'documento') c.valores = [{ etiqueta: 'un código de documento', rx: new RegExp(FUENTE_DOC, 'g'), plegado: false }];
+            if (!vals.length && r.tipo === 'equipo') { c.valores = [{ etiqueta: 'un código de equipo', rx: new RegExp(FUENTE_CANDIDATO, 'g'), plegado: true, catalogo: true }]; if (!ctx.catalogo) c.necesita = 'catalogo'; }
+            if (r.tipo === 'documento' && r.vigencia !== 'todos' && !ctx.vigentes) c.necesita = 'vigentes';
+          } else {
+            const f = r.buscar.trim(); if (!f) throw new Error('escribe el patrón');
+            let rx; try { rx = new RegExp(f, r.mayusculas ? 'gu' : 'giu'); } catch (e) { rx = new RegExp(f, r.mayusculas ? 'g' : 'gi'); }
+            c.valores = [{ etiqueta: f, rx, plegado: false }];
+          }
+          const ex = partir(r.excepto).map((v) => fuenteFrase(v, false, false)).filter(Boolean);
+          if (ex.length) c.excepto = new RegExp(ex.join('|'), 'u');
+          c.ok = r.activa && !c.necesita;
+        } catch (e) { c.error = String((e && e.message) || e).replace(/^Invalid regular expression: /, 'patrón no válido: '); }
+        return c;
+      });
+    }
+    function aplica(r, ctx) {
+      if (ctx.probar) return true;
+      if ((r.donde === 'pasos' && ctx.esPM) || (r.donde === 'menores' && !ctx.esPM)) return false;
+      if (r.lista) { if (ctx.lista == null) return true; if (!plegar(ctx.lista).p.includes(plegar(r.lista).p)) return false; }
+      return true;
+    }
+    // el catálogo puede tener el código sin el último tramo (texto "PL1-LIQ-E023-A", catálogo "PL1-LIQ-E023")
+    function enCatalogo(cand, catalogo) {
+      if (!catalogo) return null;
+      const tramos = cand.split('-');
+      for (let k = tramos.length; k >= 2; k--) { const c = tramos.slice(0, k).join('-'); if (catalogo.has(c)) return { codigo: c, desc: catalogo.get(c) || '', largo: c.length }; }
+      return null;
+    }
+    const textoAviso = (r, valor, motivo) => (r.mensaje ? `${r.mensaje} («${valor}»)` : motivo ? `${r.nombre}: ${motivo}` : r.condicion === 'noDebe' ? `${r.nombre}: «${valor}» no debe aparecer` : `${r.nombre}: «${valor}»`);
+    const textoFalta = (r, vals) => r.mensaje || `${r.nombre}: no aparece ${vals.map((v) => `«${v}»`).join(r.basta ? ' ni ' : ', ')}${r.lista ? ` en ${r.lista}` : ''}${r.donde === 'pasos' ? ' (pasos)' : r.donde === 'menores' ? ' (procesos menores)' : ''}`;
+    // Marcas que se pisan: gana la regla de más prioridad (la de más arriba en la lista) y su título suma los motivos de las demás
+    function resolverSolapes(marcas) {
+      const tomadas = [];
+      marcas.slice().sort((a, b) => a.prioridad - b.prioridad || a.ini - b.ini || (b.fin - b.ini) - (a.fin - a.ini)).forEach((m) => {
+        const choca = tomadas.find((x) => m.ini < x.fin && x.ini < m.fin);
+        if (!choca) { tomadas.push({ ...m, titulos: [m.titulo] }); return; }
+        if (!choca.titulos.includes(m.titulo)) choca.titulos.push(m.titulo);
+        if (m.aviso) choca.aviso = true;
+        if (!choca.etiqueta && m.etiqueta) choca.etiqueta = m.etiqueta;
+      });
+      return tomadas.sort((a, b) => a.ini - b.ini).map(({ titulos, ...m }) => ({ ...m, titulo: titulos.join('\n') }));
+    }
+    // Aplica las reglas a un texto. ctx: { vigentes, catalogo, esPM, lista, probar }. Devuelve las marcas (sin solaparse, en orden),
+    // las advertencias y cuántas veces apareció cada valor de cada regla (hallados: "<id>#<n>" -> veces; para "Debe estar presente").
+    function buscar(texto, compiladas, ctx = {}) {
+      const t = String(texto == null ? '' : texto), res = { marcas: [], avisos: [], hallados: {} };
+      if (!t.trim()) return res;
+      const cache = {}, plegado = (d) => cache[d ? 1 : 0] || (cache[d ? 1 : 0] = plegar(t, d));
+      (compiladas || []).forEach((c) => {
+        if (!c.ok || !aplica(c.regla, ctx)) return;
+        const r = c.regla;
+        if (c.excepto && c.excepto.test(plegado(false).p)) return;
+        c.valores.forEach((v, vi) => {
+          const base = v.plegado ? plegado(v.distinguir) : null, s = base ? base.p : t;
+          v.rx.lastIndex = 0; let m, vueltas = 0;
+          while ((m = v.rx.exec(s)) && vueltas++ < 2000) {
+            if (!m[0]) { v.rx.lastIndex++; continue; }
+            let largo = m[0].length, motivo = '';
+            if (v.catalogo) {
+              const hit = enCatalogo(m[0], ctx.catalogo); if (!hit) continue;
+              if (hit.largo < largo) { largo = hit.largo; v.rx.lastIndex = m.index + largo; }
+              motivo = `equipo ${hit.codigo}${hit.desc ? ' — ' + hit.desc : ''}`;
+            }
+            const ini = base ? base.pos[m.index] : m.index, fin = base ? base.pos[m.index + largo - 1] + 1 : m.index + largo, valor = t.slice(ini, fin);
+            if (r.tipo === 'documento') {
+              const cod = normalizarCodigo(valor), info = ctx.vigentes ? ctx.vigentes.get(cod) : undefined;
+              if ((r.vigencia === 'noVigentes' && info) || (r.vigencia === 'vigentes' && !info)) continue;
+              motivo = info ? `${cod} está en la lista de vigentes${info.titulo ? ': ' + info.titulo : ''}${info.revision ? ' (rev. ' + info.revision + ')' : ''}`
+                : ctx.vigentes ? `${cod} no está en la lista de documentos vigentes` : `${tipoDocumento(cod).toLowerCase()} ${cod}`;
+            }
+            const k = r.id + '#' + vi; res.hallados[k] = (res.hallados[k] || 0) + 1;
+            const aviso = r.condicion !== 'debe' && r.accion === 'advertencia';
+            const que = motivo || (r.condicion === 'noDebe' ? `«${valor}» no debe aparecer` : r.condicion === 'debe' ? `«${valor}» (debe estar presente)` : `«${valor}»`);
+            res.marcas.push({ ini, fin, valor, regla: r.id, prioridad: c.prioridad, color: r.color, etiqueta: r.etiqueta, aviso, titulo: `Regla «${r.nombre}»: ${que}${r.mensaje ? ' — ' + r.mensaje : ''}` });
+            if (aviso) res.avisos.push({ regla: r.id, nombre: r.nombre, valor, texto: textoAviso(r, valor, motivo) });
+          }
+        });
+      });
+      res.marcas = resolverSolapes(res.marcas);
+      return res;
+    }
+    // Todo un RMD (o una lista): textos = [{ texto, esPM, lista }]. Además de lo de cada texto, las reglas "Debe estar presente"
+    // que no aparecieron en ninguna parte (según su alcance: pasos / procesos menores / lista).
+    function evaluarConjunto(textos, compiladas, ctx = {}) {
+      const out = { items: [], faltan: [], avisos: 0, marcas: 0, hallados: {}, porRegla: {} };
+      (textos || []).forEach((x, i) => {
+        const r = buscar(x.texto, compiladas, { ...ctx, esPM: !!x.esPM, lista: x.lista || '' });
+        Object.entries(r.hallados).forEach(([k, n]) => { out.hallados[k] = (out.hallados[k] || 0) + n; const id = k.slice(0, k.lastIndexOf('#')); const p = out.porRegla[id] || (out.porRegla[id] = { veces: 0, avisos: 0 }); p.veces += n; });
+        r.avisos.forEach((a) => { out.porRegla[a.regla].avisos++; });
+        if (r.marcas.length || r.avisos.length) { out.items.push({ i, marcas: r.marcas, avisos: r.avisos }); out.avisos += r.avisos.length; out.marcas += r.marcas.length; }
+      });
+      (compiladas || []).forEach((c) => {
+        if (!c.ok || c.regla.condicion !== 'debe') return;
+        const faltan = c.valores.map((v, vi) => (out.hallados[c.regla.id + '#' + vi] ? null : v.etiqueta)).filter((v) => v !== null);
+        if (c.regla.basta ? faltan.length === c.valores.length : faltan.length) out.faltan.push({ regla: c.regla.id, nombre: c.regla.nombre, valores: faltan, texto: textoFalta(c.regla, faltan) });
+      });
+      return out;
+    }
+    function resumen(r) {
+      const p = [TIPOS[r.tipo]], vals = partir(r.buscar);
+      if (r.tipo === 'documento' && r.vigencia !== 'todos') p.push(r.vigencia === 'noVigentes' ? 'los que no están en la lista de vigentes' : 'los vigentes');
+      if (r.tipo === 'patron') { if (r.buscar.trim()) p.push(`/${r.buscar.trim().slice(0, 40)}/`); }
+      else if (vals.length) p.push(vals.slice(0, 3).map((v) => `«${v.slice(0, 30)}»`).join(', ') + (vals.length > 3 ? ` y ${vals.length - 3} más` : ''));
+      else if (r.tipo === 'equipo') p.push('cualquiera del catálogo');
+      else if (r.tipo === 'documento' && r.vigencia === 'todos') p.push('cualquiera');
+      const ex = partir(r.excepto); if (ex.length) p.push(`salvo si dice ${ex.slice(0, 2).map((v) => `«${v.slice(0, 20)}»`).join(' o ')}${ex.length > 2 ? '…' : ''}`);
+      p.push(r.condicion === 'debe' ? CONDICIONES.debe + (r.basta ? ' (al menos uno)' : '') : `${CONDICIONES[r.condicion]} → ${ACCIONES[r.accion].toLowerCase()}`);
+      if (r.donde !== 'todo') p.push(DONDE[r.donde].toLowerCase());
+      if (r.lista) p.push(`solo en ${r.lista}`);
+      return p.join(' · ');
+    }
+
+    // ---- lista de documentos vigentes: de las filas de una hoja (xls, xlsx o csv) ----
+    const ENC = {
+      codigo: [/^(identificador|c[oó]digo|c[oó]digo del documento|cod\.?|codigo documento)$/i, /^(documento|id|n[uú]mero|nro\.?)$/i],
+      titulo: [/^(t[ií]tulo|nombre|nombre del documento|descripci[oó]n)$/i], revision: [/^(revisi[oó]n|rev\.?|versi[oó]n|ver\.?)$/i],
+      estado: [/^(s|estado|situaci[oó]n|status)$/i], categoria: [/^(categor[ií]a|tipo|clase)$/i], fecha: [/^(fecha|fecha de aprobaci[oó]n|aprobado|aprobaci[oó]n)$/i],
+      validez: [/^(validez|vigencia|vence|vencimiento|v[aá]lido hasta|pr[oó]xima revisi[oó]n)$/i],
+    };
+    const PARECE_CODIGO = /^[A-Z0-9]{2,6}(?:-[A-Z0-9]{1,8}){1,3}$/;
+    const celdaTxt = (v) => (v == null ? '' : typeof v === 'object' && v.error ? '' : String(v).replace(/\s+/g, ' ').trim());
+    const fechaIso = (v) => {
+      if (typeof v === 'number' && v > 1000 && v < 2958466) { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v * 86400000)); return d.toISOString().slice(0, 10); }
+      const s = celdaTxt(v), m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/.exec(s); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : s;
+    };
+    function listaVigentesDeFilas(filas) {
+      filas = (filas || []).map((f) => (Array.isArray(f) ? f : []));
+      const parecidos = (col, desde) => { let n = 0; for (let i = desde; i < Math.min(filas.length, desde + 300); i++) if (PARECE_CODIGO.test(normalizarCodigo(celdaTxt(filas[i][col])))) n++; return n; };
+      let mejor = null;
+      for (let i = 0; i < Math.min(filas.length, 30); i++) {
+        filas[i].forEach((v, j) => {
+          const t = celdaTxt(v); if (!t) return;
+          ENC.codigo.forEach((rx, fuerza) => { if (!rx.test(t)) return; const n = parecidos(j, i + 1), p = n * 10 - fuerza; if (n && (!mejor || p > mejor.p)) mejor = { fila: i, col: j, p, titulo: t }; });
+        });
+      }
+      if (!mejor) {                                                     // sin encabezado reconocible: la columna con más códigos
+        const anchos = Math.max(0, ...filas.slice(0, 300).map((f) => f.length));
+        for (let j = 0; j < anchos; j++) { const n = parecidos(j, 0); if (n >= 3 && (!mejor || n > mejor.p)) mejor = { fila: -1, col: j, p: n, titulo: `columna ${j + 1}` }; }
+        if (mejor) { const k = filas.findIndex((f) => PARECE_CODIGO.test(normalizarCodigo(celdaTxt(f[mejor.col])))); mejor.fila = k - 1; }
+      }
+      const out = { docs: [], columnas: {}, fila: mejor ? mejor.fila : -1, duplicados: 0, estados: {} };
+      if (!mejor) return out;
+      const col = { codigo: mejor.col }; out.columnas.codigo = mejor.titulo;
+      const cab = filas[mejor.fila] || [], sobre = filas[mejor.fila - 1] || [];
+      Object.keys(ENC).forEach((k) => {
+        if (k === 'codigo') return;
+        const buscarEn = (fila, soloVacias) => fila.findIndex((v, j) => j !== mejor.col && (!soloVacias || !celdaTxt(cab[j])) && ENC[k].some((rx) => rx.test(celdaTxt(v))));
+        let j = buscarEn(cab, false); if (j < 0) j = buscarEn(sobre, true);   // (el encabezado "S" del estado está una fila más arriba en la lista del DMS)
+        if (j >= 0) { col[k] = j; out.columnas[k] = celdaTxt(cab[j]) || celdaTxt(sobre[j]); }
+      });
+      const vistos = new Set();
+      for (let i = mejor.fila + 1; i < filas.length; i++) {
+        const f = filas[i], cod = normalizarCodigo(celdaTxt(f[col.codigo])); if (!cod || !/[A-Z]/.test(cod) || !/\d/.test(cod) || cod.length > 40) continue;
+        if (vistos.has(cod)) { out.duplicados++; continue; } vistos.add(cod);
+        const val = (k) => (col[k] == null ? '' : k === 'fecha' || k === 'validez' ? fechaIso(f[col[k]]) : celdaTxt(f[col[k]]));
+        const d = [cod, val('titulo'), val('revision'), val('estado'), val('categoria'), val('fecha'), val('validez')];
+        out.docs.push(d); if (d[3]) out.estados[d[3]] = (out.estados[d[3]] || 0) + 1;
+      }
+      return out;
+    }
+    function csvAFilas(texto) {
+      const t = String(texto || '').replace(/^﻿/, ''), primera = t.split(/\r?\n/, 1)[0] || '';
+      const sep = [';', '\t', ','].map((s) => [s, primera.split(s).length]).sort((a, b) => b[1] - a[1])[0][0];
+      const filas = []; let fila = [], campo = '', q = false;
+      for (let i = 0; i < t.length; i++) {
+        const c = t[i];
+        if (q) { if (c === '"') { if (t[i + 1] === '"') { campo += '"'; i++; } else q = false; } else campo += c; }
+        else if (c === '"' && !campo) q = true;
+        else if (c === sep) { fila.push(campo); campo = ''; }
+        else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; fila.push(campo); filas.push(fila); fila = []; campo = ''; }
+        else campo += c;
+      }
+      if (campo || fila.length) { fila.push(campo); filas.push(fila); }
+      return filas;
+    }
+
+    // ---- exportar / importar ----
+    const paraExportar = (reglas, vigentes, extra) => ({ app: 'rmd-ui-mejoras', tipo: 'reglas-revision', version: 1, ...(extra || {}), reglas: (reglas || []).map(normalizar), ...(vigentes ? { vigentes } : {}) });
+    function leerExportado(obj) {
+      const o = Array.isArray(obj) ? { reglas: obj } : obj;
+      if (!o || typeof o !== 'object') throw new Error('el archivo no tiene una configuración de reglas');
+      if (o.app && o.app !== 'rmd-ui-mejoras') throw new Error('el archivo es de otra aplicación');
+      const reglas = Array.isArray(o.reglas) ? sinIdsRepetidos(o.reglas.filter((r) => r && typeof r === 'object').map(normalizar)) : null;
+      let vigentes = null;
+      if (o.vigentes && Array.isArray(o.vigentes.docs)) {
+        const vistos = new Set(), docs = [];
+        o.vigentes.docs.forEach((d) => { const f = Array.isArray(d) ? d : [d], cod = normalizarCodigo(f[0]); if (!cod || vistos.has(cod)) return; vistos.add(cod); docs.push([cod, ...f.slice(1, 7).map((x) => (x == null ? '' : String(x)))]); });
+        const estados = {}; docs.forEach((d) => { if (d[3]) estados[d[3]] = (estados[d[3]] || 0) + 1; });
+        vigentes = { archivo: String(o.vigentes.archivo || 'lista importada'), cargado: String(o.vigentes.cargado || ''), hoja: String(o.vigentes.hoja || ''), columna: String(o.vigentes.columna || ''), n: docs.length, estados, docs };
+      }
+      if (!reglas && !vigentes) throw new Error('el archivo no trae reglas ni lista de documentos vigentes');
+      return { reglas, vigentes, exportado: String(o.exportado || ''), script: String(o.script || '') };
+    }
+    // Agregar: las de mismo id o mismo nombre se reemplazan (en su lugar); las demás se agregan al final. Reemplazar: solo las nuevas.
+    function fusionar(actuales, nuevas, reemplazar) {
+      if (reemplazar) return { reglas: sinIdsRepetidos(nuevas.map(normalizar)), agregadas: nuevas.length, reemplazadas: 0 };
+      const out = (actuales || []).map(normalizar), clave = (r) => plegar(r.nombre).p;
+      let agregadas = 0, reemplazadas = 0;
+      (nuevas || []).map(normalizar).forEach((n) => {
+        const i = out.findIndex((r) => r.id === n.id || clave(r) === clave(n));
+        if (i >= 0) { out[i] = { ...n, id: out[i].id }; reemplazadas++; } else { out.push(n); agregadas++; }
+      });
+      return { reglas: sinIdsRepetidos(out), agregadas, reemplazadas };
+    }
+
+    return { TIPOS, VIGENCIAS, CONDICIONES, ACCIONES, COLORES, DONDE, FUENTE_DOC, normalizar, predeterminadas, sinIdsRepetidos, compilar, buscar, evaluarConjunto,
+      resumen, plegar, partir, normalizarCodigo, tipoDocumento, codigosDocumento, listaVigentesDeFilas, csvAFilas, paraExportar, leerExportado, fusionar, nuevoId };
+  })();
+  // ==REGLAS-FIN==
+
   // ---- "Documentos citados" del RMD (v1.23: solo los documentos, como se pensó al inicio, y en segundos) ----
   // Lee TODOS los pasos del RMD abierto (MD_ES_PASO, con su estructura), sus etiquetas (MD_ES_ETIQUETA) y todos sus procesos
   // menores (MD_ES_PASO_INSUMO_PASO) con el modelo del portal —las mismas entidades que el portal usa al abrir cada lista—, en
   // 3 lecturas y sin abrir ninguna ventana, y busca en las descripciones el patrón <Tipo I/P/F><Área>-<sufijo NNN> (mismo
-  // criterio que src/rmd_automation/referencias.py). Antes abría cada lista y tardaba de 20 s a varios minutos.
+  // criterio que src/rmd_automation/referencias.py) y, desde la v1.34, también manuales (MCAL-200) y políticas (POL-CAL-001),
+  // como en la lista de vigentes del DMS (Reglas.FUENTE_DOC). Antes abría cada lista y tardaba de 20 s a varios minutos.
+  // v1.34: la lectura (leerTextosRmd) es la misma del aviso de reglas del RMD; con la lista de vigentes cargada sale "Vigente".
   const ICONO_DOCUMENTOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h6l2.5 2.5V14a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-12a.5.5 0 0 1 .5-.5Z"/><path d="M9.5 1.5V4h2.5M5.5 8h5M5.5 10.5h5"/></svg>';
-  const TIPOS_DOC = { I: 'Instructivo', P: 'Procedimiento', F: 'Formato' };
   const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   function descargarArchivo(nombre, datos, tipo) {
     const blob = new Blob([datos], { type: tipo || 'application/octet-stream' }), url = URL.createObjectURL(blob);
@@ -2945,39 +3401,9 @@
   async function citasDelRMD(dRaiz) {
     const vista = vistaDeTabla(tablaDe(dRaiz)), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
     if (!md || !md.mdId || !modelo) throw new Error('no se pudo identificar el RMD abierto');
-    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new Filtro('mdId_mdId', 'EQ', md.mdId)], t0 = Date.now();
-    const activo = (x) => x && x.activo !== false;
-    const [pasos, etiquetas, pms] = await Promise.all([
-      leerTodoDe(modelo, 'MD_ES_PASO', porMd, { $expand: 'pasoId,mdEstructuraId,mdEstructuraId/estructuraId' }),
-      leerTodoDe(modelo, 'MD_ES_ETIQUETA', porMd, { $expand: 'etiquetaId' }),
-      leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', porMd, { $expand: 'pasoHijoId' }),
-    ]);
-    const etq = new Map(etiquetas.filter(activo).map((e) => [e.mdEsEtiquetaId, e]));
-    const pmsDe = new Map(); pms.filter(activo).filter((x) => x.pasoHijoId).forEach((x) => { const k = x.pasoId_mdEstructuraPasoId; if (!pmsDe.has(k)) pmsDe.set(k, []); pmsDe.get(k).push(x); });
-    const obj = (v) => (v && typeof v === 'object' && !v.__deferred ? v : {});
-    const listas = new Map();
-    pasos.filter(activo).forEach((p) => {
-      const est = obj(p.mdEstructuraId), e = etq.get(p.mdEsEtiquetaId_mdEsEtiquetaId);
-      const clave = (p.mdEstructuraId_mdEstructuraId || '') + '|' + (p.mdEsEtiquetaId_mdEsEtiquetaId || '');
-      if (!listas.has(clave)) listas.set(clave, { lista: norm(obj(est.estructuraId).descripcion || 'Estructura') + (e ? ' › ' + norm(obj(e.etiquetaId).descripcion || 'Etiqueta') : ''),
-        o1: +est.orden || 0, o2: e ? +e.orden || 0 : 0, pasos: [] });
-      listas.get(clave).pasos.push(p);
-    });
-    const r = { rmd: md.codigo, listas: [], citas: [], pasos: 0, pms: 0 };
-    const citasDe = (lugar, desc) => { const rx = new RegExp(PATRON_REFERENCIA_JS.source, 'g'); let m; while ((m = rx.exec(desc || ''))) r.citas.push({ ...lugar, codigo: m[0] }); };
-    [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2 || a.lista.localeCompare(b.lista)).forEach((l) => {
-      const info = { lista: l.lista, pasos: l.pasos.length, pms: 0, citas: 0 }, c0 = r.citas.length;
-      l.pasos.sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((p, k) => {
-        const pp = obj(p.pasoId), lugar = { lista: l.lista, paso: String(p.orden != null ? p.orden : k + 1), codigoPaso: String(pp.codigo || ''), descPaso: norm(pp.descripcion), pm: '', codigoPM: '', descPM: '' };
-        citasDe(lugar, lugar.descPaso);
-        (pmsDe.get(p.mdEstructuraPasoId) || []).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((q) => {
-          const h = obj(q.pasoHijoId); info.pms++; r.pms++;
-          citasDe({ ...lugar, pm: String(q.orden != null ? q.orden : ''), codigoPM: String(h.codigo || ''), descPM: norm(h.descripcion) }, norm(h.descripcion));
-        });
-      });
-      info.citas = r.citas.length - c0; r.pasos += info.pasos; r.listas.push(info);
-    });
-    r.segundos = Math.max(1, Math.round((Date.now() - t0) / 1000));
+    const base = await textosDelRmd(modelo, md, 0);                         // (lectura nueva: también la usa el aviso de reglas del RMD)
+    const r = { rmd: base.rmd, listas: base.listas.map((l) => ({ ...l, citas: 0 })), citas: [], pasos: base.pasos, pms: base.pms, segundos: base.segundos };
+    base.textos.forEach((x) => Reglas.codigosDocumento(x.texto).forEach((codigo) => { r.citas.push({ ...x.lugar, codigo }); r.listas[x.il].citas++; }));
     return r;
   }
   function agruparCitas(citas) {
@@ -2987,12 +3413,17 @@
   }
   const lugarTexto = (x) => `${x.lista} › paso ${x.paso}${x.pm ? ' › proceso menor ' + x.pm : ''}`;
   function pintarCitas(v, dRaiz, r) {
-    const docs = agruparCitas(r.citas); window.__rmdStats.ultimasCitas = r;
+    const docs = agruparCitas(r.citas), vig = on('reglasrev') && RR.mapa; window.__rmdStats.ultimasCitas = r;
     v.fondo.querySelector('h3').textContent = `Documentos citados — ${cabecera(dRaiz)}`;
-    const filasDocs = docs.map((x) => `<tr><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(TIPOS_DOC[x.tipo] || x.tipo)}</td><td>${x.citas}</td><td class="rmd-nota">${esc(x.lugares.slice(0, 3).map(lugarTexto).join('; '))}${x.lugares.length > 3 ? '…' : ''}</td></tr>`).join('');
-    v.cuerpo.innerHTML = `<p><b>${docs.length}</b> documentos citados (${r.citas.length} citas) en ${r.pasos} pasos y ${r.pms} procesos menores de ${r.listas.length} listas · ${r.segundos} s.</p>
-      ${docs.length ? `<table class="rmd-tabla"><thead><tr><th>Código</th><th>Tipo</th><th>Citas</th><th>Dónde</th></tr></thead><tbody>${filasDocs}</tbody></table>`
-        : '<p>No se encontró ningún código con el formato &lt;I/P/F&gt;Área-sufijo (ej. IPRO-P123) en las descripciones de los pasos ni de los procesos menores.</p>'}`;
+    const nNo = vig ? docs.filter((x) => !RR.mapa.has(x.codigo)).length : 0;
+    const celdaVig = (x) => { const i = RR.mapa.get(x.codigo); return i ? `<td class="rmd-vig-si" title="${esc([i.titulo, i.revision && 'Rev. ' + i.revision, i.estado, i.validez && 'Validez ' + i.validez].filter(Boolean).join(' · '))}">✓ Sí</td>` : '<td class="rmd-vig-no" title="No está en la lista de documentos vigentes">✗ No</td>'; };
+    const filasDocs = docs.map((x) => `<tr><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(Reglas.tipoDocumento(x.codigo))}</td>${vig ? celdaVig(x) : ''}<td>${x.citas}</td><td class="rmd-nota">${esc(x.lugares.slice(0, 3).map(lugarTexto).join('; '))}${x.lugares.length > 3 ? '…' : ''}</td></tr>`).join('');
+    const lineaVig = vig ? `${nNo ? ` · <b class="rmd-vig-no">${nNo} no vigente(s)</b>` : docs.length ? ' · <span class="rmd-vig-si">todos vigentes</span>' : ''} según la lista «${esc(RR.vigentes.archivo)}» (cargada el ${esc(fechaHoraCorta(RR.vigentes.cargado))})`
+      : on('reglasrev') ? ' · <button type="button" class="rmd-rg-link" data-a="vigentes">Carga la lista de documentos vigentes</button> para saber cuáles están vigentes' : '';
+    v.cuerpo.innerHTML = `<p><b>${docs.length}</b> documentos citados (${r.citas.length} citas) en ${r.pasos} pasos y ${r.pms} procesos menores de ${r.listas.length} listas · ${r.segundos} s${lineaVig}.</p>
+      ${docs.length ? `<table class="rmd-tabla"><thead><tr><th>Código</th><th>Tipo</th>${vig ? '<th>Vigente</th>' : ''}<th>Citas</th><th>Dónde</th></tr></thead><tbody>${filasDocs}</tbody></table>`
+        : '<p>No se encontró ningún código de documento (ej. IPRO-P123, FPRO-250, POL-CAL-001, MCAL-200) en las descripciones de los pasos ni de los procesos menores.</p>'}`;
+    const bL = v.cuerpo.querySelector('[data-a=vigentes]'); if (bL) bL.addEventListener('click', () => { v.cerrar(); abrirReglas('vigentes'); });
     v.pie.innerHTML = '';
     const bX = botonModal('Descargar Excel', '', async () => {
       bX.disabled = true;
@@ -3003,11 +3434,13 @@
   }
   function armarCitasExcel(dRaiz, r) {
     const rmd = r.rmd || (/\d{6,}/.exec(cabecera(dRaiz)) || ['rmd'])[0], hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), docs = agruparCitas(r.citas);
+    const vig = on('reglasrev') && RR.mapa, info = (c) => (vig ? RR.mapa.get(c) : null);   // con la lista de vigentes cargada: columna "Vigente"
     const libro = Xlsx.crearLibro();
     const hR = libro.hoja('Resumen', { activa: true, cols: [[1, 1, 52], [2, 4, 16]] });
     hR.poner('A1', 'Documentos citados en el RMD', 'titulo');
     hR.poner('A2', cabecera(dRaiz), 'negrita');
-    hR.poner('A3', `Generado el ${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} · ${docs.length} documentos, ${r.citas.length} citas en ${r.pasos} pasos y ${r.pms} procesos menores`, 'nota');
+    hR.poner('A3', `Generado el ${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} · ${docs.length} documentos, ${r.citas.length} citas en ${r.pasos} pasos y ${r.pms} procesos menores`
+      + (vig ? ` · ${docs.filter((x) => !info(x.codigo)).length} no vigentes según la lista «${RR.vigentes.archivo}» (cargada el ${fechaHoraCorta(RR.vigentes.cargado)})` : ''), 'nota');
     ['Lista', 'Pasos', 'Procesos menores', 'Citas de documentos'].forEach((t, c) => hR.poner({ c, r: 4 }, t, 'encabezado'));
     r.listas.forEach((l, i) => [l.lista, l.pasos, l.pms, l.citas].forEach((x, c) => hR.poner({ c, r: 5 + i }, x, c ? 'entero' : 'celda')));
     const fT = 5 + r.listas.length;
@@ -3018,11 +3451,12 @@
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
       filas.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'celda'); }));
     };
-    const num = (t) => (/^\d+$/.test(t || '') ? +t : t);
-    tabla('Documentos citados', ['Código', 'Tipo', 'Citas', 'Dónde aparece'], [14, 15, 8, 110],
-      docs.map((x) => [x.codigo, TIPOS_DOC[x.tipo] || x.tipo, x.citas, x.lugares.map(lugarTexto).join('\n').slice(0, 32000)]), { 3: 'envuelto' });
-    tabla('Citas', ['Código', 'Tipo', 'Lista', 'Paso', 'Proceso menor', 'Descripción donde aparece'], [14, 15, 40, 7, 9, 90],
-      r.citas.map((x) => [x.codigo, TIPOS_DOC[x.codigo[0]] || x.codigo[0], x.lista, num(x.paso), num(x.pm), x.pm ? x.descPM : x.descPaso]), { 5: 'envuelto' });
+    const num = (t) => (/^\d+$/.test(t || '') ? +t : t), dondeTxt = (x) => x.lugares.map(lugarTexto).join('\n').slice(0, 32000);
+    if (vig) tabla('Documentos citados', ['Código', 'Tipo', 'Vigente', 'Título en la lista de vigentes', 'Revisión', 'Citas', 'Dónde aparece'], [14, 15, 9, 50, 9, 8, 100],
+      docs.map((x) => { const i = info(x.codigo); return [x.codigo, Reglas.tipoDocumento(x.codigo), i ? 'Sí' : 'No', i ? i.titulo : '', i ? i.revision : '', x.citas, dondeTxt(x)]; }), { 3: 'envuelto', 6: 'envuelto' });
+    else tabla('Documentos citados', ['Código', 'Tipo', 'Citas', 'Dónde aparece'], [14, 15, 8, 110], docs.map((x) => [x.codigo, Reglas.tipoDocumento(x.codigo), x.citas, dondeTxt(x)]), { 3: 'envuelto' });
+    tabla('Citas', ['Código', 'Tipo', ...(vig ? ['Vigente'] : []), 'Lista', 'Paso', 'Proceso menor', 'Descripción donde aparece'], vig ? [14, 15, 9, 40, 7, 9, 90] : [14, 15, 40, 7, 9, 90],
+      r.citas.map((x) => [x.codigo, Reglas.tipoDocumento(x.codigo), ...(vig ? [info(x.codigo) ? 'Sí' : 'No'] : []), x.lista, num(x.paso), num(x.pm), x.pm ? x.descPM : x.descPaso]), { [vig ? 6 : 5]: 'envuelto' });
     return { libro, rmd };
   }
   async function mostrarDocumentosCitados(dRaiz, boton) {
@@ -3874,7 +4308,7 @@
       leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' }),
       leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion' }),
     ]);
-    const rx = new RegExp(PATRON_REFERENCIA_JS.source, 'g'), citados = new Map();
+    const rx = new RegExp(Reglas.FUENTE_DOC, 'g'), citados = new Map();
     pasos.forEach((p) => { const cod = [...new Set((String(p.descripcion || '').match(rx)) || [])]; if (cod.length) citados.set(p.pasoId, { codigo: p.codigo, desc: norm(p.descripcion), docs: cod }); });
     const md = new Map(masters.map((m) => [m.mdId, mdParaEquipos(m)])), est = new Map(estructuras.map((e) => [e.estructuraId, norm(e.descripcion)])), etq = new Map(etiquetas.map((e) => [e.etiquetaId, norm(e.descripcion)]));
     const ids = [...citados.keys()], vale = (m) => m && estados.includes(m.estado || '(sin estado)');
@@ -3896,6 +4330,7 @@
   }
   function armarCitasTodosExcel(r, estados) {
     const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro(), nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
+    const vig = on('reglasrev') && RR.mapa, info = (c) => (vig ? RR.mapa.get(c) : null);   // con la lista de vigentes cargada: columna "Vigente"
     const cs = [...r.citas].sort((a, b) => nat(a.doc, b.doc) || nat(a.md.codigo, b.md.codigo) || (+a.orden || 0) - (+b.orden || 0));
     const porDoc = new Map(); cs.forEach((c) => { let x = porDoc.get(c.doc); if (!x) porDoc.set(c.doc, x = { masters: new Set(), aut: new Set(), citas: 0, etapas: new Set() }); x.masters.add(c.md.mdId); if (c.md.estado === 'Autorizado') x.aut.add(c.md.mdId); x.citas++; if (c.md.etapa) x.etapas.add(c.md.etapa); });
     const tabla = (nombre, nt, cab, anchos, datos, estilos = {}, op = {}) => {
@@ -3903,15 +4338,18 @@
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
       datos.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'normal'); }));
     };
-    tabla('Documentos', 'Documentos', ['Documento', 'Tipo', 'Masters', 'Autorizados', 'Citas', 'Etapas'], [16, 15, 10, 12, 9, 50],
-      [...porDoc].map(([doc, x]) => [doc, TIPOS_DOC[doc[0]] || doc[0], x.masters.size, x.aut.size, x.citas, [...x.etapas].sort().join(', ')]), {}, { activa: true });
-    tabla('Citas', 'CitasDocumentos', ['Documento', 'Tipo', 'Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Área (sección)', 'Planta', 'Lista', 'Paso / proceso menor', 'Orden', 'Código del paso', 'Descripción donde aparece'],
-      [16, 15, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90], cs.map((c) => [c.doc, TIPOS_DOC[c.doc[0]] || c.doc[0], c.md.codigo, c.md.version, c.md.descripcion, c.md.estado, c.md.etapa, c.md.seccion, c.md.planta, c.lista, c.esPM ? 'Proceso menor' : 'Paso', c.orden, c.codigoPaso, c.desc]), { 13: 'envuelto' }, { congelar: 'B2' });
+    const vg = (doc) => (vig ? [info(doc) ? 'Sí' : 'No'] : []);
+    tabla('Documentos', 'Documentos', ['Documento', 'Tipo', ...(vig ? ['Vigente', 'Título en la lista de vigentes'] : []), 'Masters', 'Autorizados', 'Citas', 'Etapas'], vig ? [16, 15, 9, 50, 10, 12, 9, 50] : [16, 15, 10, 12, 9, 50],
+      [...porDoc].map(([doc, x]) => [doc, Reglas.tipoDocumento(doc), ...vg(doc), ...(vig ? [(info(doc) || {}).titulo || ''] : []), x.masters.size, x.aut.size, x.citas, [...x.etapas].sort().join(', ')]), {}, { activa: true });
+    tabla('Citas', 'CitasDocumentos', ['Documento', 'Tipo', ...(vig ? ['Vigente'] : []), 'Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Área (sección)', 'Planta', 'Lista', 'Paso / proceso menor', 'Orden', 'Código del paso', 'Descripción donde aparece'],
+      vig ? [16, 15, 9, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90] : [16, 15, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90],
+      cs.map((c) => [c.doc, Reglas.tipoDocumento(c.doc), ...vg(c.doc), c.md.codigo, c.md.version, c.md.descripcion, c.md.estado, c.md.etapa, c.md.seccion, c.md.planta, c.lista, c.esPM ? 'Proceso menor' : 'Paso', c.orden, c.codigoPaso, c.desc]), { [vig ? 14 : 13]: 'envuelto' }, { congelar: 'B2' });
     const hI = libro.hoja('Información', { cols: [[1, 1, 30], [2, 2, 90]] });
     hI.poner('A1', 'Documentos citados en todos los master', 'titulo');
     [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} (leído de SAP en ${r.segundos} s)`], ['Estados incluidos', estados.join(', ')],
       ['Documentos distintos', porDoc.size], ['Masters con citas', r.masters], ['Citas', cs.length], ['Pasos del catálogo que citan documentos', `${r.pasosCitados} de ${r.catalogo}`],
-      ['Criterio', 'Código con el formato <I/P/F><Área>-<sufijo NNN> (ej. IPRO-P123, PCPR-202, FPRO-250) en la descripción de los pasos y procesos menores.']]
+      ['Lista de documentos vigentes', vig ? `«${RR.vigentes.archivo}» (${RR.vigentes.docs.length} documentos, cargada el ${fechaHoraCorta(RR.vigentes.cargado)}): ${[...porDoc.keys()].filter((doc) => !info(doc)).length} de los documentos citados no están en ella` : 'sin cargar (botón de mejoras › Reglas de revisión › Documentos vigentes)'],
+      ['Criterio', 'Código de documento en la descripción de los pasos y procesos menores: <I/P/F><Área>-<sufijo NNN> (ej. IPRO-P123, PCPR-202, FPRO-250), manuales M<Área>-NNN (MCAL-200) y políticas POL-<Área>-NNN (POL-CAL-001).']]
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Documentos citados en todos los master ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, documentos: porDoc.size };
   }
@@ -4810,6 +5248,7 @@
       lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       lista && on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada documento', () => abrirCitasDeTodos()],
       lista && on('statusrmd') && document.querySelector('.rmd-status-rmd') && ['Enviar a Status RMD', 'Maestro completo a Status RMD', clic('.rmd-status-rmd')],
+      on('reglasrev') && ['Reglas de revisión', 'Crear o activar reglas, exportarlas / importarlas y cargar la lista de documentos vigentes', () => abrirReglas()],
       ['Mejoras de interfaz', 'Activar o desactivar funciones del script', () => { const p = document.getElementById('rmd-ui-panel'); if (p) p.open = true; }],
     ].filter(Boolean);
   }
@@ -5465,6 +5904,631 @@
   }
   window.__rmdStats.ofrecerPasoCreado = (nuevo, origen, codigoAntes) => ofrecerPasoCreado(nuevo, origen, codigoAntes);   // (pruebas)
 
+  // ---- 9 ter. Reglas de revisión y documentos vigentes (v1.34) ----------------------------------------------------------
+  // Reglas que define la persona para revisar los textos de los pasos y procesos menores (palabras o frases, códigos de
+  // documento o de equipo, patrones) y la lista de documentos vigentes que carga (la del DMS: los que están en la lista están
+  // vigentes; los que no, no). Se aplican solas: se resalta lo encontrado en la descripción de cada fila (al pasar el ratón se
+  // ve el motivo), sus advertencias se suman al aviso de la barra de la lista ("ir a la siguiente") y la ventana del RMD muestra
+  // un resumen de todo el RMD. Se guarda SOLO en este navegador: las reglas en localStorage (con copia en IndexedDB) y la lista
+  // en IndexedDB; nada sale a ningún servidor. "Exportar / Importar configuración" las llevan a otra PC en un archivo .json.
+  const CLAVE_REGLAS = 'rmdUiReglas', CLAVE_VIGENTES_LS = 'rmdUiVigentes', SELLO_VIGENTES = 'rmdUiVigentesSello';
+  const Almacen = (() => {
+    let base = null;
+    const abrir = () => base || (base = new Promise((ok, mal) => {
+      try {
+        const r = indexedDB.open('rmdUiMejoras', 1);
+        r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('datos')) r.result.createObjectStore('datos'); };
+        r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error || new Error('IndexedDB no disponible')); r.onblocked = () => mal(new Error('IndexedDB bloqueada'));
+      } catch (e) { mal(e); }
+    }).catch((e) => { base = null; throw e; }));
+    const tx = (modo, fn) => abrir().then((db) => new Promise((ok, mal) => {
+      const t = db.transaction('datos', modo), pedido = fn(t.objectStore('datos'));
+      t.oncomplete = () => ok(pedido && pedido.result); t.onerror = () => mal(t.error || new Error('no se pudo guardar')); t.onabort = () => mal(t.error || new Error('no se pudo guardar'));
+    }));
+    return { leer: (k) => tx('readonly', (s) => s.get(k)), guardar: (k, v) => tx('readwrite', (s) => s.put(v, k)), borrar: (k) => tx('readwrite', (s) => s.delete(k)) };
+  })();
+  const RR = { reglas: null, ver: 1, vigentes: null, mapa: null, catalogo: null, pidiendoCat: false, comp: null, compClave: '', errorGuardar: '', listo: null };
+  function leerReglasLS() {
+    try { const o = JSON.parse(localStorage.getItem(CLAVE_REGLAS) || 'null'); if (o && Array.isArray(o.reglas)) return o.reglas.map(Reglas.normalizar); } catch (e) { /* dañado: se recupera de IndexedDB */ }
+    return null;
+  }
+  function reglasActuales() { if (!RR.reglas) RR.reglas = Reglas.sinIdsRepetidos(leerReglasLS() || Reglas.predeterminadas()); return RR.reglas; }
+  async function guardarReglas(lista) {
+    const reglas = Reglas.sinIdsRepetidos((lista || []).map(Reglas.normalizar)), dato = { version: 1, guardado: new Date().toISOString(), reglas };
+    RR.reglas = reglas; RR.ver++;
+    let enLS = true, enDB = true;
+    try { localStorage.setItem(CLAVE_REGLAS, JSON.stringify(dato)); } catch (e) { enLS = false; }
+    try { await Almacen.guardar('reglas', dato); } catch (e) { enDB = false; }
+    RR.errorGuardar = enLS || enDB ? '' : 'No se pudieron guardar las reglas en este navegador: se perderán al cerrar la página.';
+    if (RR.errorGuardar) toast(RR.errorGuardar, true);
+    ajustarTodo(); refrescarVentanaReglas();
+    return enLS || enDB;
+  }
+  function ponerVigentes(v) {
+    RR.vigentes = v && Array.isArray(v.docs) && v.docs.length ? v : null;
+    RR.mapa = RR.vigentes ? new Map(RR.vigentes.docs.map((d) => [d[0], { titulo: d[1] || '', revision: d[2] || '', estado: d[3] || '', categoria: d[4] || '', fecha: d[5] || '', validez: d[6] || '' }])) : null;
+    RR.ver++;
+  }
+  async function leerVigentesGuardados() {
+    let v = null;
+    try { v = await Almacen.leer('vigentes'); } catch (e) { v = null; }
+    if (!v) { try { v = JSON.parse(localStorage.getItem(CLAVE_VIGENTES_LS) || 'null'); } catch (e) { v = null; } }
+    ponerVigentes(v); if (opc.activo) ajustarTodo(); refrescarVentanaReglas();
+  }
+  // v = null quita la lista. Si IndexedDB no está disponible se intenta en localStorage; si tampoco, queda solo mientras la página siga abierta.
+  async function guardarVigentes(v) {
+    let ok = false, error = '';
+    if (v) {
+      try { await Almacen.guardar('vigentes', v); ok = true; try { localStorage.removeItem(CLAVE_VIGENTES_LS); } catch (e) { /* nada */ } }
+      catch (e) { error = e.message; try { localStorage.setItem(CLAVE_VIGENTES_LS, JSON.stringify(v)); ok = true; } catch (e2) { error = e2.message; } }
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* sin esa API */ }
+    } else {
+      try { await Almacen.borrar('vigentes'); } catch (e) { /* no había */ }
+      try { localStorage.removeItem(CLAVE_VIGENTES_LS); } catch (e) { /* nada */ }
+      ok = true;
+    }
+    try { localStorage.setItem(SELLO_VIGENTES, String(Date.now())); } catch (e) { /* otra pestaña no se enterará */ }
+    ponerVigentes(v); ajustarTodo(); refrescarVentanaReglas();
+    return { ok, error };
+  }
+  // Al arrancar: si el localStorage se perdió, las reglas se recuperan de IndexedDB (y si no, se copian a IndexedDB); luego la lista.
+  RR.listo = (async () => {
+    try {
+      const enLS = leerReglasLS(), enDB = await Almacen.leer('reglas').catch(() => null);
+      if (!enLS && enDB && Array.isArray(enDB.reglas)) {
+        RR.reglas = Reglas.sinIdsRepetidos(enDB.reglas.map(Reglas.normalizar)); RR.ver++;
+        try { localStorage.setItem(CLAVE_REGLAS, JSON.stringify(enDB)); } catch (e) { /* solo en IndexedDB */ }
+      } else if (enLS) {
+        const dato = JSON.parse(localStorage.getItem(CLAVE_REGLAS));
+        if (!enDB || enDB.guardado !== dato.guardado) Almacen.guardar('reglas', dato).catch(() => {});
+      }
+    } catch (e) { /* sin IndexedDB: basta el localStorage */ }
+    await leerVigentesGuardados();
+  })();
+  // otra pestaña del portal cambió las reglas o la lista
+  window.addEventListener('storage', (e) => {
+    if (e.key === CLAVE_REGLAS) { RR.reglas = null; RR.ver++; ajustarTodo(); refrescarVentanaReglas(); }
+    else if (e.key === SELLO_VIGENTES) leerVigentesGuardados();
+  });
+  const firmaReglas = () => `${RR.ver}|${RR.mapa ? 1 : 0}|${RR.catalogo ? 1 : 0}`;
+  function reglasCompiladas() {
+    if (RR.compClave !== firmaReglas()) { RR.comp = Reglas.compilar(reglasActuales(), { vigentes: RR.mapa, catalogo: RR.catalogo }); RR.compClave = firmaReglas(); }
+    if (!RR.catalogo && on('reglasrev') && RR.comp.some((c) => c.necesita === 'catalogo' && c.regla.activa)) pedirCatalogo();
+    return RR.comp;
+  }
+  const reglasVivas = () => on('reglasrev') && reglasCompiladas().some((c) => c.ok);
+  const ctxReglas = (x) => ({ vigentes: RR.mapa, catalogo: RR.catalogo, ...(x || {}) });
+  // Códigos de equipo, utensilio y agrupador del catálogo del portal (el mismo de "Buscar por equipo"): solo si una regla activa lo usa
+  function pedirCatalogo() {
+    if (RR.pidiendoCat || typeof sap === 'undefined') return;
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
+    RR.pidiendoCat = true;
+    cargarCatalogoEquipos(modelo).then((items) => {
+      const m = new Map(); items.forEach((x) => { const c = Reglas.normalizarCodigo(x.codigo); if (c.length >= 5 && c.includes('-') && !m.has(c)) m.set(c, x.desc || ''); });
+      RR.catalogo = m; RR.ver++; ajustarTodo(); refrescarVentanaReglas();
+    }, () => { setTimeout(() => { RR.pidiendoCat = false; }, 60000); });   // (se reintenta en un minuto)
+  }
+
+  // ---- resaltado dentro del texto de una celda (sin cambiar su texto: el filtro, copiar y demás siguen leyendo lo mismo) ----
+  const textoDeCelda = (td) => td && (td.querySelector('.sapMText') || td.querySelector('.sapMLnk') || td.querySelector('.sapMObjectIdentifierTitle') || td.querySelector('.sapMLabel'));
+  function quitarMarcasReglas(el) {
+    el.querySelectorAll('mark.rmd-regla').forEach((m) => { const p = m.parentNode; if (!p) return; p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); });
+  }
+  function pintarMarcas(el, marcas) {
+    quitarMarcasReglas(el); if (!marcas.length) return;
+    const nodos = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, off = 0;
+    while ((n = w.nextNode())) { nodos.push({ n, ini: off, fin: off + n.data.length }); off += n.data.length; }
+    for (let k = marcas.length - 1; k >= 0; k--) {                       // de atrás hacia adelante: las posiciones pendientes no se mueven
+      const m = marcas[k]; let ultimo = true;
+      for (let j = nodos.length - 1; j >= 0; j--) {
+        const x = nodos[j], a = Math.max(m.ini, x.ini), b = Math.min(m.fin, x.fin); if (a >= b) continue;
+        const r = document.createRange(); r.setStart(x.n, a - x.ini); r.setEnd(x.n, b - x.ini);
+        const mk = document.createElement('mark'); mk.className = `rmd-regla rmd-c-${m.color}${m.aviso ? ' aviso' : ''}`; mk.title = m.titulo;
+        if (ultimo && m.etiqueta) mk.dataset.etq = m.etiqueta; ultimo = false;
+        try { r.surroundContents(mk); } catch (e) { /* (rango cortado por otro elemento: se deja sin marcar) */ }
+      }
+    }
+  }
+  // Una lista (pasos, procesos menores o el selector "Adicionar Pasos"): marca cada descripción y devuelve sus advertencias.
+  // Cada celda guarda la "firma" de lo que pintó (reglas + texto): si nada cambió no se vuelve a tocar el DOM.
+  function aplicarReglasLista(tabla, filas, iDes, ctx) {
+    const out = { n: 0, filas: [] };
+    if (!reglasVivas()) {
+      if (tabla.__rmdReglas) { tabla.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; }); tabla.__rmdReglas = false; }
+      return out;
+    }
+    tabla.__rmdReglas = true;
+    const comp = reglasCompiladas(), c = ctxReglas(ctx), clave = `${firmaReglas()}|${ctx.esPM ? 1 : 0}|${ctx.lista || ''}|`;
+    filas.forEach((tr) => {
+      const el = iDes >= 0 ? textoDeCelda(celda(tr, iDes)) : null; if (!el) return;
+      const texto = el.textContent || '', firma = clave + texto;
+      let res = el.__rmdReglasRes;
+      if (!res || el.dataset.rmdReglas !== firma || (res.marcas.length && !el.querySelector('mark.rmd-regla'))) {
+        res = Reglas.buscar(texto, comp, c); el.__rmdReglasRes = res; el.dataset.rmdReglas = firma; pintarMarcas(el, res.marcas);
+      }
+      if (res.avisos.length) { out.n += res.avisos.length; out.filas.push({ tr, avisos: res.avisos.map((a) => a.texto) }); }
+    });
+    return out;
+  }
+  // nombre de la lista de pasos que está debajo (para los procesos menores y los selectores)
+  function listaPadre(d) { const ds = dialogos(); for (let i = ds.indexOf(d) - 1; i >= 0; i--) if (ds[i].__rmdListaEfectiva) return ds[i].__rmdListaEfectiva; return ''; }
+  function gestionarReglasSelector() {
+    if (typeof sap === 'undefined') return;
+    TABLAS_SELECTOR.forEach((id, i) => {
+      const t = sap.ui.getCore().byId(id), dom = t && t.getDomRef(); if (!dom || !visible(dom)) return;
+      const tabla = dom.querySelector('table'); if (!tabla) return;
+      const iDes = [...tabla.querySelectorAll('thead th')].findIndex((th) => /^DESCRIPCI/.test(NORM(th.textContent)));
+      if (iDes >= 0) aplicarReglasLista(tabla, filasPrincipales(tabla), iDes, { esPM: i === 1, lista: listaPadre(dom.closest('.sapMDialog')) });
+    });
+  }
+
+  // ---- todo el RMD: textos de sus pasos y procesos menores (lo usan el aviso de la ventana del RMD y "Documentos citados") ----
+  // Lee TODOS los pasos del RMD (MD_ES_PASO, con su estructura), sus etiquetas (MD_ES_ETIQUETA) y todos sus procesos menores
+  // (MD_ES_PASO_INSUMO_PASO) con el modelo del portal —las mismas entidades que el portal usa al abrir cada lista—, en 3 lecturas.
+  const textosRmd = new Map();                                            // mdId -> { t, modelo, p }
+  let generacionRmd = 0, dialogosAntes = 0;                               // (sube cada vez que se cierra una ventana: pudo cambiar algo)
+  async function leerTextosRmd(modelo, md) {
+    const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new Filtro('mdId_mdId', 'EQ', md.mdId)], t0 = Date.now();
+    const activo = (x) => x && x.activo !== false;
+    const [pasos, etiquetas, pms] = await Promise.all([
+      leerTodoDe(modelo, 'MD_ES_PASO', porMd, { $expand: 'pasoId,mdEstructuraId,mdEstructuraId/estructuraId' }),
+      leerTodoDe(modelo, 'MD_ES_ETIQUETA', porMd, { $expand: 'etiquetaId' }),
+      leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', porMd, { $expand: 'pasoHijoId' }),
+    ]);
+    const etq = new Map(etiquetas.filter(activo).map((e) => [e.mdEsEtiquetaId, e]));
+    const pmsDe = new Map(); pms.filter(activo).filter((x) => x.pasoHijoId).forEach((x) => { const k = x.pasoId_mdEstructuraPasoId; if (!pmsDe.has(k)) pmsDe.set(k, []); pmsDe.get(k).push(x); });
+    const obj = (v) => (v && typeof v === 'object' && !v.__deferred ? v : {});
+    const listas = new Map();
+    pasos.filter(activo).forEach((p) => {
+      const est = obj(p.mdEstructuraId), e = etq.get(p.mdEsEtiquetaId_mdEsEtiquetaId);
+      const clave = (p.mdEstructuraId_mdEstructuraId || '') + '|' + (p.mdEsEtiquetaId_mdEsEtiquetaId || '');
+      if (!listas.has(clave)) listas.set(clave, { lista: norm(obj(est.estructuraId).descripcion || 'Estructura') + (e ? ' › ' + norm(obj(e.etiquetaId).descripcion || 'Etiqueta') : ''),
+        o1: +est.orden || 0, o2: e ? +e.orden || 0 : 0, pasos: [] });
+      listas.get(clave).pasos.push(p);
+    });
+    const r = { rmd: md.codigo, mdId: md.mdId, listas: [], textos: [], pasos: 0, pms: 0 };
+    [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2 || a.lista.localeCompare(b.lista)).forEach((l, il) => {
+      const info = { lista: l.lista, pasos: l.pasos.length, pms: 0 };
+      l.pasos.sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((p, k) => {
+        const pp = obj(p.pasoId), lugar = { lista: l.lista, paso: String(p.orden != null ? p.orden : k + 1), codigoPaso: String(pp.codigo || ''), descPaso: norm(pp.descripcion), pm: '', codigoPM: '', descPM: '' };
+        r.textos.push({ texto: lugar.descPaso, esPM: false, lista: l.lista, lugar, il });
+        (pmsDe.get(p.mdEstructuraPasoId) || []).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((q) => {
+          const h = obj(q.pasoHijoId), lq = { ...lugar, pm: String(q.orden != null ? q.orden : ''), codigoPM: String(h.codigo || ''), descPM: norm(h.descripcion) };
+          info.pms++; r.pms++; r.textos.push({ texto: lq.descPM, esPM: true, lista: l.lista, lugar: lq, il });
+        });
+      });
+      r.pasos += info.pasos; r.listas.push(info);
+    });
+    r.segundos = Math.max(1, Math.round((Date.now() - t0) / 1000));
+    return r;
+  }
+  // maxEdad: se reutiliza una lectura de hace menos de ese tiempo (ms); 0 = leer de nuevo
+  function textosDelRmd(modelo, md, maxEdad) {
+    const g = textosRmd.get(md.mdId);
+    if (g && g.modelo === modelo && Date.now() - g.t < (maxEdad == null ? 60000 : maxEdad)) return g.p;
+    const p = leerTextosRmd(modelo, md); textosRmd.set(md.mdId, { t: Date.now(), modelo, p });
+    p.catch(() => { const x = textosRmd.get(md.mdId); if (x && x.p === p) textosRmd.delete(md.mdId); });
+    return p;
+  }
+  // Aviso en la ventana del RMD: advertencias de las reglas en todo el RMD (pasos y procesos menores de todas las listas) y las
+  // reglas "Debe estar presente" que no se cumplen. Se revisa al abrir el RMD, al volver a él (cerrada una lista: pudo cambiar
+  // algo) y al cambiar las reglas o la lista de vigentes.
+  function avisoReglasRaiz(d, tabla) {
+    const quitar = () => { d.querySelectorAll('.rmd-reglas-aviso').forEach((x) => x.remove()); d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; };
+    if (typeof sap === 'undefined' || !reglasVivas()) { if (d.__rmdReglasFirma || d.querySelector('.rmd-reglas-aviso')) quitar(); return; }
+    const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
+    if (!md || !md.mdId || !modelo) return;
+    const firma = `${md.mdId}|${firmaReglas()}|${generacionRmd}`, prev = d.__rmdReglasFirma || '';
+    if (prev !== firma && dialogos().pop() === d) {                      // (con otra ventana encima se espera a volver al RMD)
+      const soloReglas = prev.startsWith(md.mdId + '|') && prev.endsWith('|' + generacionRmd);   // cambiaron las reglas: basta con reevaluar
+      d.__rmdReglasFirma = firma;
+      textosDelRmd(modelo, md, !prev.startsWith(md.mdId + '|') ? 60000 : soloReglas ? 3600000 : 0).then((base) => {
+        if (!d.isConnected || d.__rmdReglasFirma !== firma) return;
+        const res = Reglas.evaluarConjunto(base.textos, reglasCompiladas(), ctxReglas());
+        const docs = [...new Set(base.textos.flatMap((x) => Reglas.codigosDocumento(x.texto)))];
+        d.__rmdReglasRes = { res, base, docs };
+        window.__rmdStats.reglasRaiz = { rmd: base.rmd, avisos: res.avisos, faltan: res.faltan.map((f) => f.texto), marcas: res.marcas, documentos: docs.length, noVigentes: RR.mapa ? docs.filter((c) => !RR.mapa.has(c)) : null };
+        pintarAvisoReglas(d, tabla);
+      }, () => { /* sin conexión: queda sin aviso hasta el próximo cambio */ });
+    } else if (d.__rmdReglasRes && !d.querySelector('.rmd-reglas-aviso')) pintarAvisoReglas(d, tabla);   // UI5 volvió a dibujar la tabla
+  }
+  function pintarAvisoReglas(d, tabla) {
+    const x = d.__rmdReglasRes; if (!x) return;
+    const { res, docs } = x, nAv = res.avisos + res.faltan.length;
+    let a = d.querySelector('.rmd-reglas-aviso');
+    if (!a) {
+      a = document.createElement('div'); a.className = 'rmd-reglas-aviso'; tabla.insertAdjacentElement('beforebegin', a);
+      a.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-a]'); if (!b) return; e.stopPropagation();
+        if (b.dataset.a === 'ver') abrirDetalleReglas(d); else abrirReglas();
+      });
+    }
+    let h;
+    if (nAv) {
+      const grupos = new Map();
+      res.items.forEach((it) => it.avisos.forEach((av) => { let g = grupos.get(av.regla); if (!g) grupos.set(av.regla, g = { nombre: av.nombre, n: 0, valores: new Set() }); g.n++; g.valores.add(av.valor); }));
+      const partes = [...grupos.values()].map((g) => `<b>${esc(g.nombre)}</b>: ${g.n}${g.valores.size ? ` (${[...g.valores].slice(0, 4).map(esc).join(', ')}${g.valores.size > 4 ? '…' : ''})` : ''}`)
+        .concat(res.faltan.map((f) => `<b>Falta</b> — ${esc(f.texto)}`));
+      h = `⚠ Reglas de revisión · ${partes.join(' · ')}<button type="button" data-a="ver">Ver detalle</button>`;
+    } else {
+      const noVig = RR.mapa ? docs.filter((c) => !RR.mapa.has(c)).length : 0;
+      h = `✓ Reglas de revisión: sin advertencias${RR.mapa && docs.length ? ` · ${docs.length} documento(s) citado(s)${noVig ? `, ${noVig} fuera de la lista de vigentes` : ', todos en la lista de vigentes'}` : ''}<button type="button" data-a="ver">Ver detalle</button>`;
+    }
+    a.classList.toggle('ok', !nAv);
+    if (a.dataset.html !== h) { a.dataset.html = h; a.innerHTML = h; }
+    a.title = 'Según tus reglas de revisión (botón de mejoras › Reglas de revisión). Es solo un aviso: no cambia nada ni impide autorizar.';
+  }
+  // Detalle: cada texto con advertencias (resaltado), dónde está y, abajo, lo que solo se resalta
+  function abrirDetalleReglas(d) {
+    const x = d.__rmdReglasRes; if (!x) return;
+    const { res, base } = x, v = ventana(`Reglas de revisión — ${cabecera(d)}`, { cancelar: () => v.cerrar() });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-reglas-detalle');
+    const nombreRegla = new Map(reglasActuales().map((r) => [r.id, r.nombre]));
+    const donde = (l) => `${l.lista} › paso ${l.paso}${l.pm ? ' › proceso menor ' + l.pm : ''}`;
+    const pintarTabla = (conResaltados) => {
+      const items = res.items.filter((it) => conResaltados || it.avisos.length);
+      const cont = v.cuerpo.querySelector('.rmd-rd-tabla'); cont.innerHTML = '';
+      if (!items.length && !res.faltan.length) { cont.innerHTML = `<p class="rmd-nota">${conResaltados ? 'Ninguna regla encontró nada en este RMD.' : 'Sin advertencias. Marca «Ver también lo que solo se resalta» para ver el resto.'}</p>`; return; }
+      const t = document.createElement('table'); t.className = 'rmd-tabla'; t.innerHTML = '<thead><tr><th>Regla</th><th>Dónde</th><th>Texto</th></tr></thead><tbody></tbody>';
+      const tb = t.querySelector('tbody');
+      res.faltan.forEach((f) => { const tr = document.createElement('tr'); tr.innerHTML = `<td><b>${esc(f.nombre)}</b></td><td class="rmd-nota">Todo el RMD</td><td class="rmd-vig-no">${esc(f.texto)}</td>`; tb.appendChild(tr); });
+      items.slice(0, 400).forEach((it) => {
+        const tx = base.textos[it.i], tr = document.createElement('tr');
+        const reglas = [...new Set(it.marcas.map((m) => nombreRegla.get(m.regla) || m.regla))];
+        tr.innerHTML = `<td>${reglas.map((n) => `<div>${it.avisos.some((a) => a.nombre === n) ? '⚠ ' : ''}${esc(n)}</div>`).join('')}</td><td class="rmd-nota">${esc(donde(tx.lugar))}${tx.esPM ? `<div>${esc(tx.lugar.codigoPM)}</div>` : `<div>${esc(tx.lugar.codigoPaso)}</div>`}</td><td></td>`;
+        const span = document.createElement('div'); span.className = 'rmd-rg-texto'; span.textContent = tx.texto; pintarMarcas(span, it.marcas); tr.lastElementChild.appendChild(span);
+        if (it.avisos.length) { const p = document.createElement('div'); p.className = 'rmd-nota'; p.textContent = it.avisos.map((a) => a.texto).join(' · '); tr.lastElementChild.appendChild(p); }
+        tb.appendChild(tr);
+      });
+      cont.appendChild(t);
+      if (items.length > 400) cont.insertAdjacentHTML('beforeend', `<p class="rmd-nota">…y ${items.length - 400} textos más (están todos en el Excel).</p>`);
+    };
+    const nAv = res.avisos + res.faltan.length, soloMarca = res.items.filter((it) => !it.avisos.length).length;
+    v.cuerpo.innerHTML = `<p><b>${nAv}</b> advertencia(s) en ${base.pasos} pasos y ${base.pms} procesos menores de ${base.listas.length} listas${res.faltan.length ? ` (${res.faltan.length} por algo que falta)` : ''}.${RR.vigentes ? ` Lista de vigentes: «${esc(RR.vigentes.archivo)}», cargada el ${esc(fechaHoraCorta(RR.vigentes.cargado))}.` : ''}</p>
+      <label class="rmd-rg-check"><input type="checkbox" class="rmd-rd-todos" ${nAv ? '' : 'checked'}> Ver también lo que solo se resalta (${soloMarca} texto(s))</label><div class="rmd-rd-tabla"></div>`;
+    const chk = v.cuerpo.querySelector('.rmd-rd-todos'); chk.addEventListener('change', () => pintarTabla(chk.checked)); pintarTabla(chk.checked);
+    const bX = botonModal('Descargar Excel', '', async () => {
+      bX.disabled = true;
+      try { descargarArchivo(`Reglas de revisión ${base.rmd}.xlsx`, await armarReglasExcel(d, x).generar(), TIPO_XLSX); }
+      catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } finally { bX.disabled = false; }
+    });
+    v.pie.append(botonModal('Configurar reglas…', '', () => { v.cerrar(); abrirReglas(); }), bX, botonModal('Cerrar', 'primario', () => v.cerrar()));
+  }
+  function armarReglasExcel(d, x) {
+    const { res, base } = x, libro = Xlsx.crearLibro(), nombreRegla = new Map(reglasActuales().map((r) => [r.id, r.nombre])), num = (t) => (/^\d+$/.test(t || '') ? +t : t);
+    const cab = ['Regla', 'Encontrado', 'Advertencia', 'Lista', 'Paso', 'Proceso menor', 'Código del paso', 'Texto'], filas = [];
+    res.faltan.forEach((f) => filas.push([f.nombre, '', f.texto, 'Todo el RMD', '', '', '', '']));
+    res.items.forEach((it) => {
+      const tx = base.textos[it.i], l = tx.lugar;
+      it.marcas.forEach((m) => { const av = it.avisos.find((a) => a.regla === m.regla && a.valor === m.valor); filas.push([nombreRegla.get(m.regla) || m.regla, m.valor, av ? av.texto : '', l.lista, num(l.paso), num(l.pm), tx.esPM ? l.codigoPM : l.codigoPaso, tx.texto]); });
+    });
+    const h = libro.hoja('Reglas de revisión', { activa: true, congelar: 'A2', filtro: `A1:H${Math.max(2, filas.length + 1)}`, cols: [[1, 1, 28], [2, 2, 16], [3, 3, 50], [4, 4, 36], [5, 6, 9], [7, 7, 13], [8, 8, 90]] });
+    cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
+    filas.forEach((f, i) => f.forEach((v, c) => { if (v !== '' && v != null) h.poner({ c, r: i + 1 }, v, c === 7 || c === 2 ? 'envuelto' : 'celda'); }));
+    const hI = libro.hoja('Información', { cols: [[1, 1, 30], [2, 2, 90]] });
+    hI.poner('A1', `Reglas de revisión — ${cabecera(d)}`, 'titulo');
+    [['Generado', fechaHoraCorta(new Date().toISOString())], ['Advertencias', res.avisos + res.faltan.length], ['Pasos / procesos menores revisados', `${base.pasos} / ${base.pms}`],
+      ['Lista de documentos vigentes', RR.vigentes ? `${RR.vigentes.archivo} (${RR.vigentes.docs.length} documentos, cargada el ${fechaHoraCorta(RR.vigentes.cargado)})` : 'sin cargar'],
+      ...reglasActuales().filter((r) => r.activa).map((r, i) => [i ? '' : 'Reglas activas', `${r.nombre}: ${Reglas.resumen(r)}`])]
+      .forEach(([a, b], i) => { if (a) hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return libro;
+  }
+  const fechaHoraCorta = (iso) => { const t = new Date(iso); if (isNaN(t)) return String(iso || ''); const dd = (n) => String(n).padStart(2, '0'); return `${dd(t.getDate())}/${dd(t.getMonth() + 1)}/${t.getFullYear()} ${dd(t.getHours())}:${dd(t.getMinutes())}`; };
+  const diasDesde = (iso) => { const t = Date.parse(iso); return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 86400000); };
+  const infoVigente = (codigo) => (RR.mapa ? RR.mapa.get(Reglas.normalizarCodigo(codigo)) || null : null);
+
+  // ---- lista de documentos vigentes: leer el archivo (.xls del DMS, .xlsx, .csv o una tabla HTML/XML guardada como .xls) ----
+  const textoDeBytes = (u8) => { try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) { return new TextDecoder('windows-1252').decode(u8); } };
+  function filasDeMarcado(texto) {
+    const xml = /<Workbook\b/i.test(texto) && /urn:schemas-microsoft-com:office:spreadsheet/i.test(texto), doc = new DOMParser().parseFromString(texto, xml ? 'text/xml' : 'text/html');
+    const hojas = [...doc.getElementsByTagName('Worksheet')];
+    if (hojas.length) return hojas.map((w) => ({ hoja: w.getAttribute('ss:Name') || 'Hoja', filas: [...w.getElementsByTagName('Row')].map((row) => {
+      const f = []; let c = 0; [...row.getElementsByTagName('Cell')].forEach((cell) => { const i = +(cell.getAttribute('ss:Index') || 0); if (i) c = i - 1; const dt = cell.getElementsByTagName('Data')[0]; f[c] = dt ? dt.textContent : ''; c++; });
+      return f; }) }));
+    return [...doc.querySelectorAll('table')].map((t, i) => ({ hoja: `Tabla ${i + 1}`, filas: [...t.rows].map((r) => [...r.cells].map((c) => c.textContent)) }));
+  }
+  async function filasDeArchivo(u8, archivo) {
+    if (u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0) { const l = Xlsx.leerXls(u8); return l.hojas.map((h) => ({ hoja: h, filas: l.filas(h) || [] })); }
+    if (u8[0] === 0x50 && u8[1] === 0x4B) { const l = await Xlsx.leerLibro(u8), out = []; for (const h of l.hojas) out.push({ hoja: h, filas: (await l.filas(h)) || [] }); return out; }
+    const texto = textoDeBytes(u8);
+    if (/^\s*</.test(texto)) return filasDeMarcado(texto);
+    return [{ hoja: archivo, filas: Reglas.csvAFilas(texto) }];
+  }
+  async function leerListaVigentes(u8, archivo) {
+    let mejor = null;
+    (await filasDeArchivo(u8, archivo)).forEach((h) => { const l = Reglas.listaVigentesDeFilas(h.filas); if (l.docs.length && (!mejor || l.docs.length > mejor.docs.length)) mejor = { ...l, hoja: h.hoja }; });
+    if (!mejor) throw new Error('no se encontró una columna con códigos de documento (por ejemplo «Identificador» o «Código»)');
+    return { archivo, hoja: mejor.hoja, columna: mejor.columnas.codigo || '', n: mejor.docs.length, estados: mejor.estados, duplicados: mejor.duplicados, docs: mejor.docs };
+  }
+  function exportarConfiguracion() {
+    const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), nombre = `Reglas de revisión RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.json`;
+    const obj = Reglas.paraExportar(reglasActuales(), RR.vigentes, { exportado: hoy.toISOString(), script: VERSION });
+    // legible en un editor de texto: las reglas con sangría y cada documento de la lista en su propia línea
+    const marca = '@@doc' + Math.random().toString(36).slice(2) + '_';
+    const txt = JSON.stringify(obj, (k, v) => (k === 'docs' && Array.isArray(v) ? v.map((x, i) => marca + i) : v), 2).replace(new RegExp(`"${marca}(\\d+)"`, 'g'), (_, i) => JSON.stringify(obj.vigentes.docs[+i]));
+    descargarArchivo(nombre, txt, 'application/json');
+    toast(`Descargado «${nombre}»: ${obj.reglas.length} regla(s)${obj.vigentes ? ` y la lista de ${obj.vigentes.docs.length.toLocaleString('es-PE')} documentos vigentes` : ''}. En otra PC: «Importar configuración».`);
+    return { nombre, texto: txt };
+  }
+
+  // ---- ventana "Reglas de revisión" ----
+  let ventanaReglas = null;
+  function refrescarVentanaReglas() { if (ventanaReglas && ventanaReglas.fondo.isConnected) ventanaReglas.refrescar(); }
+  const AYUDA_BUSCAR = {
+    frase: 'Una o varias palabras o frases, separadas por «;» o en líneas distintas. Sin importar tildes ni mayúsculas. * = cualquier terminación (limpi* → limpiar, limpieza).',
+    documento: 'Vacío = cualquier código de documento (IPRO-P123, FPRO-250, POL-CAL-001, MCAL-200…). O escribe códigos separados por «;»; * = cualquier continuación (IPRO-*).',
+    equipo: 'Vacío = cualquier código del catálogo de equipos, utensilios y agrupadores del portal (se lee una vez por sesión). O escribe códigos separados por «;» (PL1-LIQ-E023; PL1-GV1-*).',
+    patron: 'Expresión regular de JavaScript (para usuarios avanzados). Ej.: \\d+\\s?°C marca temperaturas como «25 °C».',
+  };
+  function abrirReglas(pestana) {
+    if (ventanaReglas && ventanaReglas.fondo.isConnected) { ventanaReglas.irA(pestana || 'reglas'); return; }
+    registrarExternosUI5();
+    let vista = pestana === 'vigentes' ? 'vigentes' : 'reglas', editando = null, sucio = false, importando = null, cargandoVig = null, consulta = '';
+    const esArriba = () => [...document.querySelectorAll('.rmd-modal-fondo')].pop() === v.fondo;
+    const v = ventana('Reglas de revisión', { cancelar: () => { if (esArriba()) salir(); } });
+    const tarjeta = v.fondo.querySelector('.rmd-modal'), h3 = tarjeta.querySelector('h3');
+    tarjeta.classList.add('rmd-reglas'); v.fondo.classList.add('rmd-reglas-fondo');
+    const tabs = document.createElement('div'); tabs.className = 'rmd-rg-tabs'; tabs.setAttribute('role', 'tablist');
+    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button>';
+    h3.insertAdjacentElement('afterend', tabs);
+    const archivo = document.createElement('input'); archivo.type = 'file'; archivo.hidden = true; archivo.className = 'rmd-rg-archivo'; tarjeta.appendChild(archivo);
+    let alElegir = null;
+    const elegirArchivo = (acepta, fn) => { archivo.value = ''; archivo.accept = acepta; alElegir = fn; archivo.click(); };
+    archivo.addEventListener('change', () => { const f = archivo.files && archivo.files[0]; if (f && alElegir) alElegir(f); });
+    const q = (sel) => v.cuerpo.querySelector(sel);
+    function salir() {
+      if (vista === 'editor' && sucio) {
+        confirmar('¿Descartar los cambios?', 'La regla que estás editando tiene cambios sin guardar.', '', { si: 'Descartar', no: 'Seguir editando', peligro: true }).then((s) => { if (s) { sucio = false; v.cerrar(); ventanaReglas = null; } });
+        return;
+      }
+      v.cerrar(); ventanaReglas = null;
+    }
+    const ir = (p) => { if (vista === 'editor' && sucio) { confirmar('¿Descartar los cambios?', 'La regla que estás editando tiene cambios sin guardar.', '', { si: 'Descartar', no: 'Seguir editando', peligro: true }).then((s) => { if (s) { sucio = false; vista = p; pintar(); } }); return; } vista = p; pintar(); };
+    tabs.addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) ir(b.dataset.p); });
+    // soltar un archivo en la ventana: .json = importar configuración; .xls / .xlsx / .csv = lista de vigentes
+    ['dragenter', 'dragover'].forEach((ev) => v.fondo.addEventListener(ev, (e) => { if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); tarjeta.classList.add('rmd-rg-soltar'); }));
+    v.fondo.addEventListener('dragleave', (e) => { if (!e.relatedTarget || !v.fondo.contains(e.relatedTarget)) tarjeta.classList.remove('rmd-rg-soltar'); });
+    v.fondo.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; tarjeta.classList.remove('rmd-rg-soltar'); if (!f) return; e.preventDefault(); if (vista !== 'editor') abrirArchivo(f); });
+
+    async function abrirArchivo(f) {
+      try {
+        const u8 = new Uint8Array(await f.arrayBuffer()), ini = textoDeBytes(u8.subarray(0, 200)).replace(/^﻿/, '').trimStart();
+        if (/\.json$/i.test(f.name) || ini.startsWith('{') || ini.startsWith('[')) { importando = { archivo: f.name, ...Reglas.leerExportado(JSON.parse(textoDeBytes(u8).replace(/^﻿/, ''))) }; vista = 'importar'; pintar(); }
+        else { const lv = await leerListaVigentes(u8, f.name), antes = RR.vigentes ? new Set(RR.vigentes.docs.map((d) => d[0])) : null, ahora = new Set(lv.docs.map((d) => d[0]));
+          cargandoVig = { ...lv, nuevos: antes ? lv.docs.filter((d) => !antes.has(d[0])).length : lv.n, salen: antes ? [...antes].filter((c) => !ahora.has(c)).length : 0 }; vista = 'cargarVig'; pintar(); }
+      } catch (e) { toast(`No se pudo leer «${f.name}»: ${e.message}`, true); }
+    }
+    function pintar() {
+      const enVig = vista === 'vigentes' || vista === 'cargarVig';
+      tabs.querySelectorAll('button').forEach((b) => { const act = (b.dataset.p === 'vigentes') === enVig; b.classList.toggle('activa', act); b.setAttribute('aria-selected', String(act)); });
+      tabs.querySelector('[data-p=reglas] span').textContent = `(${reglasActuales().length})`;
+      tabs.querySelector('[data-p=vigentes] span').textContent = RR.vigentes ? `(${RR.vigentes.docs.length.toLocaleString('es-PE')})` : '';
+      tabs.style.display = vista === 'editor' || vista === 'importar' ? 'none' : '';
+      h3.textContent = vista === 'editor' ? (editando.nueva ? 'Nueva regla de revisión' : `Editar regla — ${editando.regla.nombre || ''}`) : vista === 'importar' ? 'Importar configuración' : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : 'Reglas de revisión';
+      v.pie.innerHTML = ''; v.fondo.__ctrlS = null; v.cuerpo.oninput = null; v.cuerpo.onchange = null;
+      ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, importar: pintarImportar, cargarVig: pintarCargaVig })[vista]();
+    }
+    // -- lista de reglas --
+    function pintarLista() {
+      const comp = reglasCompiladas(), reglas = reglasActuales(), activas = reglas.filter((r) => r.activa).length;
+      v.cuerpo.innerHTML = `<p class="rmd-nota">Se aplican solas al revisar el RMD: resaltan en la descripción de los pasos y procesos menores (al pasar el ratón se ve el motivo), sus advertencias se suman al aviso de la barra de cada lista («ir a la siguiente») y la ventana del RMD muestra un resumen de todo el RMD. La de más arriba tiene prioridad si dos marcan lo mismo.</p>
+        <div class="rmd-rg-barra"><button type="button" class="rmd-btn primario" data-a="nueva">+ Nueva regla</button><span class="rmd-rg-esp"></span>
+          <button type="button" class="rmd-btn" data-a="exportar" title="Descarga un archivo .json con tus reglas${RR.vigentes ? ' y la lista de documentos vigentes' : ''}: para guardarlo o usarlo en otra PC">Exportar configuración</button>
+          <button type="button" class="rmd-btn" data-a="importar" title="Carga un archivo .json exportado antes (también puedes soltarlo en esta ventana)">Importar configuración</button>
+          <button type="button" class="rmd-btn" data-a="restablecer" title="Vuelve a poner las reglas predeterminadas">Restablecer predeterminadas</button></div>
+        <div class="rmd-rg-lista" role="list"></div>`;
+      const lista = q('.rmd-rg-lista');
+      if (!reglas.length) lista.innerHTML = '<p class="rmd-rg-vacio rmd-nota">No tienes reglas. Crea una con «+ Nueva regla» o pulsa «Restablecer predeterminadas».</p>';
+      reglas.forEach((r, i) => {
+        const c = comp[i] || {}, f = document.createElement('div'); f.className = 'rmd-rg-fila' + (r.activa ? '' : ' inactiva'); f.dataset.id = r.id; f.setAttribute('role', 'listitem');
+        const nota = c.error ? `<div class="rmd-rg-error">⚠ ${esc(c.error)}</div>`
+          : r.activa && c.necesita === 'vigentes' ? '<div class="rmd-rg-falta">Necesita la lista de documentos vigentes: <button type="button" class="rmd-rg-link" data-a="ir-vigentes">cárgala aquí</button>.</div>'
+          : r.activa && c.necesita === 'catalogo' ? '<div class="rmd-rg-falta">Leyendo el catálogo de equipos del portal… (hace falta tener abierta la lista principal)</div>' : '';
+        f.innerHTML = `<label class="rmd-switch" title="${r.activa ? 'Activa: pulsa para desactivarla' : 'Inactiva: pulsa para activarla'}"><input type="checkbox" data-a="activa" ${r.activa ? 'checked' : ''} aria-label="Regla activa"><span></span></label>
+          <span class="rmd-rg-color rmd-c-${r.color}" title="Color: ${Reglas.COLORES[r.color]}"></span>
+          <div class="rmd-rg-info" data-a="editar" title="Editar la regla"><div><b>${esc(r.nombre)}</b>${r.etiqueta ? `<span class="rmd-rg-etq rmd-c-${r.color}">${esc(r.etiqueta)}</span>` : ''}${r.predeterminada ? '<span class="rmd-rg-pred">predeterminada</span>' : ''}</div><div class="rmd-nota">${esc(Reglas.resumen(r))}</div>${nota}</div>
+          <div class="rmd-rg-acc"><button type="button" data-a="subir" title="Subir (más prioridad)" ${i ? '' : 'disabled'}>↑</button><button type="button" data-a="bajar" title="Bajar (menos prioridad)" ${i < reglas.length - 1 ? '' : 'disabled'}>↓</button><button type="button" data-a="editar" title="Editar">✎</button><button type="button" data-a="duplicar" title="Duplicar">⧉</button><button type="button" data-a="eliminar" class="peligro" title="Eliminar">✕</button></div>`;
+        lista.appendChild(f);
+      });
+      const est = document.createElement('span'); est.className = 'rmd-rg-estado';
+      est.textContent = RR.errorGuardar || `${reglas.length} regla(s), ${activas} activa(s)${on('reglasrev') ? '' : ' — «Reglas de revisión» está apagado en el panel de mejoras'} · se guardan solo en este navegador`;
+      v.pie.append(est, botonModal('Cerrar', 'primario', () => salir()));
+    }
+    v.cuerpo.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-a]'); if (!b || b.tagName === 'INPUT' || !v.cuerpo.contains(b)) return;
+      const a = b.dataset.a, fila = b.closest('.rmd-rg-fila'), reglas = reglasActuales().slice(), i = fila ? reglas.findIndex((r) => r.id === fila.dataset.id) : -1;
+      if (a === 'nueva') { editando = { nueva: true, regla: { id: Reglas.nuevoId(), nombre: '', activa: true, tipo: 'frase', buscar: '', palabraCompleta: true, condicion: 'marcar', accion: 'resaltar', color: 'amarillo', donde: 'todo', vigencia: 'todos' }, accionTocada: false }; sucio = false; vista = 'editor'; pintar(); setTimeout(() => { const n = q('[data-k=nombre]'); if (n) n.focus(); }, 30); }
+      else if (a === 'exportar') exportarConfiguracion();
+      else if (a === 'importar') elegirArchivo('.json,application/json', abrirArchivo);
+      else if (a === 'restablecer') restablecer();
+      else if (a === 'ir-vigentes') ir('vigentes');
+      else if (a === 'cargar') elegirArchivo('.xls,.xlsx,.csv,.txt', abrirArchivo);
+      else if (a === 'quitar') {
+        if (await confirmar('¿Quitar la lista de documentos vigentes?', `Se borra de este navegador la lista «${RR.vigentes.archivo}» (${RR.vigentes.docs.length} documentos).`, 'Sin lista no se puede saber qué documentos citados están vigentes. Puedes volver a cargarla cuando quieras.', { si: 'Quitar', no: 'Cancelar', peligro: true })) { await guardarVigentes(null); toast('Lista de documentos vigentes quitada.'); }
+      } else if (i >= 0) {
+        if (a === 'editar') { editando = { nueva: false, regla: { ...reglas[i] }, accionTocada: true }; sucio = false; vista = 'editor'; pintar(); }
+        else if (a === 'subir' && i > 0) { [reglas[i - 1], reglas[i]] = [reglas[i], reglas[i - 1]]; await guardarReglas(reglas); }
+        else if (a === 'bajar' && i < reglas.length - 1) { [reglas[i + 1], reglas[i]] = [reglas[i], reglas[i + 1]]; await guardarReglas(reglas); }
+        else if (a === 'duplicar') { const c = { ...reglas[i], id: Reglas.nuevoId(), nombre: nombreLibre(`${reglas[i].nombre} (copia)`, reglas) }; delete c.predeterminada; reglas.splice(i + 1, 0, c); await guardarReglas(reglas); toast(`Regla duplicada: «${c.nombre}».`); }
+        else if (a === 'eliminar') {
+          if (await confirmar('¿Eliminar la regla?', `«${reglas[i].nombre}» se borra de este navegador.`, reglas[i].predeterminada ? 'Es predeterminada: «Restablecer predeterminadas» la vuelve a poner.' : 'Si la exportaste antes, puedes volver a importarla.', { si: 'Eliminar', no: 'Cancelar', peligro: true })) {
+            const nombre = reglas[i].nombre; reglas.splice(i, 1); await guardarReglas(reglas); toast(`Regla «${nombre}» eliminada.`);
+          }
+        }
+      }
+    });
+    v.cuerpo.addEventListener('change', async (e) => {
+      const t = e.target; if (vista !== 'reglas' || t.dataset.a !== 'activa') return;
+      const fila = t.closest('.rmd-rg-fila'), reglas = reglasActuales().slice(), i = reglas.findIndex((r) => r.id === fila.dataset.id); if (i < 0) return;
+      reglas[i] = { ...reglas[i], activa: t.checked }; await guardarReglas(reglas);
+    });
+    const mismoNombre = (a, b) => Reglas.plegar(a).p === Reglas.plegar(b).p;
+    function nombreLibre(nombre, reglas, id) { let n = nombre, k = 2; while (reglas.some((r) => r.id !== id && mismoNombre(r.nombre, n))) n = `${nombre} (${k++})`; return n; }
+    function restablecer() {
+      const w = ventana('Restablecer las reglas predeterminadas', { cancelar: () => w.cerrar() });
+      w.fondo.querySelector('.rmd-modal').classList.add('rmd-modal-aviso');
+      w.cuerpo.innerHTML = '<p>Las reglas predeterminadas vuelven a su configuración original (y se agregan arriba si las eliminaste).</p><p class="rmd-aviso-ayuda">Tus reglas propias se conservan, salvo que elijas borrarlas también. La lista de documentos vigentes no cambia.</p>';
+      w.pie.append(botonModal('Borrar también las mías', 'peligro', async () => { w.cerrar(); await guardarReglas(Reglas.predeterminadas()); toast('Quedaron solo las reglas predeterminadas.'); }),
+        botonModal('Cancelar', '', () => w.cerrar()),
+        botonModal('Restablecer', 'primario', async () => {
+          w.cerrar();
+          const pred = Reglas.predeterminadas(), actuales = reglasActuales(), faltan = pred.filter((p) => !actuales.some((r) => r.predeterminada === p.predeterminada));
+          await guardarReglas(faltan.concat(actuales.map((r) => (r.predeterminada ? pred.find((p) => p.predeterminada === r.predeterminada) : r))));
+          toast('Reglas predeterminadas restablecidas.');
+        }));
+    }
+    // -- editor de una regla --
+    function pintarEditor() {
+      const r = editando.regla, op = (obj, sel) => Object.entries(obj).map(([k, t]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(t)}</option>`).join('');
+      v.cuerpo.innerHTML = `<div class="rmd-rg-form">
+        <h4>Regla</h4>
+        <label class="rmd-rg-campo">Nombre <input type="text" data-k="nombre" maxlength="80" placeholder="Ej.: Documento no vigente" value="${esc(r.nombre || '')}"></label>
+        <label class="rmd-rg-check rmd-rg-abajo"><input type="checkbox" data-k="activa" ${r.activa !== false ? 'checked' : ''}> Activa</label>
+        <h4>Qué buscar</h4>
+        <label class="rmd-rg-campo">Tipo <select data-k="tipo">${op(Reglas.TIPOS, r.tipo)}</select></label>
+        <label class="rmd-rg-campo" data-si="documento">Vigencia <select data-k="vigencia">${op(Reglas.VIGENCIAS, r.vigencia || 'todos')}</select></label>
+        <label class="rmd-rg-campo ancho"><span data-titulo="buscar">Valores</span><textarea data-k="buscar" rows="2" spellcheck="false">${esc(r.buscar || '')}</textarea><small class="rmd-rg-ayuda" data-ayuda="buscar"></small></label>
+        <label class="rmd-rg-check" data-si="frase"><input type="checkbox" data-k="palabraCompleta" ${r.palabraCompleta !== false ? 'checked' : ''}> Solo palabras completas</label>
+        <label class="rmd-rg-check" data-si="frase patron"><input type="checkbox" data-k="mayusculas" ${r.mayusculas ? 'checked' : ''}> Distinguir mayúsculas y minúsculas</label>
+        <label class="rmd-rg-campo ancho">Excepto si el texto contiene <input type="text" data-k="excepto" placeholder="Opcional. Ej.: GRANEL; BIOCARGA" value="${esc(r.excepto || '')}"></label>
+        <h4>Qué hacer</h4>
+        <label class="rmd-rg-campo">Condición <select data-k="condicion">${op(Reglas.CONDICIONES, r.condicion)}</select></label>
+        <label class="rmd-rg-campo" data-cond-no="debe">Acción <select data-k="accion">${op(Reglas.ACCIONES, r.accion)}</select></label>
+        <label class="rmd-rg-check" data-cond-si="debe"><input type="checkbox" data-k="basta" ${r.basta ? 'checked' : ''}> Basta con que aparezca uno de los valores</label>
+        <div class="rmd-rg-campo">Color <div class="rmd-rg-colores">${Object.entries(Reglas.COLORES).map(([k, t]) => `<label class="rmd-rg-sw rmd-c-${k}" title="${t}"><input type="radio" name="rmd-rg-color" value="${k}" ${k === (r.color || 'amarillo') ? 'checked' : ''} aria-label="${t}"><span></span></label>`).join('')}</div></div>
+        <label class="rmd-rg-campo">Etiqueta visible junto a lo resaltado <input type="text" data-k="etiqueta" maxlength="18" placeholder="Opcional. Ej.: NO VIGENTE" value="${esc(r.etiqueta || '')}"></label>
+        <label class="rmd-rg-campo ancho">Mensaje del aviso <input type="text" data-k="mensaje" maxlength="200" placeholder="Opcional: si lo dejas vacío se arma solo con el nombre de la regla" value="${esc(r.mensaje || '')}"></label>
+        <p class="rmd-rg-ayuda ancho" data-cond-si="debe">Se revisa en todo el RMD: si no aparece, la ventana del RMD lo avisa como «Falta». Donde aparece, se resalta.</p>
+        <h4>Dónde</h4>
+        <label class="rmd-rg-campo">Revisar en <select data-k="donde">${op(Reglas.DONDE, r.donde)}</select></label>
+        <label class="rmd-rg-campo">Solo en la lista <input type="text" data-k="lista" placeholder="Opcional. Ej.: PRECAUCIONES (vacío = todas)" value="${esc(r.lista || '')}"></label>
+        <h4>Probar</h4>
+        <label class="rmd-rg-campo ancho">Texto de prueba <textarea class="rmd-rg-prueba" rows="2" placeholder="Pega el texto de un paso para ver qué marcaría esta regla">${esc(editando.prueba || '')}</textarea></label>
+        <div class="rmd-rg-res ancho"></div>
+        <p class="rmd-rg-err ancho" role="alert"></p>
+      </div>`;
+      const leer = () => ({ ...editando.regla, nombre: q('[data-k=nombre]').value, activa: q('[data-k=activa]').checked, tipo: q('[data-k=tipo]').value, vigencia: q('[data-k=vigencia]').value,
+        buscar: q('[data-k=buscar]').value, palabraCompleta: q('[data-k=palabraCompleta]').checked, mayusculas: q('[data-k=mayusculas]').checked, excepto: q('[data-k=excepto]').value,
+        condicion: q('[data-k=condicion]').value, accion: q('[data-k=accion]').value, basta: q('[data-k=basta]').checked, color: (q('input[name=rmd-rg-color]:checked') || {}).value || 'amarillo',
+        etiqueta: q('[data-k=etiqueta]').value, mensaje: q('[data-k=mensaje]').value, donde: q('[data-k=donde]').value, lista: q('[data-k=lista]').value });
+      const mostrar = (x) => {
+        v.cuerpo.querySelectorAll('[data-si]').forEach((el) => { el.style.display = el.dataset.si.split(' ').includes(x.tipo) ? '' : 'none'; });
+        v.cuerpo.querySelectorAll('[data-cond-si]').forEach((el) => { el.style.display = x.condicion === el.dataset.condSi ? '' : 'none'; });
+        v.cuerpo.querySelectorAll('[data-cond-no]').forEach((el) => { el.style.display = x.condicion === el.dataset.condNo ? 'none' : ''; });
+        setTxt(q('[data-ayuda=buscar]'), AYUDA_BUSCAR[x.tipo]); setTxt(q('[data-titulo=buscar]'), x.tipo === 'patron' ? 'Patrón' : x.tipo === 'frase' ? 'Palabras o frases' : 'Códigos (opcional)');
+        const ta = q('[data-k=buscar]'); ta.placeholder = x.tipo === 'frase' ? 'Ej.: control de calidad; borrador' : x.tipo === 'patron' ? 'Ej.: \\d+\\s?°C' : 'Vacío = cualquiera';
+      };
+      const probar = (x) => {
+        const c = Reglas.compilar([x], { vigentes: RR.mapa, catalogo: RR.catalogo })[0], err = q('.rmd-rg-err');
+        err.textContent = c.error ? '⚠ ' + c.error : c.necesita === 'vigentes' ? 'Esta regla necesita la lista de documentos vigentes (pestaña «Documentos vigentes»).' : c.necesita === 'catalogo' ? 'Esta regla usa el catálogo de equipos del portal; se lee una vez por sesión (con la lista principal abierta).' : '';
+        err.classList.toggle('aviso', !c.error);
+        const t = q('.rmd-rg-prueba').value, out = q('.rmd-rg-res'); editando.prueba = t;
+        if (!t.trim()) { out.innerHTML = '<span class="rmd-rg-ayuda">Escribe o pega un texto arriba para ver qué marcaría.</span>'; return; }
+        const res = Reglas.buscar(t, [{ ...c, ok: !c.error && !c.necesita }], ctxReglas({ probar: true })), caja = document.createElement('div'); caja.className = 'rmd-rg-texto'; caja.textContent = t; pintarMarcas(caja, res.marcas);
+        const p = document.createElement('p'); p.className = 'rmd-rg-ayuda';
+        p.textContent = x.condicion === 'debe' ? (res.marcas.length ? `✓ Aparece (${res.marcas.length} vez/veces).` : '✗ No aparece: en el RMD saldría el aviso «Falta».')
+          : res.marcas.length ? `${res.marcas.length} coincidencia(s)${res.avisos.length ? ` · aviso: ${res.avisos[0].texto}` : ' · solo se resalta'}` : 'Sin coincidencias.';
+        out.innerHTML = ''; out.append(caja, p);
+      };
+      const cambio = (e) => {
+        if (e && e.target && e.target.dataset.k === 'accion') editando.accionTocada = true;
+        if (e && e.target && e.target.dataset.k === 'condicion' && !editando.accionTocada) q('[data-k=accion]').value = e.target.value === 'noDebe' ? 'advertencia' : 'resaltar';
+        if (e && e.target && !e.target.classList.contains('rmd-rg-prueba')) sucio = true;
+        const x = leer(); mostrar(x); probar(x);
+      };
+      v.cuerpo.oninput = cambio; v.cuerpo.onchange = cambio; cambio(null);
+      const guardarEditor = async () => {
+        const x = Reglas.normalizar(leer()), c = Reglas.compilar([x], {})[0];
+        if (c.error) { q('.rmd-rg-err').textContent = '⚠ ' + c.error; q('[data-k=buscar]').focus(); return; }
+        const reglas = reglasActuales().slice(); x.nombre = nombreLibre(x.nombre, reglas, x.id);
+        const i = reglas.findIndex((r) => r.id === x.id); if (i >= 0) reglas[i] = x; else reglas.push(x);
+        sucio = false; await guardarReglas(reglas); v.cuerpo.oninput = null; v.cuerpo.onchange = null; vista = 'reglas'; pintar();
+        toast(`Regla «${x.nombre}» guardada${x.activa ? '' : ' (inactiva)'}.`);
+      };
+      v.pie.append(botonModal('Cancelar', '', () => ir('reglas')), botonModal('Guardar regla', 'primario', guardarEditor));
+      v.fondo.__ctrlS = guardarEditor;
+    }
+    // -- documentos vigentes --
+    function pintarVigentes() {
+      const V = RR.vigentes, dias = V ? diasDesde(V.cargado) : 0;
+      const estados = V && V.estados ? Object.entries(V.estados).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n.toLocaleString('es-PE')}`).join(' · ') : '';
+      v.cuerpo.innerHTML = `${V ? `<p class="rmd-rg-vig-ok">✓ <b>${V.docs.length.toLocaleString('es-PE')} documentos vigentes</b> · «${esc(V.archivo)}» · cargada el ${esc(fechaHoraCorta(V.cargado))}</p>
+          <p class="rmd-nota">${estados}${V.hoja ? ` · hoja «${esc(V.hoja)}», columna «${esc(V.columna)}»` : ''}</p>${dias > 30 ? `<p class="rmd-rg-falta">La lista tiene ${dias} días: conviene volver a cargarla del DMS para que esté al día.</p>` : ''}`
+        : '<p class="rmd-rg-falta">Aún no hay una lista cargada: sin ella no se puede saber qué documentos citados están vigentes.</p>'}
+        <p class="rmd-nota"><b>Criterio:</b> los documentos que están en esta lista están vigentes; los que no están, no (SAP no lo compara por sí solo). La regla «Documento no vigente» resalta en rojo los códigos citados que no están en la lista y lo avisa; «Documentos citados» muestra la columna «Vigente». La lista se guarda solo en este navegador.</p>
+        <div class="rmd-rg-barra"><button type="button" class="rmd-btn primario" data-a="cargar">${V ? 'Cargar otra lista' : 'Cargar la lista'} (.xls, .xlsx o .csv)</button>${V ? '<button type="button" class="rmd-btn peligro" data-a="quitar">Quitar la lista</button>' : ''}<span class="rmd-nota">o suelta el archivo en esta ventana</span></div>
+        ${V ? '<div class="rmd-rg-buscar"><input type="search" class="rmd-rg-q" placeholder="Buscar un código o un título en la lista" aria-label="Buscar en la lista de documentos vigentes"></div><div class="rmd-rg-vig-res"></div>' : ''}`;
+      const inp = q('.rmd-rg-q');
+      if (inp) { inp.value = consulta; inp.addEventListener('input', () => { consulta = inp.value; buscarVig(); }); buscarVig(); }
+      v.pie.append(Object.assign(document.createElement('span'), { className: 'rmd-rg-estado', textContent: 'Lista guardada solo en este navegador' }), botonModal('Cerrar', 'primario', () => salir()));
+    }
+    function buscarVig() {
+      const out = q('.rmd-rg-vig-res'); if (!out || !RR.vigentes) return;
+      const t = Reglas.plegar(consulta.trim()).p; if (!t) { out.innerHTML = ''; return; }
+      const cod = Reglas.normalizarCodigo(consulta), hall = RR.vigentes.docs.filter((d) => d[0].includes(cod) || Reglas.plegar(d[1]).p.includes(t)).slice(0, 30);
+      const exacto = RR.mapa.has(cod), pareceCodigo = /^[A-Z0-9]{2,6}(-[A-Z0-9]{1,8}){1,3}$/.test(cod);
+      out.innerHTML = (pareceCodigo ? (exacto ? `<p class="rmd-vig-si">✓ ${esc(cod)} está en la lista: vigente.</p>` : `<p class="rmd-vig-no">✗ ${esc(cod)} no está en la lista: se considera NO vigente.</p>`) : '')
+        + (hall.length ? `<table class="rmd-tabla"><thead><tr><th>Código</th><th>Título</th><th>Rev.</th><th>Estado</th><th>Validez</th></tr></thead><tbody>${hall.map((d) => `<tr><td class="rmd-nowrap">${esc(d[0])}</td><td>${esc(d[1])}</td><td>${esc(d[2])}</td><td>${esc(d[3])}</td><td class="rmd-nowrap">${esc(d[6])}</td></tr>`).join('')}</tbody></table>` : (pareceCodigo ? '' : '<p class="rmd-nota">Nada coincide.</p>'));
+    }
+    function pintarCargaVig() {
+      const c = cargandoVig, estados = Object.entries(c.estados || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n.toLocaleString('es-PE')}`).join(' · ');
+      v.cuerpo.innerHTML = `<p>Se leyeron <b>${c.n.toLocaleString('es-PE')} documentos</b> de «${esc(c.archivo)}» (hoja «${esc(c.hoja)}», columna «${esc(c.columna)}»).</p>
+        <p class="rmd-nota">${estados}${c.duplicados ? ` · ${c.duplicados} código(s) repetido(s) se contaron una vez` : ''}</p>
+        ${RR.vigentes ? `<p>Reemplaza la lista actual (${RR.vigentes.docs.length.toLocaleString('es-PE')} documentos, cargada el ${esc(fechaHoraCorta(RR.vigentes.cargado))}): <b>${c.nuevos}</b> documento(s) nuevo(s) y <b>${c.salen}</b> que ya no están (pasan a «no vigente»).</p>` : '<p>Con esta lista, los documentos citados que no estén en ella se marcarán como no vigentes.</p>'}
+        <table class="rmd-tabla"><thead><tr><th>Código</th><th>Título</th><th>Rev.</th><th>Estado</th><th>Validez</th></tr></thead><tbody>${c.docs.slice(0, 5).map((d) => `<tr><td class="rmd-nowrap">${esc(d[0])}</td><td>${esc(d[1])}</td><td>${esc(d[2])}</td><td>${esc(d[3])}</td><td class="rmd-nowrap">${esc(d[6])}</td></tr>`).join('')}</tbody></table>
+        ${c.n > 5 ? `<p class="rmd-nota">…y ${(c.n - 5).toLocaleString('es-PE')} más.</p>` : ''}`;
+      const usar = async () => {
+        const r = await guardarVigentes({ archivo: c.archivo, cargado: new Date().toISOString(), hoja: c.hoja, columna: c.columna, n: c.n, estados: c.estados, docs: c.docs });
+        cargandoVig = null; vista = 'vigentes'; pintar();
+        toast(r.ok ? `Lista cargada: ${c.n.toLocaleString('es-PE')} documentos vigentes. Queda guardada en este navegador.` : `Lista cargada solo mientras la página siga abierta: no se pudo guardar en el navegador (${r.error}).`, !r.ok);
+      };
+      v.pie.append(botonModal('Cancelar', '', () => { cargandoVig = null; vista = 'vigentes'; pintar(); }), botonModal('Usar esta lista', 'primario', usar));
+      v.fondo.__ctrlS = usar;
+    }
+    // -- importar configuración --
+    function pintarImportar() {
+      const im = importando, actuales = reglasActuales(), mismo = (r) => actuales.some((a) => a.id === r.id || mismoNombre(a.nombre, r.nombre));
+      const nMismo = im.reglas ? im.reglas.filter(mismo).length : 0;
+      v.cuerpo.innerHTML = `<p>Archivo <b>«${esc(im.archivo)}»</b>${im.exportado ? `, exportado el ${esc(fechaHoraCorta(im.exportado))}` : ''}${im.script ? ` (versión ${esc(im.script)})` : ''}.</p>
+        <div class="rmd-rg-imp">
+        ${im.reglas ? `<p><b>${im.reglas.length} regla(s)</b>: ${im.reglas.length - nMismo} nueva(s) y ${nMismo} con el mismo nombre que una tuya.</p>
+          <label><input type="radio" name="rmd-rg-modo" value="agregar" checked><span><b>Agregar a mis reglas</b><br><span class="rmd-nota">Las del mismo nombre se actualizan con las del archivo; las demás tuyas no cambian.</span></span></label>
+          <label><input type="radio" name="rmd-rg-modo" value="reemplazar"><span><b>Reemplazar todas mis reglas</b><br><span class="rmd-nota">Quedan solo las ${im.reglas.length} del archivo.</span></span></label>
+          <div class="rmd-rg-imp-lista">${im.reglas.slice(0, 12).map((r) => `<div><span class="rmd-rg-color rmd-c-${r.color}"></span> <b>${esc(r.nombre)}</b>${mismo(r) ? ' <span class="rmd-rg-pred">(reemplaza a la tuya)</span>' : ''}${r.activa ? '' : ' <span class="rmd-rg-pred">inactiva</span>'}<div class="rmd-nota">${esc(Reglas.resumen(r))}</div></div>`).join('')}${im.reglas.length > 12 ? `<p class="rmd-nota">…y ${im.reglas.length - 12} más.</p>` : ''}</div>` : '<p class="rmd-nota">El archivo no trae reglas.</p>'}
+        ${im.vigentes ? `<label><input type="checkbox" name="rmd-rg-vig" checked><span><b>Usar también su lista de documentos vigentes</b><br><span class="rmd-nota">${im.vigentes.n.toLocaleString('es-PE')} documentos · «${esc(im.vigentes.archivo)}»${im.vigentes.cargado ? `, cargada el ${esc(fechaHoraCorta(im.vigentes.cargado))}` : ''}${RR.vigentes ? ` · reemplaza la tuya (${RR.vigentes.docs.length.toLocaleString('es-PE')} documentos, cargada el ${esc(fechaHoraCorta(RR.vigentes.cargado))})` : ''}</span></span></label>` : ''}
+        </div>`;
+      const importar = async () => {
+        const modo = (q('input[name=rmd-rg-modo]:checked') || {}).value, conVig = !!(q('input[name=rmd-rg-vig]') || {}).checked, partes = [];
+        if (im.reglas) { const f = Reglas.fusionar(reglasActuales(), im.reglas, modo === 'reemplazar'); await guardarReglas(f.reglas); partes.push(modo === 'reemplazar' ? `${f.reglas.length} regla(s)` : `${f.agregadas} regla(s) nueva(s) y ${f.reemplazadas} actualizada(s)`); }
+        if (im.vigentes && conVig) { const r = await guardarVigentes({ ...im.vigentes, cargado: im.vigentes.cargado || new Date().toISOString() }); partes.push(`la lista de ${im.vigentes.n.toLocaleString('es-PE')} documentos vigentes${r.ok ? '' : ' (solo mientras la página siga abierta)'}`); }
+        importando = null; vista = 'reglas'; pintar();
+        toast(partes.length ? `Importado: ${partes.join(' y ')}.` : 'No se importó nada.');
+      };
+      v.pie.append(botonModal('Cancelar', '', () => { importando = null; vista = 'reglas'; pintar(); }), botonModal('Importar', 'primario', importar));
+      v.fondo.__ctrlS = importar;
+    }
+    ventanaReglas = { fondo: v.fondo, irA: (p) => ir(p), refrescar: () => { if (vista === 'reglas' || vista === 'vigentes') { const foco = document.activeElement && document.activeElement.classList.contains('rmd-rg-q'); pintar(); if (foco) { const i = q('.rmd-rg-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } } }, elegir: abrirArchivo };
+    pintar();
+  }
+  window.__rmdStats.reglas = {
+    lista: () => JSON.parse(JSON.stringify(reglasActuales())), fijar: (lista) => guardarReglas(lista), listo: () => RR.listo,
+    vigentes: () => (RR.vigentes ? { archivo: RR.vigentes.archivo, cargado: RR.vigentes.cargado, n: RR.vigentes.docs.length, hoja: RR.vigentes.hoja, columna: RR.vigentes.columna } : null),
+    // (pruebas) lista de vigentes desde los bytes de un archivo en base64, o desde una lista de códigos; null la quita
+    cargarVigentes: async (b64, nombre) => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const lv = await leerListaVigentes(u8, nombre); const r = await guardarVigentes({ ...lv, cargado: new Date().toISOString() }); return { ...r, n: lv.n, hoja: lv.hoja, columna: lv.columna }; },
+    ponerVigentes: (docs, archivo = 'prueba') => guardarVigentes(docs ? { archivo, cargado: new Date().toISOString(), n: docs.length, estados: {}, docs: docs.map((d) => (Array.isArray(d) ? d : [Reglas.normalizarCodigo(d)])) } : null),
+    guardados: async () => ({ ls: localStorage.getItem(CLAVE_REGLAS), db: await Almacen.leer('reglas').catch((e) => 'error: ' + e.message), vigentesDB: await Almacen.leer('vigentes').then((x) => (x ? x.docs.length : null), (e) => 'error: ' + e.message) }),
+    evaluar: (texto, ctx) => Reglas.buscar(texto, reglasCompiladas(), ctxReglas({ probar: true, ...(ctx || {}) })),
+    exportar: () => exportarConfiguracion(), abrir: (p) => abrirReglas(p), compiladas: () => reglasCompiladas().map((c) => ({ id: c.regla.id, ok: c.ok, error: c.error, necesita: c.necesita })),
+    motor: Reglas,
+    // (pruebas) respaldo completo de lo guardado y su restauración: las pruebas dejan el navegador como estaba
+    respaldo: async () => ({ ls: localStorage.getItem(CLAVE_REGLAS), db: await Almacen.leer('reglas').catch(() => null), vig: RR.vigentes }),
+    restaurar: async (r) => {
+      try { if (r.ls) localStorage.setItem(CLAVE_REGLAS, r.ls); else localStorage.removeItem(CLAVE_REGLAS); } catch (e) { /* nada */ }
+      try { if (r.db) await Almacen.guardar('reglas', r.db); else await Almacen.borrar('reglas'); } catch (e) { /* nada */ }
+      RR.reglas = null; RR.ver++; await guardarVigentes(r.vig || null);
+    },
+  };
+
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
@@ -5472,7 +6536,7 @@
     ['Lista principal', ['barrafiltros', 'buscarequipo', 'revisor', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
     ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
     ['Asociar fórmulas', ['asociar', 'recetas', 'recetaruta', 'recetasvarias', 'puestoreceta']],
-    ['Alertas', ['reglas', 'ordenest', 'sintipo', 'puesto']],
+    ['Alertas', ['reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],
   ];
   function panel() {
     const etiqueta = Object.fromEntries(OPC);
@@ -5480,7 +6544,7 @@
     const p = document.createElement('details'); p.id = 'rmd-ui-panel';
     p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
       '<div class="rmd-panel-cab"><b>Mejoras de interfaz</b><span>v' + VERSION + '</span></div>' + fila('activo', 'maestro') +
-      '<div class="rmd-panel-acciones"><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
+      '<div class="rmd-panel-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear, activar o editar tus reglas de revisión, exportarlas / importarlas y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión…</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
       GRUPOS_PANEL.map(([t, ks]) => `<div class="rmd-grupo">${t}</div>` + ks.map((k) => fila(k)).join('')).join('') +
       '<div class="rmd-panel-pie"><span>Ctrl+K = Ir a… · Ctrl+S = Guardar</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
     const refrescar = () => p.querySelectorAll('input[data-k]').forEach((i) => { i.checked = !!opc[i.dataset.k]; });
@@ -5491,6 +6555,7 @@
       ajustarTodo();
     });
     p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { p.open = false; abrirModificacionesMasivas('suspender'); });
+    p.querySelector('.rmd-abrir-reglas').addEventListener('click', () => { p.open = false; abrirReglas(); });
     p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
     panelEl = p; montarPanel();
   }

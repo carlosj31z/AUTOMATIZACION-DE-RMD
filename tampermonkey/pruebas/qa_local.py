@@ -366,6 +366,110 @@ with sync_playwright() as p:
         ok = (r["tipos"] == ["cambia:300", "reemplazo:110<100", "nuevo:500", "quitado:400"] and r["filas"] == 4 and r["delta"] == "(+20)" and "100" in (r["reemplazo"] or "") and "110" in (r["reemplazo"] or ""))
         return ok, json.dumps(r, ensure_ascii=False)
 
+    # ───────── R. Reglas de revisión (v1.34) ─────────
+    FILAS_REGLAS = [
+        {"desc": "SEGÚN IPRO-P123 Y FPRO-250 VIGENTES", "tipo": "Verificación Check"},
+        {"desc": "USAR GUANTES DE CAÑA ALTA", "tipo": "Verificación Check", "dep": "1000 (1)"},
+        {"desc": "PESAR LOS INSUMOS", "tipo": "Verificación Check", "dep": "1001 (2)"},
+    ]
+    MARCAS_JS = """() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(); const ths = [...d.querySelectorAll('thead th')].map(x => x.textContent.trim().toUpperCase()), iDes = ths.indexOf('DESCRIPCIÓN');
+      return { filas: [...d.querySelectorAll('tbody tr')].map(tr => ({ texto: tr.children[iDes].textContent, marcas: [...tr.children[iDes].querySelectorAll('mark.rmd-regla')].map(m => ({ t: m.textContent, c: m.className, etq: m.dataset.etq || '', title: m.title })) })),
+        barra: (d.querySelector('#rmd-filtro-bar .rmd-alerta') || {}).textContent || '' }; }"""
+    @prueba("LN15 Reglas de revisión en una lista: el documento que no está en la lista de vigentes se resalta en rojo con etiqueta y motivo, su advertencia suma en la barra, una regla 'Resaltar' marca sin avisar y el texto de la fila no cambia")
+    def _():
+        pg.evaluate("""async () => { const R = window.__rmdStats.reglas; await R.listo();
+          await R.fijar(R.motor.predeterminadas().concat([{ nombre: 'Guantes', tipo: 'frase', buscar: 'guantes', condicion: 'marcar', accion: 'resaltar', color: 'verde' }]));
+          await R.ponerVigentes(['FPRO-250', 'IPRO-P100'], 'lista de prueba.xls'); }""")
+        abrir(pg, FILAS_REGLAS); pg.wait_for_timeout(600)
+        r = pg.evaluate(MARCAS_JS)
+        m0, m1 = r["filas"][0]["marcas"], r["filas"][1]["marcas"]
+        ok = (len(m0) == 1 and m0[0]["t"] == "IPRO-P123" and "rmd-c-rojo" in m0[0]["c"] and "aviso" in m0[0]["c"] and m0[0]["etq"] == "no vigente"
+              and "no está en la lista de documentos vigentes" in m0[0]["title"] and len(m1) == 1 and m1[0]["t"] == "GUANTES" and "rmd-c-verde" in m1[0]["c"] and "aviso" not in m1[0]["c"]
+              and not r["filas"][2]["marcas"] and r["filas"][0]["texto"] == FILAS_REGLAS[0]["desc"] and "1 aviso de reglas" in r["barra"])
+        return ok, json.dumps(r, ensure_ascii=False)[:900]
+    @prueba("LN16 Reglas: al apagar 'Reglas de revisión' en el panel desaparecen los resaltados (y la advertencia de la barra); al encenderla vuelven")
+    def _():
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(200)
+        pg.locator("#rmd-ui-panel input[data-k=reglasrev]").click(); pg.wait_for_timeout(700)
+        apagada = pg.evaluate(MARCAS_JS)
+        pg.locator("#rmd-ui-panel input[data-k=reglasrev]").click(); pg.wait_for_timeout(700)
+        encendida = pg.evaluate(MARCAS_JS)
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = false")
+        ok = (all(not f["marcas"] for f in apagada["filas"]) and "aviso de reglas" not in apagada["barra"] and apagada["filas"][0]["texto"] == FILAS_REGLAS[0]["desc"]
+              and len(encendida["filas"][0]["marcas"]) == 1 and "1 aviso de reglas" in encendida["barra"])
+        return ok, f"apagada={apagada['barra']!r} {[len(f['marcas']) for f in apagada['filas']]} encendida={encendida['barra']!r}"
+    @prueba("LN17 Ventana 'Reglas de revisión' (botón del panel): crear una regla con prueba en vivo (la acción pasa sola a 'advertencia' con 'No debe aparecer'), desactivarla, duplicarla, subirla y eliminarla; Ctrl+S guarda la regla sin pulsar el Guardar de SAP")
+    def _():
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(200)
+        pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(500)
+        panel_cerrado = pg.evaluate("!document.getElementById('rmd-ui-panel').open")
+        pg.locator(".rmd-reglas .rmd-rg-barra button", has_text="Nueva regla").click(); pg.wait_for_timeout(300)
+        pg.locator(".rmd-reglas [data-k=nombre]").fill("Prueba borrador")
+        pg.locator(".rmd-reglas [data-k=buscar]").fill("borrador; xxx")
+        pg.locator(".rmd-reglas [data-k=condicion]").select_option("noDebe"); pg.wait_for_timeout(150)
+        accion = pg.locator(".rmd-reglas [data-k=accion]").input_value()
+        pg.locator(".rmd-reglas .rmd-rg-prueba").fill("ESTE PASO ES UN BORRADOR (XXX)"); pg.wait_for_timeout(200)
+        prueba_ = pg.evaluate("[...document.querySelectorAll('.rmd-reglas .rmd-rg-res mark')].map(m => m.textContent)")
+        aviso_prueba = pg.evaluate("(document.querySelector('.rmd-reglas .rmd-rg-res .rmd-rg-ayuda') || {}).textContent")
+        guardados_sap = pg.evaluate("window.__opc.guardados || 0")
+        pg.keyboard.press("Control+s"); pg.wait_for_timeout(600)
+        tras_ctrl_s = pg.evaluate("({ vista: document.querySelector('.rmd-reglas h3').textContent, sap: window.__opc.guardados || 0, nombres: window.__rmdStats.reglas.lista().map(r => r.nombre) })")
+        fila = lambda nombre: pg.locator(".rmd-rg-fila").filter(has=pg.locator("b", has_text=re.compile("^" + re.escape(nombre) + "$")))
+        fila("Prueba borrador").locator(".rmd-switch").click(); pg.wait_for_timeout(400)
+        inactiva = pg.evaluate("window.__rmdStats.reglas.lista().find(r => r.nombre === 'Prueba borrador').activa === false")
+        fila("Prueba borrador").locator("button[data-a=duplicar]").click(); pg.wait_for_timeout(400)
+        fila("Prueba borrador (copia)").locator("button[data-a=subir]").click(); pg.wait_for_timeout(400)
+        orden = pg.evaluate("window.__rmdStats.reglas.lista().map(r => r.nombre)")
+        fila("Prueba borrador (copia)").locator("button[data-a=eliminar]").click(); pg.wait_for_timeout(300)
+        pg.locator(".rmd-modal-aviso button", has_text="Eliminar").click(); pg.wait_for_timeout(400)
+        final = pg.evaluate("window.__rmdStats.reglas.lista().map(r => r.nombre)")
+        g = pg.evaluate("window.__rmdStats.reglas.guardados()")
+        ok = (panel_cerrado and accion == "advertencia" and prueba_ == ["BORRADOR", "XXX"] and "aviso" in (aviso_prueba or "") and tras_ctrl_s["vista"] == "Reglas de revisión" and tras_ctrl_s["sap"] == guardados_sap
+              and "Prueba borrador" in tras_ctrl_s["nombres"] and inactiva and orden.index("Prueba borrador (copia)") == orden.index("Prueba borrador") - 1
+              and "Prueba borrador (copia)" not in final and "Prueba borrador" in final and "Prueba borrador" in (g["ls"] or "") and isinstance(g["db"], dict) and any(r["nombre"] == "Prueba borrador" for r in g["db"]["reglas"]))
+        return ok, json.dumps({"accion": accion, "prueba": prueba_, "aviso": aviso_prueba, "ctrlS": tras_ctrl_s, "orden": orden, "final": final}, ensure_ascii=False)[:900]
+    @prueba("LN18 Exportar configuración descarga un .json (reglas + lista); Importar (reemplazar) lo recupera; la lista de vigentes se carga desde un CSV con vista previa y se busca un código; todo sigue al recargar la página")
+    def _():
+        import tempfile
+        tmp = tempfile.mkdtemp()
+        with pg.expect_download() as dl:
+            pg.locator(".rmd-reglas .rmd-rg-barra button", has_text="Exportar configuración").click()
+        ruta_json = os.path.join(tmp, dl.value.suggested_filename); dl.value.save_as(ruta_json)
+        exportado = json.load(open(ruta_json, encoding="utf-8"))
+        antes = pg.evaluate("window.__rmdStats.reglas.lista().map(r => r.nombre)")
+        pg.evaluate("window.__rmdStats.reglas.fijar([])"); pg.wait_for_timeout(300)
+        with pg.expect_file_chooser() as fc:
+            pg.locator(".rmd-reglas .rmd-rg-barra button", has_text="Importar configuración").click()
+        fc.value.set_files(ruta_json); pg.wait_for_timeout(600)
+        vista_imp = pg.evaluate("document.querySelector('.rmd-reglas .rmd-modal-cuerpo').innerText")
+        pg.locator(".rmd-reglas input[name=rmd-rg-modo][value=reemplazar]").check()
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Importar").click(); pg.wait_for_timeout(600)
+        despues = pg.evaluate("window.__rmdStats.reglas.lista().map(r => r.nombre)")
+        csv = os.path.join(tmp, "vigentes prueba.csv")
+        open(csv, "w", encoding="utf-8").write("Código;Título;Estado\nFPRO-250;INSPECCIÓN EN LÍNEAS;Aprobado\nIPRO-P123;LIMPIEZA DE SALAS;Revisión\nPOL-CAL-001;POLÍTICA;Aprobado\n")
+        pg.locator(".rmd-reglas .rmd-rg-tabs button[data-p=vigentes]").click(); pg.wait_for_timeout(300)
+        with pg.expect_file_chooser() as fc2:
+            pg.locator(".rmd-reglas .rmd-rg-barra button[data-a=cargar]").click()
+        fc2.value.set_files(csv); pg.wait_for_timeout(600)
+        previa = pg.evaluate("document.querySelector('.rmd-reglas .rmd-modal-cuerpo').innerText")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Usar esta lista").click(); pg.wait_for_timeout(600)
+        vig = pg.evaluate("window.__rmdStats.reglas.vigentes()")
+        pg.locator(".rmd-reglas .rmd-rg-q").fill("IPRO-P999"); pg.wait_for_timeout(200)
+        no_esta = pg.evaluate("(document.querySelector('.rmd-reglas .rmd-rg-vig-res') || {}).innerText || ''")
+        pg.locator(".rmd-reglas .rmd-rg-q").fill("limpieza"); pg.wait_for_timeout(200)
+        por_titulo = pg.evaluate("[...document.querySelectorAll('.rmd-reglas .rmd-rg-vig-res tbody tr')].map(t => t.children[0].textContent)")
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
+        cerrar_todo(pg)
+        # recargar la página: las reglas y la lista siguen (localStorage + IndexedDB)
+        pg.reload(); pg.evaluate(src); pg.wait_for_timeout(1500)
+        tras = pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.listo(); return { reglas: R.lista().map(r => r.nombre), vig: R.vigentes() }; }")
+        ok = (exportado.get("app") == "rmd-ui-mejoras" and len(exportado["reglas"]) == len(antes) and exportado["vigentes"]["n"] == 2 and "regla(s)" in vista_imp
+              and despues == antes and "3 documentos" in previa and vig and vig["n"] == 3 and vig["archivo"] == "vigentes prueba.csv"
+              and "IPRO-P999 no está en la lista" in no_esta and por_titulo == ["IPRO-P123"] and tras["reglas"] == antes and tras["vig"] and tras["vig"]["n"] == 3)
+        return ok, json.dumps({"exportado": [len(exportado["reglas"]), exportado.get("vigentes", {}).get("n")], "antes": antes, "despues": despues, "previa": previa[:160], "vig": vig, "noEsta": no_esta[:80], "porTitulo": por_titulo, "tras": tras}, ensure_ascii=False)[:1200]
+    # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin lista)
+    pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); }")
+
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
     print(f"{len(RES) - len(fallas)}/{len(RES)} pruebas pasan")
