@@ -1551,15 +1551,15 @@ with sync_playwright() as p:
             (loc.check() if marcar else loc.uncheck()); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
         try:
             ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_BOM)); pg.wait_for_timeout(3000); ra.configuracion.elegir_accion("Asociar fórmulas")
-            @prueba("Y1 Receta con la lista de materiales cambiada: aviso compacto y ⚠ junto al código; al pasar el ratón, tabla con componente, descripción, en el RMD → en SAP hoy (reemplazos agrupados)")
+            @prueba("Y1 Receta con la lista de materiales cambiada: aviso compacto y ⚠ junto al código; al pasar el ratón, tabla con componente, descripción, en el RMD → en SAP hoy (reemplazos agrupados) y, v1.36, fecha de asociación, último cambio de la lista y fecha / n.º de cambio en SAP de cada componente")
             def _():
                 fr.wait_for_selector(".rmd-rec-icono", timeout=60000); pg.wait_for_timeout(1200)
                 e = fr.evaluate(ESTADOY)
                 fr.locator(".rmd-rec-icono").first.hover(); pg.wait_for_timeout(900)
-                t = fr.evaluate("(() => { const t = document.querySelector('.rmd-rec-detalle'); return t && { filas: t.querySelectorAll('tbody tr').length, cab: [...t.querySelectorAll('thead th')].map(x => x.textContent), texto: t.innerText.slice(0, 300) }; })()")
+                t = fr.evaluate("(() => { const t = document.querySelector('.rmd-rec-detalle'); return t && { filas: t.querySelectorAll('tbody tr').length, cab: [...t.querySelectorAll('thead th')].map(x => x.textContent), texto: t.innerText.slice(0, 600) }; })()")
                 pg.mouse.move(5, 5); pg.wait_for_timeout(700); cierra = not fr.evaluate("!!document.querySelector('.rmd-rec-detalle')")
                 ok = ("Lista de materiales actualizada en SAP" in e["aviso"] and "no impide autorizar" in e["aviso"] and e["iconos"] >= 1 and t and t["filas"] >= 1
-                      and t["cab"][1:] == ["Componente", "Descripción", "En el RMD", "En SAP hoy"] and cierra)
+                      and t["cab"][1:] == ["Componente", "Descripción", "En el RMD", "En SAP hoy", "Cambio en SAP"] and "Asociada a este RMD el" in t["texto"] and "Último cambio de la lista en SAP" in t["texto"] and re.search(r"\d{2}/\d{2}/\d{4}", t["texto"]) and cierra)
                 return ok, f"{e['aviso'][:160]!r} iconos={e['iconos']} detalle={t} se cierra al salir={cierra}"
             @prueba("Y2 Al quitar la receta de la tabla (como hace el portal al eliminarla; aquí SOLO EN MEMORIA) el aviso y el ⚠ desaparecen sin cerrar la ventana, y vuelven si la receta vuelve")
             def _():

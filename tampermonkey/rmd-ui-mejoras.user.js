@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.35.0
+// @version      1.36.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.35.0';                                                       // mantener igual a @version
+  const VERSION = '1.36.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -207,10 +207,11 @@
   .rmd-rec-detalle hr { border: 0; border-top: 1px solid var(--rmd-borde); margin: 10px 0; }
   .rmd-rec-cab b { font-size: 14px; } .rmd-rec-cab span { color: var(--rmd-apagado); }
   .rmd-rec-sub { margin: 8px 0 4px; font-weight: 600; color: var(--rmd-ambar); }
+  .rmd-rec-fechas { margin: 2px 0 6px; font-size: 12px; color: var(--rmd-texto); } .rmd-rec-cuando { white-space: nowrap; font-size: 12px; }
   .rmd-rec-tabla { width: 100%; border-collapse: collapse; } .rmd-rec-tabla th { text-align: left; padding: 4px 6px; color: var(--rmd-apagado); font-weight: 600; border-bottom: 1px solid var(--rmd-borde); white-space: nowrap; }
   .rmd-rec-tabla td { padding: 4px 6px; border-bottom: 1px solid rgba(128,128,128,.18); vertical-align: top; } .rmd-rec-tabla td:nth-child(n+4) { white-space: nowrap; }
   .rmd-rec-marca { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; font-weight: 700; }
-  tr.rmd-rec-reemplazo .rmd-rec-marca { background: rgba(27,141,236,.2); color: var(--rmd-acento-texto); } .rmd-rec-antes { color: var(--rmd-apagado); font-weight: 400; text-decoration: line-through; } tr.rmd-rec-reemplazo td:last-child { font-weight: 600; }
+  tr.rmd-rec-reemplazo .rmd-rec-marca { background: rgba(27,141,236,.2); color: var(--rmd-acento-texto); } .rmd-rec-antes { color: var(--rmd-apagado); font-weight: 400; text-decoration: line-through; } tr.rmd-rec-reemplazo td:nth-child(5) { font-weight: 600; }
   tr.rmd-rec-nuevo .rmd-rec-marca { background: rgba(143,209,158,.2); color: var(--rmd-verde); } tr.rmd-rec-quitado .rmd-rec-marca { background: rgba(255,138,138,.18); color: var(--rmd-rojo); } tr.rmd-rec-cambia .rmd-rec-marca { background: rgba(240,180,90,.2); color: var(--rmd-ambar); }
   tr.rmd-rec-quitado td:nth-child(n+2) { color: var(--rmd-apagado); text-decoration: line-through; } tr.rmd-rec-cambia td:nth-child(n+3) { color: var(--rmd-texto); } tr.rmd-rec-cambia td:last-child, tr.rmd-rec-nuevo td:last-child { font-weight: 600; }
   .rmd-rec-delta { color: var(--rmd-ambar); font-weight: 600; } .rmd-rec-linea { margin: 6px 0 0; } .rmd-rec-rojo { color: var(--rmd-rojo); } .rmd-rec-nuevo { color: var(--rmd-verde); font-weight: 600; } span.rmd-rec-quitado { color: var(--rmd-rojo); font-weight: 600; }
@@ -4535,13 +4536,19 @@
   function leerErp(erp, entidad, filtros) {
     return new Promise((ok, mal) => erp.read('/' + entidad, { filters: filtros, success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no respondió (${entidad}, ${(e && e.statusCode) || 'sin código'})`)) }));
   }
+  // Fechas de SAP (v1.36): cada componente de la lista trae "válido desde" (ValidFrom, "dd.mm.aaaa") y su número de cambio (ChangeNo):
+  // es la fecha en que se hizo ese cambio de la lista. La versión de fabricación trae "válida desde" (Adatu).
+  const fechaBom = (v) => { const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(norm(v)); if (!m) return null; const d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])); return isNaN(d) ? null : d; };
+  const fechaCorta = (d) => (d ? `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}` : '');
+  const fechaLocalCorta = (d) => (d instanceof Date && !isNaN(d) ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}` : '');
   function diferenciasBom(sap, rmd) {
-    const agrupar = (filas) => { const m = new Map(); filas.forEach((x) => { const k = norm(x.Component); if (!k) return; const g = m.get(k) || { comp: k, desc: norm(x.Maktx || x.ItemText1 || ''), q: 0, u: norm(x.CompUnit), n: 0 }; g.q += cantidadNum(x.CompQty) || 0; g.n++; if (!g.desc) g.desc = norm(x.Maktx || x.ItemText1 || ''); m.set(k, g); }); return m; };
+    const agrupar = (filas) => { const m = new Map(); filas.forEach((x) => { const k = norm(x.Component); if (!k) return; const g = m.get(k) || { comp: k, desc: norm(x.Maktx || x.ItemText1 || ''), q: 0, u: norm(x.CompUnit), n: 0, fecha: null, cambio: '' }; g.q += cantidadNum(x.CompQty) || 0; g.n++; if (!g.desc) g.desc = norm(x.Maktx || x.ItemText1 || '');
+      const f = fechaBom(x.ValidFrom); if (f && (!g.fecha || f > g.fecha)) { g.fecha = f; g.cambio = norm(x.ChangeNo); } m.set(k, g); }); return m; };
     const a = agrupar(sap), b = agrupar(rmd), dif = [];
     a.forEach((x, k) => {
       const y = b.get(k);
-      if (!y) dif.push({ tipo: 'nuevo', comp: k, desc: x.desc, ahora: { q: x.q, u: x.u }, texto: `+ ${k} ${numTxt(x.q)} ${x.u}`.trim() });
-      else if (Math.abs(x.q - y.q) > 1e-6 || x.u.toUpperCase() !== y.u.toUpperCase()) dif.push({ tipo: 'cambia', comp: k, desc: x.desc || y.desc, antes: { q: y.q, u: y.u }, ahora: { q: x.q, u: x.u }, texto: `${k}: ${numTxt(y.q)} ${y.u} → ${numTxt(x.q)} ${x.u}` });
+      if (!y) dif.push({ tipo: 'nuevo', comp: k, desc: x.desc, ahora: { q: x.q, u: x.u }, fecha: x.fecha, cambio: x.cambio, texto: `+ ${k} ${numTxt(x.q)} ${x.u}`.trim() });
+      else if (Math.abs(x.q - y.q) > 1e-6 || x.u.toUpperCase() !== y.u.toUpperCase()) dif.push({ tipo: 'cambia', comp: k, desc: x.desc || y.desc, antes: { q: y.q, u: y.u }, ahora: { q: x.q, u: x.u }, fecha: x.fecha, cambio: x.cambio, texto: `${k}: ${numTxt(y.q)} ${y.u} → ${numTxt(x.q)} ${x.u}` });
     });
     b.forEach((y, k) => { if (!a.has(k)) dif.push({ tipo: 'quitado', comp: k, desc: y.desc, antes: { q: y.q, u: y.u }, texto: `− ${k} (ya no está en la lista de SAP)` }); });
     // un quitado y un nuevo con la misma descripción salvo la versión del material ("… x25" → "… x25 H v.1") = reemplazo
@@ -4551,7 +4558,7 @@
       const bq = base(q.desc); if (bq.length < 6) return;
       const n = nuevos.find((x) => !x.__usado && base(x.desc) === bq); if (!n) return;
       n.__usado = true; q.__usado = true;
-      dif.push({ tipo: 'reemplazo', comp: n.comp, compAntes: q.comp, desc: n.desc, descAntes: q.desc, antes: q.antes, ahora: n.ahora, texto: `${q.comp} → ${n.comp} (${n.desc})` });
+      dif.push({ tipo: 'reemplazo', comp: n.comp, compAntes: q.comp, desc: n.desc, descAntes: q.desc, antes: q.antes, ahora: n.ahora, fecha: n.fecha, cambio: n.cambio, texto: `${q.comp} → ${n.comp} (${n.desc})` });
     });
     const orden = { cambia: 0, reemplazo: 1, nuevo: 2, quitado: 3 };
     return dif.filter((d) => !d.__usado).sort((p, q) => orden[p.tipo] - orden[q.tipo] || p.comp.localeCompare(q.comp));
@@ -4563,7 +4570,7 @@
   const CAMPOS_RUTA = [
     ['Mdv01', 'Puesto de trabajo (línea)', (v) => norm(v), true], ['Plnnr', 'Hoja de ruta', (v) => norm(v), true], ['Alnal', 'Contador', (v) => String(parseInt(v, 10) || norm(v)), true],
     ['Stlal', 'Alternativa de la lista de materiales', (v) => String(parseInt(v, 10) || norm(v)), true],
-    ['Mksp', 'Estado', (v) => TEXTO_MKSP[norm(v)] || norm(v), false], ['Bdatu', 'Válida hasta', fechaSap, false], ['Bstma', 'Tamaño de lote máximo', (v) => numTxt(cantidadNum(v)), false],
+    ['Mksp', 'Estado', (v) => TEXTO_MKSP[norm(v)] || norm(v), false], ['Adatu', 'Válida desde (fecha del cambio en SAP)', fechaSap, false], ['Bdatu', 'Válida hasta', fechaSap, false], ['Bstma', 'Tamaño de lote máximo', (v) => numTxt(cantidadNum(v)), false],
   ];
   // Datos del RMD que sirven a todas sus recetas: puestos de trabajo usados en sus pasos y la receta de la versión anterior
   function contextoRmd(ctrl, mdId) {
@@ -4599,7 +4606,7 @@
     const rutaAsoc = hoy && (norm(hoy.Plnnr) !== norm(rc.Plnnr) || norm(hoy.Alnal) !== norm(rc.Alnal)) ? await puestosDe(rc.Plnnr, rc.Alnal) : rutaHoy;
     const usados = [...ctx.puestos.keys()];
     return {
-      existe: !!hoy, cambios, anteriorVersion: ctx.anterior && ctx.anterior.version,
+      existe: !!hoy, cambios, anteriorVersion: ctx.anterior && ctx.anterior.version, desde: hoy ? fechaSap(hoy.Adatu) : '', desdeAsociada: fechaSap(rc.Adatu),
       puestosRuta: rutaHoy, entran: rutaHoy.filter((x) => !rutaAsoc.includes(x)), salen: rutaAsoc.filter((x) => !rutaHoy.includes(x)),
       faltan: hoy ? usados.filter((x) => rutaHoy.length && !rutaHoy.includes(x)).map((x) => ({ puesto: x, pasos: ctx.puestos.get(x) })) : [],
     };
@@ -4618,7 +4625,9 @@
       ]);
       const dif = diferenciasBom(bom, copia.filter((x) => x.activo !== false));
       const rutaAvisa = !!(ruta && !ruta.error && (!ruta.existe || ruta.cambios.some((c) => c.avisa && !c.soloAnterior) || ruta.faltan.length || ruta.entran.length || ruta.salen.length));
-      return { receta: `${rc.Matnr} / ${rc.Verid}`, codigo: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif, ruta, rutaAvisa };
+      let ultima = null; bom.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
+      const fa = r.fechaRegistro ? (r.fechaRegistro instanceof Date ? r.fechaRegistro : new Date(r.fechaRegistro)) : null, asociada = fa && !isNaN(fa) ? { fecha: fa, usuario: norm(r.usuarioRegistro) } : null;
+      return { receta: `${rc.Matnr} / ${rc.Verid}`, codigo: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif, ruta, rutaAvisa, ultima, asociada };
     })();
     p.catch(() => revisionesReceta.delete(r.mdRecetaId)); revisionesReceta.set(r.mdRecetaId, { t: Date.now(), clave, p }); return p;
   }
@@ -4649,20 +4658,24 @@
   // Detalle: tarjeta flotante junto al icono (o al botón del aviso), con una tabla por receta
   function detalleRecetaHtml(x) {
     let h = `<div class="rmd-rec-cab"><b>${esc(x.receta)}</b> <span>${esc(x.texto)}</span></div>`;
+    if (x.asociada) h += `<div class="rmd-rec-fechas">Asociada a este RMD el <b>${esc(fechaLocalCorta(x.asociada.fecha))}</b>${x.asociada.usuario ? ` (${esc(x.asociada.usuario)})` : ''}</div>`;
     if (x.dif.length) {
-      h += `<div class="rmd-rec-sub">Lista de materiales · ${esc(resumenDif(x.dif))} <span class="rmd-nota">(${x.rmd} componentes en el RMD, ${x.sap} en SAP hoy)</span></div>
-        <table class="rmd-rec-tabla"><thead><tr><th></th><th>Componente</th><th>Descripción</th><th>En el RMD</th><th>En SAP hoy</th></tr></thead><tbody>${x.dif.map((d) => {
+      const dia = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+      const ult = x.ultima ? `<div class="rmd-rec-fechas">Último cambio de la lista en SAP: <b>${esc(fechaCorta(x.ultima.fecha))}</b> (n.º de cambio ${esc(x.ultima.cambio)})${x.asociada ? (x.ultima.fecha.getTime() > dia(x.asociada.fecha) ? ' · <b class="rmd-rec-rojo">después de asociarla al RMD</b>' : '') : ''}</div>` : '';
+      h += `<div class="rmd-rec-sub">Lista de materiales · ${esc(resumenDif(x.dif))} <span class="rmd-nota">(${x.rmd} componentes en el RMD, ${x.sap} en SAP hoy)</span></div>${ult}
+        <table class="rmd-rec-tabla"><thead><tr><th></th><th>Componente</th><th>Descripción</th><th>En el RMD</th><th>En SAP hoy</th><th title="Fecha «válido desde» del componente en SAP y su número de cambio">Cambio en SAP</th></tr></thead><tbody>${x.dif.map((d) => {
           const q = (v) => (v ? `${numTxt(v.q)} ${esc(v.u)}` : '—'), delta = d.tipo === 'cambia' && d.antes.u.toUpperCase() === d.ahora.u.toUpperCase() ? d.ahora.q - d.antes.q : null;
           const comp = d.tipo === 'reemplazo' ? `<span class="rmd-rec-antes">${esc(d.compAntes)}</span> → ${esc(d.comp)}` : esc(d.comp);
           const desc = d.tipo === 'reemplazo' ? `${esc(d.desc)}<br><span class="rmd-rec-antes">antes: ${esc(d.descAntes)}</span>` : esc(d.desc);
           const qa = d.tipo === 'reemplazo' && d.antes && d.ahora && Math.abs(d.antes.q - d.ahora.q) < 1e-6 && d.antes.u === d.ahora.u ? `${q(d.ahora)} <span class="rmd-nota">(igual)</span>` : q(d.ahora);
-          return `<tr class="rmd-rec-${d.tipo}"><td><span class="rmd-rec-marca" title="${{ nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Ya no está en SAP', reemplazo: 'Reemplazado por otra versión del material' }[d.tipo]}">${{ nuevo: '+', cambia: '≠', quitado: '−', reemplazo: '⇄' }[d.tipo]}</span></td><td>${comp}</td><td>${desc}</td><td>${q(d.antes)}</td><td>${qa}${delta ? ` <span class="rmd-rec-delta">(${delta > 0 ? '+' : ''}${numTxt(delta)})</span>` : ''}</td></tr>`; }).join('')}</tbody></table>`;
+          return `<tr class="rmd-rec-${d.tipo}"><td><span class="rmd-rec-marca" title="${{ nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Ya no está en SAP', reemplazo: 'Reemplazado por otra versión del material' }[d.tipo]}">${{ nuevo: '+', cambia: '≠', quitado: '−', reemplazo: '⇄' }[d.tipo]}</span></td><td>${comp}</td><td>${desc}</td><td>${q(d.antes)}</td><td>${qa}${delta ? ` <span class="rmd-rec-delta">(${delta > 0 ? '+' : ''}${numTxt(delta)})</span>` : ''}</td><td class="rmd-rec-cuando">${d.fecha ? `${esc(fechaCorta(d.fecha))}${d.cambio ? `<br><span class="rmd-nota">n.º ${esc(d.cambio)}</span>` : ''}` : `<span class="rmd-nota" title="${d.tipo === 'quitado' ? 'Ya no está en la lista de SAP: SAP no devuelve la fecha en que se quitó (mira el último cambio de la lista, arriba)' : 'Sin fecha en SAP'}">—</span>`}</td></tr>`; }).join('')}</tbody></table>`;
     }
     const ru = x.ruta;
     if (ru && ru.error) h += `<div class="rmd-rec-sub">Hoja de ruta: no se pudo leer (${esc(ru.error)})</div>`;
     else if (ru && x.rutaAvisa) {
       const va = ru.anteriorVersion != null ? `RMD v${esc(ru.anteriorVersion)}` : null, cs = ru.cambios.filter((c) => !c.soloAnterior || va);
       h += `<div class="rmd-rec-sub">Versión de fabricación y hoja de ruta${ru.existe ? '' : ' · <b class="rmd-rec-rojo">la versión ya no existe en SAP</b>'}</div>`;
+      if (ru.existe && ru.desde) h += `<div class="rmd-rec-fechas">${ru.desde !== ru.desdeAsociada ? `Cambio en SAP: la versión es válida desde el <b>${esc(ru.desde)}</b> (en el RMD: ${esc(ru.desdeAsociada || '—')})` : `Versión válida desde el ${esc(ru.desde)}, igual que en el RMD`} <span class="rmd-nota">· SAP no da la fecha de cambio de la hoja de ruta; la más cercana es la de la versión.</span></div>`;
       if (cs.length) h += `<table class="rmd-rec-tabla"><thead><tr><th>Dato</th><th>Asociada al RMD</th><th>En SAP hoy</th>${va ? `<th>${va} (anterior)</th>` : ''}</tr></thead><tbody>${cs.map((c) =>
         `<tr${c.avisa && !c.soloAnterior ? ' class="rmd-rec-cambia"' : ''}><td>${esc(c.campo)}${c.avisa ? '' : ' <span class="rmd-nota">(informativo)</span>'}</td><td>${esc(c.asociada)}</td><td>${c.sap == null ? '—' : esc(c.sap)}</td>${va ? `<td>${c.anterior == null ? '—' : esc(c.anterior)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
       if (ru.faltan.length) h += `<p class="rmd-rec-linea rmd-rec-rojo">⚠ Puestos usados en los pasos del RMD que ya no están en la hoja de ruta: ${ru.faltan.map((f) => `<b>${esc(f.puesto)}</b> (${f.pasos} paso${f.pasos > 1 ? 's' : ''})`).join(', ')}.</p>`;
