@@ -213,5 +213,16 @@ else {
   ok('Con la lista real: FACO-999 no vigente; FACO-200 y POL-CAL-001 sí', J(vals(r)) === '["FACO-999"]', J(vals(r)));
 }
 
+// ---- v1.37: línea de observación por un cambio de receta en SAP ----
+ok('Iniciales: primera letra del nombre y del apellido en SAP (CARLOS JEAN POOL / JESUS ZEGARRA → CJ)', Reglas.inicialesDe('CARLOS JEAN POOL', 'JESUS ZEGARRA') === 'CJ');
+ok('Iniciales: con tildes, minúsculas y espacios de más (« ángela », «  ñuñez») → AN (sin tilde)', Reglas.inicialesDe(' ángela  maría ', '  ñuñez') === 'AN');
+ok('Iniciales: sin apellido, solo la del nombre', Reglas.inicialesDe('Carlos', '') === 'C' && Reglas.inicialesDe('', '') === '');
+const dia = new Date(2026, 8, 29, 10, 32);
+ok('Línea: AAAAMMDD + iniciales + mensaje de la lista de materiales (el ejemplo pedido)', Reglas.lineaActualizacion(dia, 'CJ', { lista: true }) === '20260929CJ Actualización de Lista de Materiales', Reglas.lineaActualizacion(dia, 'CJ', { lista: true }));
+ok('Línea: hoja de ruta cuando solo cambió la hoja de ruta o el puesto de trabajo', Reglas.lineaActualizacion(dia, 'CJ', { ruta: true }) === '20260929CJ Actualización de Hoja de Ruta');
+ok('Línea: lista y hoja de ruta a la vez, en una sola línea', Reglas.lineaActualizacion(dia, 'CJ', { lista: true, ruta: true }) === '20260929CJ Actualización de Lista de Materiales y Hoja de Ruta');
+ok('Línea: mes y día siempre con dos cifras (5 de enero)', Reglas.lineaActualizacion(new Date(2026, 0, 5), 'AB', { lista: true }).startsWith('20260105AB '));
+ok('Línea: la fecha puede llegar como texto ISO o número', /^\d{8}CJ /.test(Reglas.lineaActualizacion(dia.toISOString(), 'CJ', { lista: true })) && /^\d{8}CJ /.test(Reglas.lineaActualizacion(+dia, 'CJ', { lista: true })));
+
 console.log(`\n${fallas ? fallas + ' FALLA(S)' : 'Todo pasa'}${saltadas ? ` (${saltadas} saltada(s))` : ''}.`);
 process.exit(fallas ? 1 : 0);

@@ -523,6 +523,79 @@ with sync_playwright() as p:
         pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
         ok = (form == {"etq": "no vigente", "color": "rojo"} and nv["color"] == "rojo" and nv["etiqueta"] == "no vigente" and "Mía" not in fin["reglas"] and len(fin["reglas"]) == 5 and fin["vig"] is None and fin["cal"] is None)
         return ok, json.dumps({"form": form, "nv": [nv["color"], nv["etiqueta"]], "fin": fin}, ensure_ascii=False)
+    # ── v1.37: cambios de recetas en SAP ──
+    HALLAZGOS_JS = """() => { const F = (y, m, d) => new Date(Date.UTC(y, m, d)), dif = (tipo, comp, desc, ahora, antes, fecha, cambio) => ({ tipo, comp, desc, ahora, antes, fecha, cambio, texto: tipo + comp });
+      const h = (o) => ({ mdRecetaId: 'R' + o.cod + o.rec, mdId: 'M' + o.cod, codigo: o.cod, version: o.v, estado: o.estado, linaje: o.cod, descripcion: o.desc, etapa: 'ENVASE', area: 'SOL', planta: 'PLANTA ATE',
+        receta: o.rec + ' / 1101', matnr: o.rec, verid: '1101', texto: 'RECETA ' + o.rec, sap: 9, rmd: 7, dif: o.dif || [], ruta: o.ruta || null, rutaAvisa: !!o.ruta, ultima: null, tipos: [(o.dif || []).length && 'lista', o.ruta && 'ruta'].filter(Boolean),
+        fechaSap: o.fecha || null, huella: o.hu, detectado: o.det });
+      return [
+        h({ cod: '2202600001', v: 2, estado: 'Ingresado', desc: 'PRODUCTO UNO 500 mg TAB', rec: '6000000400', hu: 'a1', det: Date.UTC(2026, 8, 29, 15, 32), fecha: F(2026, 7, 17),
+            dif: [dif('nuevo', '1100011265', 'CINTA EMB C/LOGO 48mm', { q: 0.5, u: 'ROL' }, null, F(2026, 7, 17), '500000002071'), dif('cambia', '1100002760', 'ETIQUETA ROL', { q: 2, u: 'ROL' }, { q: 1, u: 'ROL' }, F(2026, 7, 10), '500000002001')] }),
+        h({ cod: '2202600002', v: 4, estado: 'Autorizado', desc: 'PRODUCTO DOS 10 mL INY', rec: '6000003774', hu: 'b1', det: Date.UTC(2026, 8, 29, 16, 5),
+            ruta: { existe: true, cambios: [{ campo: 'Puesto de trabajo (línea)', asociada: 'AAPVAC01', sap: 'AAPVAC02', anterior: null, clave: 'Mdv01', avisa: true }], anteriorVersion: null, puestosRuta: [], entran: [], salen: [], faltan: [] } }),
+        h({ cod: '2202600003', v: 1, estado: 'Ingresado', desc: 'PRODUCTO TRES SUS', rec: '6000005791', hu: 'c1', det: Date.UTC(2026, 8, 28, 20, 0), fecha: F(2026, 8, 14),
+            dif: [dif('quitado', '1100009999', 'FRASCO 120 mL', null, { q: 1, u: 'UN' }, null, null)], ruta: { existe: false, cambios: [], anteriorVersion: null, puestosRuta: [], entran: [], salen: [], faltan: [] } }),
+        h({ cod: '2202600003', v: 1, estado: 'Ingresado', desc: 'PRODUCTO TRES SUS', rec: '6000005835', hu: 'c2', det: Date.UTC(2026, 8, 28, 20, 0), fecha: F(2026, 8, 14),
+            dif: [dif('reemplazo', '1100012482', 'FOLLETO H v.1', { q: 0.34, u: 'MLL' }, { q: 0.34, u: 'MLL' }, F(2026, 8, 14), '500000002100')] }),
+      ]; }"""
+    @prueba("LN21 Cambios de recetas en SAP (v1.37): la ventana agrupa por RMD (una fila por RMD aunque tenga varias recetas), cuenta por estado y por tipo, filtra, busca por componente, despliega el detalle con la fecha del cambio en SAP y marca lo ya observado")
+    def _():
+        res = {}
+        pg.evaluate("async (js) => { const S = window.__rmdStats.recetasSap; window.__resp = await S.respaldo(); await S.poner(eval('(' + js + ')')(), { ing: Date.now(), aut: Date.now() }); }", HALLAZGOS_JS)
+        res["grupos"] = pg.evaluate("window.__rmdStats.recetasSap.grupos().map(g => [g.codigo, g.estado, [...g.tipos].sort().join('+'), g.recetas.length])")
+        pg.evaluate("window.__rmdStats.recetasSap.abrir()"); pg.wait_for_selector(".rmd-cr .rmd-cr-t tbody tr.rmd-cr-fila", timeout=5000); pg.wait_for_timeout(300)
+        leer = lambda: pg.evaluate("({ filas: [...document.querySelectorAll('.rmd-cr .rmd-cr-fila')].map(r => r.dataset.md), chips: [...document.querySelectorAll('.rmd-cr-chips button')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) })")
+        res["inicio"] = leer()
+        pg.locator(".rmd-cr-chips button[data-f=Autorizado]").click(); pg.wait_for_timeout(200); res["autorizados"] = leer()["filas"]
+        pg.locator(".rmd-cr-chips button[data-f=ruta]").click(); pg.wait_for_timeout(200); res["ruta"] = leer()["filas"]
+        pg.locator(".rmd-cr-chips button[data-f=todos]").click(); pg.locator(".rmd-cr-buscar").fill("cinta"); pg.wait_for_timeout(250); res["buscar"] = leer()["filas"]
+        pg.locator(".rmd-cr-buscar").fill(""); pg.wait_for_timeout(200)
+        pg.locator(".rmd-cr-fila[data-md=M2202600001] button[data-a=ver]").click(); pg.wait_for_timeout(250)
+        res["detalle"] = pg.evaluate("(() => { const d = document.querySelector('.rmd-cr-detalle'); return d && { cab: [...d.querySelectorAll('thead th')].map(x => x.textContent).slice(-1)[0], fechas: (d.innerText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/g) || []).slice(0, 4), tieneAsociada: /Asociada a este RMD/.test(d.innerText) }; })()")
+        # marcar uno como ya observado: aparece ✓, no se puede seleccionar y «seleccionar todos» no lo toma
+        pg.evaluate("async () => { const S = window.__rmdStats.recetasSap, d = await S.datos(), g = S.grupos().find(x => x.codigo === '2202600001'); d.obs[g.mdId + '|' + g.huella] = { t: Date.now(), linea: '20260929CJ Actualización de Lista de Materiales' }; S.estado.ver++; }")
+        pg.locator(".rmd-cr-chips button[data-f=Ingresado]").click(); pg.wait_for_timeout(250)
+        res["observado"] = pg.evaluate("(() => { const f = document.querySelector('.rmd-cr-fila[data-md=M2202600001]'); return { texto: f.querySelector('.rmd-cr-obs').textContent.trim(), bloqueada: f.querySelector('input[data-a=sel]').disabled }; })()")
+        pg.locator(".rmd-cr-t th input[data-a=todas]").check(); pg.wait_for_timeout(250)
+        res["seleccion"] = pg.evaluate("({ marcadas: [...document.querySelectorAll('.rmd-cr-t td input[data-a=sel]:checked')].map(i => i.closest('tr').dataset.md) })")
+        # borrar lo guardado (con confirmación)
+        pg.locator(".rmd-cr .rmd-modal-pie button", has_text="Borrar lo guardado").click(); pg.wait_for_timeout(300)
+        pg.locator(".rmd-modal-aviso button", has_text="Borrar").click(); pg.wait_for_timeout(700)
+        res["tras_borrar"] = pg.evaluate("({ grupos: window.__rmdStats.recetasSap.grupos().length, texto: (document.querySelector('.rmd-cr-tabla') || {}).innerText })")
+        pg.locator(".rmd-cr .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
+        pg.evaluate("async () => { await window.__rmdStats.recetasSap.restaurar(window.__resp); }")
+        i = res["inicio"]
+        ok = (res["grupos"] == [["2202600003", "Ingresado", "lista+ruta", 2], ["2202600001", "Ingresado", "lista", 1], ["2202600002", "Autorizado", "ruta", 1]]   # (por fecha en SAP: la más reciente primero, sin fecha al final)
+              and i["chips"] == ["Todos 3", "Ingresados 2", "Autorizados 1", "Lista de materiales 2", "Hoja de ruta 2"] and len(i["filas"]) == 3
+              and res["autorizados"] == ["M2202600002"] and set(res["ruta"]) == {"M2202600002", "M2202600003"} and res["buscar"] == ["M2202600001"]
+              and res["detalle"] and res["detalle"]["cab"] == "Cambio en SAP" and "17/08/2026" in res["detalle"]["fechas"] and not res["detalle"]["tieneAsociada"]
+              and res["observado"]["texto"].startswith("✓") and res["observado"]["bloqueada"] and res["seleccion"]["marcadas"] == ["M2202600003"]
+              and res["tras_borrar"]["grupos"] == 0 and "Pulsa" in res["tras_borrar"]["texto"])
+        return ok, json.dumps(res, ensure_ascii=False, default=str)[:1500]
+    @prueba("LN22 Revisión de recetas frente a SAP (v1.37, con lecturas de mentira): detecta componentes nuevos, con otra cantidad, quitados y reemplazados con su fecha; puesto de trabajo y hoja de ruta; no avisa lo que coincide ni lo que no se pudo leer; la huella cambia con lo que cambia")
+    def _():
+        r = pg.evaluate("""() => { const S = window.__rmdStats.recetasSap;
+          const md = (id, cod, est) => [id, { mdId: id, codigo: cod, version: 3, estado: est, linaje: cod, descripcion: 'PRODUCTO ' + cod, etapa: 'ENVASE', area: 'SOL', planta: 'PLANTA ATE' }];
+          const porMd = new Map([md('m1', '2202600011', 'Ingresado'), md('m2', '2202600012', 'Autorizado'), md('m3', '2202600013', 'Ingresado'), md('m4', '2202600014', 'Ingresado'), md('m5', '2202600015', 'Ingresado')]);
+          const rc = (matnr, o = {}) => ({ Matnr: matnr, Werks: '1020', Verid: '1101', Stlal: '01', Mdv01: 'AAPVAC01', Plnnr: '304', Alnal: '4', Text1: 'RECETA ' + matnr, ...o });
+          const recs = [{ mdRecetaId: 'r1', mdId_mdId: 'm1', recetaId: rc('600001') }, { mdRecetaId: 'r2', mdId_mdId: 'm2', recetaId: rc('600002') }, { mdRecetaId: 'r3', mdId_mdId: 'm3', recetaId: rc('600003') },
+            { mdRecetaId: 'r4', mdId_mdId: 'm4', recetaId: rc('600004') }, { mdRecetaId: 'r5', mdId_mdId: 'm5', recetaId: rc('600005') }];
+          const copias = { r1: [['C1', '2', 'KG', 'UNO'], ['C2', '5', 'L', 'DOS'], ['C3', '1', 'UN', 'TRES ROL v.1']], r2: [['C1', '2', 'KG', 'UNO']], r3: [['C1', '2', 'KG', 'UNO']], r4: [], r5: [['C1', '2', 'KG', 'UNO']] };
+          const sap = (c) => ({ Component: c[0], CompQty: c[1], CompUnit: c[2], Maktx: c[3], ValidFrom: c[4] || '28.12.2022', ChangeNo: c[5] || '' });
+          const bom = new Map([['600001|1020|1', [sap(['C1', '3', 'KG', 'UNO', '17.08.2026', '500000002071']), sap(['C3', '1', 'UN', 'TRES ROL H v.1', '17.08.2026', '500000002071']), sap(['C9', '4', 'UN', 'NUEVO', '02.09.2026', '500000002150'])]],
+            ['600002|1020|1', [sap(['C1', '2', 'KG', 'UNO'])]], ['600003|1020|1', [sap(['C1', '2', 'KG', 'UNO'])]], ['600004|1020|1', [sap(['C1', '2', 'KG', 'UNO'])]], ['600005|1020|1', null]]);
+          const v = (matnr, o = {}) => [matnr + '|1020|1101', { Matnr: matnr, Werks: '1020', Verid: '1101', Mdv01: 'AAPVAC01', Plnnr: '304', Alnal: '4', Stlal: '1', ...o }];
+          const versiones = new Map([v('600001'), v('600002', { Mdv01: 'AAPVAC09' }), v('600004'), v('600005')]);   // 600003: la versión ya no existe
+          const verOk = new Set(['600001|1020', '600002|1020', '600003|1020', '600004|1020', '600005|1020']);
+          const h = S.comparar(recs, porMd, copias, bom, versiones, verOk), por = Object.fromEntries(h.map(x => [x.mdRecetaId, x]));
+          const h2 = S.comparar(recs, porMd, { ...copias, r1: [...copias.r1, ['C7', '1', 'UN', 'OTRO']] }, bom, versiones, verOk);
+          return { cuantos: h.map(x => x.mdRecetaId), r1: por.r1.dif.map(d => d.tipo + ':' + d.comp).sort(), r1tipos: por.r1.tipos, r1fecha: por.r1.fechaSap.toISOString().slice(0, 10), r1cambio: por.r1.dif.map(d => d.cambio).filter(Boolean).sort(),
+            r2: [por.r2.tipos, por.r2.ruta.cambios.map(c => c.campo + ' ' + c.asociada + '→' + c.sap)], r3: [por.r3.tipos, por.r3.ruta.existe], r4: !!por.r4, r5: !!por.r5,
+            huellaIgual: S.comparar(recs, porMd, copias, bom, versiones, verOk).find(x => x.mdRecetaId === 'r1').huella === por.r1.huella, huellaDistinta: h2.find(x => x.mdRecetaId === 'r1').huella !== por.r1.huella }; }""")
+        ok = (r["cuantos"] == ["r1", "r2", "r3"] and r["r1"] == ["cambia:C1", "nuevo:C9", "quitado:C2"] and r["r1tipos"] == ["lista"]   # (C3 solo cambió de descripción: no es una diferencia)
+              and r["r1fecha"] == "2026-09-02" and r["r1cambio"] == ["500000002071", "500000002150"] and r["r2"] == [["ruta"], ["Puesto de trabajo (línea) AAPVAC01→AAPVAC09"]] and r["r3"] == [["ruta"], False]
+              and not r["r4"] and not r["r5"] and r["huellaIgual"] and r["huellaDistinta"])
+        return ok, json.dumps(r, ensure_ascii=False, default=str)
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
 

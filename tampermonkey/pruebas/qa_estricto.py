@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R S T V W X Y Z; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R S T U V W X Y Z; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -17,7 +17,8 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   aviso al día al quitar una receta, hoja de ruta; cambios solo en memoria + cortafuegos) · Z v1.28: filtro Equipo en la barra de filtros,
   Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · S v1.34: reglas de revisión
   y lista de documentos vigentes (carga del .xls del DMS, aviso del RMD, Documentos citados con Vigente, resaltado en las listas; cortafuegos;
-  VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · U v1.37: cambios de recetas en SAP (icono tenue, revisión por tandas, ventana, Excel
+  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -41,7 +42,7 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRSTVWXYZD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRSTUVWXYZD"
 if "D" in SOLO and not RMD_PRUEBA:
     raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
@@ -128,6 +129,7 @@ with sync_playwright() as p:
             if route.request.method not in ("GET", "HEAD"): bloqueadas_global.append(route.request.method + " " + route.request.url[:90]); route.abort()
             else: route.continue_()
         pg.route("**/*", guardia_global)
+    fr.evaluate("() => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); o.recetasauto = false; localStorage.setItem('rmdUiMejoras', JSON.stringify(o)); }")   # (la revisión automática de recetas no corre durante las pruebas)
     fr.evaluate(src); fr.evaluate(JS_UTIL)
 
     def aviso_propio():
@@ -1125,7 +1127,7 @@ with sync_playwright() as p:
         RMD_SUSP = os.environ.get("RMD_SUSP", "2202608939")   # un RMD AUTORIZADO: la suspensión se simula (nada sale del navegador)
         RMD_ING = os.environ.get("RMD_ING", "2202609126")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
         cerrar_seguro(); pg.wait_for_timeout(1000)
-        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
+        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
             fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)   # sin el filtro de código que dejan otros bloques (exporta la lista entera)
             fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
@@ -1139,7 +1141,7 @@ with sync_playwright() as p:
             e = fr.evaluate("window.__exp.pop()")
             fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
             vm = (e["ultima"] or {}).get("valueMap") or {}
-            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados en todos los master"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados en todos los master", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
                   and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
             return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
         @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
@@ -1238,7 +1240,7 @@ with sync_playwright() as p:
         cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
         @prueba("V1 Barra principal: Enviar a Status RMD a la izquierda de la barra vertical de los iconos del portal (Buscar por equipo es un filtro y Modificaciones masivas está en el panel)")
         def _():
-            orden = fr.evaluate("() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar'); const barra = b.closest('.sapMBar, .sapMOTB, .sapMToolbar'); return [...barra.querySelectorAll('button, .sapMTBSeparator')].filter(x => x.getClientRects().length).map(x => x.classList.contains('sapMTBSeparator') ? '|' : (x.textContent.trim() || x.title)); }")
+            orden = fr.evaluate("() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar'); const barra = b.closest('.sapMBar, .sapMOTB, .sapMToolbar'); return [...barra.querySelectorAll('button, .sapMTBSeparator')].filter(x => x.getClientRects().length && !x.classList.contains('rmd-alerta-rec')).map(x => x.classList.contains('sapMTBSeparator') ? '|' : (x.textContent.trim() || x.title)); }")
             i = orden.index("|") if "|" in orden else -1
             return (orden[:i] == ["Enviar a Status RMD"] and orden[i + 1] == "Nuevo RMD"), str(orden)
         RmdAutomation(pg).editor_de_rmd(RMD_SEL); pg.wait_for_timeout(4000)
@@ -1820,6 +1822,114 @@ with sync_playwright() as p:
         def _():
             ahora = fr.evaluate("async () => { const r = await window.__rmdStats.reglas.respaldo(); return { ls: r.ls, vig: r.vig ? r.vig.docs.length : null, cal: r.cal ? r.cal.equipos.length : null }; }")
             return (not bloq_s and ahora["ls"] == respaldo_s["ls"] and ahora["vig"] == (len(respaldo_s["vig"]["docs"]) if respaldo_s.get("vig") else None) and ahora["cal"] == (len(respaldo_s["cal"]["equipos"]) if respaldo_s.get("cal") else None)), f"bloqueadas={bloq_s[:5]} estado final={ {'ls': (ahora['ls'] or '')[:60], 'vig': ahora['vig']} }"
+
+    # ───────────────────────── U. v1.37: cambios de recetas en SAP (lectura real; el guardado de la observación se SIMULA + cortafuegos) ─────────────────────────
+    if "U" in SOLO:
+        CODS_U = os.environ.get("CODS_U", "2202609113,2202609107,2202609132,2202609067").split(",")   # RMD Ingresados con la lista de materiales cambiada en SAP (y uno sin cambios)
+        RMD_OBS_U = os.environ.get("RMD_OBS_U", "2202609126")                                        # RMD Ingresado para probar la observación (guardado simulado)
+        TOP_U = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x => x.getClientRects().length).pop()"
+        def xlsx_u(b64):
+            import base64 as b64m, io as iom, zipfile as zipm
+            z = zipm.ZipFile(iom.BytesIO(b64m.b64decode(b64)))
+            return z, re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
+        bloq_u = []
+        def guardia_u(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_u.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_u)
+        cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1500)
+        respaldo_u = fr.evaluate("async () => await window.__rmdStats.recetasSap.respaldo()")
+        try:
+            @prueba("U1 Alerta tenue junto a «Manufactura Digital»: un icono discreto (poco opaco, sin animación cuando no lee) a la derecha del título, sin tapar los botones de la barra, con su explicación al pasar el ratón")
+            def _():
+                e = fr.evaluate("""() => { const b = document.querySelector('.rmd-alerta-rec'); if (!b) return null; const q = b.getBoundingClientRect(), t = b.previousElementSibling && b.previousElementSibling.getBoundingClientRect(), cs = getComputedStyle(b);
+                  const otros = [...document.querySelectorAll('.sapMTB button')].filter(x => x !== b && x.getClientRects().length).map(x => x.getBoundingClientRect());
+                  return { junto: b.previousElementSibling && b.previousElementSibling.textContent.trim(), opacidad: +cs.opacity, derecha: t ? Math.round(q.left - t.right) : null, ancho: Math.round(q.width), alto: Math.round(q.height), titulo: b.title, tapa: otros.some(o => !(q.right <= o.left || q.left >= o.right || q.bottom <= o.top || q.top >= o.bottom)) }; }""")
+                return (bool(e) and e["junto"] == "Manufactura Digital" and e["opacidad"] < 0.8 and 0 <= e["derecha"] <= 30 and e["ancho"] < 80 and not e["tapa"] and len(e["titulo"]) > 20), str(e)
+            @prueba("U2 Revisión frente a SAP de RMD Ingresados reales: encuentra los que tienen la lista de materiales cambiada con la fecha del cambio en SAP (2202609113: 17/08/2026) y coincide, receta por receta, con la revisión individual de «Asociar fórmulas»")
+            def _():
+                fr.evaluate("async () => { await window.__rmdStats.recetasSap.borrar(); }")
+                fr.evaluate("async (c) => { await window.__rmdStats.recetasSap.revisar('ingresados', false, { codigos: c }); }", CODS_U)
+                r = fr.evaluate("""async (cods) => { const S = window.__rmdStats.recetasSap, gr = S.grupos(), d = await S.datos(); const out = { error: S.estado.error, grupos: gr.map(g => [g.codigo, [...g.tipos].join('+'), g.fechaSap && g.fechaSap.toISOString().slice(0, 10)]), lecturas: d.lecturas, difs: [] };
+                  for (const c of cods) { const g = gr.find(x => x.codigo === c), ind = await window.__rmdStats.revisarRecetas(c, false);
+                    const m = Object.fromEntries((g ? g.recetas : []).filter(h => h.dif.length).map(h => [h.receta, h.dif.map(x => x.tipo[0] + x.comp).sort().join(',')])), i = Object.fromEntries(ind.recetas.filter(x => x.dif.length).map(x => [x.receta, x.dif.map(y => y.tipo[0] + y.comp).sort().join(',')]));
+                    if (JSON.stringify(m) !== JSON.stringify(i)) out.difs.push([c, m, i]); }
+                  return out; }""", CODS_U)
+                g113 = [g for g in r["grupos"] if g[0] == "2202609113"]
+                return (not r["error"] and bool(g113) and g113[0][1] in ("lista", "lista+ruta") and g113[0][2] == "2026-08-17" and not r["difs"] and r["lecturas"]["sinLectura"] == 0), json.dumps(r, ensure_ascii=False, default=str)[:900]
+            @prueba("U3 Por tandas: con un tope de tiempo mínimo lo automático no lee nada (todo queda pendiente); la siguiente tanda lee lo que toca; y con todo al día no vuelve a leer ninguna lista de materiales")
+            def _():
+                fr.evaluate("async () => { await window.__rmdStats.recetasSap.borrar(); }")
+                fr.evaluate("async (c) => { await window.__rmdStats.recetasSap.revisar('auto', false, { codigos: c, topeMs: 1 }); }", CODS_U)
+                a = fr.evaluate("(async () => { const d = await window.__rmdStats.recetasSap.datos(); return { hallazgos: d.hallazgos.length, lecturas: d.lecturas, leidas: Object.keys(d.leidas || {}).length }; })()")
+                fr.evaluate("async (c) => { await window.__rmdStats.recetasSap.revisar('auto', false, { codigos: c }); }", CODS_U)
+                b_ = fr.evaluate("(async () => { const d = await window.__rmdStats.recetasSap.datos(); return { hallazgos: d.hallazgos.length, lecturas: d.lecturas, leidas: Object.keys(d.leidas || {}).length }; })()")
+                fr.evaluate("async (c) => { await window.__rmdStats.recetasSap.revisar('auto', false, { codigos: c }); }", CODS_U)
+                c_ = fr.evaluate("(async () => { const d = await window.__rmdStats.recetasSap.datos(); return { hallazgos: d.hallazgos.length, lecturas: d.lecturas }; })()")
+                ok = (a["hallazgos"] == 0 and a["lecturas"]["pendientes"] > 0 and a["lecturas"]["listas"] == 0 and a["leidas"] == 0 and b_["hallazgos"] > 0 and b_["lecturas"]["pendientes"] == 0 and b_["leidas"] > 0
+                      and c_["lecturas"]["listas"] == 0 and c_["hallazgos"] == b_["hallazgos"])
+                return ok, f"tope 1 ms={a} | siguiente={b_} | al día={c_}"
+            @prueba("U4 Ventana «Cambios de recetas en SAP»: una fila por RMD, el detalle con la columna «Cambio en SAP» y las fechas, y el Excel (Resumen / Diferencias / Información) con las mismas cantidades")
+            def _():
+                fr.evaluate("window.__rmdStats.recetasSap.abrir()"); fr.wait_for_selector(".rmd-cr .rmd-cr-fila", timeout=10000); pg.wait_for_timeout(500)
+                filas = fr.evaluate("[...document.querySelectorAll('.rmd-cr .rmd-cr-fila')].map(r => r.querySelector('td b').textContent)")
+                fr.locator(".rmd-cr-fila", has_text="2202609113").locator("button[data-a=ver]").click(); pg.wait_for_timeout(400)
+                det = fr.evaluate("(() => { const d = document.querySelector('.rmd-cr-detalle'); return d && { cab: [...d.querySelectorAll('thead th')].map(x => x.textContent).slice(-1)[0], fechas: (d.innerText.match(/\\d{2}\\/\\d{2}\\/\\d{4}/g) || []).slice(0, 3), asociada: /Asociada a este RMD/.test(d.innerText) }; })()")
+                estado = fr.evaluate("document.querySelector('.rmd-cr-estado').textContent")
+                fr.locator(".rmd-cr .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
+                x = fr.evaluate("async () => { const r = await window.__rmdStats.recetasSap.excel(); return { nombre: r.nombre, rmd: r.rmd, recetas: r.recetas, diferencias: r.diferencias, base64: r.base64 }; }")
+                z, hojas = xlsx_u(x["base64"]); res = z.read("xl/worksheets/sheet1.xml").decode("utf-8"); dif = z.read("xl/worksheets/sheet2.xml").decode("utf-8")
+                ok = (len(filas) == len(set(filas)) == x["rmd"] and "2202609113" in filas and det and det["cab"] == "Cambio en SAP" and "17/08/2026" in det["fechas"] and not det["asociada"] and "listas de materiales al día" in estado
+                      and hojas == ["Resumen", "Diferencias", "Información"] and x["diferencias"] > 0 and dif.count("<row ") == x["diferencias"] + 1 and res.count("<row ") == x["recetas"] + 1)
+                return ok, f"filas={filas} detalle={det} estado={estado[:150]!r} excel={ {k: v for k, v in x.items() if k != 'base64'} } hojas={hojas}"
+            @prueba("U5 Menú Exportar: incluye «Recetas con cambios en SAP» (y Ctrl+K «Cambios de recetas en SAP»)")
+            def _():
+                fr.locator("button[title='Exportar']").first.click(); pg.wait_for_timeout(700)
+                items = fr.evaluate("[...document.querySelectorAll('.rmd-menu .rmd-menu-item b')].map(b => b.textContent)")
+                pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+                fr.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))"); pg.wait_for_timeout(600)
+                paleta = fr.evaluate("[...document.querySelectorAll('.rmd-paleta-fondo *')].some(x => x.children.length === 0 && /Cambios de recetas en SAP/.test(x.textContent))")
+                pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+                return ("Recetas con cambios en SAP" in items), f"menú={items} paleta={paleta}"
+            @prueba("U6 Agregar observación desde la ventana (guardado SIMULADO + cortafuegos): el Guardar del portal envía la línea «AAAAMMDD<iniciales> Actualización de Lista de Materiales» al final de las Observaciones y el Estado no cambia; en SAP no cambia nada")
+            def _():
+                antes = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_OBS_U)
+                fr.evaluate("""async (cod) => { const S = window.__rmdStats.recetasSap, md = (await window.__rmdStats.leerMDPorCodigos([cod])).sort((a, b) => b.version - a.version)[0];
+                  await S.poner([{ mdRecetaId: 'RU6', mdId: md.mdId, codigo: cod, version: md.version, estado: 'Ingresado', linaje: cod, descripcion: md.descripcion, etapa: md.nivelTxt, area: '', planta: '', receta: '6000000000 / 1101', matnr: '6000000000', verid: '1101', texto: 'RECETA DE PRUEBA',
+                    sap: 3, rmd: 2, dif: [{ tipo: 'nuevo', comp: '1100000001', desc: 'COMPONENTE DE PRUEBA', ahora: { q: 1, u: 'UN' }, fecha: new Date(Date.UTC(2026, 8, 20)), cambio: '500000000001', texto: '+' }], ruta: null, rutaAvisa: false, ultima: null, tipos: ['lista'], fechaSap: new Date(Date.UTC(2026, 8, 20)), huella: 'u6', detectado: Date.now() }]);
+                  S.estado.verificar = async () => true;
+                  const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener, m = ctrl.mainModelv2;
+                  window.__capt = []; window.__rest = []; const cambiar = (o, k, f) => { window.__rest.push([o, k, Object.prototype.hasOwnProperty.call(o, k), o[k]]); o[k] = f; };
+                  const sim = (tipo) => function (ruta, datos, params) { window.__capt.push({ tipo, ruta: String(ruta), datos: datos && JSON.parse(JSON.stringify(datos)) }); const p2 = tipo === 'remove' ? datos : params; setTimeout(() => { if (p2 && p2.success) p2.success(datos || {}); }, 30); };
+                  cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
+                  cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS' }); return {}; }); cambiar(ctrl, 'onTratarInformacionDMS', async () => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""", RMD_OBS_U)
+                try:
+                    fr.evaluate("window.__rmdStats.recetasSap.abrir()"); fr.wait_for_selector(".rmd-cr .rmd-cr-fila", timeout=10000); pg.wait_for_timeout(400)
+                    fr.locator(".rmd-cr-fila td input[data-a=sel]").first.check(); pg.wait_for_timeout(300)
+                    boton = fr.evaluate("[...document.querySelectorAll('.rmd-cr .rmd-modal-pie button')].map(b => b.textContent.trim() + (b.disabled ? '(off)' : ''))")
+                    fr.locator(".rmd-cr .rmd-modal-pie button", has_text="Agregar observación a 1").click(); pg.wait_for_timeout(500)
+                    aviso = fr.evaluate("(document.querySelector('.rmd-modal-aviso') || {}).innerText || ''")
+                    fr.locator(".rmd-modal-aviso button", has_text="Agregar a 1").click()
+                    fr.wait_for_function("() => { const c = document.querySelector('.rmd-cr-fila .rmd-cr-obs'); return c && /^✓/.test(c.textContent.trim()); }", timeout=120000); pg.wait_for_timeout(600)
+                    marca = fr.evaluate("document.querySelector('.rmd-cr-fila .rmd-cr-obs').textContent.trim()")
+                    capt = fr.evaluate("window.__capt")
+                finally:
+                    fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; window.__rmdStats.recetasSap.estado.verificar = null; }")
+                    fr.evaluate("document.querySelectorAll('.rmd-cr').forEach(x => x.closest('.rmd-modal-fondo').remove())"); cerrar_seguro()
+                despues = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_OBS_U)
+                upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
+                obs = upd[0]["datos"].get("observacion", "") if upd else ""
+                nueva = obs[len((antes[0][1] or "").rstrip()):].lstrip("\n") if obs.startswith((antes[0][1] or "").rstrip()) else "?"
+                ok = (bool(upd) and re.fullmatch(r"\d{8}[A-ZÑ]{2} Actualización de Lista de Materiales", nueva) is not None and obs.startswith((antes[0][1] or "").rstrip()) and upd[0]["datos"].get("estadoIdRmd_iMaestraId") == 467
+                      and despues == antes and marca.startswith("✓") and "Agregar observación a 1" in " ".join(boton) and not [c for c in capt if c["tipo"] in ("create", "DMS", "DMS-tratar")] and not bloq_u)
+                return ok, f"línea={nueva!r} campos={list((upd[0]['datos'] if upd else {}).keys())} SAP igual={despues == antes} marca={marca!r} aviso={aviso[:160]!r} otras={[c['tipo'] for c in capt if c['tipo'] != 'update']} bloqueadas={bloq_u}"
+        finally:
+            fr.evaluate("async (r) => { await window.__rmdStats.recetasSap.restaurar(r); }", respaldo_u)
+            if not respaldo_u["hallazgos"] and not respaldo_u.get("ultima", {}).get("ing"): fr.evaluate("async () => { await window.__rmdStats.recetasSap.borrar(); }")
+            cerrar_seguro(); pg.unroute("**/*", guardia_u)
+        @prueba("U7 Ninguna petición de escritura salió del navegador durante el bloque U (la observación se guardó SOLO de mentira y todo quedó como estaba)")
+        def _():
+            return (not bloq_u), f"bloqueadas={bloq_u[:5]}"
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

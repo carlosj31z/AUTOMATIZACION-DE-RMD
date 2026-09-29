@@ -344,3 +344,26 @@ Cada fila de la ventana **Especificaciones** es un registro `MD_ES_ESPECIFICACIO
   cambiar); si no, "sin calificación". Con varias filas, lo está solo si lo están todas.
 - Ejemplo real (27/09/2026): TRAMEDIF 100 mg INY (2202609126) usa PL1-PV1-E030 (tanque reactor de 500 L; OQ
   calificado, PQ por programar), PL1-PV1-E018 y PL1-PV1-E092 (módulos de flujo laminar): los tres EN PROCESO.
+
+## 5 undecies. La OP guarda su propia copia del master y las recetas cambian en SAP (userscript v1.37)
+
+- Al asociar una receta, el portal copia en el RMD su lista de materiales (`MD_ES_RE_INSUMO`, por `mdRecetaId`) y los datos de su versión de
+  fabricación (`RECETA`: puesto principal `Mdv01`, hoja de ruta `Plnnr`, contador `Alnal`, alternativa `Stlal`). Esa copia no se actualiza sola:
+  cambia solo si la receta se retira y se vuelve a asociar. Por eso un RMD (Ingresado o Autorizado) puede tener la receta distinta en SAP.
+- SAP (`MaterialSet`) solo responde **una** lista de materiales por lectura (material + planta + alternativa); sin la alternativa, o con varios
+  materiales, da error 500. `ProduccionVSet` sí admite muchos materiales de una vez (por planta). Cada componente trae `ValidFrom` («dd.mm.aaaa»,
+  la fecha del cambio) y `ChangeNo` (número de cambio); SAP no da la hora ni la fecha de cambio de la hoja de ruta.
+- En septiembre de 2026 había 2 157 RMD Ingresados o Autorizados (2 032 al quedarse con la última versión de cada uno: 288 Ingresados y
+  1 744 Autorizados) con 4 246 recetas asociadas (4 068 listas de materiales distintas). Leer todas en SAP puede tardar de 10 a 40 minutos
+  según la carga de SAP (una revisión de 603 listas tardó entre 5 y 11 minutos; 57 listas, 7 segundos): por eso la revisión es por tandas.
+- **La OP tiene su propia copia del master.** «Ver OP» (Ordenes de Producción Asociadas) lee la entidad `RMD` de la OP (con `ordenSAP`, `lote`,
+  fechas de inicio y fin) y `RMD_ES_PASO` (una fila por paso, con su propio `rmdEstructuraPasoId`, y datos de producción: `flagEditado`,
+  `contModif`, `realizadoPorUser`, `firstFechaActualiza`…), más `RMD_ES_HISTORIAL` (los registros de cada paso: quién y cuándo) y `RMD_USUARIO`. Se
+  crea al asociar la OP; cambios posteriores en el master no la reescriben (los registros de producción van en la copia).
+- **Un paso de una etiqueta puesto en la lista de otra.** Cada fila del master (`MD_ES_PASO`) está en una lista (`mdEsEtiquetaId`), pero el paso
+  del catálogo (`PASO`) tiene su propia etiqueta (`etiquetaId_etiquetaId`). Caso real (RMD 2202507339 v3 y 2202609025 v4): el paso 183405
+  («CONCLUIDO EL PROCESO, EL RESPONSABLE DE LA LÍNEA VERIFICARÁ…») es de la etiqueta **ACONDICIONADO** en el catálogo (creado el 14/09/2026) pero
+  estaba en la lista **INSPECCION DE PARTICULAS VISIBLES**; en producción (OP 2600003884, lote 2080326) el paso 4.4.24 no aparecía (saltaba de
+  4.4.23 a 4.4.25) y los registros de la OP no tienen ninguna entrada de ese paso. Es un dato, no algo que hiciera el script: el paso se creó antes
+  de que existiera el userscript (21/09) y el master ya lo traía al autorizarse (24/09). Para detectarlo: comparar `mdEsEtiquetaId → etiquetaId`
+  de la fila con `pasoId/etiquetaId_etiquetaId` (solo hay diferencias en esos dos RMD de 70 pasos).
