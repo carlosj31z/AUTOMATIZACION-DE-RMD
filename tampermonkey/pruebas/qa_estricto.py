@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O Q R S T U V W X Y Z; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -18,7 +18,7 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · S v1.34: reglas de revisión
   y lista de documentos vigentes (carga del .xls del DMS, aviso del RMD, Documentos citados con Vigente, resaltado en las listas; cortafuegos;
   VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · U v1.37: cambios de recetas en SAP (icono tenue, revisión por tandas, ventana, Excel
-  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -42,7 +42,7 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOQRSTUVWXYZD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZD"
 if "D" in SOLO and not RMD_PRUEBA:
     raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
@@ -1930,6 +1930,85 @@ with sync_playwright() as p:
         @prueba("U7 Ninguna petición de escritura salió del navegador durante el bloque U (la observación se guardó SOLO de mentira y todo quedó como estaba)")
         def _():
             return (not bloq_u), f"bloqueadas={bloq_u[:5]}"
+
+    # ───────────────────────── P. Historial de cambios en «Trazabilidad RMD» (v1.38; lectura real, sin escribir) ─────────────────────────
+    if "P" in SOLO:
+        COD_P = os.environ.get("COD_P", "2202507339")      # RMD con varias versiones (linaje de 4)
+        COD_PH = os.environ.get("COD_PH", "2202609157")    # RMD Ingresado con guardados en la auditoría
+        TOP_P = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x => x.getClientRects().length).pop()"
+        ESPERA_P = """async () => { for (let i = 0; i < 240; i++) { const t = window.__rmdStats.trazabilidad.panel(); if (t && !t.E.cargando && (t.E.cambios || t.E.error)) return true; await new Promise(r => setTimeout(r, 500)); } return false; }"""
+        def xlsx_p(b64):
+            import base64 as b64m, io as iom, zipfile as zipm
+            z = zipm.ZipFile(iom.BytesIO(b64m.b64decode(b64)))
+            return z, re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
+        bloq_p = []
+        def guardia_p(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_p.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_p)
+        def abrir_traz(cod):
+            cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1500)
+            fr.evaluate("(c) => window.__rmdStats.productividad.abrirRmdPorCodigo(c, 'trazabilidad')", cod); pg.wait_for_timeout(2500)
+        try:
+            @prueba("P1 «Trazabilidad RMD» con el panel de historial: la ventana conserva su tabla de estados, se agranda, trae las pestañas y compara sola la versión del RMD con la anterior (las versiones tienen códigos distintos: se busca por el código de versión principal)")
+            def _():
+                abrir_traz(COD_P); listo = fr.evaluate(ESPERA_P)
+                e = fr.evaluate("""(js) => { const d = eval(js); if (!d) return null; const r = d.getBoundingClientRect(), p = d.querySelector('.rmd-tz'), t = window.__rmdStats.trazabilidad.panel();
+                  const nativa = [...d.querySelectorAll('table')].find(x => !p || !p.contains(x)); const est = nativa ? [...nativa.querySelectorAll('tbody tr')].length : 0;
+                  return { titulo: sap.ui.getCore().byId(d.id).getTitle(), ancho: Math.round(r.width), alto: Math.round(r.height), vp: window.innerWidth, panel: !!p, pestanas: p ? [...p.querySelectorAll('[role=tab]')].map(x => x.textContent.trim()) : [], estados: est,
+                    versiones: t ? t.E.linaje.versiones.map(m => m.codigo + ' v' + m.version + ' ' + m.estado) : null, hasta: t && t.E.linaje.versiones.find(m => m.mdId === t.E.hasta).codigo, desde: t && t.E.desde ? t.E.linaje.versiones.find(m => m.mdId === t.E.desde).codigo : null,
+                    cambios: t && t.E.cambios ? t.E.cambios.length : null, error: t && t.E.error, visible: p ? p.getClientRects().length > 0 : false, selects: p ? p.querySelectorAll('select').length : 0 }; }""", TOP_P)
+                ok = (bool(listo) and bool(e) and e["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and e["panel"] and e["visible"] and e["pestanas"] == ["Cambios entre versiones", "Historial de guardados"] and e["estados"] >= 1
+                      and e["ancho"] >= 1000 and e["alto"] > 500 and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
+                return ok, str(e)
+            @prueba("P2 La comparación entre versiones cuadra con lo leído: (pasos de la versión nueva − pasos de la anterior) = agregados − quitados (un paso reemplazado no suma ni resta), cada cambio trae su usuario y fecha, y los filtros y la búsqueda reducen la lista")
+            def _():
+                r = fr.evaluate("""() => { const t = window.__rmdStats.trazabilidad.panel(), E = t.E, A = E.versionCache.get(E.desde), B = E.versionCache.get(E.hasta), c = E.cambios;
+                  const n = (s, tp) => c.filter(x => x.seccion === s && x.tipo === tp).length;
+                  const antes = document.querySelectorAll('.rmd-tz .rmd-tz-t tbody tr').length;
+                  const chip = [...document.querySelectorAll('.rmd-tz .rmd-cr-chips button[data-a=seccion]')].find(b => /^Pasos/.test(b.textContent.trim())); if (chip) chip.click();
+                  const soloPasos = document.querySelectorAll('.rmd-tz .rmd-tz-t tbody tr').length, todosPasos = c.filter(x => x.seccion === 'Pasos' && !x.soloOrden).length;
+                  const buscar = document.querySelector('.rmd-tz [data-f=consulta]'); buscar.value = 'zzzz-no-existe'; buscar.dispatchEvent(new Event('input', { bubbles: true }));
+                  const vacio = document.querySelectorAll('.rmd-tz .rmd-tz-t tbody tr').length; buscar.value = ''; buscar.dispatchEvent(new Event('input', { bubbles: true }));
+                  const todos = [...document.querySelectorAll('.rmd-tz .rmd-cr-chips button[data-a=seccion]')].find(b => /^Todas/.test(b.textContent.trim())); if (todos) todos.click();
+                  const sinUsuario = c.filter(x => x.tipo !== 'Quitado' && x.seccion !== 'Cabecera' && (!x.quien || !x.cuando)).length;
+                  return { nA: A.pasos.length, nB: B.pasos.length, ag: n('Pasos', 'Agregado'), qu: n('Pasos', 'Quitado'), re: n('Pasos', 'Reemplazado'), pmA: A.pm.length, pmB: B.pm.length, filas: antes, soloPasos, todosPasos, vacio, sinUsuario, total: c.length,
+                    tiposValidos: c.every(x => ['Agregado', 'Quitado', 'Modificado', 'Reemplazado'].includes(x.tipo)) }; }""")
+                ok = (r["nB"] - r["nA"] == r["ag"] - r["qu"] and r["tiposValidos"] and r["sinUsuario"] == 0 and r["soloPasos"] == min(1500, r["todosPasos"]) and r["vacio"] == 0 and r["total"] > 0
+                      and r["filas"] == min(1500, r["filas"]))
+                return ok, str(r)
+            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Cambios entre versiones / Historial de guardados / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
+            def _():
+                x = fr.evaluate("""async () => { const r = window.__rmdStats.trazabilidad.panel().excel(), b = await r.libro.generar(); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+                  return { nombre: r.nombre, cambios: r.cambios, filas: r.filas, n: window.__rmdStats.trazabilidad.panel().E.cambios.length, b64: btoa(s) }; }""")
+                z, hojas = xlsx_p(x.pop("b64")); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
+                ok = hojas == ["Cambios entre versiones", "Historial de guardados", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
+                return ok, f"{x}; hojas={hojas}"
+            @prueba("P4 Historial de guardados (auditoría): lista la cabecera y todos los pasos de la versión; al cargar la cabecera el último guardado es de quien figura en el RMD (mismo usuario, misma hora), y los pasos cargados salen en orden, con usuario, sin errores")
+            def _():
+                abrir_traz(COD_PH); fr.evaluate(ESPERA_P)
+                r = fr.evaluate("""async () => { const t = window.__rmdStats.trazabilidad.panel(); document.querySelector('.rmd-tz [data-t=his]').click();
+                  for (let i = 0; i < 60 && !t.E.pasosMd; i++) await new Promise(r => setTimeout(r, 500));
+                  const fs = t.filas(), md = t.E.linaje.actual; await t.cargarFila(fs[0]); const h0 = t.E.hist.get(fs[0].id);
+                  let con = null, visitados = 0; for (const f of fs.slice(1)) { visitados++; await t.cargarFila(f); const h = t.E.hist.get(f.id); if (h.eventos > 0 && h.entradas.some(x => x.cambios.length)) { con = { rotulo: f.rotulo.slice(-50), eventos: h.eventos, ordenados: h.entradas.every((x, i, a) => !i || a[i - 1].ts <= x.ts), usuarios: [...new Set(h.entradas.map(x => x.usuario))], error: h.error || '' }; break; } if (visitados >= 40) break; }
+                  const ult = h0.entradas.length ? h0.entradas[h0.entradas.length - 1] : null, dif = ult && md.fechaActualiza ? Math.abs(+ult.ts - +new Date(md.fechaActualiza)) / 1000 : null;
+                  t.E.abiertos.add(fs[0].id); t.pintar();
+                  return { filas: fs.length, pasosDe: t.E.pasosMd.pasos.length, cab: { eventos: h0.eventos, error: h0.error || '', entradas: h0.entradas.length, ultimoUsuario: ult && ult.usuario, mdUsuario: md.usuarioActualiza, dif }, con, filasHtml: document.querySelectorAll('.rmd-tz-fila').length, detalle: document.querySelectorAll('.rmd-tz-detalle table').length }; }""")
+                ok = (r["filas"] == r["pasosDe"] + 1 and not r["cab"]["error"] and r["cab"]["eventos"] > 0 and r["cab"]["ultimoUsuario"] == r["cab"]["mdUsuario"] and r["cab"]["dif"] is not None and r["cab"]["dif"] < 120
+                      and bool(r["con"]) and r["con"]["ordenados"] and not r["con"]["error"] and all(r["con"]["usuarios"]) and r["filasHtml"] == r["filas"] and r["detalle"] >= 1)
+                return ok, str(r)
+            @prueba("P5 Al cerrar la ventana el panel desaparece y al volver a abrir otra trazabilidad se arma de nuevo (sin quedar restos)")
+            def _():
+                cerrar_seguro(); pg.wait_for_timeout(800)
+                a = fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, document.querySelectorAll('.rmd-tz-dlg').length]")
+                abrir_traz(COD_P); fr.evaluate(ESPERA_P)
+                b_ = fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, window.__rmdStats.trazabilidad.panel().E.linaje.actual.codigo]")
+                return (a == [0, 0] and b_ == [1, COD_P]), f"cerrada={a} reabierta={b_}"
+        finally:
+            cerrar_seguro(); pg.unroute("**/*", guardia_p)
+        @prueba("P6 Ninguna petición de escritura salió del navegador durante el bloque P (todo es lectura: versiones, pasos y auditoría)")
+        def _():
+            return (not bloq_p), f"bloqueadas={bloq_p[:5]}"
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

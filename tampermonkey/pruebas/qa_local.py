@@ -596,6 +596,72 @@ with sync_playwright() as p:
               and r["r1fecha"] == "2026-09-02" and r["r1cambio"] == ["500000002071", "500000002150"] and r["r2"] == [["ruta"], ["Puesto de trabajo (línea) AAPVAC01→AAPVAC09"]] and r["r3"] == [["ruta"], False]
               and not r["r4"] and not r["r5"] and r["huellaIgual"] and r["huellaDistinta"])
         return ok, json.dumps(r, ensure_ascii=False, default=str)
+    # datos de mentira de dos versiones de un RMD (lo que devuelven las lecturas del servicio) — los usan LN23 y LN25
+    TZ_DATOS_JS = """() => { const T = window.__rmdStats.trazabilidad;
+      const cat = { estructura: new Map([['E1', 'PROCEDIMIENTO']]), etiqueta: new Map([['T1', 'FABRICACION']]), tipos: new Map(), estados: new Map() };
+      const f = (o = {}) => ({ activo: true, fechaRegistro: new Date('2026-09-24T22:20:09Z'), usuarioRegistro: 'NCUELLARL', fechaActualiza: null, usuarioActualiza: null, ...o });
+      const paso = (id, cod, orden, o = {}) => f({ mdEstructuraPasoId: id, mdEsEtiquetaId_mdEsEtiquetaId: 'et', estructuraId_estructuraId: 'E1', pasoId: { codigo: cod, descripcion: 'PASO ' + cod }, orden, valorInicial: null, tab: false, tipoDatoId: { contenido: 'Números' }, tipoDatoId_iMaestraId: 432, ...o });
+      const dA = { etiquetas: [f({ mdEsEtiquetaId: 'et', estructuraId_estructuraId: 'E1', etiquetaId_etiquetaId: 'T1', orden: 1, conforme: true })],
+        pasos: [paso('a1', 100, 1, { valorInicial: '1.0' }), paso('a2', 200, 2), paso('a3', 300, 3), paso('a5', 500, 5)],
+        pm: [f({ mdEstructuraPasoInsumoPasoId: 'am1', pasoId_mdEstructuraPasoId: 'a1', pasoHijoId: { codigo: 900, descripcion: 'PM 900' }, orden: 1, cantidadInsumo: '5' }), f({ mdEstructuraPasoInsumoPasoId: 'am3', pasoId_mdEstructuraPasoId: 'a3', pasoHijoId: { codigo: 901, descripcion: 'PM 901' }, orden: 1 })],
+        recetas: [f({ mdRecetaId: 'ra', recetaId: { Matnr: '600001', Verid: '1101', Werks: '1020', Text1: 'RECETA UNO' } })],
+        insumos: [f({ estructuraRecetaInsumoId: 'ia1', mdRecetaId_mdRecetaId: 'ra', Component: 'C1', ItemNo: '0010', CompQty: '2', CompUnit: 'KG', Maktx: 'UNO' })], espec: [] };
+      const dB = { etiquetas: dA.etiquetas,
+        pasos: [paso('b1', 100, 1, { valorInicial: 2, tab: true }), paso('b3', 350, 3), paso('b4', 400, 4), paso('b5', 500, 6)],
+        pm: [f({ mdEstructuraPasoInsumoPasoId: 'bm1', pasoId_mdEstructuraPasoId: 'b1', pasoHijoId: { codigo: 900, descripcion: 'PM 900' }, orden: 1, cantidadInsumo: '6' }), f({ mdEstructuraPasoInsumoPasoId: 'bm3', pasoId_mdEstructuraPasoId: 'b3', pasoHijoId: { codigo: 901, descripcion: 'PM 901' }, orden: 1 })],
+        recetas: dA.recetas,
+        insumos: [f({ estructuraRecetaInsumoId: 'ib1', mdRecetaId_mdRecetaId: 'ra', Component: 'C1', ItemNo: '0010', CompQty: '3', CompUnit: 'KG', Maktx: 'UNO' }), f({ estructuraRecetaInsumoId: 'ib2', mdRecetaId_mdRecetaId: 'ra', Component: 'C2', ItemNo: '0020', CompQty: '1', CompUnit: 'UN', Maktx: 'DOS' })], espec: [] };
+      const mdA = { mdId: 'mA', codigo: '2202600001', version: 2, descripcion: 'PRODUCTO', observacion: 'linea uno\\nlinea dos', fechaAutorizacion: new Date('2026-09-24T22:20:50Z') };
+      const mdB = { mdId: 'mB', codigo: '2202600002', version: 3, descripcion: 'PRODUCTO NUEVO', observacion: 'linea uno\\nlinea tres', fechaAutorizacion: new Date('2026-09-24T22:20:50Z') };
+      const A = T.normalizar(mdA, dA, cat), B = T.normalizar(mdB, dB, cat);
+      return { T, A, B, cat }; }"""
+    @prueba("LN23 Historial de cambios entre versiones (v1.38, datos de mentira): agregados, quitados, modificados y reemplazados (Cambiar paso) por sección; el cambio solo de orden se marca; los procesos menores de un paso agregado o reemplazado no se repiten; observaciones por línea; usuario y fecha de cada fila y «al autorizar»")
+    def _():
+        r = pg.evaluate(TZ_DATOS_JS.replace("return { T, A, B, cat }; }", """const c = T.comparar(A, B); return { c: c.map(x => [x.seccion, x.tipo, x.campo, x.antes, x.despues, x.soloOrden, x.quien, x.alAutorizar, x.elemento]),
+          igual: T.comparar(A, A).length, orden: A.pasos.map(p => p.key).slice(0, 2) }; }"""))
+        c = {(x[0], x[1], x[2]): x for x in r["c"]}
+        def hay(*k): return k in c
+        ok = (hay("Cabecera", "Modificado", "Descripción") and c[("Cabecera", "Modificado", "Descripción")][3:5] == ["PRODUCTO", "PRODUCTO NUEVO"]
+              and hay("Cabecera", "Agregado", "Línea agregada") and c[("Cabecera", "Agregado", "Línea agregada")][4] == "linea tres" and c[("Cabecera", "Quitado", "Línea quitada")][3] == "linea dos"
+              and c[("Pasos", "Modificado", "Val. Inicial")][3:5] == ["1", "2"] and c[("Pasos", "Modificado", "Tab")][3:5] == ["No", "Sí"]
+              and hay("Pasos", "Reemplazado", "Paso") and "300" in c[("Pasos", "Reemplazado", "Paso")][3] and "350" in c[("Pasos", "Reemplazado", "Paso")][4]
+              and hay("Pasos", "Agregado", "Paso") and "Paso 400" in c[("Pasos", "Agregado", "Paso")][8])
+        quitado = [x for x in r["c"] if x[0] == "Pasos" and x[1] == "Quitado"]
+        orden = [x for x in r["c"] if x[0] == "Pasos" and x[2] == "Orden"]
+        pms = [x for x in r["c"] if x[0] == "Procesos menores"]
+        ins = [x for x in r["c"] if x[0] == "Insumos"]
+        ok = ok and len(quitado) == 1 and "Paso 200" in quitado[0][8]          # el paso 200 desapareció (y no tiene reemplazo)
+        ok = ok and len(orden) == 1 and orden[0][5] is True and orden[0][3:5] == ["5", "6"]     # el 500 solo cambió de orden
+        ok = ok and [x[1:5] for x in pms] == [["Modificado", "Cantidad insumos", "5", "6"]]      # los PM de los pasos 300→350 (reemplazado) no se repiten
+        ok = ok and sorted((x[1], x[2]) for x in ins) == [("Agregado", "Insumo"), ("Modificado", "Cantidad")]
+        ok = ok and all(x[6] == "NCUELLARL" and x[7] is True for x in r["c"] if x[0] == "Pasos" and x[1] in ("Modificado", "Agregado", "Reemplazado")) and r["igual"] == 0
+        return ok, json.dumps(r, ensure_ascii=False, default=str)[:1800]
+    @prueba("LN24 Historial por guardado (v1.38, datos de mentira): el «antes» sale de los guardados anteriores de la misma fila, los guardados parciales se acumulan, los que no cambian nada se distinguen, las líneas de observación se listan, y solo cuentan los guardados de esa fila")
+    def _():
+        r = pg.evaluate("""() => { const T = window.__rmdStats.trazabilidad, cat = { tipos: new Map([[432, 'Números'], [433, 'Texto']]), estados: new Map([[456, 'Sin iniciar'], [457, 'En proceso']]) }, fmt = T.formato(cat);
+          const ev = (min, p, acc = 'UPDATE') => ({ ts: new Date(Date.UTC(2026, 8, 29, 10, min)), accion: acc, p });
+          const paso = T.difEventos([ev(0, { usuarioActualiza: 'AA', orden: 1, valorInicial: '1', tab: false, tipoDatoId_iMaestraId: 432, mdEstructuraPasoId: 'x' }), ev(5, { usuarioActualiza: 'BB', orden: 2, mdEstructuraPasoId: 'x' }),
+            ev(10, { usuarioActualiza: 'BB', orden: 2, valorInicial: '1', tab: false, tipoDatoId_iMaestraId: 432, mdEstructuraPasoId: 'x' }), ev(15, { usuarioActualiza: 'CC', tab: true, depende: '123', tipoDatoId_iMaestraId: 433, valorInicial: null, mdEstructuraPasoId: 'x' })], fmt);
+          const cab = T.difEventos([ev(0, { usuarioActualiza: 'AA', observacion: 'a\\nb', estadoIdProceso_iMaestraId: 456, mdId: 'm' }), ev(9, { usuarioActualiza: 'AA', observacion: 'a\\nb\\nc', estadoIdProceso_iMaestraId: 457, mdId: 'm' }), ev(20, { usuarioActualiza: 'DD', observacion: 'a\\nc', mdId: 'm' })], fmt);
+          const filas = [{ timestamp: '2026-09-29T10:30:00Z', eventAction: 'UPDATE', value: JSON.stringify({ mdEstructuraPasoId: 'x', orden: 3 }) }, { timestamp: '2026-09-29T10:10:00Z', eventAction: 'UPDATE', value: JSON.stringify({ mdEstructuraPasoId: 'x', orden: 2 }) },
+            { timestamp: '2026-09-29T10:20:00Z', eventAction: 'UPDATE', value: JSON.stringify({ mdEstructuraPasoId: 'otro', dependeMdEstructuraPasoId: 'x', orden: 9 }) }, { timestamp: '2026-09-29T10:10:00Z', eventAction: 'UPDATE', value: JSON.stringify({ mdEstructuraPasoId: 'x', orden: 2 }) }, { timestamp: '', eventAction: 'UPDATE', value: 'no es json' }];
+          const parseados = T.parsear(filas, 'mdEstructuraPasoId', 'x');
+          return { paso: paso.map(e => [e.usuario, e.primero, e.cambios.map(c => c.campo + ':' + c.antes + '>' + c.despues)]), cab: cab.map(e => [e.usuario, e.cambios.map(c => c.campo + ':' + c.antes + '>' + c.despues)]), parseados: parseados.map(e => e.p.orden) }; }""")
+        ok = (r["paso"] == [["AA", True, []], ["BB", False, ["Orden:1>2"]], ["BB", False, []], ["CC", False, ["Tab:No>Sí", "Depende del paso:(no registrado)>123", "Tipo Dato:Números>Texto", "Val. Inicial:1>(vacío)"]]]
+              and r["cab"] == [["AA", []], ["AA", ["Observaciones (línea agregada):>c", "Estado del proceso:Sin iniciar>En proceso"]], ["DD", ["Observaciones (línea quitada):b>"]]] and r["parseados"] == [2, 3])
+        return ok, json.dumps(r, ensure_ascii=False)
+    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Cambios entre versiones, Historial de guardados, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
+    def _():
+        r = pg.evaluate(TZ_DATOS_JS.replace("return { T, A, B, cat }; }", """const c = T.comparar(A, B), h = [{ rotulo: 'PROCEDIMIENTO › FABRICACION › Paso 100', entradas: [{ ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [{ campo: 'Tab', antes: 'No', despues: 'Sí' }, { campo: 'Orden', antes: '1', despues: '2' }] }, { ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [] }] }];
+          const x = T.excel({ codigo: '2202600002', descripcion: 'PRODUCTO NUEVO', cambios: c, comparacion: 'v2 → v3', historial: h, estados: [['Ingresado', '28/09/2026 03:26:22', 'JQUISPEP']] });
+          return x.libro.generar().then(b => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return { nombre: x.nombre, cambios: x.cambios, filas: x.filas, n: c.length, b64: btoa(s) }; }); }"""))
+        import base64, io, zipfile
+        z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64"))))
+        hojas = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
+        compartidas = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
+        ok = (hojas == ["Cambios entre versiones", "Historial de guardados", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
+              and "el registro al autorizar" in compartidas and "Guardado sin cambios" in compartidas and "JQUISPEP" in compartidas)
+        return ok, f"{r}; hojas={hojas}"
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
 

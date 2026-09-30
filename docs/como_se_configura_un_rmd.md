@@ -345,6 +345,14 @@ Cada fila de la ventana **Especificaciones** es un registro `MD_ES_ESPECIFICACIO
 - Ejemplo real (27/09/2026): TRAMEDIF 100 mg INY (2202609126) usa PL1-PV1-E030 (tanque reactor de 500 L; OQ
   calificado, PQ por programar), PL1-PV1-E018 y PL1-PV1-E092 (módulos de flujo laminar): los tres EN PROCESO.
 
+## 5 duodecies. Qué se guarda de cada cambio (v1.38)
+
+- **Versiones**: cada versión de un RMD es un registro `MD` aparte con **código propio** (p. ej. 2202507339 es la v3 del linaje 2202503967); el linaje se busca por `codigoversionprincipal` (o el código principal). Sus estructuras, etiquetas, pasos, procesos menores, insumos, recetas y especificaciones son filas nuevas de cada versión, y se emparejan por estructura + etiqueta + código de paso (los mismos en todas las versiones), con un número de ocurrencia por orden.
+- **Quién y cuándo en cada fila**: `usuarioRegistro`/`fechaRegistro` y `usuarioActualiza`/`fechaActualiza` guardan solo lo último. **Al autorizar, el portal vuelve a crear las filas a nombre de quien autoriza** (p. ej. los pasos de la v3 del 2202507339, registrados por NCUELLARL a las 22:20:09 y la autorización a las 22:20:50): esas filas no dicen quién editó.
+- **`MD_TRAZABILIDAD`**: solo cambios de estado (Estado, Registrado, Usuario Registro). **`RMD_ES_HISTORIAL`**: registros de producción de la OP, no del master.
+- **`AUDITORIA`** (89 millones de filas, desde enero de 2024, la lee cualquier usuario del portal): por cada guardado, `serviceName` (`CatalogService.MD_ES_PASO`…), `eventAction` (CREATE/UPDATE), `eventStatus` (cada guardado sale dos veces: `Process` y `Success`; se usa `Success`), `timestamp` y `value` con el contenido enviado en JSON, que incluye **`usuarioActualiza` (el usuario real)**; `userName` sale siempre «privileged». El portal reenvía a veces la fila completa y a veces solo algunos campos, así que el «antes» se calcula acumulando los guardados anteriores de la misma fila. Las filas creadas por copia masiva no tienen alta.
+- **Rendimiento**: filtrar por `serviceName` + `eventStatus` + `Contains(value, id)` cuesta ≈ 1-3 s por fila (el MD ≈ 25 s) y **no mejora en paralelo ni con ventanas de fechas**; `$inlinecount` ignora los filtros; ordenar sin filtro es lento. Por eso se consulta fila por fila, a demanda. No se pueden encontrar las filas eliminadas (ya no hay identificador vivo).
+
 ## 5 undecies. La OP guarda su propia copia del master y las recetas cambian en SAP (userscript v1.37)
 
 - Al asociar una receta, el portal copia en el RMD su lista de materiales (`MD_ES_RE_INSUMO`, por `mdRecetaId`) y los datos de su versión de

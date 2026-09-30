@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.37.0
-// @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.38.0
+// @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.37.0';                                                       // mantener igual a @version
+  const VERSION = '1.38.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -51,6 +51,7 @@
     ['titulo', 'La pestaña del navegador muestra la etapa y la descripción del RMD abierto ("FAB - …")'],
     ['fase', 'Columna "Fase" en la lista principal (de la 1ª línea de Observaciones: F1 = Fase 1, F1R = Fase 1 R, F2 = Fase 2…)'],
     ['cambiosrecetas', 'Cambios de recetas en SAP: icono tenue junto a «Manufactura Digital» con los RMD Ingresados y Autorizados cuya receta cambió en SAP (con fecha, observación y Excel en el menú Exportar)'],
+    ['historialcambios', 'Historial de cambios en «Trazabilidad RMD»: qué cambió entre versiones y, por paso, cada guardado con su usuario (desde la auditoría del servicio), con Excel'],
     ['recetasauto', 'Cambios de recetas: revisarlos solos en segundo plano (las listas de los Ingresados cada 3 h y las de los Autorizados cada 24 h, poco a poco; apagado, solo con «Revisar»)'],
     ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
   ];
@@ -234,6 +235,17 @@
   tr.rmd-rec-quitado td:nth-child(n+2) { color: var(--rmd-apagado); text-decoration: line-through; } tr.rmd-rec-cambia td:nth-child(n+3) { color: var(--rmd-texto); } tr.rmd-rec-cambia td:last-child, tr.rmd-rec-nuevo td:last-child { font-weight: 600; }
   .rmd-rec-delta { color: var(--rmd-ambar); font-weight: 600; } .rmd-rec-linea { margin: 6px 0 0; } .rmd-rec-rojo { color: var(--rmd-rojo); } .rmd-rec-nuevo { color: var(--rmd-verde); font-weight: 600; } span.rmd-rec-quitado { color: var(--rmd-rojo); font-weight: 600; }
   .rmd-rec-pie { margin-top: 10px; color: var(--rmd-apagado); font-size: 12px; }
+  /* v1.38: historial de cambios dentro de «Trazabilidad del RMD» */
+  html.rmd-ui .sapMDialog.rmd-tz-dlg, html.rmd-ui .sapMDialog.rmd-medio.rmd-tz-dlg { width: min(1500px, 97vw) !important; max-width: 97vw !important; height: calc(100vh - 24px) !important; max-height: calc(100vh - 24px) !important;
+    left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
+  .rmd-tz { margin: 14px 12px 8px; padding-top: 10px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-texto); font: 13px var(--rmd-fuente); text-align: left; }
+  .rmd-tz-barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .rmd-tz-sel { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; } .rmd-tz-sel label { display: inline-flex; align-items: center; gap: 6px; }
+  .rmd-tz-sel select { height: 30px; max-width: 380px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
+  .rmd-tz-acc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .rmd-tz-t { font-size: 12.5px; } .rmd-tz-antes { color: var(--rmd-apagado); } .rmd-tz-desp { font-weight: 600; }
+  tr.rmd-tz-quitado .rmd-tz-antes { text-decoration: line-through; } .rmd-tz-lista { margin-top: 4px; }
+  .rmd-tz-fila { border-bottom: 1px solid rgba(128,140,155,.16); } .rmd-tz-fila-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 4px; } .rmd-tz-rotulo { min-width: 0; overflow-wrap: anywhere; }
+  .rmd-tz-detalle { padding: 2px 8px 12px 20px; background: rgba(128,140,155,.07); } .rmd-tz [hidden] { display: none !important; } .rmd-tz-aut { margin-left: 4px; font-size: 11px; color: var(--rmd-apagado); cursor: help; }
   html.rmd-ui .sapMDialog.rmd-medio.rmd-selector-ancho { width: min(1480px, 96vw) !important; }
   .sapMToken.rmd-token-rep { display: inline-flex !important; align-items: center; }
   .rmd-restablecer-ui5 .sapMBtnIcon, .rmd-restablecer-ui5 .sapUiIcon { color: var(--rmd-rojo) !important; } .rmd-restablecer-ui5 .sapMBtnInner { border-color: transparent !important; background: transparent !important; }
@@ -1343,7 +1355,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-alerta-rec, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -1358,7 +1370,7 @@
     });
     document.querySelectorAll('.sapMDialog tbody tr').forEach((r) => r.style.removeProperty('display'));
     document.querySelectorAll('.sapMDialog table.sapMListTbl').forEach((t) => t.style.removeProperty('width'));
-    document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'));
+    document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky', 'rmd-tz-dlg'));
   }
   // ---- El "latido" de la lista principal: prolongar la sesión sin el error al volver ----
   // Cada 30 s el propio portal vuelve a buscar la lista principal (intervalTriggerActualizar -> onSearch() sin evento, y luego
@@ -1425,7 +1437,7 @@
     gestionarBotonesLista();
     gestionarRecetasAsociar();
     // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
-    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarAlertaRecetas, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector].forEach((f) => {
+    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
     gestionarTextosMayusculas();
@@ -7399,11 +7411,370 @@
     excel: async () => { const x = rsArmarExcel(); return { ...x, base64: aBase64(await x.libro.generar()) }; },
   };
 
+  // ---- 9 quinquies. Historial de cambios en «Trazabilidad RMD» (v1.38) ----
+  // Dos fuentes, ninguna con fotos propias del script:
+  //  · Entre versiones: cada versión de un RMD es un registro aparte (mismo «código de versión principal»); sus estructuras, etiquetas, pasos,
+  //    procesos menores, insumos, recetas y especificaciones se emparejan por su código de estructura, etiqueta y paso (los mismos en todas las
+  //    versiones) y se comparan.
+  //  · Por guardado: la tabla AUDITORIA del servicio guarda el contenido de cada guardado con el usuario (dentro del valor: usuarioActualiza),
+  //    desde enero de 2024. Solo se consulta por fila (≈ 1 s cada una: el servidor no filtra rápido por otra cosa). Como el portal reenvía la fila
+  //    (a veces solo algunos campos), el «antes» sale de acumular los guardados anteriores de esa misma fila.
+  const TZ_ESTR_ORDEN = ['Cabecera', 'Etiquetas', 'Pasos', 'Procesos menores', 'Insumos', 'Recetas', 'Especificaciones'];
+  const TZ_CAMPOS_PASO = [['orden', 'Orden', 'n'], ['valorInicial', 'Val. Inicial', 'n'], ['valorFinal', 'Val. Final', 'n'], ['margen', 'Margen', 'n'], ['decimales', 'Decimales', 'n'], ['tipoDato', 'Tipo Dato', 't'],
+    ['depende', 'Depende del paso', 't'], ['estadoCC', 'Estado CC', 'b'], ['estadoMov', 'Estado Mov.', 'b'], ['pmop', 'PM OP', 'b'], ['genpp', 'Gen PP', 'b'], ['tab', 'Tab', 'b'], ['edit', 'Edit', 'b'], ['rpor', 'R. Por', 'b'],
+    ['vb', 'V.B.', 'b'], ['formato', 'Formato', 'b'], ['puestoTrabajo', 'Puesto de trabajo', 't'], ['clvModelo', 'Clave modelo', 't'], ['automatico', 'Automático', 'b']];
+  const TZ_CAMPOS_PM = [['orden', 'Orden', 'n'], ['cantidadInsumo', 'Cantidad insumos', 'n'], ['tipoDato', 'Tipo Dato', 't'], ['valorInicial', 'Val. Inicial', 'n'], ['valorFinal', 'Val. Final', 'n'], ['margen', 'Margen', 'n'],
+    ['decimales', 'Decimales', 'n'], ['estadoCC', 'Estado CC', 'b'], ['estadoMov', 'Estado Mov.', 'b'], ['genpp', 'Gen PP', 'b'], ['edit', 'Edit', 'b'], ['tab', 'Tab', 'b'], ['formato', 'Formato', 'b'], ['Component', 'Componente', 't'], ['CompUnit', 'UM', 't']];
+  const TZ_CAMPOS_ETQ = [['orden', 'Orden', 'n'], ['conforme', 'Conforme', 'b'], ['procesoMenor', 'Proceso menor', 'b']];
+  const TZ_CAMPOS_INS = [['CompQty', 'Cantidad', 'n'], ['CompUnit', 'UM', 't'], ['Maktx', 'Descripción', 't'], ['cantidadRm', 'Cantidad RM', 'n']];
+  const TZ_CAMPOS_ESP = [['especificacion', 'Especificación', 't'], ['tipoDato', 'Tipo Dato', 't'], ['valorInicial', 'Val. Inicial', 'n'], ['valorFinal', 'Val. Final', 'n'], ['margen', 'Margen', 'n'], ['decimales', 'Decimales', 'n'], ['orden', 'Orden', 'n']];
+  const TZ_CAMPOS_MD = [['descripcion', 'Descripción', 't'], ['nivelTxt', 'Etapa', 't'], ['areaRmdTxt', 'Área', 't'], ['sucursal', 'Planta', 't'], ['codAgrupadorReceta', 'Cód. agrupador de receta', 't'], ['codDefectoReceta', 'Cód. de receta por defecto', 't'], ['rptaValidacion', 'Validación', 't']];
+  // nombres de los campos tal como llegan en el guardado (AUDITORIA); los no listados salen con su nombre técnico
+  const TZ_ETIQUETA_CAMPO = { orden: 'Orden', valorInicial: 'Val. Inicial', valorFinal: 'Val. Final', margen: 'Margen', decimales: 'Decimales', tipoDatoId_iMaestraId: 'Tipo Dato', depende: 'Depende del paso', estadoCC: 'Estado CC', estadoMov: 'Estado Mov.',
+    pmop: 'PM OP', genpp: 'Gen PP', tab: 'Tab', edit: 'Edit', rpor: 'R. Por', vb: 'V.B.', formato: 'Formato', imagen: 'Imagen', colorHex: 'Color', colorRgb: 'Color', puestoTrabajo: 'Puesto de trabajo', clvModelo: 'Clave modelo', automatico: 'Automático',
+    cantidadInsumo: 'Cantidad insumos', Component: 'Componente', CompUnit: 'UM', CompQty: 'Cantidad', Maktx: 'Descripción', activo: 'Activo', conforme: 'Conforme', procesoMenor: 'Proceso menor', observacion: 'Observaciones',
+    estadoIdRmd_iMaestraId: 'Estado', estadoIdProceso_iMaestraId: 'Estado del proceso', masRecetas: 'Más de una receta', rptaValidacion: 'Validación', descripcion: 'Descripción', nivelTxt: 'Etapa', areaRmdTxt: 'Área', codigo: 'Código',
+    codAgrupadorReceta: 'Cód. agrupador de receta', codDefectoReceta: 'Cód. de receta por defecto', especificacion: 'Especificación', ensayoHijo: 'Ensayo', cantidadRm: 'Cantidad RM', cantidadBarCode: 'Cantidad código de barras' };
+  const TZ_IGNORAR = /^(fechaActualiza|usuarioActualiza|fechaRegistro|usuarioRegistro|terminal|mdEstructuraPasoId|mdEstructuraPasoIdDepende|dependeMdEstructuraPasoId|tipoDatoIdAnterior_iMaestraId|mdId|archivoMD|af|wfInstanceId|mdEstructuraPasoInsumoPasoId|mdEsEtiquetaId|mdEstructuraEspecificacionId|estructuraRecetaInsumoId|mdRecetaId|flagModif|rptaValidacionDate|firstFechaActualiza|styleUser|enabledCheck|verifCheck|usuarioVerificador)$/;
+  const tzNum = (v) => { if (v == null || v === '') return ''; const n = Number(v); return isNaN(n) ? String(v).trim() : String(n); };
+  const tzNorm = (v, t) => (t === 'b' ? (v ? 'Sí' : 'No') : t === 'n' ? tzNum(v) : v == null ? '' : String(v).replace(/\s+/g, ' ').trim());
+  const tzActivo = (x) => x && x.activo !== false;
+  const tzFilaAud = (r, md) => { const cuando = r.fechaActualiza || r.fechaRegistro || null, aut = md && md.fechaAutorizacion ? +new Date(md.fechaAutorizacion) : 0, t = cuando ? +new Date(cuando) : 0;
+    return { quien: r.usuarioActualiza || r.usuarioRegistro || '', cuando, modificado: !!r.usuarioActualiza, alAutorizar: !!(aut && t && !r.usuarioActualiza && aut - t < 600000 && aut - t > -600000) }; };
+  const tzTipo = (o, cat) => (o && (o.contenido || o.descripcion)) || '';
+  // Lo leído de UNA versión del RMD, ya con las claves de emparejamiento (estructura | etiqueta | paso # ocurrencia)
+  function tzNormalizar(md, d, cat) {
+    const lugar = (estr, etq) => `${cat.estructura.get(estr) || 'Estructura'} › ${cat.etiqueta.get(etq) || 'Etiqueta'}`;
+    const ocurr = new Map(), sig = (k) => { const n = (ocurr.get(k) || 0) + 1; ocurr.set(k, n); return n; }, porOrden = (a, b) => (+a.orden || 0) - (+b.orden || 0);
+    const etqPorId = new Map(d.etiquetas.filter(tzActivo).map((e) => [e.mdEsEtiquetaId, e]));
+    const etiquetas = [...etqPorId.values()].sort(porOrden).map((e) => { const base = `${e.estructuraId_estructuraId}|${e.etiquetaId_etiquetaId}`;
+      return { id: e.mdEsEtiquetaId, key: `${base}#${sig('e' + base)}`, lugar: lugar(e.estructuraId_estructuraId, e.etiquetaId_etiquetaId), orden: e.orden, conforme: e.conforme, procesoMenor: e.procesoMenor, ...tzFilaAud(e, md) }; });
+    const pasosPorId = new Map();
+    const pasos = d.pasos.filter(tzActivo).sort(porOrden).map((p) => {
+      const e = etqPorId.get(p.mdEsEtiquetaId_mdEsEtiquetaId), etqId = e ? e.etiquetaId_etiquetaId : '', cod = p.pasoId ? p.pasoId.codigo : '', base = `${p.estructuraId_estructuraId}|${etqId}|${cod}`;
+      const r = { id: p.mdEstructuraPasoId, key: `${base}#${sig('p' + base)}`, grupo: `${p.estructuraId_estructuraId}|${etqId}`, lugar: lugar(p.estructuraId_estructuraId, etqId), paso: cod, desc: norm(p.pasoId ? p.pasoId.descripcion : ''), orden: p.orden,
+        valorInicial: p.valorInicial, valorFinal: p.valorFinal, margen: p.margen, decimales: p.decimales, tipoDato: tzTipo(p.tipoDatoId), depende: p.depende, estadoCC: p.estadoCC, estadoMov: p.estadoMov, pmop: p.pmop, genpp: p.genpp, tab: p.tab, edit: p.edit,
+        rpor: p.rpor, vb: p.vb, formato: p.formato, puestoTrabajo: p.puestoTrabajo, clvModelo: p.clvModelo, automatico: p.automatico, ...tzFilaAud(p, md) };
+      if (p.tipoDatoId_iMaestraId != null && r.tipoDato) cat.tipos.set(p.tipoDatoId_iMaestraId, r.tipoDato);
+      pasosPorId.set(r.id, r); return r; });
+    const pm = d.pm.filter(tzActivo).sort(porOrden).map((p) => {
+      const padre = pasosPorId.get(p.pasoId_mdEstructuraPasoId); if (!padre) return null;
+      const cod = p.pasoHijoId ? p.pasoHijoId.codigo : '', base = `${padre.key}|${cod}`;
+      if (p.tipoDatoId_iMaestraId != null && p.tipoDatoId) cat.tipos.set(p.tipoDatoId_iMaestraId, tzTipo(p.tipoDatoId));
+      return { id: p.mdEstructuraPasoInsumoPasoId, key: `${base}#${sig('m' + base)}`, padreKey: padre.key, lugar: padre.lugar, paso: padre.paso, desc: padre.desc, hijo: cod, hijoDesc: norm(p.pasoHijoId ? p.pasoHijoId.descripcion : ''), orden: p.orden,
+        cantidadInsumo: p.cantidadInsumo, tipoDato: tzTipo(p.tipoDatoId), valorInicial: p.valorInicial, valorFinal: p.valorFinal, margen: p.margen, decimales: p.decimales, estadoCC: p.estadoCC, estadoMov: p.estadoMov, genpp: p.genpp, edit: p.edit,
+        tab: p.tab, formato: p.formato, Component: p.Component, CompUnit: p.CompUnit, ...tzFilaAud(p, md) }; }).filter(Boolean);
+    const recPorId = new Map(d.recetas.filter(tzActivo).map((r) => [r.mdRecetaId, r]));
+    const recNombre = (r) => (r && r.recetaId ? `${norm(r.recetaId.Matnr)} / ${norm(r.recetaId.Verid)}` : '');
+    const recetas = [...recPorId.values()].map((r) => ({ id: r.mdRecetaId, key: `${recNombre(r)}|${norm(r.recetaId && r.recetaId.Werks)}#${sig('r' + recNombre(r))}`, receta: recNombre(r), texto: norm(r.recetaId && r.recetaId.Text1), ...tzFilaAud(r, md) }));
+    const insumos = d.insumos.filter(tzActivo).map((x) => { const rn = recNombre(recPorId.get(x.mdRecetaId_mdRecetaId)), base = `${rn}|${norm(x.Component)}|${norm(x.ItemNo)}`;
+      return { id: x.estructuraRecetaInsumoId, key: `${base}#${sig('i' + base)}`, receta: rn, componente: norm(x.Component), desc: norm(x.Maktx), CompQty: x.CompQty, CompUnit: x.CompUnit, Maktx: x.Maktx, cantidadRm: x.cantidadRm, ...tzFilaAud(x, md) }; });
+    const espec = d.espec.filter(tzActivo).sort(porOrden).map((x) => { const base = `${x.estructuraId_estructuraId}|${norm(x.ensayoPadreSAP)}|${norm(x.ensayoHijo)}|${norm(x.Merknr)}`;
+      return { id: x.mdEstructuraEspecificacionId, key: `${base}#${sig('s' + base)}`, lugar: cat.estructura.get(x.estructuraId_estructuraId) || 'Estructura', nombre: norm(x.ensayoHijo) || norm(x.ensayoPadreSAP), especificacion: x.especificacion,
+        tipoDato: cat.tipos.get(x.tipoDatoId_iMaestraId) || (x.tipoDatoId_iMaestraId == null ? '' : String(x.tipoDatoId_iMaestraId)), valorInicial: x.valorInicial, valorFinal: x.valorFinal, margen: x.margen, decimales: x.decimales, orden: x.orden, ...tzFilaAud(x, md) }; });
+    const mdr = { ...md, sucursal: (md.sucursalId && md.sucursalId.contenido) || '' };
+    return { md: mdr, etiquetas, pasos, pm, recetas, insumos, espec };
+  }
+  // Diferencias entre dos versiones ya normalizadas. Cada cambio: sección, elemento, campo, antes, después, tipo (Agregado / Quitado / Modificado /
+  // Reemplazado) y el último usuario y fecha de la fila (los que el portal guarda en ella). soloOrden: el único campo que cambió es el orden.
+  function tzCompararVersiones(A, B) {
+    const out = [];
+    const anota = (sec, elem, campo, antes, despues, tipo, fila, extra) => out.push({ seccion: sec, elemento: elem, campo, antes, despues, tipo, quien: fila ? fila.quien : '', cuando: fila ? fila.cuando : null, modificado: !!(fila && fila.modificado), alAutorizar: !!(fila && fila.alAutorizar), soloOrden: false, ...extra });
+    const cruzar = (sec, la, lb, campos, elem, ext) => {
+      const ma = new Map(la.map((x) => [x.key, x])), mb = new Map(lb.map((x) => [x.key, x])), agregados = lb.filter((y) => !ma.has(y.key)), quitados = la.filter((x) => !mb.has(x.key));
+      lb.forEach((y) => { const x = ma.get(y.key); if (!x) return;
+        const dif = campos.filter(([k, , t]) => tzNorm(x[k], t) !== tzNorm(y[k], t));
+        dif.forEach(([k, n, t]) => anota(sec, elem(y), n, tzNorm(x[k], t), tzNorm(y[k], t), 'Modificado', y, { soloOrden: dif.length === 1 && k === 'orden', idFila: y.id, ...(ext || {}) })); });
+      return { agregados, quitados };
+    };
+    // cabecera
+    TZ_CAMPOS_MD.forEach(([k, n, t]) => { const a = tzNorm(A.md[k], t), b = tzNorm(B.md[k], t); if (a !== b) anota('Cabecera', 'RMD', n, a, b, 'Modificado', { quien: B.md.usuarioActualiza || '', cuando: B.md.fechaActualiza || null, modificado: true }); });
+    const lineas = (t) => String(t || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean), la = lineas(A.md.observacion), lb = lineas(B.md.observacion);
+    lb.filter((x) => !la.includes(x)).forEach((x) => anota('Cabecera', 'Observaciones', 'Línea agregada', '', x, 'Agregado', null));
+    la.filter((x) => !lb.includes(x)).forEach((x) => anota('Cabecera', 'Observaciones', 'Línea quitada', x, '', 'Quitado', null));
+    // etiquetas
+    const e = cruzar('Etiquetas', A.etiquetas, B.etiquetas, TZ_CAMPOS_ETQ, (y) => y.lugar);
+    e.agregados.forEach((y) => anota('Etiquetas', y.lugar, 'Etiqueta', '', `Orden ${tzNum(y.orden)}`, 'Agregado', y, { idFila: y.id }));
+    e.quitados.forEach((x) => anota('Etiquetas', x.lugar, 'Etiqueta', `Orden ${tzNum(x.orden)}`, '', 'Quitado', null));
+    // pasos (un paso quitado y otro agregado en el mismo lugar y orden = «Cambiar paso» → Reemplazado)
+    const nombrePaso = (y) => `${y.lugar} › Paso ${y.paso}${y.desc ? ' — ' + (y.desc.length > 70 ? y.desc.slice(0, 70) + '…' : y.desc) : ''}`;
+    const p = cruzar('Pasos', A.pasos, B.pasos, TZ_CAMPOS_PASO, nombrePaso), cambiados = new Set([...p.agregados, ...p.quitados].map((x) => x.key)), hijos = (arr, k) => arr.filter((z) => z.padreKey === k).length;
+    const libres = [...p.quitados];
+    p.agregados.forEach((y) => {
+      const i = libres.findIndex((x) => x.grupo === y.grupo && tzNum(x.orden) === tzNum(y.orden));
+      if (i >= 0) { const x = libres.splice(i, 1)[0]; anota('Pasos', `${y.lugar} › Orden ${tzNum(y.orden)}`, 'Paso', `${x.paso}${x.desc ? ' — ' + x.desc.slice(0, 70) : ''}`, `${y.paso}${y.desc ? ' — ' + y.desc.slice(0, 70) : ''}`, 'Reemplazado', y, { idFila: y.id }); }
+      else anota('Pasos', nombrePaso(y), 'Paso', '', `Orden ${tzNum(y.orden)}${hijos(B.pm, y.key) ? ` (con ${hijos(B.pm, y.key)} procesos menores)` : ''}`, 'Agregado', y, { idFila: y.id });
+    });
+    libres.forEach((x) => anota('Pasos', nombrePaso(x), 'Paso', `Orden ${tzNum(x.orden)}${hijos(A.pm, x.key) ? ` (con ${hijos(A.pm, x.key)} procesos menores)` : ''}`, '', 'Quitado', null));
+    // procesos menores (los de un paso agregado, quitado o reemplazado ya van dentro de ese paso)
+    const nombrePm = (y) => `${y.lugar} › Paso ${y.paso} › Proceso menor ${y.hijo}${y.hijoDesc ? ' — ' + (y.hijoDesc.length > 60 ? y.hijoDesc.slice(0, 60) + '…' : y.hijoDesc) : ''}`;
+    const m = cruzar('Procesos menores', A.pm.filter((z) => !cambiados.has(z.padreKey)), B.pm.filter((z) => !cambiados.has(z.padreKey)), TZ_CAMPOS_PM, nombrePm);
+    m.agregados.forEach((y) => anota('Procesos menores', nombrePm(y), 'Proceso menor', '', `Orden ${tzNum(y.orden)}`, 'Agregado', y, { idFila: y.id }));
+    m.quitados.forEach((x) => anota('Procesos menores', nombrePm(x), 'Proceso menor', `Orden ${tzNum(x.orden)}`, '', 'Quitado', null));
+    // recetas e insumos
+    const r = cruzar('Recetas', A.recetas, B.recetas, [], (y) => `Receta ${y.receta}`);
+    r.agregados.forEach((y) => anota('Recetas', `Receta ${y.receta}`, 'Receta', '', y.texto || 'asociada', 'Agregado', y, { idFila: y.id }));
+    r.quitados.forEach((x) => anota('Recetas', `Receta ${x.receta}`, 'Receta', x.texto || 'asociada', '', 'Quitado', null));
+    const nombreIns = (y) => `Receta ${y.receta} › ${y.componente}${y.desc ? ' — ' + y.desc : ''}`;
+    const i = cruzar('Insumos', A.insumos, B.insumos, TZ_CAMPOS_INS, nombreIns);
+    i.agregados.forEach((y) => anota('Insumos', nombreIns(y), 'Insumo', '', `${tzNum(y.CompQty)} ${y.CompUnit || ''}`.trim(), 'Agregado', y, { idFila: y.id }));
+    i.quitados.forEach((x) => anota('Insumos', nombreIns(x), 'Insumo', `${tzNum(x.CompQty)} ${x.CompUnit || ''}`.trim(), '', 'Quitado', null));
+    // especificaciones
+    const nombreEsp = (y) => `${y.lugar} › Especificación ${y.nombre}`;
+    const s = cruzar('Especificaciones', A.espec, B.espec, TZ_CAMPOS_ESP, nombreEsp);
+    s.agregados.forEach((y) => anota('Especificaciones', nombreEsp(y), 'Especificación', '', tzNorm(y.especificacion, 't'), 'Agregado', y, { idFila: y.id }));
+    s.quitados.forEach((x) => anota('Especificaciones', nombreEsp(x), 'Especificación', tzNorm(x.especificacion, 't'), '', 'Quitado', null));
+    const oS = (c) => TZ_ESTR_ORDEN.indexOf(c.seccion);
+    return out.map((c, n) => ({ ...c, n })).sort((a, b) => (oS(a) - oS(b)) || (a.n - b.n));
+  }
+  // ---- por guardado (AUDITORIA) ----
+  // eventos: [{ ts: Date, accion, p: contenido del guardado }] ya ordenados por fecha. Devuelve una entrada por guardado: el usuario y, campo por
+  // campo, lo que cambió respecto a lo acumulado de los guardados anteriores de la misma fila (sin «antes» registrado si es el primero que se ve).
+  function tzDifEventos(eventos, fmt = (k, v) => (v == null ? '' : String(v))) {
+    let estado = null; const out = [];
+    eventos.forEach((e) => {
+      const p = e.p || {}, cambios = [], nuevo = estado ? { ...estado } : {}, primero = !estado;
+      Object.entries(p).forEach(([k, v]) => {
+        if (TZ_IGNORAR.test(k)) return;
+        const tiene = !primero && Object.prototype.hasOwnProperty.call(estado, k), antes = tiene ? estado[k] : undefined;
+        if (k === 'observacion') {
+          const nl = (t) => String(t || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean), a = nl(antes), b = nl(v);
+          if (primero) return; b.filter((x) => !a.includes(x)).forEach((x) => cambios.push({ campo: 'Observaciones (línea agregada)', antes: '', despues: x }));
+          a.filter((x) => !b.includes(x)).forEach((x) => cambios.push({ campo: 'Observaciones (línea quitada)', antes: x, despues: '' })); return;
+        }
+        if (primero) return;
+        if (tiene) { if (fmt(k, antes) === fmt(k, v)) return; cambios.push({ campo: TZ_ETIQUETA_CAMPO[k] || k, antes: fmt(k, antes) || '(vacío)', despues: fmt(k, v) || '(vacío)' }); }
+        else if (!(v == null || v === false || v === '')) cambios.push({ campo: TZ_ETIQUETA_CAMPO[k] || k, antes: '(no registrado)', despues: fmt(k, v) || '(vacío)' });
+      });
+      Object.assign(nuevo, p); estado = nuevo;
+      out.push({ ts: e.ts, accion: e.accion, usuario: p.usuarioActualiza || '', primero, cambios });
+    });
+    return out;
+  }
+  const tzParsear = (filas, campoId, id) => filas.map((f) => { try { return { ts: new Date(f.timestamp), accion: f.eventAction, p: JSON.parse(f.value), crudo: f.value }; } catch (e) { return null; } })
+    .filter((x) => x && x.p && x.p[campoId] === id).sort((a, b) => a.ts - b.ts)
+    .filter((x, i, a) => !i || x.crudo !== a[i - 1].crudo || +x.ts !== +a[i - 1].ts);
+  async function tzLeerAuditoria(modelo, servicio, campoId, id) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const filas = await leerTodoDe(modelo, 'AUDITORIA', [new F('serviceName', 'EQ', 'CatalogService.' + servicio), new F('eventStatus', 'EQ', 'Success'), new F('value', 'Contains', id)], { $select: 'timestamp,eventAction,value' });
+    return tzParsear(filas, campoId, id);
+  }
+  // ---- lectura de versiones ----
+  async function tzCatalogos(modelo) {
+    const [es, et] = await Promise.all([leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion', $orderby: 'estructuraId' }), leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion', $orderby: 'etiquetaId' })]);
+    return { estructura: new Map(es.map((x) => [x.estructuraId, norm(x.descripcion)])), etiqueta: new Map(et.map((x) => [x.etiquetaId, norm(x.descripcion)])), tipos: new Map(), estados: new Map() };
+  }
+  async function tzLinaje(modelo, codigo, cat) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, uno = (await leerTodoDe(modelo, 'MD', [new F('codigo', 'EQ', isNaN(+codigo) ? codigo : +codigo)], { $orderby: 'mdId' }))[0];
+    if (!uno) throw new Error(`no se encontró el RMD ${codigo}`);
+    const P = uno.codigoversionprincipal || uno.codigo;
+    const todos = await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', P), new F('codigo', 'EQ', P)], and: false })], { $expand: 'estadoIdRmd,estadoIdProceso,sucursalId', $orderby: 'mdId' });
+    todos.forEach((m) => { if (m.estadoIdRmd_iMaestraId != null && m.estadoIdRmd) cat.estados.set(m.estadoIdRmd_iMaestraId, m.estadoIdRmd.contenido); if (m.estadoIdProceso_iMaestraId != null && m.estadoIdProceso) cat.estados.set(m.estadoIdProceso_iMaestraId, m.estadoIdProceso.contenido); });
+    const lista = todos.map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' })).sort((a, b) => (+a.version - +b.version) || (new Date(a.fechaRegistro) - new Date(b.fechaRegistro)));
+    return { principal: P, versiones: lista, actual: lista.find((m) => String(m.codigo) === String(codigo)) || lista[lista.length - 1] };
+  }
+  async function tzLeerVersion(modelo, md, cat) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, f = [new F('mdId_mdId', 'EQ', md.mdId)], L = (ent, exp, ord) => leerTodoDe(modelo, ent, f, { ...(exp ? { $expand: exp } : {}), $orderby: ord });
+    const [etiquetas, pasos, pm, insumos, recetas, espec] = await Promise.all([L('MD_ES_ETIQUETA', '', 'mdEsEtiquetaId'), L('MD_ES_PASO', 'pasoId,tipoDatoId', 'mdEstructuraPasoId'), L('MD_ES_PASO_INSUMO_PASO', 'pasoHijoId,tipoDatoId', 'mdEstructuraPasoInsumoPasoId'),
+      L('MD_ES_RE_INSUMO', '', 'estructuraRecetaInsumoId'), L('MD_RECETA', 'recetaId', 'mdRecetaId'), L('MD_ES_ESPECIFICACION', '', 'mdEstructuraEspecificacionId')]);
+    return tzNormalizar(md, { etiquetas, pasos, pm, insumos, recetas, espec }, cat);
+  }
+  // valores de un guardado, legibles (tipo de dato y estado por su nombre, sí/no, vacíos)
+  const tzFormato = (cat) => (k, v) => {
+    if (v == null || v === '') return '';
+    if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+    if (k === 'tipoDatoId_iMaestraId') return cat.tipos.get(v) || String(v);
+    if (/^estadoId(Rmd|Proceso)_iMaestraId$/.test(k)) return cat.estados.get(v) || String(v);
+    return typeof v === 'number' ? String(v) : String(v).replace(/\s+/g, ' ').trim();
+  };
+  const tzCuando = (t) => (t ? fechaHoraCorta(t) : '');
+  const tzTituloDe = (d) => { const c = d && d.id && sap.ui.getCore().byId(d.id); return (c && c.getTitle && c.getTitle()) || ''; };
+  // ---- Excel ----
+  function tzArmarExcel(e) {
+    const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
+    const utc = (x) => { const t = x ? new Date(x) : null; return t && !isNaN(t) ? new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate(), t.getHours(), t.getMinutes())) : ''; };
+    const tabla = (nombre, nt, cab, anchos, datos, estilos = {}, op = {}) => {
+      const h = libro.hoja(nombre, { activa: !!op.activa, congelar: 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+      datos.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'normal'); }));
+    };
+    const cambios = e.cambios || [], hist = [];
+    (e.historial || []).forEach((h) => h.entradas.forEach((x) => {
+      if (x.cambios.length) x.cambios.forEach((c) => hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : 'Guardado', utc(x.ts), x.usuario, c.campo, c.antes, c.despues]));
+      else hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : x.primero ? 'Primer guardado registrado' : 'Guardado sin cambios', utc(x.ts), x.usuario, '', '', '']);
+    }));
+    tabla('Cambios entre versiones', 'CambiosEntreVersiones', ['Sección', 'Elemento', 'Cambio', 'Campo', 'Antes', 'Después', 'Solo cambia el orden', 'Usuario de la fila', 'Fecha de la fila', 'Usuario de la fila es de'],
+      [16, 70, 13, 22, 34, 34, 12, 16, 17, 22], cambios.map((c) => [c.seccion, c.elemento, c.tipo, c.campo, c.antes, c.despues, c.soloOrden ? 'Sí' : '', c.quien, utc(c.cuando), c.tipo === 'Quitado' ? '' : c.alAutorizar ? 'el registro al autorizar (no necesariamente quien editó)' : c.modificado ? 'la última modificación' : 'el registro']), { 1: 'envuelto', 4: 'envuelto', 5: 'envuelto', 8: 'fechaHora' }, { activa: true });
+    tabla('Historial de guardados', 'HistorialGuardados', ['Fila', 'Evento', 'Fecha y hora', 'Usuario', 'Campo', 'Antes', 'Después'], [70, 24, 17, 16, 30, 40, 40], hist, { 0: 'envuelto', 2: 'fechaHora', 5: 'envuelto', 6: 'envuelto' });
+    tabla('Estados', 'EstadosRmd', ['Estado', 'Registrado', 'Usuario'], [30, 20, 18], (e.estados || []).map((x) => [x[0], x[1], x[2]]));
+    const hI = libro.hoja('Información', { cols: [[1, 1, 34], [2, 2, 110]] });
+    hI.poner('A1', `Trazabilidad del RMD ${e.codigo} — ${e.descripcion || ''}`, 'titulo');
+    [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())}`],
+      ['Versiones comparadas', e.comparacion || 'no se comparó ninguna'], ['Cambios entre versiones', `${cambios.length}${cambios.some((c) => c.soloOrden) ? ` (${cambios.filter((c) => c.soloOrden).length} solo cambian el orden, por ejemplo por un paso agregado antes)` : ''}`],
+      ['Filas con historial de guardados', (e.historial || []).length ? `${e.historial.length} (solo las que se cargaron en la ventana; el historial completo lleva ≈ 1 s por fila)` : 'ninguna cargada'],
+      ['Entre versiones', 'Las versiones de un RMD son registros aparte. Se emparejan por estructura, etiqueta y código de paso (y por componente en insumos) y se comparan campo por campo. Un paso quitado y otro agregado en el mismo lugar y orden se muestra como «Reemplazado». Los procesos menores de un paso agregado, quitado o reemplazado van dentro de ese paso.'],
+      ['Usuario y fecha de la fila', 'Son los que el portal guarda en cada fila de la versión nueva (última modificación; si nunca se modificó, su registro). Al autorizar, el portal puede volver a crear las filas: entonces figura quien autorizó y no quien editó. Para saber quién cambió cada dato dentro de una versión usa el historial de guardados.'],
+      ['Historial de guardados', 'Sale de la auditoría del servicio (desde enero de 2024): cada guardado con su usuario. El «antes» se calcula con los guardados anteriores de la misma fila; el primero que se ve no tiene «antes». Las filas eliminadas no se pueden buscar (ya no tienen identificador vivo); su baja se ve como Activo Sí → No cuando el portal las desactiva.']]
+      .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return { libro, nombre: `Trazabilidad RMD ${e.codigo} ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, cambios: cambios.length, filas: hist.length };
+  }
+  // ---- el panel dentro de la ventana «Trazabilidad del RMD» del portal ----
+  function montarHistorial(d, codigo) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
+    const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d;
+    const raiz = document.createElement('div'); raiz.className = 'rmd-tz'; raiz.dataset.codigo = codigo; cont.appendChild(raiz);
+    d.classList.add('rmd-tz-dlg');
+    raiz.innerHTML = `<div class="rmd-tz-barra"><div class="rmd-cr-chips" role="tablist"><button type="button" role="tab" data-t="ver" class="activo" aria-selected="true">Cambios entre versiones</button><button type="button" role="tab" data-t="his" aria-selected="false">Historial de guardados</button></div>
+      <button type="button" class="rmd-btn rmd-tz-excel" title="Excel con lo que se ve y lo que se cargó">Exportar Excel</button></div><div class="rmd-tz-cuerpo"></div>`;
+    ['pointerdown', 'mousedown', 'touchstart', 'keydown'].forEach((ev) => raiz.addEventListener(ev, (x) => x.stopPropagation()));
+    const cuerpo = raiz.querySelector('.rmd-tz-cuerpo'), tabs = raiz.querySelector('.rmd-cr-chips');
+    const E = { tab: 'ver', cat: null, linaje: null, desde: '', hasta: '', cambios: null, comparacion: '', cargando: '', error: '', seccion: 'Todas', tipo: 'Todos', soloOrden: false, consulta: '',
+      pasosMd: null, pasoConsulta: '', incluirPm: false, hist: new Map(), abiertos: new Set(), lote: false, cancelar: false, versionCache: new Map() };
+    // los estados de la tabla nativa de la ventana (Estado · Registrado · Usuario Registro)
+    const estadosNativos = () => [...d.querySelectorAll('table tbody tr')].filter((tr) => !raiz.contains(tr) && !/SubRow/.test(tr.className))
+      .map((tr) => [...tr.children].map((td) => norm(td.textContent)).filter(Boolean)).filter((c) => c.length >= 3).map((c) => [c[0], c[1], c[2]]);
+    const nomVersion = (m) => `v${m.version} · ${m.codigo} · ${m.estado}`;
+    const asegurar = async () => { if (!E.cat) E.cat = await tzCatalogos(modelo); if (!E.linaje) E.linaje = await tzLinaje(modelo, codigo, E.cat); return E; };
+    const leerV = async (m) => { if (!E.versionCache.has(m.mdId)) E.versionCache.set(m.mdId, await tzLeerVersion(modelo, m, E.cat)); return E.versionCache.get(m.mdId); };
+    async function comparar() {
+      E.cargando = 'Leyendo las versiones…'; E.error = ''; pintar();
+      try {
+        await asegurar(); const vs = E.linaje.versiones, a = vs.find((m) => m.mdId === E.desde), b = vs.find((m) => m.mdId === E.hasta);
+        if (!a || !b) { E.cambios = []; E.comparacion = ''; return; }
+        const [A, B] = await Promise.all([leerV(a), leerV(b)]);
+        E.cambios = tzCompararVersiones(A, B); E.comparacion = `${nomVersion(a)} → ${nomVersion(b)}`;
+      } catch (e) { E.error = 'No se pudo comparar: ' + e.message; E.cambios = null; } finally { E.cargando = ''; pintar(); }
+    }
+    async function iniciar() {
+      E.cargando = 'Leyendo las versiones del RMD…'; pintar();
+      try {
+        await asegurar(); const vs = E.linaje.versiones, act = E.linaje.actual, i = vs.indexOf(act), previas = vs.slice(0, i).filter((m) => !/cancel/i.test(m.estado));
+        E.hasta = act.mdId; E.desde = previas.length ? previas[previas.length - 1].mdId : '';
+        if (E.desde) await comparar(); else { E.cambios = []; E.comparacion = ''; E.cargando = ''; pintar(); }
+      } catch (e) { E.error = 'No se pudo leer: ' + e.message; E.cargando = ''; pintar(); }
+    }
+    // ---- historial por guardado ----
+    async function pasosDeLaVersion() {
+      if (E.pasosMd) return E.pasosMd;
+      await asegurar(); const v = await leerV(E.linaje.actual); E.pasosMd = v; return v;
+    }
+    async function cargarFila(fila) {
+      if (E.hist.has(fila.id) && !E.hist.get(fila.id).error) return;
+      E.hist.set(fila.id, { cargando: true, rotulo: fila.rotulo, entradas: [] }); pintar();
+      try {
+        let ev = await tzLeerAuditoria(modelo, fila.servicio, fila.campoId, fila.id);
+        if (fila.servicio === 'MD_ES_PASO' && E.incluirPm) for (const pm of fila.hijos || []) { if (E.cancelar) break; ev = ev.concat((await tzLeerAuditoria(modelo, 'MD_ES_PASO_INSUMO_PASO', 'mdEstructuraPasoInsumoPasoId', pm.id)).map((x) => ({ ...x, _pm: pm }))); }
+        const fmt = tzFormato(E.cat), grupos = new Map(); ev.forEach((x) => { const k = x._pm ? x._pm.id : fila.id; (grupos.get(k) || grupos.set(k, []).get(k)).push(x); });
+        const entradas = [];
+        grupos.forEach((lista, k) => { lista.sort((a, b) => a.ts - b.ts); const pm = lista[0]._pm; tzDifEventos(lista, fmt).forEach((x) => entradas.push({ ...x, de: pm ? `Proceso menor ${pm.hijo}` : '' })); });
+        entradas.sort((a, b) => a.ts - b.ts); E.hist.set(fila.id, { rotulo: fila.rotulo, entradas, eventos: ev.length });
+      } catch (e) { E.hist.set(fila.id, { rotulo: fila.rotulo, entradas: [], error: e.message }); }
+      pintar();
+    }
+    const filasHistorial = (v) => {
+      const md = E.linaje.actual, hijos = new Map(); v.pm.forEach((x) => (hijos.get(x.padreKey) || hijos.set(x.padreKey, []).get(x.padreKey)).push(x));
+      const cab = { id: md.mdId, servicio: 'MD', campoId: 'mdId', rotulo: 'Cabecera del RMD (estado y observaciones)', sub: 'Quién guardó, cuándo y qué líneas de observación agregó (la consulta tarda unos 25 s)' };
+      return [cab, ...v.pasos.map((p) => ({ id: p.id, servicio: 'MD_ES_PASO', campoId: 'mdEstructuraPasoId', rotulo: `${p.lugar} › Paso ${p.paso}${p.desc ? ' — ' + (p.desc.length > 70 ? p.desc.slice(0, 70) + '…' : p.desc) : ''}`, sub: `Orden ${tzNum(p.orden)}`, hijos: hijos.get(p.key) || [] }))];
+    };
+    async function cargarTodos(filas) {
+      if (E.lote) return; E.lote = true; E.cancelar = false; pintar();
+      try { for (const f of filas) { if (E.cancelar) break; if (E.hist.has(f.id) && !E.hist.get(f.id).error) continue; E.progreso = `Cargando el historial… ${[...E.hist.values()].filter((x) => !x.cargando).length} de ${filas.length}`; await cargarFila(f); } }
+      finally { E.lote = false; E.cancelar = false; E.progreso = ''; pintar(); }
+    }
+    const htmlEntradas = (h) => {
+      if (h.cargando) return '<p class="rmd-nota">Consultando la auditoría…</p>';
+      if (h.error) return `<p class="rmd-progreso error">${esc(h.error)}</p>`;
+      const vis = h.entradas.filter((x) => x.cambios.length || x.accion === 'CREATE' || x.primero), sin = h.entradas.length - vis.length;
+      if (!vis.length) return `<p class="rmd-nota">Sin guardados con cambios registrados${sin ? ` (${sin} guardado${sin > 1 ? 's' : ''} sin cambios)` : ''}. Solo hay registros desde enero de 2024 y las filas creadas por copia masiva no tienen alta.</p>`;
+      return `<table class="rmd-tabla rmd-tz-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Qué</th><th>Antes</th><th>Después</th></tr></thead><tbody>${vis.map((x) => x.cambios.length
+        ? x.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(x.ts))}</td><td class="rmd-nowrap">${esc(x.usuario || '—')}</td>`}<td>${esc(x.de ? x.de + ' · ' : '')}${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')
+        : `<tr><td class="rmd-nowrap">${esc(tzCuando(x.ts))}</td><td class="rmd-nowrap">${esc(x.usuario || '—')}</td><td colspan="3" class="rmd-nota">${x.accion === 'CREATE' ? 'Alta de la fila' : 'Primer guardado registrado (sin guardados anteriores para comparar)'}</td></tr>`).join('')}</tbody></table>${sin ? `<p class="rmd-nota">${sin} guardado${sin > 1 ? 's' : ''} más sin cambios en esta fila.</p>` : ''}`;
+    };
+    // ---- pintar ----
+    function pintar() {
+      tabs.querySelectorAll('button').forEach((b) => { const a = b.dataset.t === E.tab; b.classList.toggle('activo', a); b.setAttribute('aria-selected', String(a)); });
+      const foco = document.activeElement && cuerpo.contains(document.activeElement) ? { n: document.activeElement.dataset.f || document.activeElement.className, pos: document.activeElement.selectionStart } : null;
+      cuerpo.innerHTML = E.tab === 'ver' ? htmlVersiones() : htmlHistorial();
+      if (foco) { const el = [...cuerpo.querySelectorAll('input[type=search]')].find((x) => (x.dataset.f || x.className) === foco.n); if (el) { el.focus(); try { el.setSelectionRange(foco.pos, foco.pos); } catch (e) { /* sin selección */ } } }
+    }
+    const opcionesVersion = (sel) => E.linaje.versiones.map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
+    function htmlVersiones() {
+      if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
+      if (!E.linaje) return `<p class="rmd-progreso">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
+      const sel = `<div class="rmd-tz-sel"><label>Desde <select data-f="desde"><option value="">—</option>${opcionesVersion(E.desde)}</select></label><label>hasta <select data-f="hasta">${opcionesVersion(E.hasta)}</select></label><button type="button" class="rmd-btn" data-a="comparar" ${E.cargando ? 'disabled' : ''}>Comparar</button></div>`;
+      if (E.cargando) return `${sel}<p class="rmd-progreso">${esc(E.cargando)}</p>`;
+      if (!E.cambios) return sel;
+      if (!E.desde) return `${sel}<p class="rmd-nota">Es la primera versión de este RMD: no hay otra con la que compararla. Elige una versión en «Desde» para compararla con otra.</p>`;
+      const todos = E.cambios, visibles = todos.filter((c) => (E.soloOrden || !c.soloOrden) && (E.seccion === 'Todas' || c.seccion === E.seccion) && (E.tipo === 'Todos' || c.tipo === E.tipo)
+        && (!E.consulta || SIN_ACENTOS([c.elemento, c.campo, c.antes, c.despues, c.quien].join(' ')).includes(E.consulta))), nOrden = todos.filter((c) => c.soloOrden).length;
+      const cuenta = (f) => todos.filter((c) => (E.soloOrden || !c.soloOrden) && f(c)).length, secs = TZ_ESTR_ORDEN.filter((s) => todos.some((c) => c.seccion === s)), tipos = ['Agregado', 'Quitado', 'Modificado', 'Reemplazado'].filter((t) => todos.some((c) => c.tipo === t));
+      const chips = (k, lista, actual, total) => `<div class="rmd-cr-chips">${[[k === 'seccion' ? 'Todas' : 'Todos', total], ...lista.map((x) => [x, cuenta((c) => c[k] === x)])].map(([x, n]) => `<button type="button" data-a="${k}" data-v="${esc(x)}" class="${actual === x ? 'activo' : ''}">${esc(x)} <span>${n}</span></button>`).join('')}</div>`;
+      return `${sel}<p class="rmd-nota">${esc(E.comparacion)} · <b>${cuenta(() => true)}</b> cambio${cuenta(() => true) === 1 ? '' : 's'}${nOrden ? ` · ${nOrden} que solo cambian el orden ${E.soloOrden ? 'se muestran' : 'están ocultos'}` : ''}. Usuario y fecha son los de la fila en la versión nueva (al autorizar, el portal puede volver a crearlas a nombre de quien autoriza).</p>
+        <div class="rmd-cr-barra">${chips('seccion', secs, E.seccion, cuenta(() => true))}<input type="search" class="rmd-cr-buscar" data-f="consulta" placeholder="Buscar por paso, campo, valor o usuario" value="${esc(E.consulta)}"></div>
+        <div class="rmd-cr-barra">${chips('tipo', tipos, E.tipo, cuenta(() => true))}${nOrden ? `<label class="rmd-nota"><input type="checkbox" data-f="soloOrden" ${E.soloOrden ? 'checked' : ''}> Mostrar los que solo cambian el orden</label>` : ''}</div>
+        ${visibles.length ? `<table class="rmd-tabla rmd-tz-t"><thead><tr><th>Sección</th><th>Elemento</th><th>Cambio</th><th>Campo</th><th>Antes</th><th>Después</th><th>Usuario · fecha de la fila</th></tr></thead><tbody>${visibles.slice(0, 1500).map((c) => `<tr class="rmd-tz-${c.tipo.toLowerCase()}"><td class="rmd-nowrap">${esc(c.seccion)}</td><td>${esc(c.elemento)}</td><td class="rmd-nowrap"><span class="rmd-cr-tag ${c.tipo === 'Quitado' ? 'ruta' : c.tipo === 'Agregado' ? 'dos' : ''}">${esc(c.tipo)}</span></td><td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td><td class="rmd-nowrap">${c.tipo === 'Quitado' ? '<span class="rmd-nota">—</span>' : `${esc(c.quien || '—')}${c.cuando ? ' · ' + esc(tzCuando(c.cuando)) : ''}${c.alAutorizar ? '<span class="rmd-tz-aut" title="Fila registrada al autorizar: el portal la vuelve a crear a nombre de quien autoriza. Quién la editó antes se ve en el historial de guardados.">(al autorizar)</span>' : ''}`}</td></tr>`).join('')}</tbody></table>${visibles.length > 1500 ? `<p class="rmd-nota">Se muestran 1 500 de ${visibles.length}: el Excel trae todos.</p>` : ''}` : `<p class="rmd-nota">${todos.length ? 'Ningún cambio coincide con el filtro.' : '✓ Las dos versiones son iguales en pasos, procesos menores, insumos, recetas y especificaciones.'}</p>`}`;
+    }
+    function htmlHistorial() {
+      if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
+      if (!E.pasosMd) return `<p class="rmd-progreso">${esc(E.cargando || 'Leyendo los pasos del RMD…')}</p>`;
+      const filas = filasHistorial(E.pasosMd), q = E.pasoConsulta, vis = filas.filter((f) => !q || SIN_ACENTOS(f.rotulo).includes(q)), cargadas = filas.filter((f) => E.hist.has(f.id) && !E.hist.get(f.id).cargando).length;
+      const pms = filas.reduce((n, f) => n + (f.hijos ? f.hijos.length : 0), 0);
+      return `<p class="rmd-nota">Historial de la versión ${esc(nomVersion(E.linaje.actual))}. Cada guardado del portal queda registrado con su usuario (desde enero de 2024); el «antes» sale de los guardados anteriores de esa fila. La consulta lleva unos 2 a 3 s por fila.</p>
+        <div class="rmd-cr-barra"><input type="search" class="rmd-cr-buscar" data-f="pasoConsulta" placeholder="Buscar un paso por código, descripción o etiqueta" value="${esc(E.pasoConsulta)}">
+          <div class="rmd-tz-acc"><label class="rmd-nota"><input type="checkbox" data-f="incluirPm" ${E.incluirPm ? 'checked' : ''}> Incluir procesos menores (${pms}: ≈ 1 s cada uno)</label>
+          <button type="button" class="rmd-btn" data-a="todos" ${E.lote ? 'disabled' : ''} title="Carga el historial de todas las filas de la lista">Cargar todas (${filas.length})</button><button type="button" class="rmd-btn" data-a="detener" ${E.lote ? '' : 'hidden'}>Detener</button></div></div>
+        <p class="rmd-progreso">${esc(E.lote ? E.progreso : cargadas ? `${cargadas} de ${filas.length} filas con historial cargado (el Excel incluye las cargadas)` : '')}</p>
+        <div class="rmd-tz-lista">${vis.map((f) => { const h = E.hist.get(f.id), ab = E.abiertos.has(f.id), n = h && !h.cargando && !h.error ? h.entradas.filter((x) => x.cambios.length).length : null;
+          return `<div class="rmd-tz-fila ${ab ? 'abierta' : ''}" data-id="${esc(f.id)}"><div class="rmd-tz-fila-cab"><span class="rmd-tz-rotulo">${esc(f.rotulo)}<span class="rmd-nota"> · ${esc(f.sub)}</span></span>
+            <span class="rmd-nowrap">${h && h.cargando ? '<span class="rmd-nota">consultando…</span>' : n != null ? `<span class="rmd-cr-tag ${n ? '' : 'dos'}">${n} cambio${n === 1 ? '' : 's'}</span> ` : ''}<button type="button" class="rmd-link" data-a="${h && !h.cargando && !h.error ? 'ver' : 'cargar'}">${h && !h.cargando && !h.error ? (ab ? 'Ocultar' : 'Ver historial') : 'Cargar historial'}</button></span></div>${ab && h ? `<div class="rmd-tz-detalle">${htmlEntradas(h)}</div>` : ''}</div>`; }).join('')}</div>`;
+    }
+    // ---- eventos ----
+    tabs.addEventListener('click', async (e) => {
+      const b = e.target.closest('button[data-t]'); if (!b) return; E.tab = b.dataset.t; pintar();
+      if (E.tab === 'his' && !E.pasosMd) { E.cargando = 'Leyendo los pasos del RMD…'; pintar(); try { await pasosDeLaVersion(); } catch (x) { E.error = 'No se pudo leer: ' + x.message; } E.cargando = ''; pintar(); }
+    });
+    cuerpo.addEventListener('change', (e) => { const f = e.target.dataset.f;
+      if (f === 'desde' || f === 'hasta') { E[f] = e.target.value; }
+      else if (f === 'soloOrden') { E.soloOrden = e.target.checked; pintar(); } else if (f === 'incluirPm') { E.incluirPm = e.target.checked; E.hist = new Map([...E.hist].filter(([, h]) => h.rotulo && /^Cabecera/.test(h.rotulo))); pintar(); } });
+    cuerpo.addEventListener('input', (e) => { const f = e.target.dataset.f; if (f === 'consulta') { E.consulta = SIN_ACENTOS(e.target.value).trim(); pintar(); } else if (f === 'pasoConsulta') { E.pasoConsulta = SIN_ACENTOS(e.target.value).trim(); pintar(); } });
+    cuerpo.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
+      if (a === 'comparar') comparar(); else if (a === 'seccion' || a === 'tipo') { E[a] = b.dataset.v; pintar(); }
+      else if (a === 'detener') { E.cancelar = true; }
+      else if (a === 'todos') { if (E.pasosMd) cargarTodos(filasHistorial(E.pasosMd)); }
+      else if (a === 'cargar' || a === 'ver') { const id = b.closest('.rmd-tz-fila').dataset.id, f = filasHistorial(E.pasosMd).find((x) => x.id === id); if (!f) return;
+        if (a === 'ver') { E.abiertos.has(id) ? E.abiertos.delete(id) : E.abiertos.add(id); pintar(); } else { E.abiertos.add(id); cargarFila(f); } }
+    });
+    raiz.querySelector('.rmd-tz-excel').addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true;
+      try {
+        const est = estadosNativos();
+        const historial = [...E.hist.values()].filter((h) => !h.cargando && !h.error && h.entradas.length);
+        const x = tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, historial, estados: est });
+        descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); toast(`Excel de la trazabilidad del RMD ${codigo}: ${x.cambios} cambios entre versiones y ${x.filas} líneas de historial.`);
+      } catch (err) { toast('No se pudo armar el Excel: ' + err.message, true); } finally { btn.disabled = false; }
+    });
+    cuerpo.addEventListener('change', (e) => { if (e.target.dataset.f === 'desde' || e.target.dataset.f === 'hasta') comparar(); });
+    raiz.__tz = { E, comparar, cargarFila, pintar, iniciar, filas: () => (E.pasosMd ? filasHistorial(E.pasosMd) : []), excel: () => { const historial = [...E.hist.values()].filter((h) => !h.cargando && !h.error && h.entradas.length); return tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, historial, estados: estadosNativos() }); } };
+    iniciar();
+  }
+  function gestionarTrazabilidad() {
+    const ctrl = typeof sap !== 'undefined' && controladorPrincipal();
+    const d = ctrl && on('historialcambios') && dialogos().find((x) => /^Trazabilidad del RMD:/i.test(tzTituloDe(x)));
+    if (!d) { document.querySelectorAll('.rmd-tz').forEach((x) => x.remove()); document.querySelectorAll('.rmd-tz-dlg').forEach((x) => x.classList.remove('rmd-tz-dlg')); return; }
+    const m = /^Trazabilidad del RMD:\s*(\S+)/i.exec(tzTituloDe(d)), codigo = m && m[1], viejo = d.querySelector('.rmd-tz');
+    if (viejo && viejo.dataset.codigo === codigo) return;
+    if (viejo) viejo.remove();
+    if (codigo) montarHistorial(d, codigo);
+  }
+  window.__rmdStats.trazabilidad = { comparar: tzCompararVersiones, normalizar: tzNormalizar, difEventos: tzDifEventos, parsear: tzParsear, excel: tzArmarExcel, formato: tzFormato, leerAuditoria: tzLeerAuditoria, leerVersion: tzLeerVersion, linaje: tzLinaje, catalogos: tzCatalogos,
+    panel: () => { const r = document.querySelector('.rmd-tz'); return r && r.__tz; } };
+
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
     ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion']],
-    ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
+    ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
     ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
     ['Asociar fórmulas', ['asociar', 'recetas', 'recetaruta', 'recetasvarias', 'puestoreceta']],
     ['Alertas', ['reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],
