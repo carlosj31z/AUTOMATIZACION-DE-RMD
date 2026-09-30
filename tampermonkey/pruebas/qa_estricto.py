@@ -1946,21 +1946,29 @@ with sync_playwright() as p:
             if route.request.method not in ("GET", "HEAD"): bloq_p.append(route.request.method + " " + route.request.url[:80]); route.abort()
             else: route.continue_()
         pg.route("**/*", guardia_p)
-        def abrir_traz(cod):
-            cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1500)
+        def abrir_traz(cod, tab="ver", ancho=1920, alto=945):
+            cerrar_seguro(); pg.set_viewport_size({"width": ancho, "height": alto}); pg.wait_for_timeout(1500)
             fr.evaluate("(c) => window.__rmdStats.productividad.abrirRmdPorCodigo(c, 'trazabilidad')", cod); pg.wait_for_timeout(2500)
+            fr.evaluate("async () => { for (let i = 0; i < 60 && !document.querySelector('.rmd-tz'); i++) await new Promise(r => setTimeout(r, 250)); }")
+            if tab: fr.evaluate("(t) => document.querySelector('.rmd-tz [data-t=' + t + ']').click()", tab)
+            if tab == "ver": fr.evaluate(ESPERA_P)
+        ESTADO_P = """(js) => { const d = eval(js); if (!d) return null; const r = d.getBoundingClientRect(), p = d.querySelector('.rmd-tz'), pie = [...d.querySelectorAll('footer button')].find(x => /^Cerrar$/.test(x.textContent.trim())), pr = pie && pie.getBoundingClientRect(), t = window.__rmdStats.trazabilidad.panel();
+          const nativa = [...d.querySelectorAll('table')].find(x => !p || !p.contains(x)); const nr = nativa ? nativa.getBoundingClientRect() : null;
+          return { titulo: sap.ui.getCore().byId(d.id).getTitle(), ancho: Math.round(r.width), alto: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), vh: window.innerHeight, vw: window.innerWidth, panel: !!p, agrandada: d.classList.contains('rmd-tz-on'),
+            pestanas: p ? [...p.querySelectorAll('[role=tab]')].map(x => x.textContent.trim()) : [], estados: nativa ? nativa.querySelectorAll('tbody tr').length : 0, nativaVisible: !!(nr && nr.height > 0), pieVisible: !!(pr && pr.bottom <= window.innerHeight && pr.top >= 0 && pr.height > 0),
+            versiones: t && t.E.linaje ? t.E.linaje.versiones.map(m => m.codigo + ' v' + m.version + ' ' + m.estado) : null, hasta: t && t.E.linaje && t.E.hasta ? t.E.linaje.versiones.find(m => m.mdId === t.E.hasta).codigo : null,
+            desde: t && t.E.linaje && t.E.desde ? t.E.linaje.versiones.find(m => m.mdId === t.E.desde).codigo : null, cambios: t && t.E.cambios ? t.E.cambios.length : null, error: t && t.E.error, selects: p ? p.querySelectorAll('select').length : 0 }; }"""
         try:
-            @prueba("P1 «Trazabilidad RMD» con el panel de historial: la ventana conserva su tabla de estados, se agranda, trae las pestañas y compara sola la versión del RMD con la anterior (las versiones tienen códigos distintos: se busca por el código de versión principal)")
+            @prueba("P1 «Trazabilidad RMD»: la pestaña «Trazabilidad» es la original (su tabla de estados, ventana sin cambiar de tamaño y sin leer nada); «Cambios entre versiones» agranda la ventana SIN salirse de la pantalla (el pie con Cerrar queda a la vista), oculta la tabla original y compara sola con la versión anterior del linaje")
             def _():
-                abrir_traz(COD_P); listo = fr.evaluate(ESPERA_P)
-                e = fr.evaluate("""(js) => { const d = eval(js); if (!d) return null; const r = d.getBoundingClientRect(), p = d.querySelector('.rmd-tz'), t = window.__rmdStats.trazabilidad.panel();
-                  const nativa = [...d.querySelectorAll('table')].find(x => !p || !p.contains(x)); const est = nativa ? [...nativa.querySelectorAll('tbody tr')].length : 0;
-                  return { titulo: sap.ui.getCore().byId(d.id).getTitle(), ancho: Math.round(r.width), alto: Math.round(r.height), vp: window.innerWidth, panel: !!p, pestanas: p ? [...p.querySelectorAll('[role=tab]')].map(x => x.textContent.trim()) : [], estados: est,
-                    versiones: t ? t.E.linaje.versiones.map(m => m.codigo + ' v' + m.version + ' ' + m.estado) : null, hasta: t && t.E.linaje.versiones.find(m => m.mdId === t.E.hasta).codigo, desde: t && t.E.desde ? t.E.linaje.versiones.find(m => m.mdId === t.E.desde).codigo : null,
-                    cambios: t && t.E.cambios ? t.E.cambios.length : null, error: t && t.E.error, visible: p ? p.getClientRects().length > 0 : false, selects: p ? p.querySelectorAll('select').length : 0 }; }""", TOP_P)
-                ok = (bool(listo) and bool(e) and e["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and e["panel"] and e["visible"] and e["pestanas"] == ["Cambios entre versiones", "Historial de guardados"] and e["estados"] >= 1
-                      and e["ancho"] >= 1000 and e["alto"] > 500 and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
-                return ok, str(e)
+                abrir_traz(COD_P, tab=None)
+                a = fr.evaluate(ESTADO_P, TOP_P)
+                fr.evaluate("(t) => document.querySelector('.rmd-tz [data-t=' + t + ']').click()", "ver"); fr.evaluate(ESPERA_P)
+                e = fr.evaluate(ESTADO_P, TOP_P)
+                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Cambios entre versiones", "Historial de guardados"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
+                      and a["cambios"] is None and bool(e) and e["agrandada"] and not e["nativaVisible"] and e["pieVisible"] and e["top"] >= 0 and e["bottom"] <= e["vh"] and e["ancho"] >= 1000
+                      and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
+                return ok, f"original={a} comparando={e}"
             @prueba("P2 La comparación entre versiones cuadra con lo leído: (pasos de la versión nueva − pasos de la anterior) = agregados − quitados (un paso reemplazado no suma ni resta), cada cambio trae su usuario y fecha, y los filtros y la búsqueda reducen la lista")
             def _():
                 r = fr.evaluate("""() => { const t = window.__rmdStats.trazabilidad.panel(), E = t.E, A = E.versionCache.get(E.desde), B = E.versionCache.get(E.hasta), c = E.cambios;
@@ -1986,8 +1994,8 @@ with sync_playwright() as p:
                 return ok, f"{x}; hojas={hojas}"
             @prueba("P4 Historial de guardados (auditoría): lista la cabecera y todos los pasos de la versión; al cargar la cabecera el último guardado es de quien figura en el RMD (mismo usuario, misma hora), y los pasos cargados salen en orden, con usuario, sin errores")
             def _():
-                abrir_traz(COD_PH); fr.evaluate(ESPERA_P)
-                r = fr.evaluate("""async () => { const t = window.__rmdStats.trazabilidad.panel(); document.querySelector('.rmd-tz [data-t=his]').click();
+                abrir_traz(COD_PH, tab="his")
+                r = fr.evaluate("""async () => { const t = window.__rmdStats.trazabilidad.panel();
                   for (let i = 0; i < 60 && !t.E.pasosMd; i++) await new Promise(r => setTimeout(r, 500));
                   const fs = t.filas(), md = t.E.linaje.actual; await t.cargarFila(fs[0]); const h0 = t.E.hist.get(fs[0].id);
                   let con = null, visitados = 0; for (const f of fs.slice(1)) { visitados++; await t.cargarFila(f); const h = t.E.hist.get(f.id); if (h.eventos > 0 && h.entradas.some(x => x.cambios.length)) { con = { rotulo: f.rotulo.slice(-50), eventos: h.eventos, ordenados: h.entradas.every((x, i, a) => !i || a[i - 1].ts <= x.ts), usuarios: [...new Set(h.entradas.map(x => x.usuario))], error: h.error || '' }; break; } if (visitados >= 40) break; }
@@ -2001,9 +2009,20 @@ with sync_playwright() as p:
             def _():
                 cerrar_seguro(); pg.wait_for_timeout(800)
                 a = fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, document.querySelectorAll('.rmd-tz-dlg').length]")
-                abrir_traz(COD_P); fr.evaluate(ESPERA_P)
+                abrir_traz(COD_P)
                 b_ = fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, window.__rmdStats.trazabilidad.panel().E.linaje.actual.codigo]")
                 return (a == [0, 0] and b_ == [1, COD_P]), f"cerrada={a} reabierta={b_}"
+            @prueba("P7 Esc cierra la ventana de trazabilidad a la primera (también con el cursor en el buscador) y en una pantalla baja el pie con Cerrar sigue a la vista")
+            def _():
+                r = []
+                for pestana in ("ver", "his"):
+                    abrir_traz(COD_P, tab=pestana, ancho=1366, alto=650)
+                    pie = fr.evaluate(ESTADO_P, TOP_P)
+                    fr.evaluate("() => { const b = document.querySelector('.rmd-tz input[type=search]'); if (b) b.focus(); }")
+                    pg.keyboard.press("Escape"); pg.wait_for_timeout(1200)
+                    r.append([pestana, pie["pieVisible"], pie["bottom"] <= pie["vh"], fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).length]")])
+                pg.set_viewport_size({"width": 1920, "height": 945})
+                return all(x[1] and x[2] and x[3] == [0, 0] for x in r), str(r)
         finally:
             cerrar_seguro(); pg.unroute("**/*", guardia_p)
         @prueba("P6 Ninguna petición de escritura salió del navegador durante el bloque P (todo es lectura: versiones, pasos y auditoría)")
