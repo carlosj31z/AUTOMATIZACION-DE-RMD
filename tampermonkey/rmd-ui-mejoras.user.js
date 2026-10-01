@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.38.1
+// @version      1.39.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.38.1';                                                       // mantener igual a @version
+  const VERSION = '1.39.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -36,7 +36,6 @@
     ['suspension', 'Modificaciones masivas: suspender Autorizados o Ingresados y agregar una observación a varios master (desde este panel o Ctrl+K)'],
     ['citastodos', '"Documentos citados en todos los master" en el menú Exportar'],
     ['recetas', 'Avisar si la lista de materiales de una receta asociada cambió en SAP (⚠ con el detalle junto al código y botón "Revisar recetas" en Asociar fórmulas)'],
-    ['recetaruta', 'Recetas: avisar también si en SAP cambió su hoja de ruta o puesto de trabajo (apagado por defecto)'],
     ['repetirpaso', 'Adicionar Pasos (también en procesos menores): panel "Pasos a agregar" con la cantidad de cada paso (− n +) y su orden (↑ ↓); Agregar los agrega así'],
     ['cambiarpaso', 'Botón "Cambiar paso" (pasos y procesos menores): cambia un paso por otro código de paso ya creado, sin tocar su configuración ni, en un paso mayor, sus procesos menores'],
     ['editarpaso', 'Editar Paso: avisa si el paso lo usan otros RMD y, al Grabar, deja elegir "Solo en este RMD" (paso nuevo o el ya existente, sin duplicar) o "En todos"'],
@@ -56,9 +55,10 @@
     ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
+  opc.recetaruta = true;                                                  // (siempre activo: el aviso de recetas incluye la hoja de ruta y el puesto de trabajo)
   const on = (k) => opc.activo && opc[k];
   // Apagadas por defecto: "RMD en vivo" cambia la disposición de las ventanas; solo se activa si la persona lo elige.
-  const APAGADAS_POR_DEFECTO = ['vivo', 'recetaruta'];
+  const APAGADAS_POR_DEFECTO = ['vivo'];
   APAGADAS_POR_DEFECTO.forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
   // Por defecto apagadas: pasar a minúsculas es una redacción automática y la ortografía usa un diccionario reducido; ambas piden revisar el resultado.
 
@@ -225,7 +225,7 @@
   .rmd-cr-estado.error { color: var(--rmd-rojo); } .rmd-cr-t { font-size: 12.5px; } .rmd-cr-t td.rmd-cr-sel, .rmd-cr-t th.rmd-cr-sel { width: 26px; padding-right: 0; }
   .rmd-cr-fila.abierta td { border-bottom-color: transparent; } .rmd-cr-detalle > td { padding: 4px 12px 14px 34px; background: rgba(128,140,155,.08); font-size: 12.5px; } .rmd-cr-detalle hr { border: 0; border-top: 1px solid var(--rmd-borde); margin: 10px 0; }
   .rmd-cr-tag { display: inline-block; margin: 0 4px 2px 0; padding: 0 7px; border-radius: 9px; font: 700 10.5px/17px var(--rmd-fuente); white-space: nowrap; background: rgba(240,180,90,.18); color: var(--rmd-ambar); } .rmd-cr-tag.ruta { background: rgba(27,141,236,.18); color: var(--rmd-acento-texto); } .rmd-cr-tag.dos { background: rgba(160,120,240,.2); color: #b79cf2; }
-  .rmd-cr-obs { max-width: 260px; font-size: 12px; } .rmd-cr-obs .rmd-nota { font-size: 11px; opacity: .8; }
+  .rmd-cr-obs { min-width: 300px; font-size: 12px; } .rmd-cr-obs-in { box-sizing: border-box; width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 12px var(--rmd-fuente); } .rmd-cr-obs .rmd-nota { font-size: 11px; opacity: .8; }
   .rmd-rec-fechas { margin: 2px 0 6px; font-size: 12px; color: var(--rmd-texto); } .rmd-rec-cuando { white-space: nowrap; font-size: 12px; }
   .rmd-rec-tabla { width: 100%; border-collapse: collapse; } .rmd-rec-tabla th { text-align: left; padding: 4px 6px; color: var(--rmd-apagado); font-weight: 600; border-bottom: 1px solid var(--rmd-borde); white-space: nowrap; }
   .rmd-rec-tabla td { padding: 4px 6px; border-bottom: 1px solid rgba(128,128,128,.18); vertical-align: top; } .rmd-rec-tabla td:nth-child(n+4) { white-space: nowrap; }
@@ -5665,7 +5665,7 @@
   // su lugar con el orden de dibujo de UI5 (Column.setOrder). Con "Columnas ordenadas": un orden más claro (lo que es el RMD, su estado y
   // fase, la producción, la autorización) y anchos según el ancho de la pantalla; la Descripción toma lo que sobra. Antes todas las
   // columnas medían lo mismo (~150 px) y la Descripción, estrecha, ocupaba 3 líneas. "Etapa" sigue en una línea ("ACONDICIONADO" completo).
-  const ORDEN_LISTA = ['Código', 'Versión', 'Descripción', 'Etapa', 'Estado', 'Fase', 'Producción Estado', 'Producción Enviar', 'Producción Estatus', 'Fecha Autorización', 'Usuario Autorización', 'A/F', 'Planta', 'Accion'];
+  const ORDEN_LISTA = ['Código', 'Versión', 'Descripción', 'Producción Estado', 'Producción Enviar', 'Producción Estatus', 'Etapa', 'Estado', 'Fase', 'Fecha Autorización', 'Usuario Autorización', 'A/F', 'Planta', 'Accion'];
   // ancho preferido en px; el mínimo se mide (la palabra más larga del encabezado y de las celdas visibles, sin partirla, + el relleno)
   const ANCHOS_LISTA = { 'Código': 110, 'Versión': 70, 'Etapa': 130, 'Estado': 100, 'Fase': 80, 'Producción Estado': 120, 'Producción Enviar': 96,
     'Producción Estatus': 200, 'Fecha Autorización': 150, 'Usuario Autorización': 124, 'A/F': 50, 'Planta': 110 };
@@ -5728,7 +5728,7 @@
           // dentro de un contenedor (.sapMColumnHeader) con su propio relleno.
           // Por columna: el mínimo (ninguna palabra partida), el de "una línea" (cada celda en una sola línea; el encabezado sí puede ocupar
           // dos) y el preferido (ANCHOS_LISTA). Los botones de la celda (iconos) también cuentan.
-          const minimos = {}, unaLinea = {}, rellenos = {};
+          const minimos = {}, unaLinea = {}, rellenos = {}; let descMaxLinea = 0;
           ths.forEach((th, i) => {
             const n = norm(th.textContent); if (!ANCHOS_LISTA[n] && n !== 'Descripción') return;
             const hdr = th.querySelector('.sapMColumnHeader'), cab = th.querySelector('.sapMColumnHeader .sapMText, .sapMText, .sapMLabel') || th;
@@ -5748,6 +5748,7 @@
               td.querySelectorAll('.sapMBtn').forEach((b) => { const w = b.getBoundingClientRect().width; mC = Math.max(mC, w); lC = Math.max(lC, w); });
               td.querySelectorAll('.sapMHBox').forEach((hb) => { const w = [...hb.children].reduce((s, x) => s + x.getBoundingClientRect().width, 0); mC = Math.max(mC, w); lC = Math.max(lC, w); });
             });
+            if (n === 'Descripción' && lineas.length) descMaxLinea = Math.max(...lineas);
             if (n === 'Descripción' && lineas.length) lC = lineas.sort((a, b) => a - b)[Math.floor((lineas.length - 1) * 0.9)];   // (9 de cada 10 en una línea: las más largas pueden ocupar dos)
             minimos[n] = Math.ceil(Math.max(mH, mC ? mC + tdPad - fuera : 0) + 6);
             unaLinea[n] = Math.max(minimos[n], Math.ceil((lC ? lC + tdPad - fuera : 0) + 6)); rellenos[n] = Math.ceil(fuera);
@@ -5768,6 +5769,15 @@
             const falta = presentes.reduce((x, k) => x + id(k) - ancho[k], 0);
             f = falta > 0 ? Math.min(1, sobra / falta) : 1;
             presentes.forEach((k) => { ancho[k] = Math.round(ancho[k] + (id(k) - ancho[k]) * f); });
+          }
+          // Pantallas anchas (zoom del navegador al 70–90 %): la Descripción se queda con lo que ocupan sus textos (+15 %) y el resto del espacio
+          // se reparte entre las demás columnas, hasta 1,8 veces su ancho preferido, para que la tabla no se vea vacía.
+          const descIdeal = Math.min(Math.round(W * 0.45), Math.max(MIN_DESCRIPCION, Math.ceil((Math.max(descMaxLinea, unaLinea['Descripción'] || 0) + (rellenos['Descripción'] || 0) + 16) * 1.05)));   // (el texto más largo en una línea)
+          let extra = W - aW - presentes.reduce((x, k) => x + ancho[k] + rellenos[k], 0) - descIdeal;
+          for (let vuelta = 0; vuelta < 4 && extra > 8; vuelta++) {
+            const crecen = presentes.filter((k) => ancho[k] < Math.round(id(k) * 1.8)), peso = crecen.reduce((x, k) => x + ancho[k], 0); if (!peso) break;
+            let usado = 0; crecen.forEach((k) => { const add = Math.min(Math.round(id(k) * 1.8) - ancho[k], Math.floor(extra * ancho[k] / peso)); ancho[k] += add; usado += add; });
+            extra -= usado; if (!usado) break;
           }
           // El ancho se cambia sin redibujar la tabla (propiedad sin invalidar + estilo del encabezado): redibujarla quitaba los revisores
           // de Producción Estatus, se volvía a medir sin ellos y el ancho oscilaba sin parar (se redibujaba ~12 veces por segundo a 1366 px).
@@ -6189,9 +6199,10 @@
     document.querySelectorAll('.rmd-creado').forEach((x) => x.remove());
     const c = document.createElement('div'); c.className = 'rmd-creado'; c.setAttribute('role', 'status');
     const donde = origen ? `el ${origen.tipo === 'menor' ? 'proceso menor' : 'paso'} de orden ${origen.orden} (${codigoAntes})` : '';
-    c.innerHTML = `<b>✓ Paso ${esc(nuevo.codigo)} creado</b><span>${esc(nuevo.descripcion)}</span><span class="rmd-nota">${copiado ? 'Código copiado al portapapeles: pégalo en "Código Paso" de Adicionar Pasos.' : `Código: ${esc(nuevo.codigo)} (no se pudo copiar al portapapeles).`}</span>
-      <div class="rmd-creado-pie">${origen ? `<button type="button" class="rmd-btn primario rmd-creado-reemplazar" title="Cambia solo el paso maestro de esa fila: conserva su configuración${origen.tipo === 'mayor' ? ' y sus procesos menores' : ''}.">Reemplazar ${esc(donde)}</button>` : ''}<button type="button" class="rmd-btn rmd-creado-cerrar">Cerrar</button></div>`;
-    html.appendChild(c);
+    c.innerHTML = `<b>✓ Paso ${esc(nuevo.codigo)} creado</b><span>${esc(nuevo.descripcion)}</span><span class="rmd-nota rmd-creado-copia">${copiado ? '✓ Código copiado al portapapeles: pégalo en "Código Paso" de Adicionar Pasos.' : `Código: ${esc(nuevo.codigo)} (no se pudo copiar solo: pulsa «Copiar código»).`}</span>
+      <div class="rmd-creado-pie">${origen ? `<button type="button" class="rmd-btn primario rmd-creado-reemplazar" title="Cambia solo el paso maestro de esa fila: conserva su configuración${origen.tipo === 'mayor' ? ' y sus procesos menores' : ''}.">Reemplazar ${esc(donde)}</button>` : ''}<button type="button" class="rmd-btn rmd-creado-copiar">Copiar código</button><button type="button" class="rmd-btn rmd-creado-cerrar">Cerrar</button></div>`;
+    html.appendChild(c);                                                               // (se queda hasta que la persona la cierre; no tiene temporizador)
+    c.querySelector('.rmd-creado-copiar').addEventListener('click', async (e) => { const ok = await copiarAlPortapapeles(String(nuevo.codigo)); const n = c.querySelector('.rmd-creado-copia'); setTxt(n, ok ? `✓ Código ${nuevo.codigo} copiado al portapapeles.` : 'No se pudo copiar: selecciona el código a mano.'); e.currentTarget.blur(); });
     c.querySelector('.rmd-creado-cerrar').addEventListener('click', () => c.remove());
     const br = c.querySelector('.rmd-creado-reemplazar');
     if (br) br.addEventListener('click', async () => {
@@ -7260,7 +7271,7 @@
     registrarExternosUI5(); await rsDatos();
     if (RS.ventana && RS.ventana.fondo.isConnected) return;
     let filtro = 'todos', consulta = '', trabajando = false;
-    const sel = new Set(), abiertos = new Set();
+    const sel = new Set(), abiertos = new Set(), editadas = new Map();
     const v = ventana('Cambios de recetas en SAP', { cancelar: () => { if (!trabajando) v.cerrar(); } }), tarjeta = v.fondo.querySelector('.rmd-modal');
     tarjeta.classList.add('rmd-cr'); RS.ventana = v;
     const cerrarOrig = v.cerrar; v.cerrar = () => { RS.ventana = null; cerrarOrig(); };
@@ -7283,6 +7294,7 @@
     bIng.title = 'Vuelve a leer SAP para los RMD Ingresados ahora (de 1 a 6 minutos).'; bTodos.title = 'Vuelve a leer SAP para todos, también los Autorizados (de 10 a 40 minutos).';
     v.pie.append(bBorrar, bCerrar, bX, bIng, bTodos, bStop, bObs);
     const lineaDe = (g, hoy) => Reglas.lineaActualizacion(hoy, rsUsuarioIniciales(), { lista: g.tipos.has('lista'), ruta: g.tipos.has('ruta') });
+    const lineaPlan = (g, hoy) => (editadas.has(g.mdId) ? editadas.get(g.mdId) : lineaDe(g, hoy)).replace(/\s*[\r\n]+\s*/g, ' ').trim();
     v.pintarEstado = () => {
       const d = RS.datos, ult = d && (d.ultima.ing || d.ultima.aut) ? `Última revisión: Ingresados ${d.ultima.ing ? fechaHoraCorta(d.ultima.ing) : '—'} · Autorizados ${d.ultima.aut ? fechaHoraCorta(d.ultima.aut) : '—'}${d.cobertura ? ` · ${d.cobertura.alDia} de ${d.cobertura.listas} listas de materiales al día${d.cobertura.alDia < d.cobertura.listas ? ' (el resto se revisa solo en segundo plano)' : ''}` : ''}${d.lecturas && d.lecturas.sinLectura ? ` · ${d.lecturas.sinLectura} sin lectura en SAP` : ''}` : 'Aún no se revisó.';
       setTxt(estado, RS.leyendo ? `${RS.progreso}` : RS.error ? RS.error : ult); estado.classList.toggle('error', !!RS.error && !RS.leyendo);
@@ -7300,7 +7312,7 @@
       bObs.disabled = hayTrabajo || !pendientes.length; setTxt(bObs, pendientes.length ? `Agregar observación a ${pendientes.length}` : 'Agregar observación');
       if (!filas.length) { tabla.innerHTML = `<p class="rmd-nota">${grupos.length ? 'Ningún RMD coincide con el filtro.' : d && (d.ultima.ing || d.ultima.aut) ? '✓ Ningún RMD tiene cambios de receta pendientes.' : 'Pulsa «Revisar Ingresados» (rápido) o «Revisar todos» para empezar.'}</p>`; return; }
       const sinObs = filas.filter((g) => !g.obs);
-      tabla.innerHTML = `<table class="rmd-tabla rmd-cr-t"><thead><tr><th class="rmd-cr-sel"><input type="checkbox" data-a="todas" ${sinObs.length && sinObs.every((g) => sel.has(g.mdId)) ? 'checked' : ''} aria-label="Seleccionar todos"></th><th>RMD</th><th>Estado</th><th>Recetas</th><th>Qué cambió</th><th>Fecha en SAP</th><th>Detectado</th><th>Observación</th><th></th></tr></thead><tbody>${filas.map((g) => {
+      tabla.innerHTML = `<table class="rmd-tabla rmd-cr-t"><thead><tr><th class="rmd-cr-sel"><input type="checkbox" data-a="todas" ${sinObs.length && sinObs.every((g) => sel.has(g.mdId)) ? 'checked' : ''} aria-label="Seleccionar todos"></th><th>RMD</th><th>Estado</th><th>Recetas</th><th>Qué cambió</th><th>Fecha en SAP</th><th>Detectado</th><th>Observación a agregar</th><th></th></tr></thead><tbody>${filas.map((g) => {
         const r = RS.resultados.get(g.mdId), abierto = abiertos.has(g.mdId), linea = g.obs ? g.obs.linea : lineaDe(g, hoyDia);
         return `<tr class="rmd-cr-fila${abierto ? ' abierta' : ''}" data-md="${esc(g.mdId)}"><td class="rmd-cr-sel"><input type="checkbox" data-a="sel" ${sel.has(g.mdId) ? 'checked' : ''} ${g.obs || hayTrabajo ? 'disabled' : ''} aria-label="Seleccionar ${esc(g.codigo)}"></td>
           <td><b>${esc(g.codigo)}</b> <span class="rmd-nota">v${esc(g.version)}</span><br><span class="rmd-nota">${esc(g.descripcion)}</span></td>
@@ -7309,13 +7321,14 @@
           <td>${g.recetas.map((h) => `<span class="rmd-cr-tag ${h.tipos.length > 1 ? 'dos' : h.tipos[0]}">${esc(rsTipoTxt(h.tipos))}</span> ${esc(rsResumenReceta(h))}`).join('<br>')}</td>
           <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio de la hoja de ruta">—</span>'}</td>
           <td class="rmd-nowrap">${esc(rsCuando(g.detectado))}</td>
-          <td class="rmd-cr-obs" title="${esc(linea)}">${r ? esc(r) : g.obs ? `✓ ${esc(fechaHoraCorta(g.obs.t).slice(0, 10))}` : `<span class="rmd-nota">${esc(ini ? linea : '')}</span>`}</td>
+          <td class="rmd-cr-obs">${r ? esc(r) : g.obs ? `<span title="${esc(g.obs.linea)}">✓ ${esc(fechaHoraCorta(g.obs.t).slice(0, 10))}</span>` : ini ? `<input type="text" class="rmd-cr-obs-in" data-a="obs" value="${esc(editadas.has(g.mdId) ? editadas.get(g.mdId) : linea)}" title="Puedes editar el texto antes de agregarlo" aria-label="Observación de ${esc(g.codigo)}">` : ''}</td>
           <td class="rmd-nowrap"><button type="button" class="rmd-link" data-a="ver">${abierto ? 'Ocultar' : 'Ver detalle'}</button> · <button type="button" class="rmd-link" data-a="abrir" title="Abrir «Asociar fórmulas» de este RMD">Abrir</button></td></tr>
           ${abierto ? `<tr class="rmd-cr-detalle"><td colspan="9">${g.recetas.map(detalleRecetaHtml).join('<hr>')}<p class="rmd-nota">Para traer lo nuevo: en «Asociar fórmulas», <b>Eliminar Receta</b> → <b>Agregar Producto</b> → asociarla de nuevo.</p></td></tr>` : ''}`;
       }).join('')}</tbody></table>`;
     };
     chips.addEventListener('click', (e) => { const b = e.target.closest('button[data-f]'); if (b) { filtro = b.dataset.f; v.pintar(); } });
     buscar.addEventListener('input', () => { consulta = norma(buscar.value).trim(); v.pintar(); });
+    tabla.addEventListener('input', (e) => { if (e.target.dataset.a !== 'obs') return; const f = e.target.closest('tr[data-md]'); if (f) editadas.set(f.dataset.md, e.target.value); });
     tabla.addEventListener('change', (e) => {
       const a = e.target.dataset.a, fila = e.target.closest('tr[data-md]');
       if (a === 'sel' && fila) { e.target.checked ? sel.add(fila.dataset.md) : sel.delete(fila.dataset.md); v.pintar(); }
@@ -7334,9 +7347,10 @@
       if (dialogos().length) { toast('Cierra las ventanas abiertas del portal antes de agregar observaciones.', true); return; }
       const ini = rsUsuarioIniciales(); if (!ini) { toast('No se pudieron leer tus iniciales en SAP (nombre y apellido del launchpad).', true); return; }
       if (!grupos.length) return;
-      const hoy = new Date(), plan = grupos.map((g) => ({ g, linea: lineaDe(g, hoy) })), distintas = [...new Set(plan.map((x) => x.linea.replace(/^\d{8}[^ ]* /, '')))];
+      if (grupos.some((g) => !lineaPlan(g, new Date()))) { toast('Hay una observación vacía: escríbela o quita la selección de ese RMD.', true); return; }
+      const hoy = new Date(), plan = grupos.map((g) => ({ g, linea: lineaPlan(g, hoy) })), distintas = [...new Set(plan.map((x) => x.linea.replace(/^\d{8}[^ ]* /, '')))];
       const ok = await confirmar(`¿Agregar la observación a ${plan.length} RMD?`,
-        `Se agregará al final de las Observaciones de ${plan.length} RMD (${plan.filter((x) => x.g.estado === 'Ingresado').length} Ingresados, ${plan.filter((x) => x.g.estado === 'Autorizado').length} Autorizados) una línea como: «${plan[0].linea}»${distintas.length > 1 ? ` (o «…${distintas.slice(1).join('», «…')}» según lo que cambió)` : ''}.`,
+        `Se agregará al final de las Observaciones de ${plan.length} RMD (${plan.filter((x) => x.g.estado === 'Ingresado').length} Ingresados, ${plan.filter((x) => x.g.estado === 'Autorizado').length} Autorizados) el texto de su fila (por ejemplo «${plan[0].linea}»).`,
         'Se guarda con el Guardar de «Asociar fórmulas» de cada RMD, igual que en las modificaciones masivas: el Estado no cambia. En un Autorizado de Fabricación o Envase el portal puede pedir revisar el comparador de fórmula y no guardar: se te avisa. Para quitar la línea habría que editarla a mano.',
         { si: `Agregar a ${plan.length}`, no: 'Cancelar' });
       if (!ok) return;
@@ -7785,7 +7799,7 @@
     ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion']],
     ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
     ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
-    ['Asociar fórmulas', ['asociar', 'recetas', 'recetaruta', 'recetasvarias', 'puestoreceta']],
+    ['Asociar fórmulas', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta']],
     ['Alertas', ['reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],
   ];
   function panel() {
