@@ -1,4 +1,4 @@
-# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.39.0
+# Mejoras de interfaz para Configuración RMD (Tampermonkey) — v1.39.1
 
 Instalación: en Tampermonkey → "Crear un script nuevo" → pega `rmd-ui-mejoras.user.js` → guarda → recarga el portal.
 Solo actúa dentro del iframe de la app (`ui5appruntime.html`). Casi todo es vista; **solo escribe cuando tú lo pides**: "Aplicar" en la vista previa de Pegar y el
@@ -11,6 +11,7 @@ Desde la versión 1.9 el script **solo modifica las ventanas del RMD** ("<códig
 
 | Mejora | Qué hace |
 |---|---|
+| **Falso cambio de cantidad por el separador de miles** *(v1.39.1)* | Al copiar la lista al asociar la receta, el portal a veces lee el separador de miles como decimal (SAP 42 094 queda «42.094000»). Si la copia es la cantidad de SAP dividida entre 1000 o entre 1 000 000 (y SAP ≥ 1000), ya no se avisa como cambio; cualquier otra diferencia sigue avisando. |
 | **Lista principal repartida para el zoom del navegador (70–90 %) y Producción junto a la Descripción** *(v1.39)* | Con «Columnas ordenadas», **Producción Estado, Producción Enviar y Producción Estatus** van ahora a continuación de la Descripción (antes de Etapa y Estado). En pantallas anchas la Descripción se queda con lo que ocupa su texto más largo y el resto del ancho se reparte entre las demás columnas (hasta 1,8 veces su ancho preferido), para que la tabla no se vea vacía. |
 | **Observación editable y hoja de ruta siempre avisada** *(v1.39)* | En «Cambios de recetas en SAP» la observación de cada RMD es un campo de texto con la propuesta `AAAAMMDD<iniciales> Actualización de…`: se puede editar antes de «Agregar observación» (se agrega lo que haya en el campo; vacío no se agrega). El aviso de recetas **siempre** incluye la hoja de ruta y el puesto de trabajo (ya no es una opción del panel). |
 | **Paso creado: tarjeta fija con «Copiar código»** *(v1.39)* | La tarjeta «✓ Paso N creado» (con «Código copiado al portapapeles») no tiene temporizador: queda hasta que se cierra, y trae «Copiar código» para volver a copiarlo. |

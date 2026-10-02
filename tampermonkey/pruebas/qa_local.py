@@ -662,6 +662,13 @@ with sync_playwright() as p:
         ok = (hojas == ["Cambios entre versiones", "Historial de guardados", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
               and "el registro al autorizar" in compartidas and "Guardado sin cambios" in compartidas and "JQUISPEP" in compartidas)
         return ok, f"{r}; hojas={hojas}"
+    @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
+    def _():
+        r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });
+          const sap = [c('C4', '42094.000'), c('C5', '2.000'), c('C6', '5000.000'), c('C7', '1500.000'), c('C8', '900.000'), c('C9', '3000.000', 'KG'), c('C10', '1234567.000')];
+          const rmd = [c('C4', '42.094000'), c('C5', '2.000000'), c('C6', '5.000000'), c('C7', '1.000000'), c('C8', '0.900000'), c('C9', '3.000000', 'L'), c('C10', '1.234567')];
+          return f(sap, rmd).map(d => d.tipo + ':' + d.comp).sort(); }""")
+        return r == ["cambia:C7", "cambia:C8", "cambia:C9"], str(r)
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
 

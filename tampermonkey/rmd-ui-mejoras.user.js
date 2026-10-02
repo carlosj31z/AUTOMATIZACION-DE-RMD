@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.39.0
+// @version      1.39.1
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.39.0';                                                       // mantener igual a @version
+  const VERSION = '1.39.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -4586,6 +4586,9 @@
   // es la fecha en que se hizo ese cambio de la lista. La versión de fabricación trae "válida desde" (Adatu).
   const fechaBom = (v) => { const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(norm(v)); if (!m) return null; const d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])); return isNaN(d) ? null : d; };
   const fechaCorta = (d) => (d ? `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}` : '');
+  // Al copiar la lista al asociar la receta, el portal a veces lee el separador de miles como decimal: 42094 queda como «42.094000» (1000 veces
+  // menos; 1 234 567 queda «1.234567»). No es un cambio en SAP: si la copia es la cantidad de SAP dividida entre 1000 o entre 1 000 000, es la misma.
+  const cantidadIgual = (qSap, qRmd) => Math.abs(qSap - qRmd) <= 1e-6 || (qSap >= 1000 && [1e3, 1e6].some((f) => Math.abs(qSap - qRmd * f) <= 1e-6 * Math.max(1, qSap)));
   function diferenciasBom(sap, rmd) {
     const agrupar = (filas) => { const m = new Map(); filas.forEach((x) => { const k = norm(x.Component); if (!k) return; const g = m.get(k) || { comp: k, desc: norm(x.Maktx || x.ItemText1 || ''), q: 0, u: norm(x.CompUnit), n: 0, fecha: null, cambio: '' }; g.q += cantidadNum(x.CompQty) || 0; g.n++; if (!g.desc) g.desc = norm(x.Maktx || x.ItemText1 || '');
       const f = fechaBom(x.ValidFrom); if (f && (!g.fecha || f > g.fecha)) { g.fecha = f; g.cambio = norm(x.ChangeNo); } m.set(k, g); }); return m; };
@@ -4593,7 +4596,7 @@
     a.forEach((x, k) => {
       const y = b.get(k);
       if (!y) dif.push({ tipo: 'nuevo', comp: k, desc: x.desc, ahora: { q: x.q, u: x.u }, fecha: x.fecha, cambio: x.cambio, texto: `+ ${k} ${numTxt(x.q)} ${x.u}`.trim() });
-      else if (Math.abs(x.q - y.q) > 1e-6 || x.u.toUpperCase() !== y.u.toUpperCase()) dif.push({ tipo: 'cambia', comp: k, desc: x.desc || y.desc, antes: { q: y.q, u: y.u }, ahora: { q: x.q, u: x.u }, fecha: x.fecha, cambio: x.cambio, texto: `${k}: ${numTxt(y.q)} ${y.u} → ${numTxt(x.q)} ${x.u}` });
+      else if (!cantidadIgual(x.q, y.q) || x.u.toUpperCase() !== y.u.toUpperCase()) dif.push({ tipo: 'cambia', comp: k, desc: x.desc || y.desc, antes: { q: y.q, u: y.u }, ahora: { q: x.q, u: x.u }, fecha: x.fecha, cambio: x.cambio, texto: `${k}: ${numTxt(y.q)} ${y.u} → ${numTxt(x.q)} ${x.u}` });
     });
     b.forEach((y, k) => { if (!a.has(k)) dif.push({ tipo: 'quitado', comp: k, desc: y.desc, antes: { q: y.q, u: y.u }, texto: `− ${k} (ya no está en la lista de SAP)` }); });
     // un quitado y un nuevo con la misma descripción salvo la versión del material ("… x25" → "… x25 H v.1") = reemplazo
