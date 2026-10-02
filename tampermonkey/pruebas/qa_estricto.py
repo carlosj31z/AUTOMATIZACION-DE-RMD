@@ -2098,19 +2098,39 @@ with sync_playwright() as p:
                 e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); e.fill("[data-k=nombre]", "QA"); e.fill("[data-k=area]", "QA"); e.fill("[data-k=motivo]", "Prueba sin escritura")
                 with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
                 guardado = open(dl.value.path(), encoding="utf-8").read(); e.close()
-                fr.evaluate("([t, n]) => { window.__rmdStats.plantilla.ultimo = null; window.__rmdStats.plantilla.importar(t, n); }", [guardado, "Propuesta QA.html"])
+                fr.evaluate("([t, n]) => { window.__rmdStats.plantilla.ultimo = null; window.__rmdStats.plantilla.importar(t, n); }", [guardado, "Borrador QA.html"])
                 fr.wait_for_function("() => window.__rmdStats.plantilla.ultimo || document.querySelector('.rmd-pp-imp .rmd-progreso.error')", timeout=120000); pg.wait_for_timeout(800)
                 an = fr.evaluate("""() => { const u = window.__rmdStats.plantilla.ultimo; if (!u) return { error: (document.querySelector('.rmd-pp-imp .rmd-progreso.error') || {}).textContent }; const a = u.an;
                   return { destino: a.destino && [a.destino.codigo, a.destino.estado], cambios: a.cambios.map((c) => [c.accion, c.codigo || '', !!c.nuevo]), nuevos: a.nuevos.map((n) => [n.texto.slice(0, 30), n.existe]), enSap: a.enSap.length, filas: document.querySelectorAll('.rmd-pp-t tbody tr').length }; }""")
                 cerrar_seguro()
                 ok = (an.get("destino") == [COD_PP, "Ingresado"] and ["cambiar", cambio["a"], False] in an["cambios"] and ["agregar", "", True] in an["cambios"] and an["enSap"] == 0 and an["nuevos"] and an["nuevos"][0][1] == [] and an["filas"] >= 2)
                 return ok, f"cambio={cambio} importada={an}"
+            @prueba("1-4 Solo se importa en un RMD Ingresado (datos reales): el borrador de un RMD Autorizado cuyo master no tiene ninguna versión Ingresada se rechaza con su explicación, sin plan ni Excel")
+            def _():
+                cod = os.environ.get("COD_PP_AUT") or fr.evaluate("""async () => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const mm = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener.getView().getModel('mainModelv2');
+                  const F = sap.ui.model.Filter, leer = (est, top) => new Promise((ok, mal) => mm.read('/MD', { filters: [new F('estadoIdRmd_iMaestraId', 'EQ', est)], urlParameters: { $select: 'codigo,codigoversionprincipal', $top: String(top), $orderby: 'fechaRegistro desc' }, success: (d) => ok(d.results), error: mal }));
+                  const [aut, ing] = await Promise.all([leer(465, 300), leer(467, 5000)]), conIng = new Set(ing.map((m) => String(m.codigoversionprincipal || m.codigo)));
+                  const m = aut.find((x) => !conIng.has(String(x.codigoversionprincipal || x.codigo))); return m ? String(m.codigo) : null; }""")
+                if not cod: return False, "no se encontró un RMD Autorizado sin versión Ingresada"
+                r = fr.evaluate("""async (cod) => { const P = window.__rmdStats.plantilla, x = await P.generar(cod, {}), pq = x.paquete, d = pq.rmd;
+                  const prop = { formato: 1, tipo: 'borrador-rmd', base: { mdId: d.mdId, codigo: d.codigo, version: d.version, huella: pq.huella }, guardado: new Date().toISOString(), solicitud: { nombre: 'QA', area: 'QA', motivo: 'Prueba sin escritura' }, trabajo: JSON.parse(JSON.stringify(pq.arbol)) };
+                  const json = JSON.stringify(prop).replace(/</g, '\\\\u003c'), html = x.html.replace(/(<script id="rmd-borrador" type="application\\/json">)[\\s\\S]*?(<\\/script>)/, (m0, a, b) => a + json + b);
+                  const cerrarImp = () => document.querySelectorAll('.rmd-pp-imp').forEach((w) => { const c = [...w.querySelectorAll('button')].find((y) => y.textContent.trim() === 'Cerrar'); if (c) c.click(); });
+                  cerrarImp(); await new Promise((ok) => setTimeout(ok, 400));                                   // (la ventana de 1-3 sigue abierta)
+                  P.ultimo = null; P.importar(html, 'Borrador QA autorizado.html'); for (let i = 0; i < 300 && !P.ultimo; i++) await new Promise((ok) => setTimeout(ok, 200));
+                  const u = P.ultimo, ms = document.querySelectorAll('.rmd-pp-imp'), m = ms[ms.length - 1];
+                  const out = { estado: d.estado, cambia: html !== x.html, bloqueado: !!(u && u.bloqueado), destino: u && u.an.destino ? u.an.destino.codigo : null, versiones: u ? u.an.lin.versiones.map((v) => v.version + ':' + v.estado) : [], ventanas: ms.length,
+                    txt: ((m && m.querySelector('.rmd-progreso.error')) || {}).textContent || '', botones: m ? [...m.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean) : [], filas: m ? m.querySelectorAll('.rmd-pp-t tbody tr').length : -1 };
+                  cerrarImp(); return out; }""", cod)
+                cerrar_seguro()
+                ok = (r["estado"] == "Autorizado" and r["cambia"] and r["bloqueado"] and r["destino"] is None and r["ventanas"] == 1 and "Solo se puede importar en un RMD Ingresado" in r["txt"] and "Exportar Excel" not in r["botones"] and r["filas"] == 0)
+                return ok, f"RMD {cod} · {r}"
         finally:
             cerrar_seguro(); pg.unroute("**/*", guardia_1)
             try:
                 if PP1.get("pagina") and not PP1["pagina"].is_closed(): PP1["pagina"].close()
             except Exception: pass
-        @prueba("1-4 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
+        @prueba("1-5 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
         def _():
             return (not bloq_1), f"bloqueadas={bloq_1[:5]}"
 

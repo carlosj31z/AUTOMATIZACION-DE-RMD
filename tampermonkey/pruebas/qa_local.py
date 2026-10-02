@@ -674,20 +674,25 @@ with sync_playwright() as p:
     PP_DATOS_JS = """() => {
       const P = (id, codigo, texto, orden, o = {}) => ({ id, pasoId: 'X' + codigo, codigo, texto, orden, tipo: 446, vi: null, vf: null, margen: null, depende: null, rpor: false, vb: false, etqCat: 'G-DOC', pm: [], ...o });
       const arbol = { estructuras: [
-        { id: 'E1', estructuraId: 'S-PREC', nombre: 'PRECAUCIONES', tipo: 484, numeracion: false, orden: 1, etiquetas: [], pasos: [P('P1', '1001', 'USAR GUANTES.', 1, { etqCat: null })], equipos: [], utensilios: [], insumos: [], espec: [] },
-        { id: 'E2', estructuraId: 'S-EQ', nombre: 'EQUIPOS / INSTRUMENTOS / MATERIALES', tipo: 485, numeracion: true, orden: 2, etiquetas: [], pasos: [], equipos: [{ id: 'Q1', equipoId: 'EQ1', codigo: '10000675', ref: 'PL1-SEL-E013', desc: 'REACTOR DE 400 L', orden: 1 }], utensilios: [], insumos: [], espec: [] },
+        { id: 'E1', estructuraId: 'S-PREC', nombre: 'PRECAUCIONES', tipo: 484, numeracion: false, verificadoPor: true, orden: 1, etiquetas: [], pasos: [P('P1', '1001', 'USAR GUANTES.', 1, { etqCat: null })], equipos: [], utensilios: [], insumos: [], espec: [] },
+        { id: 'E2', estructuraId: 'S-EQ', nombre: 'EQUIPOS / INSTRUMENTOS / MATERIALES', tipo: 485, numeracion: true, verificadoPor: true, orden: 2, etiquetas: [], pasos: [], equipos: [{ id: 'Q1', equipoId: 'EQ1', codigo: '10000675', ref: 'PL1-SEL-E013', desc: 'REACTOR DE 400 L', orden: 1 }], utensilios: [], insumos: [], espec: [] },
         { id: 'E3', estructuraId: 'S-PROC', nombre: 'PROCEDIMIENTO', tipo: 487, numeracion: true, orden: 3, pasos: [], equipos: [], utensilios: [], insumos: [], espec: [], etiquetas: [
-          { id: 'T1', etiquetaId: 'G-DOC', nombre: 'DOCUMENTACION', orden: 1, pasos: [P('P10', '2001', 'FECHA / HORA INICIO:', 1, { tipo: 436 }), P('P11', '2002', 'VERIFICAR EL DESPEJE DE LA SALA.', 2, { pm: [{ id: 'M1', pasoId: 'Y1', codigo: '3001', texto: 'N° DE REPORTE:', orden: 1, tipo: 433, etqCat: 'G-DOC' }] }),
+          { id: 'T1', etiquetaId: 'G-DOC', nombre: 'DOCUMENTACION', orden: 1, conforme: true, pasos: [P('P10', '2001', 'FECHA / HORA INICIO:', 1, { tipo: 436, edit: true }), P('P11', '2002', 'VERIFICAR EL DESPEJE DE LA SALA.', 2, { pm: [{ id: 'M1', pasoId: 'Y1', codigo: '3001', texto: 'N° DE REPORTE:', orden: 1, tipo: 433, etqCat: 'G-DOC' }] }),
             P('P12', '2003', 'AGITAR DURANTE 10 MINUTOS.', 3, { tipo: 443, vi: '40', vf: '60', margen: '1' }), P('P13', '2004', 'FECHA / HORA FINAL:', 4, { tipo: 436, depende: '2003' })] },
-          { id: 'T2', etiquetaId: 'G-FAB', nombre: 'FABRICACION', orden: 2, pasos: [P('P20', '2005', 'CONDICIONES AMBIENTALES:', 1), P('P21', '2005', 'CONDICIONES AMBIENTALES:', 2, { etqCat: 'G-FAB' })] }] }] };
+          { id: 'T2', etiquetaId: 'G-FAB', nombre: 'FABRICACION', orden: 2, pasos: [P('P20', '2005', 'CONDICIONES AMBIENTALES:', 1, { tipo: 432 }), P('P21', '2005', 'CONDICIONES AMBIENTALES:', 2, { etqCat: 'G-FAB', rpor: true })] }] },
+        { id: 'E4', estructuraId: 'S-INS', nombre: 'INSUMOS', tipo: 488, numeracion: true, verificadoPor: true, orden: 4, etiquetas: [], pasos: [], equipos: [], utensilios: [], espec: [], insumos: [
+          { comp: '1000000846', desc: 'BROMURO DE ROCURONIO APIROGENO', cant: '0.300', um: 'KGP', aiPrio: '00' }, { comp: '2500000010', desc: 'AGUA PARA INYECCION CSP', cant: '30', um: 'L', aiPrio: '01' }, { comp: '9999999', desc: 'NO SE IMPRIME', cant: '1', um: 'UN', aiPrio: '02' }] },
+        { id: 'E5', estructuraId: 'S-ESP', nombre: 'ESPECIFICACIONES DE PRODUCTO EN PROCESO: GRANEL', tipo: 486, numeracion: true, orden: 5, etiquetas: [], pasos: [], equipos: [], utensilios: [], insumos: [], espec: [
+          { id: 'S1', ensayo: 'pH (25 °C):', grupoId: 1, grupo: 'PRUEBAS ESPECIFICAS', especificacion: '3.80 - 4.20' }, { id: 'S2', ensayo: 'DESCRIPCION (Aspecto):', grupoId: 2, grupo: 'CARACTERISTICAS FISICAS', especificacion: 'Solución transparente, incolora.' }] },
+        { id: 'E6', estructuraId: 'S-FIR', nombre: 'VERIFICACION DE FIRMAS', tipo: 489, numeracion: true, orden: 6, etiquetas: [], pasos: [], equipos: [], utensilios: [], insumos: [], espec: [] }] };
       const cat = { pasos: [['1001', 'S-PREC', '', 446, 'USAR GUANTES.'], ['2001', 'S-PROC', 'G-DOC', 436, 'FECHA / HORA INICIO:'], ['2002', 'S-PROC', 'G-DOC', 446, 'VERIFICAR EL DESPEJE DE LA SALA.'], ['2003', 'S-PROC', 'G-DOC', 443, 'AGITAR DURANTE 10 MINUTOS.'],
           ['2004', 'S-PROC', 'G-DOC', 436, 'FECHA / HORA FINAL:'], ['2005', 'S-PROC', 'G-DOC', 446, 'CONDICIONES AMBIENTALES:'], ['2010', 'S-PROC', 'G-DOC', 443, 'AGITAR DURANTE 15 MINUTOS.'], ['2011', 'S-PROC', 'G-FAB', 446, 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.'],
           ['2012', 'S-PROC', 'G-DOC', 446, 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.'], ['3001', 'S-PROC', 'G-DOC', 433, 'N° DE REPORTE:']],
-        estructuras: [['S-PREC', 'PRECAUCIONES'], ['S-EQ', 'EQUIPOS / INSTRUMENTOS / MATERIALES'], ['S-PROC', 'PROCEDIMIENTO']], etiquetas: [['G-DOC', 'DOCUMENTACION'], ['G-FAB', 'FABRICACION']],
+        estructuras: [['S-PREC', 'PRECAUCIONES'], ['S-EQ', 'EQUIPOS / INSTRUMENTOS / MATERIALES'], ['S-PROC', 'PROCEDIMIENTO'], ['S-INS', 'INSUMOS'], ['S-ESP', 'ESPECIFICACIONES'], ['S-FIR', 'FIRMAS']], etiquetas: [['G-DOC', 'DOCUMENTACION'], ['G-FAB', 'FABRICACION']],
         equipos: [['EQ1', '10000675', 'PL1-SEL-E013', 'REACTOR DE 400 L'], ['EQ2', '40100796', 'SEL-BAL-08', 'BALANZA-OHAUS-R31P30']], utensilios: [['U1', 'SEL-U005', 'BALDE DE ACERO INOXIDABLE DE 10 L']], agrupadores: [], tipos: { 443: 'Rango' } };
       const md = { mdId: 'MD1', codigo: '2202600001', version: 3, descripcion: 'PRODUCTO DE PRUEBA 10 mg', nivelTxt: 'FABRICACION', areaRmdTxt: 'SOLUCIONES', sucursalId: { contenido: 'PLANTA ATE' }, estado: 'Autorizado', observacion: '', rptaValidacion: 'RVP-19-13-00', codigoversionprincipal: '2202600001' };
       return { arbol, cat, md }; }"""
-    @prueba("LN27 Plantilla para Producción · núcleo (v1.40, datos de mentira): numeración como el PDF (solo estructuras con «numeración»; pasos con su orden y renumerados si la lista cambia), buscador (igual y parecidos, primero la misma etiqueta), lista de cambios (agregar, quitar, cambiar a un paso existente, rango, mover, proceso menor, equipos, comentario) y avisos (duplicado nuevo, «Control de Calidad», rango invertido, predecesor, etiqueta distinta ya en SAP)")
+    @prueba("LN27 Plantilla para Producción · núcleo (v1.40, datos de mentira): numeración como el PDF (solo estructuras con «numeración»; pasos con su orden y renumerados si la lista cambia), buscador (igual y parecidos, primero la misma etiqueta), lista de cambios (agregar, quitar, cambiar a un paso existente, rango, mover, proceso menor, equipos, comentario) y avisos (duplicado nuevo, «Control de Calidad» con las excepciones del FPRO-250 y la biocarga, rango invertido, predecesor, etiqueta distinta ya en SAP)")
     def _():
         r = pg.evaluate("((d) => { const N = window.__rmdStats.plantilla.nucleo, base = d.arbol, W = JSON.parse(JSON.stringify(base));" + """
           const n0 = N.numerar(base.estructuras), numBase = ['E1', 'E2', 'E3', 'T1', 'P10', 'P13', 'T2', 'P21'].map((k) => k + '=' + (n0.get(k) || ''));
@@ -702,35 +707,39 @@ with sync_playwright() as p:
           T2.pasos.push({ id: 'n:3', texto: 'FECHA / HORA INICIO:', codigo: '2001', nuevo: false, etqCat: 'G-DOC', pm: [] });                                 // otra etiqueta
           T2.pasos.push({ id: 'n:4', texto: 'VARIADOR EN POSICION', codigo: null, nuevo: true, tipo: 443, vi: '60', vf: '40', pm: [] });                       // rango invertido
           T2.pasos.push({ id: 'n:5', texto: 'CONDICIONES AMBIENTALES:', codigo: '2005', nuevo: false, etqCat: 'G-DOC', pm: [] });                              // duplicado nuevo
+          T2.pasos.push({ id: 'n:7', texto: 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA.', codigo: null, nuevo: true, pm: [] });
+          T2.pasos.push({ id: 'n:8', texto: 'EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA.', codigo: null, nuevo: true,
+            pm: [{ id: 'n:9', texto: 'MUESTRA DE BIOCARGA PARA CONTROL DE CALIDAD (mL):', codigo: null, nuevo: true }] });                                  // excepciones de «Control de Calidad»
           W.estructuras[1].equipos[0].quitado = true; W.estructuras[1].equipos.push({ id: 'n:6', equipoId: 'EQ2', codigo: '40100796', ref: 'SEL-BAL-08', desc: 'BALANZA-OHAUS-R31P30' });
           T2.comentario = 'Revisar con el jefe de sección.';
           const c = N.cambios(base, W), n1 = N.numerar(W.estructuras, base.estructuras), av = N.avisos(W, { buscador: B, etiquetas: new Map(d.cat.etiquetas), base: base.estructuras });
           const avs = (id) => (av.get(id) || []).map((a) => a.nivel + ':' + a.texto.slice(0, 40));
           return { numBase, exacto, parecidos: parecidos.slice(0, 2), cambios: c.map((x) => [x.clase, x.accion, x.id, x.numero, !!x.nuevo].join('|')), numNuevo: ['P10', 'n:1', 'P13', 'P11', 'P20', 'n:5'].map((k) => k + '=' + (n1.get(k) || '')),
-            av: { n1: avs('n:1'), n2: avs('n:2'), n3: avs('n:3'), n4: avs('n:4'), n5: avs('n:5'), P12: avs('P12'), P21: avs('P21'), P20: avs('P20') } }; })""" + "((" + PP_DATOS_JS + ")())")
+            av: { n1: avs('n:1'), n2: avs('n:2'), n3: avs('n:3'), n4: avs('n:4'), n5: avs('n:5'), n7: avs('n:7'), n8: avs('n:8'), n9: avs('n:9'), P12: avs('P12'), P21: avs('P21'), P20: avs('P20') } }; })""" + "((" + PP_DATOS_JS + ")())")
         c = set(r["cambios"])
         ok = (r["numBase"] == ["E1=", "E2=1", "E3=2", "T1=2.1", "P10=2.1.1", "P13=2.1.4", "T2=2.2", "P21=2.2.2"] and r["exacto"] == ["2010"] and r["parecidos"][0] == "2011"
               and {"paso|cambiar|P11|2.1.4|false", "paso|quitar|P12|2.1.3|false", "paso|agregar|n:1|2.1.2|true", "pm|agregar|n:2|2.1.4 › proceso menor 2|true", "equipo|quitar|Q1|1|false", "equipo|agregar|n:6|1|false", "etiqueta|comentario|T2|2.2|false"} <= c
               and any(x.startswith("paso|mover|") for x in c) and r["numNuevo"] == ["P10=2.1.1", "n:1=2.1.2", "P13=2.1.3", "P11=2.1.4", "P20=2.2.1", "n:5=2.2.5"]
-              and any(a.startswith("info:Paso nuevo") for a in r["av"]["n1"]) and any("CALIDAD EN OPERACIONES" in a for a in r["av"]["n2"]) and any(a.startswith("aviso:En el catálogo este paso es de DOC") for a in r["av"]["n3"])
+              and any(a.startswith("info:Paso nuevo") for a in r["av"]["n1"]) and any("CANTIDAD MUESTREADA" in a for a in r["av"]["n2"]) and any(a.startswith("aviso:En el catálogo este paso es de DOC") for a in r["av"]["n3"])
+              and not any("Debe decir" in a for a in r["av"]["n7"] + r["av"]["n8"]) and any(a.startswith("aviso:Debe decir «CALIDAD EN OPERACIONES»") for a in r["av"]["n9"])
               and any(a.startswith("error:El valor inicial es mayor") for a in r["av"]["n4"]) and any(a.startswith("aviso:El paso 2005 ya está en esta lista") for a in r["av"]["n5"])
               and any("depende" in a for a in r["av"]["P12"]) and not r["av"]["P21"] and any(a.startswith("info:Ya está así en SAP") for a in r["av"]["P20"]))
         return ok, json.dumps(r, ensure_ascii=False)[:1900]
     PP_CTX = br.new_context(accept_downloads=True)
-    @prueba("LN28 Plantilla para Producción · el archivo (v1.40): se abre sin SAP con la numeración del PDF; cambiar un texto enlaza solo el paso existente igual; un texto nuevo queda «★ Se creará»; quitar, deshacer, mover, agregar equipo, comentario; «Guardar propuesta» pide la solicitud y descarga el archivo, que al volver a abrirlo trae todo")
+    @prueba("LN28 Plantilla para Producción · el archivo (v1.41, borrador): se abre sin SAP con la numeración del PDF; cambiar un texto enlaza solo el paso existente igual; un texto nuevo queda «★ Se creará»; quitar, deshacer, mover, agregar equipo, comentario; «Guardar borrador» pide la solicitud y descarga el archivo, que al volver a abrirlo trae todo")
     def _():
-        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA'); return P.html(await P.empacar(paq), null, 'Prueba'); }", pg.evaluate("(" + PP_DATOS_JS + ")()"))
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { estadoFechaPor: 'Autorizado/ 2026-09-24 /NCUELLARL' }); return P.html(await P.empacar(paq), null, 'Prueba'); }", pg.evaluate("(" + PP_DATOS_JS + ")()"))
         e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200])); e.on("dialog", lambda dlg: dlg.accept())
         e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
-        nums = e.evaluate("() => [...document.querySelectorAll('.pp-num')].map(x => x.textContent).filter(Boolean)")
-        acc = lambda n, a: e.evaluate("([n, a]) => { const li = [...document.querySelectorAll('.pp-paso')].find(li => (li.querySelector(':scope > .pp-linea > .pp-num') || {}).textContent === n + '.-'); li.querySelector(':scope > .pp-linea > .pp-acc [data-a=' + a + ']').click(); }", [n, a])
+        nums = e.evaluate("() => [...document.querySelectorAll('.pp-c-num, .pp-c-guion')].map(x => x.textContent.trim()).filter(Boolean)")
+        acc = lambda n, a: e.evaluate("([n, a]) => { const tr = [...document.querySelectorAll('tr.pp-paso')].find(tr => (tr.querySelector('.pp-c-num') || {}).textContent === n + '.-'); tr.querySelector('.pp-acc [data-a=' + a + ']').click(); }", [n, a])
         acc("2.1.3", "editar"); e.fill("#m-texto", "agitar durante 15 minutos."); e.wait_for_timeout(500); est1 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
         acc("2.1.1", "agregar"); e.fill("#m-texto", "ENJUAGAR CON AGUA PURIFICADA."); e.wait_for_timeout(500); est2 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
         acc("2.1.5", "quitar"); e.wait_for_timeout(200); quitados1 = e.evaluate("document.querySelectorAll('.pp-paso.qui').length")
         e.click("[data-a=deshacer]"); e.wait_for_timeout(200); quitados2 = e.evaluate("document.querySelectorAll('.pp-paso.qui').length")
         acc("2.1.5", "subir"); e.wait_for_timeout(200)
         e.evaluate("() => document.querySelector('[data-a=agregar-equipo]').click()"); e.fill("#m-q", "balanza"); e.wait_for_timeout(300); e.click("#m-res .pp-sug-it >> nth=0"); e.wait_for_timeout(200)
-        e.evaluate("() => { const h = [...document.querySelectorAll('.pp-etq h3')].find(x => /^2\\.2\\.-/.test(x.textContent.trim())); h.querySelector('[data-a=comentar]').click(); }"); e.fill("#m-com", "Revisar con el jefe."); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(200)
+        e.evaluate("() => { const h = [...document.querySelectorAll('.pp-etq-tit')].find(x => /^2\\.2\\.-/.test(x.textContent.trim())); h.querySelector('[data-a=comentar]').click(); }"); e.fill("#m-com", "Revisar con el jefe."); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(200)
         estado = e.evaluate("() => { const s = window.__pp.estado(); return { contar: s.contar, tags: [...document.querySelectorAll('.pp-tag')].map(t => t.textContent.trim()), panel: document.querySelectorAll('.pp-cmb').length }; }")
         e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); pide = e.evaluate("document.querySelector('.pp-modal h3').textContent")
         e.fill("[data-k=nombre]", "Ana Prueba"); e.fill("[data-k=area]", "Fabricación"); e.fill("[data-k=motivo]", "Ajuste de tiempos")
@@ -738,10 +747,10 @@ with sync_playwright() as p:
         ruta = dl.value.path(); guardado = open(ruta, encoding="utf-8").read(); nombre = dl.value.suggested_filename
         e2 = PP_CTX.new_page(); e2.set_content(guardado); e2.wait_for_selector(".pp-doc", timeout=15000); otra = e2.evaluate("() => ({ contar: window.__pp.estado().contar, sol: window.__pp.estado().SOL.nombre })"); e2.close(); e.close()
         ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and "★ Se creará" in estado["tags"] and "Paso 2010" in estado["tags"]
-              and estado["contar"]["total"] >= 5 and estado["contar"]["nuevos"] == 1 and "Solicitud" in pide and nombre.startswith("Propuesta RMD 2202600001 v3 ") and otra["contar"] == estado["contar"] and otra["sol"] == "Ana Prueba")
+              and estado["contar"]["total"] >= 5 and estado["contar"]["nuevos"] == 1 and "Solicitud" in pide and nombre.startswith("Borrador RMD 2202600001 v3 ") and otra["contar"] == estado["contar"] and otra["sol"] == "Ana Prueba")
         PP_GUARDADO.append(guardado)
         return ok, json.dumps({ "nums": nums[:8], "est1": est1, "est2": est2, "quitados": [quitados1, quitados2], "estado": estado, "nombre": nombre, "reabierta": otra, "errores": errs[:3] }, ensure_ascii=False)[:1800]
-    @prueba("LN29 Plantilla para Producción · leer la propuesta (v1.40): el portal lee el archivo guardado (datos y propuesta, con la huella), rehace la misma lista de cambios, une las filas con otra versión del master por estructura / etiqueta / código, y arma el Excel del plan (Cambios, Pasos nuevos, Cambiado en SAP, Solicitud); un archivo sin propuesta se rechaza con un mensaje claro")
+    @prueba("LN29 Plantilla para Producción · leer el borrador (v1.41): el portal lee el archivo guardado (datos y borrador, con la huella), rehace la misma lista de cambios, une las filas con otra versión del master por estructura / etiqueta / código, y arma el Excel del plan (Cambios, Pasos nuevos, Cambiado en SAP, Solicitud); un archivo sin borrador se rechaza con un mensaje claro")
     def _():
         if not PP_GUARDADO: return False, "LN28 no dejó archivo"
         r = pg.evaluate("""async ([h, d0]) => { const P = window.__rmdStats.plantilla, N = P.nucleo, { datos, prop } = await P.leer(h);
@@ -755,8 +764,30 @@ with sync_playwright() as p:
         import base64, io, zipfile
         z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64")))); hojas = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
         ok = (r["tipo"] == "plantilla-rmd" and r["huella"] and r["cambios"] == r["resumen"]["cambios"] and r["mapa"][1:] == ["V2-P11", "V2-T2", "V2-Q1"] and r["mapa"][0] >= 12
-              and hojas == ["Cambios", "Pasos nuevos", "Cambiado en SAP", "Solicitud"] and "todavía no tiene una propuesta" in r["sinProp"])
+              and hojas == ["Cambios", "Pasos nuevos", "Cambiado en SAP", "Solicitud"] and "todavía no tiene un borrador" in r["sinProp"])
         return ok, f"{r}; hojas={hojas}"
+    @prueba("LN30 Borrador de Producción · la hoja como el PDF (v1.41, datos de mentira): encabezado de 8 columnas con sus textos y «Estado / Fecha / Por», validación, cuadros con guion y VERIFICADO POR, equipos e insumos con sus columnas (sin los insumos que el PDF no imprime), etiqueta «conforme» con su nota, casillas según el tipo (dato, check, Realizado Por), especificaciones agrupadas y firmas; y el destino de la importación es solo un RMD Ingresado")
+    def _():
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { estadoFechaPor: 'Autorizado/ 2026-09-24 /NCUELLARL' }); return P.html(await P.empacar(paq), null, 'Prueba'); }", pg.evaluate("(" + PP_DATOS_JS + ")()"))
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        r = e.evaluate("""() => { const enc = document.querySelector('.pp-enc'), txt = (s) => [...document.querySelectorAll(s)].map((x) => x.textContent.replace(/\\s+/g, ' ').trim());
+          return { enc: enc ? enc.textContent.replace(/\\s+/g, ' ') : '', cols: enc ? enc.querySelectorAll('col').length : 0, val: txt('.pp-val td'), subs: txt('.pp-sub').map((t) => t.replace(/\\s*💬$/, '')),
+            thEq: txt('.pp-grid:not(.pp-ins):not(.pp-esp):not(.pp-firma) .pp-th th'), thIns: txt('.pp-ins .pp-th th'), insFilas: document.querySelectorAll('.pp-ins tr:not(.pp-th):not(.pp-ver)').length,
+            verificados: document.querySelectorAll('.pp-ver').length, notaConf: txt('.pp-etq-cab .pp-nota-der'), caja: !!document.querySelector('tr[data-id="P10"] .pp-caja'), conformeCheck: document.querySelectorAll('tr[data-id="P11"] .pp-check').length,
+            realizado: txt('tr[data-id="P21"] .pp-mini th'), check: !!document.querySelector('tr[data-id="P20"] .pp-c-chk .pp-check'), pmCaja: !!document.querySelector('tr[data-id="M1"] .pp-caja'),
+            esp: txt('.pp-esp .pp-th th'), grupos: txt('.pp-esp .pp-grupo td:first-child'), firmas: document.querySelectorAll('.pp-firma').length }; }""")
+        e.close()
+        d = pg.evaluate("""() => { const D = window.__rmdStats.plantilla.destino, v = (c, ver, est, f) => ({ codigo: c, version: ver, estadoIdRmd_iMaestraId: est, fechaRegistro: f });
+          const a = v('A', 3, 465, '2026-01-01'), b = v('B', 4, 467, '2026-02-01'), c = v('C', 4, 466, '2026-02-02'), x = v('X', 2, 467, '2025-01-01'), s = v('S', 5, 468, '2026-03-01');
+          return { ingresado: (D([a, b, c], b) || {}).codigo || null, autorizadoConIngresada: (D([x, a, b, c], a) || {}).codigo || null, autorizadoSinIngresada: D([x, a, c], a), suspendido: D([s], s) }; }""")
+        etiquetas = ["REGISTRO DE MANUFACTURA", "Etapa", "Emitido:", "Página:", "Orden N°:", "Lote:", "Expira:", "Teórico:", "Código", "Version Fab./Alt.", "Edi. Reg. Manuf.", "Estado / Fecha / Por", "Fecha de FABRICACION", "Inicio:", "Fin:", "Autorizado/ 2026-09-24 /NCUELLARL", "PRODUCTO DE PRUEBA 10 mg"]
+        ok = (r["cols"] == 8 and all(t in r["enc"] for t in etiquetas) and r["val"][0] == "- PROCESO VALIDADO REPORTE DE VALIDACIÓN N° RVP-19-13-00" and r["val"][-1] == "R: Realizado por, S: Supervisado por"
+              and r["subs"] == ["PRECAUCIONES", "1.-EQUIPOS / INSTRUMENTOS / MATERIALES", "2.-PROCEDIMIENTO", "3.-INSUMOS", "4.-ESPECIFICACIONES DE PRODUCTO EN PROCESO: GRANEL", "5.-VERIFICACION DE FIRMAS"]
+              and r["thEq"][:3] == ["Descripción", "Código", "Código de referencia"] and r["thIns"][:7] == ["Descripción", "Código", "Cantidad", "UM", "Cant. Recib.", "UM (CP)", "Bulto"] and r["insFilas"] == 2
+              and r["verificados"] == 5 and r["notaConf"] == ["(Colocar check en caso de conformidad)"] and r["caja"] and r["conformeCheck"] == 1 and r["realizado"] == ["Realizado Por"] and r["check"] and r["pmCaja"]
+              and r["esp"] == ["ENSAYO", "ESPECIFICACIONES", "RESULTADOS"] and r["grupos"] == ["PRUEBAS ESPECIFICAS", "CARACTERISTICAS FISICAS"] and r["firmas"] == 2
+              and d == {"ingresado": "B", "autorizadoConIngresada": "B", "autorizadoSinIngresada": None, "suspendido": None})
+        return ok, json.dumps({"hoja": r, "destino": d}, ensure_ascii=False)[:1800]
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
