@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.39.1
-// @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.40.0
+// @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (proponer cambios a un RMD sin SAP en un archivo .html con búsqueda de pasos existentes, e importarla como plan de ingreso), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.39.1';                                                       // mantener igual a @version
+  const VERSION = '1.40.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -50,6 +50,7 @@
     ['titulo', 'La pestaña del navegador muestra la etapa y la descripción del RMD abierto ("FAB - …")'],
     ['fase', 'Columna "Fase" en la lista principal (de la 1ª línea de Observaciones: F1 = Fase 1, F1R = Fase 1 R, F2 = Fase 2…)'],
     ['cambiosrecetas', 'Cambios de recetas en SAP: icono tenue junto a «Manufactura Digital» con los RMD Ingresados y Autorizados cuya receta cambió en SAP (con fecha, observación y Excel en el menú Exportar)'],
+    ['plantillaprod', 'Plantilla para Producción: archivo .html para proponer cambios a un RMD sin SAP (con búsqueda de pasos existentes) e importar la propuesta como plan de ingreso'],
     ['historialcambios', 'Historial de cambios en «Trazabilidad RMD»: qué cambió entre versiones y, por paso, cada guardado con su usuario (desde la auditoría del servicio), con Excel'],
     ['recetasauto', 'Cambios de recetas: revisarlos solos en segundo plano (las listas de los Ingresados cada 3 h y las de los Autorizados cada 24 h, poco a poco; apagado, solo con «Revisar»)'],
     ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
@@ -235,6 +236,15 @@
   tr.rmd-rec-quitado td:nth-child(n+2) { color: var(--rmd-apagado); text-decoration: line-through; } tr.rmd-rec-cambia td:nth-child(n+3) { color: var(--rmd-texto); } tr.rmd-rec-cambia td:last-child, tr.rmd-rec-nuevo td:last-child { font-weight: 600; }
   .rmd-rec-delta { color: var(--rmd-ambar); font-weight: 600; } .rmd-rec-linea { margin: 6px 0 0; } .rmd-rec-rojo { color: var(--rmd-rojo); } .rmd-rec-nuevo { color: var(--rmd-verde); font-weight: 600; } span.rmd-rec-quitado { color: var(--rmd-rojo); font-weight: 600; }
   .rmd-rec-pie { margin-top: 10px; color: var(--rmd-apagado); font-size: 12px; }
+  /* v1.40: Plantilla para Producción e importación de la propuesta */
+  .rmd-modal.rmd-pp { width: min(760px, 96vw); } .rmd-modal.rmd-pp-imp { width: min(1280px, 97vw); height: min(860px, 94vh); }
+  .rmd-pp-campo { display: block; margin: 12px 0 8px; font-weight: 600; } .rmd-pp-campo input { display: block; width: 260px; height: 32px; margin-top: 4px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
+  .rmd-pp-cab { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; } .rmd-pp-checks { margin: 6px 0 10px; padding-left: 4px; list-style: none; } .rmd-pp-checks li { margin: 3px 0; }
+  .rmd-pp-t { font-size: 12.5px; } .rmd-pp-t td { vertical-align: top; } .rmd-pp-agregar td:first-child { box-shadow: inset 3px 0 0 var(--rmd-verde); } .rmd-pp-quitar td:first-child { box-shadow: inset 3px 0 0 var(--rmd-rojo); }
+  .rmd-pp-cambiar td:first-child, .rmd-pp-valores td:first-child { box-shadow: inset 3px 0 0 var(--rmd-ambar); } .rmd-pp-mover td:first-child { box-shadow: inset 3px 0 0 var(--rmd-acento); }
+  .rmd-pp-crea { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 9px; background: rgba(122,63,191,.16); color: #b48cf0; font: 700 11px/18px var(--rmd-fuente); }
+  html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-pp-crea { color: #7a3fbf; } .rmd-pp-av { margin-top: 3px; font-size: 12px; } .rmd-pp-av.error { color: var(--rmd-rojo); } .rmd-pp-av.aviso { color: var(--rmd-ambar); }
+  .rmd-pp-rojo { color: var(--rmd-rojo); } .rmd-pp-sap { margin: 10px 0; } .rmd-pp-sap summary { cursor: pointer; color: var(--rmd-acento-texto); }
   /* v1.38: historial de cambios dentro de «Trazabilidad del RMD» (pestañas; la original no se toca) */
   html.rmd-ui .sapMDialog.rmd-tz-on, html.rmd-ui .sapMDialog.rmd-medio.rmd-tz-on { position: fixed !important; width: min(1500px, 97vw) !important; max-width: 97vw !important; height: auto !important; max-height: none !important;
     top: 12px !important; bottom: 12px !important; left: 50% !important; transform: translateX(-50%) !important; display: flex !important; flex-direction: column !important; }
@@ -4078,6 +4088,7 @@
       on('equipos') && ['Equipos por master', 'Todos los master con sus equipos, instrumentos y materiales', () => abrirEquiposPorMaster()],
       on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada instructivo, procedimiento o formato (1-2 min)', () => abrirCitasDeTodos()],
+      on('plantillaprod') && ['Plantilla para Producción', 'Archivo .html para que Producción proponga cambios a un RMD sin entrar a SAP (y luego importar su propuesta)', () => abrirPlantillaProduccion()],
       on('cambiosrecetas') && ['Recetas con cambios en SAP', 'RMD Ingresados y Autorizados con la lista de materiales u hoja de ruta distinta en SAP, y cuáles son las diferencias', () => exportarCambiosRecetas()],
     ].filter(Boolean);
     const m = document.createElement('div'); m.className = 'rmd-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Exportar');
@@ -5446,6 +5457,8 @@
       lista && on('equipos') && ['Equipos por master', 'Excel de todos los master con sus equipos', () => abrirEquiposPorMaster()],
       lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       lista && on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada documento', () => abrirCitasDeTodos()],
+      lista && on('plantillaprod') && ['Plantilla para Producción', 'Generar el archivo para que Producción proponga cambios a un RMD', () => abrirPlantillaProduccion()],
+      lista && on('plantillaprod') && ['Importar propuesta de Producción', 'Abrir el archivo de propuesta que devolvió Producción y ver su plan de ingreso', () => elegirPropuesta()],
       lista && on('cambiosrecetas') && ['Cambios de recetas en SAP', 'RMD Ingresados y Autorizados cuya receta cambió en SAP', () => abrirCambiosRecetas()],
       lista && on('statusrmd') && document.querySelector('.rmd-status-rmd') && ['Enviar a Status RMD', 'Maestro completo a Status RMD', clic('.rmd-status-rmd')],
       on('reglasrev') && ['Reglas de revisión', 'Crear o activar reglas, exportarlas / importarlas y cargar las listas', () => abrirReglas()],
@@ -7796,11 +7809,893 @@
   window.__rmdStats.trazabilidad = { comparar: tzCompararVersiones, normalizar: tzNormalizar, difEventos: tzDifEventos, parsear: tzParsear, excel: tzArmarExcel, formato: tzFormato, leerAuditoria: tzLeerAuditoria, leerVersion: tzLeerVersion, linaje: tzLinaje, catalogos: tzCatalogos,
     panel: () => { const r = document.querySelector('.rmd-tz'); return r && r.__tz; } };
 
+  // ==== PLANTILLA-PRODUCCION:INICIO ====
+  // ---- 9 sexies. Plantilla para Producción (v1.40) ----
+  // Núcleo de la plantilla para Producción: funciones puras que usan igual el editor (archivo .html, sin SAP) y el portal (al importar).
+  // Se serializa con toString() dentro del archivo: no debe usar nada de fuera de esta función.
+  function ppNucleo() {
+    const TIPO = { COND: 483, CUADRO: 484, EQUIPOS: 485, ESPEC: 486, PROCESOS: 487, FORMULA: 488, FIRMAS: 489 };
+    const RANGO = 443;                                                        // tipo de dato «Rango»: lleva valor inicial, final y margen
+    const VACIAS = new Set('DE LA EL Y EN LOS LAS DEL A AL CON POR PARA SEGUN LO O U SE QUE SU SUS UN UNA E N NO'.split(' '));
+    const normalizar = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9%°]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const fichas = (n) => n.split(' ').filter((w) => w && !VACIAS.has(w));
+    const contar = (arr) => { const m = new Map(); arr.forEach((x) => m.set(x, (m.get(x) || 0) + 1)); return m; };
+    const bigramas = (n) => { const s = ' ' + n + ' ', a = []; for (let i = 0; i < s.length - 1; i++) a.push(s.slice(i, i + 2)); return contar(a); };
+    function dice(a, b) {
+      let inter = 0, na = 0, nb = 0;
+      a.forEach((v) => { na += v; }); b.forEach((v) => { nb += v; }); a.forEach((v, k) => { const w = b.get(k); if (w) inter += Math.min(v, w); });
+      return na + nb ? (2 * inter) / (na + nb) : 0;
+    }
+    function similitud(na, nb) { if (na === nb) return 1; return 0.55 * dice(contar(fichas(na)), contar(fichas(nb))) + 0.45 * dice(bigramas(na), bigramas(nb)); }
+    const porOrden = (a, b) => (+a.orden || 0) - (+b.orden || 0);
+    // Buscador del catálogo de pasos: exacto (texto normalizado: sin tildes, mayúsculas, sin signos) y parecidos (palabras + pares de letras)
+    function crearBuscador(filas) {
+      const exacto = new Map(), indice = new Map();
+      filas.forEach((f, i) => {
+        f.i = i; f.n = normalizar(f.texto); let l = exacto.get(f.n); if (!l) exacto.set(f.n, (l = [])); l.push(f);
+        new Set(fichas(f.n)).forEach((w) => { let p = indice.get(w); if (!p) indice.set(w, (p = [])); p.push(i); });
+      });
+      return {
+        total: filas.length,
+        exactos: (texto) => exacto.get(normalizar(texto)) || [],
+        porCodigo: (() => { const m = new Map(filas.map((f) => [String(f.codigo), f])); return (c) => m.get(String(c)); })(),
+        buscar(texto, op = {}) {
+          const { estr = null, etq = null, max = 8, minimo = 0.5 } = op, n = normalizar(texto); if (n.length < 3) return [];
+          const ts = [...new Set(fichas(n))].map((w) => indice.get(w) || []).filter((l) => l.length).sort((a, b) => a.length - b.length);
+          const cand = new Set(); for (const l of ts.slice(0, 4)) { for (const i of l) cand.add(i); if (cand.size > 8000) break; }
+          (exacto.get(n) || []).forEach((f) => cand.add(f.i));
+          const res = [];
+          cand.forEach((i) => { const f = filas[i]; if (!f) return; let s = f.n === n ? 1 : similitud(n, f.n); const extra = (estr && f.estr === estr ? 0.02 : 0) + (etq && f.etq === etq ? 0.03 : 0);
+            if (s >= minimo) res.push({ f, s, orden: s + extra, igual: f.n === n }); });
+          return res.sort((a, b) => (b.igual - a.igual) || ((b.igual && a.igual) ? ((b.f.etq === etq) - (a.f.etq === etq)) : 0) || (b.orden - a.orden)).slice(0, max);
+        },
+      };
+    }
+    // Numeración como el PDF del RMD (generador del portal, controller/table.js): solo las estructuras con «numeración» llevan número
+    // (1, 2, 3…); en las de «Procesos», cada etiqueta n.m (m = su posición) y cada paso n.(orden de la etiqueta).(orden del paso).
+    // Con «base», las listas que se editaron (pasos agregados, quitados o movidos) se numeran de nuevo, correlativas.
+    function numerar(estructuras, base) {
+      const out = new Map(), listaBase = new Map(); let n = 0;
+      if (base) base.forEach((e) => (e.etiquetas || []).forEach((t) => listaBase.set(t.id, (t.pasos || []).map((p) => p.id).join('|'))));
+      [...estructuras].sort(porOrden).forEach((e) => {
+        const num = e.numeracion ? String(++n) : ''; out.set(e.id, num);
+        if (!num || e.tipo !== TIPO.PROCESOS) return;
+        [...(e.etiquetas || [])].sort(porOrden).forEach((t, j) => {
+          out.set(t.id, `${num}.${j + 1}`);
+          const ps = t.pasos || [], igual = !base || (listaBase.get(t.id) === ps.map((p) => p.id).join('|') && !ps.some((p) => p.quitado));
+          let k = 0; ps.forEach((p) => { if (p.quitado) return; k++; out.set(p.id, igual && p.orden != null ? `${num}.${t.orden != null ? t.orden : j + 1}.${p.orden}` : `${num}.${j + 1}.${k}`); });
+        });
+      });
+      return out;
+    }
+    // subsecuencia creciente más larga (para saber qué filas se movieron: las que no están en ella)
+    function enOrden(seq) {
+      const n = seq.length, prev = new Array(n).fill(-1), fin = []; let largo = 0;
+      for (let i = 0; i < n; i++) {
+        let lo = 0, hi = largo; while (lo < hi) { const m = (lo + hi) >> 1; if (seq[fin[m]] < seq[i]) lo = m + 1; else hi = m; }
+        if (lo > 0) prev[i] = fin[lo - 1]; fin[lo] = i; if (lo === largo) largo++;
+      }
+      const ok = new Set(); let k = largo ? fin[largo - 1] : -1; while (k >= 0) { ok.add(k); k = prev[k]; } return ok;
+    }
+    const num = (v) => { if (v == null || v === '') return null; const x = Number(String(v).replace(',', '.')); return isNaN(x) ? NaN : x; };
+    const txtValor = (v) => (v == null || v === '' ? '' : String(v));
+    const CAMPOS_RANGO = [['vi', 'Valor inicial'], ['vf', 'Valor final'], ['margen', 'Margen']];
+    // Lista de cambios entre el RMD de la plantilla (base) y lo editado (trabajo). Cada cambio: clase (paso, pm, equipo, utensilio,
+    // etiqueta, estructura, especificacion), accion (agregar, quitar, cambiar, valores, mover, comentario), lugar, numero, antes,
+    // despues, codigos, nuevo (pide crear un paso en SAP) e ids para ubicarlo.
+    function cambios(base, trabajo) {
+      const out = [], nW = numerar(trabajo.estructuras, base.estructuras), nB = numerar(base.estructuras), bEst = new Map(base.estructuras.map((e) => [e.id, e]));
+      const lista = (ctx, w, b, clase, padre) => {
+        const bId = new Map(b.map((x) => [x.id, x])), posB = new Map(b.map((x, i) => [x.id, i]));
+        const vivos = w.filter((x) => !x.quitado && bId.has(x.id)), ok = enOrden(vivos.map((x) => posB.get(x.id)));
+        const rotulo = (x, i) => (clase === 'pm' ? `${padre.numero ? padre.numero + ' › ' : ''}proceso menor ${i + 1}` : (nW.get(x.id) || nB.get(x.id) || ''));
+        const anterior = (i) => { for (let j = i - 1; j >= 0; j--) if (!w[j].quitado) return w[j]; return null; };
+        let iv = 0;
+        w.forEach((x, i) => {
+          const b0 = bId.get(x.id), numero = rotulo(x, x.quitado ? (b0 ? b.indexOf(b0) : i) : iv);
+          const base0 = { clase, lugar: ctx.lugar, numero, id: x.id, estructura: ctx.estructura, etiqueta: ctx.etiqueta || null, padre: padre ? padre.id : null, comentario: x.comentario || '' };
+          if (!x.quitado) iv++;
+          if (!b0) {
+            const prev = anterior(i);
+            out.push({ ...base0, accion: 'agregar', despues: x.texto, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo, tipo: x.tipo || null, valores: CAMPOS_RANGO.filter(([k]) => txtValor(x[k])).map(([k, n]) => ({ campo: n, despues: txtValor(x[k]) })),
+              trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
+            return;
+          }
+          if (x.quitado) { out.push({ ...base0, accion: 'quitar', antes: b0.texto, codigoAntes: b0.codigo || null }); return; }
+          if (String(x.codigo || '') !== String(b0.codigo || '') || normalizar(x.texto) !== normalizar(b0.texto)) out.push({ ...base0, comentario: '', accion: 'cambiar', antes: b0.texto, despues: x.texto, codigoAntes: b0.codigo || null, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo });
+          const vals = CAMPOS_RANGO.filter(([k]) => txtValor(x[k]) !== txtValor(b0[k])).map(([k, n]) => ({ campo: n, antes: txtValor(b0[k]), despues: txtValor(x[k]) }));
+          if (vals.length) out.push({ ...base0, comentario: '', accion: 'valores', texto: x.texto, campos: vals });
+          if (!ok.has(vivos.indexOf(x)) && vivos.includes(x)) { const prev = anterior(i); out.push({ ...base0, comentario: '', accion: 'mover', texto: x.texto, numeroAntes: clase === 'pm' ? `proceso menor ${posB.get(x.id) + 1}` : (nB.get(x.id) || ''), trasDe: prev ? { id: prev.id, texto: prev.texto } : null }); }
+          if (x.comentario) out.push({ ...base0, accion: 'comentario', texto: x.texto });
+          if (clase === 'paso') lista(ctx, x.pm || [], b0.pm || [], 'pm', { id: x.id, numero });
+        });
+      };
+      [...trabajo.estructuras].sort(porOrden).forEach((e) => {
+        const be = bEst.get(e.id) || { etiquetas: [], pasos: [], equipos: [], utensilios: [], espec: [] }, ctxE = { lugar: e.nombre, estructura: e.id };
+        if (e.comentario) out.push({ clase: 'estructura', accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: e.id, estructura: e.id, comentario: e.comentario, texto: e.nombre });
+        lista(ctxE, e.pasos || [], be.pasos || [], 'paso', null);
+        [...(e.etiquetas || [])].sort(porOrden).forEach((t) => {
+          const bt = (be.etiquetas || []).find((x) => x.id === t.id) || { pasos: [] }, ctxT = { lugar: `${e.nombre} › ${t.nombre}`, estructura: e.id, etiqueta: t.id };
+          if (t.comentario) out.push({ clase: 'etiqueta', accion: 'comentario', lugar: ctxT.lugar, numero: nW.get(t.id) || '', id: t.id, estructura: e.id, etiqueta: t.id, comentario: t.comentario, texto: t.nombre });
+          lista(ctxT, t.pasos || [], bt.pasos || [], 'paso', null);
+        });
+        ['equipos', 'utensilios'].forEach((k) => {
+          const bIds = new Set((be[k] || []).map((x) => x.id)), clase = k === 'equipos' ? 'equipo' : 'utensilio';
+          (e[k] || []).forEach((x) => {
+            const nombre = [x.desc, x.codigo, x.ref].filter(Boolean).join(' · ');
+            if (!bIds.has(x.id)) out.push({ clase, accion: 'agregar', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, despues: nombre, item: { equipoId: x.equipoId || null, utensilioId: x.utensilioId || null, agrupadorId: x.agrupadorId || null, codigo: x.codigo || '', desc: x.desc || '' }, comentario: x.comentario || '' });
+            else if (x.quitado) out.push({ clase, accion: 'quitar', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, antes: nombre, comentario: x.comentario || '' });
+            else if (x.comentario) out.push({ clase, accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: nombre, comentario: x.comentario });
+          });
+        });
+        (e.espec || []).forEach((x) => { if (x.comentario) out.push({ clase: 'especificacion', accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: [x.ensayo, x.especificacion].filter(Boolean).join(': '), comentario: x.comentario }); });
+      });
+      return out;
+    }
+    // Avisos de lo editado: id → [{ nivel: 'error' | 'aviso' | 'info', texto }]. ctx.buscador (opcional) y ctx.etiquetas (id → nombre).
+    function avisos(trabajo, ctx = {}) {
+      const out = new Map(), add = (id, nivel, texto) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto }); };
+      const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base);
+      const enBase = new Map();                                                // id → código en el RMD de la plantilla (lo que ya estaba así en SAP)
+      (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => enBase.set(m.id, String(m.codigo || ''))); })));
+      const igualQueSap = (x) => enBase.has(x.id) && enBase.get(x.id) === String(x.codigo || '');
+      const revisar = (x, estr, etq, esPm) => {
+        const t = String(x.texto || '').trim();
+        if (!t) { add(x.id, 'error', 'Falta el texto.'); return; }
+        if (/\bCONTROL DE CALIDAD\b/.test(normalizar(t)) && !/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES/.test(normalizar(t))) add(x.id, 'aviso', 'Debe decir «CALIDAD EN OPERACIONES» en lugar de «CONTROL DE CALIDAD».');
+        if (x.nuevo && bus) {
+          const ex = bus.exactos(t).filter((f) => f.estr === estr), aqui = ex.filter((f) => !etq || f.etq === etq);
+          if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`);
+          else if (ex.length) add(x.id, 'info', `Existe con el mismo texto en ${nomEtq(ex[0].etq)} (paso ${ex[0].codigo}). Usarlo en otra etiqueta puede hacer que no aparezca en su lugar en producción.`);
+          else add(x.id, 'info', 'Paso nuevo: el equipo RMD lo creará en SAP.');
+        }
+        if (!x.nuevo && x.etqCat && etq && x.etqCat !== etq && !esPm) add(x.id, igualQueSap(x) ? 'info' : 'aviso', `${igualQueSap(x) ? 'Ya está así en SAP: e' : 'E'}n el catálogo este paso es de ${nomEtq(x.etqCat)}, no de esta etiqueta; en producción podría no aparecer en su lugar.`);
+        if (x.tipo === RANGO || x.vi != null || x.vf != null) {
+          const a = num(x.vi), b = num(x.vf), m = num(x.margen);
+          if ([a, b, m].some((v) => Number.isNaN(v))) add(x.id, 'error', 'El rango debe tener números (usa punto o coma para los decimales).');
+          else if (a != null && b != null && a > b) add(x.id, 'error', 'El valor inicial es mayor que el final.');
+        }
+      };
+      const vivos = (l) => (l || []).filter((x) => !x.quitado);
+      const revisarLista = (l, estr, etq) => {
+        const vistos = new Map();
+        vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) add(x.id, 'aviso', `El paso ${x.codigo} ya está en esta lista (${numeros.get(otro) || 'más arriba'}).`); else if (!otro) vistos.set(String(x.codigo), x.id); }
+          vivos(x.pm).forEach((m) => revisar(m, estr, etq, true)); });
+        // quitar un paso del que depende otro
+        (l || []).filter((x) => x.quitado && x.codigo).forEach((x) => { const dep = vivos(l).filter((y) => String(y.depende || '') === String(x.codigo)); if (dep.length) add(x.id, 'aviso', `${dep.map((y) => numeros.get(y.id) || y.texto.slice(0, 30)).join(', ')} depende${dep.length > 1 ? 'n' : ''} de este paso: el equipo RMD revisará los predecesores.`); });
+      };
+      trabajo.estructuras.forEach((e) => {
+        revisarLista(e.pasos, e.estructuraId, null);
+        (e.etiquetas || []).forEach((t) => revisarLista(t.pasos, e.estructuraId, t.etiquetaId));
+        ['equipos', 'utensilios'].forEach((k) => { const vistos = new Set(); vivos(e[k]).forEach((x) => { const c = x.equipoId || x.utensilioId || x.agrupadorId; if (c && vistos.has(c)) add(x.id, 'aviso', 'Está repetido en esta lista.'); vistos.add(c); }); });
+      });
+      return out;
+    }
+    // Huella del RMD (lo que importa para saber si cambió desde que se generó la plantilla)
+    function huella(arbol) {
+      const p = (x) => [x.id, x.pasoId || '', x.orden, x.vi == null ? '' : x.vi, x.vf == null ? '' : x.vf, x.margen == null ? '' : x.margen, (x.pm || []).map((m) => [m.id, m.pasoId || '', m.orden, m.vi == null ? '' : m.vi, m.vf == null ? '' : m.vf].join(',')).join(';')].join('|');
+      const s = arbol.estructuras.map((e) => [e.id, e.orden, (e.pasos || []).map(p).join('/'), (e.etiquetas || []).map((t) => t.id + ':' + t.orden + ':' + (t.pasos || []).map(p).join('/')).join('#'), (e.equipos || []).map((x) => x.id).join(','), (e.utensilios || []).map((x) => x.id).join(',')].join('§')).join('¶');
+      let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '-' + s.length.toString(36);
+    }
+    // Catálogo empacado (una línea por paso: código, estructura, etiqueta, tipo, texto) ↔ filas
+    function desempacarPasos(cat) {
+      const E = cat.estr.map((x) => x[0]), T = cat.etq.map((x) => x[0]);
+      return cat.pasos.split('\n').filter(Boolean).map((l) => { const [c, e, t, ti, ...tx] = l.split('\t'); return { codigo: c, estr: E[+e] || null, etq: t === '' ? null : (T[+t] || null), tipo: ti === '' ? null : +ti, texto: tx.join('\t') }; });
+    }
+    return { TIPO, RANGO, normalizar, similitud, crearBuscador, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num };
+  }
+  // Editor de la plantilla (corre en el archivo .html que abre Producción, sin SAP ni internet). Se serializa con toString():
+  // no debe usar nada de fuera de esta función (recibe el núcleo ya creado).
+  function ppEditorApp(PPN) {
+    'use strict';
+    const ORIGINAL = '<!doctype html>\n' + document.documentElement.outerHTML;
+    const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const clon = (x) => JSON.parse(JSON.stringify(x));
+    const dd = (n) => String(n).padStart(2, '0');
+    const fechaHora = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${dd(d.getDate())}/${dd(d.getMonth() + 1)}/${d.getFullYear()} ${dd(d.getHours())}:${dd(d.getMinutes())}`; };
+    const { TIPO, RANGO } = PPN;
+    const app = $('#app');
+    let PQ, BASE, W, SOL, BUS, EQ = [], ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), sucio = false, seq = 1, filtro = 'todos';
+    const deshacer = [];
+    const CLAVE = () => `rmdPlantilla:${PQ.rmd.codigo}:${PQ.huella}`;
+    const tipoNombre = (id) => (PQ && PQ.tipos && PQ.tipos[id]) || '';
+
+    // ---------- carga ----------
+    async function desempacar(b64) {
+      const bin = Uint8Array.from(atob(b64.trim()), (c) => c.charCodeAt(0));
+      return JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+    }
+    async function iniciar() {
+      app.innerHTML = '<div class="pp-cargando">Abriendo la plantilla…</div>';
+      try {
+        PQ = await desempacar($('#rmd-datos').textContent);
+        BASE = PQ.arbol;
+        const filas = PPN.desempacarPasos(PQ.catalogo); BUS = PPN.crearBuscador(filas);
+        ETQ = new Map(PQ.catalogo.etq.map(([id, n]) => [id, n]));
+        EQ = [].concat(
+          (PQ.catalogo.equipos || '').split('\n').filter(Boolean).map((l) => { const [id, codigo, ref, desc] = l.split('\t'); return { clase: 'equipos', equipoId: id, codigo, ref, desc }; }),
+          (PQ.catalogo.utensilios || '').split('\n').filter(Boolean).map((l) => { const [id, codigo, desc] = l.split('\t'); return { clase: 'utensilios', utensilioId: id, codigo, desc }; }),
+          (PQ.catalogo.agrupadores || []).map(([id, desc]) => ({ clase: 'utensilios', agrupadorId: id, codigo: '', desc, agrupador: true })));
+        EQ.forEach((x) => { x.n = PPN.normalizar([x.codigo, x.ref, x.desc].join(' ')); });
+        const indexar = (arbol, m) => arbol.estructuras.forEach((e) => { m.set(e.id, e); [e.pasos || [], ...(e.etiquetas || []).map((t) => (m.set(t.id, t), t.pasos || []))].forEach((l) => l.forEach((p) => { m.set(p.id, p); (p.pm || []).forEach((x) => m.set(x.id, x)); }));
+          ['equipos', 'utensilios', 'espec'].forEach((k) => (e[k] || []).forEach((x) => m.set(x.id, x))); });
+        indexar(BASE, BI);
+        let prop = null; try { prop = JSON.parse($('#rmd-propuesta').textContent || 'null'); } catch (e) { prop = null; }
+        if (prop && prop.trabajo && prop.base && prop.base.huella === PQ.huella) { W = prop.trabajo; SOL = prop.solicitud || {}; }
+        else { W = clon(BASE); SOL = {}; }
+        W.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { const s = /^n:(\d+)/.exec(p.id); if (s) seq = Math.max(seq, +s[1] + 1); (p.pm || []).forEach((m) => { const s2 = /^n:(\d+)/.exec(m.id); if (s2) seq = Math.max(seq, +s2[1] + 1); }); })));
+        pintarTodo();
+        let auto = null; try { auto = JSON.parse(localStorage.getItem(CLAVE()) || 'null'); } catch (e) { auto = null; }
+        if (auto && auto.W && (!prop || (auto.t > Date.parse(prop.guardado || 0)))) ofrecerRecuperar(auto);
+      } catch (e) {
+        app.innerHTML = `<div class="pp-cargando error">No se pudo abrir la plantilla: ${esc(e.message)}.<br>Ábrela con Google Chrome o Microsoft Edge actualizados.</div>`;
+      }
+    }
+
+    // ---------- estado ----------
+    function cambio(fn) { const rb = document.querySelector('.pp-recuperar'); if (rb && !cambio.recuperando) rb.remove(); deshacer.push(clon({ W, SOL })); if (deshacer.length > 60) deshacer.shift(); fn(); sucio = true; guardarLocal(); pintarTodo(); }
+    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { /* sin almacenamiento: solo se pierde la copia automática */ } }, 400); }
+    function ofrecerRecuperar(auto) {
+      const b = document.createElement('div'); b.className = 'pp-recuperar';
+      b.innerHTML = `Hay cambios de esta plantilla que no se guardaron en un archivo (${esc(fechaHora(auto.t))}). <button type="button" data-a="si">Recuperarlos</button> <button type="button" data-a="no">Descartar</button>`;
+      document.body.appendChild(b);
+      b.addEventListener('click', (e) => { const a = e.target.dataset.a; if (!a) return; if (a === 'si') { cambio.recuperando = true; cambio(() => { W = auto.W; SOL = auto.SOL || {}; }); cambio.recuperando = false; } else { try { localStorage.removeItem(CLAVE()); } catch (x) { /* nada */ } } b.remove(); });
+    }
+    function encontrar(id) {
+      for (const e of W.estructuras) {
+        if (e.id === id) return { item: e, e, clase: 'estructura' };
+        const listas = [[e.pasos || (e.pasos = []), null], ...(e.etiquetas || []).map((t) => [t.pasos || (t.pasos = []), t])];
+        for (const [lista, t] of listas) {
+          if (t && t.id === id) return { item: t, e, t, clase: 'etiqueta' };
+          for (const p of lista) { if (p.id === id) return { item: p, lista, e, t, clase: 'paso' }; for (const m of p.pm || []) if (m.id === id) return { item: m, lista: p.pm, e, t, padre: p, clase: 'pm' }; }
+        }
+        for (const k of ['equipos', 'utensilios']) for (const x of e[k] || []) if (x.id === id) return { item: x, lista: e[k], e, clase: k === 'equipos' ? 'equipo' : 'utensilio' };
+        for (const x of e.espec || []) if (x.id === id) return { item: x, lista: e.espec, e, clase: 'especificacion' };
+      }
+      return null;
+    }
+    const cambiado = (x, b) => b && (String(x.codigo || '') !== String(b.codigo || '') || PPN.normalizar(x.texto) !== PPN.normalizar(b.texto));
+    const valoresCambiados = (x, b) => b && ['vi', 'vf', 'margen'].some((k) => String(x[k] == null ? '' : x[k]) !== String(b[k] == null ? '' : b[k]));
+
+    // ---------- dibujo ----------
+    function pintarTodo() {
+      CMB = PPN.cambios(BASE, W); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras }); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
+      const y = window.scrollY;
+      app.innerHTML = `${htmlBarra()}<div class="pp-cuerpo"><main class="pp-doc" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>`;
+      window.scrollTo(0, y);
+      document.title = `${sucio ? '● ' : ''}Propuesta RMD ${PQ.rmd.codigo} v${PQ.rmd.version}`;
+    }
+    function contar() {
+      const errores = [...AV.values()].flat().filter((a) => a.nivel === 'error').length, avisosN = [...AV.values()].flat().filter((a) => a.nivel === 'aviso').length;
+      const nuevos = CMB.filter((c) => (c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo).length + CMB.filter((c) => c.accion === 'agregar' && c.pm).reduce((s, c) => s + c.pm.filter((m) => m.nuevo).length, 0);
+      return { errores, avisos: avisosN, nuevos, total: CMB.length };
+    }
+    function htmlBarra() {
+      const r = PQ.rmd, n = contar(), falta = !solicitudCompleta();
+      return `<header class="pp-barra"><div class="pp-titulo"><b>Propuesta de cambios · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)}</span></div>
+        <div class="pp-botones"><span class="pp-sucio" title="Hay cambios que aún no se guardaron en un archivo">${sucio ? '● Sin guardar' : ''}</span>
+        <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
+        <button type="button" data-a="solicitud" class="${falta ? 'falta' : ''}" title="Quién pide el cambio y por qué">Solicitud${falta ? ' ⚠' : ' ✓'}</button>
+        <button type="button" data-a="imprimir" title="Imprimir o guardar en PDF la propuesta con los cambios marcados">Imprimir</button>
+        <button type="button" data-a="guardar" class="primario" title="Descarga el archivo con la propuesta para enviarlo al equipo RMD">Guardar propuesta</button></div>
+        <div class="pp-resumen">${n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'Sin cambios todavía'}${n.nuevos ? ` · <b class="crea">${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'} a crear</b>` : ''}${n.errores ? ` · <b class="err">${n.errores} por corregir</b>` : ''}${n.avisos ? ` · <b class="avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</b>` : ''}</div></header>`;
+    }
+    function htmlEncabezado() {
+      const r = PQ.rmd;
+      return `<table class="pp-enc"><tr><td class="logo" rowspan="1"><b>Medifarma</b><br>REGISTRO DE MANUFACTURA</td><td class="eti">Etapa<br><b>${esc(r.etapa)}</b></td><td class="eti">Planta<br><b>${esc(r.planta)}</b></td></tr>
+        <tr><td colspan="3" class="desc">${esc(r.descripcion)}</td></tr>
+        <tr><td>Código <b>${esc(r.codigo)}</b></td><td>Edi. Reg. Manuf. <b>${esc(r.version)}</b></td><td>${esc(r.estado)}${r.area ? ' · ' + esc(r.area) : ''}</td></tr></table>
+        ${r.rptaValidacion ? `<div class="pp-validacion">- ${/^RVP/i.test(r.rptaValidacion) ? 'PROCESO VALIDADO REPORTE DE VALIDACIÓN N° ' : ''}${esc(r.rptaValidacion)}</div>` : ''}
+        <p class="pp-ayuda">Pasa el ratón por un paso para cambiarlo (✎), agregar uno debajo (+), moverlo (↑ ↓), quitarlo (✕) o dejar un comentario (💬). Al escribir un texto se buscan los pasos que ya existen en SAP para no duplicarlos.</p>`;
+    }
+    function htmlDoc() {
+      const num = PPN.numerar(W.estructuras, BASE.estructuras);
+      return htmlEncabezado() + [...W.estructuras].sort(PPN.porOrden).map((e) => htmlEstructura(e, num)).join('');
+    }
+    const acciones = (x, clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? `<button type="button" data-a="restaurar" title="Volver a poner">↺</button>` : soloComentario ? `<button type="button" data-a="comentar" title="Comentario">💬</button>` :
+      `<button type="button" data-a="editar" title="Cambiar el texto">✎</button>${clase === 'paso' || clase === 'pm' ? `<button type="button" data-a="agregar" title="Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo">+</button>${conPm ? '<button type="button" data-a="agregar-pm" class="ancho" title="Agregar un proceso menor a este paso">+PM</button>' : ''}<button type="button" data-a="subir" title="Subir">↑</button><button type="button" data-a="bajar" title="Bajar">↓</button>` : ''}<button type="button" data-a="quitar" title="Quitar">✕</button><button type="button" data-a="comentar" title="Comentario">💬</button>`}</span>`;
+    function marcasDe(x, b) {
+      const out = [];
+      if (!b) out.push('<span class="pp-tag agr">Nuevo</span>'); else if (x.quitado) out.push('<span class="pp-tag qui">Quitado</span>');
+      else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
+      if (!x.quitado && x.nuevo) out.push('<span class="pp-tag crea" title="No existe en el catálogo de SAP con este texto: el equipo RMD lo creará">★ Se creará</span>');
+      else if (!x.quitado && x.codigo && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
+      return out.join('');
+    }
+    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}</div>`).join('');
+    const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
+    function htmlRango(x) {
+      if (!(x.tipo === RANGO || x.vi != null || x.vf != null) || (x.vi == null && x.vf == null && x.margen == null)) return '';
+      return `<span class="pp-rango" title="Rango del tipo de dato «Rango»">Rango: ${esc(x.vi == null ? '—' : x.vi)} – ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ` (margen ${esc(x.margen)})` : ''}</span>`;
+    }
+    function htmlPm(m, p) {
+      const b = BI.get(m.id), cl = ['pp-pm'];
+      if (!b) cl.push('agr'); if (m.quitado) cl.push('qui'); if (b && !m.quitado && (cambiado(m, b) || valoresCambiados(m, b) || MOV.has(m.id))) cl.push('cam');
+      const texto = m.insumo ? `${esc(m.mat || m.texto)} (${esc(m.comp)}) <span class="pp-cant">${esc(m.cant || '')} ${esc(m.um || '')}</span>` : esc(m.texto);
+      const antes = b && !m.quitado && cambiado(m, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}</div>` : '';
+      return `<li class="${cl.join(' ')}" data-id="${esc(m.id)}"><div class="pp-linea"><span class="pp-txt">${texto}</span>${htmlRango(m)}${marcasDe(m, b)}${acciones(m, 'pm', m.quitado, m.insumo)}</div>${antes}${htmlAvisos(m.id)}${htmlComentario(m)}</li>`;
+    }
+    function htmlPaso(p, numero, sinNum, conPm) {
+      const b = BI.get(p.id), cl = ['pp-paso'];
+      if (!b) cl.push('agr'); if (p.quitado) cl.push('qui'); if (b && !p.quitado && (cambiado(p, b) || valoresCambiados(p, b))) cl.push('cam'); if (MOV.has(p.id)) cl.push('mov');
+      const firmas = [p.rpor && 'Realizado por', p.vb && 'V°B°'].filter(Boolean);
+      const antes = b && !p.quitado && cambiado(p, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '';
+      const pms = (p.pm || []).map((m) => htmlPm(m, p)).join('');
+      return `<li class="${cl.join(' ')}" data-id="${esc(p.id)}"><div class="pp-linea">${sinNum ? '<span class="pp-num">-</span>' : `<span class="pp-num">${esc(numero || '')}${numero ? '.-' : ''}</span>`}<span class="pp-txt">${esc(p.texto)}</span>${htmlRango(p)}${firmas.length ? `<span class="pp-firma">${firmas.join(' · ')}</span>` : ''}${marcasDe(p, b)}${acciones(p, 'paso', p.quitado, false, conPm)}</div>
+        ${antes}${htmlAvisos(p.id)}${htmlComentario(p)}${p.quitado || !pms ? '' : `<ul class="pp-pms">${pms}</ul>`}</li>`;
+    }
+    function htmlLista(lista, num, sinNum, ref, conPm) {
+      return `<ol class="pp-lista${sinNum ? ' sin-num' : ''}">${lista.map((p) => htmlPaso(p, num.get(p.id), sinNum, conPm)).join('')}</ol><button type="button" class="pp-mas" data-a="agregar-final" data-lista="${esc(ref)}">+ Agregar paso</button>`;
+    }
+    function htmlEstructura(e, num) {
+      const n = num.get(e.id), titulo = `${n ? n + '.-' : ''}${esc(e.nombre)}`, com = `<button type="button" class="pp-com-tit" data-a="comentar" data-id="${esc(e.id)}" title="Comentario sobre esta sección">💬</button>`;
+      let cuerpo = '';
+      if (e.tipo === TIPO.EQUIPOS || (e.equipos || []).length || (e.utensilios || []).length) {
+        const filas = [...(e.equipos || []).map((x) => ['equipos', x]), ...(e.utensilios || []).map((x) => ['utensilios', x])];
+        cuerpo += `<table class="pp-tabla"><thead><tr><th>Descripción</th><th>Código</th><th>Código de referencia</th><th></th></tr></thead><tbody>${filas.map(([k, x]) => { const b = BI.get(x.id);
+          return `<tr class="${!b ? 'agr' : x.quitado ? 'qui' : ''}" data-id="${esc(x.id)}"><td>${esc(x.desc)}${!b ? ' <span class="pp-tag agr">Nuevo</span>' : x.quitado ? ' <span class="pp-tag qui">Quitado</span>' : ''}${htmlAvisos(x.id)}${htmlComentario(x)}</td><td>${esc(x.codigo)}</td><td>${esc(x.ref || '-')}</td><td>${x.quitado ? '<span class="pp-acc"><button type="button" data-a="restaurar" title="Volver a poner">↺</button></span>' : '<span class="pp-acc"><button type="button" data-a="quitar" title="Quitar">✕</button><button type="button" data-a="comentar" title="Comentario">💬</button></span>'}</td></tr>`; }).join('')}</tbody></table>
+          <button type="button" class="pp-mas" data-a="agregar-equipo" data-est="${esc(e.id)}">+ Agregar equipo o utensilio</button>`;
+      }
+      if (e.tipo === TIPO.FORMULA) {
+        cuerpo += (e.insumos || []).length ? `<table class="pp-tabla"><thead><tr><th>Descripción</th><th>Código</th><th>Cantidad</th><th>UM</th></tr></thead><tbody>${e.insumos.map((x) => `<tr><td>${esc(x.desc)}</td><td>${esc(x.comp)}</td><td class="der">${esc(x.cant)}</td><td>${esc(x.um)}</td></tr>`).join('')}</tbody></table>` : '';
+        cuerpo += '<p class="pp-nota">Los insumos vienen de la receta en SAP: para cambiarlos se actualiza la receta. Puedes dejar un comentario en la sección.</p>';
+      }
+      if (e.tipo === TIPO.ESPEC) {
+        cuerpo += (e.espec || []).length ? `<table class="pp-tabla"><thead><tr><th>Ensayo</th><th>Especificaciones</th><th></th></tr></thead><tbody>${e.espec.map((x) => `<tr data-id="${esc(x.id)}"><td>${x.padre ? `<span class="pp-nota">${esc(x.padre)}</span><br>` : ''}${esc(x.ensayo)}${htmlComentario(x)}</td><td>${esc(x.especificacion || [x.vi, x.vf].filter((v) => v != null && v !== '').join(' - '))}</td><td><span class="pp-acc"><button type="button" data-a="comentar" title="Comentario">💬</button></span></td></tr>`).join('')}</tbody></table>` : '<p class="pp-nota">Sin especificaciones.</p>';
+      }
+      if (e.tipo === TIPO.FIRMAS) cuerpo += '<p class="pp-nota">Verificación de firmas: se genera sola en el RMD.</p>';
+      if (e.tipo !== TIPO.EQUIPOS && e.tipo !== TIPO.FORMULA && e.tipo !== TIPO.ESPEC && e.tipo !== TIPO.FIRMAS) {
+        const conEtq = (e.etiquetas || []).length;
+        if ((e.pasos || []).length || !conEtq) cuerpo += htmlLista(e.pasos || [], num, true, 'est:' + e.id, e.tipo === TIPO.PROCESOS);
+        [...(e.etiquetas || [])].sort(PPN.porOrden).forEach((t) => {
+          const nt = num.get(t.id);
+          cuerpo += `<div class="pp-etq" data-id="${esc(t.id)}"><h3>${nt ? esc(nt) + '.-' : ''}${esc(t.nombre)} <button type="button" class="pp-com-tit" data-a="comentar" data-id="${esc(t.id)}" title="Comentario sobre esta etiqueta">💬</button></h3>${htmlAvisos(t.id)}${htmlComentario(t)}${htmlLista(t.pasos || [], num, e.tipo !== TIPO.PROCESOS, 'etq:' + t.id, e.tipo === TIPO.PROCESOS)}</div>`;
+        });
+      }
+      return `<section class="pp-est" data-id="${esc(e.id)}"><h2>${titulo} ${com}</h2>${htmlComentario(e)}${cuerpo}</section>`;
+    }
+    const ETQ_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', mover: 'Mover', comentario: 'Comentario' };
+    function htmlPanel() {
+      const n = contar(), conAviso = [...AV.entries()].filter(([, l]) => l.some((a) => a.nivel !== 'info'));
+      const lista = filtro === 'nuevos' ? CMB.filter((c) => c.nuevo || (c.pm && c.pm.some((m) => m.nuevo))) : filtro === 'avisos' ? [] : CMB;
+      const chips = [['todos', `Cambios ${n.total}`], ['nuevos', `A crear ${n.nuevos}`], ['avisos', `Avisos ${conAviso.length}`]].map(([k, t]) => `<button type="button" data-filtro="${k}" class="${filtro === k ? 'activo' : ''}">${t}</button>`).join('');
+      const corto = (t) => { t = String(t || ''); return t.length > 90 ? t.slice(0, 90) + '…' : t; };
+      let cuerpo;
+      if (filtro === 'avisos') cuerpo = conAviso.length ? conAviso.map(([id, l]) => { const f = encontrar(id); return `<button type="button" class="pp-cmb" data-ir="${esc(id)}"><b>${esc(f ? (f.item.texto || f.item.nombre || f.item.desc || '') : '').slice(0, 70)}</b>${l.filter((a) => a.nivel !== 'info').map((a) => `<span class="pp-cmb-av ${a.nivel}">${esc(a.texto)}</span>`).join('')}</button>`; }).join('') : '<p class="pp-nota">Sin avisos.</p>';
+      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ' <span class="pp-tag crea">★ se creará</span>' : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
+      return `<div class="pp-panel-cab"><b>Cambios de la propuesta</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
+    }
+    function htmlImpresion() {
+      const r = PQ.rmd, s = SOL || {};
+      return `<h2>Resumen de la propuesta · RMD ${esc(r.codigo)} v${esc(r.version)}</h2><table class="pp-tabla"><tbody><tr><td>Solicitado por</td><td>${esc(s.nombre || '')}</td><td>Área</td><td>${esc(s.area || '')}</td></tr><tr><td>Motivo</td><td colspan="3">${esc(s.motivo || '')}</td></tr><tr><td>Control de cambio</td><td>${esc(s.cc || '')}</td><td>Fecha</td><td>${esc(fechaHora(Date.now()))}</td></tr>${s.observacion ? `<tr><td>Observación</td><td colspan="3">${esc(s.observacion)}</td></tr>` : ''}</tbody></table>
+        <table class="pp-tabla"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${CMB.map((c) => `<tr><td>${esc(c.numero || '')}</td><td>${ETQ_ACCION[c.accion]}${c.nuevo ? ' ★' : ''}<br><span class="pp-nota">${esc(c.lugar)}</span></td><td>${esc(c.antes || '')}</td><td>${esc(c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? 'después de: ' + ((c.trasDe && c.trasDe.texto) || 'al inicio') : c.texto || ''))}</td><td>${esc(c.comentario || '')}</td></tr>`).join('')}</tbody></table>
+        <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p><table class="pp-firmas"><tr><td>Solicitado por (firma)</td><td>Revisado por (firma)</td><td>Ingresado en SAP RMD por</td></tr></table>`;
+    }
+
+    // ---------- modales ----------
+    function modal(html, alMontar) {
+      const f = document.createElement('div'); f.className = 'pp-modal-fondo'; f.innerHTML = `<div class="pp-modal" role="dialog" aria-modal="true">${html}</div>`;
+      document.body.appendChild(f); const cerrar = () => { f.remove(); document.removeEventListener('keydown', tecla, true); };
+      const tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); cerrar(); } };
+      document.addEventListener('keydown', tecla, true); f.addEventListener('mousedown', (e) => { if (e.target === f) cerrar(); });
+      if (alMontar) alMontar(f.firstElementChild, cerrar); return cerrar;
+    }
+    function editar(ref) {
+      // ref: { id } (editar) o { nuevo: true, lista, despuesDe, clase, e, t, padre }
+      const f = ref.id ? encontrar(ref.id) : ref, x = ref.id ? f.item : { texto: '' }, b = ref.id ? BI.get(ref.id) : null, clase = ref.id ? f.clase : ref.clase;
+      const estr = f.e.estructuraId, etq = f.t ? f.t.etiquetaId : null, num = PPN.numerar(W.estructuras, BASE.estructuras);
+      const donde = `${f.e.nombre}${f.t ? ' › ' + f.t.nombre : ''}`;
+      const titulo = ref.id ? `${clase === 'pm' ? 'Proceso menor' : 'Paso'} ${clase === 'pm' ? '' : esc(num.get(x.id) || '')}` : `Nuevo ${clase === 'pm' ? 'proceso menor' : 'paso'}`;
+      let elegido = x.codigo && !x.nuevo ? BUS.porCodigo(x.codigo) || { codigo: x.codigo, texto: x.texto, etq: x.etqCat || etq, estr, tipo: x.tipo } : null;
+      const conRango = () => (elegido ? elegido.tipo === RANGO : x.tipo === RANGO) || x.vi != null || x.vf != null;
+      modal(`<h3>${titulo}<span>${esc(donde)}${ref.padre ? ' › ' + esc(ref.padre.texto).slice(0, 60) : ''}</span></h3>
+        <label class="pp-campo">Texto<textarea id="m-texto" rows="3" spellcheck="true">${esc(x.texto)}</textarea></label>
+        <div id="m-estado" class="pp-estado"></div><div id="m-sug" class="pp-sug"></div>
+        <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" value="${esc(x.margen == null ? '' : x.margen)}"></label></div>
+        <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
+        const ta = $('#m-texto', m), est = $('#m-estado', m), sug = $('#m-sug', m), rango = $('#m-rango', m);
+        const pintarEstado = () => {
+          const t = ta.value.trim(), igualBase = b && PPN.normalizar(t) === PPN.normalizar(b.texto);
+          if (elegido && PPN.normalizar(t) !== PPN.normalizar(elegido.texto)) elegido = null;
+          if (!elegido && t) { const ex = BUS.exactos(t).filter((c) => c.estr === estr && (clase === 'pm' || !etq || c.etq === etq)); if (ex.length) elegido = ex[0]; }
+          if (!t) est.innerHTML = '<span class="err">Escribe el texto del paso o elige uno de la lista.</span>';
+          else if (igualBase && (!elegido || String(elegido.codigo) === String(b.codigo))) est.innerHTML = '<span class="ok">Sin cambios en el texto.</span>';
+          else if (elegido) est.innerHTML = `<span class="ok">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${etq && elegido.etq && elegido.etq !== etq && clase !== 'pm' ? `<br><span class="avi">⚠ En el catálogo es de ${esc(ETQ.get(elegido.etq) || 'otra etiqueta')}: en producción podría no aparecer en su lugar.</span>` : ''}`;
+          else est.innerHTML = '<span class="crea">★ Paso nuevo: no existe en SAP con este texto. El equipo RMD lo creará.</span>';
+          rango.hidden = !conRango();
+        };
+        const pintarSug = () => {
+          const t = ta.value.trim(); if (t.length < 4) { sug.innerHTML = ''; return; }
+          const r = BUS.buscar(t, { estr, etq, max: 7 }).filter((y) => y.f.estr === estr);
+          sug.innerHTML = r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP (${BUS.total.toLocaleString('es-PE')} en el catálogo)</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${esc(y.f.texto)}</span>${etq && y.f.etq && y.f.etq !== etq && clase !== 'pm' ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}` : '<div class="pp-sug-tit">No hay pasos parecidos en el catálogo.</div>';
+        };
+        let tm = 0; ta.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { pintarEstado(); pintarSug(); }, 140); });
+        sug.addEventListener('click', (e) => { const s = e.target.closest('[data-codigo]'); if (!s) return; elegido = BUS.porCodigo(s.dataset.codigo); ta.value = elegido.texto; pintarEstado(); pintarSug(); ta.focus(); });
+        const aceptar = () => {
+          const t = ta.value.trim(); if (!t) { ta.focus(); return; }
+          const vi = $('#m-vi', m).value.trim(), vf = $('#m-vf', m).value.trim(), mg = $('#m-mg', m).value.trim(), com = $('#m-com', m).value.trim();
+          cambio(() => {
+            let it = x;
+            if (!ref.id) { it = { id: `n:${seq++}`, texto: '', pm: clase === 'paso' ? [] : undefined }; const lista = ref.lista, i = ref.despuesDe ? lista.findIndex((y) => y.id === ref.despuesDe) + 1 : lista.length; lista.splice(i, 0, it); }
+            const viva = ref.id ? encontrar(ref.id).item : it;
+            viva.texto = t; viva.comentario = com;
+            const igualBase = b && PPN.normalizar(t) === PPN.normalizar(b.texto) && (!elegido || String(elegido.codigo) === String(b.codigo));
+            if (igualBase) { viva.codigo = b.codigo; viva.pasoId = b.pasoId; viva.nuevo = false; viva.etqCat = b.etqCat; viva.tipo = b.tipo; }
+            else if (elegido) { viva.codigo = String(elegido.codigo); viva.pasoId = null; viva.nuevo = false; viva.etqCat = elegido.etq; viva.tipo = elegido.tipo; }
+            else { viva.codigo = null; viva.pasoId = null; viva.nuevo = true; viva.etqCat = null; viva.tipo = b ? b.tipo : (viva.tipo || null); }
+            if (!rango.hidden) { viva.vi = vi === '' ? null : vi; viva.vf = vf === '' ? null : vf; viva.margen = mg === '' ? null : mg; }
+          });
+          cerrar(); setTimeout(() => irA(ref.id || `n:${seq - 1}`), 30);
+        };
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') aceptar(); });
+        ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); aceptar(); } });
+        pintarEstado(); pintarSug(); setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 20);
+      });
+    }
+    function comentar(id) {
+      const f = encontrar(id); if (!f) return; const x = f.item;
+      modal(`<h3>Comentario<span>${esc(x.texto || x.nombre || x.desc || '')}</span></h3><label class="pp-campo">Comentario para el equipo RMD<textarea id="m-com" rows="4">${esc(x.comentario || '')}</textarea></label><div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
+        const ta = $('#m-com', m); setTimeout(() => ta.focus(), 20);
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') { const v = ta.value.trim(); cambio(() => { encontrar(id).item.comentario = v; }); cerrar(); } });
+      });
+    }
+    function solicitudCompleta() { const s = SOL || {}; return !!(String(s.nombre || '').trim() && String(s.area || '').trim() && String(s.motivo || '').trim()); }
+    function abrirSolicitud(paraGuardar) {
+      const s = SOL || {}, campo = (k, t, req, filas) => `<label class="pp-campo">${t}${req ? ' *' : ''}${filas ? `<textarea data-k="${k}" rows="${filas}">${esc(s[k] || '')}</textarea>` : `<input data-k="${k}" value="${esc(s[k] || '')}">`}</label>`;
+      modal(`<h3>Solicitud de cambio<span>${paraGuardar ? 'Completa estos datos para guardar la propuesta' : 'Quién pide el cambio y por qué'}</span></h3>${campo('nombre', 'Nombre y apellido', true)}${campo('area', 'Área o sección', true)}${campo('motivo', 'Motivo del cambio', true, 2)}${campo('cc', 'Control de cambio (si lo hay)', false)}${campo('observacion', 'Observación', false, 2)}
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">${paraGuardar ? 'Guardar propuesta' : 'Aceptar'}</button></div>`, (m, cerrar) => {
+        setTimeout(() => { const i = $$('[data-k]', m).find((x) => !x.value.trim()) || $('[data-k]', m); i.focus(); }, 20);
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') {
+          const nuevo = {}; $$('[data-k]', m).forEach((i) => { nuevo[i.dataset.k] = i.value.trim(); });
+          const faltan = ['nombre', 'area', 'motivo'].filter((k) => !nuevo[k]); $$('[data-k]', m).forEach((i) => i.classList.toggle('falta', faltan.includes(i.dataset.k)));
+          if (faltan.length && paraGuardar) return;
+          cambio(() => { SOL = nuevo; }); cerrar(); if (paraGuardar) guardar(); } });
+      });
+    }
+    function agregarEquipo(estId) {
+      const e = encontrar(estId).item;
+      modal(`<h3>Agregar equipo o utensilio<span>${esc(e.nombre)}</span></h3><label class="pp-campo">Buscar por código o descripción<input id="m-q" placeholder="p. ej. BALANZA, PL1-SEL-E013, SEL-U005"></label><div id="m-res" class="pp-sug"></div><div class="pp-pie"><button type="button" data-a="cancelar">Cerrar</button></div>`, (m, cerrar) => {
+        const q = $('#m-q', m), res = $('#m-res', m);
+        const pintar = () => { const t = PPN.normalizar(q.value), ps = t.split(' ').filter(Boolean); if (!ps.length) { res.innerHTML = ''; return; }
+          const r = EQ.filter((x) => ps.every((p) => x.n.includes(p))).slice(0, 40);
+          res.innerHTML = r.length ? r.map((x, i) => `<button type="button" class="pp-sug-it" data-i="${EQ.indexOf(x)}"><span class="cod">${esc(x.codigo || (x.agrupador ? 'Agrupador' : ''))}</span><span class="tx">${esc(x.desc)}${x.ref ? ` · ${esc(x.ref)}` : ''}</span><span class="otra">${x.clase === 'equipos' ? 'Equipo' : x.agrupador ? 'Agrupador' : 'Utensilio'}</span></button>`).join('') : '<div class="pp-sug-tit">Sin resultados.</div>'; };
+        q.addEventListener('input', pintar); setTimeout(() => q.focus(), 20);
+        m.addEventListener('click', (ev) => { if (ev.target.dataset.a === 'cancelar') { cerrar(); return; } const s = ev.target.closest('[data-i]'); if (!s) return; const x = EQ[+s.dataset.i];
+          cambio(() => { const est = encontrar(estId).item, k = x.clase; if (!est[k]) est[k] = []; est[k].push({ id: `n:${seq++}`, equipoId: x.equipoId || null, utensilioId: x.utensilioId || null, agrupadorId: x.agrupadorId || null, codigo: x.codigo || '', ref: x.ref || '', desc: x.desc }); });
+          cerrar(); });
+      });
+    }
+
+    // ---------- acciones ----------
+    function irA(id) {
+      const el = document.querySelector(`[data-id="${CSS.escape(id)}"]`); if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('pp-destello'); void el.offsetWidth; el.classList.add('pp-destello');
+    }
+    function mover(id, dir) {
+      cambio(() => { const f = encontrar(id), l = f.lista, i = l.findIndex((y) => y.id === id); let j = i + dir; while (j >= 0 && j < l.length && l[j].quitado) j += dir; if (j < 0 || j >= l.length) return; const [x] = l.splice(i, 1); l.splice(j, 0, x); });
+      setTimeout(() => irA(id), 30);
+    }
+    function quitar(id) {
+      cambio(() => { const f = encontrar(id); if (!BI.has(id)) { f.lista.splice(f.lista.findIndex((y) => y.id === id), 1); return; } f.item.quitado = true; });
+    }
+    function listaDe(ref) {
+      const [tipo, id] = ref.split(/:(.+)/); const f = encontrar(id);
+      return tipo === 'est' ? { lista: f.item.pasos || (f.item.pasos = []), e: f.item, t: null } : { lista: f.item.pasos || (f.item.pasos = []), e: f.e, t: f.item };
+    }
+    app.addEventListener('click', (ev) => {
+      const fb = ev.target.closest('[data-filtro]'); if (fb) { filtro = fb.dataset.filtro; $('#pp-panel').innerHTML = htmlPanel(); return; }
+      const ir = ev.target.closest('[data-ir]'); if (ir) { irA(ir.dataset.ir); return; }
+      const b = ev.target.closest('button[data-a]'); if (!b) return;
+      const a = b.dataset.a, fila = b.closest('[data-id]'), id = b.dataset.id || (fila && fila.dataset.id);
+      if (a === 'guardar') guardar(); else if (a === 'imprimir') { pintarTodo(); window.print(); }
+      else if (a === 'solicitud') abrirSolicitud(false);
+      else if (a === 'deshacer') deshacerUno();
+      else if (a === 'editar') editar({ id });
+      else if (a === 'comentar') comentar(id);
+      else if (a === 'quitar') quitar(id);
+      else if (a === 'restaurar') cambio(() => { delete encontrar(id).item.quitado; });
+      else if (a === 'subir' || a === 'bajar') mover(id, a === 'subir' ? -1 : 1);
+      else if (a === 'agregar') { const f = encontrar(id); editar({ nuevo: true, lista: f.lista, despuesDe: id, clase: f.clase, e: f.e, t: f.t, padre: f.padre }); }
+      else if (a === 'agregar-final') { const l = listaDe(b.dataset.lista); editar({ nuevo: true, lista: l.lista, despuesDe: null, clase: 'paso', e: l.e, t: l.t }); }
+      else if (a === 'agregar-pm') { const f = encontrar(b.dataset.padre || id); if (!f.item.pm) f.item.pm = []; editar({ nuevo: true, lista: f.item.pm, despuesDe: null, clase: 'pm', e: f.e, t: f.t, padre: f.item }); }
+      else if (a === 'agregar-equipo') agregarEquipo(b.dataset.est);
+    });
+    function deshacerUno() { const s = deshacer.pop(); if (!s) return; W = s.W; SOL = s.SOL; sucio = true; guardarLocal(); pintarTodo(); }
+    document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !document.querySelector('.pp-modal-fondo') && !/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); deshacerUno(); } });
+    window.addEventListener('beforeunload', (e) => { if (sucio) { e.preventDefault(); e.returnValue = ''; } });
+    function descargar(texto, nombre) {
+      const u = URL.createObjectURL(new Blob([texto], { type: 'text/html;charset=utf-8' })), a = document.createElement('a'); a.href = u; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 15000);
+    }
+    function guardar() {
+      if (!solicitudCompleta()) { abrirSolicitud(true); return; }
+      const n = contar();
+      if (n.errores && !confirm(`Hay ${n.errores} cosa(s) por corregir (marcadas con ✕). ¿Guardar la propuesta igual?`)) return;
+      const d = new Date(), r = PQ.rmd, prop = { formato: 1, tipo: 'propuesta-rmd', base: { mdId: r.mdId, codigo: r.codigo, version: r.version, huella: PQ.huella }, guardado: d.toISOString(), solicitud: SOL, trabajo: W,
+        resumen: { cambios: n.total, nuevos: n.nuevos, errores: n.errores, avisos: n.avisos } };
+      const json = JSON.stringify(prop).replace(/</g, '\\u003c');
+      const html = ORIGINAL.replace(/(<script id="rmd-propuesta" type="application\/json">)[\s\S]*?(<\/script>)/, (m0, a, b) => a + json + b);
+      descargar(html, `Propuesta RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`);
+      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { /* nada */ } pintarTodo(); aviso('Se descargó la propuesta. Envía ese archivo al equipo RMD (también puedes volver a abrirlo para seguir editando).');
+      window.__ppUltimo = { prop, html };                                                // (pruebas)
+    }
+    function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
+    window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion(); });
+    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar() }), editar, quitar, mover, comentar, guardar, encontrar, buscador: () => BUS, irA };   // (pruebas)
+    iniciar();
+  }
+  // Estilos del archivo de la plantilla (aspecto del PDF del RMD: hoja blanca, letra simple, numeración a la izquierda)
+  const PP_EDITOR_CSS = `
+:root { --tx: #1f2328; --ap: #59636e; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #eef0f2; --hoja: #fff; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e8f5ec; --qui: #b42318; --qui-f: #fdecea;
+  --cam: #9a6700; --cam-f: #fff6dc; --mov: #2f5fb3; --mov-f: #e8effb; --crea: #7a3fbf; --crea-f: #f3ebfc; color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--fondo); color: var(--tx); font: 13px/1.45 "Segoe UI", Roboto, Arial, sans-serif; }
+button { font: inherit; cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+.pp-cargando { margin: 80px auto; max-width: 520px; padding: 24px; background: var(--hoja); border: 1px solid var(--bd); border-radius: 8px; text-align: center; font-size: 15px; }
+.pp-cargando.error { color: var(--qui); }
+.pp-barra { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 10px 18px; background: #fff; border-bottom: 1px solid var(--bd); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.pp-titulo b { display: block; font-size: 15px; } .pp-titulo span { color: var(--ap); }
+.pp-botones { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.pp-botones button { height: 32px; padding: 0 14px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; color: var(--tx); }
+.pp-botones button:hover:not(:disabled) { border-color: var(--acento); color: var(--acento); }
+.pp-botones button.primario { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; } .pp-botones button.primario:hover { filter: brightness(1.08); color: #fff; }
+.pp-botones button.falta { border-color: var(--cam); color: var(--cam); }
+.pp-sucio { color: var(--cam); font-weight: 600; font-size: 12px; }
+.pp-resumen { grid-column: 1 / -1; color: var(--ap); font-size: 12.5px; } .pp-resumen .crea { color: var(--crea); } .pp-resumen .err { color: var(--qui); } .pp-resumen .avi { color: var(--cam); }
+.pp-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; max-width: 1360px; margin: 16px auto; padding: 0 16px; align-items: start; }
+.pp-doc { background: var(--hoja); border: 1px solid var(--bd); border-radius: 4px; padding: 26px 30px 40px; min-width: 0; }
+.pp-panel { position: sticky; top: 92px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; background: #fff; border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
+.pp-panel-cab { padding: 12px 14px 8px; border-bottom: 1px solid var(--bd2); } .pp-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.pp-chips button { padding: 3px 10px; border: 1px solid var(--bd); border-radius: 12px; background: #fff; font-size: 12px; } .pp-chips button.activo { background: var(--acento); border-color: var(--acento); color: #fff; }
+.pp-panel-lista { overflow: auto; padding: 6px 8px 12px; }
+.pp-cmb { display: block; width: 100%; margin: 3px 0; padding: 7px 9px; border: 1px solid transparent; border-left: 3px solid var(--bd); border-radius: 4px; background: #fafbfc; text-align: left; color: var(--tx); font-size: 12.5px; }
+.pp-cmb:hover { border-color: var(--bd); } .pp-cmb span { color: var(--ap); } .pp-cmb-n { font-weight: 600; color: var(--tx) !important; }
+.pp-cmb.agregar { border-left-color: var(--agr); } .pp-cmb.quitar { border-left-color: var(--qui); } .pp-cmb.cambiar, .pp-cmb.valores { border-left-color: var(--cam); } .pp-cmb.mover { border-left-color: var(--mov); } .pp-cmb.comentario { border-left-color: var(--ap); }
+.pp-cmb-av { display: block; margin-top: 3px; } .pp-cmb-av.error { color: var(--qui) !important; } .pp-cmb-av.aviso { color: var(--cam) !important; }
+.pp-enc { width: 100%; border-collapse: collapse; margin-bottom: 10px; } .pp-enc td { border: 1px solid var(--tx); padding: 6px 8px; vertical-align: middle; }
+.pp-enc .logo { width: 46%; font-size: 14px; } .pp-enc .logo b { color: #c8102e; font-style: italic; } .pp-enc .eti { text-align: center; } .pp-enc .desc { text-align: center; font-size: 15px; padding: 14px 8px; }
+.pp-validacion { border: 1px solid var(--bd); padding: 4px 8px; margin: 10px 0; font-size: 12px; }
+.pp-ayuda { margin: 10px 0 18px; padding: 8px 12px; background: #f6f8fa; border-radius: 6px; color: var(--ap); font-size: 12.5px; }
+.pp-est { margin: 22px 0 6px; } .pp-est h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: .2px; }
+.pp-etq { margin: 14px 0 4px 6px; } .pp-etq h3 { margin: 0 0 6px; font-size: 13.5px; font-weight: 500; text-transform: uppercase; }
+.pp-com-tit { border: 0; background: none; opacity: .25; padding: 0 4px; } .pp-est h2:hover .pp-com-tit, .pp-etq h3:hover .pp-com-tit, .pp-com-tit:focus-visible { opacity: 1; }
+.pp-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--bd2); border-radius: 4px; }
+.pp-paso { padding: 5px 8px 6px; border-bottom: 1px solid var(--bd2); } .pp-paso:last-child { border-bottom: 0; }
+.pp-linea { display: flex; align-items: flex-start; gap: 8px; } .pp-num { flex: 0 0 64px; color: var(--tx); } .sin-num .pp-num { flex-basis: 16px; }
+.pp-txt { flex: 1 1 auto; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pp-firma { flex: 0 0 auto; padding: 0 6px; border: 1px solid var(--bd); border-radius: 3px; font-size: 11px; color: var(--ap); }
+.pp-rango { flex: 0 0 auto; font-size: 11.5px; color: var(--ap); white-space: nowrap; }
+.pp-tag { flex: 0 0 auto; padding: 0 7px; border-radius: 9px; font-size: 11px; font-weight: 600; line-height: 18px; white-space: nowrap; }
+.pp-tag.agr { background: var(--agr-f); color: var(--agr); } .pp-tag.qui { background: var(--qui-f); color: var(--qui); } .pp-tag.cam { background: var(--cam-f); color: var(--cam); } .pp-tag.mov { background: var(--mov-f); color: var(--mov); }
+.pp-tag.crea { background: var(--crea-f); color: var(--crea); } .pp-tag.ok { background: #eef1f4; color: var(--ap); font-weight: 500; }
+.pp-acc { flex: 0 0 auto; display: inline-flex; gap: 2px; margin-left: auto; opacity: 0; transition: opacity .12s; }
+.pp-acc button { min-width: 26px; height: 24px; padding: 0; border: 1px solid var(--bd); border-radius: 4px; background: #fff; color: var(--tx); font-size: 13px; line-height: 1; }
+.pp-acc button:hover { border-color: var(--acento); color: var(--acento); } .pp-acc button.ancho { padding: 0 5px; font-size: 11px; font-weight: 600; }
+li:hover > .pp-linea > .pp-acc, tr:hover .pp-acc, .pp-acc:focus-within, .qui > .pp-linea > .pp-acc, tr.qui .pp-acc { opacity: 1; }
+.pp-pms { list-style: none; margin: 4px 0 0 72px; padding: 0; } .sin-num .pp-pms { margin-left: 24px; }
+.pp-pm { padding: 3px 6px; border-left: 2px solid var(--bd2); margin: 2px 0; color: #3a4048; }
+.pp-cant { color: var(--ap); margin-left: 6px; }
+.pp-mas { margin: 4px 0 2px; padding: 3px 10px; border: 1px dashed var(--bd); border-radius: 4px; background: none; color: var(--acento); font-size: 12px; }
+.agr { background: var(--agr-f); } .pp-pm.agr { border-left-color: var(--agr); }
+.qui > .pp-linea .pp-txt, tr.qui td:first-child { text-decoration: line-through; color: var(--qui); } .qui { background: var(--qui-f); }
+.cam { background: var(--cam-f); } .pp-pm.cam { border-left-color: var(--cam); } .mov { box-shadow: inset 3px 0 0 var(--mov); }
+.pp-antes { margin: 2px 0 0 72px; font-size: 11.5px; color: var(--ap); text-decoration: line-through; } .pp-pm .pp-antes { margin-left: 4px; }
+.pp-aviso { margin: 3px 0 0 72px; font-size: 12px; } .pp-pm .pp-aviso, td .pp-aviso { margin-left: 4px; } .pp-aviso.error { color: var(--qui); } .pp-aviso.aviso { color: var(--cam); } .pp-aviso.info { color: var(--crea); }
+.pp-coment { margin: 3px 0 0 72px; padding: 3px 8px; background: #f6f8fa; border-radius: 4px; font-size: 12px; color: #3a4048; } td .pp-coment, .pp-pm .pp-coment { margin-left: 0; }
+.pp-tabla { width: 100%; border-collapse: collapse; margin: 6px 0; } .pp-tabla th, .pp-tabla td { border: 1px solid var(--bd); padding: 4px 8px; text-align: left; vertical-align: top; } .pp-tabla th { background: #f6f8fa; font-weight: 600; }
+.pp-tabla td.der { text-align: right; } .pp-nota { color: var(--ap); font-size: 12px; margin: 4px 0; }
+.pp-destello { animation: pp-destello 1.6s ease-out; } @keyframes pp-destello { 0% { outline: 3px solid var(--acento); outline-offset: 2px; } 100% { outline: 3px solid transparent; outline-offset: 2px; } }
+.pp-modal-fondo { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; background: rgba(20, 24, 28, .38); }
+.pp-modal { width: min(760px, 100%); max-height: 88vh; overflow: auto; padding: 18px 20px 14px; background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.pp-modal h3 { margin: 0 0 12px; font-size: 16px; } .pp-modal h3 span { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 400; color: var(--ap); }
+.pp-campo { display: block; margin: 10px 0; font-weight: 600; font-size: 12.5px; } .pp-campo textarea, .pp-campo input { display: block; width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--bd); border-radius: 6px; font: 13px/1.45 "Segoe UI", Roboto, Arial, sans-serif; font-weight: 400; }
+.pp-campo textarea:focus, .pp-campo input:focus, .pp-rango-ed input:focus { outline: 2px solid var(--acento); outline-offset: -1px; border-color: var(--acento); } .pp-campo .falta { border-color: var(--qui); }
+.pp-estado { min-height: 20px; font-size: 12.5px; } .pp-estado .ok { color: var(--agr); } .pp-estado .crea { color: var(--crea); font-weight: 600; } .pp-estado .err { color: var(--qui); } .pp-estado .avi { color: var(--cam); }
+.pp-sug { margin: 8px 0; } .pp-sug-tit { font-size: 12px; color: var(--ap); margin: 6px 0 4px; }
+.pp-sug-it { display: flex; gap: 8px; align-items: baseline; width: 100%; margin: 2px 0; padding: 6px 8px; border: 1px solid var(--bd2); border-radius: 6px; background: #fff; text-align: left; color: var(--tx); font-size: 12.5px; }
+.pp-sug-it:hover { border-color: var(--acento); } .pp-sug-it.igual { border-color: var(--agr); background: var(--agr-f); } .pp-sug-it.elegido { outline: 2px solid var(--agr); }
+.pp-sug-it .pct { flex: 0 0 46px; color: var(--ap); font-size: 11.5px; } .pp-sug-it .cod { flex: 0 0 64px; font-weight: 600; } .pp-sug-it .tx { flex: 1 1 auto; } .pp-sug-it .otra { flex: 0 0 auto; color: var(--cam); font-size: 11px; }
+.pp-rango-ed { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; font-size: 12.5px; font-weight: 600; } .pp-rango-ed input { display: block; width: 120px; margin-top: 3px; padding: 5px 8px; border: 1px solid var(--bd); border-radius: 6px; font: inherit; font-weight: 400; }
+.pp-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--bd2); }
+.pp-pie button { height: 32px; padding: 0 16px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; } .pp-pie button.primario { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; }
+.pp-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); padding: 10px 16px; background: #1f2328; color: #fff; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.pp-recuperar { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); z-index: 40; padding: 10px 14px; background: var(--cam-f); border: 1px solid var(--cam); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.pp-recuperar button { margin-left: 8px; padding: 3px 10px; border: 1px solid var(--cam); border-radius: 5px; background: #fff; }
+.pp-solo-impresion { display: none; } .pp-firmas { width: 100%; margin-top: 28px; border-collapse: collapse; } .pp-firmas td { width: 33%; height: 70px; border: 1px solid var(--tx); vertical-align: bottom; padding: 6px; font-size: 12px; }
+@media (max-width: 1000px) { .pp-cuerpo { grid-template-columns: 1fr; } .pp-panel { position: static; max-height: none; } }
+@media print {
+  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-ayuda, .pp-com-tit, .pp-recuperar, .pp-toast { display: none !important; }
+  .pp-cuerpo { display: block; margin: 0; padding: 0; max-width: none; } .pp-doc { border: 0; padding: 0; }
+  .pp-solo-impresion { display: block; break-before: page; } .agr, .qui, .cam { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .pp-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pp-paso { break-inside: avoid; }
+}
+`;
+  // ---- Plantilla para Producción: del portal al archivo y de vuelta (v1.40) ----
+  // 1) «Plantilla para Producción»: lee el RMD (las mismas 8 listas que usa el portal para su PDF) y el catálogo de pasos, equipos y
+  //    utensilios de SAP, y descarga un .html que se abre en cualquier Chrome / Edge, sin SAP ni internet. Producción propone ahí los
+  //    cambios (con el aspecto y la numeración del PDF) y devuelve el archivo con su propuesta.
+  // 2) «Importar propuesta de Producción»: lee ese archivo, ubica la versión del RMD donde se ingresará (la misma si está Ingresada, o
+  //    la versión Ingresada más nueva del mismo master), revisa si el RMD cambió desde que se hizo la plantilla, vuelve a buscar en SAP
+  //    los pasos nuevos (por si ya se crearon) y muestra el plan de cambios con sus avisos y su Excel. Esta parte no escribe nada.
+  const PPN = ppNucleo();
+  const PP = { cat: null, catT: 0 };
+  const PP_TTL_CATALOGO = 12 * 3600000;
+  const ppLimpio = (t) => String(t == null ? '' : t).replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const ppNulo = (v) => (v == null || v === '' ? null : v);
+  // Recién cargada la página, durante unos segundos el portal no responde las lecturas (se pierden sin respuesta). Antes de empezar se
+  // prueba una lectura corta (hasta 4 intentos de 8 s); si el portal sigue sin responder, se avisa en vez de quedarse esperando.
+  async function ppModeloListo(modelo) {
+    for (let i = 0; i < 4; i++) {
+      const ok = await Promise.race([new Promise((r) => modelo.read('/ESTRUCTURA', { urlParameters: { $top: '1', $select: 'estructuraId' }, success: () => r(true), error: () => r(true) })), new Promise((r) => setTimeout(() => r(false), 8000))]);
+      if (ok) return;
+    }
+    throw new Error('el portal no está respondiendo las lecturas; recarga la página (F5) y vuelve a intentarlo');
+  }
+  async function ppLeerArbol(modelo, md) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, f = [new F('mdId_mdId', 'EQ', md.mdId)];
+    const L = (ent, exp, ord) => leerTodoDe(modelo, ent, f, { ...(exp ? { $expand: exp } : {}), $orderby: ord });
+    const [estr, etqs, pasos, pms, equipos, utens, insumos, espec, recetas] = await Promise.all([
+      L('MD_ESTRUCTURA', 'estructuraId', 'mdEstructuraId'), L('MD_ES_ETIQUETA', 'etiquetaId', 'mdEsEtiquetaId'), L('MD_ES_PASO', 'pasoId', 'mdEstructuraPasoId'),
+      L('MD_ES_PASO_INSUMO_PASO', 'pasoHijoId', 'mdEstructuraPasoInsumoPasoId'), L('MD_ES_EQUIPO', 'equipoId', 'mdEstructuraEquipoId'), L('MD_ES_UTENSILIO', 'utensilioId,agrupadorId', 'mdEstructuraUtensilioId'),
+      L('MD_ES_RE_INSUMO', '', 'estructuraRecetaInsumoId'), L('MD_ES_ESPECIFICACION', '', 'mdEstructuraEspecificacionId'), L('MD_RECETA', 'recetaId', 'mdRecetaId')]);
+    const act = (x) => x && x.activo !== false, orden = (a, b) => (+a.orden || 0) - (+b.orden || 0);
+    const E = new Map(estr.filter(act).map((e) => [e.mdEstructuraId, { id: e.mdEstructuraId, estructuraId: e.estructuraId_estructuraId, nombre: ppLimpio(e.estructuraId && e.estructuraId.descripcion), tipo: e.estructuraId ? e.estructuraId.tipoEstructuraId_iMaestraId : null, numeracion: !!(e.estructuraId && e.estructuraId.numeracion), orden: e.orden, etiquetas: [], pasos: [], equipos: [], utensilios: [], insumos: [], espec: [] }]));
+    const T = new Map();
+    etqs.filter(act).forEach((t) => { const e = E.get(t.mdEstructuraId_mdEstructuraId); if (!e) return; const x = { id: t.mdEsEtiquetaId, etiquetaId: t.etiquetaId_etiquetaId, nombre: ppLimpio(t.etiquetaId && t.etiquetaId.descripcion), orden: t.orden, pasos: [] }; T.set(x.id, x); e.etiquetas.push(x); });
+    const P = new Map();
+    pasos.filter(act).sort(orden).forEach((p) => {
+      const c = p.pasoId || {}, x = { id: p.mdEstructuraPasoId, pasoId: p.pasoId_pasoId, codigo: c.codigo != null ? String(c.codigo) : null, texto: ppLimpio(c.descripcion), orden: p.orden, tipo: p.tipoDatoId_iMaestraId,
+        vi: ppNulo(p.valorInicial), vf: ppNulo(p.valorFinal), margen: ppNulo(p.margen), depende: ppNulo(p.depende), rpor: !!p.rpor, vb: !!p.vb, etqCat: c.etiquetaId_etiquetaId || null, pm: [] };
+      P.set(x.id, x); const t = p.mdEsEtiquetaId_mdEsEtiquetaId && T.get(p.mdEsEtiquetaId_mdEsEtiquetaId), e = E.get(p.mdEstructuraId_mdEstructuraId);
+      if (t) t.pasos.push(x); else if (e) e.pasos.push(x);
+    });
+    pms.filter(act).sort(orden).forEach((m) => {
+      const padre = P.get(m.pasoId_mdEstructuraPasoId); if (!padre) return; const c = m.pasoHijoId || {}, insumo = !!(m.estructuraRecetaInsumoId_estructuraRecetaInsumoId || m.Component);
+      padre.pm.push({ id: m.mdEstructuraPasoInsumoPasoId, pasoId: m.pasoHijoId_pasoId, codigo: c.codigo != null ? String(c.codigo) : null, texto: ppLimpio(c.descripcion || m.Maktx), orden: m.orden, tipo: m.tipoDatoId_iMaestraId,
+        vi: ppNulo(m.valorInicial), vf: ppNulo(m.valorFinal), margen: ppNulo(m.margen), insumo, comp: ppNulo(m.Component), mat: ppLimpio(m.Maktx), cant: ppNulo(m.cantidadInsumo), um: ppNulo(m.CompUnit), etqCat: c.etiquetaId_etiquetaId || null });
+    });
+    equipos.filter(act).sort(orden).forEach((q) => { const e = E.get(q.mdEstructuraId_mdEstructuraId), c = q.equipoId || {}; if (e) e.equipos.push({ id: q.mdEstructuraEquipoId, equipoId: q.equipoId_equipoId, codigo: ppLimpio(c.equnr), ref: ppLimpio(c.CodigoGaci), desc: ppLimpio(c.eqktx), orden: q.orden }); });
+    utens.filter(act).sort(orden).forEach((u) => { const e = E.get(u.mdEstructuraId_mdEstructuraId), c = u.utensilioId || {}, g = u.agrupadorId || {}; if (e) e.utensilios.push({ id: u.mdEstructuraUtensilioId, utensilioId: u.utensilioId_utensilioId || null, agrupadorId: u.agrupadorId_clasificacionUtensilioId || null, codigo: ppLimpio(c.codigo), desc: ppLimpio(c.descripcion || g.descripcion), orden: u.orden }); });
+    const recPorId = new Map(recetas.filter(act).map((r) => [r.mdRecetaId, r.recetaId ? `${norm(r.recetaId.Matnr)} / ${norm(r.recetaId.Verid)}` : '']));
+    insumos.filter(act).sort((a, b) => (+a.ItemNo || 0) - (+b.ItemNo || 0)).forEach((i) => { const e = E.get(i.mdEstructuraId_mdEstructuraId); if (e) e.insumos.push({ receta: recPorId.get(i.mdRecetaId_mdRecetaId) || '', comp: ppLimpio(i.Component), desc: ppLimpio(i.Maktx), cant: ppNulo(i.CompQty), um: ppNulo(i.CompUnit) }); });
+    espec.filter(act).sort((a, b) => (+a.Merknr || +a.orden || 0) - (+b.Merknr || +b.orden || 0)).forEach((s) => { const e = E.get(s.mdEstructuraId_mdEstructuraId); if (e) e.espec.push({ id: s.mdEstructuraEspecificacionId, ensayo: ppLimpio(s.ensayoHijo), padre: ppLimpio(s.ensayoPadreSAP), especificacion: ppLimpio(s.especificacion), vi: ppNulo(s.valorInicial), vf: ppNulo(s.valorFinal), orden: s.orden }); });
+    const out = { estructuras: [...E.values()].sort(orden) };
+    out.estructuras.forEach((e) => e.etiquetas.sort(orden));
+    return out;
+  }
+  // Catálogo de SAP para buscar duplicados y agregar equipos (se guarda en este navegador 12 h; ~16 s leerlo)
+  async function ppCatalogo(modelo, forzar, avisar) {
+    if (!forzar && PP.cat && Date.now() - PP.catT < PP_TTL_CATALOGO) return PP.cat;
+    if (!forzar) { try { const c = await Almacen.leer('ppCatalogo'); if (c && c.t && Date.now() - c.t < PP_TTL_CATALOGO && c.v === 1) { PP.cat = c; PP.catT = c.t; return c; } } catch (e) { /* se lee de SAP */ } }
+    avisar('Leyendo el catálogo de pasos de SAP…');
+    const [pasos, estructuras, etiquetas, equipos, utensilios, agrupadores, maestra] = await Promise.all([
+      leerEntidadCompleta(modelo, 'PASO', { $select: 'pasoId,codigo,descripcion,estructuraId_estructuraId,etiquetaId_etiquetaId,estadoId_iMaestraId,tipoDatoId_iMaestraId,activo' }, 'pasoId', (h, n) => avisar(`Leyendo el catálogo de pasos de SAP… ${h} de ${n}`)),
+      leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion', $orderby: 'estructuraId' }), leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion', $orderby: 'etiquetaId' }),
+      leerEntidadCompleta(modelo, 'EQUIPO', { $select: 'equipoId,equnr,eqktx,CodigoGaci,activo' }, 'equipoId'),
+      leerTodoDe(modelo, 'UTENSILIO', [], { $select: 'utensilioId,codigo,descripcion,estadoId_iMaestraId,activo', $orderby: 'utensilioId' }),
+      leerTodoDe(modelo, 'UTENSILIO_CLASIFICACION', [], { $select: 'clasificacionUtensilioId,descripcion,activo', $orderby: 'clasificacionUtensilioId' }),
+      leerTodoDe(modelo, 'MAESTRA', [], { $select: 'iMaestraId,contenido', $orderby: 'iMaestraId' }).catch(() => [])]);
+    const c = { v: 1, t: Date.now(),
+      pasos: pasos.filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && norm(p.descripcion)).map((p) => [String(p.codigo), p.estructuraId_estructuraId || '', p.etiquetaId_etiquetaId || '', p.tipoDatoId_iMaestraId == null ? '' : p.tipoDatoId_iMaestraId, ppLimpio(p.descripcion)]),
+      estructuras: estructuras.map((x) => [x.estructuraId, ppLimpio(x.descripcion)]), etiquetas: etiquetas.map((x) => [x.etiquetaId, ppLimpio(x.descripcion)]),
+      equipos: equipos.filter((x) => x.activo !== false && (x.equnr || x.eqktx)).map((x) => [x.equipoId, ppLimpio(x.equnr), ppLimpio(x.CodigoGaci), ppLimpio(x.eqktx)]),
+      utensilios: utensilios.filter((x) => x.activo !== false && +x.estadoId_iMaestraId !== 1).map((x) => [x.utensilioId, ppLimpio(x.codigo), ppLimpio(x.descripcion)]),
+      agrupadores: agrupadores.filter((x) => x.activo !== false).map((x) => [x.clasificacionUtensilioId, ppLimpio(x.descripcion)]),
+      tipos: Object.fromEntries(maestra.filter((x) => x.iMaestraId >= 430 && x.iMaestraId <= 460).map((x) => [x.iMaestraId, ppLimpio(x.contenido)])) };
+    PP.cat = c; PP.catT = c.t; try { await Almacen.guardar('ppCatalogo', c); } catch (e) { /* sin almacenamiento: se vuelve a leer la próxima vez */ }
+    return c;
+  }
+  // El paquete que viaja en el archivo: el RMD, los nombres y el catálogo empacado (solo los pasos de las estructuras del RMD)
+  function ppPaquete(md, arbol, cat, usuario) {
+    const estrRmd = new Set(arbol.estructuras.map((e) => e.estructuraId)), pasos = cat.pasos.filter((p) => estrRmd.has(p[1]));
+    const iE = new Map(), iT = new Map(), estr = [], etq = [];
+    const idxE = (id) => { if (!iE.has(id)) { iE.set(id, estr.length); estr.push([id, (cat.estructuras.find((x) => x[0] === id) || [])[1] || '']); } return iE.get(id); };
+    const nomT = new Map(cat.etiquetas);
+    const idxT = (id) => { if (!id) return ''; if (!iT.has(id)) { iT.set(id, etq.length); etq.push([id, nomT.get(id) || '']); } return iT.get(id); };
+    arbol.estructuras.forEach((e) => { idxE(e.estructuraId); e.etiquetas.forEach((t) => idxT(t.etiquetaId)); [e.pasos, ...e.etiquetas.map((t) => t.pasos)].forEach((l) => l.forEach((p) => { if (p.etqCat) idxT(p.etqCat); })); });
+    const lineas = pasos.map((p) => [p[0], idxE(p[1]), idxT(p[2]), p[3], p[4]].join('\t')).join('\n');
+    return { formato: 1, tipo: 'plantilla-rmd', generado: new Date().toISOString(), por: usuario || '', script: VERSION,
+      rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), principal: md.codigoversionprincipal || String(md.codigo) },
+      tipos: cat.tipos || {}, arbol, huella: PPN.huella(arbol),
+      catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
+  }
+  async function ppEmpacar(obj) {
+    const gz = await new Response(new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+    return aBase64(new Uint8Array(gz));
+  }
+  async function ppDesempacar(b64) {
+    const bin = Uint8Array.from(atob(String(b64).trim()), (c) => c.charCodeAt(0));
+    return JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  }
+  function ppHtml(b64, propuesta, titulo) {
+    const prop = propuesta ? JSON.stringify(propuesta).replace(/</g, '\\u003c') : 'null';
+    return `<!doctype html>\n<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="RMD mejoras ${VERSION}"><title>${esc(titulo)}</title><style>${PP_EDITOR_CSS}</style></head>\n<body><div id="app"></div>\n<script id="rmd-datos" type="application/octet-stream">${b64}</script>\n<script id="rmd-propuesta" type="application/json">${prop}</script>\n<script>(${ppEditorApp.toString()})((${ppNucleo.toString()})());</script>\n</body></html>`;
+  }
+  async function ppGenerar(codigo, op = {}) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'), avisar = op.avisar || (() => {});
+    if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital»');
+    avisar('Leyendo el RMD…'); await ppModeloListo(modelo);
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, c0 = String(codigo).trim();
+    const md = (await leerTodoDe(modelo, 'MD', [new F('codigo', 'EQ', isNaN(+c0) ? c0 : +c0)], { $expand: 'estadoIdRmd,sucursalId', $orderby: 'mdId' })).sort((a, b) => b.version - a.version)[0];
+    if (!md) throw new Error(`no se encontró el RMD ${codigo}`);
+    md.estado = norm(md.estadoIdRmd && md.estadoIdRmd.contenido);
+    const [arbol, cat] = await Promise.all([ppLeerArbol(modelo, md), ppCatalogo(modelo, !!op.forzar, avisar)]);
+    avisar('Armando el archivo…');
+    const paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl)), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
+    const nombre = `Plantilla RMD ${paq.rmd.codigo} v${paq.rmd.version} ${d.getFullYear()}-${dd2(d.getMonth() + 1)}-${dd2(d.getDate())}.html`;
+    const html = ppHtml(b64, null, `Propuesta RMD ${paq.rmd.codigo} v${paq.rmd.version} · ${paq.rmd.descripcion}`);
+    const cuenta = (f) => arbol.estructuras.reduce((s, e) => s + f(e), 0);
+    return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length } };
+  }
+  // ---- leer un archivo de propuesta (el .html que devuelve Producción, o el .json) ----
+  async function ppLeerPropuesta(texto) {
+    const m1 = /<script id="rmd-datos" type="application\/octet-stream">([\s\S]*?)<\/script>/.exec(texto), m2 = /<script id="rmd-propuesta" type="application\/json">([\s\S]*?)<\/script>/.exec(texto);
+    if (!m1 || !m2) throw new Error('el archivo no es una plantilla de RMD (¿es el .html que generó «Plantilla para Producción»?)');
+    const datos = await ppDesempacar(m1[1]); let prop = null; try { prop = JSON.parse(m2[1]); } catch (e) { prop = null; }
+    if (!datos || datos.tipo !== 'plantilla-rmd') throw new Error('el archivo no trae una plantilla de RMD válida');
+    if (!prop || prop.tipo !== 'propuesta-rmd' || !prop.trabajo) throw new Error('la plantilla todavía no tiene una propuesta guardada (Producción debe usar «Guardar propuesta»)');
+    if (!prop.base || prop.base.huella !== datos.huella) throw new Error('la propuesta no corresponde a esta plantilla');
+    return { datos, prop };
+  }
+  // Une filas de dos versiones del mismo master por estructura, etiqueta y código de paso (las versiones tienen filas nuevas)
+  function ppMapear(base, otro) {
+    const claves = (arbol) => {
+      const m = new Map(), oc = new Map(), sig = (k) => { const n = (oc.get(k) || 0) + 1; oc.set(k, n); return `${k}#${n}`; };
+      arbol.estructuras.forEach((e) => {
+        const ke = sig('E' + e.estructuraId); m.set(ke, e.id);
+        const lista = (l, pref) => l.forEach((p) => { const kp = sig(`${pref}|${p.codigo}`); m.set(kp, p.id); (p.pm || []).forEach((x) => m.set(sig(`${kp}|${x.codigo || x.comp}`), x.id)); });
+        lista(e.pasos || [], ke); (e.etiquetas || []).forEach((t) => { const kt = sig(`${ke}|T${t.etiquetaId}`); m.set(kt, t.id); lista(t.pasos || [], kt); });
+        (e.equipos || []).forEach((q) => m.set(sig(`${ke}|Q${q.equipoId}`), q.id)); (e.utensilios || []).forEach((u) => m.set(sig(`${ke}|U${u.utensilioId || u.agrupadorId}`), u.id));
+      });
+      return m;
+    };
+    const a = claves(base), b = claves(otro), out = new Map();
+    a.forEach((id, k) => { if (b.has(k)) out.set(id, b.get(k)); });
+    return out;
+  }
+  async function ppAnalizar(datos, prop) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
+    if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital»');
+    await ppModeloListo(modelo);
+    const cat = { estructura: new Map(), etiqueta: new Map(datos.catalogo.etq), tipos: new Map(), estados: new Map() };
+    const lin = await tzLinaje(modelo, datos.rmd.codigo, cat), base = lin.versiones.find((m) => m.mdId === datos.rmd.mdId) || lin.actual;
+    const ing = (m) => +m.estadoIdRmd_iMaestraId === 467;
+    const destino = ing(base) ? base : lin.versiones.filter((m) => ing(m) && (+m.version > +base.version || (+m.version === +base.version && new Date(m.fechaRegistro) > new Date(base.fechaRegistro)))).sort((x, y) => (+y.version - +x.version) || (new Date(y.fechaRegistro) - new Date(x.fechaRegistro)))[0] || null;
+    const filas = PPN.desempacarPasos(datos.catalogo), bus = PPN.crearBuscador(filas), etqNom = new Map(datos.catalogo.etq);
+    const cambiosP = PPN.cambios(datos.arbol, prop.trabajo), avisosP = PPN.avisos(prop.trabajo, { buscador: bus, etiquetas: etqNom, base: datos.arbol.estructuras });
+    let actual = null, enSap = [], mapa = null;
+    if (destino) {
+      actual = await ppLeerArbol(modelo, destino);
+      if (destino.mdId === datos.rmd.mdId) { if (PPN.huella(actual) !== datos.huella) enSap = PPN.cambios(datos.arbol, actual); }
+      else { mapa = ppMapear(datos.arbol, actual); enSap = PPN.cambios(datos.arbol, ppTraducir(actual, mapa)); }
+    }
+    // los pasos nuevos se vuelven a buscar en SAP como lo hace el portal (mismo texto, estructura y etiqueta), por si ya se crearon
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
+    const estrDe = new Map(), etqDe = new Map(); prop.trabajo.estructuras.forEach((e) => { estrDe.set(e.id, e.estructuraId); (e.etiquetas || []).forEach((t) => etqDe.set(t.id, t.etiquetaId)); });
+    const nuevos = [];
+    cambiosP.forEach((c) => { if ((c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo) nuevos.push({ c, texto: c.despues, estr: estrDe.get(c.estructura), etq: c.etiqueta ? etqDe.get(c.etiqueta) : null }); if (c.accion === 'agregar' && c.pm) c.pm.filter((m) => m.nuevo).forEach((m) => nuevos.push({ c, texto: m.texto, estr: estrDe.get(c.estructura), etq: null, pm: true })); });
+    await Promise.all(nuevos.map(async (n) => {
+      try {
+        const fs = [new F('tolower(descripcion)', FO.EQ, "'" + n.texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', n.estr)]; if (n.etq) fs.push(new F('etiquetaId_etiquetaId', 'EQ', n.etq));
+        const r = await leerTodoDe(modelo, 'PASO', fs, { $select: 'pasoId,codigo,descripcion,etiquetaId_etiquetaId,fechaRegistro' });
+        n.existe = r.filter((x) => x.activo !== false).map((x) => String(x.codigo));
+      } catch (e) { n.error = e.message; }
+    }));
+    const tocados = new Set(cambiosP.map((c) => c.id)), conflictos = enSap.filter((c) => tocados.has(c.id) || (c.padre && tocados.has(c.padre)));
+    return { base, destino, lin, cambios: cambiosP, avisos: avisosP, enSap, conflictos, nuevos, mapa, etqNom };
+  }
+  // reemplaza los ids de la otra versión por los de la base (para comparar)
+  function ppTraducir(arbol, mapa) {
+    const inv = new Map([...mapa.entries()].map(([a, b]) => [b, a])), t = (x) => ({ ...x, id: inv.get(x.id) || ('otra:' + x.id) });
+    return { estructuras: arbol.estructuras.map((e) => ({ ...t(e), pasos: (e.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })), etiquetas: (e.etiquetas || []).map((x) => ({ ...t(x), pasos: (x.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })) })), equipos: (e.equipos || []).map(t), utensilios: (e.utensilios || []).map(t), espec: (e.espec || []).map(t) })) };
+  }
+  const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', mover: 'Mover', comentario: 'Comentario' };
+  const ppQue = (c) => `${PP_ACCION[c.accion]}${c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ` (${c.clase})` : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}`;
+  const ppDespues = (c) => c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? `después de: ${(c.trasDe && c.trasDe.texto) || '(al inicio)'}` : c.texto || '');
+  function ppExcel(datos, prop, an) {
+    const libro = Xlsx.crearLibro(), hoy = new Date(), dd2 = (n) => String(n).padStart(2, '0'), s = prop.solicitud || {};
+    const tabla = (nombre, nt, cab, anchos, filas, estilos = {}, activa) => {
+      const h = libro.hoja(nombre, { activa: !!activa, congelar: 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal')); filas.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, x, estilos[c] || 'normal'); }));
+    };
+    const avisoDe = (id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info').map((a) => a.texto).join(' · ');
+    tabla('Cambios', 'CambiosPropuesta', ['N.°', 'Lugar', 'Cambio', 'Antes', 'Después', 'Código antes', 'Código después', 'Paso nuevo a crear', 'Avisos', 'Comentario de Producción'], [10, 36, 22, 50, 50, 12, 12, 10, 40, 40],
+      an.cambios.map((c) => [c.numero || '', c.lugar || '', ppQue(c), c.antes || '', ppDespues(c), c.codigoAntes || '', c.codigo || '', c.nuevo ? 'Sí' : '', avisoDe(c.id), c.comentario || '']), { 1: 'envuelto', 3: 'envuelto', 4: 'envuelto', 8: 'envuelto', 9: 'envuelto' }, true);
+    tabla('Pasos nuevos', 'PasosNuevos', ['N.°', 'Lugar', 'Texto del paso nuevo', 'Ya existe en SAP (mismo texto, estructura y etiqueta)'], [10, 36, 70, 30],
+      an.nuevos.map((n) => [n.c.numero || '', n.c.lugar || '', n.texto, n.error ? 'no se pudo comprobar' : (n.existe || []).join(', ')]), { 1: 'envuelto', 2: 'envuelto' });
+    tabla('Cambiado en SAP', 'CambiadoEnSap', ['N.°', 'Lugar', 'Cambio en SAP desde la plantilla', 'Antes', 'Después', 'Toca un cambio de la propuesta'], [10, 36, 26, 50, 50, 12],
+      an.enSap.map((c) => [c.numero || '', c.lugar || '', ppQue(c), c.antes || '', ppDespues(c), an.conflictos.includes(c) ? 'Sí' : '']), { 1: 'envuelto', 3: 'envuelto', 4: 'envuelto' });
+    const hI = libro.hoja('Solicitud', { cols: [[1, 1, 30], [2, 2, 90]] });
+    hI.poner('A1', `Propuesta de Producción · RMD ${datos.rmd.codigo} v${datos.rmd.version}`, 'titulo');
+    [['Descripción', datos.rmd.descripcion], ['Solicitado por', s.nombre || ''], ['Área', s.area || ''], ['Motivo', s.motivo || ''], ['Control de cambio', s.cc || ''], ['Observación', s.observacion || ''],
+      ['Guardada el', fechaHoraCorta(prop.guardado)], ['Plantilla generada', `${fechaHoraCorta(datos.generado)} por ${datos.por || '—'}`], ['Se ingresa en', an.destino ? `v${an.destino.version} · ${an.destino.codigo} (${an.destino.estado})` : 'falta crear una versión Ingresada del RMD'],
+      ['Generado', `${dd2(hoy.getDate())}/${dd2(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd2(hoy.getHours())}:${dd2(hoy.getMinutes())}`]].forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return { libro, nombre: `Propuesta RMD ${datos.rmd.codigo} - plan de ingreso ${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}.xlsx` };
+  }
+  // ---- ventanas ----
+  function abrirPlantillaProduccion(codigo) {
+    const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista «Configuración Manufactura Digital».', true); return; }
+    const asoc = ctrl.getView().getModel('asociarDatos'), abierto = asoc && asoc.getData() && asoc.getData().codigo;
+    const filtro = (ctrl.getView().getModel('oDataFilter') || { getProperty: () => '' }).getProperty('/code');
+    const v = ventana('Plantilla para Producción', { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false;
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp');
+    v.cuerpo.innerHTML = `<p class="rmd-nota">Un archivo .html que Producción abre en Chrome o Edge, sin SAP: ve el RMD como en el PDF, propone cambios (buscando los pasos que ya existen) y devuelve el archivo con su propuesta para importarla aquí.</p>
+      <label class="rmd-pp-campo">Código del RMD <input class="rmd-pp-cod" value="${esc(codigo || abierto || filtro || '')}" placeholder="p. ej. 2202609157" inputmode="numeric"></label>
+      <label class="rmd-nota"><input type="checkbox" class="rmd-pp-forzar"> Volver a leer el catálogo de SAP (si se crearon pasos hoy)</label>
+      <p class="rmd-progreso rmd-pp-estado"></p>`;
+    const cod = v.cuerpo.querySelector('.rmd-pp-cod'), est = v.cuerpo.querySelector('.rmd-pp-estado');
+    const bGen = botonModal('Generar plantilla', 'primario', async () => {
+      if (ocupado) return; const c = cod.value.trim(); if (!/^\d{5,}$/.test(c)) { setTxt(est, 'Escribe el código del RMD.'); est.classList.add('error'); return; }
+      ocupado = true; bGen.disabled = bImp.disabled = true; est.classList.remove('error');
+      try {
+        const r = await ppGenerar(c, { forzar: v.cuerpo.querySelector('.rmd-pp-forzar').checked, avisar: (t) => setTxt(est, t) });
+        descargarArchivo(r.nombre, r.html, 'text/html;charset=utf-8');
+        setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos. Envíalo a Producción.`);
+        if (!['Autorizado', 'Ingresado'].includes(r.paquete.rmd.estado)) { est.classList.add('error'); est.textContent += ` Ojo: el RMD está ${r.paquete.rmd.estado}.`; }
+      } catch (e) { setTxt(est, 'No se pudo generar: ' + e.message); est.classList.add('error'); }
+      finally { ocupado = false; bGen.disabled = bImp.disabled = false; }
+    });
+    const bImp = botonModal('Importar una propuesta…', '', () => { if (!ocupado) { v.cerrar(); elegirPropuesta(); } });
+    v.pie.append(botonModal('Cerrar', '', () => { if (!ocupado) v.cerrar(); }), bImp, bGen);
+    cod.addEventListener('keydown', (e) => { if (e.key === 'Enter') bGen.click(); }); setTimeout(() => cod.focus(), 30);
+  }
+  function elegirPropuesta() {
+    const i = document.createElement('input'); i.type = 'file'; i.accept = '.html,.htm,text/html';
+    i.addEventListener('change', async () => { const f = i.files && i.files[0]; if (f) abrirImportarPropuesta(await f.text(), f.name); });
+    i.click();
+  }
+  async function abrirImportarPropuesta(texto, nombreArchivo) {
+    const v = ventana('Propuesta de Producción', { cancelar: () => v.cerrar() });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-pp-imp');
+    v.cuerpo.innerHTML = '<p class="rmd-progreso">Leyendo la propuesta…</p>';
+    let datos, prop, an;
+    try {
+      ({ datos, prop } = await ppLeerPropuesta(texto));
+      v.cuerpo.innerHTML = '<p class="rmd-progreso">Revisando el RMD en SAP…</p>';
+      an = await ppAnalizar(datos, prop);
+    } catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo abrir «${esc(nombreArchivo || 'el archivo')}»: ${esc(e.message)}</p>`; v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); return; }
+    const s = prop.solicitud || {}, r = datos.rmd, nNuevos = an.nuevos.length, yaExisten = an.nuevos.filter((n) => n.existe && n.existe.length).length;
+    const errores = [...an.avisos.values()].flat().filter((a) => a.nivel === 'error').length;
+    const estadoDestino = an.destino ? (an.destino.mdId === r.mdId ? `se ingresa en este mismo RMD (v${esc(r.version)}, Ingresado)` : `se ingresa en la versión Ingresada <b>v${esc(an.destino.version)} · ${esc(an.destino.codigo)}</b>`) :
+      `<b class="rmd-pp-rojo">no hay una versión Ingresada</b>: el RMD ${esc(r.codigo)} está ${esc(an.base.estado || r.estado)}. Crea la nueva versión en el portal y vuelve a importar la propuesta.`;
+    const lineas = [
+      `<li>${an.destino ? '✓' : '✕'} ${estadoDestino}</li>`,
+      `<li>${an.enSap.length ? (an.conflictos.length ? '⚠' : 'ℹ') : '✓'} ${an.enSap.length ? `En SAP hubo ${an.enSap.length} cambio(s) desde que se generó la plantilla${an.conflictos.length ? `, <b>${an.conflictos.length} en lo mismo que toca la propuesta</b>` : ' (ninguno en lo que toca la propuesta)'}` : 'El RMD no cambió en SAP desde que se generó la plantilla'}</li>`,
+      `<li>${nNuevos ? '★' : '✓'} ${nNuevos ? `${nNuevos} paso(s) nuevo(s) a crear${yaExisten ? `; <b>${yaExisten} ya existe(n) ahora en SAP</b>` : ''}` : 'Todos los pasos ya existen en SAP'}</li>`,
+      errores ? `<li>✕ ${errores} dato(s) por corregir que Producción dejó marcados</li>` : ''];
+    const avisoDe = (id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info').map((a) => `<div class="rmd-pp-av ${a.nivel}">${a.nivel === 'error' ? '✕' : '⚠'} ${esc(a.texto)}</div>`).join('');
+    const nuevoDe = new Map(an.nuevos.filter((n) => !n.pm).map((n) => [n.c, n]));
+    const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
+      return `<tr class="rmd-pp-${c.accion}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
+        <td>${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => esc(m.texto) + (m.nuevo ? ' ★' : '')).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
+        <td>${esc(c.comentario || '')}</td></tr>`; }).join('');
+    v.cuerpo.innerHTML = `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}<br><span class="rmd-nota">Plantilla del ${esc(fechaHoraCorta(datos.generado))} · propuesta guardada el ${esc(fechaHoraCorta(prop.guardado))}</span></div>
+        <div><b>${esc(s.nombre || '—')}</b> · ${esc(s.area || '')}<br><span class="rmd-nota">${esc(s.motivo || '')}${s.cc ? ' · ' + esc(s.cc) : ''}</span></div></div>
+      ${s.observacion ? `<p class="rmd-nota">Observación: ${esc(s.observacion)}</p>` : ''}<ul class="rmd-pp-checks">${lineas.join('')}</ul>
+      ${an.cambios.length ? `<table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>` : '<p class="rmd-nota">La propuesta no trae cambios.</p>'}
+      ${an.enSap.length ? `<details class="rmd-pp-sap"><summary>Cambios hechos en SAP desde la plantilla (${an.enSap.length})</summary><table class="rmd-tabla rmd-pp-t"><tbody>${an.enSap.map((c) => `<tr><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}</td><td>${esc(ppDespues(c))}</td></tr>`).join('')}</tbody></table></details>` : ''}
+      <p class="rmd-nota">El ingreso asistido (aplicar cada cambio con las ventanas del portal) llega en la próxima versión; por ahora usa este plan y su Excel.</p>`;
+    v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), botonModal('Exportar Excel', 'primario', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } }));
+    v.__pp = { datos, prop, an };
+    window.__rmdStats.plantilla.ultimo = { datos, prop, an };
+  }
+  // soltar el archivo de la propuesta sobre la lista principal la abre
+  document.addEventListener('dragover', (e) => { if (on('plantillaprod') && e.dataTransfer && [...(e.dataTransfer.items || [])].some((i) => i.kind === 'file') && controladorPrincipal() && !dialogos().length) e.preventDefault(); });
+  document.addEventListener('drop', async (e) => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!on('plantillaprod') || !f || !/\.html?$/i.test(f.name) || !/propuesta|plantilla/i.test(f.name) || dialogos().length || !controladorPrincipal()) return;
+    e.preventDefault(); abrirImportarPropuesta(await f.text(), f.name);
+  });
+  window.__rmdStats.plantilla = { generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerPropuesta, analizar: ppAnalizar, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarPropuesta, nucleo: PPN };
+  // ==== PLANTILLA-PRODUCCION:FIN ====
+
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
   // Grupos del panel (las claves son las de OPC)
   const GRUPOS_PANEL = [
     ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion']],
-    ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
+    ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'plantillaprod', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
     ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
     ['Asociar fórmulas', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta']],
     ['Alertas', ['reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],

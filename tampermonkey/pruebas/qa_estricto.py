@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 1; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -18,7 +18,7 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · S v1.34: reglas de revisión
   y lista de documentos vigentes (carga del .xls del DMS, aviso del RMD, Documentos citados con Vigente, resaltado en las listas; cortafuegos;
   VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · U v1.37: cambios de recetas en SAP (icono tenue, revisión por tandas, ventana, Excel
-  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · 1 v1.40: plantilla para Producción (numeración frente al PDF del portal, catálogo, archivo sin SAP e importación; COD_PP = RMD Ingresado; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -29,7 +29,7 @@ Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variable
 NUNCA apuntes RMD_PRUEBA a un RMD real si vas a ejecutar el bloque D: cambia y borra procesos menores del paso 19.
 QA_CORTAFUEGOS=1 (sin el bloque D): aborta durante toda la ejecución cualquier petición que no sea GET/HEAD, para correr A-C/E-K sobre un RMD real Ingresado sin ningún riesgo.
 """
-import json, os, re, sys, time, traceback
+import json, os, re, sys, tempfile, time, traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from util import SCRIPT, abrir, abrir_con_inyeccion_temprana, abrir_dialogo, marcar_fila, cerrar_todo
 from playwright.sync_api import sync_playwright
@@ -42,7 +42,7 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZD"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ1D"
 if "D" in SOLO and not RMD_PRUEBA:
     raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
@@ -1127,7 +1127,7 @@ with sync_playwright() as p:
         RMD_SUSP = os.environ.get("RMD_SUSP", "2202608939")   # un RMD AUTORIZADO: la suspensión se simula (nada sale del navegador)
         RMD_ING = os.environ.get("RMD_ING", "2202609157")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
         cerrar_seguro(); pg.wait_for_timeout(1000)
-        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
+        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
             fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)   # sin el filtro de código que dejan otros bloques (exporta la lista entera)
             fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
@@ -1141,7 +1141,7 @@ with sync_playwright() as p:
             e = fr.evaluate("window.__exp.pop()")
             fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
             vm = (e["ultima"] or {}).get("valueMap") or {}
-            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados en todos los master", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados en todos los master", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
                   and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
             return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
         @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
@@ -2030,6 +2030,89 @@ with sync_playwright() as p:
         @prueba("P6 Ninguna petición de escritura salió del navegador durante el bloque P (todo es lectura: versiones, pasos y auditoría)")
         def _():
             return (not bloq_p), f"bloqueadas={bloq_p[:5]}"
+
+    # ───────────────────────── 1. Plantilla para Producción (v1.40; lectura real, sin escribir) ─────────────────────────
+    if "1" in SOLO:
+        COD_PP = os.environ.get("COD_PP", "2202609157")      # RMD (Ingresado) para la plantilla y la importación
+        bloq_1 = []
+        def guardia_1(route):
+            if route.request.method not in ("GET", "HEAD"): bloq_1.append(route.request.method + " " + route.request.url[:80]); route.abort()
+            else: route.continue_()
+        pg.route("**/*", guardia_1)
+        PP1 = {}
+        # recién cargada la página, el portal tarda unos segundos en responder lecturas: se espera a que conteste una corta
+        for _i in range(30):
+            if fr.evaluate("""() => new Promise((ok) => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const mm = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener.getView().getModel('mainModelv2');
+              mm.read('/ESTRUCTURA', { urlParameters: { $top: '1', $select: 'estructuraId' }, success: () => ok(true), error: () => ok(true) }); setTimeout(() => ok(false), 4000); })"""): break
+            pg.wait_for_timeout(2000)
+        try:
+            @prueba("1-1 Plantilla de un RMD real: se genera desde el portal (RMD + catálogo de SAP), su numeración es la misma del PDF que genera el portal (paso por paso) y el archivo pesa lo razonable")
+            def _():
+                cerrar_seguro(); t0 = time.time()
+                r = fr.evaluate("""async (c) => { const x = await window.__rmdStats.plantilla.generar(c, {}); const N = window.__rmdStats.plantilla.nucleo, num = N.numerar(x.paquete.arbol.estructuras), lista = [];
+                  x.paquete.arbol.estructuras.forEach((e) => (e.etiquetas || []).forEach((t) => (t.pasos || []).forEach((p) => lista.push([num.get(p.id) || '', p.texto, p.codigo]))));
+                  window.__pp1 = x; return { nombre: x.nombre, resumen: x.resumen, lista }; }""", COD_PP)
+                seg = round(time.time() - t0, 1); PP1.update(r)
+                # el PDF del propio portal (pdfMake) para el mismo RMD: se abre el RMD, se genera el documento y se leen sus números
+                RmdAutomation(pg).editor_de_rmd(COD_PP); pg.wait_for_timeout(4000)
+                pdf = fr.evaluate("""async () => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener;
+                  const pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open; let dd = null;
+                  const t = []; const leer = (n) => { if (n == null) return; if (typeof n === 'string' || typeof n === 'number') { t.push(String(n)); return; } if (Array.isArray(n)) { n.forEach(leer); return; } if (typeof n !== 'object') return;
+                    if (n.text !== undefined) { leer(n.text); return; } if (n.table) { (n.table.body || []).forEach((f) => (f || []).forEach(leer)); return; } for (const k of ['stack', 'columns', 'ul', 'ol']) if (n[k]) { leer(n[k]); return; } };
+                  const cou0 = URL.createObjectURL; let blob = null;
+                  try { window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} }); URL.createObjectURL = function (x) { if (x && x.type === 'application/pdf') blob = x; return cou0.apply(this, arguments); };
+                    pm.createPdf = function (d) { if (!dd) { try { leer(d.content); } catch (e) { t.push('ERROR ' + e.message); } dd = true; } return cp0.apply(this, arguments); };
+                    await ctrl.onCompletarAsociarDatos(); await ctrl.tratarInformacion(false, true); for (let i = 0; i < 100 && !blob; i++) await new Promise((r) => setTimeout(r, 200));
+                  } finally { window.open = open0; URL.createObjectURL = cou0; pm.createPdf = cp0; try { sap.ui.core.BusyIndicator.hide(); } catch (e) {} }
+                  const out = {}; const ts = t.map((x) => x.replace(/\\s+/g, ' ').trim()).filter(Boolean); ts.forEach((x, i) => { const m = /^(\\d+(?:\\.\\d+)+)\\.-$/.exec(x); if (m && ts[i + 1]) out[m[1]] = ts[i + 1]; }); return out; }""")
+                cerrar_seguro()
+                n = lambda s: re.sub(r"[^A-Z0-9]", "", (s or "").upper())
+                mal = [(x[0], x[1][:40], (pdf.get(x[0]) or "¿?")[:40]) for x in r["lista"] if n(pdf.get(x[0])) != n(x[1])]
+                return (len(r["lista"]) > 10 and not mal and len(pdf) >= len(r["lista"]) and r["resumen"]["bytes"] < 12 * 1048576), f"{seg} s · {r['nombre']} · {r['resumen']} · pasos {len(r['lista'])} · en el PDF {len(pdf)} · distintos {mal[:5]}"
+            @prueba("1-2 El catálogo de la plantilla encuentra cada paso del RMD por su código y por su texto (igual), y el archivo se abre sin SAP, sin errores, con todos los pasos y procesos menores")
+            def _():
+                ruta = os.path.join(tempfile.gettempdir(), "qa_plantilla_rmd.html")
+                html = fr.evaluate("() => window.__pp1.html"); open(ruta, "w", encoding="utf-8").write(html)
+                ctx = pg.context; e = ctx.new_page(); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+                e.goto("file:///" + ruta.replace("\\", "/")); e.wait_for_selector(".pp-doc", timeout=60000)
+                r = e.evaluate("""() => { const B = window.__pp.buscador(), s = window.__pp.estado(), sin = [], noIgual = [];
+                  s.W.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { if (!p.codigo) return; if (!B.porCodigo(p.codigo)) sin.push(p.codigo); else if (!B.exactos(p.texto).some((f) => String(f.codigo) === String(p.codigo))) noIgual.push(p.codigo); })));
+                  return { pasos: document.querySelectorAll('.pp-paso').length, pms: document.querySelectorAll('.pp-pm').length, sin, noIgual, total: B.total }; }""")
+                arbol = fr.evaluate("() => { const a = window.__pp1.paquete.arbol; let p = 0, m = 0; a.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((x) => { p++; m += (x.pm || []).length; }))); return [p, m]; }")
+                PP1["ruta"] = ruta; PP1["pagina"] = e
+                return (not errs and [r["pasos"], r["pms"]] == arbol and not r["sin"] and not r["noIgual"] and r["total"] > 1000), f"{r} · árbol={arbol} · errores={errs[:2]}"
+            @prueba("1-3 Ida y vuelta con datos reales: en el archivo se cambia un paso por otro que ya existe y se agrega uno nuevo; se guarda; el portal lo importa: mismo RMD de destino (Ingresado), sin cambios en SAP desde la plantilla, los cambios iguales y el paso nuevo vuelto a buscar en SAP")
+            def _():
+                e = PP1.get("pagina"); e.on("dialog", lambda d: d.accept())
+                cambio = e.evaluate("""() => { const s = window.__pp.estado(), B = window.__pp.buscador(); let hecho = null;
+                  for (const est of s.W.estructuras) for (const t of est.etiquetas || []) for (const p of t.pasos || []) { if (hecho || !p.codigo) continue;
+                    const otro = B.buscar(p.texto, { estr: est.estructuraId, etq: t.etiquetaId, max: 6 }).find((y) => !y.igual && String(y.f.codigo) !== String(p.codigo)); if (!otro) continue;
+                    hecho = { id: p.id, de: p.codigo, a: String(otro.f.codigo), etiqueta: t.id }; }
+                  return hecho; }""")
+                e.evaluate("(c) => { const f = window.__pp.encontrar(c.id); window.__pp.editar({ id: c.id }); }", cambio); e.wait_for_selector("#m-texto")
+                e.evaluate("(c) => { const B = window.__pp.buscador(); document.querySelector('#m-texto').value = B.porCodigo(c.a).texto; document.querySelector('#m-texto').dispatchEvent(new Event('input', { bubbles: true })); }", cambio); e.wait_for_timeout(700)
+                e.click(f".pp-sug-it[data-codigo='{cambio['a']}']"); e.wait_for_timeout(300)                     # se elige de la lista de pasos existentes
+                e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+                e.evaluate("(c) => { const f = window.__pp.encontrar(c.id); window.__pp.editar({ nuevo: true, lista: f.lista, despuesDe: c.id, clase: 'paso', e: f.e, t: f.t }); }", cambio); e.wait_for_selector("#m-texto")
+                e.fill("#m-texto", "PASO DE PRUEBA QA QUE NO EXISTE EN EL CATALOGO 7421."); e.wait_for_timeout(500); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+                e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); e.fill("[data-k=nombre]", "QA"); e.fill("[data-k=area]", "QA"); e.fill("[data-k=motivo]", "Prueba sin escritura")
+                with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
+                guardado = open(dl.value.path(), encoding="utf-8").read(); e.close()
+                fr.evaluate("([t, n]) => { window.__rmdStats.plantilla.ultimo = null; window.__rmdStats.plantilla.importar(t, n); }", [guardado, "Propuesta QA.html"])
+                fr.wait_for_function("() => window.__rmdStats.plantilla.ultimo || document.querySelector('.rmd-pp-imp .rmd-progreso.error')", timeout=120000); pg.wait_for_timeout(800)
+                an = fr.evaluate("""() => { const u = window.__rmdStats.plantilla.ultimo; if (!u) return { error: (document.querySelector('.rmd-pp-imp .rmd-progreso.error') || {}).textContent }; const a = u.an;
+                  return { destino: a.destino && [a.destino.codigo, a.destino.estado], cambios: a.cambios.map((c) => [c.accion, c.codigo || '', !!c.nuevo]), nuevos: a.nuevos.map((n) => [n.texto.slice(0, 30), n.existe]), enSap: a.enSap.length, filas: document.querySelectorAll('.rmd-pp-t tbody tr').length }; }""")
+                cerrar_seguro()
+                ok = (an.get("destino") == [COD_PP, "Ingresado"] and ["cambiar", cambio["a"], False] in an["cambios"] and ["agregar", "", True] in an["cambios"] and an["enSap"] == 0 and an["nuevos"] and an["nuevos"][0][1] == [] and an["filas"] >= 2)
+                return ok, f"cambio={cambio} importada={an}"
+        finally:
+            cerrar_seguro(); pg.unroute("**/*", guardia_1)
+            try:
+                if PP1.get("pagina") and not PP1["pagina"].is_closed(): PP1["pagina"].close()
+            except Exception: pass
+        @prueba("1-4 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
+        def _():
+            return (not bloq_1), f"bloqueadas={bloq_1[:5]}"
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:
