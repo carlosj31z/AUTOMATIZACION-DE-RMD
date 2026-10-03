@@ -2130,7 +2130,37 @@ with sync_playwright() as p:
             try:
                 if PP1.get("pagina") and not PP1["pagina"].is_closed(): PP1["pagina"].close()
             except Exception: pass
-        @prueba("1-5 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
+            @prueba("1-5 Ingreso asistido SIMULADO en el RMD de prueba 2202609209 (cortafuegos): cambiar, agregar, quitar, mover y quitar un equipo se convierten en las escrituras del portal (MD_ES_PASO, MD_ESTRUCTURA aPaso, MD_ES_EQUIPO) con el orden renumerado, sin bloqueos, y no sale ninguna petición")
+            def _():
+                MODELO_JS = "sap.ui.getCore().byId([...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')).id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener.getView().getModel('mainModelv2')"
+                JS = """async ([cod, modo]) => { const P = window.__rmdStats.plantilla, mm = @@MODELO@@, F = sap.ui.model.Filter;
+  const x = await P.generar(cod, {}), datos = x.paquete, W = JSON.parse(JSON.stringify(datos.arbol));
+  const etq = (n) => { for (const e of W.estructuras) for (const t of e.etiquetas || []) if (t.nombre === n) return { e, t }; };
+  const cat = async (est, et, no) => (await new Promise((ok, mal) => mm.read('/PASO', { filters: [new F('estructuraId_estructuraId', 'EQ', est), new F('etiquetaId_etiquetaId', 'EQ', et), new F('activo', 'EQ', true), new F('estadoId_iMaestraId', 'NE', 1)], urlParameters: { $top: '40', $orderby: 'codigo' }, success: (r) => ok(r.results), error: mal }))).filter((p) => !no.includes(String(p.codigo)));
+  const cambios = [];
+  // 1) cambiar un paso de DOCUMENTACION por otro del catálogo
+  const D = etq('DOCUMENTACION'), usados = D.t.pasos.map((p) => String(p.codigo)); const alt = await cat(D.e.estructuraId, D.t.etiquetaId, usados);
+  const p0 = D.t.pasos[2]; Object.assign(p0, { texto: alt[0].descripcion, codigo: String(alt[0].codigo), pasoId: alt[0].pasoId, nuevo: false }); cambios.push('cambiar ' + p0.id);
+  // 2) agregar otro del catálogo en PREPARACION DEL MATERIAL tras el primero
+  const M = etq('PREPARACION DEL MATERIAL'), usM = M.t.pasos.map((p) => String(p.codigo)), altM = await cat(M.e.estructuraId, M.t.etiquetaId, usM);
+  M.t.pasos.splice(1, 0, { id: 'n:1', texto: altM[0].descripcion, codigo: String(altM[0].codigo), nuevo: false, pm: [] }); cambios.push('agregar ' + altM[0].codigo);
+  // 3) quitar el último de RENDIMIENTO y subir el penúltimo
+  const R = etq('RENDIMIENTO'); R.t.pasos[R.t.pasos.length - 1].quitado = true; cambios.push('quitar ' + R.t.pasos[R.t.pasos.length - 1].codigo);
+  const a = R.t.pasos[1]; R.t.pasos.splice(1, 1); R.t.pasos.splice(3, 0, a); cambios.push('mover ' + a.codigo);
+  // 4) quitar un equipo
+  const Q = W.estructuras.find((e) => (e.equipos || []).length); Q.equipos[0].quitado = true; cambios.push('quitar equipo ' + Q.equipos[0].codigo);
+  const prop = { formato: 1, tipo: 'borrador-rmd', base: { mdId: datos.rmd.mdId, codigo: datos.rmd.codigo, version: datos.rmd.version, huella: datos.huella }, guardado: new Date().toISOString(), solicitud: { nombre: 'QA', area: 'QA', motivo: 'Prueba' }, trabajo: W };
+  const an = await P.analizar(datos, prop); const est = await P.ingresar(datos, prop, an, { simular: modo === 'sim' });
+  if (!est.plan.bloqueos.length) { await est.ejecutar(modo === 'sim'); await new Promise((r) => setTimeout(r, 500)); }
+  const v = est.ventana && est.ventana.cuerpo;
+  return { cambios, destino: an.destino && [an.destino.codigo, an.destino.estado], enSap: an.enSap.length, bloqueos: est.plan.bloqueos, manual: est.plan.manual, ops: est.plan.ops.map((o) => [o.n, o.accion, o.clase, o.desc, o.ruta]), diario: (est.diario || []).map((d) => [d.n, d.estado, d.error || '']), dif: est.dif, prog: v ? (v.querySelector('.rmd-pp-prog') || {}).textContent : null }; }"""
+                JS = JS.replace("@@MODELO@@", MODELO_JS); cerrar_seguro()
+                r = fr.evaluate(JS, [os.environ.get("COD_ING", "2202609209"), "sim"]); cerrar_seguro()
+                tipos = [o[1] + ":" + o[2] for o in r["ops"]]; rutas = " ".join(o[4] for o in r["ops"])
+                ok = (not r["bloqueos"] and r["enSap"] == 0 and "Cambiar:paso" in tipos and "Agregar:paso" in tipos and "Quitar:paso" in tipos and "Quitar:equipo" in tipos and "Orden:paso" in tipos
+                      and "/MD_ES_EQUIPO(" in rutas and "/MD_ESTRUCTURA(" in rutas and all(x[1] == "simulado" for x in r["diario"]) and len(r["diario"]) == len(r["ops"]))
+                return ok, f"{r['cambios']} · {len(r['ops'])} escrituras {tipos} · {r['prog']}"
+        @prueba("1-6 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
         def _():
             return (not bloq_1), f"bloqueadas={bloq_1[:5]}"
 

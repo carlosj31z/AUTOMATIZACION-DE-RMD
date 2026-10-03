@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.41.0
+// @version      1.42.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.41.0';                                                       // mantener igual a @version
+  const VERSION = '1.42.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -244,6 +244,8 @@
   .rmd-pp-cambiar td:first-child, .rmd-pp-valores td:first-child { box-shadow: inset 3px 0 0 var(--rmd-ambar); } .rmd-pp-mover td:first-child { box-shadow: inset 3px 0 0 var(--rmd-acento); }
   .rmd-pp-crea { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 9px; background: rgba(122,63,191,.16); color: #b48cf0; font: 700 11px/18px var(--rmd-fuente); }
   html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-pp-crea { color: #7a3fbf; } .rmd-pp-av { margin-top: 3px; font-size: 12px; } .rmd-pp-av.error { color: var(--rmd-rojo); } .rmd-pp-av.aviso { color: var(--rmd-ambar); }
+  .rmd-modal.rmd-pp-ing { width: min(1100px, 96vw); height: min(820px, 92vh); } .rmd-pp-tabla { max-height: 46vh; overflow: auto; margin: 8px 0; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; } .rmd-pp-conf { display: block; margin: 10px 0 4px; }
+  .rmd-pp-e-hecho td:last-child { color: var(--rmd-verde); } .rmd-pp-e-simulado td:last-child { color: var(--rmd-acento-texto); } .rmd-pp-e-error td { background: rgba(220,53,69,.12); } .rmd-pp-e-error td:last-child { color: var(--rmd-rojo); }
   .rmd-pp-rojo { color: var(--rmd-rojo); } .rmd-pp-sap { margin: 10px 0; } .rmd-pp-sap summary { cursor: pointer; color: var(--rmd-acento-texto); }
   /* v1.38: historial de cambios dentro de «Trazabilidad del RMD» (pestañas; la original no se toca) */
   html.rmd-ui .sapMDialog.rmd-tz-on, html.rmd-ui .sapMDialog.rmd-medio.rmd-tz-on { position: fixed !important; width: min(1500px, 97vw) !important; max-width: 97vw !important; height: auto !important; max-height: none !important;
@@ -8699,7 +8701,7 @@ td.ult { position: relative; }
       } catch (e) { n.error = e.message; }
     }));
     const tocados = new Set(cambiosP.map((c) => c.id)), conflictos = enSap.filter((c) => tocados.has(c.id) || (c.padre && tocados.has(c.padre)));
-    return { base, destino, lin, cambios: cambiosP, avisos: avisosP, enSap, conflictos, nuevos, mapa, etqNom };
+    return { base, destino, actual, lin, cambios: cambiosP, avisos: avisosP, enSap, conflictos, nuevos, mapa, etqNom };
   }
   // reemplaza los ids de la otra versión por los de la base (para comparar)
   function ppTraducir(arbol, mapa) {
@@ -8797,8 +8799,10 @@ td.ult { position: relative; }
       ${s.observacion ? `<p class="rmd-nota">Observación: ${esc(s.observacion)}</p>` : ''}<ul class="rmd-pp-checks">${lineas.join('')}</ul>
       ${an.cambios.length ? `<table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>` : '<p class="rmd-nota">El borrador no trae cambios.</p>'}
       ${an.enSap.length ? `<details class="rmd-pp-sap"><summary>Cambios hechos en SAP desde la plantilla (${an.enSap.length})</summary><table class="rmd-tabla rmd-pp-t"><tbody>${an.enSap.map((c) => `<tr><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}</td><td>${esc(ppDespues(c))}</td></tr>`).join('')}</tbody></table></details>` : ''}
-      <p class="rmd-nota">El ingreso asistido (aplicar cada cambio con las ventanas del portal) llega en la próxima versión; por ahora usa este plan y su Excel.</p>`;
-    v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), botonModal('Exportar Excel', 'primario', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } }));
+      <p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>`;
+    const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length ? 'El borrador no trae cambios.' : '';
+    const bIngresar = botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an)); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
+    v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), botonModal('Exportar Excel', '', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } }), bIngresar);
     v.__pp = { datos, prop, an };
     window.__rmdStats.plantilla.ultimo = { datos, prop, an };
   }
@@ -8809,7 +8813,208 @@ td.ult { position: relative; }
     if (!on('plantillaprod') || !f || !/\.html?$/i.test(f.name) || !/borrador|propuesta|plantilla/i.test(f.name) || dialogos().length || !controladorPrincipal()) return;
     e.preventDefault(); abrirImportarBorrador(await f.text(), f.name);
   });
-  window.__rmdStats.plantilla = { generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
+  window.__rmdStats.plantilla = { ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
+  // ---- Ingreso asistido del borrador (v1.42) ----
+  // Desde la ventana del borrador importado, «Ingresar en SAP…» escribe en el RMD Ingresado lo mismo que haría una persona con las
+  // ventanas del portal, con las mismas escrituras que el propio portal (leídas de su código y comprobadas simulando): agregar pasos y
+  // procesos menores = actualización profunda de MD_ESTRUCTURA (aPaso / aPasoInsumoPaso, con los mismos campos que «Adicionar Pasos»),
+  // quitar = activo:false como el botón Eliminar (más sus procesos menores), cambiar el paso de una fila = pasoId_pasoId (como
+  // «Cambiar paso»), rangos = valorInicial / valorFinal / margen y el orden = `orden` de cada fila (como updateOrder del portal).
+  // Sin cambios pendientes en SAP desde la plantilla, sin errores del borrador y sin pasos nuevos por crear. Equipos y utensilios: se quitan
+  // aquí; agregarlos se hace a mano en el portal (el portal copia el equipo de SAP a su catálogo al asignarlo).
+  const PP_PASO_SEL = 'pasoId,codigo,descripcion,estructuraId_estructuraId,etiquetaId_etiquetaId,tipoDatoId_iMaestraId,decimales,margen,valorInicial,valorFinal,clvModelo,automatico,activo,estadoId_iMaestraId';
+  const ppUuid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
+  const ppNum = (v) => { if (v == null || v === '') return null; const x = Number(String(v).replace(',', '.')); return isNaN(x) ? null : x; };
+  // Arma las escrituras del ingreso (sin escribir nada): { ops, bloqueos, manual, finales } o bloqueos si algo impide ingresar.
+  async function ppPlanEscritura(datos, prop, an, modelo, usuario) {
+    const bloqueos = [], manual = [], ops = [], finales = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
+    if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);
+    if (an.enSap.length) bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
+    const errores = [...an.avisos.values()].flat().filter((a) => a.nivel === 'error').length; if (errores) bloqueos.push(`El borrador tiene ${errores} dato(s) por corregir marcados con ✕.`);
+    if (!an.cambios.length) bloqueos.push('El borrador no trae cambios.');
+    if (bloqueos.length) return { ops, bloqueos, manual, finales };
+    // índice de lo que hay hoy en el destino y mapa de ids (base → destino)
+    const idx = new Map();
+    an.actual.estructuras.forEach((e) => { const rec = (l) => (l || []).forEach((p) => { idx.set(p.id, p); (p.pm || []).forEach((m) => idx.set(m.id, m)); }); rec(e.pasos); (e.etiquetas || []).forEach((t) => rec(t.pasos)); (e.equipos || []).forEach((q) => idx.set(q.id, q)); (e.utensilios || []).forEach((q) => idx.set(q.id, q)); });
+    const nuevosIds = new Map(), D = (id) => (String(id).startsWith('n:') ? (nuevosIds.get(id) || (nuevosIds.set(id, ppUuid()), nuevosIds.get(id))) : mismo ? id : (an.mapa && an.mapa.get(id)) || null);
+    const bEst = new Map(datos.arbol.estructuras.map((e) => [e.id, e]));
+    // listas a procesar (pasos de cada estructura y etiqueta; procesos menores de cada paso que ya existía)
+    const listas = [];
+    prop.trabajo.estructuras.forEach((e) => {
+      const be = bEst.get(e.id) || { pasos: [], etiquetas: [] };
+      if ((e.pasos || []).length || (be.pasos || []).length) listas.push({ kind: 'paso', w: e.pasos || [], b: be.pasos || [], e, t: null });
+      (e.etiquetas || []).forEach((t) => { const bt = (be.etiquetas || []).find((x) => x.id === t.id) || { pasos: [] }; listas.push({ kind: 'paso', w: t.pasos || [], b: bt.pasos || [], e, t }); });
+    });
+    const conPm = [];
+    listas.forEach((L) => L.w.forEach((x) => { const b0 = L.b.find((y) => y.id === x.id); if (b0 && !x.quitado && ((x.pm || []).length || (b0.pm || []).length)) conPm.push({ kind: 'pm', w: x.pm || [], b: b0.pm || [], e: L.e, t: L.t, padre: x }); }));
+    listas.push(...conPm);
+    // pasos del catálogo que hacen falta: por código; los «nuevos» se buscan otra vez por su texto (por si ya se crearon)
+    const pide = (x, b0) => !b0 || String(x.codigo || '') !== String(b0.codigo || '') || x.nuevo;
+    const codigos = new Set(), buscarTexto = [];
+    listas.forEach((L) => { const bId = new Map(L.b.map((y) => [y.id, y])); L.w.filter((x) => !x.quitado).forEach((x) => { if (!pide(x, bId.get(x.id))) return; if (x.codigo && !x.nuevo) codigos.add(String(x.codigo)); else buscarTexto.push({ x, L }); }); });
+    listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach((m) => { if (m.codigo && !m.nuevo) codigos.add(String(m.codigo)); else buscarTexto.push({ x: m, L: { e: L.e, t: null } }); })); });
+    const porCodigo = new Map(), lee = async (filtros) => leerTodoDe(modelo, 'PASO', filtros, { $select: PP_PASO_SEL });
+    const lista = [...codigos]; for (let i = 0; i < lista.length; i += 40) (await lee([new F({ filters: lista.slice(i, i + 40).map((c) => new F('codigo', 'EQ', c)), and: false })])).forEach((p) => { if (p.activo !== false) porCodigo.set(String(p.codigo), p); });
+    for (const { x, L } of buscarTexto) {
+      const f = [new F('tolower(descripcion)', FO.EQ, "'" + String(x.texto || '').toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (L.t) f.push(new F('etiquetaId_etiquetaId', 'EQ', L.t.etiquetaId));
+      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
+      if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); } else bloqueos.push(`El paso nuevo «${String(x.texto).slice(0, 70)}» (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) todavía no existe en SAP: créalo con «Nuevo Paso» y vuelve a importar.`);
+    }
+    const cod = (x) => String(x.__codigo || x.codigo || '');
+    const faltan = [...new Set(listas.flatMap((L) => L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id)) && cod(x) && !porCodigo.has(cod(x))).map((x) => cod(x))))];
+    faltan.forEach((c) => bloqueos.push(`El paso ${c} no se encontró (¿está de baja?) en el catálogo de SAP.`));
+    if (bloqueos.length) return { ops, bloqueos, manual, finales };
+    const lugar = (L) => `${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}${L.padre ? ' › paso ' + (L.padre.codigo || '') : ''}`;
+    const fechaUsuario = { usuarioActualiza: usuario, fechaActualiza: ahora }, baja = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: false };
+    const dE = (L) => D(L.e.id), dT = (L) => (L.t ? D(L.t.id) : null);
+    let n = 0; const op = (o) => ops.push({ n: ++n, ...o });
+    listas.forEach((L) => {
+      const esPm = L.kind === 'pm', tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO', campo = esPm ? 'pasoHijoId_pasoId' : 'pasoId_pasoId', bId = new Map(L.b.map((y) => [y.id, y]));
+      const quien = (x, b0) => `${esPm ? 'proceso menor' : 'paso'} ${cod(x) || (b0 && b0.codigo) || ''} — ${String(x.texto || (b0 && b0.texto) || '').slice(0, 60)}`;
+      let estructural = false;
+      L.w.filter((x) => x.quitado && bId.has(x.id)).forEach((x) => {
+        estructural = true; const b0 = bId.get(x.id), fila = idx.get(D(x.id)); if (!fila) { bloqueos.push(`No se encontró en SAP ${quien(x, b0)} (${lugar(L)}).`); return; }
+        if (!esPm) (fila.pm || []).forEach((m) => op({ lugar: lugar(L), accion: 'Quitar', clase: 'pm', desc: `quitar proceso menor ${m.codigo || ''} — ${String(m.texto || '').slice(0, 50)} (del paso que se quita)`, ruta: `/MD_ES_PASO_INSUMO_PASO('${m.id}')`, datos: { ...baja } }));
+        op({ lugar: lugar(L), accion: 'Quitar', clase: esPm ? 'pm' : 'paso', desc: `quitar ${quien(x, b0)}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...baja } });
+      });
+      const vivos = L.w.filter((x) => !x.quitado);
+      vivos.filter((x) => bId.has(x.id)).forEach((x) => {
+        const b0 = bId.get(x.id), fila = idx.get(D(x.id)); if (!fila) { bloqueos.push(`No se encontró en SAP ${quien(x, b0)} (${lugar(L)}).`); return; }
+        if (pide(x, b0) && cod(x) && cod(x) !== String(b0.codigo || '')) {
+          if (esPm && b0.insumo) { bloqueos.push(`${quien(b0, b0)} es un insumo de la receta: no se cambia desde el borrador.`); return; }
+          op({ lugar: lugar(L), accion: 'Cambiar', clase: esPm ? 'pm' : 'paso', desc: `cambiar ${esPm ? 'el proceso menor' : 'el paso'} ${b0.codigo || ''} por el ${cod(x)} — ${String(x.texto || '').slice(0, 60)}`, ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: porCodigo.get(cod(x)).pasoId, ...fechaUsuario } });
+        }
+        const dv = {}; [['vi', 'valorInicial'], ['vf', 'valorFinal'], ['margen', 'margen']].forEach(([k, c]) => { if (String(x[k] == null ? '' : x[k]) !== String(b0[k] == null ? '' : b0[k])) dv[c] = ppNum(x[k]); });
+        if (Object.keys(dv).length) op({ lugar: lugar(L), accion: 'Rango', clase: esPm ? 'pm' : 'paso', desc: `rango de ${quien(x, b0)}: ${Object.entries(dv).map(([c, v]) => `${c === 'valorInicial' ? 'inicial' : c === 'valorFinal' ? 'final' : 'margen'} ${v == null ? '(vacío)' : v}`).join(', ')}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...dv, ...fechaUsuario } });
+      });
+      const nuevos = vivos.filter((x) => !bId.has(x.id));
+      if (nuevos.length) estructural = true;
+      // el orden: lo que ya existía conserva su orden relativo salvo que se haya movido; cualquier cambio de la lista renumera 1..n como el portal
+      const existentes = vivos.filter((x) => bId.has(x.id)), baseVivos = L.b.filter((y) => !L.w.some((x) => x.id === y.id && x.quitado));
+      if (existentes.map((x) => x.id).join('|') !== baseVivos.map((y) => y.id).join('|')) estructural = true;
+      if (estructural) vivos.forEach((x, i) => { if (!bId.has(x.id)) return; const fila = idx.get(D(x.id)); if (fila && +fila.orden !== i + 1) op({ lugar: lugar(L), accion: 'Orden', clase: esPm ? 'pm' : 'paso', desc: `${quien(x, bId.get(x.id))}: orden ${fila.orden} → ${i + 1}`, ruta: `/${tabla}('${fila.id}')`, datos: { orden: i + 1 } }); });
+      vivos.forEach((x, i) => {
+        if (bId.has(x.id)) return;
+        const p = porCodigo.get(cod(x)), id = D(x.id), mdE = dE(L), mdT = dT(L), padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x));
+        if (!esPm) {
+          const ini = x.vi != null && x.vi !== '' ? ppNum(x.vi) : p.valorInicial, fin = x.vf != null && x.vf !== '' ? ppNum(x.vf) : p.valorFinal, mar = x.margen != null && x.margen !== '' ? ppNum(x.margen) : p.margen;
+          op({ lugar: lugar(L), accion: 'Agregar', clase: 'paso', desc: `agregar paso ${cod(x)} — ${String(x.texto || '').slice(0, 60)} (posición ${i + 1})`, ruta: `/MD_ESTRUCTURA('${mdE}')`,
+            datos: { mdEstructuraId: mdE, aPaso: [{ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, fechaActualiza: ahora, usuarioActualiza: null, activo: true, mdEstructuraPasoId: id, estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdEsEtiquetaId_mdEsEtiquetaId: mdT,
+              mdId_mdId: dest.mdId, pasoId_pasoId: p.pasoId, orden: i + 1, tipoDatoId_iMaestraId: p.tipoDatoId_iMaestraId, decimales: p.decimales, margen: mar, valorInicial: ini, valorFinal: fin, clvModelo: p.clvModelo, automatico: p.automatico, mdEstructuraPasoIdDepende: id, tipoDatoIdAnterior_iMaestraId: p.tipoDatoId_iMaestraId }] } });
+          // sus procesos menores (los que Producción dejó en el paso nuevo)
+          (x.pm || []).filter((m) => !m.quitado).forEach((m, j) => {
+            const pm = porCodigo.get(cod(m)); if (!pm) { bloqueos.push(`El proceso menor «${String(m.texto).slice(0, 60)}» del paso nuevo no está en el catálogo de SAP.`); return; }
+            finales.set(m.id, cod(m));
+            op({ lugar: lugar(L), accion: 'Agregar', clase: 'pm', desc: `agregar proceso menor ${cod(m)} — ${String(m.texto || '').slice(0, 50)} al paso nuevo`, ruta: `/MD_ESTRUCTURA('${mdE}')`,
+              datos: { mdEstructuraId: mdE, aPasoInsumoPaso: [{ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, activo: true, mdEstructuraPasoInsumoPasoId: D(m.id), mdEstructuraPasoInsumoPasoIdAct: D(m.id), estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdId_mdId: dest.mdId, tipoDatoId_iMaestraId: pm.tipoDatoId_iMaestraId,
+                pasoId_mdEstructuraPasoId: id, pasoHijoId_pasoId: pm.pasoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, orden: j + 1, decimales: pm.decimales, margen: pm.margen, valorInicial: pm.valorInicial, valorFinal: pm.valorFinal, tipoDatoIdAnterior_iMaestraId: pm.tipoDatoId_iMaestraId }] } });
+          });
+        } else {
+          op({ lugar: lugar(L), accion: 'Agregar', clase: 'pm', desc: `agregar proceso menor ${cod(x)} — ${String(x.texto || '').slice(0, 50)} (posición ${i + 1})`, ruta: `/MD_ESTRUCTURA('${mdE}')`,
+            datos: { mdEstructuraId: mdE, aPasoInsumoPaso: [{ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, activo: true, mdEstructuraPasoInsumoPasoId: id, mdEstructuraPasoInsumoPasoIdAct: id, estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdId_mdId: dest.mdId, tipoDatoId_iMaestraId: p.tipoDatoId_iMaestraId,
+              pasoId_mdEstructuraPasoId: padreId, pasoHijoId_pasoId: p.pasoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, orden: i + 1, decimales: p.decimales, margen: p.margen, valorInicial: p.valorInicial, valorFinal: p.valorFinal, tipoDatoIdAnterior_iMaestraId: p.tipoDatoId_iMaestraId }] } });
+        }
+      });
+    });
+    // equipos y utensilios: se quitan aquí; agregarlos se hace a mano (el portal copia el equipo de SAP a su catálogo al asignarlo)
+    prop.trabajo.estructuras.forEach((e) => ['equipos', 'utensilios'].forEach((k) => {
+      const be = bEst.get(e.id) || {}, bIds = new Set((be[k] || []).map((x) => x.id)), tabla = k === 'equipos' ? 'MD_ES_EQUIPO' : 'MD_ES_UTENSILIO';
+      (e[k] || []).forEach((x) => {
+        const nombre = [x.desc, x.codigo, x.ref].filter(Boolean).join(' · ');
+        if (!bIds.has(x.id)) { if (!x.quitado) manual.push(`Agregar ${k === 'equipos' ? 'el equipo' : 'el utensilio'} ${nombre} en «${e.nombre}» (Adicionar Equipo del portal).`); return; }
+        if (x.quitado) { const fila = idx.get(D(x.id)); if (!fila) { bloqueos.push(`No se encontró en SAP ${nombre} (${e.nombre}).`); return; } op({ lugar: e.nombre, accion: 'Quitar', clase: k === 'equipos' ? 'equipo' : 'utensilio', desc: `quitar ${k === 'equipos' ? 'el equipo' : 'el utensilio'} ${nombre}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...baja } }); }
+      });
+    }));
+    return { ops, bloqueos, manual, finales, D, nuevosIds, porCodigo };
+  }
+  // Comprueba, releyendo el RMD, que cada lista quedó con los pasos (y procesos menores) del borrador y en su orden.
+  async function ppVerificarIngreso(modelo, dest, prop, plan) {
+    const nuevo = await ppLeerArbol(modelo, dest), dif = [], est = new Map(nuevo.estructuras.map((e) => [e.id, e])), D = plan.D, cod = (x) => String(plan.finales.get(x.id) || x.__codigo || x.codigo || x.comp || '');
+    prop.trabajo.estructuras.forEach((e) => {
+      const ne = est.get(D(e.id)); if (!ne) { dif.push(`Falta la estructura ${e.nombre}.`); return; }
+      const cmp = (w, nl, etiqueta) => {
+        const quiere = w.filter((x) => !x.quitado), tiene = nl || [];
+        if (quiere.map(cod).join('|') !== tiene.map((p) => String(p.codigo || '')).join('|')) dif.push(`${etiqueta}: esperaba ${quiere.length} pasos [${quiere.map(cod).slice(0, 8).join(', ')}…] y hay ${tiene.length} [${tiene.map((p) => p.codigo).slice(0, 8).join(', ')}…].`);
+        quiere.forEach((x) => { const p = tiene.find((y) => y.id === D(x.id)); if (!p) return; const q = x.pm || []; if (!q.length && !(p.pm || []).length) return;
+          const a = q.filter((m) => !m.quitado).map(cod).join('|'), b = (p.pm || []).map((m) => String(m.codigo || m.comp || '')).join('|'); if (a !== b) dif.push(`${etiqueta} › paso ${cod(x)}: procesos menores distintos (esperaba ${q.filter((m) => !m.quitado).length}, hay ${(p.pm || []).length}).`); });
+      };
+      cmp(e.pasos || [], ne.pasos, e.nombre);
+      (e.etiquetas || []).forEach((t) => { const nt = (ne.etiquetas || []).find((x) => x.id === D(t.id)); if (!nt) { dif.push(`Falta la etiqueta ${t.nombre}.`); return; } cmp(t.pasos || [], nt.pasos, `${e.nombre} › ${t.nombre}`); });
+      ['equipos', 'utensilios'].forEach((k) => { const quiere = (e[k] || []).filter((x) => !x.quitado && !String(x.id).startsWith('n:')).length; const hay = (ne[k] || []).length; if (!(e[k] || []).some((x) => String(x.id).startsWith('n:')) && quiere !== hay) dif.push(`${e.nombre}: ${k} esperados ${quiere}, hay ${hay}.`); });
+    });
+    return dif;
+  }
+  // Ejecuta las operaciones una por una (para al primer error). simular = no envía nada (para probar).
+  async function ppEjecutarIngreso(modelo, ops, o = {}) {
+    const diario = []; let hechas = 0;
+    for (const x of ops) {
+      if (o.detener && o.detener()) { diario.push({ ...x, estado: 'detenido' }); break; }
+      try { if (!o.simular) await modeloEscribir(modelo, 'update', x.ruta, x.datos); diario.push({ ...x, estado: o.simular ? 'simulado' : 'hecho' }); hechas++; }
+      catch (e) { diario.push({ ...x, estado: 'error', error: (e && e.message) || String(e) }); break; }
+      if (o.avance) o.avance(hechas, ops.length, x);
+    }
+    return diario;
+  }
+  function ppExcelIngreso(datos, dest, diario, dif, manual) {
+    const libro = Xlsx.crearLibro(), hoy = new Date(), dd2 = (n) => String(n).padStart(2, '0');
+    const h = libro.hoja('Ingreso', { activa: true, congelar: 'A2', cols: [[1, 1, 8], [2, 2, 44], [3, 3, 12], [4, 4, 90], [5, 5, 12], [6, 6, 40]], tabla: { nombre: 'IngresoBorrador', ref: `A1:F${Math.max(2, diario.length + 1)}`, estilo: 'TableStyleMedium2' } });
+    ['N.°', 'Lugar', 'Acción', 'Operación', 'Estado', 'Error'].forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+    diario.forEach((x, i) => [x.n, x.lugar, x.accion, x.desc, x.estado, x.error || ''].forEach((v, c) => { if (v !== '' && v != null) h.poner({ c, r: i + 1 }, v, c === 1 || c === 3 || c === 5 ? 'envuelto' : 'normal'); }));
+    const hI = libro.hoja('Resumen', { cols: [[1, 1, 30], [2, 2, 100]] });
+    hI.poner('A1', `Ingreso del borrador · RMD ${dest.codigo} v${dest.version}`, 'titulo');
+    [['Operaciones', String(diario.length)], ['Hechas', String(diario.filter((x) => x.estado === 'hecho').length)], ['Simuladas', String(diario.filter((x) => x.estado === 'simulado').length)], ['Con error', String(diario.filter((x) => x.estado === 'error').length)],
+      ['Comprobación', dif.length ? dif.join(' | ') : 'El RMD quedó como el borrador'], ['Pendiente a mano', manual.join(' | ') || '—'], ['Generado', `${dd2(hoy.getDate())}/${dd2(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd2(hoy.getHours())}:${dd2(hoy.getMinutes())}`]]
+      .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return { libro, nombre: `Ingreso RMD ${dest.codigo} v${dest.version} ${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}.xlsx` };
+  }
+  async function abrirIngreso(datos, prop, an, opc = {}) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'), usuario = codigoUsuario(ctrl);
+    if (!modelo) { toast('Abre la lista «Configuración Manufactura Digital».', true); return null; }
+    const v = ventana(`Ingresar en SAP · RMD ${an.destino.codigo} v${an.destino.version}`, { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false, detener = false;
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-pp-ing');
+    v.cuerpo.innerHTML = '<p class="rmd-progreso">Preparando las escrituras…</p>';
+    const cerrar = botonModal('Cerrar', '', () => { if (!ocupado) v.cerrar(); }); v.pie.append(cerrar);
+    let plan;
+    try { plan = await ppPlanEscritura(datos, prop, an, modelo, usuario); } catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo preparar: ${esc(e.message)}</p>`; return null; }
+    const est = { plan, diario: [], dif: null };
+    window.__rmdStats.plantilla.ingreso = est;
+    if (plan.bloqueos.length) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se puede ingresar todavía:</p><ul class="rmd-pp-checks">${plan.bloqueos.map((b) => `<li>✕ ${esc(b)}</li>`).join('')}</ul>`; return est; }
+    const cuenta = {}; plan.ops.forEach((o) => { const k = `${o.accion} ${o.clase === 'pm' ? 'procesos menores' : o.clase === 'paso' ? 'pasos' : o.clase === 'equipo' ? 'equipos' : 'utensilios'}`; cuenta[k] = (cuenta[k] || 0) + 1; });
+    const filas = () => plan.ops.map((o) => { const d = est.diario.find((x) => x.n === o.n); return `<tr class="${d ? 'rmd-pp-e-' + d.estado : ''}"><td class="rmd-nowrap">${o.n}</td><td>${esc(o.lugar)}</td><td>${esc(o.desc)}${d && d.error ? `<div class="rmd-pp-av error">✕ ${esc(d.error)}</div>` : ''}</td><td class="rmd-nowrap">${d ? esc(d.estado) : ''}</td></tr>`; }).join('');
+    v.cuerpo.innerHTML = `<p><b>${plan.ops.length} escrituras</b> en el RMD <b>${esc(an.destino.codigo)} v${esc(an.destino.version)}</b> (${esc(an.destino.estado)}): ${Object.entries(cuenta).map(([k, n]) => `${n} ${esc(k.toLowerCase())}`).join(' · ')}.</p>
+      ${plan.manual.length ? `<div class="rmd-pp-av aviso">Queda a mano (no se hace desde aquí):<ul>${plan.manual.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
+      <div class="rmd-pp-tabla"><table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Dónde</th><th>Operación</th><th>Estado</th></tr></thead><tbody>${filas()}</tbody></table></div>
+      <label class="rmd-nota rmd-pp-conf"><input type="checkbox" class="rmd-pp-ok"> Confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP.</label>
+      <div class="rmd-progreso rmd-pp-prog"></div>`;
+    const prog = v.cuerpo.querySelector('.rmd-pp-prog'), ok = v.cuerpo.querySelector('.rmd-pp-ok'), tabla = v.cuerpo.querySelector('tbody');
+    const pintar = () => { tabla.innerHTML = filas(); };
+    const correr = async (simular) => {
+      if (ocupado) return; ocupado = true; detener = false; bIng.disabled = bSim.disabled = true; bDet.style.display = ''; prog.classList.remove('error');
+      try {
+        if (!simular) {
+          if (dialogos().length > 1) throw new Error('cierra las ventanas del portal que estén abiertas (solo debe quedar esta).');
+          setTxt(prog, 'Comprobando que el RMD sigue igual…');
+          const md = (await leerTodoDe(modelo, 'MD', [new (sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter)('mdId', 'EQ', an.destino.mdId)], { $select: 'mdId,estadoIdRmd_iMaestraId' }))[0];
+          if (!md || +md.estadoIdRmd_iMaestraId !== 467) throw new Error('el RMD ya no está Ingresado.');
+          if (PPN.huella(await ppLeerArbol(modelo, an.destino)) !== PPN.huella(an.actual)) throw new Error('el RMD cambió en SAP mientras revisabas. Cierra esta ventana e importa el borrador otra vez.');
+        }
+        est.diario = await ppEjecutarIngreso(modelo, plan.ops, { simular: !!simular || !!opc.simular, detener: () => detener, avance: (h, t, x) => { setTxt(prog, `${simular ? 'Simulando' : 'Escribiendo'} ${h} de ${t}…`); pintar(); } });
+        pintar(); const mal = est.diario.find((x) => x.estado === 'error'), hechas = est.diario.filter((x) => x.estado === 'hecho').length;
+        if (mal) { setTxt(prog, `Se detuvo en la operación ${mal.n}: ${mal.error}. Hechas antes: ${hechas}. Revisa el RMD en el portal antes de reintentar (no se repite lo ya hecho si importas otra vez: el borrador se vuelve a comparar).`); prog.classList.add('error'); }
+        else if (est.diario.length < plan.ops.length) setTxt(prog, `Detenido tras ${hechas} operaciones.`);
+        else if (simular || opc.simular) setTxt(prog, `Simulación lista: ${est.diario.length} escrituras que se harían (no se envió nada).`);
+        else { setTxt(prog, 'Comprobando el resultado…'); est.dif = await ppVerificarIngreso(modelo, an.destino, prop, plan); setTxt(prog, est.dif.length ? `Se escribió todo, pero la comprobación encontró diferencias: ${est.dif.join(' ')}` : `Listo: ${hechas} escrituras. El RMD quedó como el borrador.`); if (est.dif.length) prog.classList.add('error'); }
+        bX.disabled = false;
+      } catch (e) { setTxt(prog, 'No se escribió nada: ' + e.message); prog.classList.add('error'); }
+      finally { ocupado = false; bSim.disabled = false; bIng.disabled = !ok.checked || est.diario.some((x) => x.estado === 'hecho'); bDet.style.display = 'none'; }
+    };
+    const bIng = botonModal('Ingresar en SAP', 'primario', () => correr(false)), bSim = botonModal('Probar sin escribir', '', () => correr(true)), bDet = botonModal('Detener', '', () => { detener = true; }), bX = botonModal('Exportar registro', '', async () => { try { const x = ppExcelIngreso(datos, an.destino, est.diario, est.dif || [], plan.manual); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } });
+    bIng.disabled = true; bDet.style.display = 'none'; bX.disabled = true; ok.addEventListener('change', () => { bIng.disabled = !ok.checked || ocupado; });
+    v.pie.prepend(bX); v.pie.append(bDet, bSim, bIng);
+    est.ejecutar = correr; est.ventana = v;
+    return est;
+  }
   // ==== PLANTILLA-PRODUCCION:FIN ====
 
   // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
