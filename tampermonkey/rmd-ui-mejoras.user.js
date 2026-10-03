@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.46.0
+// @version      1.46.1
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.46.0';                                                       // mantener igual a @version
+  const VERSION = '1.46.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -264,6 +264,9 @@
   .rmd-ing-aviso { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; padding: 7px 12px; border-radius: 8px; background: rgba(155,107,214,.16); border-left: 4px solid #9b6bd6; font-size: 12.5px; } .rmd-ing-aviso .rmd-btn { margin-left: 6px; }
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   .rmd-pp-conf { display: block; margin: 10px 0 4px; }
+  .rmd-ing-conf { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 14px; margin: 12px 0 4px; padding: 14px 18px; border: 2px solid var(--rmd-acento); border-radius: 10px; background: var(--rmd-fondo-modal, #1d2733); font-size: 14px; cursor: pointer; box-shadow: 0 -6px 14px rgba(0,0,0,.25); }
+  .rmd-ing-conf input { width: 26px; height: 26px; flex: 0 0 auto; cursor: pointer; accent-color: var(--rmd-verde); } .rmd-ing-conf.marcada { border-color: var(--rmd-verde); } .rmd-ing-conf:not(.marcada) { animation: rmd-ing-pulso 2s ease-in-out infinite; }
+  @keyframes rmd-ing-pulso { 0%, 100% { box-shadow: 0 -6px 14px rgba(0,0,0,.25); } 50% { box-shadow: 0 -6px 14px rgba(0,0,0,.25), 0 0 0 4px rgba(10,110,209,.45); } } .rmd-ing-conf-flash { animation: rmd-ing-sacudir .5s; border-color: var(--rmd-rojo); } @keyframes rmd-ing-sacudir { 0%, 100% { transform: none; } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
   @keyframes rmd-ing-vaiven { from { margin-left: 0; width: 15% !important; } to { margin-left: 85%; width: 15% !important; } } .rmd-ing-rev ul { margin: 6px 0 0; padding-left: 18px; } .rmd-ing-rev-ok { color: var(--rmd-verde); }
   .rmd-pp-e-hecho td:last-child { color: var(--rmd-verde); } .rmd-pp-e-simulado td:last-child { color: var(--rmd-acento-texto); } .rmd-pp-e-error td { background: rgba(220,53,69,.12); } .rmd-pp-e-error td:last-child { color: var(--rmd-rojo); }
   .rmd-pp-rojo { color: var(--rmd-rojo); } .rmd-pp-sap { margin: 10px 0; } .rmd-pp-sap summary { cursor: pointer; color: var(--rmd-acento-texto); }
@@ -9495,7 +9498,7 @@ td.ult { position: relative; }
       ${listaAv('Revisa después en SAP', plan.avisos.concat(plan.manual), 'ambar')}
       ${plan.revision.length ? `<details class="rmd-ing-nota ambar rmd-ing-rev" open><summary><b>Revisión con las reglas: ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''}</b> (no bloquean; se aceptan al confirmar)</summary><ul>${plan.revision.slice(0, 60).map((a) => `<li><span class="rmd-nota">${esc(a.donde)}</span><br>${esc(a.texto)}</li>`).join('')}${plan.revision.length > 60 ? `<li>… y ${plan.revision.length - 60} más</li>` : ''}</ul></details>` : '<p class="rmd-nota rmd-ing-rev-ok">✓ Revisión con las reglas: sin alertas en lo que se ingresa.</p>'}
       <div class="rmd-ing-ops">${grupos()}</div>
-      <label class="rmd-nota rmd-pp-conf"><input type="checkbox" class="rmd-pp-ok"> Confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${plan.revision.length ? ` y acepto las ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''} de la revisión` : ''}${plan.resumen.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}.</label>
+      <label class="rmd-ing-conf"><input type="checkbox" class="rmd-pp-ok"><span><b>Marca aquí para poder ingresar:</b> confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${plan.revision.length ? ` y acepto las ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''} de la revisión` : ''}${plan.resumen.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}.</span></label>
       <div class="rmd-ing-barra" hidden><i></i></div><div class="rmd-progreso rmd-pp-prog"></div>`;
     const cuerpo = v.cuerpo, prog = cuerpo.querySelector('.rmd-pp-prog'), ok = cuerpo.querySelector('.rmd-pp-ok'), barra = cuerpo.querySelector('.rmd-ing-barra'), bi = barra.querySelector('i');
     const pintar = () => { const abiertos = new Set([...cuerpo.querySelectorAll('.rmd-ing-grupo[open] summary b')].map((x) => x.textContent)); cuerpo.querySelector('.rmd-ing-ops').innerHTML = grupos(); cuerpo.querySelectorAll('.rmd-ing-grupo').forEach((g) => { if (abiertos.has(g.querySelector('summary b').textContent)) g.open = true; }); };
@@ -9535,7 +9538,7 @@ td.ult { position: relative; }
           cuerpo.querySelector('.rmd-ing-pasos').outerHTML = pasos(4); resultado(); }
         bX.disabled = false;
       } catch (e) { setTxt(prog, 'No se escribió nada: ' + e.message); prog.classList.add('error'); }
-      finally { ocupado = false; if ((simular || opc.simular) && cuerpo.querySelector('.rmd-ing-pasos')) cuerpo.querySelector('.rmd-ing-pasos').outerHTML = pasos(1); bSim.disabled = false; bIng.disabled = !ok.checked || est.diario.some((x) => x.estado === 'hecho'); bDet.style.display = 'none'; }
+      finally { ocupado = false; if ((simular || opc.simular) && cuerpo.querySelector('.rmd-ing-pasos')) cuerpo.querySelector('.rmd-ing-pasos').outerHTML = pasos(1); bSim.disabled = false; bIng.disabled = est.diario.some((x) => x.estado === 'hecho'); bDet.style.display = 'none'; }
     };
     const resultado = () => {
       const bien = !est.dif.length, rev = plan.avisos.concat(plan.manual);
@@ -9545,12 +9548,12 @@ td.ult { position: relative; }
       cuerpo.querySelectorAll('.rmd-ing-nota').forEach((x) => x.remove()); cuerpo.querySelector('.rmd-ing-cards').insertAdjacentHTML('beforebegin', bloque);
       bAbrir.style.display = bDes.style.display = ''; bIng.style.display = bSim.style.display = 'none';
     };
-    const bIng = botonModal('Ingresar en SAP', 'primario', () => correr(false)), bSim = botonModal('Probar sin escribir', '', () => correr(true)), bDet = botonModal('Detener', '', () => { detener = true; }),
+    const bIng = botonModal('Ingresar en SAP', 'primario', () => { if (!ok.checked) { const c = cuerpo.querySelector('.rmd-ing-conf'); c.scrollIntoView({ block: 'center', behavior: 'smooth' }); c.classList.remove('rmd-ing-conf-flash'); void c.offsetWidth; c.classList.add('rmd-ing-conf-flash'); setTxt(prog, 'Marca la casilla de confirmación para poder ingresar.'); return; } correr(false); }), bSim = botonModal('Probar sin escribir', '', () => correr(true)), bDet = botonModal('Detener', '', () => { detener = true; }),
       bX = botonModal('Exportar registro', '', async () => { try { const x = ppExcelIngreso(datos, an.destino, est.diario, est.dif || [], plan.manual, plan.avisos); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } }),
       bAbrir = botonModal('Abrir el RMD para revisar', 'primario', () => { v.cerrar(); document.querySelectorAll('.rmd-modal-fondo').forEach((f) => f.remove()); setTimeout(() => abrirRmdPorCodigo(an.destino.codigo, 'configurar', an.destino.version), 200); }),
       bDes = botonModal('Deshacer ingreso', '', async () => { if (ocupado || !est.entrada) return; if (!(await confirmar('¿Deshacer el ingreso?', `Se revierten las ${est.entrada.ops.filter((o) => o.estado === 'hecho').length} escrituras de este ingreso, en orden inverso.`, 'Los pasos nuevos creados en el catálogo quedan de baja.', { si: 'Deshacer', no: 'Cancelar' }))) return;
         ocupado = true; bDes.disabled = true; barra.hidden = false; try { const er = await ppDeshacerIngreso(modelo, est.entrada, (h, t) => { bi.style.width = `${Math.round((h / t) * 100)}%`; setTxt(prog, `Deshaciendo ${h} de ${t}…`); }); setTxt(prog, er.length ? `Se deshizo con ${er.length} error(es): ${er.join(' | ')}` : 'Listo: el RMD volvió a como estaba antes del ingreso.'); prog.classList.toggle('error', !!er.length); } catch (e) { setTxt(prog, 'No se pudo deshacer: ' + e.message); prog.classList.add('error'); } finally { ocupado = false; } });
-    bIng.disabled = true; bDet.style.display = 'none'; bX.disabled = true; bAbrir.style.display = bDes.style.display = 'none'; ok.addEventListener('change', () => { bIng.disabled = !ok.checked || ocupado; });
+    bDet.style.display = 'none'; bX.disabled = true; bAbrir.style.display = bDes.style.display = 'none'; ok.addEventListener('change', () => { cuerpo.querySelector('.rmd-ing-conf').classList.toggle('marcada', ok.checked); if (ok.checked) setTxt(prog, ''); });
     v.pie.prepend(bX); v.pie.append(bDet, bDes, bAbrir, bSim, bIng);
     est.ejecutar = correr; est.deshacer = () => bDes.click();
     return est;
