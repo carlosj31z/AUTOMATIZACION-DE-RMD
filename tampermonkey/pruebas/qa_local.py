@@ -712,14 +712,14 @@ with sync_playwright() as p:
           T2.pasos.push({ id: 'n:8', texto: 'EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA.', codigo: null, nuevo: true,
             pm: [{ id: 'n:9', texto: 'MUESTRA DE BIOCARGA PARA CONTROL DE CALIDAD (mL):', codigo: null, nuevo: true }] });                                  // excepciones de «Control de Calidad»
           W.estructuras[1].equipos[0].quitado = true; W.estructuras[1].equipos.push({ id: 'n:6', equipoId: 'EQ2', codigo: '40100796', ref: 'SEL-BAL-08', desc: 'BALANZA-OHAUS-R31P30' });
-          T2.comentario = 'Revisar con el jefe de sección.';
+          T2.comentario = 'Revisar con el jefe de sección.'; T2.pasos[0].vb = true; T1.pasos.find((y) => y.id === 'P10').rpor = true;                  // quién firma
           const c = N.cambios(base, W), n1 = N.numerar(W.estructuras, base.estructuras), av = N.avisos(W, { buscador: B, etiquetas: new Map(d.cat.etiquetas), base: base.estructuras });
           const avs = (id) => (av.get(id) || []).map((a) => a.nivel + ':' + a.texto.slice(0, 40));
           return { numBase, exacto, parte, tipo, codigoB, res, sim, parecidos: parecidos.slice(0, 2), cambios: c.map((x) => [x.clase, x.accion, x.id, x.numero, !!x.nuevo].join('|')), numNuevo: ['P10', 'n:1', 'P13', 'P11', 'P20', 'n:5'].map((k) => k + '=' + (n1.get(k) || '')),
             av: { n1: avs('n:1'), n2: avs('n:2'), n3: avs('n:3'), n4: avs('n:4'), n5: avs('n:5'), n7: avs('n:7'), n8: avs('n:8'), n9: avs('n:9'), P12: avs('P12'), P21: avs('P21'), P20: avs('P20') } }; })""" + "((" + PP_DATOS_JS + ")())")
         c = set(r["cambios"])
         ok = (r["numBase"] == ["E1=", "E2=1", "E3=2", "T1=2.1", "P10=2.1.1", "P13=2.1.4", "T2=2.2", "P21=2.2.2"] and r["exacto"] == ["2010"] and r["parecidos"][0] == "2011" and "2012" in r["parte"] and "2012" in r["tipo"] and r["codigoB"][0] == "2010" and r["res"] == ["LIMPIEZA"] and "2012" in r["sim"]
-              and {"paso|cambiar|P11|2.1.4|false", "paso|quitar|P12|2.1.3|false", "paso|agregar|n:1|2.1.2|true", "pm|agregar|n:2|2.1.4 › proceso menor 2|true", "equipo|quitar|Q1|1|false", "equipo|agregar|n:6|1|false", "etiqueta|comentario|T2|2.2|false"} <= c
+              and {"paso|cambiar|P11|2.1.4|false", "paso|quitar|P12|2.1.3|false", "paso|agregar|n:1|2.1.2|true", "pm|agregar|n:2|2.1.4 › proceso menor 2|true", "equipo|quitar|Q1|1|false", "equipo|agregar|n:6|1|false", "etiqueta|comentario|T2|2.2|false", "paso|casillas|P20|2.2.1|false", "paso|casillas|P10|2.1.1|false"} <= c
               and any(x.startswith("paso|mover|") for x in c) and r["numNuevo"] == ["P10=2.1.1", "n:1=2.1.2", "P13=2.1.3", "P11=2.1.4", "P20=2.2.1", "n:5=2.2.5"]
               and any(a.startswith("info:Paso nuevo") for a in r["av"]["n1"]) and any("CANTIDAD MUESTREADA" in a for a in r["av"]["n2"]) and any(a.startswith("aviso:En el catálogo este paso es de DOC") for a in r["av"]["n3"])
               and not any("Debe decir" in a for a in r["av"]["n7"] + r["av"]["n8"]) and any(a.startswith("aviso:Debe decir «CALIDAD EN OPERACIONES»") for a in r["av"]["n9"])
@@ -789,6 +789,25 @@ with sync_playwright() as p:
               and r["esp"] == ["ENSAYO", "ESPECIFICACIONES", "RESULTADOS"] and r["grupos"] == ["PRUEBAS ESPECIFICAS", "CARACTERISTICAS FISICAS"] and r["firmas"] == 2
               and d == {"ingresado": "B", "autorizadoConIngresada": "B", "autorizadoSinIngresada": None, "suspendido": None})
         return ok, json.dumps({"hoja": r, "destino": d}, ensure_ascii=False)[:1800]
+    @prueba("LN31 Borrador de Producción · el archivo (v1.44): los pasos mayores no piden valor inicial / final / margen, se elige si llevan «Realizado por» y / o «Visto bueno» (y queda como cambio «Casillas»), el área solo ofrece las de SAP, «Realizado Por» y «VB» miden lo mismo y al guardar se explica cómo enviar el archivo")
+    def _():
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { estadoFechaPor: 'Autorizado/ 2026-09-24 /NCUELLARL', areas: ['SOLIDOS', 'LIQUIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", pg.evaluate("(" + PP_DATOS_JS + ")()"))
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200])); e.on("dialog", lambda dlg: dlg.accept())
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        pid = e.evaluate("() => { const f = window.__pp.estado().W.estructuras.flatMap((x) => (x.etiquetas || []).filter((t) => !t.conforme).flatMap((t) => t.pasos)).find((q) => !q.edit && !q.rpor && !q.vb); return f.id; }")
+        e.evaluate("(id) => window.__pp.editar({ id })", pid); e.wait_for_selector("#m-texto")
+        rango = e.evaluate("() => !document.querySelector('#m-rango').hidden"); cas = e.evaluate("() => [...document.querySelectorAll('.pp-cas input')].map((i) => i.id)")
+        e.check("#m-rpor"); e.check("#m-vb"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        cambios = e.evaluate("() => window.__pp.estado().CMB.filter((c) => c.accion === 'casillas').map((c) => c.campos.map((x) => x.campo + ':' + x.despues).join(','))")
+        anchos = e.evaluate("(id) => { const t = document.querySelector('tr[data-id=' + JSON.stringify(id) + '] .pp-mini'); return t ? [...t.querySelectorAll('th')].map((x) => Math.round(x.getBoundingClientRect().width)) : null; }", pid)
+        e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=area]")
+        area = e.evaluate("() => ({ tag: document.querySelector('.pp-modal [data-k=area]').tagName, ops: [...document.querySelectorAll('.pp-modal [data-k=area] option')].map((o) => o.textContent) })")
+        e.fill("[data-k=nombre]", "Ana Prueba"); e.select_option("[data-k=area]", label="LIQUIDOS"); e.fill("[data-k=motivo]", "Ajuste")
+        with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
+        e.wait_for_selector(".pp-envio"); envio = e.evaluate("() => ({ nombre: document.querySelector('.pp-envio code').textContent, correo: document.querySelector('.pp-btn-enlace').href.startsWith('mailto:?subject=') })"); e.close()
+        ok = (not errs and not rango and cas == ["m-rpor", "m-vb"] and cambios == ["Realizado por:Sí,Visto bueno:Sí"] and anchos and anchos[0] == anchos[1] and area["tag"] == "SELECT" and area["ops"][1:] == ["SOLIDOS", "LIQUIDOS"]
+              and envio["nombre"].startswith("Borrador RMD 2202600001 v3 ") and envio["correo"])
+        return ok, json.dumps({ "rango": rango, "cas": cas, "cambios": cambios, "anchos": anchos, "area": area, "envio": envio, "errores": errs[:3] }, ensure_ascii=False)
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")

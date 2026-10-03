@@ -42,7 +42,7 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ1D"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ12D"
 if "D" in SOLO and not RMD_PRUEBA:
     raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
@@ -2095,7 +2095,7 @@ with sync_playwright() as p:
                 e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
                 e.evaluate("(c) => { const f = window.__pp.encontrar(c.id); window.__pp.editar({ nuevo: true, lista: f.lista, despuesDe: c.id, clase: 'paso', e: f.e, t: f.t }); }", cambio); e.wait_for_selector("#m-texto")
                 e.fill("#m-texto", "PASO DE PRUEBA QA QUE NO EXISTE EN EL CATALOGO 7421."); e.wait_for_timeout(500); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
-                e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); e.fill("[data-k=nombre]", "QA"); e.fill("[data-k=area]", "QA"); e.fill("[data-k=motivo]", "Prueba sin escritura")
+                e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); e.fill("[data-k=nombre]", "QA"); e.select_option("[data-k=area]", index=1); e.fill("[data-k=motivo]", "Prueba sin escritura")
                 with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
                 guardado = open(dl.value.path(), encoding="utf-8").read(); e.close()
                 fr.evaluate("([t, n]) => { window.__rmdStats.plantilla.ultimo = null; window.__rmdStats.plantilla.importar(t, n); }", [guardado, "Borrador QA.html"])
@@ -2163,6 +2163,17 @@ with sync_playwright() as p:
         @prueba("1-6 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
         def _():
             return (not bloq_1), f"bloqueadas={bloq_1[:5]}"
+
+    # ───────────────────────── 2. v1.44: escenarios del ingreso automático (RMD de prueba 2202609209) ─────────────────────────
+    if "2" in SOLO:
+        import subprocess
+        REAL = os.environ.get("QA_ESCRIBIR_PRUEBA") == "1"          # solo con esta variable se escribe de verdad (y se deshace) en el RMD de prueba 2202609209
+        @prueba("2-1 Escenarios del ingreso automático (" + ("REALES con deshacer" if REAL else "SIMULADOS") + ") en el RMD de prueba 2202609209: quitar seguidos, agregar al inicio y al final, Sin tipo de dato, mover, procesos menores, firmas, paso nuevo con rango, equipos / utensilios / agrupador, texto ya existente y pasos nuevos parecidos; sin bloqueos ni errores" + (", comprobación sin diferencias y el RMD vuelve exacto" if REAL else ""))
+        def _():
+            env = dict(os.environ, MODO="real" if REAL else "sim", PYTHONIOENCODING="utf-8")
+            r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "_indicadores", "pruebas", "diag_escenarios.py")], capture_output=True, text=True, env=env, timeout=3000, encoding="utf-8")
+            lineas = [l for l in r.stdout.splitlines() if l.startswith(("OK ", "FALLA"))]
+            return (len(lineas) == 11 and all(l.startswith("OK") for l in lineas)), f"{len(lineas)} escenarios · " + " | ".join(l[:70] for l in lineas if not l.startswith("OK")) + (r.stderr[-300:] if not lineas else "")
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.43.0
+// @version      1.44.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.43.0';                                                       // mantener igual a @version
+  const VERSION = '1.44.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -168,7 +168,7 @@
   html.rmd-ui .sapMDialog.rmd-medio {
     width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 24px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
-  html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: min(1560px, 97vw) !important; }
+  html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: 90vw !important; max-width: 97vw !important; min-height: min(560px, 60vh); }
   html.rmd-ui .sapMDialog.sapMMessageDialog { position: fixed !important; margin: 0 !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
 
   /* ── Tablas: mismas filas del portal, un poco más de aire; cabecera fija ── */
@@ -250,6 +250,9 @@
   .rmd-ing-pasos li b { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; background: rgba(128,128,128,.3); color: #fff; font-size: 12px; }
   .rmd-ing-pasos li.actual { background: rgba(10,110,209,.18); color: var(--rmd-acento-texto); font-weight: 600; } .rmd-ing-pasos li.actual b { background: var(--rmd-acento); } .rmd-ing-pasos li.hecho { color: var(--rmd-verde); } .rmd-ing-pasos li.hecho b { background: var(--rmd-verde); }
   .rmd-ing-tit { margin: 4px 0 10px; } .rmd-ing-cards { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
+  button.rmd-ing-card { border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; } button.rmd-ing-card:hover, button.rmd-ing-card.activa { background: rgba(128,128,128,.24); } .rmd-ing-card small { font-size: 11px; opacity: .7; margin-top: 2px; max-width: 200px; }
+  .rmd-ing-filtro { margin: 0 0 6px; font-size: 12.5px; } .rmd-ing-filtro a { color: var(--rmd-acento-texto); } .rmd-ing-ver { margin-left: 8px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 10px; background: transparent; color: var(--rmd-acento-texto); cursor: pointer; font-size: 11px; }
+  tr.rmd-ing-destello > td { animation: rmd-ing-flash 2.4s ease-out 2; } @keyframes rmd-ing-flash { 0%, 100% { box-shadow: none; } 30% { box-shadow: inset 0 0 0 9999px rgba(255,200,0,.35); } }
   .rmd-ing-card { min-width: 118px; padding: 10px 14px; border-radius: 10px; background: rgba(128,128,128,.12); box-shadow: inset 0 3px 0 var(--c, #8a94a0); display: flex; flex-direction: column; } .rmd-ing-card b { font-size: 24px; line-height: 1.1; } .rmd-ing-card span { font-size: 12px; opacity: .85; }
   .rmd-ing-card.verde { --c: var(--rmd-verde); } .rmd-ing-card.rojo { --c: var(--rmd-rojo); } .rmd-ing-card.ambar { --c: var(--rmd-ambar); } .rmd-ing-card.azul { --c: var(--rmd-acento); } .rmd-ing-card.violeta { --c: #9b6bd6; }
   .rmd-ing-nota { margin: 8px 0; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; background: rgba(128,128,128,.1); border-left: 4px solid var(--c, #8a94a0); } .rmd-ing-nota ul { margin: 4px 0 0; padding-left: 18px; } .rmd-ing-nota.ambar { --c: var(--rmd-ambar); } .rmd-ing-nota.rojo { --c: var(--rmd-rojo); }
@@ -7963,7 +7966,7 @@
           if (!b0) {
             const prev = anterior(i);
             out.push({ ...base0, accion: 'agregar', despues: x.texto, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo, tipo: x.tipo || null, valores: CAMPOS_RANGO.filter(([k]) => txtValor(x[k])).map(([k, n]) => ({ campo: n, despues: txtValor(x[k]) })),
-              trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
+              casillas: clase === 'paso' && (x.rpor || x.vb) ? { rpor: !!x.rpor, vb: !!x.vb } : null, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
             return;
           }
           if (x.quitado) { out.push({ ...base0, accion: 'quitar', antes: b0.texto, codigoAntes: b0.codigo || null }); return; }
@@ -7971,6 +7974,7 @@
           const vals = CAMPOS_RANGO.filter(([k]) => txtValor(x[k]) !== txtValor(b0[k])).map(([k, n]) => ({ campo: n, antes: txtValor(b0[k]), despues: txtValor(x[k]) }));
           if (vals.length) out.push({ ...base0, comentario: '', accion: 'valores', texto: x.texto, campos: vals });
           if (!ok.has(vivos.indexOf(x)) && vivos.includes(x)) { const prev = anterior(i); out.push({ ...base0, comentario: '', accion: 'mover', texto: x.texto, numeroAntes: clase === 'pm' ? `proceso menor ${posB.get(x.id) + 1}` : (nB.get(x.id) || ''), trasDe: prev ? { id: prev.id, texto: prev.texto } : null }); }
+          if (clase === 'paso' && (!!x.rpor !== !!b0.rpor || !!x.vb !== !!b0.vb)) out.push({ ...base0, comentario: '', accion: 'casillas', texto: x.texto, campos: [['rpor', 'Realizado por'], ['vb', 'Visto bueno']].filter(([k]) => !!x[k] !== !!b0[k]).map(([k, n]) => ({ campo: n, antes: b0[k] ? 'Sí' : 'No', despues: x[k] ? 'Sí' : 'No' })) });
           if (x.comentario) out.push({ ...base0, accion: 'comentario', texto: x.texto });
           if (clase === 'paso') lista(ctx, x.pm || [], b0.pm || [], 'pm', { id: x.id, numero });
         });
@@ -8134,6 +8138,7 @@
       return null;
     }
     const cambiado = (x, b) => b && (String(x.codigo || '') !== String(b.codigo || '') || PPN.normalizar(x.texto) !== PPN.normalizar(b.texto));
+    const casillasCambiadas = (x, b) => b && (!!x.rpor !== !!b.rpor || !!x.vb !== !!b.vb);
     const valoresCambiados = (x, b) => b && ['vi', 'vf', 'margen'].some((k) => String(x[k] == null ? '' : x[k]) !== String(b[k] == null ? '' : b[k]));
 
     // ---------- dibujo ----------
@@ -8182,12 +8187,12 @@
     function marcasDe(x, b) {
       const out = [];
       if (!b) out.push('<span class="pp-tag agr">Nuevo</span>'); else if (x.quitado) out.push('<span class="pp-tag qui">Quitado</span>');
-      else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
+      else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (casillasCambiadas(x, b)) out.push('<span class="pp-tag cam">Casillas</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
       if (!x.quitado && x.nuevo) out.push('<span class="pp-tag crea" title="No existe en el catálogo de SAP con este texto: el equipo RMD lo creará">★ Se creará</span>');
       else if (!x.quitado && x.codigo && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
       return out.length ? `<span class="pp-tags">${out.join('')}</span>` : '';
     }
-    const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || valoresCambiados(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
+    const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
     const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
     const htmlAntes = (x, b) => (b && !x.quitado && cambiado(x, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '');
@@ -8197,7 +8202,7 @@
     }
     const colorDe = (x) => (x.formato && x.colorHex && /^#?[0-9a-f]{3,8}$/i.test(String(x.colorHex).trim()) ? ` style="color:${String(x.colorHex).trim().replace(/^(?!#)/, '#')}"` : '');
     // contenido de la celda de texto (texto como el PDF + marcas del borrador)
-    const celdaTexto = (x, b, texto) => `<span class="pp-tx"${colorDe(x)}>${texto}</span>${htmlRango(x)}${marcasDe(x, b)}${htmlAntes(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}`;
+    const celdaTexto = (x, b, texto, conRango) => `<span class="pp-tx"${colorDe(x)}>${texto}</span>${conRango ? htmlRango(x) : ''}${marcasDe(x, b)}${htmlAntes(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}`;
     function tipoFila(x, esPm, conforme) {
       let r;
       if (x.edit) r = 'I';
@@ -8228,7 +8233,7 @@
     }
     function filaPm(m, conforme) {
       const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo);
-      const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`) : celdaTexto(m, b, esc(m.texto));
+      const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`, true) : celdaTexto(m, b, esc(m.texto), true);
       const celdas = ['<td></td>'];
       if (m.insumo) celdas.push(`<td class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`, `<td class="pp-c-cant">${esc(fmtDec(m.cant))} ${esc(m.um || '')}</td>`);
       else celdas.push(`<td colspan="2" class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`);
@@ -8249,7 +8254,7 @@
     function htmlCuadro(e, lista) {
       const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false);
         return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
-          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto))}${acciones('pm', m.quitado, m.insumo)}</td></tr>`; }).join('')); }).join('');
+          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
       return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">+ Agregar paso</button>`;
     }
@@ -8289,7 +8294,7 @@
       else cuerpo = htmlCuadro(e, e.pasos || []);
       return `<section class="pp-est" data-id="${esc(e.id)}"><div class="pp-sub">${n ? esc(n) + '.-' : ''}${esc(e.nombre)} ${com}</div>${htmlAvisos(e.id)}${htmlComentario(e)}${cuerpo}</section>`;
     }
-    const ETQ_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', mover: 'Mover', comentario: 'Comentario' };
+    const ETQ_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario' };
     function htmlPanel() {
       const n = contar(), conAviso = [...AV.entries()].filter(([, l]) => l.some((a) => a.nivel !== 'info'));
       const lista = filtro === 'nuevos' ? CMB.filter((c) => c.nuevo || (c.pm && c.pm.some((m) => m.nuevo))) : filtro === 'avisos' ? [] : CMB;
@@ -8304,7 +8309,7 @@
       const r = PQ.rmd, s = SOL || {};
       return `<h2>Resumen del borrador · RMD ${esc(r.codigo)} v${esc(r.version)}</h2><table class="pp-tabla"><tbody><tr><td>Solicitado por</td><td>${esc(s.nombre || '')}</td><td>Área</td><td>${esc(s.area || '')}</td></tr><tr><td>Motivo</td><td colspan="3">${esc(s.motivo || '')}</td></tr><tr><td>Control de cambio</td><td>${esc(s.cc || '')}</td><td>Fecha</td><td>${esc(fechaHora(Date.now()))}</td></tr>${s.observacion ? `<tr><td>Observación</td><td colspan="3">${esc(s.observacion)}</td></tr>` : ''}</tbody></table>
         <table class="pp-tabla"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${CMB.map((c) => `<tr><td>${esc(c.numero || '')}</td><td>${ETQ_ACCION[c.accion]}${c.nuevo ? ' ★' : ''}<br><span class="pp-nota">${esc(c.lugar)}</span></td><td>${esc(c.antes || '')}</td><td>${esc(c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? 'después de: ' + ((c.trasDe && c.trasDe.texto) || 'al inicio') : c.texto || ''))}</td><td>${esc(c.comentario || '')}</td></tr>`).join('')}</tbody></table>
-        <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p><table class="pp-firmas"><tr><td>Solicitado por (firma)</td><td>Revisado por (firma)</td><td>Ingresado en SAP RMD por</td></tr></table>`;
+        <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p>`;
     }
 
     // ---------- modales ----------
@@ -8322,11 +8327,12 @@
       const donde = `${f.e.nombre}${f.t ? ' › ' + f.t.nombre : ''}`;
       const titulo = ref.id ? `${clase === 'pm' ? 'Proceso menor' : 'Paso'} ${clase === 'pm' ? '' : esc(num.get(x.id) || '')}` : `Nuevo ${clase === 'pm' ? 'proceso menor' : 'paso'}`;
       let elegido = x.codigo && !x.nuevo ? BUS.porCodigo(x.codigo) || { codigo: x.codigo, texto: x.texto, etq: x.etqCat || etq, estr, tipo: x.tipo } : null;
-      const conRango = () => (elegido ? elegido.tipo === RANGO : x.tipo === RANGO) || x.vi != null || x.vf != null;
+      const conRango = () => clase === 'pm' && ((elegido ? elegido.tipo === RANGO : x.tipo === RANGO) || x.vi != null || x.vf != null);
       modal(`<h3>${titulo}<span>${esc(donde)}${ref.padre ? ' › ' + esc(ref.padre.texto).slice(0, 60) : ''}</span></h3>
         <label class="pp-campo">Texto<textarea id="m-texto" rows="3" spellcheck="true">${esc(x.texto)}</textarea></label>
         <div id="m-estado" class="pp-estado"></div><div id="m-sug" class="pp-sug"></div>
         <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" value="${esc(x.margen == null ? '' : x.margen)}"></label></div>
+        ${clase === 'paso' ? `<fieldset class="pp-cas"><legend>Quién firma este paso</legend><label><input type="checkbox" id="m-rpor"${x.rpor ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Realizado por»</label><label><input type="checkbox" id="m-vb"${x.vb ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Visto bueno»</label>${x.edit ? '<span class="pp-nota">Este paso pide un dato: lleva su caja de dato.</span>' : '<span class="pp-nota">Márcalo solo cuando el paso lo amerite.</span>'}</fieldset>` : ''}
         <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
         const ta = $('#m-texto', m), est = $('#m-estado', m), sug = $('#m-sug', m), rango = $('#m-rango', m);
@@ -8362,6 +8368,7 @@
             if (igualBase) { viva.codigo = b.codigo; viva.pasoId = b.pasoId; viva.nuevo = false; viva.etqCat = b.etqCat; viva.tipo = b.tipo; }
             else if (elegido) { viva.codigo = String(elegido.codigo); viva.pasoId = null; viva.nuevo = false; viva.etqCat = elegido.etq; viva.tipo = elegido.tipo; }
             else { viva.codigo = null; viva.pasoId = null; viva.nuevo = true; viva.etqCat = null; viva.tipo = b ? b.tipo : (viva.tipo || null); }
+            if (clase === 'paso' && $('#m-rpor', m) && !$('#m-rpor', m).disabled) { viva.rpor = $('#m-rpor', m).checked; viva.vb = $('#m-vb', m).checked; }
             if (!rango.hidden) { viva.vi = vi === '' ? null : vi; viva.vf = vf === '' ? null : vf; viva.margen = mg === '' ? null : mg; }
           });
           cerrar(); setTimeout(() => irA(ref.id || `n:${seq - 1}`), 30);
@@ -8380,8 +8387,8 @@
     }
     function solicitudCompleta() { const s = SOL || {}; return !!(String(s.nombre || '').trim() && String(s.area || '').trim() && String(s.motivo || '').trim()); }
     function abrirSolicitud(paraGuardar) {
-      const s = SOL || {}, campo = (k, t, req, filas) => `<label class="pp-campo">${t}${req ? ' *' : ''}${filas ? `<textarea data-k="${k}" rows="${filas}">${esc(s[k] || '')}</textarea>` : `<input data-k="${k}" value="${esc(s[k] || '')}">`}</label>`;
-      modal(`<h3>Solicitud de cambio<span>${paraGuardar ? 'Completa estos datos para guardar el borrador' : 'Quién pide el cambio y por qué'}</span></h3>${campo('nombre', 'Nombre y apellido', true)}${campo('area', 'Área o sección', true)}${campo('motivo', 'Motivo del cambio', true, 2)}${campo('cc', 'Control de cambio (si lo hay)', false)}${campo('observacion', 'Observación', false, 2)}
+      const s = SOL || {}, areas = (PQ.rmd.areas || []), campoArea = () => (areas.length ? `<label class="pp-campo">Área o sección *<select data-k="area"><option value="">Elige el área…</option>${areas.map((a) => `<option value="${esc(a)}"${(s.area || PQ.rmd.area) === a ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select></label>` : campo('area', 'Área o sección', true)), campo = (k, t, req, filas) => `<label class="pp-campo">${t}${req ? ' *' : ''}${filas ? `<textarea data-k="${k}" rows="${filas}">${esc(s[k] || '')}</textarea>` : `<input data-k="${k}" value="${esc(s[k] || '')}">`}</label>`;
+      modal(`<h3>Solicitud de cambio<span>${paraGuardar ? 'Completa estos datos para guardar el borrador' : 'Quién pide el cambio y por qué'}</span></h3>${campo('nombre', 'Nombre y apellido', true)}${campoArea()}${campo('motivo', 'Motivo del cambio', true, 2)}${campo('cc', 'Control de cambio (si lo hay)', false)}${campo('observacion', 'Observación', false, 2)}
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">${paraGuardar ? 'Guardar borrador' : 'Aceptar'}</button></div>`, (m, cerrar) => {
         setTimeout(() => { const i = $$('[data-k]', m).find((x) => !x.value.trim()) || $('[data-k]', m); i.focus(); }, 20);
         m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') {
@@ -8454,8 +8461,18 @@
       const json = JSON.stringify(prop).replace(/</g, '\\u003c');
       const html = ORIGINAL.replace(/(<script id="rmd-(?:borrador|propuesta)" type="application\/json">)[\s\S]*?(<\/script>)/, (m0, a, b) => a + json + b);
       descargar(html, `Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`);
-      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { /* nada */ } pintarTodo(); aviso('Se descargó el borrador. Envía ese archivo al equipo RMD (también puedes volver a abrirlo para seguir editando).');
-      window.__ppUltimo = { prop, html };                                                // (pruebas)
+      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { /* nada */ } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(`Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`, n);                                                // (pruebas)
+    }
+    // Qué hacer con el archivo que se acaba de guardar (para quien no sabe cómo enviarlo)
+    function mostrarEnvio(nombre, n) {
+      const asunto = `Borrador RMD ${PQ.rmd.codigo} v${PQ.rmd.version} - ${(SOL && SOL.nombre) || ''}`, cuerpo = `Adjunto el borrador de cambios del RMD ${PQ.rmd.codigo} v${PQ.rmd.version} (${PQ.rmd.descripcion}).\n${n.total} cambio(s). Solicitado por ${(SOL && SOL.nombre) || ''} (${(SOL && SOL.area) || ''}).`;
+      modal(`<h3>Borrador guardado<span>${n.total} cambio${n.total === 1 ? '' : 's'} · listo para enviar al equipo RMD</span></h3>
+        <ol class="pp-envio"><li><b>Busca el archivo</b> en la carpeta <b>Descargas</b> de tu computadora (o abre las descargas del navegador con Ctrl+J):<code>${esc(nombre)}</code></li>
+        <li><b>Envíalo al equipo RMD</b> como archivo adjunto, por correo o Teams. Es un solo archivo; no lo copies a otro formato ni lo imprimas en su lugar.</li>
+        <li><b>No lo abras con otro programa ni lo renombres.</b> Si te falta algo, ábrelo de nuevo con Chrome o Edge, sigue editando y vuelve a guardar: se descarga una versión nueva con el mismo nombre.</li></ol>
+        <div class="pp-pie"><button type="button" data-a="copiar">Copiar nombre del archivo</button><a class="pp-btn-enlace" href="mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}">Abrir un correo con el asunto listo</a><button type="button" class="primario" data-a="cancelar">Entendido</button></div>`, (m, cerrar) => {
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
+      });
     }
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
     window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion(); });
@@ -8514,7 +8531,7 @@ button { font: inherit; cursor: pointer; } button:disabled { cursor: default; op
 .pp-proc { border: 0; border-right: 1px solid var(--linea); border-bottom: 1px solid var(--linea); } .pp-proc tr.pp-paso > td { border-top: 1px solid var(--linea); } .pp-proc tr.pp-paso:first-child > td { border-top: 0; }
 .pp-c-num { white-space: nowrap; } .pp-c-pm { padding-left: 2px !important; color: #222; } .pp-c-pm.tab { padding-left: 22px !important; } .pp-c-cant { white-space: nowrap; }
 .pp-caja { display: block; height: 20px; border: 1px solid var(--linea); margin: 2px 0; } .pp-c-chk { text-align: right; } .pp-check { display: inline-block; width: 18px; height: 18px; border: 1px solid var(--linea); margin: 2px 0; vertical-align: top; }
-.pp-mini { border-collapse: collapse; width: 100%; font-size: 10.5px; } .pp-mini th, .pp-mini td { border: 1px solid var(--linea); text-align: center; padding: 1px 2px; height: 15px; font-weight: 700; }
+.pp-mini { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: 10.5px; } .pp-mini th, .pp-mini td { border: 1px solid var(--linea); text-align: center; padding: 1px 2px; height: 15px; font-weight: 700; }
 .pp-esp .pp-grupo td { font-weight: 700; border-bottom: 0; } .pp-esp tr:not(.pp-grupo):not(.pp-th):not(.pp-ver) td { border-top: 0; border-bottom: 0; }
 .pp-firmas2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; } .pp-firma td { height: 22px; } .pp-vacio { color: var(--ap); font-style: italic; }
 .pp-com-tit { border: 0; background: none; opacity: .2; padding: 0 4px; font-size: 12px; } .pp-sub:hover .pp-com-tit, .pp-etq-tit:hover .pp-com-tit, .pp-com-tit:focus-visible { opacity: 1; }
@@ -8546,6 +8563,9 @@ td.ult { position: relative; }
 .pp-campo { display: block; margin: 10px 0; font-weight: 600; font-size: 12.5px; } .pp-campo textarea, .pp-campo input { display: block; width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--bd); border-radius: 6px; font: 13px/1.45 "Segoe UI", Roboto, Arial, sans-serif; font-weight: 400; }
 .pp-campo textarea:focus, .pp-campo input:focus, .pp-rango-ed input:focus { outline: 2px solid var(--acento); outline-offset: -1px; border-color: var(--acento); } .pp-campo .falta { border-color: var(--qui); }
 .pp-estado { min-height: 20px; font-size: 12.5px; } .pp-estado .ok { color: var(--agr); } .pp-estado .crea { color: var(--crea); font-weight: 600; } .pp-estado .err { color: var(--qui); } .pp-estado .avi { color: var(--cam); }
+.pp-cas { margin: 10px 0 4px; padding: 8px 12px; border: 1px solid var(--bd2); border-radius: 8px; } .pp-cas legend { font-size: 12px; padding: 0 6px; color: var(--ap); } .pp-cas label { display: inline-flex; gap: 6px; align-items: center; margin-right: 18px; } .pp-cas .pp-nota { display: block; margin-top: 4px; }
+.pp-envio { margin: 8px 0 14px; padding-left: 20px; line-height: 1.5; } .pp-envio li { margin: 8px 0; } .pp-envio code { display: block; margin: 6px 0 0; padding: 6px 10px; background: rgba(128,128,128,.14); border-radius: 6px; word-break: break-all; }
+.pp-btn-enlace { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--bd2); border-radius: 6px; color: inherit; text-decoration: none; } select[data-k] { width: 100%; padding: 7px; border: 1px solid var(--bd2); border-radius: 6px; background: transparent; color: inherit; }
 .pp-sug mark { background: rgba(255,200,0,.38); color: inherit; border-radius: 2px; padding: 0 1px; } .pp-sug-mas { display: block; width: 100%; margin: 4px 0; padding: 6px; border: 1px dashed var(--bd2); border-radius: 6px; background: transparent; color: var(--ap); cursor: pointer; }
 .pp-sug { margin: 8px 0; } .pp-sug-tit { font-size: 12px; color: var(--ap); margin: 6px 0 4px; }
 .pp-sug-it { display: flex; gap: 8px; align-items: baseline; width: 100%; margin: 2px 0; padding: 6px 8px; border: 1px solid var(--bd2); border-radius: 6px; background: #fff; text-align: left; color: var(--tx); font-size: 12.5px; }
@@ -8654,7 +8674,7 @@ td.ult { position: relative; }
     arbol.estructuras.forEach((e) => { idxE(e.estructuraId); e.etiquetas.forEach((t) => idxT(t.etiquetaId)); [e.pasos, ...e.etiquetas.map((t) => t.pasos)].forEach((l) => l.forEach((p) => { if (p.etqCat) idxT(p.etqCat); })); });
     const lineas = pasos.map((p) => [p[0], idxE(p[1]), idxT(p[2]), p[3], p[4]].join('\t')).join('\n');
     return { formato: 1, tipo: 'plantilla-rmd', generado: new Date().toISOString(), por: usuario || '', script: VERSION,
-      rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), principal: md.codigoversionprincipal || String(md.codigo), estadoFechaPor: extra.estadoFechaPor || '', logo: extra.logo || null },
+      rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), areas: extra.areas || [], principal: md.codigoversionprincipal || String(md.codigo), estadoFechaPor: extra.estadoFechaPor || '', logo: extra.logo || null },
       tipos: cat.tipos || {}, arbol, huella: PPN.huella(arbol),
       catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
   }
@@ -8701,7 +8721,7 @@ td.ult { position: relative; }
     // insumos: como el PDF, los de la receta por defecto del RMD (si la tiene)
     const def = norm(md.codDefectoReceta); if (def) arbol.estructuras.forEach((e) => { if (e.insumos.some((i) => i.matnr === def)) e.insumos = e.insumos.filter((i) => i.matnr === def); });
     avisar('Armando el archivo…');
-    const paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
+    const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
     const nombre = `Plantilla RMD ${paq.rmd.codigo} v${paq.rmd.version} ${d.getFullYear()}-${dd2(d.getMonth() + 1)}-${dd2(d.getDate())}.html`;
     const html = ppHtml(b64, null, `Borrador RMD ${paq.rmd.codigo} v${paq.rmd.version} · ${paq.rmd.descripcion}`);
     const cuenta = (f) => arbol.estructuras.reduce((s, e) => s + f(e), 0);
@@ -8752,8 +8772,8 @@ td.ult { position: relative; }
     let actual = null, enSap = [], mapa = null;
     if (destino) {
       actual = await ppLeerArbol(modelo, destino);
-      if (destino.mdId === datos.rmd.mdId) { if (PPN.huella(actual) !== datos.huella) enSap = PPN.cambios(datos.arbol, actual); }
-      else { mapa = ppMapear(datos.arbol, actual); enSap = PPN.cambios(datos.arbol, ppTraducir(actual, mapa)); }
+      if (destino.mdId === datos.rmd.mdId) { if (PPN.huella(actual) !== datos.huella) enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, actual)); }
+      else { mapa = ppMapear(datos.arbol, actual); enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, ppTraducir(actual, mapa))); }
     }
     // los pasos nuevos se vuelven a buscar en SAP como lo hace el portal (mismo texto, estructura y etiqueta), por si ya se crearon
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
@@ -8770,12 +8790,20 @@ td.ult { position: relative; }
     const tocados = new Set(cambiosP.map((c) => c.id)), conflictos = enSap.filter((c) => tocados.has(c.id) || (c.padre && tocados.has(c.padre)));
     return { base, destino, actual, lin, cambios: cambiosP, avisos: avisosP, enSap, conflictos, nuevos, mapa, etqNom };
   }
+  // Lo que ya no está en SAP (se quitó desde la plantilla) no aparece en el árbol actual: se agrega marcado como quitado para que la comparación lo vea
+  function ppConQuitados(base, actual) {
+    const mezcla = (b, w) => { const ids = new Set(w.map((x) => x.id)); return [...w, ...b.filter((x) => !ids.has(x.id)).map((x) => ({ ...x, quitado: true }))].map((x) => ({ ...x })); };
+    const pasos = (b, w) => mezcla(b || [], w || []).map((p) => { const bp = (b || []).find((y) => y.id === p.id); return { ...p, pm: p.quitado ? p.pm : mezcla(bp ? bp.pm || [] : [], p.pm || []) }; });
+    const baseE = new Map(base.estructuras.map((e) => [e.id, e]));
+    return { estructuras: actual.estructuras.map((e) => { const be = baseE.get(e.id) || {}, baseT = new Map((be.etiquetas || []).map((t) => [t.id, t]));
+      return { ...e, pasos: pasos(be.pasos, e.pasos), etiquetas: (e.etiquetas || []).map((t) => ({ ...t, pasos: pasos((baseT.get(t.id) || {}).pasos, t.pasos) })), equipos: mezcla(be.equipos || [], e.equipos || []), utensilios: mezcla(be.utensilios || [], e.utensilios || []) }; }) };
+  }
   // reemplaza los ids de la otra versión por los de la base (para comparar)
   function ppTraducir(arbol, mapa) {
     const inv = new Map([...mapa.entries()].map(([a, b]) => [b, a])), t = (x) => ({ ...x, id: inv.get(x.id) || ('otra:' + x.id) });
     return { estructuras: arbol.estructuras.map((e) => ({ ...t(e), pasos: (e.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })), etiquetas: (e.etiquetas || []).map((x) => ({ ...t(x), pasos: (x.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })) })), equipos: (e.equipos || []).map(t), utensilios: (e.utensilios || []).map(t), espec: (e.espec || []).map(t) })) };
   }
-  const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', mover: 'Mover', comentario: 'Comentario' };
+  const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario' };
   const ppQue = (c) => `${PP_ACCION[c.accion]}${c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ` (${c.clase})` : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}`;
   const ppDespues = (c) => c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? `después de: ${(c.trasDe && c.trasDe.texto) || '(al inicio)'}` : c.texto || '');
   function ppExcel(datos, prop, an) {
@@ -8889,7 +8917,7 @@ td.ult { position: relative; }
   // `orden` renumerado; pasos que aún no existen = PASO nuevo (código correlativo del portal, como «Nuevo Paso»); predecesores = «Depende»
   // de lo que quedó enlazado a un paso quitado o separado por un paso nuevo. Cada escritura guarda su inverso: «Deshacer ingreso» lo revierte.
   // Las filas ingresadas quedan marcadas en las ventanas de pasos del portal para que el equipo RMD las revise y haga los últimos ajustes.
-  const PP_PASO_SEL = 'pasoId,codigo,descripcion,estructuraId_estructuraId,etiquetaId_etiquetaId,tipoDatoId_iMaestraId,decimales,margen,valorInicial,valorFinal,clvModelo,automatico,activo,estadoId_iMaestraId,numeracion';
+  const PP_PASO_SEL = 'pasoId,codigo,descripcion,estructuraId_estructuraId,etiquetaId_etiquetaId,tipoDatoId_iMaestraId,decimales,margen,valorInicial,valorFinal,clvModelo,automatico,activo,estadoId_iMaestraId,numeracion,tipoLapsoId_motivoLapsoId,tipoCondicionId_iMaestraId';
   const PP_FASES = ['Crear los pasos nuevos en SAP', 'Quitar', 'Cambiar pasos y rangos', 'Agregar', 'Ordenar', 'Enlazar predecesores'];
   const PP_SIN_TIPO = 446;                                                                // tipo de dato «Sin tipo de dato»
   const ppUuid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
@@ -8901,6 +8929,8 @@ td.ult { position: relative; }
     try { const r = reglasDeFila({ esPM: !!esPm, tipo: nombreTipo, desc: texto, chk: { 'EDIT': false, 'R. POR': false, 'V.B.': false, 'ESTADO CC': false } }), out = {};
       r.forEach((x) => { if (x.clase === 'rmd-marcar' && PP_CAMPO_CASILLA[x.col]) out[PP_CAMPO_CASILLA[x.col]] = true; }); return Object.keys(out).length ? out : null; } catch (e) { return null; }
   }
+  const PP_CFG_SEL = 'mdEstructuraPasoId,edit,rpor,vb,estadoCC,estadoMov,genpp,tab,formato,decimales,valorInicial,valorFinal,margen';
+  const PP_CASILLA_NOMBRE = { edit: 'Edit', rpor: 'R. Por', vb: 'V.B.', estadoCC: 'Estado CC', estadoMov: 'Estado Mov.', genpp: 'Gen PP', tab: 'Tab' };
   async function ppLeerUno(modelo, entidad, filtros, select) {
     return new Promise((ok) => modelo.read('/' + entidad, { filters: filtros, urlParameters: { $top: '1', ...(select ? { $select: select } : {}) }, success: (r) => ok((r.results || [])[0] || null), error: () => ok(null) }));
   }
@@ -8935,6 +8965,7 @@ td.ult { position: relative; }
     listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach((m) => { if (m.codigo && !m.nuevo) codigos.add(String(m.codigo)); else buscarTexto.push({ x: m, L: { e: L.e, t: L.t, pmDe: x }, pm: true }); })); });
     const porCodigo = new Map(), lee = async (filtros) => leerTodoDe(modelo, 'PASO', filtros, { $select: PP_PASO_SEL });
     const lista = [...codigos]; for (let i = 0; i < lista.length; i += 40) (await lee([new F({ filters: lista.slice(i, i + 40).map((c) => new F('codigo', 'EQ', c)), and: false })])).forEach((p) => { if (p.activo !== false) porCodigo.set(String(p.codigo), p); });
+    const cfgCache = new Map(), configDe = async (pasoId) => { if (!cfgCache.has(pasoId)) { cfgCache.set(pasoId, (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('mdId_mdId', 'EQ', dest.mdId), new F('activo', 'EQ', true)], PP_CFG_SEL)) || (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('activo', 'EQ', true)], PP_CFG_SEL))); } return cfgCache.get(pasoId); };
     const muestras = new Map(), muestra = async (estr, etq) => { const k = estr + '|' + (etq || ''); if (!muestras.has(k)) { let m = etq ? await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('etiquetaId_etiquetaId', 'EQ', etq), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion') : null; if (!m) m = await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion'); muestras.set(k, m); } return muestras.get(k); };
     const catNuevo = new Map();                                                           // id del paso del borrador → fila que tendrá en el catálogo
     for (const { x, L, tipoBase, pm } of buscarTexto) {
@@ -8942,17 +8973,25 @@ td.ult { position: relative; }
       const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL && !pm) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
       const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
       if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); continue; }
+      // el texto del árbol viene limpio (sin espacios dobles): también se busca igual en el catálogo del archivo (sin tildes ni signos)
+      if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo));
+      const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && (pm || !etqL || f.etq === etqL)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
+      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
       const key = `${L.e.estructuraId}|${etqL || ''}|${texto.toLowerCase()}`; let n = nuevosPaso.get(key);
       if (!n) {
         const m = await muestra(L.e.estructuraId, etqL); if (!m) { bloqueos.push(`No se pudo preparar el paso nuevo «${texto.slice(0, 70)}»: no hay pasos de ${L.e.nombre} en el catálogo para copiar sus datos.`); continue; }
         let tipo = ppNum(x.tipo) || ppNum(tipoBase), inferido = null;
-        if (!tipo) { if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo)); inferido = plan0.bus.parecidos(texto, { estr: L.e.estructuraId, etq: etqL, max: 4, minimo: 0.6 }).find((y) => y.f.tipo); if (inferido) tipo = inferido.f.tipo; inferido = inferido && inferido.f; }
-        tipo = tipo || PP_SIN_TIPO; const rango = +tipo === (PPN.RANGO || 443);
+        if (!tipo) { if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo)); inferido = plan0.bus.parecidos(texto, { estr: L.e.estructuraId, etq: etqL, max: 4, minimo: 0.55 }).find((y) => y.f.tipo); if (inferido) tipo = inferido.f.tipo; inferido = inferido && inferido.f; }
+        tipo = tipo || PP_SIN_TIPO;
+        if ((x.rpor || x.vb) && +tipo === PP_SIN_TIPO) tipo = x.rpor && x.vb ? 441 : x.rpor ? 439 : 440;
+        const rango = +tipo === (PPN.RANGO || 443);
+        let sim = null; if (inferido) { const sp = await ppLeerUno(modelo, 'PASO', [new F('codigo', 'EQ', String(inferido.codigo))], PP_PASO_SEL); if (sp) sim = { paso: sp, md: await configDe(sp.pasoId) }; }
+        const sp0 = (sim && sim.paso) || {}, pick = (a, b) => (a != null && a !== '' ? a : b == null ? null : b);
         n = { key, texto, estr: L.e.estructuraId, etq: etqL, estrNombre: L.e.nombre, etqNombre: L.t ? L.t.nombre : '', pasoId: ppUuid(), tipo, items: [], codigo: null,
           fila: { terminal: null, usuarioRegistro: usuario, fechaRegistro: ahora, activo: true, descripcion: texto, numeracion: !!m.numeracion, tipoDatoId_iMaestraId: tipo, estadoId_iMaestraId: m.estadoId_iMaestraId, estructuraId_estructuraId: L.e.estructuraId, etiquetaId_etiquetaId: etqL,
-            valorInicial: ppNum(x.vi), valorFinal: ppNum(x.vf), margen: ppNum(x.margen), decimales: 0, clvModelo: null, automatico: false, tipoLapsoId_motivoLapsoId: null, tipoCondicionId_iMaestraId: null } };
+            valorInicial: pick(ppNum(x.vi), sp0.valorInicial), valorFinal: pick(ppNum(x.vf), sp0.valorFinal), margen: pick(ppNum(x.margen), sp0.margen), decimales: sp0.decimales == null ? 0 : sp0.decimales, clvModelo: sp0.clvModelo || null, automatico: !!sp0.automatico, tipoLapsoId_motivoLapsoId: sp0.tipoLapsoId_motivoLapsoId || null, tipoCondicionId_iMaestraId: sp0.tipoCondicionId_iMaestraId || null }, cfg: sim && sim.md, simCodigo: inferido ? inferido.codigo : null };
         n.fila.pasoId = n.pasoId; nuevosPaso.set(key, n);
-        if (inferido) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» toma el tipo de dato «${(datos.tipos || {})[tipo] || tipo}» del paso parecido ${inferido.codigo}: confírmalo en SAP.`);
+        if (inferido) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» copia del paso parecido ${inferido.codigo} su tipo de dato «${(datos.tipos || {})[tipo] || tipo}», decimales${sim && sim.md ? ' y casillas' : ''}${rango ? ' y rango' : ''}: confírmalo en SAP.`);
         if (!inferido && +tipo === PP_SIN_TIPO) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) se crea como «Sin tipo de dato»: revisa su tipo de dato y casillas en SAP.`);
         else if (rango && (n.fila.valorInicial == null || n.fila.valorFinal == null)) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» es de tipo Rango sin todos sus valores: complétalos en SAP.`);
       }
@@ -8963,13 +9002,14 @@ td.ult { position: relative; }
     const faltan = [...new Set(listas.flatMap((L) => L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id)) && !catDe(x)).map((x) => cod(x) || String(x.texto || '').slice(0, 40))))];
     faltan.forEach((c) => bloqueos.push(`El paso ${c} no se encontró (¿está de baja?) en el catálogo de SAP.`));
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
+    const cfgPorPaso = new Map(); { const ids = new Set(); listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id) && !catNuevo.has(x.id)).forEach((x) => { const p = catDe(x); if (p) ids.add(p.pasoId); }); }); for (const id of [...ids].slice(0, 60)) cfgPorPaso.set(id, await configDe(id)); }
     // predecesores de los pasos de las listas que cambian: se leen una vez
     const rowsMd = new Map(), leerRowsMd = async () => { if (rowsMd.size) return; (await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', dest.mdId)], { $select: 'mdEstructuraPasoId,orden,depende,dependeMdEstructuraPasoId,mdEstructuraPasoIdDepende,tipoDatoId_iMaestraId,activo' })).filter((p) => p.activo !== false).forEach((p) => rowsMd.set(p.mdEstructuraPasoId, p)); };
     // ---- operaciones ----
     let n = 0; const op = (fase, o) => { ops.push({ fase, ...o }); };
     const fechaUsuario = { usuarioActualiza: usuario, fechaActualiza: ahora }, baja = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: false }, alta = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: true };
     const lugar = (L) => `${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}${L.padre ? ' › paso ' + (L.padre.codigo || '') : ''}`;
-    const quitados = new Set(), seqPasos = [];                                           // para los predecesores: [{L, seq: [{id, x, nuevo}]}]
+    const quitados = new Set(), seqPasos = [], locNuevo = new Map();                                           // para los predecesores: [{L, seq: [{id, x, nuevo}]}]
     for (const L of listas) {
       const esPm = L.kind === 'pm', tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO', campo = esPm ? 'pasoHijoId_pasoId' : 'pasoId_pasoId', clase = esPm ? 'pm' : 'paso', bId = new Map(L.b.map((y) => [y.id, y]));
       const quien = (x, b0) => `${esPm ? 'proceso menor' : 'paso'} ${cod(x) || (b0 && b0.codigo) || '(nuevo)'} — ${String(x.texto || (b0 && b0.texto) || '').slice(0, 60)}`;
@@ -8986,6 +9026,14 @@ td.ult { position: relative; }
           if (esPm && b0.insumo) { bloqueos.push(`${quien(b0, b0)} es un insumo de la receta: no se cambia desde el borrador.`); return; }
           op(2, { lugar: lugar(L), accion: 'Cambiar', clase, desc: `cambiar ${esPm ? 'el proceso menor' : 'el paso'} ${b0.codigo || ''} por el ${codVer(x)} — ${String(x.texto || '').slice(0, 60)}`, ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: catDe(x).pasoId, ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: fila.pasoId, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
         }
+        if (!esPm && (!!x.rpor !== !!b0.rpor || !!x.vb !== !!b0.vb)) {
+          const t0 = +fila.tipo, nuevoTipo = x.rpor && x.vb ? 441 : x.rpor ? 439 : x.vb ? 440 : ([439, 440, 441].includes(t0) ? PP_SIN_TIPO : null), cambiaTipo = nuevoTipo && [PP_SIN_TIPO, 439, 440, 441, 432].includes(t0) && nuevoTipo !== t0 ? nuevoTipo : null;
+          const nom = `${x.rpor ? 'Realizado por' : ''}${x.rpor && x.vb ? ' y ' : ''}${x.vb ? 'Visto bueno' : ''}` || 'sin firmas';
+          op(2, { lugar: lugar(L), accion: 'Casillas', clase: 'paso', desc: `quién firma ${quien(x, b0)}: ${nom}${cambiaTipo ? ` (tipo de dato «${(datos.tipos || {})[cambiaTipo] || cambiaTipo}»)` : ''}`, ruta: `/MD_ES_PASO('${fila.id}')`,
+            datos: { rpor: !!x.rpor, vb: !!x.vb, ...(cambiaTipo ? { tipoDatoId_iMaestraId: cambiaTipo, tipoDatoIdAnterior_iMaestraId: cambiaTipo } : {}), ...fechaUsuario },
+            inv: { ruta: `/MD_ES_PASO('${fila.id}')`, datos: { rpor: !!b0.rpor, vb: !!b0.vb, ...(cambiaTipo ? { tipoDatoId_iMaestraId: t0, tipoDatoIdAnterior_iMaestraId: t0 } : {}), ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
+          if (cambiaTipo === PP_SIN_TIPO) avisos.push(`El paso ${b0.codigo} queda «Sin tipo de dato» al quitarle todas sus firmas: revisa su «Depende».`);
+        }
         const dv = {}, dvAntes = {}; [['vi', 'valorInicial'], ['vf', 'valorFinal'], ['margen', 'margen']].forEach(([k, c]) => { if (String(x[k] == null ? '' : x[k]) !== String(b0[k] == null ? '' : b0[k])) { dv[c] = ppNum(x[k]); dvAntes[c] = fila[k] == null ? null : fila[k]; } });
         if (Object.keys(dv).length) op(2, { lugar: lugar(L), accion: 'Rango', clase, desc: `rango de ${quien(x, b0)}: ${Object.entries(dv).map(([c, v]) => `${c === 'valorInicial' ? 'inicial' : c === 'valorFinal' ? 'final' : 'margen'} ${v == null ? '(vacío)' : v}`).join(', ')}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...dv, ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { ...dvAntes, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
       });
@@ -8996,7 +9044,7 @@ td.ult { position: relative; }
       if (estructural) vivos.forEach((x, i) => { if (!bId.has(x.id)) return; const fila = idx.get(D(x.id)); if (fila && +fila.orden !== i + 1) op(4, { lugar: lugar(L), accion: 'Orden', clase, desc: `${quien(x, bId.get(x.id))}: orden ${fila.orden} → ${i + 1}`, ruta: `/${tabla}('${fila.id}')`, datos: { orden: i + 1 }, paralelo: true, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { orden: fila.orden } }, marca: movidos ? { id: fila.id, tipo: 'movido' } : null }); });
       vivos.forEach((x, i) => {
         if (bId.has(x.id)) return;
-        const p = catDe(x), id = D(x.id), mdE = D(L.e.id), mdT = L.t ? D(L.t.id) : null, padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x));
+        const p = catDe(x), id = D(x.id), mdE = D(L.e.id), mdT = L.t ? D(L.t.id) : null, padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x)); locNuevo.set(id, { estr: mdE, etq: mdT, padre: padreId });
         const ini = x.vi != null && x.vi !== '' ? ppNum(x.vi) : p.valorInicial, fin = x.vf != null && x.vf !== '' ? ppNum(x.vf) : p.valorFinal, mar = x.margen != null && x.margen !== '' ? ppNum(x.margen) : p.margen;
         const filaPm = (m, pm, ord, padre) => ({ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, activo: true, mdEstructuraPasoInsumoPasoId: D(m.id), mdEstructuraPasoInsumoPasoIdAct: D(m.id), estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdId_mdId: dest.mdId, tipoDatoId_iMaestraId: pm.tipoDatoId_iMaestraId,
           pasoId_mdEstructuraPasoId: padre, pasoHijoId_pasoId: pm.pasoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, orden: ord, decimales: pm.decimales, margen: pm.margen, valorInicial: pm.valorInicial, valorFinal: pm.valorFinal, tipoDatoIdAnterior_iMaestraId: pm.tipoDatoId_iMaestraId });
@@ -9005,10 +9053,13 @@ td.ult { position: relative; }
             datos: { mdEstructuraId: mdE, aPaso: [{ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, fechaActualiza: ahora, usuarioActualiza: null, activo: true, mdEstructuraPasoId: id, estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdEsEtiquetaId_mdEsEtiquetaId: mdT,
               mdId_mdId: dest.mdId, pasoId_pasoId: p.pasoId, orden: i + 1, tipoDatoId_iMaestraId: p.tipoDatoId_iMaestraId, decimales: p.decimales, margen: mar, valorInicial: ini, valorFinal: fin, clvModelo: p.clvModelo, automatico: p.automatico, mdEstructuraPasoIdDepende: id, tipoDatoIdAnterior_iMaestraId: p.tipoDatoId_iMaestraId }] },
             inv: { ruta: `/MD_ES_PASO('${id}')`, datos: { ...baja } }, marca: { id, tipo: 'agregado' } });
-          { const cas = ppCasillas(x.texto, (datos.tipos || {})[p.tipoDatoId_iMaestraId], false); if (cas) op(3, { lugar: lugar(L), accion: 'Casillas', clase: 'paso', desc: `casillas del paso ${codVer(x)}: ${Object.keys(cas).map((k) => ({ edit: 'Edit', rpor: 'R. Por', vb: 'V.B.', estadoCC: 'Estado CC' }[k])).join(', ')} (según su tipo de dato)`, ruta: `/MD_ES_PASO('${id}')`, datos: { ...cas, ...fechaUsuario }, inv: null }); }
+          { const cfg = catNuevo.has(x.id) ? catNuevo.get(x.id).cfg : cfgPorPaso.get(p.pasoId), elegido = x.rpor || x.vb ? { rpor: !!x.rpor, vb: !!x.vb } : null;
+            let cas = null; if (cfg) { cas = {}; Object.keys(PP_CASILLA_NOMBRE).forEach((k) => { if (cfg[k]) cas[k] = true; }); } else cas = ppCasillas(x.texto, (datos.tipos || {})[p.tipoDatoId_iMaestraId], false);
+            if (elegido) { cas = { ...(cas || {}) }; delete cas.rpor; delete cas.vb; if (elegido.rpor) cas.rpor = true; if (elegido.vb) cas.vb = true; }
+            if (cas && Object.keys(cas).length) op(3, { lugar: lugar(L), accion: 'Casillas', clase: 'paso', desc: `casillas del paso ${codVer(x)}: ${Object.keys(cas).map((k) => PP_CASILLA_NOMBRE[k]).join(', ')} (${elegido ? 'elegidas por Producción' : cfg ? 'como en un paso igual de SAP' : 'según su tipo de dato'})`, ruta: `/MD_ES_PASO('${id}')`, datos: { ...cas, ...fechaUsuario }, inv: null }); }
           (x.pm || []).filter((m) => !m.quitado).forEach((m, j) => {
             const pm = catDe(m); if (!pm) { bloqueos.push(`El proceso menor «${String(m.texto).slice(0, 60)}» del paso nuevo no está en el catálogo de SAP.`); return; }
-            finales.set(m.id, cod(m));
+            finales.set(m.id, cod(m)); locNuevo.set(D(m.id), { estr: mdE, etq: mdT, padre: id });
             op(3, { lugar: lugar(L), accion: 'Agregar', clase: 'pm', desc: `agregar proceso menor ${codVer(m)} — ${String(m.texto || '').slice(0, 50)} al paso nuevo`, ruta: `/MD_ESTRUCTURA('${mdE}')`, datos: { mdEstructuraId: mdE, aPasoInsumoPaso: [filaPm(m, pm, j + 1, id)] },
               inv: { ruta: `/MD_ES_PASO_INSUMO_PASO('${D(m.id)}')`, datos: { ...baja } }, marca: { id: D(m.id), tipo: 'agregado' } });
           });
@@ -9038,7 +9089,7 @@ td.ult { position: relative; }
         });
       });
       for (const { x, k, clase, nombre } of nuevosEq) {
-        cambiaListas = true; const id = D(x.id);
+        cambiaListas = true; const id = D(x.id); locNuevo.set(id, { estr: D(e.id), equipo: true });
         if (k === 'equipos') {
           const base = x.equipoId && catEq.get(x.equipoId); if (!base) { bloqueos.push(`No se encontró en el catálogo de SAP el equipo ${nombre}.`); continue; }
           const copiaId = ppUuid(), copia = { terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, fechaActualiza: ahora, usuarioActualiza: null, activo: true, equipoId: copiaId, tipoId_iMaestraId: base.tipoId_iMaestraId, werks: base.werks, sstat: base.sstat, tplnr: base.tplnr, pltxt: base.pltxt, equnr: base.equnr, eqtyp: base.eqtyp, estat: base.estat, eqktx: base.eqktx, inbdt: base.inbdt, ctext: base.ctext, abckz: base.abckz, denom: base.denom, arbpl: base.arbpl, CodigoGaci: base.CodigoGaci };
@@ -9066,35 +9117,62 @@ td.ult { position: relative; }
       const quitadosTodos = new Set(seqPasos.flatMap((s) => s.quitados)); seqPasos.forEach((s) => s.quitados.forEach((id) => quitados.add(id)));
       const predDe = (id) => { const r = rowsMd.get(id); return r ? (r.dependeMdEstructuraPasoId || '') : ''; };
       const salta = (id) => { let c = id, g = 0; while (c && quitados.has(c) && g++ < 50) c = predDe(c); return c; };
+      const ordenBase = (L) => [...L.b].sort((a, b) => (+((rowsMd.get(D(a.id)) || {}).orden) || 0) - (+((rowsMd.get(D(b.id)) || {}).orden) || 0));
       for (const s of seqPasos) {
-        const seq = s.vivos; if (s.movidos) avisos.push(`En «${lugar(s.L)}» se movieron pasos: revisa su «Depende» en SAP (no se reordenan solos).`);
-        const usaPred = seq.some((v) => !v.nuevo && predDe(v.id)); if (!usaPred) continue;
-        let prevNoVacio = null, prevExistente = null;
-        seq.forEach((v, i) => {
-          const t = tipoDe(v), sinTipo = t === PP_SIN_TIPO;
-          if (v.nuevo) { if (!sinTipo) { const sig = seq.slice(i + 1).find((y) => !y.nuevo); const heredado = !prevNoVacio && sig ? salta(predDe(sig.id)) : ''; cambia.set(v.id, prevNoVacio ? prevNoVacio.id : heredado); } }
-          else if (!sinTipo) {
-            const actual = predDe(v.id); let deseado = actual;
-            if (actual && quitados.has(actual)) deseado = salta(actual);
-            if (deseado && prevNoVacio && deseado === (prevExistente && prevExistente.id) && prevNoVacio.id !== deseado) deseado = prevNoVacio.id;       // se insertó algo entre los dos
-            if (prevNoVacio && prevNoVacio.nuevo && !prevExistente && !s.movidos && seq.slice(0, i).every((y) => y.nuevo)) deseado = prevNoVacio.id;            // delante hay solo pasos nuevos
-            if (deseado !== actual && !(deseado === '' && !actual)) cambia.set(v.id, deseado);
-          }
-          if (!sinTipo) { prevNoVacio = v; if (!v.nuevo) prevExistente = v; }
-        });
+        const seq = s.vivos;
+        // ¿la lista se encadena paso a paso (cada uno depende del anterior con tipo de dato)? Entonces se vuelve a encadenar entera
+        const orig = ordenBase(s.L).map((y) => D(y.id)).filter((id) => rowsMd.has(id) && +rowsMd.get(id).tipoDatoId_iMaestraId !== PP_SIN_TIPO);
+        let enCadena = 0; orig.forEach((id, i) => { if (i > 0 && predDe(id) === orig[i - 1]) enCadena++; });
+        const cadena = orig.length > 2 && enCadena >= Math.max(1, Math.round((orig.length - 1) * 0.6));
+        const consistente = new Set(orig.filter((id, i) => i > 0 && predDe(id) === orig[i - 1]));
+        let prev = null;
+        if (cadena) {
+          const primeroExistente = seq.find((v) => !v.nuevo && tipoDe(v) !== PP_SIN_TIPO);
+          seq.forEach((v) => {
+            if (tipoDe(v) === PP_SIN_TIPO) return;
+            let deseado;
+            if (prev) deseado = prev.id;
+            else if (v.nuevo) deseado = primeroExistente ? salta(predDe(primeroExistente.id)) : '';       // abre la lista: hereda lo que enlazaba al primero
+            else deseado = salta(predDe(v.id));
+            if (!v.nuevo && prev && !consistente.has(v.id)) deseado = salta(predDe(v.id));                    // una rama paralela que ya era así: no se toca
+            const actual = v.nuevo ? '' : predDe(v.id);
+            if (v.nuevo ? !!deseado : deseado !== actual) cambia.set(v.id, deseado);
+            prev = v;
+          });
+        } else {
+          if (s.movidos) avisos.push(`En «${lugar(s.L)}» se movieron pasos y su lista no sigue una cadena simple: revisa su «Depende» en SAP.`);
+          if (!seq.some((v) => !v.nuevo && predDe(v.id))) continue;
+          let prevNoVacio = null, prevExistente = null;
+          seq.forEach((v, i) => {
+            const t = tipoDe(v), sinTipo = t === PP_SIN_TIPO;
+            if (v.nuevo) { if (!sinTipo) { const sig = seq.slice(i + 1).find((y) => !y.nuevo); const heredado = !prevNoVacio && sig ? salta(predDe(sig.id)) : ''; cambia.set(v.id, prevNoVacio ? prevNoVacio.id : heredado); } }
+            else if (!sinTipo) {
+              const actual = predDe(v.id); let deseado = actual;
+              if (actual && quitados.has(actual)) deseado = salta(actual);
+              if (deseado && prevNoVacio && deseado === (prevExistente && prevExistente.id) && prevNoVacio.id !== deseado) deseado = prevNoVacio.id;
+              if (prevNoVacio && prevNoVacio.nuevo && !prevExistente && !s.movidos && seq.slice(0, i).every((y) => y.nuevo)) deseado = prevNoVacio.id;
+              if (deseado !== actual && !(deseado === '' && !actual)) cambia.set(v.id, deseado);
+            }
+            if (!sinTipo) { prevNoVacio = v; if (!v.nuevo) prevExistente = v; }
+          });
+        }
       }
+      // pasos de otras listas que dependían de uno quitado: se enlazan al anterior de ese
+      rowsMd.forEach((r, id) => { if (!cambia.has(id) && !quitados.has(id) && r.dependeMdEstructuraPasoId && quitados.has(r.dependeMdEstructuraPasoId)) cambia.set(id, salta(r.dependeMdEstructuraPasoId)); });
       const nuevoPorId = new Map(seqPasos.flatMap((s) => s.vivos).filter((y) => y.nuevo).map((y) => [y.id, y.x]));
       const codigoDe = (id) => { const f = idx.get(id); if (f) return String(f.codigo || ''); const v = seqPasos.flatMap((s) => s.vivos).find((y) => y.id === id); return v ? String(cod(v.x) || '') : ''; };
       cambia.forEach((pred, id) => {
-        const r = rowsMd.get(id), v = seqPasos.flatMap((s) => s.vivos).find((y) => y.id === id), nombre = (v && v.x.texto || '').slice(0, 50), predTxt = pred ? `${codigoDe(pred) || '(paso nuevo)'}` : 'ninguno';
+        const r = rowsMd.get(id), v = seqPasos.flatMap((s) => s.vivos).find((y) => y.id === id), nombre = ((v && v.x.texto) || (idx.get(id) || {}).texto || '').slice(0, 50), predTxt = pred ? `${codigoDe(pred) || '(paso nuevo)'}` : 'ninguno';
         const datosP = { depende: pred ? codigoDe(pred) : '', dependeMdEstructuraPasoId: pred || '', ...fechaUsuario };
-        op(5, { lugar: v ? lugar(seqPasos.find((s) => s.vivos.includes(v)).L) : '', accion: 'Predecesor', clase: 'paso', desc: `«Depende» del ${v && v.nuevo ? 'paso nuevo' : 'paso'} ${nombre}: ${r ? (r.depende || 'ninguno') : '—'} → ${predTxt}`, ruta: `/MD_ES_PASO('${id}')`, datos: datosP,
+        op(5, { lugar: v ? lugar(seqPasos.find((s) => s.vivos.includes(v)).L) : 'Otros pasos que dependían de uno quitado', accion: 'Predecesor', clase: 'paso', desc: `«Depende» del ${v && v.nuevo ? 'paso nuevo' : 'paso'} ${nombre}: ${r ? (r.depende || 'ninguno') : '—'} → ${predTxt}`, ruta: `/MD_ES_PASO('${id}')`, datos: datosP,
           inv: r ? { ruta: `/MD_ES_PASO('${id}')`, datos: { depende: r.depende || '', dependeMdEstructuraPasoId: r.dependeMdEstructuraPasoId || '', ...fechaUsuario } } : null, marca: { id, tipo: 'predecesor' }, predItem: pred ? nuevoPorId.get(pred) : null });
       });
     }
     // lo que queda a mano
     prop.trabajo.estructuras.forEach((e) => (e.espec || []).forEach((x) => { if (x.comentario) manual.push(`Comentario de Producción en la especificación «${String(x.ensayo || '').slice(0, 40)}» (${e.nombre}): ${x.comentario}`); }));
     an.cambios.filter((c) => c.accion === 'comentario' && c.comentario && c.clase !== 'especificacion').forEach((c) => manual.push(`Comentario de Producción en ${c.lugar}${c.texto ? ' › ' + String(c.texto).slice(0, 50) : ''}: ${c.comentario}`));
+    const loc = new Map(); an.actual.estructuras.forEach((e) => { const reg = (l, t) => (l || []).forEach((p) => { loc.set(p.id, { estr: e.id, etq: t ? t.id : null }); (p.pm || []).forEach((m) => loc.set(m.id, { estr: e.id, etq: t ? t.id : null, padre: p.id })); }); reg(e.pasos, null); (e.etiquetas || []).forEach((t) => reg(t.pasos, t)); (e.equipos || []).concat(e.utensilios || []).forEach((q) => loc.set(q.id, { estr: e.id, equipo: true })); });
+    ops.forEach((o) => { const id = o.marca ? o.marca.id : ((/\('([^']+)'\)$/.exec(o.ruta) || [])[1]), u = locNuevo.get(id) || loc.get(id); o.ver = u && o.accion !== 'Crear' ? { ...u, id } : null; o.verNuevo = locNuevo.has(id); });
     ops.sort((a, b) => a.fase - b.fase); ops.forEach((o) => { o.n = ++n; });
     const cuenta = (f) => ops.filter(f).length;
     const resumen = { crear: cuenta((o) => o.accion === 'Crear'), agregarPasos: cuenta((o) => o.accion === 'Agregar' && o.clase === 'paso'), agregarPm: cuenta((o) => o.accion === 'Agregar' && o.clase === 'pm'), agregarEquipos: cuenta((o) => o.accion === 'Agregar' && (o.clase === 'equipo' || o.clase === 'utensilio') && !/copiar/.test(o.desc)),
@@ -9190,21 +9268,38 @@ td.ult { position: relative; }
     const est = { plan, diario: [], dif: null, ventana: v };
     window.__rmdStats.plantilla.ingreso = est;
     if (plan.bloqueos.length) { v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-progreso error">No se puede ingresar todavía:</p><ul class="rmd-pp-checks">${plan.bloqueos.map((b) => `<li>✕ ${esc(b)}</li>`).join('')}</ul>`; return est; }
-    const r = plan.resumen, tarjeta = (n, t, c) => (n ? `<div class="rmd-ing-card ${c || ''}"><b>${n}</b><span>${t}</span></div>` : '');
-    const tarjetas = [tarjeta(r.agregarPasos, 'pasos agregados', 'verde'), tarjeta(r.agregarPm, 'procesos menores agregados', 'verde'), tarjeta(r.quitar + r.quitarPm, 'quitados', 'rojo'), tarjeta(r.cambiar, 'pasos cambiados', 'ambar'), tarjeta(r.rango, 'rangos', 'ambar'), tarjeta(r.orden, 'filas reordenadas', 'azul'),
-      tarjeta(r.agregarEquipos, 'equipos / utensilios agregados', 'verde'), tarjeta(plan.ops.filter((o) => o.accion === 'Quitar' && (o.clase === 'equipo' || o.clase === 'utensilio')).length, 'equipos / utensilios quitados', 'rojo'), tarjeta(r.crear, 'pasos nuevos que se crean en SAP', 'violeta'), tarjeta(r.predecesores, 'predecesores enlazados', 'azul')].join('');
-    const agrupar = () => { const g = new Map(); plan.ops.forEach((o) => { if (!g.has(o.lugar)) g.set(o.lugar, []); g.get(o.lugar).push(o); }); return g; };
-    const filasOps = (l) => l.map((o) => { const d = est.diario.find((x) => x.n === o.n); return `<tr class="${d ? 'rmd-pp-e-' + d.estado : ''}"><td class="rmd-nowrap">${o.n}</td><td class="rmd-nowrap"><span class="rmd-ing-tag t-${esc(o.accion.toLowerCase())}">${esc(o.accion)}</span></td><td>${esc(o.desc)}${d && d.error ? `<div class="rmd-pp-av error">✕ ${esc(d.error)}</div>` : ''}</td><td class="rmd-nowrap">${d ? esc(d.estado) : ''}</td></tr>`; }).join('');
+    const FILTROS = { agregarPasos: (o) => o.accion === 'Agregar' && o.clase === 'paso', agregarPm: (o) => o.accion === 'Agregar' && o.clase === 'pm', quitar: (o) => o.accion === 'Quitar' && (o.clase === 'paso' || o.clase === 'pm'), cambiar: (o) => o.accion === 'Cambiar', rango: (o) => o.accion === 'Rango',
+      casillas: (o) => o.accion === 'Casillas', orden: (o) => o.accion === 'Orden', equiposMas: (o) => o.accion === 'Agregar' && (o.clase === 'equipo' || o.clase === 'utensilio') && !/^copiar/.test(o.desc), equiposMenos: (o) => o.accion === 'Quitar' && (o.clase === 'equipo' || o.clase === 'utensilio'),
+      crear: (o) => o.accion === 'Crear', predecesores: (o) => o.accion === 'Predecesor' };
+    const corto = (o) => o.desc.replace(/^(agregar|quitar|cambiar|crear en SAP|rango de|casillas del|quién firma|«Depende» del|equipos y utensilios:)\s+/i, '').replace(/^(el|la|paso|proceso menor|equipo|utensilio|nuevo)\s+/i, '').replace(/\s+—\s+/, ' ').slice(0, 34);
+    const r = plan.resumen, tarjeta = (k, t, c) => { const l = plan.ops.filter(FILTROS[k]); if (!l.length) return ''; const det = [...new Set(l.map(corto))].slice(0, 2).join(' · ') + (l.length > 2 && k !== 'orden' ? ' …' : '');
+      return `<button type="button" class="rmd-ing-card ${c || ''}" data-f="${k}" title="Ver solo estas escrituras"><b>${l.length}</b><span>${t}</span><small>${esc(k === 'orden' ? `en ${new Set(l.map((o) => o.lugar)).size} lista(s)` : det)}</small></button>`; };
+    const tarjetas = [tarjeta('agregarPasos', 'pasos agregados', 'verde'), tarjeta('agregarPm', 'procesos menores agregados', 'verde'), tarjeta('quitar', 'quitados', 'rojo'), tarjeta('cambiar', 'pasos cambiados', 'ambar'), tarjeta('rango', 'rangos', 'ambar'), tarjeta('casillas', 'casillas (quién firma)', 'ambar'), tarjeta('orden', 'filas reordenadas', 'azul'),
+      tarjeta('equiposMas', 'equipos / utensilios agregados', 'verde'), tarjeta('equiposMenos', 'equipos / utensilios quitados', 'rojo'), tarjeta('crear', 'pasos nuevos en el catálogo', 'violeta'), tarjeta('predecesores', 'predecesores enlazados', 'azul')].join('');
+    let filtroTarjeta = null;
+    const agrupar = () => { const g = new Map(); plan.ops.filter((o) => !filtroTarjeta || FILTROS[filtroTarjeta](o)).forEach((o) => { if (!g.has(o.lugar)) g.set(o.lugar, []); g.get(o.lugar).push(o); }); return g; };
+    const filasOps = (l) => l.map((o) => { const d = est.diario.find((x) => x.n === o.n); return `<tr class="${d ? 'rmd-pp-e-' + d.estado : ''}"><td class="rmd-nowrap">${o.n}</td><td class="rmd-nowrap"><span class="rmd-ing-tag t-${esc(o.accion.toLowerCase())}">${esc(o.accion)}</span></td><td>${esc(o.desc)}${(() => { const hecho = d && d.estado === 'hecho', puede = o.ver && (hecho ? o.accion !== 'Quitar' : !o.verNuevo && !['Agregar', 'Crear'].includes(o.accion) && !(est.entrada)); return puede ? ` <button type="button" class="rmd-ing-ver" data-n="${o.n}" title="Abrir en SAP RMD">Ver en SAP ↗</button>` : ''; })()}${d && d.error ? `<div class="rmd-pp-av error">✕ ${esc(d.error)}</div>` : ''}</td><td class="rmd-nowrap">${d ? esc(d.estado) : ''}</td></tr>`; }).join('');
     const grupos = () => [...agrupar()].map(([lugar, l]) => `<details class="rmd-ing-grupo" ${l.length <= 6 ? 'open' : ''}><summary><b>${esc(lugar)}</b> <span>${l.length} escritura${l.length > 1 ? 's' : ''}</span></summary><table class="rmd-tabla rmd-pp-t"><tbody>${filasOps(l)}</tbody></table></details>`).join('');
     const listaAv = (t, l, c) => (l.length ? `<div class="rmd-ing-nota ${c}"><b>${t}</b><ul>${l.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>` : '');
     v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-ing-tit"><b>${plan.ops.length} escrituras</b> en el RMD <b>${esc(an.destino.codigo)} v${esc(an.destino.version)}</b> (${esc(an.destino.estado)}) · ${esc(an.destino.descripcion || '')}</p>
-      <div class="rmd-ing-cards">${tarjetas}</div>
+      <div class="rmd-ing-cards">${tarjetas}</div><p class="rmd-ing-filtro" hidden></p>
       ${listaAv('Revisa después en SAP', plan.avisos.concat(plan.manual), 'ambar')}
       <div class="rmd-ing-ops">${grupos()}</div>
       <label class="rmd-nota rmd-pp-conf"><input type="checkbox" class="rmd-pp-ok"> Confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${r.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}.</label>
       <div class="rmd-ing-barra" hidden><i></i></div><div class="rmd-progreso rmd-pp-prog"></div>`;
     const cuerpo = v.cuerpo, prog = cuerpo.querySelector('.rmd-pp-prog'), ok = cuerpo.querySelector('.rmd-pp-ok'), barra = cuerpo.querySelector('.rmd-ing-barra'), bi = barra.querySelector('i');
     const pintar = () => { const abiertos = new Set([...cuerpo.querySelectorAll('.rmd-ing-grupo[open] summary b')].map((x) => x.textContent)); cuerpo.querySelector('.rmd-ing-ops').innerHTML = grupos(); cuerpo.querySelectorAll('.rmd-ing-grupo').forEach((g) => { if (abiertos.has(g.querySelector('summary b').textContent)) g.open = true; }); };
+    cuerpo.addEventListener('click', async (ev) => {
+      const t = ev.target.closest('.rmd-ing-card'), l = ev.target.closest('.rmd-ing-ver'), q = ev.target.closest('.rmd-ing-filtro a');
+      if (t) { filtroTarjeta = filtroTarjeta === t.dataset.f ? null : t.dataset.f; actualizarFiltro(); }
+      else if (q) { filtroTarjeta = null; actualizarFiltro(); }
+      else if (l && !ocupado) { const o = plan.ops.find((x) => x.n === +l.dataset.n); if (o && o.ver) { v.cerrar(); await ppIrASap(an.destino, o.ver); } }
+    });
+    const actualizarFiltro = () => {
+      cuerpo.querySelectorAll('.rmd-ing-card').forEach((c) => c.classList.toggle('activa', c.dataset.f === filtroTarjeta));
+      const f = cuerpo.querySelector('.rmd-ing-filtro'); f.hidden = !filtroTarjeta; if (filtroTarjeta) f.innerHTML = `Mostrando ${plan.ops.filter(FILTROS[filtroTarjeta]).length} de ${plan.ops.length} escrituras · <a href="#" onclick="return false">Ver todas</a>`;
+      pintar(); cuerpo.querySelectorAll('.rmd-ing-grupo').forEach((g) => { g.open = !!filtroTarjeta || g.open; });
+    };
     const guardar = async (simular, diario, dif) => {
       if (simular || !diario.some((x) => x.estado === 'hecho')) return;
       const entrada = { id: ppUuid(), mdId: an.destino.mdId, codigo: an.destino.codigo, version: an.destino.version, fecha: new Date().toISOString(), usuario, solicitud: (prop.solicitud || {}).nombre || '', ops: diario.map((d) => ({ n: d.n, desc: d.desc, estado: d.estado, accion: d.accion, inv: d.inv, paralelo: !!d.paralelo })), marcas: diario.filter((d) => d.estado === 'hecho' && d.marca).map((d) => [d.marca.id, d.marca.tipo]), comprobacion: dif };
@@ -9249,6 +9344,35 @@ td.ult { position: relative; }
     v.pie.prepend(bX); v.pie.append(bDet, bDes, bAbrir, bSim, bIng);
     est.ejecutar = correr; est.deshacer = () => bDes.click();
     return est;
+  }
+  // Abre el RMD en el portal y llega hasta la fila (paso, proceso menor, equipo) indicada
+  async function ppIrASap(destino, ver) {
+    document.querySelectorAll('.rmd-modal-fondo').forEach((f) => f.remove());
+    const filaDe = (d, f) => [...d.querySelectorAll('table.sapMListTbl tbody tr:not(.sapMListTblSubRow)')].find((tr) => { const o = objetoDeFila(tr); return o && f(o); });
+    const pulsarEn = (tr, titulo) => { const b = tr.querySelector(`button[title="${titulo}"]`); if (!b) return false; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return true; };
+    const nueva = async (previos) => hasta(() => dialogos().find((d) => !previos.has(d)), 20000, 200);
+    try {
+      let abiertos = dialogos();
+      if (abiertos.length > 1) { toast('Cierra primero las ventanas abiertas del RMD para ir al paso.', true); return false; }
+      if (!abiertos.length) { if (!(await abrirRmdPorCodigo(destino.codigo, 'configurar', destino.version))) return false; abiertos = [await hasta(() => dialogos()[0], 20000, 200)]; }
+      const raiz = abiertos[0]; await hasta(() => !ocupadoGlobal() && filaDe(raiz, (o) => o.mdEstructuraId), 20000, 200);
+      let tr = filaDe(raiz, (o) => o.mdEstructuraId === ver.estr); if (!tr) throw new Error('no se encontró la estructura en el RMD');
+      let previos = new Set(dialogos()), d = raiz;
+      if (ver.equipo) { pulsarEn(tr, 'Adicionar Equipo'); d = await nueva(previos); }
+      else if (ver.etq) {
+        pulsarEn(tr, 'Adicionar Etiqueta'); d = await nueva(previos); await hasta(() => filaDe(d, (o) => o.mdEsEtiquetaId === ver.etq), 20000, 200);
+        tr = filaDe(d, (o) => o.mdEsEtiquetaId === ver.etq); previos = new Set(dialogos()); pulsarEn(tr, 'Adicionar Pasos RMD'); d = await nueva(previos);
+      } else { pulsarEn(tr, 'Adicionar Pasos RMD'); d = await nueva(previos); }
+      if (!d) throw new Error('no se abrió la ventana');
+      const campoId = (o) => o.mdEstructuraPasoInsumoPasoId || o.mdEstructuraPasoId || o.mdEstructuraEquipoId || o.mdEstructuraUtensilioId;
+      if (ver.padre) {
+        await hasta(() => filaDe(d, (o) => o.mdEstructuraPasoId === ver.padre), 20000, 200);
+        previos = new Set(dialogos()); pulsarEn(filaDe(d, (o) => o.mdEstructuraPasoId === ver.padre), 'Procesos Menores'); d = await nueva(previos);
+      }
+      const fila = await hasta(() => filaDe(d, (o) => campoId(o) === ver.id), 20000, 200);
+      if (!fila) throw new Error('la fila ya no está en la lista');
+      fila.scrollIntoView({ block: 'center' }); fila.classList.remove('rmd-ing-destello'); void fila.offsetWidth; fila.classList.add('rmd-ing-destello'); return true;
+    } catch (e) { toast('No se pudo llegar al paso: ' + e.message, true); return false; }
   }
   // Marcas en las ventanas de pasos del portal: lo que se ingresó desde un borrador queda resaltado, con un aviso para quitar las marcas o deshacer
   function gestionarMarcasIngreso() {
