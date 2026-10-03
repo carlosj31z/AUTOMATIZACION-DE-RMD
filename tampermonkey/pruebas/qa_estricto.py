@@ -2106,7 +2106,7 @@ with sync_playwright() as p:
                 cerrar_seguro()
                 ok = (an.get("destino") == [COD_PP, "Ingresado"] and ["cambiar", cambio["a"], False] in an["cambios"] and ["agregar", "", True] in an["cambios"] and an["enSap"] == 0 and an["nuevos"] and an["nuevos"][0][1] == [] and an["filas"] >= 2 and renombrado)
                 return ok, f"cambio={cambio} importada={an}"
-            @prueba("1-4 Solo se importa en un RMD Ingresado (datos reales): el borrador de un RMD Autorizado cuyo master no tiene ninguna versión Ingresada se rechaza con su explicación, sin plan ni Excel")
+            @prueba("1-4 Solo se importa en un RMD Ingresado (datos reales): el borrador de un RMD Autorizado cuyo master no tiene ninguna versión Ingresada se rechaza con su explicación, sin plan ni Excel, y ofrece crear la versión (sin pulsarlo)")
             def _():
                 cod = os.environ.get("COD_PP_AUT") or fr.evaluate("""async () => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const mm = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener.getView().getModel('mainModelv2');
                   const F = sap.ui.model.Filter, leer = (est, top) => new Promise((ok, mal) => mm.read('/MD', { filters: [new F('estadoIdRmd_iMaestraId', 'EQ', est)], urlParameters: { $select: 'codigo,codigoversionprincipal', $top: String(top), $orderby: 'fechaRegistro desc' }, success: (d) => ok(d.results), error: mal }));
@@ -2124,7 +2124,7 @@ with sync_playwright() as p:
                     txt: ((m && m.querySelector('.rmd-progreso.error')) || {}).textContent || '', botones: m ? [...m.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean) : [], filas: m ? m.querySelectorAll('.rmd-pp-t tbody tr').length : -1 };
                   cerrarImp(); return out; }""", cod)
                 cerrar_seguro()
-                ok = (r["estado"] == "Autorizado" and r["cambia"] and r["bloqueado"] and r["destino"] is None and r["ventanas"] == 1 and "Solo se puede importar en un RMD Ingresado" in r["txt"] and "Exportar Excel" not in r["botones"] and r["filas"] == 0)
+                ok = (r["estado"] == "Autorizado" and r["cambia"] and r["bloqueado"] and r["destino"] is None and r["ventanas"] == 1 and "Solo se puede importar en un RMD Ingresado" in r["txt"] and "Exportar Excel" not in r["botones"] and "Crear la versión Ingresada ahora" in r["botones"] and r["filas"] == 0)
                 return ok, f"RMD {cod} · {r}"
             @prueba("1-5 Ingreso automático SIMULADO en el RMD de prueba 2202609209 (cortafuegos): cambiar, agregar, paso NUEVO (se crearía con su tipo de dato deducido), quitar con sus procesos menores, equipos (copia + alta), renumerar y enlazar predecesores se convierten en las escrituras del portal, sin bloqueos y sin enviar nada")
             def _():
@@ -2174,7 +2174,17 @@ with sync_playwright() as p:
             env = dict(os.environ, MODO="real" if REAL else "sim", PYTHONIOENCODING="utf-8")
             r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "_indicadores", "pruebas", "diag_escenarios.py")], capture_output=True, text=True, env=env, timeout=3000, encoding="utf-8")
             lineas = [l for l in r.stdout.splitlines() if l.startswith(("OK ", "FALLA"))]
-            return (len(lineas) == 11 and all(l.startswith("OK") for l in lineas)), f"{len(lineas)} escenarios · " + " | ".join(l[:70] for l in lineas if not l.startswith("OK")) + (r.stderr[-300:] if not lineas else "")
+            return (len(lineas) == 12 and all(l.startswith("OK") for l in lineas)), f"{len(lineas)} escenarios · " + " | ".join(l[:70] for l in lineas if not l.startswith("OK")) + (r.stderr[-300:] if not lineas else "")
+        if REAL:
+            @prueba("2-2 «Nueva Versión» del portal desde el script (REAL) en el RMD de prueba 2202609209: se crea la versión siguiente (Ingresada), su contenido es igual al original y la prueba la cancela al terminar")
+            def _():
+                env = dict(os.environ, PYTHONIOENCODING="utf-8")
+                for _intento in range(2):                                    # (la conexión al navegador a veces falla al arrancar: se reintenta una vez, sin riesgo de crear dos versiones porque la falla ocurre antes de pulsar nada)
+                    r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "_indicadores", "pruebas", "diag_version.py")], capture_output=True, text=True, env=env, timeout=1500, encoding="utf-8")
+                    if "nueva" in r.stdout: break
+                try: x = json.loads(r.stdout[r.stdout.index("{"):r.stdout.rindex("}") + 1])
+                except Exception: return False, (r.stdout + r.stderr)[-600:]
+                return (x["igual"] and x["nueva"][1] == x["origen"][1] + 1 and x["nueva"][2] == "Ingresado" and x["dialogos"] == 0), f"{x['origen']} → {x['nueva']} en {x['segundos']} s · igual={x['igual']}"
 
     # ───────────────────────── D. Otras funciones y escritura controlada ─────────────────────────
     if "D" in SOLO:

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.45.0
+// @version      1.46.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.45.0';                                                       // mantener igual a @version
+  const VERSION = '1.46.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -264,6 +264,7 @@
   .rmd-ing-aviso { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; padding: 7px 12px; border-radius: 8px; background: rgba(155,107,214,.16); border-left: 4px solid #9b6bd6; font-size: 12.5px; } .rmd-ing-aviso .rmd-btn { margin-left: 6px; }
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   .rmd-pp-conf { display: block; margin: 10px 0 4px; }
+  @keyframes rmd-ing-vaiven { from { margin-left: 0; width: 15% !important; } to { margin-left: 85%; width: 15% !important; } } .rmd-ing-rev ul { margin: 6px 0 0; padding-left: 18px; } .rmd-ing-rev-ok { color: var(--rmd-verde); }
   .rmd-pp-e-hecho td:last-child { color: var(--rmd-verde); } .rmd-pp-e-simulado td:last-child { color: var(--rmd-acento-texto); } .rmd-pp-e-error td { background: rgba(220,53,69,.12); } .rmd-pp-e-error td:last-child { color: var(--rmd-rojo); }
   .rmd-pp-rojo { color: var(--rmd-rojo); } .rmd-pp-sap { margin: 10px 0; } .rmd-pp-sap summary { cursor: pointer; color: var(--rmd-acento-texto); }
   /* v1.38: historial de cambios dentro de «Trazabilidad del RMD» (pestañas; la original no se toca) */
@@ -8046,6 +8047,62 @@
       });
       return out;
     }
+    // Rehace el borrador sobre el RMD tal como está hoy en SAP (cuando cambió desde que se generó la plantilla): lo que Producción hizo se
+    // vuelve a aplicar sobre `actual` fila por fila; si SAP y Producción tocaron lo mismo, no se pisa y se avisa. `mapa` (id de la base → id
+    // en actual) solo hace falta si `actual` es otra versión del master. Devuelve { trabajo, conflictos, aplicados }.
+    function rebase(base, trabajo, actual, mapa) {
+      const clon = (x) => JSON.parse(JSON.stringify(x)), R = clon(actual), conflictos = [], M = (id) => (mapa ? mapa.get(id) : id) || null;
+      let aplicados = 0;
+      const nombre = (x) => String((x && (x.texto || x.nombre || x.desc)) || '').slice(0, 60);
+      const grupos = { texto: (x) => normalizar(x.texto) + '|' + String(x.codigo || ''), rango: (x) => ['vi', 'vf', 'margen'].map((k) => txtValor(x[k])).join('|'), firma: (x) => (x.rpor ? 1 : 0) + '|' + (x.vb ? 1 : 0) };
+      const campos = { texto: ['texto', 'codigo', 'pasoId', 'nuevo', 'etqCat', 'tipo'], rango: ['vi', 'vf', 'margen'], firma: ['rpor', 'vb'] };
+      const mezclar = (b, w, r, donde) => {
+        const bId = new Map(b.map((x) => [x.id, x])), mapR = new Map(r.map((x) => [x.id, x])), nuevoClon = new Map(), vivos = w.filter((x) => !x.quitado), posB = new Map(b.map((x, i) => [x.id, i]));
+        const delActual = (x) => mapR.get(M(x.id)) || null;
+        w.forEach((x) => {                                                            // quitados y cambiados
+          const b0 = bId.get(x.id); if (!b0) return; const ra = delActual(x);
+          if (x.quitado) { if (!ra) return; if (Object.keys(grupos).some((g) => grupos[g](ra) !== grupos[g](b0))) conflictos.push(`${donde}: Producción quitó «${nombre(b0)}» pero en SAP cambió; se deja como está en SAP.`); else { ra.quitado = true; aplicados++; } return; }
+          if (!ra) { if (Object.keys(grupos).some((g) => grupos[g](x) !== grupos[g](b0))) conflictos.push(`${donde}: «${nombre(b0)}» ya no está en SAP; se omite el cambio de Producción.`); return; }
+          Object.keys(grupos).forEach((g) => {
+            if (grupos[g](x) === grupos[g](b0)) return;                              // Producción no tocó este grupo
+            if (grupos[g](ra) === grupos[g](x)) return;                              // SAP ya quedó igual
+            if (grupos[g](ra) !== grupos[g](b0)) { conflictos.push(`${donde}: «${nombre(b0)}» (${g === 'texto' ? 'texto' : g === 'rango' ? 'rango' : 'firmas'}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
+            campos[g].forEach((k) => { if (x[k] === undefined) delete ra[k]; else ra[k] = x[k]; }); aplicados++;
+          });
+          if ((x.comentario || '') !== (ra.comentario || '')) ra.comentario = x.comentario || '';
+          if (b0.pm || x.pm) mezclar(b0.pm || [], x.pm || [], ra.pm || (ra.pm = []), `${donde} › ${nombre(b0)}`);
+        });
+        const orden = vivos.filter((x) => bId.has(x.id)), ok = enOrden(orden.map((x) => posB.get(x.id))), movidos = new Set(orden.filter((x, i) => !ok.has(i)).map((x) => x.id));
+        const insertarDespues = (ancla, item) => { const i = ancla ? r.indexOf(ancla) : -1; if (ancla && i < 0) return false; r.splice(i + 1, 0, item); return true; };
+        vivos.forEach((x, i) => {                                                    // agregados y movidos, en el orden del borrador
+          const nuevo = !bId.has(x.id); if (!nuevo && !movidos.has(x.id)) return;
+          let ancla = null; for (let j = i - 1; j >= 0 && !ancla; j--) { const y = vivos[j]; ancla = nuevoClon.get(y.id) || (bId.has(y.id) ? delActual(y) : null); }
+          if (nuevo) { const c = clon(x); const ok2 = insertarDespues(ancla, c); if (!ok2) r.push(c); nuevoClon.set(x.id, c); aplicados++; return; }
+          const ra = delActual(x); if (!ra) return;
+          const j = r.indexOf(ra), a = ancla ? r.indexOf(ancla) : -1; if (j === a + 1 || (ancla && a < 0)) return;
+          r.splice(j, 1); insertarDespues(ancla, ra) || r.unshift(ra); aplicados++;
+        });
+      };
+      const aE = new Map(R.estructuras.map((e) => [e.id, e])), bE = new Map(base.estructuras.map((e) => [e.id, e]));
+      trabajo.estructuras.forEach((e) => {
+        const be = bE.get(e.id) || { pasos: [], etiquetas: [], equipos: [], utensilios: [] }, ae = aE.get(M(e.id)); if (!ae) { if ((e.pasos || []).length || (e.etiquetas || []).length) conflictos.push(`${e.nombre}: la sección ya no está en SAP; se omiten sus cambios.`); return; }
+        if (e.comentario) ae.comentario = e.comentario;
+        mezclar(be.pasos || [], e.pasos || [], ae.pasos || (ae.pasos = []), e.nombre);
+        (e.etiquetas || []).forEach((t) => { const bt = (be.etiquetas || []).find((y) => y.id === t.id) || { pasos: [] }, at = (ae.etiquetas || []).find((y) => y.id === M(t.id)); if (!at) { if ((t.pasos || []).length) conflictos.push(`${e.nombre} › ${t.nombre}: la etiqueta ya no está en SAP; se omiten sus cambios.`); return; }
+          if (t.comentario) at.comentario = t.comentario; mezclar(bt.pasos || [], t.pasos || [], at.pasos || (at.pasos = []), `${e.nombre} › ${t.nombre}`); });
+        ['equipos', 'utensilios'].forEach((k) => {
+          const bIds = new Set((be[k] || []).map((x) => x.id)), lista = ae[k] || (ae[k] = []);
+          (e[k] || []).forEach((x) => {
+            if (bIds.has(x.id)) { const ra = lista.find((y) => y.id === M(x.id)); if (!ra) return; if (x.quitado) { ra.quitado = true; aplicados++; } if (x.comentario) ra.comentario = x.comentario; return; }
+            if (x.quitado) return;
+            if (x.codigo && lista.some((y) => !y.quitado && String(y.codigo) === String(x.codigo))) { conflictos.push(`${e.nombre}: ${nombre(x)} ya está en SAP; no se agrega otra vez.`); return; }
+            lista.push(clon(x)); aplicados++;
+          });
+        });
+        (e.espec || []).forEach((x) => { if (x.comentario) { const ra = (ae.espec || []).find((y) => y.id === M(x.id)); if (ra) ra.comentario = x.comentario; } });
+      });
+      return { trabajo: R, conflictos, aplicados };
+    }
     // Huella del RMD (lo que importa para saber si cambió desde que se generó la plantilla)
     function huella(arbol) {
       const p = (x) => [x.id, x.pasoId || '', x.orden, x.vi == null ? '' : x.vi, x.vf == null ? '' : x.vf, x.margen == null ? '' : x.margen, (x.pm || []).map((m) => [m.id, m.pasoId || '', m.orden, m.vi == null ? '' : m.vi, m.vf == null ? '' : m.vf].join(',')).join(';')].join('|');
@@ -8057,7 +8114,7 @@
       const E = cat.estr.map((x) => x[0]), T = cat.etq.map((x) => x[0]);
       return cat.pasos.split('\n').filter(Boolean).map((l) => { const [c, e, t, ti, ...tx] = l.split('\t'); return { codigo: c, estr: E[+e] || null, etq: t === '' ? null : (T[+t] || null), tipo: ti === '' ? null : +ti, texto: tx.join('\t') }; });
     }
-    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num };
+    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num };
   }
   // Editor del borrador (corre en el archivo .html que abre Producción, sin SAP ni internet). Se serializa con toString():
   // no debe usar nada de fuera de esta función (recibe el núcleo ya creado). La hoja copia el PDF del RMD que genera el portal
@@ -8873,6 +8930,45 @@ td.ult { position: relative; }
       ['Generado', `${dd2(hoy.getDate())}/${dd2(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd2(hoy.getHours())}:${dd2(hoy.getMinutes())}`]].forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Borrador RMD ${datos.rmd.codigo} - plan de ingreso ${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}.xlsx` };
   }
+  // ---- Crear la versión Ingresada con el propio botón «Nueva Versión» del portal (el portal copia toda la configuración) ----
+  async function ppVersiones(modelo, principal) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, p = isNaN(+principal) ? principal : +principal;
+    return (await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', String(principal)), new F('codigo', 'EQ', p)], and: false })], { $expand: 'estadoIdRmd', $orderby: 'mdId' })).map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' }));
+  }
+  function ppCerrarDialogosSap() {
+    for (let i = 0; i < 8; i++) { const d = dialogos().pop(); if (!d) return; const b = [...d.querySelectorAll('button')].find((x) => x.getClientRects().length && /^(Cerrar|Cancelar)$/.test(norm(x.textContent))); if (!b) return; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }
+  }
+  // origen: el MD (Autorizado) desde el que se crea; avance(segundos, texto). Devuelve el MD nuevo ya completo.
+  async function ppCrearVersionNueva(modelo, origen, avance) {
+    if (dialogos().length) throw new Error('cierra primero las ventanas abiertas del portal');
+    const principal = String(origen.codigoversionprincipal || origen.codigo), antes = await ppVersiones(modelo, principal), idsAntes = new Set(antes.map((m) => m.mdId)), t0 = Date.now(), seg = () => Math.round((Date.now() - t0) / 1000);
+    avance(0, 'Abriendo el RMD en el portal…');
+    if (!(await abrirRmdPorCodigo(origen.codigo, 'configurar', origen.version))) throw new Error('no se pudo abrir el RMD en el portal');
+    const raiz = await hasta(() => dialogos().find((d) => norm(cabecera(d)).startsWith(String(origen.codigo) + ' ')), 30000, 300); if (!raiz) throw new Error('no se abrió el RMD');
+    await hasta(() => !ocupadoGlobal() && raiz.querySelector('table.sapMListTbl tbody tr'), 30000, 300);
+    const bt = botonPorTitulo(raiz, 'Nueva Versión'); if (!bt) throw new Error('el RMD no tiene el botón «Nueva Versión»');
+    const c = sap.ui.getCore().byId(bt.id.replace(/-inner$/, '')); if (!c.getEnabled()) throw new Error('«Nueva Versión» no está disponible en este RMD');
+    c.firePress();
+    const ok = await hasta(() => { const d = [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)); return d && [...d.querySelectorAll('button')].find((x) => /^OK$/i.test(x.textContent.trim())); }, 15000, 200);
+    if (!ok) throw new Error('el portal no mostró su confirmación de «Nueva Versión»');
+    sap.ui.getCore().byId(ok.id.replace(/-inner$/, '')).firePress();
+    avance(seg(), 'El portal está copiando la configuración del RMD…');
+    let nueva = null;
+    for (let i = 0; i < 225 && !nueva; i++) { await esperar(4000); avance(seg(), 'El portal está copiando la configuración del RMD…'); try { nueva = (await ppVersiones(modelo, principal)).find((m) => !idsAntes.has(m.mdId) && +m.version > +origen.version); } catch (e) { /* se reintenta */ } }
+    if (!nueva) throw new Error('el portal no creó la versión nueva en 15 minutos; revisa la lista y vuelve a importar');
+    // el portal sigue escribiendo las filas: se espera a que deje de estar ocupado y a que la copia tenga lo mismo que el origen
+    const filas = (a) => a.estructuras.reduce((n, e) => n + (e.pasos || []).length + (e.etiquetas || []).reduce((m, t) => m + t.pasos.length + t.pasos.reduce((k, p) => k + (p.pm || []).length, 0), 0) + (e.pasos || []).reduce((k, p) => k + (p.pm || []).length, 0) + (e.equipos || []).length + (e.utensilios || []).length, 0);
+    const total = filas(await ppLeerArbol(modelo, origen)); let ultimo = -1, estables = 0;
+    for (let i = 0; i < 225; i++) {
+      await esperar(4000); avance(seg(), 'Comprobando que la copia esté completa…');
+      let n = 0; try { n = filas(await ppLeerArbol(modelo, nueva)); } catch (e) { n = 0; }
+      estables = n === ultimo ? estables + 1 : 0; ultimo = n;
+      if (n >= total && !ocupadoGlobal() && estables >= 1) break;
+      if (i === 224) throw new Error(`la copia quedó incompleta (${n} de ${total} filas); revísala en el portal antes de importar`);
+    }
+    await esperar(1500); ppCerrarDialogosSap(); await esperar(800);
+    return { ...nueva, estado: nueva.estado };
+  }
   // ---- ventanas ----
   function abrirPlantillaProduccion(codigo) {
     const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista «Configuración Manufactura Digital».', true); return; }
@@ -8921,13 +9017,30 @@ td.ult { position: relative; }
       v.cuerpo.innerHTML = '<p class="rmd-progreso">Revisando el RMD en SAP…</p>';
       an = await ppAnalizar(datos, prop);
     } catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo abrir «${esc(nombreArchivo || 'el archivo')}»: ${esc(e.message)}</p>`; v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); return; }
+    pintarImportacion(v, datos, prop, an, {});
+  }
+  // La revisión del borrador (se vuelve a pintar cuando se rehace sobre el RMD actual)
+  function pintarImportacion(v, datos, prop, an, extra) {
+    v.pie.innerHTML = '';
     const s = prop.solicitud || {}, r = datos.rmd;
     const cab = `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}<br><span class="rmd-nota">Plantilla del ${esc(fechaHoraCorta(datos.generado))} · borrador guardado el ${esc(fechaHoraCorta(prop.guardado))}</span></div>
         <div><b>${esc(s.nombre || '—')}</b> · ${esc(s.area || '')}<br><span class="rmd-nota">${esc(s.motivo || '')}${s.cc ? ' · ' + esc(s.cc) : ''}</span></div></div>`;
     if (!an.destino) {                                                          // solo se importa en un RMD Ingresado
       v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso error">Solo se puede importar en un RMD <b>Ingresado</b>. El RMD ${esc(r.codigo)} (v${esc(r.version)}) está ${esc(an.base.estado || r.estado)} y su master no tiene una versión Ingresada posterior.</p>
-        <p class="rmd-nota">Crea en el portal la nueva versión del RMD (quedará Ingresada) y vuelve a importar este borrador: se aplicará sobre esa versión.</p>`;
-      v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); v.__pp = { datos, prop, an, bloqueado: true }; window.__rmdStats.plantilla.ultimo = { datos, prop, an, bloqueado: true }; return;
+        <p class="rmd-nota">Puedes crear la versión Ingresada desde aquí con «Crear la versión Ingresada ahora» (usa el botón «Nueva Versión» del portal) o hacerlo en el portal y volver a importar este borrador.</p>`;
+      const origen = [...an.lin.versiones].filter((m) => +m.estadoIdRmd_iMaestraId !== 466).sort((a, b) => +b.version - +a.version)[0];
+      const puede = origen && +origen.estadoIdRmd_iMaestraId === 465;
+      const bVersion = botonModal('Crear la versión Ingresada ahora', 'primario', async () => {
+        const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
+        if (!(await confirmar('¿Crear una versión nueva del RMD?', `El portal copiará toda la configuración de ${origen.codigo} v${origen.version} en un RMD nuevo (versión ${+origen.version + 1}, Ingresado).`, 'Puede tardar varios minutos. No uses el portal mientras tanto: después se vuelve a revisar el borrador sobre esa versión.', { si: 'Crear versión', no: 'Cancelar' }))) return;
+        bVersion.disabled = true; v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso rmd-ing-versionp">Creando la versión nueva…</p><div class="rmd-ing-barra"><i style="width:100%;animation:rmd-ing-vaiven 1.6s infinite alternate"></i></div>`;
+        const p = v.cuerpo.querySelector('.rmd-ing-versionp');
+        try { const nueva = await ppCrearVersionNueva(modelo, origen, (s, t) => setTxt(p, `${t} (${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')})`)); const an2 = await ppAnalizar(datos, prop); pintarImportacion(v, datos, prop, an2, { versionCreada: nueva }); }
+        catch (e) { v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso error">No se pudo crear la versión: ${esc(e.message)}</p><p class="rmd-nota">Revisa en el portal si el RMD nuevo quedó creado y vuelve a importar el borrador.</p>`; bVersion.disabled = false; }
+      });
+      window.__rmdStats.plantilla.crearVersion = () => bVersion.click();
+      if (!puede) { bVersion.disabled = true; bVersion.title = origen ? `La versión más reciente (${origen.codigo} v${origen.version}) está ${origen.estado || 'en otro estado'}: solo se crea una nueva desde una Autorizada.` : 'No hay una versión desde la que crear.'; }
+      v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), bVersion); v.__pp = { datos, prop, an, bloqueado: true }; window.__rmdStats.plantilla.ultimo = { datos, prop, an, bloqueado: true }; return;
     }
     const nNuevos = an.nuevos.length, yaExisten = an.nuevos.filter((n) => n.existe && n.existe.length).length;
     const errores = [...an.avisos.values()].flat().filter((a) => a.nivel === 'error').length;
@@ -8943,13 +9056,27 @@ td.ult { position: relative; }
       return `<tr class="rmd-pp-${c.accion}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
         <td>${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => esc(m.texto) + (m.nuevo ? ' ★' : '')).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
         <td>${esc(c.comentario || '')}</td></tr>`; }).join('');
-    v.cuerpo.innerHTML = `${cab}
+    const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
+    const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
+    v.cuerpo.innerHTML = `${cab}${creada}${rehecho}
       ${s.observacion ? `<p class="rmd-nota">Observación: ${esc(s.observacion)}</p>` : ''}<ul class="rmd-pp-checks">${lineas.join('')}</ul>
       ${an.cambios.length ? `<table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>` : '<p class="rmd-nota">El borrador no trae cambios.</p>'}
       ${an.enSap.length ? `<details class="rmd-pp-sap"><summary>Cambios hechos en SAP desde la plantilla (${an.enSap.length})</summary><table class="rmd-tabla rmd-pp-t"><tbody>${an.enSap.map((c) => `<tr><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}</td><td>${esc(ppDespues(c))}</td></tr>`).join('')}</tbody></table></details>` : ''}
       <p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>`;
     const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length ? 'El borrador no trae cambios.' : '';
     const bIngresar = botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an)); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
+    // el RMD cambió desde la plantilla: se puede rehacer el borrador sobre lo que hay hoy, sin que Producción repita nada
+    const bRehacer = botonModal('Rehacer sobre el RMD actual', 'primario', async () => {
+      bRehacer.disabled = true; const aviso = document.createElement('p'); aviso.className = 'rmd-progreso'; aviso.textContent = 'Rehaciendo el borrador sobre el RMD actual…'; v.cuerpo.prepend(aviso);
+      try {
+        const rb = PPN.rebase(datos.arbol, prop.trabajo, an.actual, an.mapa), d = an.destino;
+        const datos2 = { ...datos, arbol: an.actual, huella: PPN.huella(an.actual), rmd: { ...datos.rmd, mdId: d.mdId, codigo: String(d.codigo), version: d.version, estado: d.estado || datos.rmd.estado } };
+        const prop2 = { ...prop, base: { mdId: d.mdId, codigo: String(d.codigo), version: d.version, huella: datos2.huella }, trabajo: rb.trabajo };
+        const an2 = await ppAnalizar(datos2, prop2); pintarImportacion(v, datos2, prop2, an2, { rehecho: { aplicados: rb.aplicados, conflictos: rb.conflictos, de: `${datos.rmd.codigo} v${datos.rmd.version}` } });
+      } catch (e) { toast('No se pudo rehacer el borrador: ' + e.message, true); bRehacer.disabled = false; aviso.remove(); }
+    });
+    window.__rmdStats.plantilla.rehacer = () => bRehacer.click();
+    v.pie.append(...(an.enSap.length && !errores ? [bRehacer] : []));
     v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), botonModal('Exportar Excel', '', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } }), bIngresar);
     v.__pp = { datos, prop, an };
     window.__rmdStats.plantilla.ultimo = { datos, prop, an };
@@ -8961,7 +9088,7 @@ td.ult { position: relative; }
     if (!on('plantillaprod') || !fs || !fs.length || dialogos().length || !controladorPrincipal() || document.querySelector('.rmd-modal-fondo')) return;
     e.preventDefault(); abrirArchivos(fs);
   });
-  window.__rmdStats.plantilla = { archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
+  window.__rmdStats.plantilla = { versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
   // ---- Ingreso automático del borrador (v1.42; v1.43: pasos nuevos, equipos, predecesores, marcas y «Deshacer») ----
   // «Ingresar en SAP…» (en la ventana del borrador importado) deja el RMD Ingresado como el borrador, con las mismas escrituras que hace el
   // portal (leídas de su código y comprobadas simulando): agregar pasos y procesos menores = actualización profunda de MD_ESTRUCTURA
@@ -9063,7 +9190,7 @@ td.ult { position: relative; }
     let n = 0; const op = (fase, o) => { ops.push({ fase, ...o }); };
     const fechaUsuario = { usuarioActualiza: usuario, fechaActualiza: ahora }, baja = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: false }, alta = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: true };
     const lugar = (L) => `${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}${L.padre ? ' › paso ' + (L.padre.codigo || '') : ''}`;
-    const quitados = new Set(), seqPasos = [], locNuevo = new Map();                                           // para los predecesores: [{L, seq: [{id, x, nuevo}]}]
+    const quitados = new Set(), seqPasos = [], locNuevo = new Map(), revisar = [], equiposRev = [];                                           // para los predecesores: [{L, seq: [{id, x, nuevo}]}]
     for (const L of listas) {
       const esPm = L.kind === 'pm', tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO', campo = esPm ? 'pasoHijoId_pasoId' : 'pasoId_pasoId', clase = esPm ? 'pm' : 'paso', bId = new Map(L.b.map((y) => [y.id, y]));
       const quien = (x, b0) => `${esPm ? 'proceso menor' : 'paso'} ${cod(x) || (b0 && b0.codigo) || '(nuevo)'} — ${String(x.texto || (b0 && b0.texto) || '').slice(0, 60)}`;
@@ -9078,6 +9205,7 @@ td.ult { position: relative; }
         const b0 = bId.get(x.id), fila = idx.get(D(x.id)); if (!fila) { bloqueos.push(`No se encontró en SAP ${quien(x, b0)} (${lugar(L)}).`); return; }
         if (pide(x, b0) && catDe(x) && (cod(x) !== String(b0.codigo || '') || catNuevo.has(x.id))) {
           if (esPm && b0.insumo) { bloqueos.push(`${quien(b0, b0)} es un insumo de la receta: no se cambia desde el borrador.`); return; }
+          revisar.push({ x, p: catDe(x), esPm, L, que: 'cambiado' });
           op(2, { lugar: lugar(L), accion: 'Cambiar', clase, desc: `cambiar ${esPm ? 'el proceso menor' : 'el paso'} ${b0.codigo || ''} por el ${codVer(x)} — ${String(x.texto || '').slice(0, 60)}`, ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: catDe(x).pasoId, ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: fila.pasoId, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
         }
         if (!esPm && (!!x.rpor !== !!b0.rpor || !!x.vb !== !!b0.vb)) {
@@ -9098,7 +9226,7 @@ td.ult { position: relative; }
       if (estructural) vivos.forEach((x, i) => { if (!bId.has(x.id)) return; const fila = idx.get(D(x.id)); if (fila && +fila.orden !== i + 1) op(4, { lugar: lugar(L), accion: 'Orden', clase, desc: `${quien(x, bId.get(x.id))}: orden ${fila.orden} → ${i + 1}`, ruta: `/${tabla}('${fila.id}')`, datos: { orden: i + 1 }, paralelo: true, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { orden: fila.orden } }, marca: movidos ? { id: fila.id, tipo: 'movido' } : null }); });
       vivos.forEach((x, i) => {
         if (bId.has(x.id)) return;
-        const p = catDe(x), id = D(x.id), mdE = D(L.e.id), mdT = L.t ? D(L.t.id) : null, padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x)); locNuevo.set(id, { estr: mdE, etq: mdT, padre: padreId });
+        const p = catDe(x), id = D(x.id), mdE = D(L.e.id), mdT = L.t ? D(L.t.id) : null, padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x)); locNuevo.set(id, { estr: mdE, etq: mdT, padre: padreId }); revisar.push({ x, p, esPm, L, que: 'nuevo' });
         const ini = x.vi != null && x.vi !== '' ? ppNum(x.vi) : p.valorInicial, fin = x.vf != null && x.vf !== '' ? ppNum(x.vf) : p.valorFinal, mar = x.margen != null && x.margen !== '' ? ppNum(x.margen) : p.margen;
         const filaPm = (m, pm, ord, padre) => ({ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, activo: true, mdEstructuraPasoInsumoPasoId: D(m.id), mdEstructuraPasoInsumoPasoIdAct: D(m.id), estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdId_mdId: dest.mdId, tipoDatoId_iMaestraId: pm.tipoDatoId_iMaestraId,
           pasoId_mdEstructuraPasoId: padre, pasoHijoId_pasoId: pm.pasoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, orden: ord, decimales: pm.decimales, margen: pm.margen, valorInicial: pm.valorInicial, valorFinal: pm.valorFinal, tipoDatoIdAnterior_iMaestraId: pm.tipoDatoId_iMaestraId });
@@ -9113,7 +9241,7 @@ td.ult { position: relative; }
             if (cas && Object.keys(cas).length) op(3, { lugar: lugar(L), accion: 'Casillas', clase: 'paso', desc: `casillas del paso ${codVer(x)}: ${Object.keys(cas).map((k) => PP_CASILLA_NOMBRE[k]).join(', ')} (${elegido ? 'elegidas por Producción' : cfg ? 'como en un paso igual de SAP' : 'según su tipo de dato'})`, ruta: `/MD_ES_PASO('${id}')`, datos: { ...cas, ...fechaUsuario }, inv: null }); }
           (x.pm || []).filter((m) => !m.quitado).forEach((m, j) => {
             const pm = catDe(m); if (!pm) { bloqueos.push(`El proceso menor «${String(m.texto).slice(0, 60)}» del paso nuevo no está en el catálogo de SAP.`); return; }
-            finales.set(m.id, cod(m)); locNuevo.set(D(m.id), { estr: mdE, etq: mdT, padre: id });
+            finales.set(m.id, cod(m)); locNuevo.set(D(m.id), { estr: mdE, etq: mdT, padre: id }); revisar.push({ x: m, p: pm, esPm: true, L, que: 'nuevo' });
             op(3, { lugar: lugar(L), accion: 'Agregar', clase: 'pm', desc: `agregar proceso menor ${codVer(m)} — ${String(m.texto || '').slice(0, 50)} al paso nuevo`, ruta: `/MD_ESTRUCTURA('${mdE}')`, datos: { mdEstructuraId: mdE, aPasoInsumoPaso: [filaPm(m, pm, j + 1, id)] },
               inv: { ruta: `/MD_ES_PASO_INSUMO_PASO('${D(m.id)}')`, datos: { ...baja } }, marca: { id: D(m.id), tipo: 'agregado' } });
           });
@@ -9143,7 +9271,7 @@ td.ult { position: relative; }
         });
       });
       for (const { x, k, clase, nombre } of nuevosEq) {
-        cambiaListas = true; const id = D(x.id); locNuevo.set(id, { estr: D(e.id), equipo: true });
+        cambiaListas = true; const id = D(x.id); locNuevo.set(id, { estr: D(e.id), equipo: true }); if (k === 'equipos') equiposRev.push({ x, e, nombre });
         if (k === 'equipos') {
           const base = x.equipoId && catEq.get(x.equipoId); if (!base) { bloqueos.push(`No se encontró en el catálogo de SAP el equipo ${nombre}.`); continue; }
           const copiaId = ppUuid(), copia = { terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, fechaActualiza: ahora, usuarioActualiza: null, activo: true, equipoId: copiaId, tipoId_iMaestraId: base.tipoId_iMaestraId, werks: base.werks, sstat: base.sstat, tplnr: base.tplnr, pltxt: base.pltxt, equnr: base.equnr, eqtyp: base.eqtyp, estat: base.estat, eqktx: base.eqktx, inbdt: base.inbdt, ctext: base.ctext, abckz: base.abckz, denom: base.denom, arbpl: base.arbpl, CodigoGaci: base.CodigoGaci };
@@ -9231,7 +9359,34 @@ td.ult { position: relative; }
     const cuenta = (f) => ops.filter(f).length;
     const resumen = { crear: cuenta((o) => o.accion === 'Crear'), agregarPasos: cuenta((o) => o.accion === 'Agregar' && o.clase === 'paso'), agregarPm: cuenta((o) => o.accion === 'Agregar' && o.clase === 'pm'), agregarEquipos: cuenta((o) => o.accion === 'Agregar' && (o.clase === 'equipo' || o.clase === 'utensilio') && !/copiar/.test(o.desc)),
       quitar: cuenta((o) => o.accion === 'Quitar' && o.clase !== 'pm'), quitarPm: cuenta((o) => o.accion === 'Quitar' && o.clase === 'pm'), cambiar: cuenta((o) => o.accion === 'Cambiar'), rango: cuenta((o) => o.accion === 'Rango'), orden: cuenta((o) => o.accion === 'Orden'), predecesores: cuenta((o) => o.accion === 'Predecesor') };
-    return { ops, bloqueos, avisos, manual, nuevos: [...nuevosPaso.values()], finales, resumen, D, nuevosIds, porCodigo, catNuevo };
+    const revision = ppRevisarReglas(datos, an, revisar, equiposRev, ops, seqPasos, lugar);
+    return { ops, bloqueos, avisos, manual, revision, nuevos: [...nuevosPaso.values()], finales, resumen, D, nuevosIds, porCodigo, catNuevo };
+  }
+  // Revisión de lo que se va a ingresar con las reglas del script: las de redacción y tipo de dato (reglasDeFila), las reglas propias de la
+  // persona (textos, documentos no vigentes, equipos sin calificación) y los avisos que dejó el borrador. Son alertas: no bloquean, se aceptan.
+  function ppRevisarReglas(datos, an, revisar, equiposRev, ops, seqPasos, lugar) {
+    const alertas = [], add = (donde, texto, nivel) => alertas.push({ nivel: nivel || 'aviso', donde, texto });
+    const tipos = datos.tipos || {};
+    revisar.forEach(({ x, p, esPm, L }) => {
+      const donde = `${lugar(L)} › ${(x.codigo || p && p.codigo || 'paso nuevo')} ${String(x.texto || '').slice(0, 50)}`, t = tipos[p && p.tipoDatoId_iMaestraId] || '';
+      try { reglasDeFila({ esPM: !!esPm, tipo: t, desc: x.texto, chk: {}, dec: p && p.decimales == null ? '' : p && p.decimales, vi: p && p.valorInicial == null ? '' : p && p.valorInicial, vf: p && p.valorFinal == null ? '' : p && p.valorFinal })
+        .filter((f) => f.col === 'DESCRIPCION' || f.col === 'DECIMAL' || f.col === 'VAL. INICIAL' || f.col === 'VAL. FINAL').forEach((f) => add(donde, f.msg)); } catch (e) { /* sin reglas de fila */ }
+    });
+    // un paso nuevo con tipo de dato en una lista que usa predecesores debería quedar enlazado
+    const enlazados = new Set(ops.filter((o) => o.accion === 'Predecesor' && o.marca).map((o) => o.marca.id));
+    seqPasos.forEach((s) => { const usa = s.vivos.some((v) => !v.nuevo); s.vivos.filter((v) => v.nuevo).forEach((v) => { const t = +(((revisar.find((r) => r.x === v.x) || {}).p) || {}).tipoDatoId_iMaestraId; if (usa && t && t !== PP_SIN_TIPO && !enlazados.has(v.id)) add(`${lugar(s.L)} › ${String(v.x.texto || '').slice(0, 50)}`, 'El paso nuevo no quedó enlazado a un predecesor: revisa su «Depende».'); }); });
+    // reglas de la persona
+    try {
+      if (typeof reglasVivas === 'function' && reglasVivas()) {
+        const comp = reglasCompiladas(), ctx = ctxReglas(), textos = revisar.map((r) => ({ texto: r.x.texto, esPM: !!r.esPm, lista: r.L.t ? r.L.t.nombre : r.L.e.nombre }));
+        const ev = Reglas.evaluarConjunto(textos, comp, ctx);
+        ev.items.forEach((it) => it.avisos.forEach((a) => { const r = revisar[it.i]; add(`${lugar(r.L)} › ${String(r.x.texto || '').slice(0, 50)}`, a.texto); }));
+        if (equiposRev.length) { const eq = equiposRev.map((q) => ({ codigo: q.x.ref, sap: q.x.codigo, desc: q.x.desc, orden: 0 })), ee = Reglas.evaluarEquipos(eq, comp, ctx); ee.items.forEach((it) => it.avisos.forEach((a) => add(`${equiposRev[it.i].e.nombre} › ${equiposRev[it.i].nombre}`, a.texto))); }
+      }
+    } catch (e) { /* las reglas de la persona no se pudieron evaluar */ }
+    // avisos que dejó el borrador (duplicados, etiqueta distinta, «Control de Calidad»…)
+    an.avisos.forEach((lista, id) => { const c = an.cambios.find((y) => y.id === id); lista.filter((a) => a.nivel === 'aviso' && !/^Debe decir «CALIDAD/.test(a.texto)).forEach((a) => add(c ? `${c.lugar}${c.numero ? ' › ' + c.numero : ''}` : 'Borrador', a.texto)); });
+    const vistos = new Set(); return alertas.filter((a) => { const k = a.donde + '|' + a.texto; if (vistos.has(k)) return false; vistos.add(k); return true; });
   }
   // Comprueba, releyendo el RMD, que cada lista quedó con los pasos (y procesos menores) del borrador y en su orden.
   async function ppVerificarIngreso(modelo, dest, prop, plan) {
@@ -9338,8 +9493,9 @@ td.ult { position: relative; }
     v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-ing-tit"><b>${plan.ops.length} escrituras</b> en el RMD <b>${esc(an.destino.codigo)} v${esc(an.destino.version)}</b> (${esc(an.destino.estado)}) · ${esc(an.destino.descripcion || '')}</p>
       <div class="rmd-ing-cards">${tarjetas}</div><p class="rmd-ing-filtro" hidden></p>
       ${listaAv('Revisa después en SAP', plan.avisos.concat(plan.manual), 'ambar')}
+      ${plan.revision.length ? `<details class="rmd-ing-nota ambar rmd-ing-rev" open><summary><b>Revisión con las reglas: ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''}</b> (no bloquean; se aceptan al confirmar)</summary><ul>${plan.revision.slice(0, 60).map((a) => `<li><span class="rmd-nota">${esc(a.donde)}</span><br>${esc(a.texto)}</li>`).join('')}${plan.revision.length > 60 ? `<li>… y ${plan.revision.length - 60} más</li>` : ''}</ul></details>` : '<p class="rmd-nota rmd-ing-rev-ok">✓ Revisión con las reglas: sin alertas en lo que se ingresa.</p>'}
       <div class="rmd-ing-ops">${grupos()}</div>
-      <label class="rmd-nota rmd-pp-conf"><input type="checkbox" class="rmd-pp-ok"> Confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${r.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}.</label>
+      <label class="rmd-nota rmd-pp-conf"><input type="checkbox" class="rmd-pp-ok"> Confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${plan.revision.length ? ` y acepto las ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''} de la revisión` : ''}${plan.resumen.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}.</label>
       <div class="rmd-ing-barra" hidden><i></i></div><div class="rmd-progreso rmd-pp-prog"></div>`;
     const cuerpo = v.cuerpo, prog = cuerpo.querySelector('.rmd-pp-prog'), ok = cuerpo.querySelector('.rmd-pp-ok'), barra = cuerpo.querySelector('.rmd-ing-barra'), bi = barra.querySelector('i');
     const pintar = () => { const abiertos = new Set([...cuerpo.querySelectorAll('.rmd-ing-grupo[open] summary b')].map((x) => x.textContent)); cuerpo.querySelector('.rmd-ing-ops').innerHTML = grupos(); cuerpo.querySelectorAll('.rmd-ing-grupo').forEach((g) => { if (abiertos.has(g.querySelector('summary b').textContent)) g.open = true; }); };

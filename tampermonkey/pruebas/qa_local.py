@@ -827,6 +827,24 @@ with sync_playwright() as p:
         ok = (r["original"] == "Ana Prueba" and r["bomcrlf"] == "Ana Prueba" and r["atributos"] == "Ana Prueba" and "incompleto" in r["cortado"] and "dañados" in r["base64"] and "todavía no tiene un borrador" in r["sinBorrador"]
               and "no corresponde" in r["otra"] and "dañada" in r["json"] and "no es un borrador" in r["noEs"] and r["archivos"][:2] == [True, True] and "no es un borrador" in r["archivos"][2] and "vacío" in r["archivos"][3])
         return ok, json.dumps(r, ensure_ascii=False)[:1800]
+    @prueba("LN33 Rehacer el borrador sobre el RMD actual (v1.46, datos de mentira): lo de Producción se vuelve a aplicar sobre lo que hay hoy en SAP (quitar, cambiar, agregar tras su paso anterior, mover, equipos, comentarios), lo que SAP cambió se conserva y lo que tocaron los dos se avisa sin pisar")
+    def _():
+        r = pg.evaluate("((d) => { const N = window.__rmdStats.plantilla.nucleo, base = d.arbol, W = JSON.parse(JSON.stringify(base)), A = JSON.parse(JSON.stringify(base));" + """
+          const T1 = W.estructuras[2].etiquetas[0], T2 = W.estructuras[2].etiquetas[1], a1 = A.estructuras[2].etiquetas[0], a2 = A.estructuras[2].etiquetas[1];
+          // Producción: cambia P11 a otro paso, quita P12, agrega uno nuevo tras P10, sube P13, quita un equipo, agrega otro, comenta T2
+          Object.assign(T1.pasos[1], { texto: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', codigo: '2012', pasoId: null, nuevo: false });
+          T1.pasos[2].quitado = true; T1.pasos.splice(1, 0, { id: 'n:1', texto: 'ENJUAGAR CON AGUA PURIFICADA.', codigo: null, nuevo: true, pm: [] });
+          const p13 = T1.pasos.splice(4, 1)[0]; T1.pasos.splice(2, 0, p13);
+          W.estructuras[1].equipos[0].quitado = true; W.estructuras[1].equipos.push({ id: 'n:6', equipoId: 'EQ2', codigo: '40100796', ref: 'SEL-BAL-08', desc: 'BALANZA-OHAUS-R31P30' }); T2.comentario = 'Revisar con el jefe.';
+          // SAP: cambió el texto de P11 (choca), quitó P21, agregó S1 al final de T1 y cambió el texto de P20
+          a1.pasos[1].texto = 'OTRO TEXTO QUE PUSO SAP.'; a1.pasos.push({ id: 'S1', texto: 'NUEVO EN SAP', codigo: '9001', pm: [] }); a2.pasos = a2.pasos.filter((x) => x.id !== 'P21'); a2.pasos[0].texto = 'P20 CAMBIADO EN SAP';
+          const rb = N.rebase(base, W, A), R = rb.trabajo, t1 = R.estructuras[2].etiquetas[0].pasos, t2 = R.estructuras[2].etiquetas[1].pasos;
+          const c = N.cambios(A, R).map((x) => x.clase + '|' + x.accion + '|' + x.id + '|' + (x.nuevo ? 'nuevo' : ''));
+          return { orden: t1.map((x) => x.id + (x.quitado ? '(q)' : '')), p11: t1.find((x) => x.id === 'P11').texto, s1: t1.some((x) => x.id === 'S1'), t2: t2.map((x) => x.id + ':' + x.texto.slice(0, 9)), com: R.estructuras[2].etiquetas[1].comentario, aplicados: rb.aplicados, conflictos: rb.conflictos.map((x) => x.slice(0, 220)), cambios: c, eq: R.estructuras[1].equipos.map((x) => x.id + (x.quitado ? '(q)' : '')) }; })""" + "((" + PP_DATOS_JS + ")())")
+        ok = (r["orden"][0] == "P10" and r["orden"][1] == "n:1" and "P12(q)" in r["orden"] and r["orden"].index("P13") < r["orden"].index("P11") and r["s1"] and r["p11"] == "OTRO TEXTO QUE PUSO SAP."
+              and len(r["conflictos"]) == 1 and "P11" not in r["conflictos"][0] and "cambió en SAP y en el borrador" in r["conflictos"][0] and r["t2"] == ["P20:P20 CAMBI"] and r["com"] == "Revisar con el jefe."
+              and r["eq"][0] == "Q1(q)" and r["eq"][-1] == "n:6" and any(x.startswith("paso|agregar|n:1|") for x in r["cambios"]) and any(x.startswith("paso|quitar|P12") for x in r["cambios"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:1700]
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
