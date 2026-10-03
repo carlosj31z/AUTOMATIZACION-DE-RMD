@@ -808,6 +808,25 @@ with sync_playwright() as p:
         ok = (not errs and not rango and cas == ["m-rpor", "m-vb"] and cambios == ["Realizado por:Sí,Visto bueno:Sí"] and anchos and anchos[0] == anchos[1] and area["tag"] == "SELECT" and area["ops"][1:] == ["SOLIDOS", "LIQUIDOS"]
               and envio["nombre"].startswith("Borrador RMD 2202600001 v3 ") and envio["correo"])
         return ok, json.dumps({ "rango": rango, "cas": cas, "cambios": cambios, "anchos": anchos, "area": area, "envio": envio, "errores": errs[:3] }, ensure_ascii=False)
+    @prueba("LN32 Importar el borrador a prueba de errores (v1.45): se reconoce por su contenido (da igual el nombre o la extensión del archivo), aguanta BOM, saltos de línea y atributos distintos, y cada daño (cortado, dañado, sin borrador, de otra plantilla, no es un borrador) se explica con su mensaje")
+    def _():
+        if not PP_GUARDADO: return False, "LN28 no dejó archivo"
+        r = pg.evaluate("""async ([h, d0]) => { const P = window.__rmdStats.plantilla, ok = async (t) => { try { const x = await P.leer(t); return x.prop.solicitud.nombre; } catch (e) { return 'ERR ' + e.message; } }, out = {};
+          const gt = (t, id) => t.indexOf('>', t.indexOf('id="' + id + '"')) + 1, fin = (t, desde) => t.indexOf('</script>', desde);
+          out.original = await ok(h); out.bomcrlf = await ok(String.fromCharCode(65279) + h.split(String.fromCharCode(10)).join(String.fromCharCode(13, 10)));
+          out.atributos = await ok(h.replace('<script id="rmd-datos"', "<script type='application/octet-stream' id='rmd-datos'").replace('<script id="rmd-borrador" type="application/json">', '<script   type="application/json"   id=rmd-borrador >'));
+          out.cortado = await ok(h.slice(0, h.indexOf('<script id="rmd-datos"') + 120));
+          const g1 = gt(h, 'rmd-datos'); out.base64 = await ok(h.slice(0, g1) + 'AAAA'.repeat(100) + h.slice(g1 + 400));
+          out.sinBorrador = await ok(P.html(await P.empacar(P.paquete(d0.md, d0.arbol, d0.cat, 'X')), null, 'x'));
+          const k = h.indexOf('"huella":"', h.indexOf('id="rmd-borrador"')) + 10; out.otra = await ok(h.slice(0, k) + 'zzzzzz' + h.slice(k + 6));
+          const g2 = gt(h, 'rmd-borrador'); out.json = await ok(h.slice(0, g2) + '{"tipo": nope' + h.slice(fin(h, g2)));
+          out.noEs = await ok('hola mundo, esto no es un borrador');
+          const f1 = new File([h], 'Documento sin titulo (3)', { type: '' }), f2 = new File([h], 'foto.png.txt', { type: 'text/plain' }), f3 = new File(['x'.repeat(2000)], 'borrador.html'), f4 = new File(['x'], 'borrador.html');
+          out.archivos = [!!(await P.archivo(f1)).texto, !!(await P.archivo(f2)).texto, (await P.archivo(f3)).error, (await P.archivo(f4)).error];
+          return out; }""", [PP_GUARDADO[0], pg.evaluate("(" + PP_DATOS_JS + ")()")])
+        ok = (r["original"] == "Ana Prueba" and r["bomcrlf"] == "Ana Prueba" and r["atributos"] == "Ana Prueba" and "incompleto" in r["cortado"] and "dañados" in r["base64"] and "todavía no tiene un borrador" in r["sinBorrador"]
+              and "no corresponde" in r["otra"] and "dañada" in r["json"] and "no es un borrador" in r["noEs"] and r["archivos"][:2] == [True, True] and "no es un borrador" in r["archivos"][2] and "vacío" in r["archivos"][3])
+        return ok, json.dumps(r, ensure_ascii=False)[:1800]
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")

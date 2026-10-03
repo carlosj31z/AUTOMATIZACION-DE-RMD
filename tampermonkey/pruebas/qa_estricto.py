@@ -2098,12 +2098,13 @@ with sync_playwright() as p:
                 e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); e.fill("[data-k=nombre]", "QA"); e.select_option("[data-k=area]", index=1); e.fill("[data-k=motivo]", "Prueba sin escritura")
                 with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
                 guardado = open(dl.value.path(), encoding="utf-8").read(); e.close()
+                renombrado = fr.evaluate("async (t) => { const r = await window.__rmdStats.plantilla.archivo(new File([t], 'adjunto sin nombre (2)')); return !!r.texto; }", guardado)      # el nombre no importa
                 fr.evaluate("([t, n]) => { window.__rmdStats.plantilla.ultimo = null; window.__rmdStats.plantilla.importar(t, n); }", [guardado, "Borrador QA.html"])
                 fr.wait_for_function("() => window.__rmdStats.plantilla.ultimo || document.querySelector('.rmd-pp-imp .rmd-progreso.error')", timeout=120000); pg.wait_for_timeout(800)
                 an = fr.evaluate("""() => { const u = window.__rmdStats.plantilla.ultimo; if (!u) return { error: (document.querySelector('.rmd-pp-imp .rmd-progreso.error') || {}).textContent }; const a = u.an;
                   return { destino: a.destino && [a.destino.codigo, a.destino.estado], cambios: a.cambios.map((c) => [c.accion, c.codigo || '', !!c.nuevo]), nuevos: a.nuevos.map((n) => [n.texto.slice(0, 30), n.existe]), enSap: a.enSap.length, filas: document.querySelectorAll('.rmd-pp-t tbody tr').length }; }""")
                 cerrar_seguro()
-                ok = (an.get("destino") == [COD_PP, "Ingresado"] and ["cambiar", cambio["a"], False] in an["cambios"] and ["agregar", "", True] in an["cambios"] and an["enSap"] == 0 and an["nuevos"] and an["nuevos"][0][1] == [] and an["filas"] >= 2)
+                ok = (an.get("destino") == [COD_PP, "Ingresado"] and ["cambiar", cambio["a"], False] in an["cambios"] and ["agregar", "", True] in an["cambios"] and an["enSap"] == 0 and an["nuevos"] and an["nuevos"][0][1] == [] and an["filas"] >= 2 and renombrado)
                 return ok, f"cambio={cambio} importada={an}"
             @prueba("1-4 Solo se importa en un RMD Ingresado (datos reales): el borrador de un RMD Autorizado cuyo master no tiene ninguna versión Ingresada se rechaza con su explicación, sin plan ni Excel")
             def _():

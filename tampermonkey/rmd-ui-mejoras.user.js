@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.44.0
+// @version      1.45.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.44.0';                                                       // mantener igual a @version
+  const VERSION = '1.45.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -8079,6 +8079,7 @@
     const app = $('#app');
     let PQ, BASE, W, SOL, BUS, EQ = [], ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), NUM_BASE = new Map(), sucio = false, seq = 1, filtro = 'todos';
     const deshacer = [];
+    let avisoInicial = '';
     const CLAVE = () => `rmdPlantilla:${PQ.rmd.codigo}:${PQ.huella}`;
     const scriptBorrador = () => $('#rmd-borrador') || $('#rmd-propuesta');
 
@@ -8087,10 +8088,12 @@
       const bin = Uint8Array.from(atob(b64.trim()), (c) => c.charCodeAt(0));
       return JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
     }
+    const CLAVE_AYUDA = 'rmdPlantillaAyuda';
     async function iniciar() {
       app.innerHTML = '<div class="pp-cargando">Abriendo la plantilla…</div>';
       try {
-        PQ = await desempacar($('#rmd-datos').textContent);
+        if (!window.DecompressionStream || !window.Blob || !Blob.prototype.stream) throw new Error('este navegador es demasiado antiguo');
+        try { PQ = await desempacar($('#rmd-datos').textContent.replace(/\s+/g, '')); } catch (e) { throw new Error('el archivo está incompleto o dañado (¿se cortó la descarga o lo modificó el correo?). Pide que te lo envíen otra vez'); }
         BASE = PQ.arbol; NUM_BASE = PPN.numerar(BASE.estructuras);
         const filas = PPN.desempacarPasos(PQ.catalogo); BUS = PPN.crearBuscador(filas);
         ETQ = new Map(PQ.catalogo.etq.map(([id, n]) => [id, n]));
@@ -8104,14 +8107,14 @@
         indexar(BASE, BI);
         let prop = null; try { const sc = scriptBorrador(); prop = JSON.parse((sc && sc.textContent) || 'null'); } catch (e) { prop = null; }
         if (prop && prop.trabajo && prop.base && prop.base.huella === PQ.huella) { W = prop.trabajo; SOL = prop.solicitud || {}; }
-        else { W = clon(BASE); SOL = {}; }
+        else { W = clon(BASE); SOL = {}; if (prop && prop.trabajo) avisoInicial = 'El borrador guardado en este archivo no corresponde a esta plantilla; se abrió la plantilla sin cambios.'; }
         W.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { [p, ...(p.pm || [])].forEach((x) => { const s = /^n:(\d+)/.exec(x.id); if (s) seq = Math.max(seq, +s[1] + 1); }); })));
         ['equipos', 'utensilios'].forEach((k) => W.estructuras.forEach((e) => (e[k] || []).forEach((x) => { const s = /^n:(\d+)/.exec(x.id); if (s) seq = Math.max(seq, +s[1] + 1); })));
         pintarTodo();
         let auto = null; try { auto = JSON.parse(localStorage.getItem(CLAVE()) || 'null'); } catch (e) { auto = null; }
         if (auto && auto.W && (!prop || (auto.t > Date.parse(prop.guardado || 0)))) ofrecerRecuperar(auto);
       } catch (e) {
-        app.innerHTML = `<div class="pp-cargando error">No se pudo abrir la plantilla: ${esc(e.message)}.<br>Ábrela con Google Chrome o Microsoft Edge actualizados.</div>`;
+        app.innerHTML = `<div class="pp-cargando error"><b>No se pudo abrir la plantilla:</b> ${esc(e.message)}.<br>Ábrela con Google Chrome o Microsoft Edge actualizados, directamente desde el archivo guardado (no desde la vista previa del correo ni de Teams).</div>`;
       }
     }
 
@@ -8145,7 +8148,7 @@
     function pintarTodo() {
       CMB = PPN.cambios(BASE, W); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras }); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
       const y = window.scrollY;
-      app.innerHTML = `${htmlBarra()}<div class="pp-cuerpo"><main class="pp-doc" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>`;
+      app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>`;
       window.scrollTo(0, y);
       document.title = `${sucio ? '● ' : ''}Borrador RMD ${PQ.rmd.codigo} v${PQ.rmd.version}`;
     }
@@ -8154,12 +8157,23 @@
       const nuevos = CMB.filter((c) => (c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo).length + CMB.filter((c) => c.accion === 'agregar' && c.pm).reduce((s, c) => s + c.pm.filter((m) => m.nuevo).length, 0);
       return { errores, avisos: avisosN, nuevos, total: CMB.length };
     }
+    // Orientación para quien trabaja el archivo: estado del RMD, ayuda y avisos de apertura
+    function htmlAvisosGenerales() {
+      const r = PQ.rmd, partes = [];
+      if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
+      if (r.estado && r.estado !== 'Ingresado') partes.push(`<div class="pp-aviso-gen">ℹ Este RMD está <b>${esc(r.estado)}</b>. Puedes preparar tu borrador igual: el equipo RMD lo ingresará cuando exista una versión nueva en estado Ingresado.</div>`);
+      let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
+      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Pasa el ratón por una fila</b> (a la derecha de la hoja) y usa ✎ para cambiar el texto, <b>+</b> para agregar debajo, ↑ ↓ para mover y ✕ para quitar. Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar.</li><li>Si el paso no existe, queda marcado <b>★ Se creará</b>; el equipo RMD lo creará.</li><li>Pulsa <b>Solicitud</b> y completa quién pide el cambio y por qué.</li><li>Pulsa <b>Guardar borrador</b> (Ctrl+S) y envía el archivo descargado al equipo RMD, como adjunto.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      return partes.join('');
+    }
+    let ayudaAbierta = false;
     function htmlBarra() {
       const r = PQ.rmd, n = contar(), falta = !solicitudCompleta();
       return `<header class="pp-barra"><div class="pp-titulo"><b>Borrador de Producción · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)}</span></div>
         <div class="pp-botones"><span class="pp-sucio" title="Hay cambios que aún no se guardaron en un archivo">${sucio ? '● Sin guardar' : ''}</span>
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <button type="button" data-a="solicitud" class="${falta ? 'falta' : ''}" title="Quién pide el cambio y por qué">Solicitud${falta ? ' ⚠' : ' ✓'}</button>
+        <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="imprimir" title="Imprimir o guardar en PDF el borrador con los cambios marcados">Imprimir</button>
         <button type="button" data-a="guardar" class="primario" title="Descarga el archivo con el borrador para enviarlo al equipo RMD">Guardar borrador</button></div>
         <div class="pp-resumen">${n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'Sin cambios todavía'}${n.nuevos ? ` · <b class="crea">${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'} a crear</b>` : ''}${n.errores ? ` · <b class="err">${n.errores} por corregir</b>` : ''}${n.avisos ? ` · <b class="avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</b>` : ''} · <span class="pp-ayuda-corta">Pasa el ratón por una fila: ✎ cambiar · + agregar · ↑ ↓ mover · ✕ quitar · 💬 comentar</span></div></header>`;
@@ -8445,23 +8459,31 @@
       else if (a === 'agregar-final') { const l = listaDe(b.dataset.lista); editar({ nuevo: true, lista: l.lista, despuesDe: null, clase: 'paso', e: l.e, t: l.t }); }
       else if (a === 'agregar-pm') { const f = encontrar(b.dataset.padre || id); if (!f.item.pm) f.item.pm = []; editar({ nuevo: true, lista: f.item.pm, despuesDe: null, clase: 'pm', e: f.e, t: f.t, padre: f.item }); }
       else if (a === 'agregar-equipo') agregarEquipo(b.dataset.est);
+      else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
+      else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { /* nada */ } pintarTodo(); }
     });
     function deshacerUno() { const s = deshacer.pop(); if (!s) return; W = s.W; SOL = s.SOL; sucio = true; guardarLocal(); pintarTodo(); }
     document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !document.querySelector('.pp-modal-fondo') && !/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); deshacerUno(); } });
+    window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (PQ && !document.querySelector('.pp-modal-fondo')) guardar(); } });
+    const errorGlobal = (m) => { if (document.querySelector('.pp-toast.error')) return; const x = document.createElement('div'); x.className = 'pp-toast error'; x.textContent = 'Ocurrió un error inesperado. Tus cambios se guardaron solos en este navegador: recarga la página (F5) y elige «Recuperarlos».'; document.body.appendChild(x); setTimeout(() => x.remove(), 12000); try { console.error(m); } catch (e) { /* nada */ } };
+    window.addEventListener('error', (e) => errorGlobal(e.message)); window.addEventListener('unhandledrejection', (e) => errorGlobal(e.reason));
     window.addEventListener('beforeunload', (e) => { if (sucio) { e.preventDefault(); e.returnValue = ''; } });
+    let ULTIMO = null;
     function descargar(texto, nombre) {
       const u = URL.createObjectURL(new Blob([texto], { type: 'text/html;charset=utf-8' })), a = document.createElement('a'); a.href = u; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 15000);
     }
     function guardar() {
       if (!solicitudCompleta()) { abrirSolicitud(true); return; }
       const n = contar();
+      if (!n.total && !confirm('Todavía no hay cambios en el borrador. ¿Guardar el archivo igual?')) return;
       if (n.errores && !confirm(`Hay ${n.errores} cosa(s) por corregir (marcadas con ✕). ¿Guardar el borrador igual?`)) return;
       const d = new Date(), r = PQ.rmd, prop = { formato: 1, tipo: 'borrador-rmd', base: { mdId: r.mdId, codigo: r.codigo, version: r.version, huella: PQ.huella }, guardado: d.toISOString(), solicitud: SOL, trabajo: W,
         resumen: { cambios: n.total, nuevos: n.nuevos, errores: n.errores, avisos: n.avisos } };
       const json = JSON.stringify(prop).replace(/</g, '\\u003c');
       const html = ORIGINAL.replace(/(<script id="rmd-(?:borrador|propuesta)" type="application\/json">)[\s\S]*?(<\/script>)/, (m0, a, b) => a + json + b);
-      descargar(html, `Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`);
-      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { /* nada */ } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(`Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`, n);                                                // (pruebas)
+      const nombreArchivo = `Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`.replace(/[\\/:*?"<>|]/g, '-'); ULTIMO = { html, nombre: nombreArchivo };
+      descargar(html, nombreArchivo);
+      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { /* nada */ } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(nombreArchivo, n);                                                // (pruebas)
     }
     // Qué hacer con el archivo que se acaba de guardar (para quien no sabe cómo enviarlo)
     function mostrarEnvio(nombre, n) {
@@ -8470,8 +8492,8 @@
         <ol class="pp-envio"><li><b>Busca el archivo</b> en la carpeta <b>Descargas</b> de tu computadora (o abre las descargas del navegador con Ctrl+J):<code>${esc(nombre)}</code></li>
         <li><b>Envíalo al equipo RMD</b> como archivo adjunto, por correo o Teams. Es un solo archivo; no lo copies a otro formato ni lo imprimas en su lugar.</li>
         <li><b>No lo abras con otro programa ni lo renombres.</b> Si te falta algo, ábrelo de nuevo con Chrome o Edge, sigue editando y vuelve a guardar: se descarga una versión nueva con el mismo nombre.</li></ol>
-        <div class="pp-pie"><button type="button" data-a="copiar">Copiar nombre del archivo</button><a class="pp-btn-enlace" href="mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}">Abrir un correo con el asunto listo</a><button type="button" class="primario" data-a="cancelar">Entendido</button></div>`, (m, cerrar) => {
-        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
+        <p class="pp-nota">¿No se descargó? Tu navegador pudo bloquear la descarga: pulsa «Descargar otra vez».</p><div class="pp-pie"><button type="button" data-a="otra">Descargar otra vez</button><button type="button" data-a="copiar">Copiar nombre del archivo</button><a class="pp-btn-enlace" href="mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}">Abrir un correo con el asunto listo</a><button type="button" class="primario" data-a="cancelar">Entendido</button></div>`, (m, cerrar) => {
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'otra' && ULTIMO) descargar(ULTIMO.html, ULTIMO.nombre); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
       });
     }
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
@@ -8563,6 +8585,9 @@ td.ult { position: relative; }
 .pp-campo { display: block; margin: 10px 0; font-weight: 600; font-size: 12.5px; } .pp-campo textarea, .pp-campo input { display: block; width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--bd); border-radius: 6px; font: 13px/1.45 "Segoe UI", Roboto, Arial, sans-serif; font-weight: 400; }
 .pp-campo textarea:focus, .pp-campo input:focus, .pp-rango-ed input:focus { outline: 2px solid var(--acento); outline-offset: -1px; border-color: var(--acento); } .pp-campo .falta { border-color: var(--qui); }
 .pp-estado { min-height: 20px; font-size: 12.5px; } .pp-estado .ok { color: var(--agr); } .pp-estado .crea { color: var(--crea); font-weight: 600; } .pp-estado .err { color: var(--qui); } .pp-estado .avi { color: var(--cam); }
+.pp-aviso-gen { margin: 0 24px 8px; padding: 8px 14px; border-radius: 8px; background: rgba(10,110,209,.1); border-left: 4px solid #0a6ed1; font-size: 13px; } .pp-aviso-gen.aviso { background: rgba(224,160,0,.16); border-left-color: #e0a000; }
+.pp-ayuda { margin: 0 24px 10px; padding: 12px 16px; border-radius: 8px; background: rgba(46,160,67,.1); border-left: 4px solid #2ea043; font-size: 13px; line-height: 1.5; } .pp-ayuda ol { margin: 6px 0; padding-left: 20px; } .pp-ayuda button { margin-top: 4px; padding: 5px 14px; border: 1px solid var(--bd2); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.pp-toast.error { background: #b3261e; color: #fff; max-width: 520px; }
 .pp-cas { margin: 10px 0 4px; padding: 8px 12px; border: 1px solid var(--bd2); border-radius: 8px; } .pp-cas legend { font-size: 12px; padding: 0 6px; color: var(--ap); } .pp-cas label { display: inline-flex; gap: 6px; align-items: center; margin-right: 18px; } .pp-cas .pp-nota { display: block; margin-top: 4px; }
 .pp-envio { margin: 8px 0 14px; padding-left: 20px; line-height: 1.5; } .pp-envio li { margin: 8px 0; } .pp-envio code { display: block; margin: 6px 0 0; padding: 6px 10px; background: rgba(128,128,128,.14); border-radius: 6px; word-break: break-all; }
 .pp-btn-enlace { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--bd2); border-radius: 6px; color: inherit; text-decoration: none; } select[data-k] { width: 100%; padding: 7px; border: 1px solid var(--bd2); border-radius: 6px; background: transparent; color: inherit; }
@@ -8707,7 +8732,7 @@ td.ult { position: relative; }
   }
   function ppHtml(b64, borrador, titulo) {
     const prop = borrador ? JSON.stringify(borrador).replace(/</g, '\\u003c') : 'null';
-    return `<!doctype html>\n<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="RMD mejoras ${VERSION}"><title>${esc(titulo)}</title><style>${PP_EDITOR_CSS}</style></head>\n<body><div id="app"></div>\n<script id="rmd-datos" type="application/octet-stream">${b64}</script>\n<script id="rmd-borrador" type="application/json">${prop}</script>\n<script>(${ppEditorApp.toString()})((${ppNucleo.toString()})());</script>\n</body></html>`;
+    return `<!doctype html>\n<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="RMD mejoras ${VERSION}"><title>${esc(titulo)}</title><style>${PP_EDITOR_CSS}</style></head>\n<body><div id="app"><div class="pp-cargando">Abriendo el borrador… Si esta pantalla no avanza, abre el archivo con Google Chrome o Microsoft Edge desde la carpeta donde lo guardaste (no desde la vista previa del correo ni de Teams).<noscript><br>Para usarlo hay que tener JavaScript activado.</noscript></div></div>\n<script id="rmd-datos" type="application/octet-stream">${b64}</script>\n<script id="rmd-borrador" type="application/json">${prop}</script>\n<script>(${ppEditorApp.toString()})((${ppNucleo.toString()})());</script>\n</body></html>`;
   }
   async function ppGenerar(codigo, op = {}) {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'), avisar = op.avisar || (() => {});
@@ -8728,14 +8753,36 @@ td.ult { position: relative; }
     return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length } };
   }
   // ---- leer el archivo del borrador (el .html que devuelve Producción; también los de la v1.40, «propuesta») ----
+  // Contenido de un <script id="…"> sin depender del orden de sus atributos ni de las comillas
+  function ppExtraerScript(texto, id) {
+    const re = new RegExp(`<script\\b[^>]*\\bid\\s*=\\s*(["']?)${id}\\1[^>]*>([\\s\\S]*?)<\\/script>`, 'ig'); let m, mejor = null;
+    while ((m = re.exec(texto))) { if (mejor == null || m[2].length > mejor.length) mejor = m[2]; }
+    return mejor;
+  }
+  // Lee el archivo que devuelve Producción: no importa cómo se llame ni de dónde venga; se reconoce por su contenido. Cada problema se explica.
   async function ppLeerBorrador(texto) {
-    const m1 = /<script id="rmd-datos" type="application\/octet-stream">([\s\S]*?)<\/script>/.exec(texto), m2 = /<script id="rmd-(?:borrador|propuesta)" type="application\/json">([\s\S]*?)<\/script>/.exec(texto);
-    if (!m1 || !m2) throw new Error('el archivo no es una plantilla de RMD (¿es el .html que generó «Plantilla para Producción»?)');
-    const datos = await ppDesempacar(m1[1]); let prop = null; try { prop = JSON.parse(m2[1]); } catch (e) { prop = null; }
-    if (!datos || datos.tipo !== 'plantilla-rmd') throw new Error('el archivo no trae una plantilla de RMD válida');
-    if (!prop || !['borrador-rmd', 'propuesta-rmd'].includes(prop.tipo) || !prop.trabajo) throw new Error('la plantilla todavía no tiene un borrador guardado (Producción debe usar «Guardar borrador»)');
-    if (!prop.base || prop.base.huella !== datos.huella) throw new Error('el borrador no corresponde a esta plantilla');
+    texto = String(texto == null ? '' : texto).replace(/^\uFEFF/, '');
+    if (!/rmd-datos/i.test(texto)) throw new Error('el archivo no es un borrador de Producción (no contiene los datos de un RMD). Debe ser el .html que se guardó con «Guardar borrador»');
+    const b64 = ppExtraerScript(texto, 'rmd-datos');
+    if (b64 == null || b64.trim().length < 200) throw new Error('el archivo está incompleto: termina antes de los datos del RMD (¿se cortó la descarga o el correo lo recortó?). Pide a Producción que lo envíe otra vez como adjunto');
+    let datos; try { datos = await ppDesempacar(b64.replace(/\s+/g, '')); } catch (e) { throw new Error('los datos del RMD están dañados (¿lo modificó un programa de correo, un antivirus o se abrió y guardó con otro programa?). Pide a Producción que vuelva a guardar el borrador desde Chrome o Edge'); }
+    if (!datos || datos.tipo !== 'plantilla-rmd' || !datos.arbol || !datos.rmd) throw new Error('el archivo no trae una plantilla de RMD válida');
+    const crudo = ppExtraerScript(texto, 'rmd-borrador'); const crudo2 = crudo == null ? ppExtraerScript(texto, 'rmd-propuesta') : crudo;
+    if (crudo2 == null) throw new Error('el archivo no trae la parte del borrador: la plantilla todavía no tiene un borrador guardado (Producción debe usar «Guardar borrador» y enviar ese archivo, no la plantilla vacía)');
+    let prop; try { prop = JSON.parse(crudo2.trim()); } catch (e) { throw new Error('la parte del borrador está dañada. Pide a Producción que lo guarde otra vez'); }
+    if (!prop) throw new Error('la plantilla todavía no tiene un borrador guardado (Producción debe usar «Guardar borrador»)');
+    if (!['borrador-rmd', 'propuesta-rmd'].includes(prop.tipo) || !prop.trabajo || !Array.isArray(prop.trabajo.estructuras)) throw new Error('el borrador no tiene el formato esperado (¿se editó a mano?)');
+    if (+prop.formato > 1) throw new Error('el borrador lo guardó una versión más nueva del script: actualiza el script e inténtalo de nuevo');
+    if (!prop.base || prop.base.huella !== datos.huella) throw new Error('el borrador no corresponde a esta plantilla (¿se mezclaron archivos de distintas versiones?)');
     return { datos, prop };
+  }
+  // ¿Este archivo es un borrador? Se decide por su contenido, no por su nombre ni extensión (se puede renombrar, quedar como .txt o sin extensión)
+  async function ppArchivoValido(f) {
+    if (!f) return { error: 'no se eligió ningún archivo' };
+    if (f.size > 80 * 1048576) return { error: 'el archivo pesa demasiado para ser un borrador' };
+    if (f.size < 1000) return { error: 'el archivo está vacío o es muy pequeño' };
+    let texto; try { texto = await f.text(); } catch (e) { return { error: 'no se pudo leer el archivo: ' + e.message }; }
+    return /rmd-datos/i.test(texto) ? { texto } : { error: 'no es un borrador de Producción (debe ser el .html que se guardó con «Guardar borrador»)' };
   }
   // Une filas de dos versiones del mismo master por estructura, etiqueta y código de paso (las versiones tienen filas nuevas)
   function ppMapear(base, otro) {
@@ -8854,9 +8901,15 @@ td.ult { position: relative; }
     cod.addEventListener('keydown', (e) => { if (e.key === 'Enter') bGen.click(); }); setTimeout(() => cod.focus(), 30);
   }
   function elegirBorrador() {
-    const i = document.createElement('input'); i.type = 'file'; i.accept = '.html,.htm,text/html';
-    i.addEventListener('change', async () => { const f = i.files && i.files[0]; if (f) abrirImportarBorrador(await f.text(), f.name); });
+    const i = document.createElement('input'); i.type = 'file'; i.multiple = true;                  // sin filtro de tipo: el archivo puede venir renombrado
+    i.addEventListener('change', async () => { await abrirArchivos([...(i.files || [])]); });
     i.click();
+  }
+  // Abre el primer archivo que sea un borrador (también varios soltados a la vez); si ninguno lo es, dice por qué
+  async function abrirArchivos(lista) {
+    if (!lista.length) return;
+    const errores = []; for (const f of lista) { const r = await ppArchivoValido(f); if (r.texto) { abrirImportarBorrador(r.texto, f.name); return; } errores.push(`${f.name}: ${r.error}`); }
+    toast(`No se abrió ningún borrador. ${errores.slice(0, 2).join(' · ')}`, true);
   }
   async function abrirImportarBorrador(texto, nombreArchivo) {
     const v = ventana('Borrador de Producción', { cancelar: () => v.cerrar() });
@@ -8904,11 +8957,11 @@ td.ult { position: relative; }
   // soltar el archivo del borrador sobre la lista principal lo abre
   document.addEventListener('dragover', (e) => { if (on('plantillaprod') && e.dataTransfer && [...(e.dataTransfer.items || [])].some((i) => i.kind === 'file') && controladorPrincipal() && !dialogos().length) e.preventDefault(); });
   document.addEventListener('drop', async (e) => {
-    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (!on('plantillaprod') || !f || !/\.html?$/i.test(f.name) || !/borrador|propuesta|plantilla/i.test(f.name) || dialogos().length || !controladorPrincipal()) return;
-    e.preventDefault(); abrirImportarBorrador(await f.text(), f.name);
+    const fs = e.dataTransfer && e.dataTransfer.files && [...e.dataTransfer.files];
+    if (!on('plantillaprod') || !fs || !fs.length || dialogos().length || !controladorPrincipal() || document.querySelector('.rmd-modal-fondo')) return;
+    e.preventDefault(); abrirArchivos(fs);
   });
-  window.__rmdStats.plantilla = { ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
+  window.__rmdStats.plantilla = { archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
   // ---- Ingreso automático del borrador (v1.42; v1.43: pasos nuevos, equipos, predecesores, marcas y «Deshacer») ----
   // «Ingresar en SAP…» (en la ventana del borrador importado) deja el RMD Ingresado como el borrador, con las mismas escrituras que hace el
   // portal (leídas de su código y comprobadas simulando): agregar pasos y procesos menores = actualización profunda de MD_ESTRUCTURA
@@ -8939,7 +8992,8 @@ td.ult { position: relative; }
     const plan0 = {}, bloqueos = [], avisos = [], manual = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);
-    if (an.enSap.length) bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
+    if (an.enSap.length) { bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
+      try { await ppDiarioCargar(); const g = PP_MARCAS.ingresos.find((y) => y.mdId === dest.mdId && y.borrador && y.borrador === prop.guardado && !y.deshecho); if (g) bloqueos.push(`Parece que este mismo borrador ya se ingresó el ${new Date(g.fecha).toLocaleString('es-PE')}${g.usuario ? ' (' + g.usuario + ')' : ''}.`); } catch (e) { /* sin diario */ } }
     const errores = [...an.avisos.values()].flat().filter((a) => a.nivel === 'error').length; if (errores) bloqueos.push(`El borrador tiene ${errores} dato(s) por corregir marcados con ✕.`);
     if (!an.cambios.length) bloqueos.push('El borrador no trae cambios.');
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
@@ -9302,7 +9356,7 @@ td.ult { position: relative; }
     };
     const guardar = async (simular, diario, dif) => {
       if (simular || !diario.some((x) => x.estado === 'hecho')) return;
-      const entrada = { id: ppUuid(), mdId: an.destino.mdId, codigo: an.destino.codigo, version: an.destino.version, fecha: new Date().toISOString(), usuario, solicitud: (prop.solicitud || {}).nombre || '', ops: diario.map((d) => ({ n: d.n, desc: d.desc, estado: d.estado, accion: d.accion, inv: d.inv, paralelo: !!d.paralelo })), marcas: diario.filter((d) => d.estado === 'hecho' && d.marca).map((d) => [d.marca.id, d.marca.tipo]), comprobacion: dif };
+      const entrada = { id: ppUuid(), borrador: prop.guardado || '', mdId: an.destino.mdId, codigo: an.destino.codigo, version: an.destino.version, fecha: new Date().toISOString(), usuario, solicitud: (prop.solicitud || {}).nombre || '', ops: diario.map((d) => ({ n: d.n, desc: d.desc, estado: d.estado, accion: d.accion, inv: d.inv, paralelo: !!d.paralelo })), marcas: diario.filter((d) => d.estado === 'hecho' && d.marca).map((d) => [d.marca.id, d.marca.tipo]), comprobacion: dif };
       est.entrada = entrada; await ppDiarioGuardar(entrada);
     };
     const correr = async (simular) => {
