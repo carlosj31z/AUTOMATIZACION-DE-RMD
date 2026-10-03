@@ -845,6 +845,10 @@ with sync_playwright() as p:
               and len(r["conflictos"]) == 1 and "P11" not in r["conflictos"][0] and "cambió en SAP y en el borrador" in r["conflictos"][0] and r["t2"] == ["P20:P20 CAMBI"] and r["com"] == "Revisar con el jefe."
               and r["eq"][0] == "Q1(q)" and r["eq"][-1] == "n:6" and any(x.startswith("paso|agregar|n:1|") for x in r["cambios"]) and any(x.startswith("paso|quitar|P12") for x in r["cambios"]))
         return ok, json.dumps(r, ensure_ascii=False)[:1700]
+    @prueba("LN34 Elementos de baja (v1.47): solo MONT y AEQS (accesorio) no son baja; PTBO, NOAC y similares sí; sin estado no se marca")
+    def _():
+        r = pg.evaluate("() => { const f = window.__rmdStats.bajas.equipoDeBaja; return ['MONT-Montado', 'AEQS-Asignado al equipo superior', 'PTBO-Petición de borrado', 'NOAC-Objeto no activo', '', undefined].map((x) => f(x)); }")
+        return r == [False, False, True, True, False, False], json.dumps(r)
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")

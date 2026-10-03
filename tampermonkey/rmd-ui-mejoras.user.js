@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.46.1
+// @version      1.47.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.46.1';                                                       // mantener igual a @version
+  const VERSION = '1.47.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -53,6 +53,7 @@
     ['plantillaprod', 'Plantilla para Producción: archivo .html con la hoja del PDF para que Producción deje su borrador de cambios sin SAP (con búsqueda de pasos existentes) e importarlo como plan de ingreso en un RMD Ingresado'],
     ['historialcambios', 'Historial de cambios en «Trazabilidad RMD»: qué cambió entre versiones y, por paso, cada guardado con su usuario (desde la auditoría del servicio), con Excel'],
     ['recetasauto', 'Cambios de recetas: revisarlos solos en segundo plano (las listas de los Ingresados cada 3 h y las de los Autorizados cada 24 h, poco a poco; apagado, solo con «Revisar»)'],
+    ['bajas', 'Elementos dados de baja: al entrar a la configuración de un RMD Ingresado avisa qué pasos, procesos menores, utensilios y equipos están de baja en SAP (equipo = estado distinto de MONT-Montado) y los resalta en amarillo en sus listas; no cambia el PDF'],
     ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
@@ -263,6 +264,14 @@
   .rmd-ing-res { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; padding: 12px 16px; border-radius: 10px; } .rmd-ing-res b { font-size: 17px; } .rmd-ing-res.ok { background: rgba(46,160,67,.16); } .rmd-ing-res.mal { background: rgba(224,160,0,.2); }
   .rmd-ing-aviso { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; padding: 7px 12px; border-radius: 8px; background: rgba(155,107,214,.16); border-left: 4px solid #9b6bd6; font-size: 12.5px; } .rmd-ing-aviso .rmd-btn { margin-left: 6px; }
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
+  /* v1.47: elementos dados de baja */
+  .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-bajas-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #f0b400; color: #1d2733; font: 700 14px/22px var(--rmd-fuente); text-align: center; animation: rmd-baja-pulso 2.4s ease-in-out 2; }
+  .rmd-bajas-aviso button { margin-left: auto; padding: 2px 10px; border: 1px solid rgba(240,180,0,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; } .rmd-bajas-aviso button:hover { background: rgba(240,180,0,.25); }
+  @keyframes rmd-baja-pulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(240,180,0,.6); } 50% { box-shadow: 0 0 0 7px rgba(240,180,0,0); } }
+  tr.rmd-baja > td { background-image: linear-gradient(rgba(255,214,0,.2), rgba(255,214,0,.2)); } tr.rmd-baja > td:first-child { border-left: 4px solid #f0b400 !important; }
+  .rmd-modal.rmd-adv { width: min(640px, 94vw); border-top: 3px solid #f0b400; } .rmd-modal.rmd-adv h3 { display: flex; align-items: center; gap: 10px; } .rmd-modal.rmd-adv h3::before { content: '!'; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; background: #f0b400; color: #1d2733; font: 700 16px/26px var(--rmd-fuente); text-align: center; }
+  .rmd-adv-lista { margin: 8px 0; padding-left: 20px; max-height: 45vh; overflow: auto; } .rmd-adv-lista li { margin: 6px 0; } .rmd-adv-donde { display: block; font-size: 11.5px; opacity: .65; } .rmd-adv-motivo { display: inline-block; margin-top: 2px; padding: 0 8px; border-radius: 9px; background: rgba(240,180,0,.25); font: 700 11px/18px var(--rmd-fuente); }
   .rmd-pp-conf { display: block; margin: 10px 0 4px; }
   .rmd-ing-conf { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 14px; margin: 12px 0 4px; padding: 14px 18px; border: 2px solid var(--rmd-acento); border-radius: 10px; background: var(--rmd-fondo-modal, #1d2733); font-size: 14px; cursor: pointer; box-shadow: 0 -6px 14px rgba(0,0,0,.25); }
   .rmd-ing-conf input { width: 26px; height: 26px; flex: 0 0 auto; cursor: pointer; accent-color: var(--rmd-verde); } .rmd-ing-conf.marcada { border-color: var(--rmd-verde); } .rmd-ing-conf:not(.marcada) { animation: rmd-ing-pulso 2s ease-in-out infinite; }
@@ -806,6 +815,7 @@
     // la conocen los usuarios; solo se revisa el orden de sus estructuras.
     if (/^Estructura de RMD\b/i.test(norm((barraDeLista(tabla) || {}).textContent))) {
       d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla);
+      try { avisoBajasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoBajasRaiz: ' + e.message); }
       try { avisoReglasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoReglasRaiz: ' + e.message); }
       return;
     }
@@ -1475,7 +1485,7 @@
     gestionarBotonesLista();
     gestionarRecetasAsociar();
     // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
-    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector].forEach((f) => {
+    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
     gestionarTextosMayusculas();
@@ -6500,11 +6510,12 @@
   async function leerTextosRmd(modelo, md) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new Filtro('mdId_mdId', 'EQ', md.mdId)], t0 = Date.now();
     const activo = (x) => x && x.activo !== false;
-    const [pasos, etiquetas, pms, equipos] = await Promise.all([
+    const [pasos, etiquetas, pms, equipos, utensilios] = await Promise.all([
       leerTodoDe(modelo, 'MD_ES_PASO', porMd, { $expand: 'pasoId,mdEstructuraId,mdEstructuraId/estructuraId' }),
       leerTodoDe(modelo, 'MD_ES_ETIQUETA', porMd, { $expand: 'etiquetaId' }),
       leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', porMd, { $expand: 'pasoHijoId' }),
       leerTodoDe(modelo, 'MD_ES_EQUIPO', porMd, { $expand: 'equipoId' }).catch(() => []),
+      leerTodoDe(modelo, 'MD_ES_UTENSILIO', porMd, { $expand: 'utensilioId' }).catch(() => []),
     ]);
     const etq = new Map(etiquetas.filter(activo).map((e) => [e.mdEsEtiquetaId, e]));
     const pmsDe = new Map(); pms.filter(activo).filter((x) => x.pasoHijoId).forEach((x) => { const k = x.pasoId_mdEstructuraPasoId; if (!pmsDe.has(k)) pmsDe.set(k, []); pmsDe.get(k).push(x); });
@@ -6517,21 +6528,25 @@
         o1: +est.orden || 0, o2: e ? +e.orden || 0 : 0, pasos: [] });
       listas.get(clave).pasos.push(p);
     });
-    const r = { rmd: md.codigo, mdId: md.mdId, listas: [], textos: [], pasos: 0, pms: 0 };
+    const r = { rmd: md.codigo, mdId: md.mdId, listas: [], textos: [], pasos: 0, pms: 0, bajas: [], equiposRaw: [] };
     [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2 || a.lista.localeCompare(b.lista)).forEach((l, il) => {
       const info = { lista: l.lista, pasos: l.pasos.length, pms: 0 };
       l.pasos.sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((p, k) => {
         const pp = obj(p.pasoId), lugar = { lista: l.lista, paso: String(p.orden != null ? p.orden : k + 1), codigoPaso: String(pp.codigo || ''), descPaso: norm(pp.descripcion), pm: '', codigoPM: '', descPM: '' };
         r.textos.push({ texto: lugar.descPaso, esPM: false, lista: l.lista, lugar, il });
+        if (+pp.estadoId_iMaestraId === 1) r.bajas.push({ tipo: 'Paso', donde: l.lista, codigo: lugar.codigoPaso, desc: lugar.descPaso, motivo: 'DE BAJA' });
         (pmsDe.get(p.mdEstructuraPasoId) || []).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((q) => {
           const h = obj(q.pasoHijoId), lq = { ...lugar, pm: String(q.orden != null ? q.orden : ''), codigoPM: String(h.codigo || ''), descPM: norm(h.descripcion) };
           info.pms++; r.pms++; r.textos.push({ texto: lq.descPM, esPM: true, lista: l.lista, lugar: lq, il });
+          if (+h.estadoId_iMaestraId === 1) r.bajas.push({ tipo: 'Proceso menor', donde: `${l.lista} › paso ${lugar.codigoPaso}`, codigo: lq.codigoPM, desc: lq.descPM, motivo: 'DE BAJA' });
         });
       });
       r.pasos += info.pasos; r.listas.push(info);
     });
     r.equipos = equipos.filter(activo).sort((a, b) => (+a.orden || 0) - (+b.orden || 0))
       .map((x) => { const e = obj(x.equipoId); return { orden: x.orden, codigo: norm(e.CodigoGaci || ''), sap: sinCeros(e.equnr), desc: norm(e.denom || e.eqktx || '') }; });
+    utensilios.filter(activo).forEach((u) => { const x = obj(u.utensilioId); if (+x.estadoId_iMaestraId === 1) r.bajas.push({ tipo: 'Utensilio', donde: 'Equipos / instrumentos / materiales', codigo: norm(x.codigo), desc: norm(x.descripcion), motivo: 'DE BAJA' }); });
+    r.equiposRaw = equipos.filter(activo).map((x) => { const e = obj(x.equipoId); return { equnr: sinCeros(e.equnr), codigo: norm(e.CodigoGaci || ''), desc: norm(e.denom || e.eqktx || ''), estat: norm(e.estat || '') }; });
     r.segundos = Math.max(1, Math.round((Date.now() - t0) / 1000));
     return r;
   }
@@ -6543,6 +6558,81 @@
     p.catch(() => { const x = textosRmd.get(md.mdId); if (x && x.p === p) textosRmd.delete(md.mdId); });
     return p;
   }
+  // ---- Elementos dados de baja (BPD n.º 6): aviso al entrar a la configuración de un RMD Ingresado ----
+  // Paso, proceso menor o utensilio de baja = estado «De Baja» en su catálogo; equipo de baja = su estado en SAP (ERP, lectura del portal) es distinto de
+  // «MONT-Montado» (se exceptúa «AEQS-Asignado al equipo superior», que es un accesorio y no una baja). Es solo un aviso: no cambia el PDF ni impide autorizar. Se resalta en amarillo la fila en las listas del RMD.
+  const BAJAS = { erp: new Map(), avisados: new Set(), t: 0 };
+  function estadosEquiposErp(ctrl, swerk) {
+    const g = BAJAS.erp.get(String(swerk)); if (g && Date.now() - g.t < 3600000) return g.p;
+    const erp = ctrl && ctrl.oModelErpNec; if (!erp || !swerk) return Promise.resolve(null);
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, reg = { t: Date.now(), mapa: null };
+    reg.p = new Promise((ok) => erp.read('/EquipoSet', { filters: [new F('Swerk', 'EQ', String(swerk)), new F('Eqtyp', 'EQ', '')], success: (r) => { reg.mapa = new Map((r.results || []).map((x) => [sinCeros(x.Equipment), norm(x.Txt30)])); ok(reg.mapa); }, error: () => ok(null) }));
+    BAJAS.erp.set(String(swerk), reg); reg.p.then((m) => { if (!m) BAJAS.erp.delete(String(swerk)); }); return reg.p;
+  }
+  const equipoDeBaja = (estado) => !!estado && !/^(MONT|AEQS)-/i.test(estado.trim());      // (AEQS = asignado al equipo superior: un accesorio, no una baja)
+  function bajasDelRmd(base, mapaErp) {
+    const items = base.bajas.slice();
+    (base.equiposRaw || []).forEach((q) => { const estado = (mapaErp && mapaErp.get(q.equnr)) || q.estat; if (equipoDeBaja(estado)) items.push({ tipo: 'Equipo', donde: 'Equipos / instrumentos / materiales', codigo: q.codigo || q.equnr, desc: q.desc, motivo: estado }); });
+    return items;
+  }
+  function resumenBajas(items) { const n = (t) => items.filter((x) => x.tipo === t).length, p = (c, s, pl) => (c ? `${c} ${c > 1 ? pl : s}` : ''); return [p(n('Paso'), 'paso', 'pasos'), p(n('Proceso menor'), 'proceso menor', 'procesos menores'), p(n('Utensilio'), 'utensilio', 'utensilios'), p(n('Equipo'), 'equipo', 'equipos')].filter(Boolean).join(', '); }
+  function abrirAdvertenciaBajas(md, items) {
+    const v = ventana('Advertencia', { cancelar: () => v.cerrar() }); v.fondo.querySelector('.rmd-modal').classList.add('rmd-adv');
+    const linea = (x) => `<li><b>${esc(x.tipo)}</b> ${esc(x.codigo ? x.codigo + ' · ' : '')}${esc(x.desc)}<span class="rmd-adv-donde">${esc(x.donde || '')}</span><span class="rmd-adv-motivo">${esc(x.motivo)}</span></li>`;
+    v.cuerpo.innerHTML = `<p>El máster <b>${esc(md.codigo)}</b> contiene los siguientes elementos en estado <b>DE BAJA</b>:</p><ul class="rmd-adv-lista">${items.slice(0, 60).map(linea).join('')}${items.length > 60 ? `<li>… y ${items.length - 60} más</li>` : ''}</ul>
+      <p class="rmd-nota">Es solo un aviso: revisa si deben reemplazarse antes de autorizar. Las filas de baja quedan resaltadas en amarillo en las listas del RMD.</p>`;
+    v.pie.append(botonModal('Entendido', 'primario', () => v.cerrar())); window.__rmdStats.advertenciaBajas = { items: items.length };
+    setTimeout(() => { const b = v.pie.querySelector('button'); if (b) b.focus(); }, 40);
+  }
+  function pintarAvisoBajas(d, tabla) {
+    const x = d.__rmdBajas; let a = d.querySelector('.rmd-bajas-aviso');
+    if (!x || !x.items.length) { if (a) a.remove(); return; }
+    if (!a) { a = document.createElement('div'); a.className = 'rmd-bajas-aviso'; a.setAttribute('role', 'status'); tabla.insertAdjacentElement('beforebegin', a); a.addEventListener('click', (e) => { if (e.target.closest('button')) { e.stopPropagation(); abrirAdvertenciaBajas(x.md, d.__rmdBajas.items); } }); }
+    const t = `<span class="rmd-bajas-ico" aria-hidden="true">!</span><span><b>${x.items.length} elemento${x.items.length > 1 ? 's' : ''} DE BAJA</b> en este máster: ${esc(resumenBajas(x.items))}${x.erp ? '' : ' <i>(estado de equipos según la última copia del RMD)</i>'}</span><button type="button">Ver detalle</button>`;
+    if (a.innerHTML !== t) a.innerHTML = t;
+  }
+  function avisoBajasRaiz(d, tabla) {
+    const quitar = () => { d.querySelectorAll('.rmd-bajas-aviso').forEach((x) => x.remove()); d.__rmdBajasFirma = ''; d.__rmdBajas = null; };
+    if (typeof sap === 'undefined' || !on('bajas')) { if (d.__rmdBajasFirma || d.querySelector('.rmd-bajas-aviso')) quitar(); return; }
+    const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
+    if (!md || !md.mdId || !modelo) return;
+    if (+md.estadoIdRmd_iMaestraId !== 467) { if (d.__rmdBajasFirma || d.querySelector('.rmd-bajas-aviso')) quitar(); return; }   // (solo en RMD Ingresados)
+    const firma = `${md.mdId}|${generacionRmd}`, prev = d.__rmdBajasFirma || '';
+    if (prev !== firma && dialogos().pop() === d) {
+      d.__rmdBajasFirma = firma;
+      Promise.all([textosDelRmd(modelo, md, prev.startsWith(md.mdId + '|') ? 0 : 60000), estadosEquiposErp(controladorPrincipal(), md.sucursalId && md.sucursalId.codigo)]).then(([base, mapa]) => {
+        if (!d.isConnected || d.__rmdBajasFirma !== firma) return;
+        const items = bajasDelRmd(base, mapa); d.__rmdBajas = { items, erp: !!mapa, md };
+        window.__rmdStats.bajasRaiz = { rmd: md.codigo, total: items.length, porTipo: items.reduce((o, x) => { o[x.tipo] = (o[x.tipo] || 0) + 1; return o; }, {}), erp: !!mapa, equipos: (base.equiposRaw || []).length };
+        pintarAvisoBajas(d, tabla);
+        if (items.length && !BAJAS.avisados.has(md.mdId)) { BAJAS.avisados.add(md.mdId); abrirAdvertenciaBajas(md, items); }
+      }, () => { /* sin conexión: queda sin aviso hasta el próximo cambio */ });
+    } else if (d.__rmdBajas && !d.querySelector('.rmd-bajas-aviso')) pintarAvisoBajas(d, tabla);
+  }
+  // filas de baja resaltadas en las listas del RMD (pasos, procesos menores, utensilios y equipos)
+  function gestionarBajasFilas() {
+    if (typeof sap === 'undefined') return;
+    if (!on('bajas')) { document.querySelectorAll('.rmd-baja').forEach((tr) => { tr.classList.remove('rmd-baja'); if (/^De baja/.test(tr.title || '')) tr.removeAttribute('title'); }); return; }
+    if (Date.now() - BAJAS.t < 500) return; BAJAS.t = Date.now();
+    const ctrl = controladorPrincipal(), md = ctrl && ctrl.getView().getModel('asociarDatos') && ctrl.getView().getModel('asociarDatos').getData(); if (!md) return;
+    const ing = +md.estadoIdRmd_iMaestraId === 467, reg = BAJAS.erp.get(String(md.sucursalId && md.sucursalId.codigo)), mapa = reg && reg.mapa;
+    const objCargado = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null);
+    dialogos().forEach((dlg) => {
+      const tabla = dlg.querySelector('table.sapMListTbl'); if (!tabla || !/^\d+\s/.test(cabecera(dlg))) return;
+      tabla.querySelectorAll('tbody tr:not(.sapMListTblSubRow)').forEach((tr) => {
+        let motivo = '';
+        if (ing) { const o = objetoDeFila(tr); if (o) {
+          const m = objCargado(o.pasoHijoId) || objCargado(o.pasoId), u = objCargado(o.utensilioId), q = objCargado(o.equipoId);
+          if (m && m.codigo !== undefined && +m.estadoId_iMaestraId === 1) motivo = 'DE BAJA';
+          else if (u && +u.estadoId_iMaestraId === 1) motivo = 'DE BAJA';
+          else if (q) { const e = (mapa && mapa.get(sinCeros(q.equnr))) || norm(q.estat || ''); if (equipoDeBaja(e)) motivo = e; }
+          else if (o.equipoId_equipoId) { const e = (mapa && mapa.get(sinCeros(o.codigo))) || norm(o.estado || ''); if (equipoDeBaja(e)) motivo = e; }
+        } }
+        tr.classList.toggle('rmd-baja', !!motivo); if (motivo) tr.title = `De baja en SAP: ${motivo}`; else if (/^De baja/.test(tr.title || '')) tr.removeAttribute('title');
+      });
+    });
+  }
+  window.__rmdStats.bajas = { equipoDeBaja, bajasDelRmd, resumen: resumenBajas };
   // Aviso en la ventana del RMD: advertencias de las reglas en todo el RMD (pasos y procesos menores de todas las listas) y las
   // reglas "Debe estar presente" que no se cumplen. Se revisa al abrir el RMD, al volver a él (cerrada una lista: pudo cambiar
   // algo) y al cambiar las reglas o la lista de vigentes.
@@ -9628,7 +9718,7 @@ td.ult { position: relative; }
     ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'plantillaprod', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
     ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
     ['Asociar fórmulas', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta']],
-    ['Alertas', ['reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],
+    ['Alertas', ['bajas', 'reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],
   ];
   function panel() {
     const etiqueta = Object.fromEntries(OPC);
