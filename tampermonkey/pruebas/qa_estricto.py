@@ -1961,13 +1961,13 @@ with sync_playwright() as p:
             versiones: t && t.E.linaje ? t.E.linaje.versiones.map(m => m.codigo + ' v' + m.version + ' ' + m.estado) : null, hasta: t && t.E.linaje && t.E.hasta ? t.E.linaje.versiones.find(m => m.mdId === t.E.hasta).codigo : null,
             desde: t && t.E.linaje && t.E.desde ? t.E.linaje.versiones.find(m => m.mdId === t.E.desde).codigo : null, cambios: t && t.E.cambios ? t.E.cambios.length : null, error: t && t.E.error, selects: p ? p.querySelectorAll('select').length : 0 }; }"""
         try:
-            @prueba("P1 «Trazabilidad RMD»: la pestaña «Trazabilidad» es la original (su tabla de estados, ventana sin cambiar de tamaño y sin leer nada); «Cambios entre versiones» agranda la ventana SIN salirse de la pantalla (el pie con Cerrar queda a la vista), oculta la tabla original y compara sola con la versión anterior del linaje")
+            @prueba("P1 «Trazabilidad RMD»: la pestaña «Trazabilidad» es la original (su tabla de estados, ventana sin cambiar de tamaño y sin leer nada); «Diferencia entre versiones» agranda la ventana SIN salirse de la pantalla (el pie con Cerrar queda a la vista), oculta la tabla original y compara sola con la versión anterior del linaje")
             def _():
                 abrir_traz(COD_P, tab=None)
                 a = fr.evaluate(ESTADO_P, TOP_P)
                 fr.evaluate("(t) => document.querySelector('.rmd-tz [data-t=' + t + ']').click()", "ver"); fr.evaluate(ESPERA_P)
                 e = fr.evaluate(ESTADO_P, TOP_P)
-                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Cambios entre versiones", "Historial de guardados"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
+                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Historial de versiones", "Diferencia entre versiones", "Historial post autorización"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
                       and a["cambios"] is None and bool(e) and e["agrandada"] and not e["nativaVisible"] and e["pieVisible"] and e["top"] >= 0 and e["bottom"] <= e["vh"] and e["ancho"] >= 1000
                       and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
                 return ok, f"original={a} comparando={e}"
@@ -1987,12 +1987,12 @@ with sync_playwright() as p:
                 ok = (r["nB"] - r["nA"] == r["ag"] - r["qu"] and r["tiposValidos"] and r["sinUsuario"] == 0 and r["soloPasos"] == min(1500, r["todosPasos"]) and r["vacio"] == 0 and r["total"] > 0
                       and r["filas"] == min(1500, r["filas"]))
                 return ok, str(r)
-            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Cambios entre versiones / Historial de guardados / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
+            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Historial de versiones / Diferencia entre versiones / Historial post autorización / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
             def _():
                 x = fr.evaluate("""async () => { const r = window.__rmdStats.trazabilidad.panel().excel(), b = await r.libro.generar(); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
                   return { nombre: r.nombre, cambios: r.cambios, filas: r.filas, n: window.__rmdStats.trazabilidad.panel().E.cambios.length, b64: btoa(s) }; }""")
                 z, hojas = xlsx_p(x.pop("b64")); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
-                ok = hojas == ["Cambios entre versiones", "Historial de guardados", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
+                ok = hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
                 return ok, f"{x}; hojas={hojas}"
             @prueba("P4 Historial de guardados (auditoría): lista la cabecera y todos los pasos de la versión; al cargar la cabecera el último guardado es de quien figura en el RMD (mismo usuario, misma hora), y los pasos cargados salen en orden, con usuario, sin errores")
             def _():

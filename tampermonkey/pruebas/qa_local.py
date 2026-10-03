@@ -650,7 +650,7 @@ with sync_playwright() as p:
         ok = (r["paso"] == [["AA", True, []], ["BB", False, ["Orden:1>2"]], ["BB", False, []], ["CC", False, ["Tab:No>Sí", "Depende del paso:(no registrado)>123", "Tipo Dato:Números>Texto", "Val. Inicial:1>(vacío)"]]]
               and r["cab"] == [["AA", []], ["AA", ["Observaciones (línea agregada):>c", "Estado del proceso:Sin iniciar>En proceso"]], ["DD", ["Observaciones (línea quitada):b>"]]] and r["parseados"] == [2, 3])
         return ok, json.dumps(r, ensure_ascii=False)
-    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Cambios entre versiones, Historial de guardados, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
+    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Historial de versiones, Diferencia entre versiones, Historial post autorización, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
     def _():
         r = pg.evaluate(TZ_DATOS_JS.replace("return { T, A, B, cat }; }", """const c = T.comparar(A, B), h = [{ rotulo: 'PROCEDIMIENTO › FABRICACION › Paso 100', entradas: [{ ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [{ campo: 'Tab', antes: 'No', despues: 'Sí' }, { campo: 'Orden', antes: '1', despues: '2' }] }, { ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [] }] }];
           const x = T.excel({ codigo: '2202600002', descripcion: 'PRODUCTO NUEVO', cambios: c, comparacion: 'v2 → v3', historial: h, estados: [['Ingresado', '28/09/2026 03:26:22', 'JQUISPEP']] });
@@ -659,7 +659,7 @@ with sync_playwright() as p:
         z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64"))))
         hojas = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
         compartidas = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
-        ok = (hojas == ["Cambios entre versiones", "Historial de guardados", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
+        ok = (hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
               and "el registro al autorizar" in compartidas and "Guardado sin cambios" in compartidas and "JQUISPEP" in compartidas)
         return ok, f"{r}; hojas={hojas}"
     @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
