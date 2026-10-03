@@ -328,7 +328,10 @@
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
   .rmd-btn.exito { background: #2e7d32; border-color: #2e7d32; color: #fff; } .rmd-btn.exito:hover { background: #276c2b; }
   .rmd-btn.ambar { background: #b26a00; border-color: #b26a00; color: #fff; } .rmd-btn.ambar:hover { background: #995b00; } .rmd-btn.ambar:disabled { opacity: .45; }
-  .rmd-formula-orden { display: inline-flex; gap: 6px; margin: 0 10px; } .rmd-formula-orden .rmd-btn { height: 30px; padding: 0 10px; }
+  .rmd-formula-orden { display: inline-flex; margin: 0 10px; } .rmd-chev { display: inline-grid; place-items: center; width: 32px; height: 28px; padding: 0; border: 1px solid var(--rmd-acento); background: transparent; color: var(--rmd-acento-texto); cursor: pointer; transition: background .15s, transform .12s; }
+  .rmd-chev:first-child { border-radius: 6px 0 0 6px; } .rmd-chev:last-child { border-radius: 0 6px 6px 0; border-left: 0; } .rmd-chev:hover { background: rgba(27,141,236,.18); } .rmd-chev:active { transform: scale(.92); }
+  .rmd-chev svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  td.rmd-grip-td { position: relative; padding-left: 26px !important; }
   .rmd-revisor { display: inline-block; vertical-align: middle; margin: 2px 0 2px 6px; text-align: left; font-size: 11.5px; line-height: 1.25; color: var(--rmd-apagado); white-space: pre-line; }   /* junto al icono si cabe; si no, debajo */
   .sapMListTbl td:has(> .rmd-revisor) > .sapMBtn { vertical-align: middle; }
   .rmd-borrar-recetas { margin: 0 8px; height: 30px; }
@@ -399,6 +402,20 @@
   .rmd-grip:hover { color: var(--rmd-acento-texto); background: rgba(27,141,236,.14); } .rmd-grip:active { cursor: grabbing; }
   .rmd-grip svg { width: 10px; height: 16px; fill: currentColor; pointer-events: none; }
   tr.rmd-espec-mod > td.sapMListTblSelCol { box-shadow: inset 3px 0 0 var(--rmd-ambar); }
+  .rmd-espec-lapiz { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--rmd-acento-texto); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+  .rmd-espec-lapiz:hover { background: rgba(27,141,236,.16); border-color: var(--rmd-acento); } .rmd-espec-lapiz:active { transform: scale(.92); } .rmd-espec-lapiz svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  td.rmd-ed-desc > .rmd-espec-lapiz { position: absolute; top: 3px; right: 4px; width: 26px; height: 26px; }
+  tr.rmd-recien-movida > td { animation: rmd-movida 1.4s ease-out; } @keyframes rmd-movida { 0% { background: rgba(27,141,236,.38); } 100% { background: transparent; } }
+  .rmd-modal.rmd-espec-form { width: min(720px, 94vw); padding: 0; border-top: 3px solid var(--rmd-acento); animation: rmd-pop .16s ease-out; } .rmd-espec-form h3 { margin: 0; padding: 16px 24px; font-size: 18px; border-bottom: 1px solid var(--rmd-borde-campo); }
+  .rmd-espec-form .rmd-modal-cuerpo { padding: 14px 24px 4px; display: grid; gap: 12px; } .rmd-espec-form .rmd-modal-pie { padding: 12px 24px 16px; }
+  .rmd-espec-form label { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: start; color: var(--rmd-apagado); font: 13px var(--rmd-fuente); } .rmd-espec-form label > span { padding-top: 7px; } .rmd-espec-form label > span.req::after { content: ' *'; color: var(--rmd-rojo); }
+  .rmd-espec-form input, .rmd-espec-form textarea { box-sizing: border-box; width: 100%; padding: 6px 10px; background: var(--rmd-barra); color: var(--rmd-texto); border: 1px solid var(--rmd-borde-campo); border-radius: 4px; font: 14px/1.4 var(--rmd-fuente); resize: vertical; }
+  .rmd-espec-form input:focus, .rmd-espec-form textarea:focus { outline: 2px solid var(--rmd-acento); outline-offset: -1px; } .rmd-espec-form input[readonly] { opacity: .65; cursor: default; }
+  .rmd-espec-form .rmd-espec-vals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .rmd-espec-form .rmd-espec-vals small { display: block; color: var(--rmd-apagado); font-size: 11px; margin-bottom: 2px; }
+  .rmd-espec-form .rmd-nota { margin: 0; color: var(--rmd-apagado); font-size: 12px; }
+  .rmd-modal.rmd-modal-exito { border-top: 3px solid var(--rmd-verde); animation: rmd-pop .16s ease-out; } .rmd-modal-exito .rmd-aviso-ico { background: rgba(60,200,120,.18); color: var(--rmd-verde); }
+  .rmd-modal.rmd-modal-confirma { border-top: 3px solid var(--rmd-acento); } .rmd-modal-confirma .rmd-aviso-ico { background: rgba(27,141,236,.18); color: var(--rmd-acento-texto); font: 700 22px var(--rmd-fuente); }
+  @keyframes rmd-pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
   tr.rmd-arrastrando { opacity: .4; } tr.rmd-drop-antes > td { box-shadow: inset 0 2px 0 var(--rmd-acento); } tr.rmd-drop-despues > td { box-shadow: inset 0 -2px 0 var(--rmd-acento); }
   .rmd-copia-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
   .rmd-nuevo-paso-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; margin-left: 10px; vertical-align: middle; }
@@ -1239,6 +1256,7 @@
     e.model.setData(arr);
     e.ctl.removeSelections(true);
     e.ctl.getItems().forEach((it, i) => { if (mover.includes(arr[i])) it.setSelected(true); });
+    setTimeout(() => e.ctl.getItems().forEach((it, i) => { const tr = it.getDomRef(); if (tr && mover.includes(arr[i])) { tr.classList.remove('rmd-recien-movida'); void tr.offsetWidth; tr.classList.add('rmd-recien-movida'); } }), 80);
   }
   function moverFilas(d, sentido) {
     const e = estadoEspec(d); if (!e || !reordenable(e.datos)) return;
@@ -1337,10 +1355,53 @@
   const ICONO_SUBIR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
   const ICONO_BAJAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4"/></svg>';
   const ICONO_ASA = '<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></svg>';
+  const ICONO_LAPIZ = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5l.7-3L11 2.7a1.2 1.2 0 011.7 0l.6.6a1.2 1.2 0 010 1.7L5.5 12.8l-3 .7z"/><path d="M9.8 3.9l2.3 2.3"/></svg>';
+  // Mensajes con el aspecto del BPD: «Confirmación» (azul, con «?») y «Éxito» (verde, con ✓; se cierra solo)
+  function mensajeEspec(tipo, titulo, texto, botones) {
+    return new Promise((resolve) => {
+      let hecho = false, tm = null;
+      const fin = (v) => { if (hecho) return; hecho = true; clearTimeout(tm); w.cerrar(); resolve(v); };
+      const w = ventana(titulo, { cancelar: () => fin(false) });
+      const tarjeta = w.fondo.querySelector('.rmd-modal'); tarjeta.classList.add('rmd-modal-aviso', tipo === 'exito' ? 'rmd-modal-exito' : 'rmd-modal-confirma'); tarjeta.setAttribute('role', 'alertdialog'); tarjeta.setAttribute('aria-label', titulo);
+      const h3 = tarjeta.querySelector('h3'), cab = document.createElement('div'), ico = document.createElement('span'); cab.className = 'rmd-aviso-cab'; ico.className = 'rmd-aviso-ico';
+      ico.innerHTML = tipo === 'exito' ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '?'; h3.replaceWith(cab); cab.append(ico, h3);
+      const p = document.createElement('p'); p.textContent = texto; w.cuerpo.append(p);
+      if (tipo === 'exito') { const ok = botonModal('Aceptar', 'primario', () => fin(true)); w.pie.append(ok); tm = setTimeout(() => fin(true), 4000); setTimeout(() => ok.focus(), 30); }
+      else { const si = botonModal(botones[0], 'primario', () => fin(true)), no = botonModal(botones[1], '', () => fin(false)); w.pie.append(si, no); setTimeout(() => si.focus(), 30); }
+    });
+  }
+  // Lápiz de cada fila: abre «Modificar Especificaciones» (Ensayo Hijo y Especificaciones editables); Guardar pide confirmación, graba con el Guardar del portal y avisa
+  function abrirModificarEspec(d, tr) {
+    const e = estadoEspec(d), it = tr && sap.ui.getCore().byId(tr.id), c = it && contextoDe(it), fila = c && c.getObject(); if (!e || !fila || document.querySelector('.rmd-espec-form')) return;
+    const lim = limitesEspec(e), cols = [...e.t.querySelectorAll('thead th')].map((th) => NORM(th.textContent)), celda = (n) => tr.children[cols.indexOf(n)];
+    const padre = norm(((tr.querySelector('.sapMObjectIdentifierTitle') || {}).textContent) || ''), slt = celda('TIPO DATO') && celda('TIPO DATO').querySelector('.sapMSlt'), cs = slt && sap.ui.getCore().byId(slt.id), tipo = norm((cs && cs.getSelectedItem && cs.getSelectedItem() && cs.getSelectedItem().getText()) || (celda('TIPO DATO') || {}).textContent || '');
+    const valor = (n) => { const i = celda(n) && celda(n).querySelector('input'); return i ? i.value : ''; };
+    const w = ventana('Modificar Especificaciones', { cancelar: () => w.cerrar() }); w.fondo.querySelector('.rmd-modal').classList.add('rmd-espec-form');
+    w.cuerpo.innerHTML = `<label><span>Ensayo Padre</span><input readonly value="${esc(padre)}"></label>
+      <label><span class="req">Ensayo Hijo</span><input data-c="ensayoHijo" maxlength="${lim.ensayoHijo}" value="${esc(fila.ensayoHijo)}"></label>
+      <label><span class="req">Especificaciones</span><textarea data-c="especificacion" rows="4" maxlength="${lim.especificacion}">${esc(fila.especificacion)}</textarea></label>
+      <label><span>Tipo Dato</span><input readonly value="${esc(tipo)}"></label>
+      <label><span>Valores</span><div class="rmd-espec-vals">${['Valor Inicial', 'Valor Final', 'Margen', 'Decimal'].map((n) => `<div><small>${n}</small><input readonly value="${esc(valor(n.toUpperCase()))}"></div>`).join('')}</div></label>
+      <p class="rmd-nota">El tipo de dato y los valores se cambian directamente en la tabla.</p>`;
+    const [iH, tE] = [w.cuerpo.querySelector('[data-c=ensayoHijo]'), w.cuerpo.querySelector('[data-c=especificacion]')];
+    const guardar = botonModal('Guardar', 'primario', async () => {
+      const hijo = iH.value.replace(/[\r\n]+/g, ' ').trim(), esp = tE.value;
+      if (!hijo) { toast('El Ensayo Hijo no puede quedar vacío.', true); iH.focus(); return; }
+      if (hijo === (fila.ensayoHijo == null ? '' : String(fila.ensayoHijo)) && esp === (fila.especificacion == null ? '' : String(fila.especificacion))) { w.cerrar(); toast('No hay modificaciones que guardar.'); return; }
+      if (!(await mensajeEspec('confirma', 'Confirmación', '¿Está seguro de que desea guardar las modificaciones realizadas?', ['Confirmar', 'Cancelar']))) return;
+      const m = c.getModel(); m.setProperty(c.getPath() + '/ensayoHijo', hijo); m.setProperty(c.getPath() + '/especificacion', esp); w.cerrar(); setTimeout(ajustarTodo, 50);
+      const bt = botonPorTitulo(d, 'Guardar'), ctlG = bt && sap.ui.getCore().byId(bt.id.replace(/-inner$/, ''));
+      if (!ctlG || !ctlG.getEnabled()) { toast('Los cambios quedaron en la lista: pulsa Guardar del portal para grabarlos.'); return; }
+      ctlG.firePress();
+      const listo = await hasta(() => !espEnviando && !Object.keys(pendientesEspec(e.datos)).length, 25000, 250);
+      if (listo) mensajeEspec('exito', 'Éxito', 'La información se guardó correctamente.'); else toast('No se pudo confirmar el guardado. Revisa la lista e inténtalo de nuevo.', true);
+    });
+    w.pie.append(guardar, botonModal('Cancelar', '', () => w.cerrar())); setTimeout(() => iH.focus(), 30);
+  }
   function quitarEdicionEspec(d, t) {
     d.querySelectorAll('.rmd-orden-grupo').forEach((x) => x.remove());
-    (t || d).querySelectorAll('textarea.rmd-edit, .rmd-grip').forEach((x) => x.remove());
-    (t || d).querySelectorAll('.rmd-ed, .rmd-ed-desc, .rmd-espec-mod').forEach((x) => x.classList.remove('rmd-ed', 'rmd-ed-desc', 'rmd-espec-mod'));
+    (t || d).querySelectorAll('textarea.rmd-edit, .rmd-grip, .rmd-espec-lapiz').forEach((x) => x.remove());
+    (t || d).querySelectorAll('.rmd-ed, .rmd-ed-desc, .rmd-espec-mod, .rmd-espec-mod').forEach((x) => x.classList.remove('rmd-ed', 'rmd-ed-desc', 'rmd-espec-mod'));
   }
   function sincronizarEspec(d, t) {
     const e = estadoEspec(d); if (!e) return;
@@ -1395,17 +1456,23 @@
         tdD.appendChild(asa);
       }
       else if (asa && !puede) asa.remove();
+      const tdL = tdD; let lap = tdL && tdL.querySelector(':scope > .rmd-espec-lapiz');
+      if (tdL && !lap) {
+        lap = document.createElement('button'); lap.type = 'button'; lap.className = 'rmd-espec-lapiz'; lap.title = 'Modificar esta especificación'; lap.setAttribute('aria-label', 'Modificar'); lap.innerHTML = ICONO_LAPIZ;
+        ['dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach((ev) => lap.addEventListener(ev, (x) => x.stopPropagation()));
+        lap.addEventListener('click', (x) => { x.stopPropagation(); abrirModificarEspec(d, tr); }); tdL.appendChild(lap);
+      }
     });
   }
 
   let pendiente = false;
-  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila };   // (diagnóstico y pruebas)
+  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec } };   // (diagnóstico y pruebas)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -5124,29 +5191,70 @@
   function listaFormula(d) {
     return [...d.querySelectorAll('.sapMList')].map((x) => sap.ui.getCore().byId(x.id)).find((l) => { const bi = l && l.getBindingInfo && l.getBindingInfo('items'); return bi && bi.path === RUTA_FORMULA; });
   }
-  function moverTermino(d, paso) {
+  // Mueve el término de la posición `de` a la posición `a` (los dos índices de la lista) y rehace el texto de la fórmula
+  function reordenarFormula(d, de, a) {
     const lista = listaFormula(d); if (!lista) return;
-    const bi = lista.getBindingInfo('items'), lm = lista.getModel(bi.model), arr = lm.getProperty(RUTA_FORMULA) || [];
-    const sel = lista.getSelectedItem(); if (!sel) { toast('Marca el término de la fórmula que quieres mover.', true); return; }
-    const i = +String(sel.getBindingContext(bi.model).getPath()).split('/').pop(), j = i + paso;
-    if (isNaN(i) || j < 0 || j >= arr.length) return;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    const bi = lista.getBindingInfo('items'), lm = lista.getModel(bi.model), arr = (lm.getProperty(RUTA_FORMULA) || []).slice();
+    if (de === a || isNaN(de) || isNaN(a) || de < 0 || a < 0 || de >= arr.length || a >= arr.length) return;
+    arr.splice(a, 0, arr.splice(de, 1)[0]);
     lm.setProperty(RUTA_FORMULA, arr); lm.refresh(true);
-    const it = lista.getItems()[j]; if (it) lista.setSelectedItem(it, true);
+    const it = lista.getItems()[a]; if (it) lista.setSelectedItem(it, true);
     const reg = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).map((c) => c && ((c.mEventRegistry || {}).press || [])[0]).find((r) => r && r.oListener && r.oListener._mssgPrintFormula);
     if (reg) reg.oListener._mssgPrintFormula(arr);   // el mismo texto de la fórmula que arma el portal
+    setTimeout(() => { const tr = it && it.getDomRef(); if (tr) { tr.classList.remove('rmd-recien-movida'); void tr.offsetWidth; tr.classList.add('rmd-recien-movida'); } }, 80);
+  }
+  function moverTermino(d, paso) {
+    const lista = listaFormula(d); if (!lista) return;
+    const sel = lista.getSelectedItem(); if (!sel) { toast('Marca el término de la fórmula que quieres mover.', true); return; }
+    const bi = lista.getBindingInfo('items'), i = +String(sel.getBindingContext(bi.model).getPath()).split('/').pop();
+    reordenarFormula(d, i, i + paso);
+  }
+  const ICONO_CHEV_ARRIBA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10.5L8 6l4.5 4.5"/></svg>';
+  const ICONO_CHEV_ABAJO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 5.5L8 10l4.5-4.5"/></svg>';
+  function arrastreFormula(d, lista) {
+    const t = lista.getDomRef() && lista.getDomRef().querySelector('table'); if (!t || t.__rmdDndF) return; t.__rmdDndF = true;
+    let origen = -1;
+    const filaBajo = (e) => e.target.closest && e.target.closest('tr.sapMListTblRow'), indice = (tr) => lista.getItems().findIndex((x) => x.getDomRef() === tr);
+    const limpiar = () => t.querySelectorAll('.rmd-arrastrando, .rmd-drop-antes, .rmd-drop-despues').forEach((x) => x.classList.remove('rmd-arrastrando', 'rmd-drop-antes', 'rmd-drop-despues'));
+    t.addEventListener('dragstart', (e) => {
+      const g = e.target.closest && e.target.closest('.rmd-grip-f'), tr = g && g.closest('tr'); if (!tr) return;
+      origen = indice(tr); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'rmd-formula');
+      try { e.dataTransfer.setDragImage(tr, 24, 16); } catch (x) { /* sin imagen de arrastre */ }
+      setTimeout(() => tr.classList.add('rmd-arrastrando'), 0);
+    });
+    t.addEventListener('dragover', (e) => {
+      const tr = origen >= 0 && filaBajo(e); if (!tr) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const q = tr.getBoundingClientRect(), antes = e.clientY < q.top + q.height / 2;
+      t.querySelectorAll('.rmd-drop-antes, .rmd-drop-despues').forEach((x) => x.classList.remove('rmd-drop-antes', 'rmd-drop-despues')); tr.classList.add(antes ? 'rmd-drop-antes' : 'rmd-drop-despues');
+    });
+    t.addEventListener('drop', (e) => {
+      const tr = origen >= 0 && filaBajo(e); if (!tr) return; e.preventDefault();
+      const j = indice(tr), q = tr.getBoundingClientRect(), antes = e.clientY < q.top + q.height / 2, a = antes ? (j > origen ? j - 1 : j) : (j > origen ? j : j + 1);
+      const de = origen; origen = -1; limpiar(); reordenarFormula(d, de, a);
+    });
+    t.addEventListener('dragend', () => { origen = -1; limpiar(); });
   }
   function gestionarFormulas() {
     const d = typeof sap !== 'undefined' && dialogos().find((x) => /^F[oó]rmulas$/i.test(cabecera(x)));
-    if (!d || !on('formulas')) { document.querySelectorAll('.rmd-formula-orden').forEach((e) => e.remove()); return; }
-    const lista = listaFormula(d); if (!lista) return;
-    const barra = lista.getDomRef() && lista.getDomRef().querySelector('.sapMTB, .sapMListHdr'); if (!barra || barra.querySelector('.rmd-formula-orden')) return;
-    const g = document.createElement('span'); g.className = 'rmd-formula-orden';
-    const sub = botonModal('▲ Subir', '', () => moverTermino(d, -1)), baj = botonModal('▼ Bajar', '', () => moverTermino(d, 1));
-    sub.title = 'Sube el término marcado (Alt+↑). El nuevo orden se graba al pulsar Guardar.'; baj.title = 'Baja el término marcado (Alt+↓). El nuevo orden se graba al pulsar Guardar.';
-    g.append(sub, baj);
-    const ref = barra.querySelector('.sapMTBSeparator') || barra.querySelector('.sapMInputBase'); if (ref) ref.insertAdjacentElement('beforebegin', g); else barra.appendChild(g);
+    if (!d || !on('formulas')) { document.querySelectorAll('.rmd-formula-orden, .rmd-grip-f').forEach((e) => e.remove()); document.querySelectorAll('.rmd-grip-td').forEach((e) => e.classList.remove('rmd-grip-td')); return; }
+    const lista = listaFormula(d); if (!lista || !lista.getDomRef()) return;
+    const barra = lista.getDomRef().querySelector('.sapMTB, .sapMListHdr');
+    if (barra && !barra.querySelector('.rmd-formula-orden')) {
+      const g = document.createElement('span'); g.className = 'rmd-formula-orden', g.setAttribute('role', 'group'); g.setAttribute('aria-label', 'Orden de los términos');
+      const chev = (icono, tit, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-chev'; b.innerHTML = icono; b.title = tit; b.setAttribute('aria-label', tit.split(' (')[0]); b.addEventListener('click', fn); return b; };
+      g.append(chev(ICONO_CHEV_ARRIBA, 'Sube el término marcado (Alt+↑). El nuevo orden se graba al pulsar Guardar.', () => moverTermino(d, -1)), chev(ICONO_CHEV_ABAJO, 'Baja el término marcado (Alt+↓). El nuevo orden se graba al pulsar Guardar.', () => moverTermino(d, 1)));
+      const ref = barra.querySelector('.sapMTBSeparator') || barra.querySelector('.sapMInputBase'); if (ref) ref.insertAdjacentElement('beforebegin', g); else barra.appendChild(g);
+    }
     if (!d.__rmdTeclasFormula) { d.__rmdTeclasFormula = true; d.addEventListener('keydown', (e) => { if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); moverTermino(d, e.key === 'ArrowUp' ? -1 : 1); } }, true); }
+    // asa para arrastrar cada término (como en las estructuras del máster)
+    lista.getItems().forEach((it) => {
+      const tr = it.getDomRef(); if (!tr) return;
+      const td = [...tr.children].find((x) => !/sapMListTblHighlightCell|sapMListTblSelCol|sapMListTblNavCol/.test(x.className)); if (!td || td.querySelector(':scope > .rmd-grip-f')) return;
+      const asa = document.createElement('span'); asa.className = 'rmd-grip rmd-grip-f'; asa.draggable = true; asa.title = 'Arrastra para cambiar la posición'; asa.innerHTML = ICONO_ASA;
+      ['click', 'dblclick', 'mouseup', 'touchend'].forEach((ev) => asa.addEventListener(ev, (x) => x.stopPropagation()));
+      td.classList.add('rmd-grip-td'); td.appendChild(asa);
+    });
+    arrastreFormula(d, lista);
   }
 
   // ---- Producción Estatus: a quién se envió a revisión (v1.25) ----

@@ -697,6 +697,29 @@ with sync_playwright() as p:
                 n2 = fr.evaluate("window.__q.d().length")
                 cerrar_spec()
                 return (bool(av) and "sin guardar" in av["titulo"].lower() and av["botones"] == ["Continuar sin guardar", "Volver"] and n1 == n0 and n2 == n0 and len(dialogos_nativos) == nativos), f"{av and av['titulo']} botones={av and av['botones']} diálogos {n0}->{n1}->{n2}"
+            @prueba("J14 Lápiz de cada fila (v1.47): abre «Modificar Especificaciones» con Ensayo Padre / Hijo / Especificaciones; Guardar pide «¿Está seguro de que desea guardar las modificaciones realizadas?», graba con el Guardar del portal (petición simulada) y avisa «La información se guardó correctamente.»")
+            def _():
+                reabrir_spec()
+                listo, bloqueadas, guardia = cortafuegos_y_stub()
+                if not listo: return False, "no se pudo asegurar el simulador"
+                try:
+                    lapices = fr.evaluate("(" + TOP + ").querySelectorAll('.rmd-espec-lapiz').length")
+                    fr.locator(f"[id='{dlg_id()}'] .rmd-espec-lapiz").first.click(); pg.wait_for_timeout(700)
+                    campos = fr.evaluate("() => { const f = document.querySelector('.rmd-espec-form'); return f && [...f.querySelectorAll('label > span')].map(x => x.textContent) }")
+                    ta = fr.locator(".rmd-espec-form textarea"); ta.click(); ta.press("End"); ta.type(" (PRUEBA J14)")
+                    fr.locator(".rmd-espec-form .rmd-modal-pie button", has_text="Guardar").click(); pg.wait_for_timeout(700)
+                    conf = fr.evaluate("() => { const c = document.querySelector('.rmd-modal-confirma'); return c && c.textContent }")
+                    antes = fr.evaluate("window.__capt.length")
+                    fr.locator(".rmd-modal-confirma .rmd-modal-pie button", has_text="Confirmar").click(); pg.wait_for_timeout(2500)
+                    exito = fr.evaluate("() => { const c = document.querySelector('.rmd-modal-exito'); return c && c.textContent }"); capt = fr.evaluate("window.__capt")
+                    pulsar = fr.evaluate("() => { const b = document.querySelector('.rmd-modal-exito button'); if (b) b.click(); return !!b }")
+                finally:
+                    quitar_stub(guardia)
+                cerrar_spec()
+                con = [c for c in capt if "especificacion" in c["datos"]]
+                ok = (lapices == N and campos and "Ensayo Padre" in campos[0] and conf and "¿Está seguro de que desea guardar las modificaciones realizadas?" in conf and antes == 0 and len(capt) == N
+                      and len(con) == 1 and con[0]["datos"]["especificacion"].endswith("(PRUEBA J14)") and exito and "La información se guardó correctamente." in exito and not bloqueadas)
+                return ok, f"lápices={lapices} campos={campos} peticiones={len(capt)} con_texto={len(con)} bloqueadas={bloqueadas}"
             cerrar_seguro()
             # RMD que no está Ingresado: no se ofrece edición ni reorden (el portal tampoco deja modificarlo)
             ab = abrir_spec(RMD_AUTORIZADO)
@@ -1373,16 +1396,21 @@ with sync_playwright() as p:
             cerrar_seguro()
             RmdAutomation(pg).editor_de_rmd(RMD_EDIT); pg.wait_for_timeout(4000)
             abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "RENDIMIENTO", "Adicionar Pasos RMD"); pg.wait_for_timeout(4000)
-            @prueba("W3 Fórmulas: Subir/Bajar mueve el término marcado y el texto de la fórmula se rehace (en memoria, sin Guardar)")
+            @prueba("W3 Fórmulas: los chevrons ^ v mueven el término marcado y el texto de la fórmula se rehace; arrastrar el asa también reordena (en memoria, sin Guardar)")
             def _():
                 n = fr.evaluate("() => { const d=" + TOPW + "; const b=[...d.querySelectorAll('button')].map(x=>sap.ui.getCore().byId(x.id.replace(/-inner$/,''))).filter(x=>x&&x.mEventRegistry&&x.mEventRegistry.press&&/OpenFormula/.test(String(x.mEventRegistry.press[0].fFunction))&&x.getVisible()&&x.getDomRef()&&x.getDomRef().getClientRects().length); if(!b.length) return 0; b[b.length-1].firePress(); return b.length; }")
                 pg.wait_for_timeout(5000)
                 LEER = "() => { const l=[...document.querySelectorAll('.sapMList')].map(x=>sap.ui.getCore().byId(x.id)).find(l=>l&&l.getBindingInfo&&(l.getBindingInfo('items')||{}).path==='/aListFormulaPasoDisponibleSeleccionados'); window.__lf=l; if(!l) return null; const m=l.getModel(l.getBindingInfo('items').model); return { t: m.getProperty('/aListFormulaPasoDisponibleSeleccionados').map(x=>String(x.codigo)), f: m.getProperty('/formulaText') }; }"
                 a = fr.evaluate(LEER)
                 if not a or len(a["t"]) < 2: return False, f"sin fórmula con 2+ términos (botones={n}) {a}"
-                fr.evaluate("() => window.__lf.setSelectedItem(window.__lf.getItems()[0], true)"); fr.locator(".rmd-formula-orden button", has_text="Bajar").click(); pg.wait_for_timeout(700)
+                fr.evaluate("() => window.__lf.setSelectedItem(window.__lf.getItems()[0], true)"); fr.locator(".rmd-formula-orden button[title^='Baja']").click(); pg.wait_for_timeout(700)
                 d_ = fr.evaluate(LEER)
-                return (d_["t"] == [a["t"][1], a["t"][0]] + a["t"][2:] and d_["f"] != a["f"]), f"antes={a} después={d_}"
+                # arrastre (v1.47): el asa del segundo término se suelta sobre la parte de arriba del primero y vuelve el orden original
+                asas = fr.locator(".rmd-grip-f").count()
+                fr.locator(".rmd-grip-f").nth(1).drag_to(fr.locator(".rmd-grip-f").nth(0).locator("xpath=ancestor::tr"), target_position={"x": 60, "y": 3}); pg.wait_for_timeout(800)
+                e_ = fr.evaluate(LEER)
+                chev = fr.evaluate("() => [...document.querySelectorAll('.rmd-formula-orden .rmd-chev')].map(b => b.getAttribute('aria-label'))")
+                return (d_["t"] == [a["t"][1], a["t"][0]] + a["t"][2:] and d_["f"] != a["f"] and asas == len(a["t"]) and e_["t"] == a["t"] and chev == ["Sube el término marcado", "Baja el término marcado"]), f"antes={a} después={d_} tras arrastrar={e_['t']} asas={asas} chevrons={chev}"
             cerrar_seguro()
             ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_RECS)); pg.wait_for_timeout(3000); ra.configuracion.elegir_accion("Asociar fórmulas"); pg.wait_for_timeout(7000)
             @prueba("W4 Asociar fórmulas: las recetas asociadas se pueden marcar varias y 'Eliminar seleccionadas' las quita de una vez (SIMULADO: onBorrarRecetasAsignada y DMS)")
