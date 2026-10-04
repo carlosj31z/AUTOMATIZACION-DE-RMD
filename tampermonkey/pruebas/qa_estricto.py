@@ -1347,7 +1347,7 @@ with sync_playwright() as p:
 
     # ───────────────────────── W. v1.25 (no escribe: escrituras SIMULADAS + cortafuegos) ─────────────────────────
     if "W" in SOLO:
-        RMD_EDIT = os.environ.get("RMD_EDIT", "2202609126"); FILA_EDIT = int(os.environ.get("FILA_EDIT", "18"))   # fila de Fabricación con un paso usado en otro RMD Ingresado
+        RMD_EDIT = os.environ.get("RMD_EDIT", "2202609212"); FILA_EDIT = int(os.environ.get("FILA_EDIT", "18"))   # fila de Fabricación con un paso usado en otro RMD Ingresado
         RMD_RECS = os.environ.get("RMD_RECS", "2202609131"); RMD_VIVO = os.environ.get("RMD_VIVO", "2202609126")    # RMD con 2+ recetas · RMD para el PDF en vivo
         RMD_REVISADO = os.environ.get("RMD_REVISADO", "2202609124")                                                    # RMD enviado a revisión (Producción Estatus con jefe)
         TOPW = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x=>x.getClientRects().length).pop()"
@@ -1487,7 +1487,8 @@ with sync_playwright() as p:
                 fr.evaluate("() => { const m = " + CTRL + ".mainModelv2; window.__u0 = m.update; window.__capt = []; m.update = function (ruta, datos, prm) { window.__capt.push({ ruta: String(ruta), datos }); setTimeout(() => prm && prm.success && prm.success({}), 30); }; }")
                 try:
                     fr.locator(".rmd-cambiar-paso").click(); pg.wait_for_timeout(2500)
-                    nota = fr.evaluate("document.querySelector('.rmd-modal .rmd-nota').innerText")
+                    nota = fr.evaluate("(document.querySelector('.rmd-modal .rmd-nota') || {}).innerText || ''")
+                    if not nota: raise Exception(f"no se abrió «Cambiar paso»: el RMD {RMD_EDIT} debe estar Ingresado (no Autorizado ni Suspendido)")
                     fr.locator(".rmd-cp-q").fill("fecha hora inicio"); fr.locator(".rmd-cp-q").press("Enter"); pg.wait_for_timeout(4000)
                     fr.locator(".rmd-cp-res tbody tr").first.click(); pg.wait_for_timeout(300)
                     fr.locator(".rmd-modal-pie button", has_text="Cambiar paso").click(); pg.wait_for_timeout(700)
