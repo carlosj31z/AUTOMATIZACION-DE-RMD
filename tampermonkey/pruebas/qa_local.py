@@ -849,6 +849,44 @@ with sync_playwright() as p:
     def _():
         r = pg.evaluate("() => { const f = window.__rmdStats.bajas.equipoDeBaja; return ['MONT-Montado', 'AEQS-Asignado al equipo superior', 'PTBO-Petición de borrado', 'NOAC-Objeto no activo', '', undefined].map((x) => f(x)); }")
         return r == [False, False, True, True, False, False], json.dumps(r)
+    @prueba("LN35 Orbes de espera (v1.48): los 7 estados se pintan en 20 y 64 px; un mensaje con «…» lleva su orbe (64 px si es la espera principal) según su verbo, cambiar el texto no lo quita y al terminar se va; la ventana ocupada más de 1,2 s muestra el brillo del borde y se apaga sola; los tres puntos del portal pasan a ser un orbe; sin orbes el ciclo de dibujo se detiene; apagar la opción lo retira todo")
+    def _():
+        r = pg.evaluate("""async () => {
+          const O = window.__rmdStats.orbes, esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+          const pinta = ['working', 'searching', 'solving', 'listening', 'connecting', 'composing', 'breathing'].map((e) => [20, 64].every((t) => { const c = O.orbe(e, t); document.body.appendChild(c);
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0 ? 1 : 0; c.remove(); return n > 10; }));
+          const estados = ['Leyendo SAP… página 2 de 9', 'Buscando…', 'Revisando el RMD en SAP…', 'Esperando a Status RMD…', 'Armando el Excel con 10 master…', 'Suspendiendo 1 de 3: 2202609126…'].map(O.estadoDeEspera);
+          const f = document.createElement('div'); f.className = 'rmd-modal-fondo';
+          f.innerHTML = '<div class="rmd-modal"><h3>Prueba</h3><div class="rmd-modal-cuerpo"><p class="rmd-progreso rmd-espera">Leyendo los pasos…</p><p class="rmd-progreso chico"></p></div><div class="rmd-modal-pie"></div></div>';
+          document.body.appendChild(f); await esperar(250);
+          const p = f.querySelector('.rmd-progreso.rmd-espera'), chico = f.querySelector('.chico');
+          const a = { orbe: !!p.querySelector(':scope > canvas.rmd-orbe-64'), clase: p.className, texto: p.textContent, alto: Math.round(p.getBoundingClientRect().height) };
+          chico.textContent = 'Comparando 3 de 9…'; await esperar(150);
+          const oc = chico.querySelector('canvas.rmd-orbe'), b = { tam: oc ? oc.__orbe.tam : 0, estado: oc ? oc.__orbe.estado : '' };
+          p.querySelector('.rmd-orbe-txt').textContent = 'Leyendo los pasos… 40 de 80'; await esperar(120);
+          const mismo = p.querySelector('canvas.rmd-orbe') !== null;
+          await esperar(1300);
+          const be = f.querySelector('.rmd-modal > .rmd-beam'), c = { beam: !!be && be.hasAttribute('data-active'), anim: be ? getComputedStyle(be).animationName : '' };
+          p.querySelector('.rmd-orbe-txt').textContent = 'Listo: 12 documentos.'; chico.querySelector('.rmd-orbe-txt').textContent = 'Hecho.'; await esperar(200);
+          const d1 = { orbes: f.querySelectorAll('canvas.rmd-orbe').length, clase: p.className, texto: p.textContent, apagando: !!f.querySelector('.rmd-beam[data-fading]') };
+          await esperar(800); const d2 = { beam: !!f.querySelector('.rmd-beam') };
+          const bi = document.createElement('div'); bi.className = 'sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig'; bi.style.cssText = 'position: fixed; left: 100px; top: 100px; width: 300px; height: 200px'; bi.innerHTML = '<div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div>';
+          document.body.appendChild(bi); await esperar(200);
+          const e = { orbe: !!bi.querySelector('canvas.rmd-orbe-64'), puntos: getComputedStyle(bi.querySelector('.sapUiLocalBusyIndicatorAnimation')).display, centro: (() => { const o = bi.querySelector('canvas.rmd-orbe').getBoundingClientRect(), z = bi.getBoundingClientRect(); return [Math.round(o.left + o.width / 2 - (z.left + z.width / 2)), Math.round(o.top + o.height / 2 - (z.top + z.height / 2))]; })() };
+          f.remove(); bi.remove(); await esperar(200);
+          const g = { vivos: O.vivos(), ciclo: O.ciclo() };
+          return { pinta, estados, a, b, mismo, c, d1, d2, e, g };
+        }""")
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(150)
+        pg.locator("#rmd-ui-panel input[data-k=orbes]").click(); pg.wait_for_timeout(300)
+        apagada = pg.evaluate("""async () => { const x = document.createElement('p'); x.className = 'rmd-progreso'; x.textContent = 'Leyendo…'; document.body.appendChild(x); await new Promise((ok) => setTimeout(ok, 250));
+          const r = { orbe: !!x.querySelector('canvas'), clase: document.documentElement.classList.contains('rmd-orbes') }; x.remove(); return r; }""")
+        pg.locator("#rmd-ui-panel input[data-k=orbes]").click(); pg.wait_for_timeout(300)
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = false")
+        ok = (all(r["pinta"]) and r["estados"] == ["searching", "searching", "solving", "listening", "composing", "working"] and r["a"]["orbe"] and "rmd-espera-on" in r["a"]["clase"] and r["a"]["texto"] == "Leyendo los pasos…" and r["a"]["alto"] >= 160
+              and r["b"] == {"tam": 20, "estado": "solving"} and r["mismo"] and r["c"]["beam"] and "beam-spin" in r["c"]["anim"] and r["d1"]["orbes"] == 0 and "rmd-con-orbe" not in r["d1"]["clase"] and r["d1"]["texto"] == "Listo: 12 documentos."
+              and r["d1"]["apagando"] and not r["d2"]["beam"] and r["e"]["orbe"] and r["e"]["puntos"] == "none" and r["e"]["centro"] == [0, 0] and r["g"] == {"vivos": 0, "ciclo": False} and apagada == {"orbe": False, "clase": False})
+        return ok, json.dumps({**r, "apagada": apagada}, ensure_ascii=False)[:1500]
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
