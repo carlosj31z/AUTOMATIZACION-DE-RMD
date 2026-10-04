@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.48.0
+// @version      1.49.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.48.0';                                                       // mantener igual a @version
+  const VERSION = '1.49.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -23,7 +23,7 @@
     ['filtro', 'Filtro local en las listas de pasos (por texto, código u orden)'], ['copiar', 'Copiar / Pegar la configuración de un paso en uno o varios pasos'], ['asociar', 'Asociar fórmulas: avisar códigos distintos a la versión anterior y validar la 1ª línea de Observaciones'],
     ['singuardar', 'Avisar cambios sin guardar + Ctrl+S'], ['exito', 'Cerrar solos los mensajes de éxito'], ['espec', 'Especificaciones: reordenar filas y editar sus textos'],
     ['sesion', 'Prolongar la sesión (clic automático en "Continuar trabajando" y sin el error del refresco automático al volver)'],
-    ['orbes', 'Animaciones modernas: orbes en las esperas del portal y del script, un brillo en el borde de la ventana que está trabajando y en el buscador Ctrl+K'],
+    ['orbes', 'Animaciones modernas: un orbe distinto por tipo de espera (portal y script), brillo en el borde de la ventana que trabaja y en Ctrl+K, y transiciones suaves en ventanas, avisos, pestañas y copiar'],
     ['nuevopaso', 'Botón "Nuevo Paso" al adicionar pasos (abre Configuración Maestra)'],
     ['pasominusculas', 'Pasar a minúsculas: botón "En minúsculas" en pasos y procesos menores (crea el paso en minúsculas con "Nuevo Paso" ya lleno; al crearlo, código copiado y opción de reemplazarlo en la fila) y botón "Aa" en la Descripción de "Nuevo Paso" / "Editar Paso"'],
     ['verop', 'Ver OP: ver todas (rápido), filtrar por columna y exportar a CSV'],
@@ -101,9 +101,13 @@
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const faseDe = (x) => String(x).split('…')[0].replace(/[\d.,:~]+/g, '#');
   const setTxt = (el, t) => {
     if (!el) return; const s = el.classList && el.classList.contains('rmd-con-orbe') ? el.querySelector(':scope > .rmd-orbe-txt') : null;   // (mensaje con su orbe de espera: solo cambia el texto)
-    if (s) { if (s.textContent !== t) s.textContent = t; } else if (el.textContent !== t) el.textContent = t;
+    if (!s) { if (el.textContent !== t) el.textContent = t; return; }
+    if (s.textContent === t) return;
+    const otraFase = faseDe(s.textContent) !== faseDe(t); s.textContent = t; if (s.dataset.texto != null) s.dataset.texto = t;
+    if (otraFase) { s.classList.remove('rmd-texto-entra'); void s.offsetWidth; s.classList.add('rmd-texto-entra'); }   // (otra fase: el texto entra deslizándose; los contadores no)
   };
   const visible = (e) => !!e && e.getClientRects().length > 0;                   // (offsetParent es null en elementos con position:fixed)
   const enDialogo = (el) => el.closest && el.closest('.sapMDialog:not(.sapMMessageDialog)');
@@ -572,14 +576,49 @@
   /* ── Orbes de espera (thinking-orbs) y brillo en el borde de las ventanas ocupadas (border-beam) ── */
   canvas.rmd-orbe { display: inline-block; flex: 0 0 auto; vertical-align: middle; } canvas.rmd-orbe-20 { width: 20px; height: 20px; } canvas.rmd-orbe-64 { width: 64px; height: 64px; }
   .rmd-con-orbe { display: flex; align-items: center; gap: 8px; } .rmd-espera-mini.rmd-con-orbe { display: inline-flex; gap: 5px; } .rmd-espera-mini > canvas.rmd-orbe { width: 16px; height: 16px; }
-  .rmd-con-orbe.rmd-espera-on { flex-direction: column; justify-content: center; gap: 14px; min-height: 170px; margin: 6px 0; text-align: center; color: var(--rmd-apagado); font-size: 13.5px; animation: rmd-orbe-entra .35s ease-out; }
-  @keyframes rmd-orbe-entra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .rmd-con-orbe.rmd-espera-on { flex-direction: column; justify-content: center; gap: 14px; min-height: 170px; margin: 6px 0; text-align: center; color: var(--rmd-apagado); font-size: 13.5px; animation: rmd-espera-entra .35s ease-out; }
+  @keyframes rmd-espera-entra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   html.rmd-orbes .sapUiLocalBusyIndicator.rmd-orbe-sap > .sapUiLocalBusyIndicatorAnimation { display: none !important; }
   html.rmd-orbes .sapUiLocalBusyIndicator.rmd-orbe-sap { overflow: visible !important; } html.rmd-orbes .sapUiLocalBusyIndicator.rmd-orbe-sap:focus::after { border-color: transparent !important; }   /* (el recuadro punteado del foco no cruza el orbe) */ .sapUiLocalBusyIndicator > canvas.rmd-orbe { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
   html.rmd-orbes .sapMBusyDialog, html.rmd-orbes .sapMBusyDialog .sapMDialogSection, html.rmd-orbes .sapMBusyDialog .sapMDialogScroll, html.rmd-orbes .sapMBusyDialog .sapMDialogScrollCont, html.rmd-orbes .sapMBusyDialog .sapMBusyIndicator, html.rmd-orbes .sapMBusyDialog .sapUiLocalBusy { overflow: visible !important; }
   html.rmd-orbes .rmd-alerta-rec.leyendo > svg, .rmd-status-rmd.rmd-enviando > svg { display: none; } .rmd-alerta-rec > canvas.rmd-orbe { width: 16px; height: 16px; }
   .rmd-modal, .rmd-op-caja { position: relative; } .rmd-op-caja { border-radius: 12px; }
   .rmd-beam[data-beam] { position: absolute; inset: -1px; z-index: 4; pointer-events: none; } .rmd-paleta-caja { position: relative; }
+  /* ── Transiciones como las de libraries.dev: curva de salida suave, fundidos con desenfoque ── */
+  html { --rmd-curva: cubic-bezier(.22, 1, .36, 1); --rmd-brillo-txt: #ffffff; } html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-brillo-txt: #0d0d0d; }
+  canvas.rmd-orbe { animation: rmd-orbe-entra .32s var(--rmd-curva) both; } canvas.rmd-orbe.rmd-sin-entrada { animation: none; }
+  @keyframes rmd-orbe-entra { from { opacity: 0; scale: .25; filter: blur(4px); } }
+  canvas.rmd-orbe.rmd-orbe-sale { animation: rmd-orbe-sale .26s var(--rmd-curva) forwards; } @keyframes rmd-orbe-sale { to { opacity: 0; scale: .25; filter: blur(4px); } }
+  .rmd-con-orbe:not(.rmd-espera-on) > canvas.rmd-orbe.rmd-orbe-sale { width: 0 !important; margin-right: -8px; transition: width .26s var(--rmd-curva), margin-right .26s var(--rmd-curva); }
+  .rmd-texto-entra { animation: rmd-texto-entra .22s ease-out both; } @keyframes rmd-texto-entra { from { opacity: 0; translate: 0 6px; filter: blur(2px); } }
+  .rmd-orbe-txt[data-texto] { position: relative; }
+  .rmd-orbe-txt[data-texto]::before { content: attr(data-texto); position: absolute; inset: 0; pointer-events: none; color: transparent; -webkit-text-fill-color: transparent;
+    background: linear-gradient(90deg, transparent 40%, var(--rmd-brillo-txt) 50%, transparent 60%) no-repeat 100% 0 / 400% 100%; -webkit-background-clip: text; background-clip: text; animation: rmd-brillo-txt 2s linear infinite; animation-delay: var(--rmd-fase, 0s); }
+  @keyframes rmd-brillo-txt { to { background-position: 0 0; } }
+  .rmd-vivo-espera.rmd-progreso { position: absolute; inset: 0; margin: 0; color: #e6e6e6; }
+  @property --beam-hue-base { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+  .rmd-beam[data-beam] { transition: --beam-hue-base .7s var(--rmd-curva); } .rmd-beam[data-fin="ok"] { --beam-hue-base: -110deg; } .rmd-beam[data-fin="mal"] { --beam-hue-base: 165deg; }
+  .rmd-con-ind { position: relative; isolation: isolate; }
+  .rmd-ind { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: -1; opacity: 0; pointer-events: none; border-radius: 14px; background: var(--rmd-acento); transition: transform .28s var(--rmd-curva), width .28s var(--rmd-curva), height .28s var(--rmd-curva), opacity .18s; }
+  .rmd-ind.rmd-ind-linea { border-radius: 2px; }
+  .rmd-cr-chips.rmd-con-ind > button.activo { background: transparent; border-color: transparent; }
+  .rmd-rg-tabs.rmd-con-ind > button.activa, .rmd-mm-modos.rmd-con-ind > button.activo { border-bottom-color: transparent; }
+  .rmd-ico-swap { display: inline-grid; place-items: center; } .rmd-ico-swap > svg { grid-area: 1 / 1; transition: opacity .3s var(--rmd-curva), scale .3s var(--rmd-curva), filter .3s var(--rmd-curva); }
+  .rmd-ico-swap > .rmd-ico-ok { opacity: 0; scale: .25; filter: blur(4px); color: var(--rmd-verde); }
+  .rmd-copiado .rmd-ico-swap > svg:not(.rmd-ico-ok) { opacity: 0; scale: .25; filter: blur(4px); } .rmd-copiado .rmd-ico-swap > .rmd-ico-ok { opacity: 1; scale: 1; filter: none; }
+  .rmd-modal-fondo { animation: rmd-fundido .18s ease-out both; } .rmd-modal { animation: rmd-surge .26s var(--rmd-curva) both; }
+  @keyframes rmd-fundido { from { opacity: 0; } } @keyframes rmd-surge { from { opacity: 0; scale: .97; filter: blur(3px); } }
+  .rmd-menu, .rmd-rec-detalle { animation: rmd-surge .2s var(--rmd-curva) both; transform-origin: top right; }
+  #rmd-ui-panel[open] > :not(summary) { animation: rmd-surge .24s var(--rmd-curva) both; transform-origin: bottom left; }
+  .rmd-toast, .rmd-creado { animation: rmd-sube .3s var(--rmd-curva) both; } .rmd-toast.rmd-sale { animation: rmd-baja .2s ease-in forwards; }
+  @keyframes rmd-sube { from { opacity: 0; translate: 0 10px; filter: blur(3px); } } @keyframes rmd-baja { to { opacity: 0; translate: 0 6px; filter: blur(3px); } }
+  .rmd-ing-cards > .rmd-ing-card { animation: rmd-sube .36s var(--rmd-curva) both; }
+  .rmd-ing-cards > .rmd-ing-card:nth-child(2) { animation-delay: 40ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(3) { animation-delay: 80ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(4) { animation-delay: 120ms; }
+  .rmd-ing-cards > .rmd-ing-card:nth-child(5) { animation-delay: 160ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(6) { animation-delay: 200ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(n+7) { animation-delay: 240ms; }
+  @media (prefers-reduced-motion: reduce) {
+    canvas.rmd-orbe, .rmd-texto-entra, .rmd-modal, .rmd-modal-fondo, .rmd-menu, .rmd-rec-detalle, .rmd-toast, .rmd-creado, .rmd-ing-card, #rmd-ui-panel[open] > :not(summary) { animation: none !important; }
+    .rmd-orbe-txt[data-texto]::before { display: none; } .rmd-ind, .rmd-ico-swap > svg { transition: none !important; }
+  }
   @property --beam-angle-rmd {
     syntax: "<angle>";
     initial-value: 0deg;
@@ -2418,7 +2457,7 @@
     gestionarBotonesLista();
     gestionarRecetasAsociar();
     // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
-    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes].forEach((f) => {
+    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
     gestionarTextosMayusculas();
@@ -2816,7 +2855,7 @@
   function toast(txt, error) {
     document.querySelectorAll('.rmd-toast').forEach((x) => x.remove());
     const t = document.createElement('div'); t.className = 'rmd-toast' + (error ? ' error' : ''); t.textContent = txt; document.body.appendChild(t);
-    setTimeout(() => t.remove(), error ? 9000 : 5500);
+    setTimeout(() => { t.classList.add('rmd-sale'); setTimeout(() => t.remove(), 220); }, error ? 9000 : 5500);
   }
   // ---- Orbes de espera (v1.48) ----
   // Las esperas usan los orbes de «thinking-orbs» 0.3.2 (https://libraries.dev/orbs): puntos sobre una esfera que se mueven mientras
@@ -3700,7 +3739,7 @@
     }
     return { resolvePreset, MODE_FRAMES, paintFrame };
   })();
-  const ORBE_ROTULOS = { working: 'Trabajando…', searching: 'Buscando…', solving: 'Analizando…', listening: 'Esperando…', connecting: 'Conectando…', composing: 'Generando…', breathing: 'En espera…' };
+  const ORBE_ROTULOS = { working: 'Trabajando…', searching: 'Buscando…', solving: 'Analizando…', listening: 'Esperando…', connecting: 'Conectando con SAP…', composing: 'Generando…', breathing: 'En espera…', weaving: 'Escribiendo en SAP…', shaping: 'Armando…' };
   const ORBES = { vivos: new Set(), raf: 0, io: null, reducido: window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false } };
   const temaOscuro = () => html.classList.contains('sapUiTheme-sap_fiori_3_dark');
   // Un orbe: 20 px junto a un texto o 64 px para la espera principal de una ventana (son dos diseños distintos, no una escala)
@@ -3738,24 +3777,50 @@
     if (alguno && !document.hidden) ORBES.raf = requestAnimationFrame(cicloOrbes);   // (sin ninguno a la vista el ciclo se detiene)
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden && ORBES.vivos.size && !ORBES.raf) ORBES.raf = requestAnimationFrame(cicloOrbes); });
-  // Qué orbe acompaña cada espera, por el verbo del mensaje («Leyendo…», «Revisando…», «Armando el Excel…»)
-  const estadoDeEspera = (t) => (/busc|leyendo|cargando|consultando|contando/i.test(t) ? 'searching'
-    : /revisando|comprobando|comparando|analizando|calculando|verificando/i.test(t) ? 'solving'
-      : /esperando|procesando|confirma/i.test(t) ? 'listening'
-        : /enviando|conectando/i.test(t) ? 'connecting'
-          : /armando|generando|preparando|creando|redactando|rehaciendo/i.test(t) ? 'composing' : 'working');
+  // Qué orbe acompaña cada espera: uno por tipo de tarea, según el verbo del mensaje
+  //   listening  (onda)          esperar a otro: Status RMD, el portal copiando una versión
+  //   weaving    (trenza)        escribir en SAP: ingreso del borrador, modificaciones masivas, deshacer
+  //   shaping    (forma)         armar una estructura: crear la versión, preparar las escrituras, rehacer el borrador
+  //   solving    (bandas)        revisar, comparar, comprobar
+  //   composing  (cinta)         generar un documento: Excel, PDF, plantilla
+  //   connecting (constelación)  leer de SAP por páginas, la auditoría, tus RMD
+  //   searching  (globo)         buscar o recorrer: pasos, equipos, OP, documentos citados
+  //   breathing  (anillo)        trabajo en segundo plano y las tablas del portal; working (órbitas): lo demás
+  const estadoDeEspera = (t) => (/esperando|procesando en|confirma tu|está copiando/i.test(t) ? 'listening'
+    : /escribiendo|simulando|suspendiendo|agregando la observación|deshaciendo|guardando/i.test(t) ? 'weaving'
+      : /creando la versión|preparando|rehaciendo|comprobando que la copia/i.test(t) ? 'shaping'
+        : /revisando|comprobando|comparando|analizando|calculando|verificando/i.test(t) ? 'solving'
+          : /armando|generando|redactando/i.test(t) ? 'composing'
+            : /\bsap\b|consultando|enviando|conectando|tus rmd|página \d+ de/i.test(t) ? 'connecting'
+              : /busc|leyendo|cargando|contando/i.test(t) ? 'searching' : 'working');
   const ESPERAS = '.rmd-progreso, .rmd-vivo-estado, .rmd-espera-mini, .rmd-paleta-estado';
+  // Las ventanas que se vuelven a pintar (p. ej. Trazabilidad con cada fila cargada) recrean su mensaje: si el orbe es el mismo
+  // de hace un momento, no vuelve a «entrar» (todos comparten el reloj, así que sigue en su punto) y el brillo del texto sigue en fase
+  const ORBE_MEMORIA = new WeakMap();
+  const raizDeOrbe = (el) => el.closest('.rmd-modal, .rmd-tz, .rmd-vivo-panel, .rmd-paleta, .sapMDialog') || document.body;
   function ponerOrbeEn(el, estado, tam) {
     let s = el.querySelector(':scope > .rmd-orbe-txt');
     if (!s) { s = document.createElement('span'); s.className = 'rmd-orbe-txt'; while (el.firstChild) s.appendChild(el.firstChild); el.appendChild(s); }
-    const viejo = el.querySelector(':scope > canvas.rmd-orbe'), nuevo = orbe(estado, tam);
-    if (viejo) viejo.replaceWith(nuevo); else el.insertBefore(nuevo, s);
-    el.classList.add('rmd-con-orbe'); el.classList.toggle('rmd-espera-on', tam === 64);
+    if (!s.children.length) { s.dataset.texto = s.textContent; s.style.setProperty('--rmd-fase', `-${Math.round(performance.now() % 2000)}ms`); }   // (el brillo que recorre el texto)
+    const viejo = el.querySelector(':scope > canvas.rmd-orbe'), nuevo = orbe(estado, tam), r = raizDeOrbe(el), m = ORBE_MEMORIA.get(r);
+    if (!viejo && m && m.estado === estado && m.tam === tam && Date.now() - m.t < 2500) nuevo.classList.add('rmd-sin-entrada');
+    ORBE_MEMORIA.set(r, { estado, tam, t: Date.now() });
+    if (viejo) viejo.replaceWith(nuevo); else el.insertBefore(nuevo, s);   // (otro tipo de tarea: el orbe nuevo entra con un leve desenfoque)
+    el.classList.remove('rmd-orbe-saliendo'); el.classList.add('rmd-con-orbe'); el.classList.toggle('rmd-espera-on', tam === 64);
   }
-  function quitarOrbeDe(el) {
-    const o = el.querySelector(':scope > canvas.rmd-orbe'); if (o) o.remove();
-    const s = el.querySelector(':scope > .rmd-orbe-txt'); if (s) s.replaceWith(...s.childNodes);
-    el.classList.remove('rmd-con-orbe', 'rmd-espera-on');
+  // Al terminar la espera el orbe se encoge y se desenfoca, y el mensaje final entra con un leve desenfoque (como en libraries.dev)
+  function quitarOrbeDe(el, suave) {
+    const o = el.querySelector(':scope > canvas.rmd-orbe'), s = el.querySelector(':scope > .rmd-orbe-txt');
+    if (s) { delete s.dataset.texto; s.style.removeProperty('--rmd-fase'); }
+    const fin = () => {
+      if (suave && !el.classList.contains('rmd-orbe-saliendo')) return;   // (volvió a esperar mientras salía)
+      if (o) o.remove(); const s2 = el.querySelector(':scope > .rmd-orbe-txt'); if (s2) s2.replaceWith(...s2.childNodes);
+      el.classList.remove('rmd-con-orbe', 'rmd-espera-on', 'rmd-orbe-saliendo');
+    };
+    if (!suave || !o || ORBES.reducido.matches) { fin(); return; }
+    el.classList.add('rmd-orbe-saliendo'); o.classList.add('rmd-orbe-sale');
+    if (s) { s.classList.remove('rmd-texto-entra'); void s.offsetWidth; s.classList.add('rmd-texto-entra'); }
+    setTimeout(fin, 270);
   }
   // Brillo que recorre el borde de una ventana mientras trabaja (border-beam: https://libraries.dev/beam, MIT © 2026 Jakub Antalik)
   function brillo() {
@@ -3765,7 +3830,9 @@
   function apagarBrillo(b) { if (!b || b.hasAttribute('data-fading')) return; b.removeAttribute('data-active'); b.setAttribute('data-fading', ''); setTimeout(() => b.remove(), 650); }
   function quitarOrbes() {
     html.classList.remove('rmd-orbes');
-    document.querySelectorAll('.rmd-con-orbe').forEach(quitarOrbeDe);
+    document.querySelectorAll('.rmd-ind').forEach((e) => e.remove()); document.querySelectorAll('.rmd-con-ind').forEach((g) => { g.classList.remove('rmd-con-ind'); delete g.__rmdInd; });
+    document.querySelectorAll('.rmd-vivo-espera').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-con-orbe').forEach((el) => quitarOrbeDe(el));
     document.querySelectorAll('canvas.rmd-orbe, .rmd-beam').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-orbe-sap').forEach((e) => e.classList.remove('rmd-orbe-sap'));
   }
@@ -3773,12 +3840,20 @@
     if (!on('orbes')) { if (html.classList.contains('rmd-orbes') || document.querySelector('canvas.rmd-orbe, .rmd-beam')) quitarOrbes(); return; }
     html.classList.add('rmd-orbes');
     ORBES.vivos.forEach((c) => { if (!c.isConnected) soltarOrbe(c); });   // (los que se quitaron con su ventana)
+    // 0) RMD en vivo: mientras genera el primer PDF, el visor vacío muestra un orbe grande
+    document.querySelectorAll('.rmd-vivo-panel').forEach((p) => {
+      const m = p.querySelector('.rmd-vivo-marco'); if (!m) return;
+      const falta = p.classList.contains('generando') && !m.querySelector('iframe.rmd-vivo-pdf.activo'); let e = m.querySelector(':scope > .rmd-vivo-espera');
+      if (falta && !e) { e = document.createElement('p'); e.className = 'rmd-progreso rmd-espera rmd-vivo-espera'; e.dataset.orbe = 'composing'; e.textContent = 'Generando el PDF del RMD…'; m.appendChild(e); }
+      else if (!falta && e) e.remove();
+    });
     // 1) los mensajes de espera del script: el que dice «…» lleva su orbe (de 64 px si es la espera principal de la ventana)
     document.querySelectorAll(ESPERAS).forEach((el) => {
       const t = norm(el.textContent), espera = /…|\.\.\./.test(t) && !el.classList.contains('error') && !el.hidden;
-      if (!espera) { if (el.classList.contains('rmd-con-orbe')) quitarOrbeDe(el); return; }
+      if (!espera) { if (el.classList.contains('rmd-con-orbe') && !el.classList.contains('rmd-orbe-saliendo')) quitarOrbeDe(el, true); return; }
       const estado = el.dataset.orbe || estadoDeEspera(t), tam = el.classList.contains('rmd-espera') ? 64 : 20, o = el.querySelector(':scope > canvas.rmd-orbe');
-      if (!o || o.__orbe.estado !== estado || o.__orbe.tam !== tam) ponerOrbeEn(el, estado, tam);
+      if (!o || o.__orbe.estado !== estado || o.__orbe.tam !== tam || el.classList.contains('rmd-orbe-saliendo')) ponerOrbeEn(el, estado, tam);
+      else ORBE_MEMORIA.set(raizDeOrbe(el), { estado, tam, t: Date.now() });
     });
     // 2) los tres puntos de espera del portal (la capa a pantalla completa y la ventanita de «Espere»)
     // (el orbe se centra en la zona que espera: el cuadro de los puntos tiene su esquina, no su centro, en el centro de la zona)
@@ -3786,7 +3861,7 @@
       if (z.querySelector(':scope > canvas.rmd-orbe') || !z.querySelector(':scope > .sapUiLocalBusyIndicatorAnimation')) return;
       const ventanita = !!z.closest('.sapMBusyDialog'), grande = ventanita || z.classList.contains('sapUiLocalBusyIndicatorSizeBig');   // (la ventanita «Espere» no tiene caja en el tema oscuro: va el orbe grande)
       if (getComputedStyle(z).position === 'static') z.style.position = 'relative';
-      z.classList.add('rmd-orbe-sap'); z.appendChild(orbe(ventanita ? 'searching' : 'working', grande ? 64 : 20, 'Cargando…'));
+      z.classList.add('rmd-orbe-sap'); z.appendChild(orbe(ventanita ? 'connecting' : grande ? 'working' : 'breathing', grande ? 64 : 20, 'Cargando…'));   // (la ventanita lee de SAP; la capa completa trabaja; las tablas respiran)
     });
     // 3) el aviso de «Cambios de recetas en SAP» mientras revisa en segundo plano
     document.querySelectorAll('.rmd-alerta-rec').forEach((b) => {
@@ -3795,13 +3870,64 @@
     });
     // 4) la ventana que lleva más de 1,2 s esperando algo muestra el brillo en su borde; se apaga sola al terminar
     document.querySelectorAll('.rmd-modal, .rmd-op-caja').forEach((v) => {
-      const ocupada = !ORBES.reducido.matches && !!v.querySelector('canvas.rmd-orbe'), b = v.querySelector(':scope > .rmd-beam');
-      if (!ocupada) { v.__rmdOcupada = 0; apagarBrillo(b); return; }
+      const ocupada = !ORBES.reducido.matches && !!v.querySelector('canvas.rmd-orbe:not(.rmd-orbe-sale)'), b = v.querySelector(':scope > .rmd-beam');
+      if (!ocupada) {
+        v.__rmdOcupada = 0; if (!b || b.dataset.fin) return;
+        if (!b.hasAttribute('data-active')) { apagarBrillo(b); return; }
+        b.dataset.fin = v.querySelector('.rmd-progreso.error') ? 'mal' : 'ok'; setTimeout(() => apagarBrillo(b), 1300);   // (terminó: el brillo toma el color del resultado y se apaga)
+        return;
+      }
+      if (b && b.dataset.fin && !b.hasAttribute('data-fading')) delete b.dataset.fin;   // (volvió a trabajar)
       if (!v.__rmdOcupada) { v.__rmdOcupada = Date.now(); setTimeout(() => { try { gestionarOrbes(); } catch (e) { /* se reintenta en el próximo ajuste */ } }, 1250); return; }
       if (Date.now() - v.__rmdOcupada >= 1200 && (!b || b.hasAttribute('data-fading'))) { if (b) b.remove(); v.appendChild(brillo()); }
     });
   }
-  window.__rmdStats.orbes = { orbe, estadoDeEspera, vivos: () => ORBES.vivos.size, ciclo: () => !!ORBES.raf, motor: MOTOR_ORBES };
+  // ---- Pestañas y filtros con un indicador que se desliza a la elegida (como las pestañas de libraries.dev) ----
+  const GRUPOS_PESTANAS = '.rmd-cr-chips, .rmd-rg-tabs, .rmd-mm-modos';
+  const IND_MEMORIA = new WeakMap();   // ventana → { grupo: posición }: si la ventana se vuelve a pintar, el indicador sale de donde estaba
+  const activaDe = (g) => [...g.children].find((x) => x.tagName === 'BUTTON' && (x.classList.contains('activo') || x.classList.contains('activa')));
+  function colocarIndicador(g, animar) {
+    const ind = g.__rmdInd; if (!ind || !ind.isConnected) return;
+    const b = activaDe(g); if (!b || !b.offsetWidth) { ind.style.opacity = '0'; return; }
+    const linea = ind.classList.contains('rmd-ind-linea'), p = { x: b.offsetLeft, y: linea ? b.offsetTop + b.offsetHeight - 2 : b.offsetTop, w: b.offsetWidth, h: linea ? 2 : b.offsetHeight };
+    const raiz = g.closest('.rmd-modal, .rmd-tz') || document.body; let mem = IND_MEMORIA.get(raiz); if (!mem) IND_MEMORIA.set(raiz, (mem = {}));
+    const antes = !ind.__rmdPuesto && mem[g.__rmdClave];
+    const poner = (q) => { ind.style.transform = `translate(${q.x}px, ${q.y}px)`; ind.style.width = `${q.w}px`; ind.style.height = `${q.h}px`; ind.style.opacity = '1'; };
+    if (ORBES.reducido.matches || (!animar && !antes)) { ind.style.transition = 'none'; poner(p); void ind.offsetWidth; ind.style.transition = ''; }
+    else if (antes) { ind.style.transition = 'none'; poner(antes); void ind.offsetWidth; ind.style.transition = ''; poner(p); }
+    else poner(p);
+    ind.__rmdPuesto = true; mem[g.__rmdClave] = p;
+  }
+  function gestionarPestanas() {
+    if (!on('orbes')) return;
+    document.querySelectorAll(GRUPOS_PESTANAS).forEach((g) => {
+      if (g.__rmdInd && g.__rmdInd.isConnected) return;
+      const linea = !g.classList.contains('rmd-cr-chips'), ind = document.createElement('i'); ind.className = 'rmd-ind' + (linea ? ' rmd-ind-linea' : ''); ind.setAttribute('aria-hidden', 'true');
+      const b = g.querySelector('button'), d = (b && b.dataset) || {};
+      g.__rmdClave = g.className.split(' ')[0] + ':' + (d.t != null ? 't' : d.modo != null ? 'modo' : d.a ? 'a-' + d.a : d.f != null ? 'f' : d.k ? 'k' : 'g');
+      g.prepend(ind); g.__rmdInd = ind; g.classList.add('rmd-con-ind');
+      if (!g.__rmdObs) {
+        g.__rmdObs = true;
+        new MutationObserver(() => requestAnimationFrame(() => colocarIndicador(g, true))).observe(g, { attributes: true, subtree: true, attributeFilter: ['class', 'aria-selected'], childList: true });
+        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => colocarIndicador(g, false)).observe(g);
+      }
+      colocarIndicador(g, false);
+    });
+  }
+  // ---- Copiar: el icono se transforma en ✓ un momento (como el botón de copiar de libraries.dev) ----
+  const ICONO_OK = '<svg class="rmd-ico-ok" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 8.4l2.9 2.9 6.2-6.6"/></svg>';
+  function confirmarCopia(b) {
+    if (!b || !on('orbes')) return;
+    const svg = b.querySelector(':scope > svg, :scope > .rmd-ico-swap');
+    if (svg && !svg.classList.contains('rmd-ico-swap')) { const sw = document.createElement('span'); sw.className = 'rmd-ico-swap'; svg.replaceWith(sw); sw.appendChild(svg); sw.insertAdjacentHTML('beforeend', ICONO_OK); }
+    if (!svg) {   // (botón de solo texto: el texto cambia a «✓ Copiado» y vuelve)
+      if (!b.__rmdTexto) b.__rmdTexto = b.textContent;
+      b.textContent = '✓ Copiado'; b.classList.remove('rmd-texto-entra'); void b.offsetWidth; b.classList.add('rmd-texto-entra');
+    }
+    b.classList.add('rmd-copiado'); clearTimeout(b.__rmdCopiado);
+    b.__rmdCopiado = setTimeout(() => { b.classList.remove('rmd-copiado'); if (b.__rmdTexto) { b.textContent = b.__rmdTexto; b.classList.remove('rmd-texto-entra'); void b.offsetWidth; b.classList.add('rmd-texto-entra'); } }, 1600);
+  }
+  window.__rmdStats.orbes = { orbe, estadoDeEspera, faseDe, setTxt, confirmarCopia, colocarIndicador, vivos: () => ORBES.vivos.size, ciclo: () => !!ORBES.raf, motor: MOTOR_ORBES };
   const resumenCasillas = (c) => Object.entries(c || {}).filter(([, v]) => v).map(([k]) => NOMBRE_CASILLA[k] || k).join(' + ') || 'sin casillas';
   const resumenPaso = (p) => `${p.tipo || '(sin tipo)'}${p.clave ? ' · ' + p.clave : ''}${p.puesto ? ' · ' + p.puesto : ''}${p.dec !== '' && p.dec != null ? ' · dec ' + p.dec : ''} · ${resumenCasillas(p.chk)}`;
 
@@ -3816,7 +3942,7 @@
       const texto = `Copiado: #${portapapeles.paso.orden} ${desc.slice(0, 60)}${desc.length > 60 ? '…' : ''} — ${n} proceso(s) menor(es)`;
       if (sp.dataset.texto !== texto) {
         sp.dataset.texto = texto; sp.innerHTML = '';
-        const t = document.createElement('span'); t.textContent = texto;
+        const t = document.createElement('span'); t.textContent = texto; t.className = 'rmd-texto-entra';
         const x = document.createElement('button'); x.type = 'button'; x.className = 'rmd-clip-x'; x.textContent = '×'; x.title = 'Vaciar el portapapeles';
         x.addEventListener('click', (e) => { e.stopPropagation(); limpiarPortapapeles(); });
         sp.append(t, x);
@@ -3836,7 +3962,7 @@
       toast('Leyendo la configuración y los procesos menores del paso…');
       const pms = botonPM(sel[0]) ? await leerPMsDe(tabla, sel[0].id) : [];
       const rmd = (d.querySelector('h2') || {}).textContent || '';
-      portapapeles = { paso, pms, rmd: norm(rmd).split(' - ')[0], dialogoId: d.id, trId: sel[0].id }; pintarEstadoPortapapeles();
+      portapapeles = { paso, pms, rmd: norm(rmd).split(' - ')[0], dialogoId: d.id, trId: sel[0].id }; pintarEstadoPortapapeles(); confirmarCopia(d.querySelector('.rmd-copiar'));
       const ins = pms.filter((x) => x.insumo).length;
       toast(`Copiado el paso #${paso.orden} con ${pms.length - ins} proceso(s) menor(es)${ins ? ` (${ins} insumo(s) no se copian: se agregan con "Agregar Insumo")` : ''}. Ahora marca uno o varios pasos destino y pulsa "Pegar".`);
     } catch (e) { toast('No se pudo copiar: ' + e.message, true); } finally { ocupadoCopia = false; }
@@ -8215,7 +8341,7 @@
     c.innerHTML = `<b>✓ Paso ${esc(nuevo.codigo)} creado</b><span>${esc(nuevo.descripcion)}</span><span class="rmd-nota rmd-creado-copia">${copiado ? '✓ Código copiado al portapapeles: pégalo en "Código Paso" de Adicionar Pasos.' : `Código: ${esc(nuevo.codigo)} (no se pudo copiar solo: pulsa «Copiar código»).`}</span>
       <div class="rmd-creado-pie">${origen ? `<button type="button" class="rmd-btn primario rmd-creado-reemplazar" title="Cambia solo el paso maestro de esa fila: conserva su configuración${origen.tipo === 'mayor' ? ' y sus procesos menores' : ''}.">Reemplazar ${esc(donde)}</button>` : ''}<button type="button" class="rmd-btn rmd-creado-copiar">Copiar código</button><button type="button" class="rmd-btn rmd-creado-cerrar">Cerrar</button></div>`;
     html.appendChild(c);                                                               // (se queda hasta que la persona la cierre; no tiene temporizador)
-    c.querySelector('.rmd-creado-copiar').addEventListener('click', async (e) => { const ok = await copiarAlPortapapeles(String(nuevo.codigo)); const n = c.querySelector('.rmd-creado-copia'); setTxt(n, ok ? `✓ Código ${nuevo.codigo} copiado al portapapeles.` : 'No se pudo copiar: selecciona el código a mano.'); e.currentTarget.blur(); });
+    c.querySelector('.rmd-creado-copiar').addEventListener('click', async (e) => { const ok = await copiarAlPortapapeles(String(nuevo.codigo)); const n = c.querySelector('.rmd-creado-copia'); if (ok) confirmarCopia(e.currentTarget); setTxt(n, ok ? `✓ Código ${nuevo.codigo} copiado al portapapeles.` : 'No se pudo copiar: selecciona el código a mano.'); e.currentTarget.blur(); });
     c.querySelector('.rmd-creado-cerrar').addEventListener('click', () => c.remove());
     const br = c.querySelector('.rmd-creado-reemplazar');
     if (br) br.addEventListener('click', async () => {
@@ -9820,15 +9946,15 @@
     const opcionesVersion = (sel) => E.linaje.versiones.map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
     function htmlVersionesLista() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
-      if (!E.linaje) return `<p class="rmd-progreso rmd-espera">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
+      if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="searching">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
       const f = filasVersiones(), act = E.linaje.actual;
       return `${ficha(act)}<p class="rmd-tz-resumen">Todas las versiones relacionadas del RMD. «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Descripción</th><th>Versión origen</th><th>Registrada</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(x.version)}</td><td class="rmd-nowrap">${esc(x.estado)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? ' · ' + esc(x.usuario) : ''}</td><td>${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
     }
     function htmlVersiones() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
-      if (!E.linaje) return `<p class="rmd-progreso rmd-espera">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
+      if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="solving">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
       const sel = `${ficha(E.linaje.versiones.find((m) => m.mdId === E.hasta) || E.linaje.actual)}<div class="rmd-tz-sel"><label>Desde <select data-f="desde"><option value="">—</option>${opcionesVersion(E.desde)}</select></label><label>hasta <select data-f="hasta">${opcionesVersion(E.hasta)}</select></label><button type="button" class="rmd-btn" data-a="comparar" ${E.cargando ? 'disabled' : ''}>Comparar</button></div>`;
-      if (E.cargando) return `${sel}<p class="rmd-progreso rmd-espera">${esc(E.cargando)}</p>`;
+      if (E.cargando) return `${sel}<p class="rmd-progreso rmd-espera" data-orbe="solving">${esc(E.cargando)}</p>`;
       if (!E.cambios) return sel;
       if (!E.desde) return `${sel}<p class="rmd-nota">Sin datos: es la primera versión, no hay otra con la que compararla.</p>`;
       const todos = E.cambios, visibles = todos.filter((c) => (E.soloOrden || !c.soloOrden) && (E.seccion === 'Todas' || c.seccion === E.seccion) && (E.tipo === 'Todos' || c.tipo === E.tipo)
@@ -9842,7 +9968,7 @@
     }
     function htmlHistorial() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
-      if (!E.pasosMd) return `<p class="rmd-progreso rmd-espera">${esc(E.cargando || 'Leyendo los pasos del RMD…')}</p>`;
+      if (!E.pasosMd) return `<p class="rmd-progreso rmd-espera" data-orbe="connecting">${esc(E.cargando || 'Leyendo los pasos del RMD…')}</p>`;
       const filas = filasHistorial(E.pasosMd), q = E.pasoConsulta, vis = filas.filter((f) => !q || SIN_ACENTOS(f.rotulo).includes(q)), cargadas = filas.filter((f) => E.hist.has(f.id) && !E.hist.get(f.id).cargando).length;
       const pms = filas.reduce((n, f) => n + (f.hijos ? f.hijos.length : 0), 0);
       const aut = autorizadaEn(), nota = aut ? `Versión autorizada el ${tzCuando(new Date(aut))}: ${soloPost() ? 'se muestran solo los cambios posteriores (ya no deberían hacerse tras autorizar).' : 'se muestran todos los guardados.'}` : 'La versión aún no está autorizada: se muestran todos los guardados.';
@@ -9850,7 +9976,7 @@
         <div class="rmd-cr-barra"><input type="search" class="rmd-cr-buscar" data-f="pasoConsulta" placeholder="Buscar paso o etiqueta" value="${esc(E.pasoConsulta)}">
           <div class="rmd-tz-acc"><label class="rmd-nota"><input type="checkbox" data-f="incluirPm" ${E.incluirPm ? 'checked' : ''}> Incluir procesos menores (${pms}: ≈ 1 s cada uno)</label>
           <button type="button" class="rmd-btn" data-a="todos" ${E.lote ? 'disabled' : ''} title="Unos 2 min para 75 filas; se puede detener">Cargar todas (${filas.length})</button><button type="button" class="rmd-btn" data-a="detener" ${E.lote ? '' : 'hidden'}>Detener</button></div></div>
-        <p class="rmd-progreso">${esc(E.lote ? E.progreso : cargadas ? `${cargadas} de ${filas.length} cargadas` : '')}</p>
+        <p class="rmd-progreso" data-orbe="connecting">${esc(E.lote ? E.progreso : cargadas ? `${cargadas} de ${filas.length} cargadas` : '')}</p>
         <div class="rmd-tz-lista">${vis.map((f) => { const h = E.hist.get(f.id), ab = E.abiertos.has(f.id), n = h && !h.cargando && !h.error ? h.entradas.filter((x) => x.cambios.length && despuesDeAutorizar(x)).length : null;
           return `<div class="rmd-tz-fila ${ab ? 'abierta' : ''}" data-id="${esc(f.id)}"><div class="rmd-tz-fila-cab"><span class="rmd-tz-rotulo">${esc(f.rotulo)}<span class="rmd-nota"> · ${esc(f.sub)}</span></span>
             <span class="rmd-nowrap">${h && h.cargando ? '<span class="rmd-nota rmd-espera-mini">consultando…</span>' : n != null ? `<span class="rmd-cr-tag ${n ? '' : 'dos'}">${n} cambio${n === 1 ? '' : 's'}</span> ` : ''}<button type="button" class="rmd-link" data-a="${h && !h.cargando && !h.error ? 'ver' : 'cargar'}">${h && !h.cargando && !h.error ? (ab ? 'Ocultar' : 'Ver historial') : 'Cargar historial'}</button></span></div>${ab && h ? `<div class="rmd-tz-detalle">${htmlEntradas(h)}</div>` : ''}</div>`; }).join('')}</div>`;
@@ -11106,7 +11232,7 @@ td.ult { position: relative; }
       const bVersion = botonModal('Crear la versión Ingresada ahora', 'primario', async () => {
         const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
         if (!(await confirmar('¿Crear una versión nueva del RMD?', `El portal copiará toda la configuración de ${origen.codigo} v${origen.version} en un RMD nuevo (versión ${+origen.version + 1}, Ingresado).`, 'Puede tardar varios minutos. No uses el portal mientras tanto: después se vuelve a revisar el borrador sobre esa versión.', { si: 'Crear versión', no: 'Cancelar' }))) return;
-        bVersion.disabled = true; v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso rmd-espera rmd-ing-versionp" data-orbe="working">Creando la versión nueva…</p>`;
+        bVersion.disabled = true; v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso rmd-espera rmd-ing-versionp">Creando la versión nueva…</p>`;
         const p = v.cuerpo.querySelector('.rmd-ing-versionp');
         try { const nueva = await ppCrearVersionNueva(modelo, origen, (s, t) => setTxt(p, `${t} (${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')})`)); const an2 = await ppAnalizar(datos, prop); pintarImportacion(v, datos, prop, an2, { versionCreada: nueva }); }
         catch (e) { v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso error">No se pudo crear la versión: ${esc(e.message)}</p><p class="rmd-nota">Revisa en el portal si el RMD nuevo quedó creado y vuelve a importar el borrador.</p>`; bVersion.disabled = false; }

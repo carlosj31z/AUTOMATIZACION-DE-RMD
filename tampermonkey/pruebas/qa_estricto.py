@@ -1513,6 +1513,8 @@ with sync_playwright() as p:
             if route.request.method not in ("GET", "HEAD"): bloq_x.append(route.request.method + " " + route.request.url[:80]); route.abort()
             else: route.continue_()
         pg.route("**/*", guardia_x)
+        # (X5 mide solo este bloque: los anteriores, como W con ventanas de 149 pasos, no cuentan)
+        fr.evaluate("() => { const s = window.__rmdStats; s.ajusteMax = 0; s.ajusteTotalMs = 0; s.ajustes = 0; }")
         cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
         RAIZ_ABIERTA = "() => [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^\\d{6,}\\s*-/.test(((d.querySelector('h2') || {}).textContent || '').trim()))"
         try:
