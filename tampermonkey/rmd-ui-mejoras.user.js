@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.49.0
+// @version      1.50.0
 // @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.49.0';                                                       // mantener igual a @version
+  const VERSION = '1.50.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -615,6 +615,386 @@
   .rmd-ing-cards > .rmd-ing-card { animation: rmd-sube .36s var(--rmd-curva) both; }
   .rmd-ing-cards > .rmd-ing-card:nth-child(2) { animation-delay: 40ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(3) { animation-delay: 80ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(4) { animation-delay: 120ms; }
   .rmd-ing-cards > .rmd-ing-card:nth-child(5) { animation-delay: 160ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(6) { animation-delay: 200ms; } .rmd-ing-cards > .rmd-ing-card:nth-child(n+7) { animation-delay: 240ms; }
+  /* ── Espera de inicio y a pantalla completa: la página entera queda envuelta (brillo en sus bordes + velo suave) con una esfera en el centro, sin recuadro ── */
+  html.rmd-orbes #sapUiBusyIndicator .sapUiLocalBusyIndicatorAnimation, html.rmd-orbes .sapMBusyDialog .sapUiLocalBusyIndicatorAnimation { opacity: 0 !important; transition: opacity .3s; } html.rmd-orbes .sapMBusyDialog { opacity: 0 !important; }
+  .rmd-eg { position: fixed; inset: 0; z-index: 99990; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity .5s var(--rmd-curva); } .rmd-eg.visible { opacity: 1; } .rmd-eg.rmd-eg-sale { opacity: 0; transition-duration: .6s; }
+  .rmd-eg-velo { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 46%, rgba(10, 14, 19, .56) 0%, rgba(10, 14, 19, .32) 58%, rgba(10, 14, 19, .18) 100%); }
+  html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-eg-velo { background: radial-gradient(ellipse at 50% 46%, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .5) 58%, rgba(255, 255, 255, .34) 100%); }
+  .rmd-eg-centro { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--rmd-apagado); font: 13.5px var(--rmd-fuente); }
+  .rmd-eg-centro::before { content: ''; position: absolute; left: 50%; top: 72px; width: 360px; height: 360px; translate: -50% -50%; z-index: -1; pointer-events: none; background: radial-gradient(circle, rgba(27, 141, 236, .12), transparent 62%); }
+  .rmd-eg-centro .rmd-orbe-txt { min-height: 1.4em; text-align: center; }
+  .rmd-eg > .rmd-beam { inset: 0; }
+  @property --beam-angle-rmdp {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: true;
+  }
+  @property --beam-opacity-rmdp {
+    syntax: "<number>";
+    initial-value: 0;
+    inherits: true;
+  }
+  [data-beam="rmdp"] {
+    position: relative;
+    border-radius: 0px;
+    overflow: hidden;
+  }
+  [data-beam="rmdp"][data-active] {
+    animation:
+      beam-spin-rmdp 4.6s linear infinite,
+      beam-fade-in-rmdp 0.6s ease forwards;
+  }
+  [data-beam="rmdp"][data-fading] {
+    animation:
+      beam-spin-rmdp 4.6s linear infinite,
+      beam-fade-out-rmdp 0.5s ease forwards;
+  }
+  [data-beam="rmdp"][data-active]::after,
+  [data-beam="rmdp"][data-fading]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 0px;
+    padding: 3px;
+    clip-path: inset(0 round 0px);
+    background: conic-gradient(
+          from var(--beam-angle-rmdp),
+          transparent 0%, transparent 54%,
+          rgba(255, 255, 255, 0.1) 57%,
+          rgba(255, 255, 255, 0.3) 60%,
+          rgba(255, 255, 255, 0.6) 63%,
+          rgba(255, 255, 255, 0.75) 66%,
+          rgba(255, 255, 255, 0.6) 69%,
+          rgba(255, 255, 255, 0.3) 72%,
+          rgba(255, 255, 255, 0.1) 75%,
+          transparent 78%, transparent 100%
+        ),radial-gradient(ellipse 420px 240px at 33% -7.4%, rgb(100, 80, 220), transparent),
+      radial-gradient(ellipse 360px 210px at 12% -5%, rgb(60, 120, 255), transparent),
+      radial-gradient(ellipse 240px 420px at 2.1% 68.3%, rgb(80, 100, 200), transparent),
+      radial-gradient(ellipse 120px 210px at 2.1% 68.3%, rgb(50, 140, 220), transparent),
+      radial-gradient(ellipse 1080px 192px at 74.4% 100%, rgb(120, 80, 255), transparent),
+      radial-gradient(ellipse 510px 156px at 55% 100%, rgb(70, 130, 255), transparent),
+      radial-gradient(ellipse 444px 192px at 93.9% 0%, rgb(140, 100, 240), transparent),
+      radial-gradient(ellipse 156px 252px at 100% 27.1%, rgb(90, 110, 230), transparent),
+      radial-gradient(ellipse 312px 288px at 100% 27.1%, rgb(130, 70, 255), transparent);
+    -webkit-mask:
+      conic-gradient(
+        from var(--beam-angle-rmdp),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: source-in, xor;
+    mask:
+      conic-gradient(
+        from var(--beam-angle-rmdp),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: intersect, exclude;
+    pointer-events: none;
+    z-index: 2;
+    opacity: calc(var(--beam-opacity-rmdp) * 1.00 * var(--beam-stroke-opacity, 1) * var(--beam-strength, 1));
+    animation: beam-hue-shift-rmdp 12s ease-in-out infinite;
+  }
+  [data-beam="rmdp"][data-active]::before,
+  [data-beam="rmdp"][data-fading]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 0px;
+    background: radial-gradient(ellipse 378px 216px at 33% -7.4%, rgba(100, 80, 220, 0.45), transparent),
+      radial-gradient(ellipse 324px 192px at 12% -5%, rgba(60, 120, 255, 0.45), transparent),
+      radial-gradient(ellipse 216px 378px at 2.1% 68.3%, rgba(80, 100, 200, 0.45), transparent),
+      radial-gradient(ellipse 108px 192px at 2.1% 68.3%, rgba(50, 140, 220, 0.45), transparent),
+      radial-gradient(ellipse 972px 174px at 74.4% 100%, rgba(120, 80, 255, 0.45), transparent),
+      radial-gradient(ellipse 462px 138px at 55% 100%, rgba(70, 130, 255, 0.45), transparent),
+      radial-gradient(ellipse 402px 174px at 93.9% 0%, rgba(140, 100, 240, 0.45), transparent),
+      radial-gradient(ellipse 138px 228px at 100% 27.1%, rgba(90, 110, 230, 0.45), transparent),
+      radial-gradient(ellipse 282px 258px at 100% 27.1%, rgba(130, 70, 255, 0.45), transparent);
+    box-shadow: inset 0 0 9px 1px rgba(255, 255, 255, 0.27);
+    -webkit-mask-image:
+      conic-gradient(
+        from var(--beam-angle-rmdp),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(white, transparent 28px, transparent calc(100% - 28px), white),
+      linear-gradient(to right, white, transparent 28px, transparent calc(100% - 28px), white);
+    -webkit-mask-composite: source-in, source-over;
+    mask-image:
+      conic-gradient(
+        from var(--beam-angle-rmdp),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(white, transparent 28px, transparent calc(100% - 28px), white),
+      linear-gradient(to right, white, transparent 28px, transparent calc(100% - 28px), white);
+    mask-composite: intersect, add;
+    pointer-events: none;
+    z-index: 1;
+    opacity: calc(var(--beam-opacity-rmdp) * 0.90 * var(--beam-inner-opacity, 1) * var(--beam-strength, 1));
+    clip-path: inset(0 round 0px);
+    animation: beam-hue-shift-rmdp 12s ease-in-out infinite;
+  }
+  [data-beam="rmdp"] [data-beam-bloom] {
+    display: none;
+    position: absolute;
+    inset: 0;
+    border-radius: 0px;
+    clip-path: inset(0 round 0px);
+    background: conic-gradient(
+          from var(--beam-angle-rmdp),
+          transparent 0%, transparent 58%,
+          rgba(255, 255, 255, 0.03) 62%,
+          rgba(255, 255, 255, 0.08) 65%,
+          rgba(255, 255, 255, 0.2) 67%,
+          rgba(255, 255, 255, 0.45) 69%,
+          rgba(255, 255, 255, 0.85) 70%,
+          rgba(255, 255, 255, 0.85) 70.5%,
+          rgba(255, 255, 255, 0.45) 71.5%,
+          rgba(255, 255, 255, 0.2) 73%,
+          rgba(255, 255, 255, 0.08) 75%,
+          rgba(255, 255, 255, 0.03) 78%,
+          transparent 82%
+        );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    padding: 3px;
+    filter: blur(24px) brightness(1.30) saturate(1.20);
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+  }
+  [data-beam="rmdp"][data-active] [data-beam-bloom],
+  [data-beam="rmdp"][data-fading] [data-beam-bloom] {
+    display: block;
+    opacity: calc(var(--beam-opacity-rmdp) * 0.80 * var(--beam-bloom-opacity, 1) * var(--beam-strength, 1));
+  }
+  @keyframes beam-spin-rmdp {
+    to { --beam-angle-rmdp: 360deg; }
+  }
+  @keyframes beam-fade-in-rmdp {
+    to { --beam-opacity-rmdp: 1; }
+  }
+  @keyframes beam-fade-out-rmdp {
+    from { --beam-opacity-rmdp: 1; }
+    to { --beam-opacity-rmdp: 0; }
+  }
+  @keyframes beam-hue-shift-rmdp {
+    0% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) - 30deg)) brightness(1.30) saturate(1.20); }
+    50% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) + 30deg)) brightness(1.30) saturate(1.20); }
+    100% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) - 30deg)) brightness(1.30) saturate(1.20); }
+  }
+  [data-beam="rmdp"][data-paused],
+  [data-beam="rmdp"][data-paused]::after,
+  [data-beam="rmdp"][data-paused]::before,
+  [data-beam="rmdp"][data-paused] [data-beam-bloom] {
+    animation-play-state: paused !important;
+  }
+  @property --beam-angle-rmdpc {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: true;
+  }
+  @property --beam-opacity-rmdpc {
+    syntax: "<number>";
+    initial-value: 0;
+    inherits: true;
+  }
+  [data-beam="rmdpc"] {
+    position: relative;
+    border-radius: 0px;
+    overflow: hidden;
+  }
+  [data-beam="rmdpc"][data-active] {
+    animation:
+      beam-spin-rmdpc 4.6s linear infinite,
+      beam-fade-in-rmdpc 0.6s ease forwards;
+  }
+  [data-beam="rmdpc"][data-fading] {
+    animation:
+      beam-spin-rmdpc 4.6s linear infinite,
+      beam-fade-out-rmdpc 0.5s ease forwards;
+  }
+  [data-beam="rmdpc"][data-active]::after,
+  [data-beam="rmdpc"][data-fading]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 0px;
+    padding: 3px;
+    clip-path: inset(0 round 0px);
+    background: conic-gradient(
+          from var(--beam-angle-rmdpc),
+          transparent 0%, transparent 54%,
+          rgba(0, 0, 0, 0.08) 57%,
+          rgba(0, 0, 0, 0.2) 60%,
+          rgba(0, 0, 0, 0.4) 63%,
+          rgba(0, 0, 0, 0.55) 66%,
+          rgba(0, 0, 0, 0.4) 69%,
+          rgba(0, 0, 0, 0.2) 72%,
+          rgba(0, 0, 0, 0.08) 75%,
+          transparent 78%, transparent 100%
+        ),radial-gradient(ellipse 420px 240px at 33% -7.4%, rgb(100, 80, 220), transparent),
+      radial-gradient(ellipse 360px 210px at 12% -5%, rgb(60, 120, 255), transparent),
+      radial-gradient(ellipse 240px 420px at 2.1% 68.3%, rgb(80, 100, 200), transparent),
+      radial-gradient(ellipse 120px 210px at 2.1% 68.3%, rgb(50, 140, 220), transparent),
+      radial-gradient(ellipse 1080px 192px at 74.4% 100%, rgb(120, 80, 255), transparent),
+      radial-gradient(ellipse 510px 156px at 55% 100%, rgb(70, 130, 255), transparent),
+      radial-gradient(ellipse 444px 192px at 93.9% 0%, rgb(140, 100, 240), transparent),
+      radial-gradient(ellipse 156px 252px at 100% 27.1%, rgb(90, 110, 230), transparent),
+      radial-gradient(ellipse 312px 288px at 100% 27.1%, rgb(130, 70, 255), transparent);
+    -webkit-mask:
+      conic-gradient(
+        from var(--beam-angle-rmdpc),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: source-in, xor;
+    mask:
+      conic-gradient(
+        from var(--beam-angle-rmdpc),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: intersect, exclude;
+    pointer-events: none;
+    z-index: 2;
+    opacity: calc(var(--beam-opacity-rmdpc) * 1.00 * var(--beam-stroke-opacity, 1) * var(--beam-strength, 1));
+    animation: beam-hue-shift-rmdpc 12s ease-in-out infinite;
+  }
+  [data-beam="rmdpc"][data-active]::before,
+  [data-beam="rmdpc"][data-fading]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 0px;
+    background: radial-gradient(ellipse 378px 216px at 33% -7.4%, rgba(100, 80, 220, 0.45), transparent),
+      radial-gradient(ellipse 324px 192px at 12% -5%, rgba(60, 120, 255, 0.45), transparent),
+      radial-gradient(ellipse 216px 378px at 2.1% 68.3%, rgba(80, 100, 200, 0.45), transparent),
+      radial-gradient(ellipse 108px 192px at 2.1% 68.3%, rgba(50, 140, 220, 0.45), transparent),
+      radial-gradient(ellipse 972px 174px at 74.4% 100%, rgba(120, 80, 255, 0.45), transparent),
+      radial-gradient(ellipse 462px 138px at 55% 100%, rgba(70, 130, 255, 0.45), transparent),
+      radial-gradient(ellipse 402px 174px at 93.9% 0%, rgba(140, 100, 240, 0.45), transparent),
+      radial-gradient(ellipse 138px 228px at 100% 27.1%, rgba(90, 110, 230, 0.45), transparent),
+      radial-gradient(ellipse 282px 258px at 100% 27.1%, rgba(130, 70, 255, 0.45), transparent);
+    box-shadow: inset 0 0 9px 1px rgba(0, 0, 0, 0.14);
+    -webkit-mask-image:
+      conic-gradient(
+        from var(--beam-angle-rmdpc),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(white, transparent 28px, transparent calc(100% - 28px), white),
+      linear-gradient(to right, white, transparent 28px, transparent calc(100% - 28px), white);
+    -webkit-mask-composite: source-in, source-over;
+    mask-image:
+      conic-gradient(
+        from var(--beam-angle-rmdpc),
+        transparent 0%, transparent 30%,
+        rgba(255, 255, 255, 0.1) 36%, rgba(255, 255, 255, 0.35) 44%,
+        white 52%, white 80%,
+        rgba(255, 255, 255, 0.35) 86%, rgba(255, 255, 255, 0.1) 92%,
+        transparent 95%, transparent 100%
+      ),
+      linear-gradient(white, transparent 28px, transparent calc(100% - 28px), white),
+      linear-gradient(to right, white, transparent 28px, transparent calc(100% - 28px), white);
+    mask-composite: intersect, add;
+    pointer-events: none;
+    z-index: 1;
+    opacity: calc(var(--beam-opacity-rmdpc) * 0.90 * var(--beam-inner-opacity, 1) * var(--beam-strength, 1));
+    clip-path: inset(0 round 0px);
+    animation: beam-hue-shift-rmdpc 12s ease-in-out infinite;
+  }
+  [data-beam="rmdpc"] [data-beam-bloom] {
+    display: none;
+    position: absolute;
+    inset: 0;
+    border-radius: 0px;
+    clip-path: inset(0 round 0px);
+    background: conic-gradient(
+          from var(--beam-angle-rmdpc),
+          transparent 0%, transparent 58%,
+          rgba(0, 0, 0, 0.02) 62%,
+          rgba(0, 0, 0, 0.08) 65%,
+          rgba(0, 0, 0, 0.2) 67%,
+          rgba(0, 0, 0, 0.4) 69%,
+          rgba(0, 0, 0, 0.6) 70%,
+          rgba(0, 0, 0, 0.6) 70.5%,
+          rgba(0, 0, 0, 0.4) 71.5%,
+          rgba(0, 0, 0, 0.2) 73%,
+          rgba(0, 0, 0, 0.08) 75%,
+          rgba(0, 0, 0, 0.02) 78%,
+          transparent 82%
+        );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    padding: 3px;
+    filter: blur(24px) brightness(1.30) saturate(1.50);
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+  }
+  [data-beam="rmdpc"][data-active] [data-beam-bloom],
+  [data-beam="rmdpc"][data-fading] [data-beam-bloom] {
+    display: block;
+    opacity: calc(var(--beam-opacity-rmdpc) * 0.80 * var(--beam-bloom-opacity, 1) * var(--beam-strength, 1));
+  }
+  @keyframes beam-spin-rmdpc {
+    to { --beam-angle-rmdpc: 360deg; }
+  }
+  @keyframes beam-fade-in-rmdpc {
+    to { --beam-opacity-rmdpc: 1; }
+  }
+  @keyframes beam-fade-out-rmdpc {
+    from { --beam-opacity-rmdpc: 1; }
+    to { --beam-opacity-rmdpc: 0; }
+  }
+  @keyframes beam-hue-shift-rmdpc {
+    0% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) - 30deg)) brightness(1.30) saturate(1.50); }
+    50% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) + 30deg)) brightness(1.30) saturate(1.50); }
+    100% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) - 30deg)) brightness(1.30) saturate(1.50); }
+  }
+  [data-beam="rmdpc"][data-paused],
+  [data-beam="rmdpc"][data-paused]::after,
+  [data-beam="rmdpc"][data-paused]::before,
+  [data-beam="rmdpc"][data-paused] [data-beam-bloom] {
+    animation-play-state: paused !important;
+  }
+  @media (prefers-reduced-motion: reduce) { .rmd-eg { transition: none !important; } }
   @media (prefers-reduced-motion: reduce) {
     canvas.rmd-orbe, .rmd-texto-entra, .rmd-modal, .rmd-modal-fondo, .rmd-menu, .rmd-rec-detalle, .rmd-toast, .rmd-creado, .rmd-ing-card, #rmd-ui-panel[open] > :not(summary) { animation: none !important; }
     .rmd-orbe-txt[data-texto]::before { display: none; } .rmd-ind, .rmd-ico-swap > svg { transition: none !important; }
@@ -3737,16 +4117,23 @@
       cache.set(key, resolved);
       return resolved;
     }
-    return { resolvePreset, MODE_FRAMES, paintFrame };
+    return { resolvePreset, MODE_FRAMES, paintFrame, scaleCounts, scaleRadii, BASE_PROFILES, STATE_TO_MODE, PRESETS };
   })();
   const ORBE_ROTULOS = { working: 'Trabajando…', searching: 'Buscando…', solving: 'Analizando…', listening: 'Esperando…', connecting: 'Conectando con SAP…', composing: 'Generando…', breathing: 'En espera…', weaving: 'Escribiendo en SAP…', shaping: 'Armando…' };
   const ORBES = { vivos: new Set(), raf: 0, io: null, reducido: window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false } };
   const temaOscuro = () => html.classList.contains('sapUiTheme-sap_fiori_3_dark');
   // Un orbe: 20 px junto a un texto o 64 px para la espera principal de una ventana (son dos diseños distintos, no una escala)
+  // (los orbes grandes —la espera de inicio— usan el diseño de 64 px con más puntos, proporcional al área, para que se vea una esfera definida)
+  function opcionesGrande(estado, tam) {
+    const M = MOTOR_ORBES, modo = M.STATE_TO_MODE[estado], pr = M.PRESETS[modo][64], k = Math.min(1.3, 0.18 * Math.pow(tam / 64, 2));
+    let o = M.scaleCounts({ ...M.BASE_PROFILES[modo] }, k); if (pr.size !== 1) o = M.scaleRadii(o, pr.size * 0.9);
+    return pr.extra ? { ...o, ...pr.extra } : o;
+  }
   function orbe(estado, tam, rotulo) {
-    if (!ORBE_ROTULOS[estado]) estado = 'working'; tam = tam === 64 ? 64 : 20;
-    const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1), p = MOTOR_ORBES.resolvePreset(estado, tam);
-    c.className = `rmd-orbe rmd-orbe-${tam}`; c.width = c.height = Math.round(tam * dpr); c.setAttribute('role', 'img'); c.setAttribute('aria-label', rotulo || ORBE_ROTULOS[estado]);
+    if (!ORBE_ROTULOS[estado]) estado = 'working'; const grande = tam > 64; tam = grande ? Math.round(tam) : tam === 64 ? 64 : 20;
+    const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1); let p = MOTOR_ORBES.resolvePreset(estado, grande ? 64 : tam);
+    if (grande) { p = { ...p, opts: opcionesGrande(estado, tam) }; c.style.width = c.style.height = tam + 'px'; }
+    c.className = `rmd-orbe rmd-orbe-${grande ? 'g' : tam}`; c.width = c.height = Math.round(tam * dpr); c.setAttribute('role', 'img'); c.setAttribute('aria-label', rotulo || ORBE_ROTULOS[estado]);
     c.__orbe = { estado, tam, dpr, ctx: c.getContext('2d'), geometria: MOTOR_ORBES.MODE_FRAMES[p.mode], velocidad: p.speed, opts: p.opts, visible: true };
     pintarOrbe(c, ORBES.reducido.matches ? 0.6 : (performance.now() / 1000) * p.speed);
     if (!ORBES.reducido.matches) activarOrbe(c);
@@ -3792,7 +4179,7 @@
         : /revisando|comprobando|comparando|analizando|calculando|verificando/i.test(t) ? 'solving'
           : /armando|generando|redactando/i.test(t) ? 'composing'
             : /\bsap\b|consultando|enviando|conectando|tus rmd|página \d+ de/i.test(t) ? 'connecting'
-              : /busc|leyendo|cargando|contando/i.test(t) ? 'searching' : 'working');
+              : /busc|leyendo|cargando|contando/i.test(t) ? 'searching' : 'searching');   // (las «órbitas», puntos sueltos, ya no son el orbe por defecto: no parecen una esfera)
   const ESPERAS = '.rmd-progreso, .rmd-vivo-estado, .rmd-espera-mini, .rmd-paleta-estado';
   // Las ventanas que se vuelven a pintar (p. ej. Trazabilidad con cada fila cargada) recrean su mensaje: si el orbe es el mismo
   // de hace un momento, no vuelve a «entrar» (todos comparten el reloj, así que sigue en su punto) y el brillo del texto sigue en fase
@@ -3829,7 +4216,7 @@
   }
   function apagarBrillo(b) { if (!b || b.hasAttribute('data-fading')) return; b.removeAttribute('data-active'); b.setAttribute('data-fading', ''); setTimeout(() => b.remove(), 650); }
   function quitarOrbes() {
-    html.classList.remove('rmd-orbes');
+    html.classList.remove('rmd-orbes'); quitarEsperaGlobal();
     document.querySelectorAll('.rmd-ind').forEach((e) => e.remove()); document.querySelectorAll('.rmd-con-ind').forEach((g) => { g.classList.remove('rmd-con-ind'); delete g.__rmdInd; });
     document.querySelectorAll('.rmd-vivo-espera').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-con-orbe').forEach((el) => quitarOrbeDe(el));
@@ -3858,10 +4245,11 @@
     // 2) los tres puntos de espera del portal (la capa a pantalla completa y la ventanita de «Espere»)
     // (el orbe se centra en la zona que espera: el cuadro de los puntos tiene su esquina, no su centro, en el centro de la zona)
     document.querySelectorAll('.sapUiLocalBusyIndicator').forEach((z) => {
+      if (z.closest('#sapUiBusyIndicator, .sapMBusyDialog')) { const o = z.querySelector(':scope > canvas.rmd-orbe'); if (o) o.remove(); return; }   // (esas las dibuja la capa propia, sin cortes)
       if (z.querySelector(':scope > canvas.rmd-orbe') || !z.querySelector(':scope > .sapUiLocalBusyIndicatorAnimation')) return;
-      const ventanita = !!z.closest('.sapMBusyDialog'), grande = ventanita || z.classList.contains('sapUiLocalBusyIndicatorSizeBig');   // (la ventanita «Espere» no tiene caja en el tema oscuro: va el orbe grande)
+      const grande = z.classList.contains('sapUiLocalBusyIndicatorSizeBig');
       if (getComputedStyle(z).position === 'static') z.style.position = 'relative';
-      z.classList.add('rmd-orbe-sap'); z.appendChild(orbe(ventanita ? 'connecting' : grande ? 'working' : 'breathing', grande ? 64 : 20, 'Cargando…'));   // (la ventanita lee de SAP; la capa completa trabaja; las tablas respiran)
+      z.classList.add('rmd-orbe-sap'); z.appendChild(orbe(grande ? 'searching' : 'breathing', grande ? 64 : 20, 'Cargando…'));   // (el globo en las zonas grandes; el anillo respira en las tablas)
     });
     // 3) el aviso de «Cambios de recetas en SAP» mientras revisa en segundo plano
     document.querySelectorAll('.rmd-alerta-rec').forEach((b) => {
@@ -3927,7 +4315,67 @@
     b.classList.add('rmd-copiado'); clearTimeout(b.__rmdCopiado);
     b.__rmdCopiado = setTimeout(() => { b.classList.remove('rmd-copiado'); if (b.__rmdTexto) { b.textContent = b.__rmdTexto; b.classList.remove('rmd-texto-entra'); void b.offsetWidth; b.classList.add('rmd-texto-entra'); } }, 1600);
   }
-  window.__rmdStats.orbes = { orbe, estadoDeEspera, faseDe, setTxt, confirmarCopia, colocarIndicador, vivos: () => ORBES.vivos.size, ciclo: () => !!ORBES.raf, motor: MOTOR_ORBES };
+  // ---- Espera de inicio y de la capa a pantalla completa (v1.50) ----
+  // Al arrancar, SAP muestra y oculta su capa de espera varias veces seguidas (en el portal real: 4 veces en 7 s, con un hueco en blanco
+  // de más de un segundo antes de dibujar la pantalla) y un orbe colgado de esa capa se cortaba y reaparecía cada vez. Aquí la espera vive
+  // en una capa propia que envuelve toda la página: un brillo recorre sus cuatro bordes (border-beam), un velo muy suave la oscurece y en
+  // el centro una esfera grande con su texto, sin recuadro, para que no parezca algo puesto encima. No se mueve mientras SAP quita y vuelve
+  // a poner su capa y solo se va, con un fundido, cuando la espera terminó de verdad. Al arrancar se queda hasta que la lista está dibujada.
+  const TAM_EG = 144;
+  const EG = { RETRASO: 350, GRACIA: 300, FIN_INICIO: 500, MAX_INICIO: 30000, el: null, txt: null, desde: 0, sinEspera: 0, listoDesde: 0, t0: Date.now(), inicio: null, saliendo: 0 };
+  const esperaVisible = (e) => { if (!e) return false; const z = getComputedStyle(e); return z.display !== 'none' && z.visibility !== 'hidden' && e.getClientRects().length > 0; };
+  // (la app está dibujada cuando se ve el botón «Ir» de la lista principal o, en cualquier otra pantalla del portal, cuando UI5 ya montó más de 30 controles)
+  const appDibujada = () => esperaVisible(document.querySelector('[id$=btnGo]')) || document.querySelectorAll('[data-sap-ui]').length > 30;
+  function esperaDeSap() {
+    const capa = esperaVisible(document.getElementById('sapUiBusyIndicator')), d = [...document.querySelectorAll('.sapMBusyDialog')].find(esperaVisible);
+    const t = d ? norm(((d.querySelector('.sapMBusyDialogLabel, .sapMText, .sapMLabel') || {}).textContent) || '') : '';
+    return { activa: capa || !!d, texto: t };
+  }
+  function textoEsperaGlobal(t) {
+    const s = EG.txt; if (!s || s.textContent === t) return;
+    const antes = s.textContent; s.textContent = t; s.dataset.texto = t;
+    if (!s.style.getPropertyValue('--rmd-fase')) s.style.setProperty('--rmd-fase', `-${Math.round(performance.now() % 2000)}ms`);
+    if (antes && faseDe(antes) !== faseDe(t)) { s.classList.remove('rmd-texto-entra'); void s.offsetWidth; s.classList.add('rmd-texto-entra'); }
+  }
+  function mostrarEsperaGlobal(texto) {
+    let e = EG.el;
+    if (e && EG.saliendo) { clearTimeout(EG.saliendo); EG.saliendo = 0; e.classList.remove('rmd-eg-sale'); e.classList.add('visible'); }   // (volvió a esperar mientras se iba: sigue la misma capa, el mismo orbe y el mismo brillo)
+    if (!e || !e.isConnected) {
+      e = EG.el = document.createElement('div'); e.className = 'rmd-eg'; e.setAttribute('role', 'status'); e.setAttribute('aria-label', 'Cargando');
+      const velo = document.createElement('div'); velo.className = 'rmd-eg-velo'; velo.setAttribute('aria-hidden', 'true');
+      const centro = document.createElement('div'); centro.className = 'rmd-eg-centro'; EG.txt = document.createElement('span'); EG.txt.className = 'rmd-orbe-txt'; centro.append(orbe('solving', TAM_EG, 'Cargando…'), EG.txt);
+      e.append(velo, centro);
+      if (!ORBES.reducido.matches) { const b = brillo(); b.dataset.beam = temaOscuro() ? 'rmdp' : 'rmdpc'; b.classList.add('rmd-beam-pagina'); e.appendChild(b); }   // (el brillo recorre los cuatro bordes de la página)
+      html.appendChild(e); requestAnimationFrame(() => requestAnimationFrame(() => e.classList.add('visible')));
+    }
+    textoEsperaGlobal(texto);
+  }
+  function ocultarEsperaGlobal() {
+    const e = EG.el; if (!e || EG.saliendo) return;
+    e.classList.remove('visible'); e.classList.add('rmd-eg-sale');   // (todo se desvanece a la vez: velo, brillo y esfera)
+    EG.saliendo = setTimeout(() => { EG.saliendo = 0; e.remove(); if (EG.el === e) { EG.el = EG.txt = null; } }, 620);
+  }
+  function quitarEsperaGlobal() { clearTimeout(EG.saliendo); EG.saliendo = 0; if (EG.el) EG.el.remove(); EG.el = EG.txt = null; EG.desde = EG.sinEspera = EG.listoDesde = 0; }
+  function sincronizarEsperaGlobal() {
+    if (!on('orbes')) { if (EG.el) quitarEsperaGlobal(); return; }
+    const ahora = Date.now(), sap = esperaDeSap();
+    if (EG.inicio == null) EG.inicio = !window.__rmdSinInicio && !appDibujada();                       // (¿el script llegó antes de que la app se dibujara?)
+    if (EG.inicio) {
+      if (appDibujada() && !sap.activa) { if (!EG.listoDesde) EG.listoDesde = ahora; if (ahora - EG.listoDesde >= EG.FIN_INICIO) EG.inicio = false; } else EG.listoDesde = 0;
+      if (ahora - EG.t0 > EG.MAX_INICIO) EG.inicio = false;                                              // (por si esta pantalla nunca muestra la lista)
+    }
+    if (EG.inicio || sap.activa) {
+      EG.sinEspera = 0; if (!EG.desde) EG.desde = ahora;
+      if (EG.inicio || EG.el || ahora - EG.desde >= EG.RETRASO) mostrarEsperaGlobal(EG.inicio ? (appDibujada() ? 'Cargando datos…' : 'Iniciando…') : (sap.texto || 'Cargando…'));   // (una espera de menos de 350 ms no muestra nada: sin destellos)
+    } else {
+      EG.desde = 0;
+      if (EG.el && !EG.saliendo) { if (!EG.sinEspera) EG.sinEspera = ahora; if (ahora - EG.sinEspera >= EG.GRACIA) { EG.sinEspera = 0; ocultarEsperaGlobal(); } }   // (huecos de menos de 300 ms: sigue, no se corta)
+    }
+  }
+  setInterval(() => { try { sincronizarEsperaGlobal(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('sincronizarEsperaGlobal: ' + e.message); } }, 120);
+  if (on('orbes')) { html.classList.add('rmd-orbes'); try { sincronizarEsperaGlobal(); } catch (e) { /* se reintenta en el siguiente ciclo */ } }   // (si el arranque ya está en curso, la esfera sale desde este mismo instante y los puntos de SAP se van con ella)
+  window.__rmdStats.orbes = { orbe, estadoDeEspera, faseDe, setTxt, confirmarCopia, colocarIndicador, vivos: () => ORBES.vivos.size, ciclo: () => !!ORBES.raf, motor: MOTOR_ORBES,
+    esperaGlobal: { estado: () => ({ inicio: EG.inicio, el: !!(EG.el && EG.el.isConnected), saliendo: !!EG.saliendo, texto: EG.txt ? EG.txt.textContent : '', canvas: EG.el ? EG.el.querySelector('canvas') : null }), reiniciar: () => { quitarEsperaGlobal(); EG.inicio = null; EG.t0 = Date.now(); }, sincronizar: sincronizarEsperaGlobal } };
   const resumenCasillas = (c) => Object.entries(c || {}).filter(([, v]) => v).map(([k]) => NOMBRE_CASILLA[k] || k).join(' + ') || 'sin casillas';
   const resumenPaso = (p) => `${p.tipo || '(sin tipo)'}${p.clave ? ' · ' + p.clave : ''}${p.puesto ? ' · ' + p.puesto : ''}${p.dec !== '' && p.dec != null ? ' · dec ' + p.dec : ''} · ${resumenCasillas(p.chk)}`;
 
