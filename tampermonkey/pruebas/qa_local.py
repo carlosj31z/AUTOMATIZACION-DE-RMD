@@ -982,6 +982,102 @@ with sync_playwright() as p:
               and r["dialogo"]["el"] and r["dialogo"]["texto"] == "Guardando el RMD…" and r["dialogo"]["opZona"] == 0 and r["dialogo"]["opacidad"] == "0" and r["dialogo"]["quitado"] is not None
               and r["limpio"] == {"el": False, "vivos": 0})
         return ok, json.dumps(r, ensure_ascii=False)[:1700]
+    # ── Vista móvil (v1.51): se prueba con el tamaño de pantalla (390 px) sobre la maqueta ──
+    def movil_estado():
+        return pg.evaluate("() => { const b = document.getElementById('rmd-ui-buscar'); return { clase: document.documentElement.classList.contains('rmd-movil'), buscar: !!b && b.isConnected && !b.hidden, activo: window.__rmdStats.movil.activo() }; }")
+
+    def tamano(w, h=844): pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(600)
+
+    @prueba("LN38 Vista móvil (v1.51): con 390 px la página pasa sola a la vista móvil (clase rmd-movil y botón flotante de búsqueda) y con 1415 px no; «Siempre» la fuerza en escritorio, «Nunca» la quita en el teléfono y «Auto» vuelve a decidir por el ancho (se guarda); «Restablecer» deja «Auto»; apagar las mejoras la retira por completo")
+    def _():
+        r = {"escritorio": movil_estado()}
+        tamano(390); r["telefono"] = movil_estado()
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(150)
+        sel = lambda k: pg.locator(f"#rmd-ui-panel .rmd-movil-sel button[data-vm={k}]")
+        sel("no").click(); pg.wait_for_timeout(500); r["nunca"] = movil_estado()
+        tamano(1415); sel("si").click(); pg.wait_for_timeout(500); r["siempre"] = {**movil_estado(), "guardado": pg.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')).vistaMovil")}
+        sel("auto").click(); pg.wait_for_timeout(500); r["auto"] = movil_estado()
+        sel("si").click(); pg.wait_for_timeout(300); pg.locator("#rmd-ui-panel .rmd-restablecer").click(); pg.wait_for_timeout(500)
+        r["restablecido"] = {**movil_estado(), "selector": pg.evaluate("document.querySelector('#rmd-ui-panel .rmd-movil-sel button.activo').dataset.vm")}
+        tamano(390); pg.locator("#rmd-ui-panel input[data-k=activo]").click(); pg.wait_for_timeout(600); r["apagado"] = movil_estado()
+        pg.locator("#rmd-ui-panel input[data-k=activo]").click(); pg.wait_for_timeout(600); r["encendido"] = movil_estado()
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = false"); tamano(1415, 886)
+        ok = (r["escritorio"] == {"clase": False, "buscar": False, "activo": False} and r["telefono"] == {"clase": True, "buscar": True, "activo": True}
+              and r["nunca"] == {"clase": False, "buscar": False, "activo": False} and r["siempre"] == {"clase": True, "buscar": True, "activo": True, "guardado": "si"}
+              and r["auto"] == {"clase": False, "buscar": False, "activo": False} and r["restablecido"] == {"clase": False, "buscar": False, "activo": False, "selector": "auto"}
+              and r["apagado"]["clase"] is False and not r["apagado"]["buscar"] and r["encendido"]["clase"] is True and r["encendido"]["buscar"])
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
+    @prueba("LN39 Vista móvil, tablas como tarjetas: en 390 px la ventana de pasos ocupa toda la pantalla, su tabla se reconoce (pasos, con selección), cada celda lleva su nombre y las filas son tarjetas (sin cabecera ni desborde); un campo vacío y deshabilitado no ocupa sitio y uno editable sí; al volver a escritorio se quitan todas las marcas")
+    def _():
+        tamano(390); abrir(pg, PRECAUCIONES); pg.wait_for_timeout(600)
+        pg.evaluate("() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(); const tr = d.querySelector('tbody tr'); const i = tr.querySelectorAll('input')[1]; i.id = 'dep-prueba'; i.disabled = true; }"); pg.wait_for_timeout(700)
+        medir = """() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), t = d.querySelector('table.sapMListTbl'), tr = t.querySelector('tbody tr.sapMListTblRow'), r = d.getBoundingClientRect();
+          const td = (c) => tr.querySelector('td[data-rmd-col=' + c + ']'), lab = (c) => td(c) ? getComputedStyle(td(c), '::before').content : null, de = document.documentElement;
+          return { tipo: t.dataset.rmdMov, sel: t.dataset.rmdSel, dlg: [Math.round(r.width), Math.round(r.height)], thead: getComputedStyle(t.querySelector('thead')).display, fila: getComputedStyle(tr).display, tabla: getComputedStyle(t).display, anchoTabla: Math.round(t.getBoundingClientRect().width),
+            etq: td('descripcion') && td('descripcion').dataset.rmdEtq, labOrden: lab('orden'), labDesc: lab('descripcion'), vacio: td('depende') && td('depende').dataset.rmdVacio, vacioVisible: td('depende') && getComputedStyle(td('depende')).display, tipoVisible: td('tipo-dato') && getComputedStyle(td('tipo-dato')).display,
+            desborde: de.scrollWidth - innerWidth, marcas: document.querySelectorAll('[data-rmd-mov], td[data-rmd-col], td[data-rmd-etq], td[data-rmd-vacio]').length }; }"""
+        a = pg.evaluate(medir)
+        pg.evaluate("document.getElementById('dep-prueba').disabled = false"); pg.wait_for_timeout(700)
+        b = pg.evaluate("() => { const td = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop().querySelector('tbody tr td[data-rmd-col=depende]'); return { vacio: td.dataset.rmdVacio || null, display: getComputedStyle(td).display }; }")
+        tamano(1415, 886); pg.wait_for_timeout(300)
+        c = pg.evaluate("() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), t = d.querySelector('table.sapMListTbl'), r = d.getBoundingClientRect(); return { dlg: Math.round(r.width), thead: getComputedStyle(t.querySelector('thead')).display, tabla: getComputedStyle(t).display, marcas: document.querySelectorAll('[data-rmd-mov], td[data-rmd-col], td[data-rmd-etq], td[data-rmd-vacio]').length }; }")
+        cerrar_todo(pg)
+        ok = (a["tipo"] == "pasos" and a["sel"] == "1" and a["dlg"] == [390, 844] and a["thead"] == "none" and a["fila"] == "flex" and a["tabla"] == "block" and a["anchoTabla"] <= 390 and a["etq"] == "Descripción" and a["labOrden"] == '"Orden"' and a["labDesc"] == "none"
+              and a["vacio"] == "1" and a["vacioVisible"] == "none" and a["tipoVisible"] != "none" and a["desborde"] <= 0 and a["marcas"] > 10
+              and b == {"vacio": None, "display": "block"} and c["dlg"] > 1000 and c["thead"] != "none" and c["tabla"] != "block" and c["marcas"] == 0)
+        return ok, json.dumps({"movil": a, "habilitado": b, "escritorio": c}, ensure_ascii=False)[:1500]
+
+    @prueba("LN40 Vista móvil, filtros plegables: en 390 px la barra de filtros deja a la vista los dos primeros campos y el último, esconde los del medio tras «Más filtros» (que cuenta los que están en uso), el botón no cuelga del layout de SAP (su reflow() escribe en el último hijo) y «Menos filtros» los vuelve a mostrar; en escritorio no hay nada")
+    def _():
+        tamano(1415, 886)
+        pg.evaluate("""() => { const l = document.createElement('div'); l.className = 'sapUiAFLayout'; l.id = '__layoutPrueba'; l.style.cssText = 'position:relative;display:flex;flex-wrap:wrap';
+          l.innerHTML = [1, 2, 3, 4, 5, 6].map((i) => '<div class="sapUiAFLayoutItem" style="flex:1 1 160px"><input placeholder="campo ' + i + '"></div>').join('') + '<div class="sapUiAFLayoutEnd" style="position:absolute;right:0;bottom:0"><button id="prueba--btnGo">Ir</button></div><div class="sapUiAFLayoutItem sapUiAFLayoutSpacer"></div>';
+          const c = document.createElement('div'); c.id = 'celda-filtros'; c.appendChild(l); document.body.appendChild(c); }"""); pg.wait_for_timeout(500)
+        est = """() => { const l = document.getElementById('__layoutPrueba'), it = [...l.querySelectorAll(':scope > .sapUiAFLayoutItem:not(.sapUiAFLayoutSpacer)')], b = l.nextElementSibling;
+          return { estado: l.dataset.rmdFiltros || null, visibles: it.map((x) => getComputedStyle(x).display !== 'none'), extra: it.map((x) => x.dataset.rmdExtra === '1'), boton: b && b.classList.contains('rmd-filtros-mas') ? b.textContent : null, hijoDelLayout: !!l.querySelector(':scope > .rmd-filtros-mas'), expandido: b && b.getAttribute('aria-expanded') }; }"""
+        r = {"escritorio": pg.evaluate(est)}
+        tamano(390); r["plegado"] = pg.evaluate(est)
+        pg.evaluate("document.querySelectorAll('#__layoutPrueba input')[3].value = 'ING'"); pg.evaluate("window.__rmdStats.movil.gestionar()"); pg.wait_for_timeout(200); r["enUso"] = pg.evaluate(est)
+        pg.evaluate("document.querySelector('.rmd-filtros-mas').click()"); pg.wait_for_timeout(300); r["abierto"] = pg.evaluate(est)
+        pg.evaluate("document.querySelector('.rmd-filtros-mas').click()"); pg.wait_for_timeout(300); r["plegado2"] = pg.evaluate(est)
+        tamano(1415, 886); pg.wait_for_timeout(300); r["vuelta"] = pg.evaluate(est)
+        pg.evaluate("document.getElementById('celda-filtros').remove()")
+        ok = (r["escritorio"]["estado"] is None and r["escritorio"]["boton"] is None and all(r["escritorio"]["visibles"])
+              and r["plegado"]["estado"] == "plegado" and r["plegado"]["visibles"] == [True, True, False, False, False, True] and r["plegado"]["boton"] == "Más filtros" and not r["plegado"]["hijoDelLayout"] and r["plegado"]["expandido"] == "false"
+              and r["enUso"]["boton"] == "Más filtros · 1 en uso" and r["abierto"]["estado"] == "abierto" and all(r["abierto"]["visibles"]) and r["abierto"]["boton"] == "Menos filtros" and r["abierto"]["expandido"] == "true"
+              and r["plegado2"]["visibles"] == [True, True, False, False, False, True] and r["vuelta"]["estado"] is None and r["vuelta"]["boton"] is None and not any(r["vuelta"]["extra"]) and all(r["vuelta"]["visibles"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:1600]
+
+    @prueba("LN41 Vista móvil, lo del script: en 390 px la paleta (botón de búsqueda) ocupa toda la pantalla, tiene su «×» y no habla de teclas; el panel de ajustes es una hoja inferior; las ventanas del script (Reglas) ocupan la pantalla sin desbordar y los avisos pequeños siguen centrados; en escritorio la paleta no tiene «×» y la ventana no es de pantalla completa")
+    def _():
+        tamano(390); r = {}
+        pg.evaluate("document.getElementById('rmd-ui-buscar').click()"); pg.wait_for_timeout(500)
+        r["paleta"] = pg.evaluate("() => { const p = document.querySelector('.rmd-paleta'), b = p.getBoundingClientRect(), x = document.querySelector('.rmd-paleta-x'); return { tam: [Math.round(b.width), Math.round(b.height)], x: getComputedStyle(x).display, pie: document.querySelector('.rmd-paleta-pie span').textContent.slice(0, 30), q: getComputedStyle(document.querySelector('.rmd-paleta-q')).fontSize }; }")
+        pg.locator(".rmd-paleta-x").click(); pg.wait_for_timeout(300); r["paletaCerrada"] = not pg.evaluate("!!document.querySelector('.rmd-paleta-fondo')")
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(300)
+        r["panel"] = pg.evaluate("() => { const c = document.querySelector('#rmd-ui-panel .rmd-panel-cuerpo'), b = c.getBoundingClientRect(); return { pos: getComputedStyle(c).position, ancho: Math.round(b.width), dentro: b.left >= 0 && b.right <= innerWidth, tam: getComputedStyle(document.querySelector('#rmd-ui-panel summary')).width }; }")
+        pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(700)
+        r["ventana"] = pg.evaluate("() => { const m = document.querySelector('.rmd-modal'), b = m.getBoundingClientRect(), c = m.querySelector('.rmd-modal-cuerpo'); return { tam: [Math.round(b.width), Math.round(b.height)], desbordeCuerpo: c.scrollWidth - c.clientWidth, pagina: document.documentElement.scrollWidth - innerWidth }; }")
+        pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")
+        pg.evaluate("window.__maq.mensaje('Aviso', 'Prueba de mensaje del portal')"); pg.wait_for_timeout(300); pg.evaluate("document.querySelectorAll('.sapMMessageDialog').forEach((x) => x.remove())")
+        pg.evaluate("() => { const f = document.createElement('div'); f.className = 'rmd-modal-fondo'; f.innerHTML = '<div class=\"rmd-modal rmd-modal-aviso\"><div class=\"rmd-aviso-cab\"><h3>Aviso</h3></div><div class=\"rmd-modal-cuerpo\"><p>Texto de prueba</p></div><div class=\"rmd-modal-pie\"><button class=\"rmd-btn\">Entendido</button></div></div>'; document.body.appendChild(f); }"); pg.wait_for_timeout(300)
+        r["aviso"] = pg.evaluate("() => { const b = document.querySelector('.rmd-modal-aviso').getBoundingClientRect(); return { ancho: Math.round(b.width), alto: Math.round(b.height), cx: Math.round(b.left + b.width / 2), cy: Math.round(b.top + b.height / 2) }; }")
+        pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())"); pg.evaluate("document.getElementById('rmd-ui-panel').open = false")
+        tamano(1415, 886)
+        pg.keyboard.press("Control+k"); pg.wait_for_timeout(400)
+        r["paletaEscritorio"] = pg.evaluate("() => ({ x: getComputedStyle(document.querySelector('.rmd-paleta-x')).display, pie: document.querySelector('.rmd-paleta-pie span').textContent.slice(0, 12) })")
+        pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(500)
+        r["ventanaEscritorio"] = pg.evaluate("() => { const b = document.querySelector('.rmd-modal').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }")
+        pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")
+        ok = (r["paleta"]["tam"] == [390, 844] and r["paleta"]["x"] == "block" and r["paleta"]["pie"].startswith("Toca un RMD") and r["paleta"]["q"] == "16px" and r["paletaCerrada"]
+              and r["panel"]["pos"] == "fixed" and r["panel"]["dentro"] and r["panel"]["ancho"] >= 370 and r["panel"]["tam"] == "44px"
+              and r["ventana"]["tam"] == [390, 844] and r["ventana"]["desbordeCuerpo"] <= 0 and r["ventana"]["pagina"] <= 0
+              and r["aviso"]["ancho"] <= 366 and abs(r["aviso"]["cx"] - 195) <= 2 and 150 < r["aviso"]["cy"] < 700
+              and r["paletaEscritorio"]["x"] == "none" and r["paletaEscritorio"]["pie"].startswith("↑↓") and r["ventanaEscritorio"][0] < 1300 and r["ventanaEscritorio"][1] < 886)
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")

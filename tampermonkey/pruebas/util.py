@@ -73,12 +73,21 @@ def cerrar_todo(fr, pg):
         pg.wait_for_timeout(1000)
 
 
-def abrir_con_inyeccion_temprana(b, src, ancho=1415, alto=886, espera=180):
+UA_MOVIL = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+
+def abrir_con_inyeccion_temprana(b, src, ancho=1415, alto=886, espera=180, movil=False):
     """Abre el portal en una pestaña nueva e inyecta el script en cuanto el iframe de la app tiene DOM, sin esperar a que la app esté montada
-    (como hace Tampermonkey con document-idle). Devuelve (pagina, frame, segundos_hasta_inyectar) cuando aparece el botón "Ir" de la app."""
+    (como hace Tampermonkey con document-idle). Devuelve (pagina, frame, segundos_hasta_inyectar) cuando aparece el botón "Ir" de la app.
+    movil=True: con un teléfono emulado (ancho x alto, agente de usuario móvil y tacto)."""
     import time
     pg = b.contexts[0].new_page()
-    pg.set_viewport_size({"width": ancho, "height": alto})
+    if movil:   # teléfono emulado (pantalla, agente de usuario y tacto) ANTES de cargar: UI5 arranca en modo teléfono, con las tablas en «popin»
+        cdp = pg.context.new_cdp_session(pg)
+        cdp.send("Emulation.setDeviceMetricsOverride", {"width": ancho, "height": alto, "deviceScaleFactor": 2, "mobile": True, "screenWidth": ancho, "screenHeight": alto})
+        cdp.send("Emulation.setUserAgentOverride", {"userAgent": UA_MOVIL}); cdp.send("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5})
+    else:
+        pg.set_viewport_size({"width": ancho, "height": alto})
     t0 = time.time()
     pg.goto(url_portal(), wait_until="commit")
     inyectado = None

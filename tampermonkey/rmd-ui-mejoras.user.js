@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.50.0
-// @description  Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.51.0
+// @description  Vista móvil (tablas como tarjetas, ventanas a pantalla completa, filtros plegables y botón de búsqueda), Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.50.0';                                                       // mantener igual a @version
+  const VERSION = '1.51.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -995,6 +995,156 @@
     animation-play-state: paused !important;
   }
   @media (prefers-reduced-motion: reduce) { .rmd-eg { transition: none !important; } }
+
+  /* Insumos ya procesados: el portal los pinta con un celeste claro pensado para el tema claro (rgb 221,244,255) y en el tema oscuro su texto claro no se leía */
+  html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.30); }
+  /* ── Vista móvil (v1.51): tablas como tarjetas, ventanas a pantalla completa y controles de tamaño táctil. Todo cuelga de html.rmd-movil: en escritorio no cambia nada ── */
+  html.rmd-movil, html.rmd-movil body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+  .rmd-movil-sel { display: flex; align-items: center; gap: 4px; margin: 6px 0 2px; padding: 4px 6px; border-radius: 8px; background: rgba(128,128,128,.12); font: 12.5px var(--rmd-fuente); color: var(--rmd-texto); }
+  .rmd-movil-sel > span { flex: 1 1 auto; font-weight: 600; } .rmd-movil-sel button { padding: 4px 9px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--rmd-apagado); font: 600 12px var(--rmd-fuente); cursor: pointer; }
+  .rmd-movil-sel button.activo { background: var(--rmd-acento); color: #fff; }
+  /* tabla -> tarjetas (todas las columnas siguen en el DOM: solo cambia cómo se dibujan) */
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] { display: block; width: 100% !important; min-width: 0 !important; table-layout: auto !important; border-collapse: collapse; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > thead { display: none !important; } html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody { display: block; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow { display: flex !important; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 6px 14px; position: relative; box-sizing: border-box; height: auto !important; padding: 10px 14px 12px; border-bottom: 1px solid var(--rmd-borde); }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov][data-rmd-mov=estructura] > tbody > tr.sapMListTblRow { display: grid !important; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px 8px; }
+  html.rmd-movil table.sapMListTbl[data-rmd-sel] > tbody > tr.sapMListTblRow { padding-left: 44px; } html.rmd-movil table.sapMListTbl[data-rmd-nav] > tbody > tr.sapMListTblRow { padding-right: 38px; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td { box-sizing: border-box; min-width: 0; width: auto !important; max-width: 100% !important; height: auto !important; padding: 0 !important; border: 0 !important; text-align: left !important; overflow: visible; vertical-align: top; }
+  html.rmd-movil :where(table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow) > td { order: 500; flex: 0 1 auto; grid-column: 1 / -1; }
+  html.rmd-movil :where(table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow) > td[data-rmd-etq]::before { content: attr(data-rmd-etq); display: block; margin: 0 0 2px; font: 400 11px/1.2 var(--rmd-fuente); color: var(--rmd-apagado); white-space: nowrap; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-vacio], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblHighlightCell, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblNavigatedCell { display: none !important; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblSelCol { position: absolute; left: 6px; top: 6px; width: 36px !important; grid-column: auto; grid-row: auto; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblNavCol { position: absolute; right: 6px; top: 12px; width: 28px !important; grid-column: auto; grid-row: auto; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMText, html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMLabel { white-space: normal; overflow-wrap: anywhere; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMInputBase, html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMSlt, html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMComboBox { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+  /* casillas: el nombre del campo va junto a la casilla */
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=estado-cc], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=edit], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=r-por], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=v-b], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=conforme], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=proceso-menor] { display: flex; align-items: center; gap: 6px; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=estado-cc]::before, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=edit]::before, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=r-por]::before, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=v-b]::before, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=conforme]::before, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=proceso-menor]::before { margin: 0; }
+  /* lista principal */
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=codigo] { order: 1; flex: 0 0 auto; font-size: 16px; font-weight: 700; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=version] { order: 2; flex: 0 0 auto; color: var(--rmd-apagado); }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=estado] { order: 3; flex: 0 0 auto; margin-left: auto; font-weight: 600; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=descripcion] { order: 4; flex: 1 0 100%; font-size: 14px; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=etapa] { order: 5; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=planta] { order: 6; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=fase] { order: 7; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=produccion-estado] { order: 8; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=produccion-enviar] { order: 9; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=produccion-estatus] { order: 10; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=fecha-autorizacion] { order: 11; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=usuario-autorizacion] { order: 12; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=a-f] { order: 13; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=accion] { order: 20; flex: 1 0 100%; margin-top: 4px; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=codigo]::before, html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=version]::before, html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=descripcion]::before, html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=estado]::before, html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=accion]::before { content: none; }
+  html.rmd-movil table[data-rmd-mov=lista] td[data-rmd-col=version]::before { content: 'v'; display: inline; margin: 0; font-size: inherit; color: inherit; }
+  /* estructura de RMD (ventana raíz) */
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=orden] { grid-column: 1 / span 2; grid-row: 1; font-size: 18px; font-weight: 700; color: var(--rmd-acento-texto); }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=descripcion] { grid-column: 3 / span 10; grid-row: 1; font-size: 15px; font-weight: 600; }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=codigo] { grid-column: 1 / span 3; grid-row: 2; }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=items] { grid-column: 4 / span 3; grid-row: 2; }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=repite] { grid-column: 7 / span 3; grid-row: 2; }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=num] { grid-column: 10 / span 3; grid-row: 2; }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=acc] { grid-column: 1 / -1; grid-row: 3; display: flex; justify-content: flex-end; gap: 6px; }
+  html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=orden]::before, html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=descripcion]::before, html.rmd-movil table[data-rmd-mov=estructura] td[data-rmd-col=acc]::before { content: none; }
+  /* etiquetas */
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=orden] { order: 1; flex: 0 0 auto; min-width: 18px; font-size: 18px; font-weight: 700; color: var(--rmd-acento-texto); }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=descripcion] { order: 2; flex: 1 1 calc(100% - 52px); font-size: 15px; font-weight: 600; }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=codigo] { order: 3; }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=items] { order: 4; }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=conforme] { order: 5; }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=proceso-menor] { order: 6; }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=acciones] { order: 20; flex: 1 0 100%; display: flex; justify-content: flex-end; gap: 6px; }
+  html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=orden]::before, html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=descripcion]::before, html.rmd-movil table[data-rmd-mov=etiquetas] td[data-rmd-col=acciones]::before { content: none; }
+  /* pasos y procesos menores */
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=orden], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=orden] { order: 10; flex: 0 0 74px; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=codigo], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=codigo] { order: 20; flex: 1 1 auto; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=estado], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=estado] { order: 25; flex: 0 0 auto; color: var(--rmd-apagado); }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=descripcion], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=descripcion] { order: 30; flex: 1 0 100%; font-size: 14px; font-weight: 600; line-height: 1.35; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=depende], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=depende] { order: 22; flex: 1 1 120px; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=tipo-dato], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=tipo-dato] { order: 50; flex: 1 0 100%; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=clave-modelo], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=clave-modelo] { order: 60; flex: 1 1 calc(50% - 7px); }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=puesto-trabajo], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=puesto-trabajo] { order: 70; flex: 1 1 calc(50% - 7px); }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=cantidad-insumos], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=cantidad-insumos] { order: 75; flex: 1 1 calc(50% - 7px); }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=um], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=um] { order: 76; flex: 1 1 calc(50% - 7px); }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=val-inicial], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=val-inicial] { order: 80; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=val-final], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=val-final] { order: 90; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=margen], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=margen] { order: 100; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=decimal], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=decimal] { order: 110; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=estado-cc], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=estado-cc] { order: 120; flex: 0 0 auto; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=edit], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=edit] { order: 130; flex: 0 0 auto; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=r-por], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=r-por] { order: 140; flex: 0 0 auto; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=v-b], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=v-b] { order: 150; flex: 0 0 auto; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=proc-men], html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=proc-men] { order: 160; flex: 1 0 100%; }
+  html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=descripcion]::before, html.rmd-movil table[data-rmd-mov=pasos] td[data-rmd-col=estado]::before, html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=descripcion]::before, html.rmd-movil table[data-rmd-mov=pm] td[data-rmd-col=estado]::before { content: none; }
+  /* especificaciones y equipos */
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=descripcion] { order: 1; flex: 1 0 100%; font-weight: 600; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=especificaciones] { order: 2; flex: 1 0 100%; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=tipo-dato] { order: 3; flex: 1 0 100%; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=valor-inicial] { order: 4; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=valor-final] { order: 5; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=margen] { order: 6; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=decimal] { order: 7; flex: 1 1 64px; }
+  html.rmd-movil table[data-rmd-mov=espec] td[data-rmd-col=descripcion]::before { content: none; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=orden] { order: 1; flex: 0 0 auto; font-size: 16px; font-weight: 700; color: var(--rmd-acento-texto); }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=descripcion] { order: 2; flex: 1 1 calc(100% - 52px); font-weight: 600; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=codigo] { order: 3; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=codigo-de-referencia] { order: 4; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=estado] { order: 5; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=area] { order: 6; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=tipo] { order: 7; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=acciones] { order: 20; flex: 1 0 100%; }
+  html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=orden]::before, html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=descripcion]::before { content: none; }
+  /* cualquier otra tabla: dos campos por línea */
+  html.rmd-movil :where(table[data-rmd-mov=otra] > tbody > tr.sapMListTblRow) > td { flex: 1 1 calc(50% - 7px); }
+  html.rmd-movil table[data-rmd-mov=otra] td[data-rmd-col^=descripcion], html.rmd-movil table[data-rmd-mov=otra] td[data-rmd-col^=especificacion], html.rmd-movil table[data-rmd-mov=otra] td[data-rmd-col^=observ] { flex: 1 0 100%; }
+  /* ventanas a pantalla completa y barras de herramientas */
+  html.rmd-movil .sapMDialog:not(.sapMMessageBox):not(.sapMMessageDialog):not(.sapMBusyDialog):not(.sapMBusyDialog-Light) { top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; margin: 0 !important; border-radius: 0 !important; transform: none !important; box-sizing: border-box; }
+  html.rmd-movil .sapMDialogSection .sapMTB, html.rmd-movil .sapMPage .sapMTB { flex-wrap: wrap; height: auto !important; min-height: 2.75rem; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
+  html.rmd-movil .sapMTB > span[class*=rmd-], html.rmd-movil .sapMTB > div[class*=rmd-] { flex-wrap: wrap; max-width: 100%; } html.rmd-movil .rmd-copia-grupo { display: flex; flex: 1 1 100%; margin-right: 0; }
+  /* filtros plegables de la lista principal */
+  html.rmd-movil .sapUiAFLayout[data-rmd-filtros=plegado] > [data-rmd-extra] { display: none !important; }
+  html.rmd-movil .rmd-filtros-mas { display: block; margin: 2px 0 8px 0; height: 34px; padding: 0 14px; border: 1px solid var(--rmd-borde-campo); border-radius: 17px; background: transparent; color: var(--rmd-acento-texto); font: 600 13px var(--rmd-fuente); cursor: pointer; }
+  html.rmd-movil .rmd-filtros-mas::after { content: '▾'; margin-left: 6px; } html.rmd-movil .rmd-filtros-mas[aria-expanded=true]::after { content: '▴'; }
+  html:not(.rmd-movil) .rmd-filtros-mas, html:not(.rmd-movil) #rmd-ui-buscar { display: none !important; }
+  /* botones flotantes (ajustes y búsqueda) y panel como hoja inferior */
+  html.rmd-movil #rmd-ui-panel { left: 10px; bottom: 10px; } html.rmd-movil #rmd-ui-panel summary { width: 44px; height: 44px; } html.rmd-movil #rmd-ui-panel summary svg { width: 20px; height: 20px; }
+  #rmd-ui-buscar { position: fixed; left: 62px; bottom: 10px; z-index: 99999; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: var(--rmd-acento); color: #fff; border: 1px solid var(--rmd-acento); box-shadow: 0 2px 10px rgba(0,0,0,.4); cursor: pointer; }
+  #rmd-ui-buscar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; } #rmd-ui-buscar[hidden] { display: none; }
+  html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo { position: fixed; left: 8px; right: 8px; bottom: 62px; width: auto; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); padding: 14px 14px 12px; }
+  html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo, html.rmd-movil .rmd-modal-cuerpo, html.rmd-movil .rmd-paleta-res { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }   /* (al llegar al final no se desplaza la página de detrás) */
+  html.rmd-movil #rmd-ui-panel summary, html.rmd-movil #rmd-ui-buscar, html.rmd-movil .rmd-filtros-mas, html.rmd-movil .rmd-paleta-it, html.rmd-movil .rmd-movil-sel button { -webkit-tap-highlight-color: transparent; }
+  html.rmd-movil #rmd-ui-panel .rmd-fila { padding: 9px 0; gap: 14px; } html.rmd-movil #rmd-ui-panel .rmd-btn { height: 40px; }
+  html.rmd-movil #rmd-ui-panel input[type=checkbox] { width: 44px; height: 26px; border-radius: 13px; } html.rmd-movil #rmd-ui-panel input[type=checkbox]::after { top: 3px; left: 3px; width: 20px; height: 20px; } html.rmd-movil #rmd-ui-panel input[type=checkbox]:checked::after { transform: translateX(18px); }
+  html.rmd-movil #rmd-ui-panel .rmd-panel-pie > span { display: none; } html.rmd-movil #rmd-ui-panel .rmd-panel-pie { justify-content: flex-end; }
+  /* saludo, avisos y mensajes */
+  html.rmd-movil .rmd-saludo { left: 10px; right: 10px; bottom: 62px; max-width: none; } html.rmd-movil .rmd-saludo-tip { display: none; }
+  html.rmd-movil .rmd-toast { top: 58px; bottom: auto; max-width: calc(100vw - 20px); }
+  html.rmd-movil .rmd-creado { left: 10px; right: 10px; bottom: 62px; transform: none; min-width: 0; max-width: none; }
+  /* ventanas del script a pantalla completa (los avisos pequeños siguen centrados) */
+  html.rmd-movil .rmd-modal-fondo { place-items: stretch; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  html.rmd-movil .rmd-modal:not(.rmd-modal-aviso) { width: 100%; min-width: 0; max-width: none; height: 100%; max-height: none; box-sizing: border-box; padding: 12px 12px 10px; border: 0; border-radius: 0; }
+  html.rmd-movil .rmd-modal.rmd-modal-aviso { align-self: center; justify-self: center; width: calc(100vw - 24px); box-sizing: border-box; padding: 18px 18px 14px; }
+  html.rmd-movil .rmd-modal-pie { flex-wrap: wrap; } html.rmd-movil .rmd-btn { height: 40px; }
+  html.rmd-movil .rmd-menu { left: 8px !important; right: 8px; width: auto; min-width: 0; } html.rmd-movil .rmd-rec-detalle { left: 8px !important; right: 8px; width: auto; max-width: none; }
+  /* contenido de las ventanas del script (reglas, formularios) */
+  html.rmd-movil .rmd-rg-tabs { overflow-x: auto; } html.rmd-movil .rmd-rg-tabs button { flex: none; padding: 9px 12px; white-space: nowrap; }
+  html.rmd-movil .rmd-rg-fila { flex-wrap: wrap; } html.rmd-movil .rmd-rg-fila .rmd-rg-acc { flex: 1 0 100%; justify-content: flex-end; gap: 6px; } html.rmd-movil .rmd-rg-acc button { width: 40px; height: 36px; }
+  html.rmd-movil .rmd-rg-form { grid-template-columns: minmax(0, 1fr); } html.rmd-movil .rmd-rg-form input[type=text], html.rmd-movil .rmd-rg-form select, html.rmd-movil .rmd-rg-form textarea, html.rmd-movil .rmd-rg-q { min-height: 38px; font-size: 16px; }
+  html.rmd-movil .rmd-rg-okcal { flex-wrap: wrap; } html.rmd-movil .rmd-ind-form { gap: 10px 14px; } html.rmd-movil .rmd-ind-form label { flex: 1 1 100%; }
+  /* paleta (Ctrl+K en escritorio; botón de búsqueda en el teléfono) */
+  .rmd-paleta-x { display: none; }
+  html.rmd-movil .rmd-paleta-fondo { padding-top: 0; align-items: stretch; } html.rmd-movil .rmd-paleta { display: flex; flex-direction: column; width: 100%; height: 100%; border: 0; border-radius: 0; }
+  html.rmd-movil .rmd-paleta-caja { padding-right: 44px; } html.rmd-movil .rmd-paleta-q { font-size: 16px; }
+  html.rmd-movil .rmd-paleta-x { display: block; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 0; background: transparent; color: var(--rmd-apagado); font: 300 28px/1 var(--rmd-fuente); cursor: pointer; }
+  html.rmd-movil .rmd-paleta-res { flex: 1 1 auto; max-height: none; } html.rmd-movil .rmd-paleta-it { flex-wrap: wrap; gap: 4px 10px; padding: 10px 16px; min-height: 44px; }
+  html.rmd-movil .rmd-paleta-it .cod { order: 1; min-width: 0; } html.rmd-movil .rmd-paleta-it .ver { order: 2; min-width: 0; } html.rmd-movil .rmd-paleta-it > .meta { order: 3; margin-left: auto; }
+  html.rmd-movil .rmd-paleta-it .desc { order: 4; flex: 1 0 100%; white-space: normal; } html.rmd-movil .rmd-paleta-it .desc .meta { white-space: normal; }
+  html.rmd-movil .rmd-paleta-acc { order: 5; display: inline-flex !important; flex: 1 0 100%; gap: 8px; } html.rmd-movil .rmd-paleta-acc button { padding: 7px 12px; }
+  html.rmd-movil .rmd-paleta-pie { padding-bottom: 66px; }
+  html.rmd-movil .rmd-vivo-panel { display: none !important; }   /* «RMD en vivo» (PDF a la derecha, apagado por defecto) no cabe en un teléfono */
+  /* controles del portal con tamaño táctil */
+  html.rmd-movil .sapMBtn, html.rmd-movil .sapMBtn > .sapMBtnInner { min-height: 36px; } html.rmd-movil .sapMBtnIconFirst.sapMBtnIcon:not(.sapMBtnText) { min-width: 36px; }
+  /* fin de la vista móvil */
   @media (prefers-reduced-motion: reduce) {
     canvas.rmd-orbe, .rmd-texto-entra, .rmd-modal, .rmd-modal-fondo, .rmd-menu, .rmd-rec-detalle, .rmd-toast, .rmd-creado, .rmd-ing-card, #rmd-ui-panel[open] > :not(summary) { animation: none !important; }
     .rmd-orbe-txt[data-texto]::before { display: none; } .rmd-ind, .rmd-ico-swap > svg { transition: none !important; }
@@ -2141,7 +2291,12 @@
     // PM OP no debe marcarse nunca: si algún paso la tiene marcada, la columna deja de ocultarse para que se vea y se corrija
     const iPmop = nombres.indexOf('PM OP');
     if (iPmop >= 0 && filas.some((tr) => marcada(celda(tr, iPmop)))) tabla.dataset.rmdPmop = '1'; else delete tabla.dataset.rmdPmop;
-    if (on('columnas')) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : 'otro'); else { quitarAnchos(tabla, ths); delete tabla.dataset.rmdOcultaEstado; }
+    if (on('columnas') && !html.classList.contains('rmd-movil')) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : 'otro');
+    else {                                                                                  // (en móvil las filas son tarjetas: sin anchos fijos; «Estado» sigue oculto si todos son «Activo»)
+      quitarAnchos(tabla, ths); delete tabla.dataset.rmdOcultaEstado;
+      const iEst = nombres.indexOf('ESTADO');
+      if (html.classList.contains('rmd-movil') && esPasos && iEst >= 0 && filas.length > 0 && filas.every((tr) => celda(tr, iEst) && norm(celda(tr, iEst).textContent) === 'Activo')) tabla.dataset.rmdOcultaEstado = '1';
+    }
     // columnas ocultas
     ths.forEach((th, i) => {
       const oculta = columnaOculta(nombres[i], tabla, esPM) || (tabla.dataset.rmdOcultaEstado === '1' && nombres[i] === 'ESTADO');
@@ -2751,6 +2906,7 @@
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec } };   // (diagnóstico y pruebas)
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
+    try { quitarVistaMovil(); } catch (e) { /* sin UI5 */ }
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
@@ -2823,6 +2979,7 @@
   }
   function ajustarTodoCuerpo() {
     if (!opc.activo) { limpiezaTotal(); return; }
+    try { gestionarVistaMovil(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('vista móvil: ' + e.message); }
     window.__rmdStats.ajustes++;
     // al cerrarse una ventana de procesos menores (pudo corregirse algo) se vuelven a revisar los de la lista de pasos
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
@@ -4315,6 +4472,133 @@
     b.classList.add('rmd-copiado'); clearTimeout(b.__rmdCopiado);
     b.__rmdCopiado = setTimeout(() => { b.classList.remove('rmd-copiado'); if (b.__rmdTexto) { b.textContent = b.__rmdTexto; b.classList.remove('rmd-texto-entra'); void b.offsetWidth; b.classList.add('rmd-texto-entra'); } }, 1600);
   }
+  // ---- Vista móvil (v1.51) ----
+  // En un teléfono UI5 pasa cada fila de una tabla a una «tarjeta» de un solo campo por línea (un paso mide ~900 px) y esconde las columnas
+  // que el script necesita para sus avisos. Aquí se hace al revés: las tablas conservan TODAS sus columnas y celdas (así siguen funcionando las
+  // alertas, copiar y pegar, la selección, etc.) y solo cambia su presentación: cada fila es una tarjeta compacta hecha con CSS, con el nombre
+  // de cada campo tomado de la cabecera. Se activa sola con pantallas de hasta 900 px (o un teléfono) y se puede forzar o apagar en el panel.
+  const MQ_MOVIL = window.matchMedia ? window.matchMedia('(max-width: 900px)') : null;
+  const esTelefono = () => !!(window.sap && sap.ui && sap.ui.Device && sap.ui.Device.system && sap.ui.Device.system.phone);
+  function movilActivo() { if (!opc.activo) return false; const m = opc.vistaMovil || 'auto'; return m === 'si' ? true : m === 'no' ? false : !!((MQ_MOVIL && MQ_MOVIL.matches) || esTelefono()); }
+  const POPIN_ORIG = new Map();                                       // columna (control UI5) -> [minScreenWidth, demandPopin], tal como los puso el portal o el script
+  const slugCol = (n) => SIN_ACENTOS(n).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  function tipoTablaMovil(c, t) {
+    const tiene = (x) => c.includes(x);
+    if (tiene('produccion-estado') && tiene('planta')) return 'lista';
+    if (tiene('tipo-dato') && tiene('depende')) return 'pasos';
+    if (tiene('cantidad-insumos')) return 'pm';
+    if (tiene('especificaciones') && tiene('tipo-dato')) return 'espec';
+    if (tiene('codigo-de-referencia')) return 'equipos';
+    if (tiene('repite') && tiene('items')) return 'estructura';
+    if (tiene('conforme') && tiene('items')) return 'etiquetas';
+    return 'otra';
+  }
+  function etiquetarTablaMovil(t) {
+    const ths = [...t.querySelectorAll('thead th')]; if (ths.length < 3) return;
+    const nombres = ths.map((th) => norm(th.textContent)), cols = nombres.map((n) => (n ? slugCol(n) : '')), tipo = tipoTablaMovil(cols, t);
+    if (t.dataset.rmdMov !== tipo) t.dataset.rmdMov = tipo;
+    const conSel = ths.some((th) => th.classList.contains('sapMListTblSelCol')) || (ths.length > 1 && !cols[0] && !!ths[1].querySelector('[role=checkbox], .sapMCb') && !cols[1]), v = conSel ? '1' : '';
+    if ((t.dataset.rmdSel || '') !== v) { if (v) t.dataset.rmdSel = v; else delete t.dataset.rmdSel; }
+    const vn = ths.some((th) => th.classList.contains('sapMListTblNavCol')) ? '1' : '';
+    if ((t.dataset.rmdNav || '') !== vn) { if (vn) t.dataset.rmdNav = vn; else delete t.dataset.rmdNav; }
+    filasPrincipales(t).forEach((tr) => {
+      for (let i = 0; i < cols.length; i++) {
+        const td = tr.children[i]; if (!td || td.tagName !== 'TD') continue;
+        if (cols[i]) { if (td.dataset.rmdCol !== cols[i]) td.dataset.rmdCol = cols[i]; if (td.dataset.rmdEtq !== nombres[i]) td.dataset.rmdEtq = nombres[i]; }
+        const vacio = !(td.textContent || '').trim() && !td.querySelector('button, [role=checkbox], [role=button], .sapUiIcon, img, svg, canvas') && [...td.querySelectorAll('input, textarea, select')].every((i) => !i.value && deshabilitado(i));   // (un campo vacío y deshabilitado no aporta nada en una tarjeta; uno editable sí)
+        if (vacio !== (td.dataset.rmdVacio === '1')) { if (vacio) td.dataset.rmdVacio = '1'; else delete td.dataset.rmdVacio; }
+      }
+    });
+  }
+  function tablasMovil(activo) {
+    const ui5 = typeof sap !== 'undefined' && sap.ui && sap.ui.getCore;
+    if (activo) {
+      document.querySelectorAll('table.sapMListTbl').forEach((t) => {
+        const ctl = ui5 ? sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')) : null;
+        let cambio = false;
+        if (ctl && ctl.getColumns) ctl.getColumns().forEach((c) => {     // (en cada ajuste: también las columnas que se añaden más tarde, como «Fase»)
+          if (c.getMinScreenWidth() === '' && !c.getDemandPopin()) return;
+          if (!POPIN_ORIG.has(c)) POPIN_ORIG.set(c, [c.getMinScreenWidth(), c.getDemandPopin()]);
+          if (c.getMinScreenWidth() !== '') c.setMinScreenWidth('');
+          if (c.getDemandPopin()) c.setDemandPopin(false);
+          cambio = true;
+        });
+        if (!cambio && t.getClientRects().length) etiquetarTablaMovil(t);
+      });
+    } else {
+      if (ui5) POPIN_ORIG.forEach(([min, dem], c) => { try { if (!c.bIsDestroyed) { c.setMinScreenWidth(min); c.setDemandPopin(dem); } } catch (e) { /* la columna ya no existe */ } });
+      POPIN_ORIG.clear();
+      document.querySelectorAll('table[data-rmd-mov]').forEach((t) => { delete t.dataset.rmdMov; delete t.dataset.rmdSel; delete t.dataset.rmdNav; });
+      document.querySelectorAll('td[data-rmd-col], td[data-rmd-etq], td[data-rmd-vacio]').forEach((td) => { delete td.dataset.rmdCol; delete td.dataset.rmdEtq; delete td.dataset.rmdVacio; });
+    }
+  }
+  // Filtros de la lista principal: en el teléfono quedan a la vista «Código RMD», «Descripción» y el último campo (Equipo); los del medio (estado,
+  // planta, etapa…) van tras «Más filtros». Los campos siguen ahí con su valor: «Ir» busca con todos. El botón indica cuántos ocultos están en uso.
+  // OJO con el AlignedFlowLayout de SAP: su reflow() escribe alto y ancho en el ÚLTIMO HIJO del layout y mide el último campo (si ese campo
+  // está oculto sus medidas son 0 y coloca mal el botón «Ir»): por eso el botón es hermano del layout y el último campo nunca se oculta.
+  function reflujoFiltros(lay) { try { const c = sap.ui.getCore().byId(lay.id); if (c && c.reflow) c.reflow(); } catch (e) { /* sin AlignedFlowLayout */ } }
+  // La barra de filtros de la PÁGINA: la ventana raíz del RMD trae su propio «btnGo» invisible (sap-ui-invisible-…-btnGo), que sale antes en el DOM
+  // porque las ventanas cuelgan de la zona estática de UI5 y su formulario de cabecera también es un AlignedFlowLayout: no es la barra de filtros.
+  let layFiltrosPag = null;
+  function layoutFiltrosPagina() {
+    if (layFiltrosPag && layFiltrosPag.isConnected && !layFiltrosPag.closest('.sapMDialog')) return layFiltrosPag;
+    layFiltrosPag = null;
+    for (const go of document.querySelectorAll('[id$=btnGo]')) {
+      if (/^sap-ui-invisible-/.test(go.id) || go.closest('.sapMDialog')) continue;
+      const l = go.closest('.sapUiAFLayout'); if (l) return (layFiltrosPag = l);
+    }
+    return null;
+  }
+  function gestionarFiltrosMovil(activo) {
+    const lay = activo ? layoutFiltrosPagina() : null;
+    document.querySelectorAll('.sapUiAFLayout[data-rmd-filtros]').forEach((l) => {
+      if (activo && l === lay) return;
+      delete l.dataset.rmdFiltros; l.querySelectorAll(':scope > [data-rmd-extra]').forEach((x) => x.removeAttribute('data-rmd-extra')); reflujoFiltros(l);
+    });
+    document.querySelectorAll('.rmd-filtros-mas').forEach((x) => { if (!(activo && lay && x.previousElementSibling === lay)) x.remove(); });
+    if (!activo || !lay) return;
+    const campos = [...lay.querySelectorAll(':scope > .sapUiAFLayoutItem:not(.sapUiAFLayoutSpacer)')], medio = campos.slice(2, -1);
+    if (!medio.length) return;
+    let cambio = false;
+    if (!lay.dataset.rmdFiltros) { lay.dataset.rmdFiltros = 'plegado'; cambio = true; }
+    medio.forEach((c) => { if (c.dataset.rmdExtra !== '1') { c.dataset.rmdExtra = '1'; cambio = true; } });
+    let b = lay.nextElementSibling && lay.nextElementSibling.classList.contains('rmd-filtros-mas') ? lay.nextElementSibling : null;
+    if (!b) {
+      b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-filtros-mas';
+      b.addEventListener('click', () => { lay.dataset.rmdFiltros = lay.dataset.rmdFiltros === 'abierto' ? 'plegado' : 'abierto'; gestionarFiltrosMovil(true); reflujoFiltros(lay); });
+      lay.after(b);
+    }
+    const enUso = medio.filter((it) => it.querySelector('.sapMToken') || [...it.querySelectorAll('input')].some((i) => i.value)).length, abierto = lay.dataset.rmdFiltros === 'abierto';
+    const t = abierto ? 'Menos filtros' : 'Más filtros' + (enUso ? ` · ${enUso} en uso` : '');
+    if (b.textContent !== t) b.textContent = t;
+    b.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+    if (cambio) reflujoFiltros(lay);
+  }
+  // Botón flotante de búsqueda (junto al de ajustes): en el teléfono no hay Ctrl+K, y «ir a un RMD» es lo más usado
+  let buscarEl = null;
+  function montarBuscarMovil(m) {
+    if (!buscarEl) {
+      buscarEl = document.createElement('button'); buscarEl.type = 'button'; buscarEl.id = 'rmd-ui-buscar'; buscarEl.title = 'Ir a un RMD o a una herramienta'; buscarEl.setAttribute('aria-label', 'Ir a un RMD o a una herramienta');
+      buscarEl.innerHTML = ICONO_LUPA; buscarEl.addEventListener('click', () => abrirPaleta());
+    }
+    const ver = m && on('paleta'); if (buscarEl.hidden === ver) buscarEl.hidden = !ver;
+    if (ver && buscarEl.parentNode !== html) html.appendChild(buscarEl); else if (!ver && buscarEl.isConnected) buscarEl.remove();
+  }
+  let movilPuesto = false;                                            // hay algo de la vista móvil puesto (marcas, botón, filtros): al salir se limpia una sola vez
+  function gestionarVistaMovil() {
+    const m = movilActivo(), clase = html.classList.contains('rmd-movil');
+    if (!m && !movilPuesto && !clase) return;                         // (escritorio sin nada puesto: no se recorre el DOM en cada ajuste)
+    if (clase !== m) html.classList.toggle('rmd-movil', m);
+    tablasMovil(m); gestionarFiltrosMovil(m); montarBuscarMovil(m);
+    movilPuesto = m;
+  }
+  window.__rmdStats.movil = { activo: () => movilActivo(), gestionar: () => gestionarVistaMovil(), popinGuardadas: () => POPIN_ORIG.size };   // (pruebas)
+  function quitarVistaMovil() {
+    if (!movilPuesto && !html.classList.contains('rmd-movil')) return;
+    html.classList.remove('rmd-movil'); tablasMovil(false); gestionarFiltrosMovil(false); montarBuscarMovil(false); movilPuesto = false;
+  }
+  if (MQ_MOVIL && MQ_MOVIL.addEventListener) MQ_MOVIL.addEventListener('change', () => setTimeout(() => { try { gestionarVistaMovil(); } catch (e) { /* se reintenta en el siguiente ajuste */ } }, 50));
+  try { if (movilActivo()) html.classList.add('rmd-movil'); } catch (e) { /* sin matchMedia */ }   // (desde el primer instante: sin un destello con el diseño de escritorio)
   // ---- Espera de inicio y de la capa a pantalla completa (v1.50) ----
   // Al arrancar, SAP muestra y oculta su capa de espera varias veces seguidas (en el portal real: 4 veces en 7 s, con un hueco en blanco
   // de más de un segundo antes de dibujar la pantalla) y un orbe colgado de esa capa se cortaba y reaparecía cada vez. Aquí la espera vive
@@ -8040,15 +8324,15 @@
   let externosUI5 = false;
   function registrarExternosUI5() {
     if (externosUI5 || typeof sap === 'undefined') return;
-    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { /* versión de UI5 sin esta función */ }
+    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { /* versión de UI5 sin esta función */ }
   }
   function abrirPaleta() {
     if (document.querySelector('.rmd-paleta-fondo')) return;
     registrarExternosUI5();
     const ctrl = controladorPrincipal(), hayVentanas = dialogos().length > 0;
     const fondo = document.createElement('div'); fondo.className = 'rmd-paleta-fondo';
-    fondo.innerHTML = `<div class="rmd-paleta" role="dialog" aria-label="Ir a"><div class="rmd-paleta-caja"><input type="search" class="rmd-paleta-q" autocomplete="off" spellcheck="false" placeholder="Código o descripción de un RMD, o una herramienta" aria-label="Ir a un RMD o a una herramienta"></div>
-      <div class="rmd-paleta-res" role="listbox"></div><div class="rmd-paleta-pie"><span>↑↓ elegir · Enter configurar el RMD · Alt+Enter asociar fórmulas · Esc cerrar</span><span class="rmd-paleta-estado"></span></div></div>`;
+    fondo.innerHTML = `<div class="rmd-paleta" role="dialog" aria-label="Ir a"><div class="rmd-paleta-caja"><input type="search" class="rmd-paleta-q" autocomplete="off" spellcheck="false" placeholder="Código o descripción de un RMD, o una herramienta" aria-label="Ir a un RMD o a una herramienta"><button type="button" class="rmd-paleta-x" aria-label="Cerrar" title="Cerrar">×</button></div>
+      <div class="rmd-paleta-res" role="listbox"></div><div class="rmd-paleta-pie"><span>${html.classList.contains('rmd-movil') ? 'Toca un RMD para configurarlo; «Fórmulas», «Master» o «Filtrar» para otra acción' : '↑↓ elegir · Enter configurar el RMD · Alt+Enter asociar fórmulas · Esc cerrar'}</span><span class="rmd-paleta-estado"></span></div></div>`;
     if (on('orbes') && !ORBES.reducido.matches) { const b = brillo(); b.classList.add('rmd-beam-linea'); b.dataset.beam = temaOscuro() ? 'rmdl' : 'rmdlc'; fondo.querySelector('.rmd-paleta-caja').appendChild(b); }   // (el brillo de la barra de búsqueda de libraries.dev)
     document.body.appendChild(fondo);
     const q = fondo.querySelector('.rmd-paleta-q'), res = fondo.querySelector('.rmd-paleta-res'), estado = fondo.querySelector('.rmd-paleta-estado');
@@ -8086,7 +8370,7 @@
       if (e.key === 'Enter' && e.target === q) { e.preventDefault(); e.stopPropagation(); ejecutar(activo, e.altKey ? 'asociar' : 'configurar'); }
     };
     document.addEventListener('keydown', teclas, true);
-    fondo.addEventListener('mousedown', (e) => { if (e.target === fondo) cerrar(); });
+    fondo.addEventListener('mousedown', (e) => { if (e.target === fondo) cerrar(); }); fondo.querySelector('.rmd-paleta-x').addEventListener('click', cerrar);
     res.addEventListener('mousemove', (e) => { const it = e.target.closest('.rmd-paleta-it'); if (it && +it.dataset.k !== activo) { activo = +it.dataset.k; marcar(); } });
     res.addEventListener('click', (e) => { const it = e.target.closest('.rmd-paleta-it'); if (!it) return; const b = e.target.closest('button[data-a]'); ejecutar(+it.dataset.k, b ? b.dataset.a : 'configurar'); });
     q.addEventListener('input', () => { activo = 0; pintar(); });
@@ -8658,6 +8942,7 @@
   const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
   const ICONO_PEGAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4v2H6z"/><path d="M4 3h-.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 12.5 3H12"/></svg>';
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
+  const ICONO_LUPA = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/></svg>';
   const botonIcono = (icono, txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-btn ' + (cls || ''); b.innerHTML = icono + '<span></span>'; b.querySelector('span').textContent = txt; b.addEventListener('click', fn); return b; };
   // Los botones van en la barra de herramientas de la tabla ("Pasos (n)"), justo a la izquierda del separador y del icono de impresora.
   function instalarBotonesCopia(d) {
@@ -12280,6 +12565,7 @@ td.ult { position: relative; }
     const p = document.createElement('details'); p.id = 'rmd-ui-panel';
     p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
       '<div class="rmd-panel-cab"><b>Mejoras de interfaz</b><span>v' + VERSION + '</span></div>' + fila('activo', 'maestro') +
+      '<div class="rmd-movil-sel" role="group" aria-label="Vista móvil" title="Cómo se ven las tablas y las ventanas: Auto = en pantallas de hasta 900 px"><span>Vista móvil</span>' + [['auto', 'Auto'], ['si', 'Siempre'], ['no', 'Nunca']].map(([k, t]) => `<button type="button" data-vm="${k}" class="${(opc.vistaMovil || 'auto') === k ? 'activo' : ''}">${t}</button>`).join('') + '</div>' +
       '<div class="rmd-panel-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear, activar o editar tus reglas de revisión, exportarlas / importarlas y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión…</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
       GRUPOS_PANEL.map(([t, ks]) => `<div class="rmd-grupo">${t}</div>` + ks.map((k) => fila(k)).join('')).join('') +
       '<div class="rmd-panel-pie"><span>Ctrl+K = Ir a… · Ctrl+S = Guardar</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
@@ -12290,9 +12576,10 @@ td.ult { position: relative; }
       document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => { if (c.style.display === 'none') c.style.display = ''; });
       ajustarTodo();
     });
+    p.querySelector('.rmd-movil-sel').addEventListener('click', (e) => { const b = e.target.closest('button[data-vm]'); if (!b) return; opc.vistaMovil = b.dataset.vm; guardar(opc); p.querySelectorAll('.rmd-movil-sel button').forEach((x) => x.classList.toggle('activo', x === b)); gestionarVistaMovil(); ajustarTodo(); });
     p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { p.open = false; abrirModificacionesMasivas('suspender'); });
     p.querySelector('.rmd-abrir-reglas').addEventListener('click', () => { p.open = false; abrirReglas(); });
-    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); guardar(opc); refrescar(); aplicarClases(); ajustarTodo(); });
+    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); opc.vistaMovil = 'auto'; p.querySelectorAll('.rmd-movil-sel button').forEach((x) => x.classList.toggle('activo', x.dataset.vm === 'auto')); guardar(opc); refrescar(); gestionarVistaMovil(); aplicarClases(); ajustarTodo(); });
     panelEl = p; montarPanel();
   }
   // El botón cuelga de <html>, no de <body>: UI5 usa el <body> como zona de dibujo y, al montar la app (unos segundos después de cargar la página),
