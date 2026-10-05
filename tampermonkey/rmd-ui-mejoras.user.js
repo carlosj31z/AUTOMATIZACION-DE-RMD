@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.51.0
-// @description  Vista móvil (tablas como tarjetas, ventanas a pantalla completa, filtros plegables y botón de búsqueda), Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @version      1.52.0
+// @description  Entrada a Pasos sin congelar el navegador (las etiquetas de más de 50 pasos llegan por tandas), Vista móvil (tablas como tarjetas, ventanas a pantalla completa, filtros plegables y botón de búsqueda), Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -10,7 +10,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.51.0';                                                       // mantener igual a @version
+  const VERSION = '1.52.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
@@ -56,6 +56,7 @@
     ['recetasauto', 'Cambios de recetas: revisarlos solos en segundo plano (las listas de los Ingresados cada 3 h y las de los Autorizados cada 24 h, poco a poco; apagado, solo con «Revisar»)'],
     ['bajas', 'Elementos dados de baja: al entrar a la configuración de un RMD Ingresado avisa qué pasos, procesos menores, utensilios y equipos están de baja en SAP (equipo = estado distinto de MONT-Montado) y los resalta en amarillo en sus listas; no cambia el PDF'],
     ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
+    ['tandas', 'Pasos por tandas: en las etiquetas de más de 50 pasos (Fabricación puede traer 149) la lista enseña los primeros al instante y el resto llega solo en unos segundos, en vez de congelar el navegador mientras el portal los dibuja todos de golpe (si la apagas y la vuelves a encender, recarga la página)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   opc.recetaruta = true;                                                  // (siempre activo: el aviso de recetas incluye la hoja de ruta y el puesto de trabajo)
@@ -190,7 +191,8 @@
   html.rmd-cols .sapMDialog.rmd-g thead th, html.rmd-cols .sapMDialog.rmd-g thead th .sapMText { overflow-wrap: normal !important; word-break: keep-all !important; hyphens: none !important; }
   html.rmd-ui .sapMDialog.rmd-g tbody tr.sapMLIB > td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
   html.rmd-ui .sapMDialog.rmd-g tbody tr.sapMLIB:hover > td { background: rgba(27,141,236,.09) !important; }
-  html.rmd-ui .sapMDialog.rmd-g td .sapMText, html.rmd-ui .sapMDialog.rmd-g td .sapMLabel { white-space: normal; line-height: 1.35; }
+  html.rmd-ui .sapMDialog.rmd-g td .sapMText:not(.sapMTextRenderWhitespaceWrap), html.rmd-ui .sapMDialog.rmd-g td .sapMLabel { white-space: normal; line-height: 1.35; }
+  html.rmd-ui .sapMDialog.rmd-g td .sapMText.sapMTextRenderWhitespaceWrap { white-space: pre-wrap; line-height: 1.35; }                     /* (los saltos de línea y los espacios de la descripción se respetan, como en el portal: fórmulas, listas…) */
   html.rmd-ui .sapMDialog.rmd-g input:focus { outline: 1px solid var(--rmd-acento) !important; outline-offset: -1px; }
 
   /* ── Señales sobre la tabla (discretas: tinte suave + marca lateral, sin contornos) ── */
@@ -396,6 +398,8 @@
   #rmd-filtro-bar button.rmd-alerta { border: 0; background: transparent; color: var(--rmd-ambar); font: inherit; font-size: 13px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
   #rmd-filtro-bar button.rmd-alerta:hover { background: rgba(240,180,90,.12); }
   #rmd-filtro-bar button.rmd-alerta.ok { color: var(--rmd-verde); cursor: default; } #rmd-filtro-bar button.rmd-alerta.ok:hover { background: transparent; }
+  #rmd-filtro-bar button.rmd-alerta:empty { display: none; }                                    /* (mientras llegan los pasos aún no hay alertas que contar) */
+  .rmd-tandas .sapMGrowingListTrigger, .sapMList.rmd-tandas > .sapMGrowingListTrigger { display: none !important; }   /* pasos por tandas: las filas llegan solas, el botón «Más» de UI5 no se ve (si el cargador no avanza, vuelve) */
   /* ── Especificaciones: subir/bajar, asa para arrastrar y textos editables ── */
   .rmd-orden-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
   .rmd-espec-nota { color: var(--rmd-ambar); font: 600 12px var(--rmd-fuente); white-space: nowrap; }
@@ -1000,9 +1004,6 @@
   html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.30); }
   /* ── Vista móvil (v1.51): tablas como tarjetas, ventanas a pantalla completa y controles de tamaño táctil. Todo cuelga de html.rmd-movil: en escritorio no cambia nada ── */
   html.rmd-movil, html.rmd-movil body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
-  .rmd-movil-sel { display: flex; align-items: center; gap: 4px; margin: 6px 0 2px; padding: 4px 6px; border-radius: 8px; background: rgba(128,128,128,.12); font: 12.5px var(--rmd-fuente); color: var(--rmd-texto); }
-  .rmd-movil-sel > span { flex: 1 1 auto; font-weight: 600; } .rmd-movil-sel button { padding: 4px 9px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--rmd-apagado); font: 600 12px var(--rmd-fuente); cursor: pointer; }
-  .rmd-movil-sel button.activo { background: var(--rmd-acento); color: #fff; }
   /* tabla -> tarjetas (todas las columnas siguen en el DOM: solo cambia cómo se dibujan) */
   html.rmd-movil table.sapMListTbl[data-rmd-mov] { display: block; width: 100% !important; min-width: 0 !important; table-layout: auto !important; border-collapse: collapse; }
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > thead { display: none !important; } html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody { display: block; }
@@ -1015,7 +1016,8 @@
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-vacio], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblHighlightCell, html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblNavigatedCell { display: none !important; }
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblSelCol { position: absolute; left: 6px; top: 6px; width: 36px !important; grid-column: auto; grid-row: auto; }
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td.sapMListTblNavCol { position: absolute; right: 6px; top: 12px; width: 28px !important; grid-column: auto; grid-row: auto; }
-  html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMText, html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMLabel { white-space: normal; overflow-wrap: anywhere; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMText:not(.sapMTextRenderWhitespaceWrap), html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMLabel { white-space: normal; overflow-wrap: anywhere; }
+  html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMText.sapMTextRenderWhitespaceWrap { white-space: pre-wrap; overflow-wrap: anywhere; }
   html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMInputBase, html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMSlt, html.rmd-movil table.sapMListTbl[data-rmd-mov] td .sapMComboBox { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
   /* casillas: el nombre del campo va junto a la casilla */
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=estado-cc], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=edit], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=r-por], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=v-b], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=conforme], html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow > td[data-rmd-col=proceso-menor] { display: flex; align-items: center; gap: 6px; }
@@ -1112,7 +1114,7 @@
   #rmd-ui-buscar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; } #rmd-ui-buscar[hidden] { display: none; }
   html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo { position: fixed; left: 8px; right: 8px; bottom: 62px; width: auto; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); padding: 14px 14px 12px; }
   html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo, html.rmd-movil .rmd-modal-cuerpo, html.rmd-movil .rmd-paleta-res { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }   /* (al llegar al final no se desplaza la página de detrás) */
-  html.rmd-movil #rmd-ui-panel summary, html.rmd-movil #rmd-ui-buscar, html.rmd-movil .rmd-filtros-mas, html.rmd-movil .rmd-paleta-it, html.rmd-movil .rmd-movil-sel button { -webkit-tap-highlight-color: transparent; }
+  html.rmd-movil #rmd-ui-panel summary, html.rmd-movil #rmd-ui-buscar, html.rmd-movil .rmd-filtros-mas, html.rmd-movil .rmd-paleta-it { -webkit-tap-highlight-color: transparent; }
   html.rmd-movil #rmd-ui-panel .rmd-fila { padding: 9px 0; gap: 14px; } html.rmd-movil #rmd-ui-panel .rmd-btn { height: 40px; }
   html.rmd-movil #rmd-ui-panel input[type=checkbox] { width: 44px; height: 26px; border-radius: 13px; } html.rmd-movil #rmd-ui-panel input[type=checkbox]::after { top: 3px; left: 3px; width: 20px; height: 20px; } html.rmd-movil #rmd-ui-panel input[type=checkbox]:checked::after { transform: translateX(18px); }
   html.rmd-movil #rmd-ui-panel .rmd-panel-pie > span { display: none; } html.rmd-movil #rmd-ui-panel .rmd-panel-pie { justify-content: flex-end; }
@@ -2201,6 +2203,14 @@
     }
     let codW = 0;                                                                          // Código: que un código de 6-10 dígitos no se parta
     if (iCod >= 0) filas.slice(0, 60).forEach((tr) => { const td = celda(tr, iCod); if (td) { const cs = getComputedStyle(td); codW = Math.max(codW, anchoTexto(td, norm(td.textContent)) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 6); } });
+    let formulaW = 0;                                                                      // Descripción con una fracción dibujada con guiones (p. ej. el cálculo de Rendimiento): que su línea más larga quepa y la barra no se parta
+    const iDesc = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
+    if (tipoTabla === 'pasos' && iDesc >= 0) filas.forEach((tr) => {
+      const el = celda(tr, iDesc) && celda(tr, iDesc).querySelector('.sapMText'), t = el ? el.textContent : '';
+      if (t.indexOf('\n') > -1 && /[-_=]{8,}/.test(t)) t.split('\n').forEach((l) => { formulaW = Math.max(formulaW, anchoTexto(el, l.replace(/\u00a0/g, ' ').replace(/\s+$/, ''))); });
+    });
+    if (formulaW) formulaW = Math.min(Math.ceil(formulaW) + 16, 420);                       // (+ relleno de la celda y un margen; tope para que una línea enorme no ensanche la tabla sin fin)
+    if (formulaW) tabla.dataset.rmdFormula = String(formulaW); else delete tabla.dataset.rmdFormula;
     const minimo = (th, i, n) => {
       const palabras = norm(th.textContent).split(' ').filter(Boolean);
       const ih = th.querySelector('.sapMColumnHeader') || th, cs = getComputedStyle(ih), cs0 = getComputedStyle(th);
@@ -2231,7 +2241,7 @@
       const n = nombres[i], esControl = n === '' ;                                          // selección y navegación no se tocan
       return esControl ? w : Math.max(minimo(ths[i], i, n), Math.round(w * f));
     });
-    const sumaF = finales.reduce((a, w) => a + (w || 0), 0), W = Math.max(tipoTabla === 'espec' ? 420 : Math.min(minDesc, 205), C - sumaF);   // la descripción cede hasta 205 px antes de que aparezca desplazamiento horizontal
+    const sumaF = finales.reduce((a, w) => a + (w || 0), 0), W = Math.max(tipoTabla === 'espec' ? 420 : Math.min(minDesc, 205), C - sumaF, formulaW);   // la descripción cede hasta 205 px antes de que aparezca desplazamiento horizontal (con una fracción dibujada, no cede por debajo de su línea más larga)
     const wDes = tipoTabla === 'espec' ? Math.round(W * 0.4) : W, wEsp = W - wDes;
     ths.forEach((th, i) => {
       const w = finales[i] === null ? (tipoTabla === 'espec' && nombres[i] === 'ESPECIFICACIONES' ? wEsp : wDes) : finales[i]; if (!w) return;
@@ -2260,6 +2270,17 @@
     const d0 = filas[0] && iDes >= 0 ? SIN_ACENTOS(celda(filas[0], iDes) && celda(filas[0], iDes).textContent) : '';
     return /^EVITAR EL INGRESO AL AREA DE TRABAJO/.test(d0) ? 'PRECAUCIONES' : '';
   }
+  // Lo que se ve mientras la lista de pasos se va completando (v1.52): la barra con el contador «Cargando pasos… n de N» y los botones de la lista
+  function complementosParciales(d, tabla, esPasos, esPM) {
+    if (esPasos && (on('filtro') || on('reglas') || reglasVivas())) filtroLocal(tabla, true);
+    else if (esPasos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); }
+    if (esPasos && on('copiar')) instalarBotonesCopia(d); else if (esPasos) d.querySelectorAll('.rmd-copia-grupo, .rmd-clip').forEach((e) => e.remove());
+    if ((esPasos || esPM) && on('cambiarpaso')) instalarBotonCambiarPaso(d, tabla); else if (esPasos || esPM) d.querySelectorAll('.rmd-cambiar-paso').forEach((e) => e.remove());
+    if ((esPasos || esPM) && on('pasominusculas')) instalarBotonMinusculas(d, tabla); else if (esPasos || esPM) d.querySelectorAll('.rmd-minusculas').forEach((e) => e.remove());
+    const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
+    const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = (esPasos || esPM) && hdr ? hdr.offsetHeight : 0;
+    d.style.setProperty('--rmd-h1', h1 + 'px'); d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
+  }
   function ajustarTabla(tabla) {
     const d = enDialogo(tabla); if (!d || !gestionada(d)) return;
     // Ventana raíz del RMD ("Estructura de RMD"): se deja con el ancho y las filas del portal (90 % de la pantalla), que es como
@@ -2278,9 +2299,10 @@
     const esPM = nombres.includes('CANTIDAD INSUMOS');
     const esEspec = nombres.includes('ESPECIFICACIONES') && nombres.includes('TIPO DATO') && !nombres.includes('DEPENDE');
     const filas = filasPrincipales(tabla);
+    const ctlT = ctlDeTabla(tabla), parcial = faltanFilas(ctlT), nFilas = enTandas(ctlT) ? Math.max(filas.length, totalDeTabla(ctlT)) : filas.length;   // (tandas: faltan pasos por dibujar)
 
     // tamaño del diálogo
-    const grande = esPasos && filas.length > 12;                      // muchas filas: casi pantalla completa; pocas: solo el alto que necesitan
+    const grande = esPasos && nFilas > 12;                      // muchas filas: casi pantalla completa; pocas: solo el alto que necesitan
     d.classList.toggle('rmd-pasos', grande);
     d.classList.toggle('rmd-medio', !grande);
     d.classList.toggle('rmd-ancho', !grande && (esPM || ths.length > 12));
@@ -2291,18 +2313,21 @@
     // PM OP no debe marcarse nunca: si algún paso la tiene marcada, la columna deja de ocultarse para que se vea y se corrija
     const iPmop = nombres.indexOf('PM OP');
     if (iPmop >= 0 && filas.some((tr) => marcada(celda(tr, iPmop)))) tabla.dataset.rmdPmop = '1'; else delete tabla.dataset.rmdPmop;
-    if (on('columnas') && !html.classList.contains('rmd-movil')) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : 'otro');
+    if (on('columnas') && !html.classList.contains('rmd-movil')) { if (!parcial || !ths.some((th) => th.style.getPropertyValue('width'))) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : 'otro'); }   // (mientras llegan los pasos, los anchos se calculan una vez)
     else {                                                                                  // (en móvil las filas son tarjetas: sin anchos fijos; «Estado» sigue oculto si todos son «Activo»)
       quitarAnchos(tabla, ths); delete tabla.dataset.rmdOcultaEstado;
       const iEst = nombres.indexOf('ESTADO');
       if (html.classList.contains('rmd-movil') && esPasos && iEst >= 0 && filas.length > 0 && filas.every((tr) => celda(tr, iEst) && norm(celda(tr, iEst).textContent) === 'Activo')) tabla.dataset.rmdOcultaEstado = '1';
     }
     // columnas ocultas
+    const ocultas = [];
     ths.forEach((th, i) => {
       const oculta = columnaOculta(nombres[i], tabla, esPM) || (tabla.dataset.rmdOcultaEstado === '1' && nombres[i] === 'ESTADO');
-      th.style.display = oculta ? 'none' : '';
+      th.style.display = oculta ? 'none' : ''; if (oculta) ocultas.push(i);
       filas.forEach((tr) => { if (celda(tr, i)) celda(tr, i).style.display = oculta ? 'none' : ''; });
     });
+    tabla.__rmdOcultas = ocultas; filas.forEach((tr) => { tr.__rmdOc = true; });                    // (las filas que lleguen después por tandas: ver ocultarEnFilas)
+    if (parcial) { complementosParciales(d, tabla, esPasos, esPM); return; }   // (faltan pasos por dibujar: la ventana ya está a su medida y con su barra; el análisis espera a que lleguen todos)
 
     const iDep = nombres.indexOf('DEPENDE'), iTipo = nombres.indexOf('TIPO DATO'), iOrd = nombres.indexOf('ORDEN'), iDes = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
     const iClave = nombres.indexOf('CLAVE MODELO'), iPuesto = nombres.indexOf('PUESTO TRABAJO'), iDec = Math.max(nombres.indexOf('DECIMAL'), nombres.indexOf('DECIM.'));
@@ -2434,7 +2459,7 @@
       barra.innerHTML = (conFiltro ? '<input class="rmd-filtro" type="text" placeholder="Filtrar pasos por texto, código u orden…">' : '') + '<span class="rmd-cuenta"></span><button type="button" class="rmd-alerta ok"></button>';
       const cont = tabla.closest('.sapMDialogScrollCont') || d;
       cont.parentNode.insertBefore(barra, cont);
-      const inp = barra.querySelector('input'); if (inp) inp.addEventListener('input', () => aplicarFiltro(d));
+      const inp = barra.querySelector('input'); if (inp) inp.addEventListener('input', () => { const c = ctlDeTabla(tabla); if (faltanFilas(c)) completarYa(c); aplicarFiltro(d); });   // (filtrar pide ver todos los pasos)
       if (conFiltro && on('copiar')) { const sp = document.createElement('span'); sp.className = 'rmd-clip'; barra.appendChild(sp); pintarEstadoPortapapeles(); }
       barra.querySelector('button').addEventListener('click', () => irAlSiguiente(d));
     }
@@ -2455,7 +2480,9 @@
       tr.style.display = ok ? '' : 'none'; if (sub) sub.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     });
-    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} ${barra.dataset.nombre || (inp ? 'pasos' : 'procesos menores')}`);
+    const ctl = ctlDeTabla(tabla), faltan = faltanFilas(ctl), cuenta = barra.querySelector('.rmd-cuenta');
+    if (cuenta) cuenta.classList.toggle('rmd-espera-mini', faltan);                      // (mientras llegan los pasos, con su orbe pequeño)
+    setTxt(cuenta, faltan ? `Cargando pasos… ${total} de ${totalDeTabla(ctl)}` : q ? `${visibles} de ${total} pasos` : `${total} ${barra.dataset.nombre || (inp ? 'pasos' : 'procesos menores')}`);
   }
   function actualizarBarra(d, tabla) {
     const barra = d.querySelector('#rmd-filtro-bar'); if (!barra || !tabla.__rmdAlertas) return;
@@ -2907,6 +2934,7 @@
   // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
   function limpiezaTotal() {
     try { quitarVistaMovil(); } catch (e) { /* sin UI5 */ }
+    try { quitarTandas(); } catch (e) { /* sin UI5 */ }
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
@@ -2936,7 +2964,7 @@
   // __rmdStats.latido) si la persona no hizo clic ni tecleó desde que empezó; los errores de lo que ella haga se ven igual.
   const latido = { enCurso: 0, inicio: 0, fin: 0, esLatido: false, interaccion: 0, omitidos: 0, ultimo: '' };
   window.__rmdStats.latido = latido;
-  ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { latido.interaccion = Date.now(); }, true));
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove'].forEach((ev) => document.addEventListener(ev, () => { latido.interaccion = Date.now(); }, { capture: true, passive: true }));   // (touchmove: arrastrar el dedo por la lista también cuenta como «estar tocando»)
   (() => { const log0 = console.log; console.log = function (...a) { if (a[0] === 'Actualizado!' && Date.now() - latido.inicio < 1500) latido.esLatido = true; return log0.apply(this, a); }; })();
   function instalarFiltroLatido() {
     try {
@@ -2971,8 +2999,9 @@
 
   let habiaVentanaPM = false;
   // cuánto tarda cada ajuste (diagnóstico de rendimiento: __rmdStats.ajusteMs / ajusteMax / ajusteTotalMs)
+  let ajusteIni = 0;
   function ajustarTodo() {
-    const t0 = performance.now();
+    const t0 = performance.now(); ajusteIni = t0;
     try { ajustarTodoCuerpo(); } finally {
       const s = window.__rmdStats, ms = performance.now() - t0; s.ajusteMs = Math.round(ms * 10) / 10; s.ajusteMax = Math.max(s.ajusteMax || 0, s.ajusteMs); s.ajusteTotalMs = Math.round((s.ajusteTotalMs || 0) + ms);
     }
@@ -2980,6 +3009,8 @@
   function ajustarTodoCuerpo() {
     if (!opc.activo) { limpiezaTotal(); return; }
     try { gestionarVistaMovil(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('vista móvil: ' + e.message); }
+    try { gestionarTandas(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('tandas: ' + e.message); }
+    if (TANDAS.desde && Date.now() - TANDAS.desde < 6000 && tandasCargando()) return;                // (UI5 está dibujando los pasos por tandas: el análisis espera a que lleguen todos; al terminar hay un ajuste completo)
     window.__rmdStats.ajustes++;
     // al cerrarse una ventana de procesos menores (pudo corregirse algo) se vuelven a revisar los de la lista de pasos
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
@@ -3008,7 +3039,7 @@
   const firmaTablas = () => {
     let f = ''; const ts = document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl');
     ts.forEach((t) => { f += ((t.closest('.sapMDialogScrollCont') || t.parentElement || {}).clientWidth || 0) + ';';   // el ancho útil cambia si aparece una barra de desplazamiento o se redimensiona
-      t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
+      t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody td:not(.sapMListTblSelCol) [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
     return f + ts.length;
   };
   let sinVentanas = 0;
@@ -3027,7 +3058,10 @@
   setInterval(() => { const t0 = performance.now(); revisionPeriodica(); window.__rmdStats.pollMs = Math.round((performance.now() - t0) * 10) / 10; }, 700);
   window.addEventListener('resize', () => setTimeout(ajustarTodo, 150));
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
-  document.addEventListener('click', () => setTimeout(ajustarTodo, 120), true);
+  document.addEventListener('click', (e) => {
+    const t = performance.now(), solo = !!(e.target && e.target.closest && e.target.closest('.sapMListTblSelCol'));        // (marcar filas: el observador ya provoca la pasada; una segunda 120 ms después no cambia nada)
+    setTimeout(() => { if (solo && ajusteIni > t) return; ajustarTodo(); }, 120);
+  }, true);
 
   // ---- 7. Avisar cambios sin guardar -----------------------------------------------------------
   // Una ventana está "sucia" cuando la persona TOCÓ algo (bandera __rmdInter) y la firma de la tabla (valores y casillas) difiere de la del
@@ -3263,6 +3297,123 @@
     }
     return ctl;
   }
+  // ---- Pasos por tandas (v1.52) ----
+  // La tabla de pasos del portal dibuja de golpe TODAS sus filas (149 en Fabricación: unos 16 000 elementos y 2-3 s con el navegador congelado; más en un equipo
+  // lento o en el teléfono). Si trae más de 50 filas se activa el «growing» de UI5 (sap.m.Table dibuja N filas y el resto a petición): salen las 8 primeras (la ventana
+  // se ve a los ~1,5 s en vez de a los ~3,4 s) y el resto llega solo, en tandas de ~0,2 s y cuando la persona no está tocando nada. El portal guarda, borra y arrastra
+  // desde su MODELO (JSON), no desde las filas dibujadas, así que nada de lo suyo cambia. Mientras faltan filas el script no analiza (alertas, orden, filtro…); si la
+  // persona marca todos los pasos (casilla, Espacio en la cabecera o Ctrl+A) o filtra antes de tiempo, las filas que faltan se dibujan en ese instante.
+  const TANDAS = { objetivoMs: 200, minimo: 50, tablas: new Set(), gancho: false, desde: 0 };                      // (minimo: las tablas de hasta 50 filas se dibujan enteras de una vez, como siempre; congelan menos de 1 s)
+  const umbralInicial = () => (html.classList.contains('rmd-movil') ? 6 : 8);                                        // (primera página pequeña: al volver a entrar, el portal avisa 3 veces de cambios en su modelo y UI5 reconstruye lo dibujado en cada aviso; con 8 filas cuesta ~0,25 s en total, con 30 casi 1 s)
+  const tandasCargando = () => { for (const c of TANDAS.tablas) { if (!c.bIsDestroyed && c.getDomRef() && faltanFilas(c)) return true; } return false; };
+  const TABLA_PASOS = /(^|--)idTblPasoCuadro(Process)?$/;
+  const ctlDeTabla = (t) => { try { return t && t.id ? nucleo().byId(t.id.replace(/-listUl$/, '')) : null; } catch (e) { return null; } };
+  const enTandas = (c) => { try { return !!(c && c.__rmdTandas && c.getBinding && c.getBinding('items')); } catch (e) { return false; } };
+  const totalDeTabla = (c) => { const b = c.getBinding('items'); return b && b.getLength ? b.getLength() : c.getItems().length; };
+  const faltanFilas = (c) => { try { return enTandas(c) && c.getItems().length < totalDeTabla(c); } catch (e) { return false; } };
+  function pedirTanda(c) {
+    const g = c._oGrowingDelegate; if (!g || !g.requestNewPage) return false;
+    const n0 = c.getItems().length, t0 = performance.now(); g.requestNewPage();
+    const n1 = c.getItems().length; if (n1 > n0) { const porFila = Math.max(1, (performance.now() - t0) / (n1 - n0)); c.setGrowingThreshold(Math.max(10, Math.min(40, Math.round(TANDAS.objetivoMs / porFila)))); }   // (tandas de ~0,2 s: en un equipo lento, más pequeñas)
+    return n1 > n0;
+  }
+  function completarYa(c) { for (let i = 0; i < 60 && faltanFilas(c); i++) if (!pedirTanda(c)) break; }                // (síncrono: el modelo es local)
+  function programarTanda(c) {
+    clearTimeout(c.__rmdT);
+    if (!c.getDomRef()) { c.__rmdIni = 0; c.__rmdListo = false; if (!tandasCargando()) TANDAS.desde = 0; if (enTandas(c) && c.getGrowingThreshold() !== umbralInicial()) c.setGrowingThreshold(umbralInicial()); return; }
+    if (!faltanFilas(c)) {                                                                                             // (llegaron todas: un único análisis completo, en su propia tarea)
+      if (c.__rmdIni) { c.__rmdIni = 0; c.__rmdListo = false; c.setGrowingThreshold(umbralInicial()); if (!tandasCargando()) TANDAS.desde = 0; setTimeout(() => { try { ajustarTodo(); } catch (e) { /* se reintenta en el siguiente ajuste */ } }, 40); }
+      return;
+    }
+    if (!c.__rmdIni) { c.__rmdIni = Date.now(); TANDAS.desde = c.__rmdIni; }                                           // (carga nueva: el reloj de «no analizar mientras llegan» empieza ahora)
+    const usando = () => Date.now() - latido.interaccion < 450 && Date.now() - c.__rmdIni < 10000;                     // (la persona está tocando la página: se espera un respiro, hasta 10 s)
+    c.__rmdT = setTimeout(() => {
+      if (!c.getDomRef() || !faltanFilas(c)) return;
+      if (usando()) { programarTanda(c); return; }
+      try { if (!pedirTanda(c)) { c.removeStyleClass('rmd-tandas'); } } catch (e) { c.removeStyleClass('rmd-tandas'); }     // (si no avanza, aparece el botón «Más» de UI5)
+    }, usando() ? 200 : 70);
+  }
+  // Las filas que llegan por tandas nacen con todas sus celdas: se ocultan las columnas de siempre en cuanto UI5 las dibuja (en la misma tarea: sin un cuadro con ellas)
+  function ocultarEnFilas(t) {
+    const idx = t.__rmdOcultas || []; if (!idx.length) return;
+    filasPrincipales(t).forEach((tr) => { if (tr.__rmdOc) return; tr.__rmdOc = true; idx.forEach((i) => { const td = celda(tr, i); if (td) td.style.display = 'none'; }); });
+  }
+  function alTerminarTanda(c) {                                                                                         // (síncrono, en cuanto UI5 termina de dibujar las filas)
+    if (!enTandas(c)) return;                                                                                          // (opción apagada o tabla ya liberada: el controlador queda enganchado pero no hace nada)
+    try {
+      const t = document.getElementById(c.getId() + '-listUl');
+      if (t && t.isConnected && opc.activo) {
+        if (html.classList.contains('rmd-movil') && c.getColumns().every((k) => !k.getDemandPopin() && k.getMinScreenWidth() === '')) etiquetarTablaMovil(t);
+        if (!c.__rmdListo) { ajustarTabla(t); c.__rmdListo = faltanFilas(c); }                                         // (primera tanda: ventana a su medida, barra con su contador y botones)
+        else {
+          ocultarEnFilas(t);                                                                                           // (las siguientes: solo lo mínimo)
+          const cuenta = enDialogo(t) && enDialogo(t).querySelector('#rmd-filtro-bar .rmd-cuenta');
+          if (cuenta && faltanFilas(c)) setTxt(cuenta, `Cargando pasos… ${c.getItems().length} de ${totalDeTabla(c)}`);
+        }
+      }
+      programarTanda(c);
+    } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('tandas: ' + e.message); }
+  }
+  function instalarTandas() {
+    if (TANDAS.gancho || typeof sap === 'undefined' || !sap.ui || !sap.ui.require) return;
+    try {
+      const T = sap.ui.require('sap/m/Table'); if (!T) return;
+      const orig = T.prototype.bindAggregation;
+      if (!orig.__rmdTandas) {
+        const envuelto = function (nombre) {
+          try {
+            if (nombre === 'items' && on('tandas') && !this.__rmdTandas && TABLA_PASOS.test(this.getId())) {
+              this.__rmdTandas = true; TANDAS.tablas.add(this);
+              this.setGrowing(true); this.setGrowingThreshold(umbralInicial()); this.setGrowingScrollToLoad(false); this.addStyleClass('rmd-tandas');
+              this.attachUpdateFinished(() => alTerminarTanda(this));
+            }
+          } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('tandas: ' + e.message); }
+          return orig.apply(this, arguments);
+        };
+        envuelto.__rmdTandas = true; T.prototype.bindAggregation = envuelto;
+      }
+      const LB = sap.ui.require('sap/m/ListBase'), origU = LB && LB.prototype.updateItems;
+      if (origU && !origU.__rmdTandas) {
+        const envU = function (razon) {
+          try {
+            if (this.__rmdTandas) {                                                                                       // (la primera página la decide el tamaño: pequeña → entera; grande → 8 filas y el resto por tandas)
+              const g = this._oGrowingDelegate, b = this.getBinding('items'), n = b && b.getLength ? b.getLength() : 0;
+              if (n && (!g || !g._iLimit || (g.shouldReset && g.shouldReset(razon)) || !this.getItems(true).length)) this.setGrowingThreshold(n <= TANDAS.minimo ? n : umbralInicial());
+            }
+          } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('tandas: ' + e.message); }
+          return origU.apply(this, arguments);
+        };
+        envU.__rmdTandas = true; LB.prototype.updateItems = envU;
+      }
+      TANDAS.gancho = true;
+    } catch (e) { /* UI5 aún sin sap.m.Table: se reintenta en el siguiente ajuste */ }
+  }
+  function quitarTandas() {
+    if (!TANDAS.tablas.size) return;
+    TANDAS.tablas.forEach((c) => {
+      try { clearTimeout(c.__rmdT); if (!c.bIsDestroyed) { if (c.getDomRef()) completarYa(c); delete c.__rmdTandas; c.removeStyleClass('rmd-tandas'); if (c.getGrowing()) c.setGrowing(false); } } catch (e) { /* ya no existe */ }
+    });
+    TANDAS.tablas.clear();
+  }
+  function gestionarTandas() {
+    instalarTandas();
+    if (!on('tandas')) { quitarTandas(); return; }
+    TANDAS.tablas.forEach((c) => { if (c.bIsDestroyed) TANDAS.tablas.delete(c); else if (c.getDomRef() && faltanFilas(c) && !c.__rmdT) programarTanda(c); });   // (por si un cambio de datos dejó filas por dibujar)
+  }
+  // marcar todos los pasos pide verlos todos (UI5 solo marca las filas ya dibujadas): casilla de la cabecera, Espacio/Enter en la cabecera y Ctrl+A en una fila
+  ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, (e) => {
+    if (!TANDAS.tablas.size) return;
+    const el = e.target && e.target.closest ? e.target : null; if (!el) return;
+    let pide = false;
+    if (ev === 'pointerdown') pide = !!el.closest('th.sapMListTblSelCol');
+    else if (e.key === ' ' || e.key === 'Enter') pide = !!el.closest('th.sapMListTblSelCol') || /-tblHeader$/.test(el.id || '');
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) pide = !!el.closest('tr.sapMLIB, .sapMListTblRow');
+    if (!pide) return;
+    const c = ctlDeTabla(el.closest('table')); if (faltanFilas(c)) completarYa(c);
+  }, true));
+  window.__rmdStats.tandas = { tablas: () => [...TANDAS.tablas].filter((c) => !c.bIsDestroyed).map((c) => ({ id: c.getId(), filas: c.getItems().length, total: totalDeTabla(c), growing: c.getGrowing(), umbral: c.getGrowingThreshold(), conectada: !!c.getDomRef() })),
+    faltan: () => [...TANDAS.tablas].some((c) => !c.bIsDestroyed && c.getDomRef() && faltanFilas(c)), completar: () => TANDAS.tablas.forEach((c) => { if (!c.bIsDestroyed && c.getDomRef()) completarYa(c); }) };
+  try { instalarTandas(); } catch (e) { /* se reintenta en el siguiente ajuste */ }
   const tablaDe = (d) => d.querySelector('table.sapMListTbl');
   // botón "Procesos Menores" de la fila de un paso (resaltado, tipo Ghost, cuando el paso tiene procesos menores)
   const botonPM = (tr) => [...tr.querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
@@ -4476,10 +4627,10 @@
   // En un teléfono UI5 pasa cada fila de una tabla a una «tarjeta» de un solo campo por línea (un paso mide ~900 px) y esconde las columnas
   // que el script necesita para sus avisos. Aquí se hace al revés: las tablas conservan TODAS sus columnas y celdas (así siguen funcionando las
   // alertas, copiar y pegar, la selección, etc.) y solo cambia su presentación: cada fila es una tarjeta compacta hecha con CSS, con el nombre
-  // de cada campo tomado de la cabecera. Se activa sola con pantallas de hasta 900 px (o un teléfono) y se puede forzar o apagar en el panel.
-  const MQ_MOVIL = window.matchMedia ? window.matchMedia('(max-width: 900px)') : null;
+  // de cada campo tomado de la cabecera. Se activa sola con pantallas de hasta 700 px (o un teléfono, también en horizontal); no hay control en el panel.
+  const MQ_MOVIL = window.matchMedia ? window.matchMedia('(max-width: 700px)') : null;
   const esTelefono = () => !!(window.sap && sap.ui && sap.ui.Device && sap.ui.Device.system && sap.ui.Device.system.phone);
-  function movilActivo() { if (!opc.activo) return false; const m = opc.vistaMovil || 'auto'; return m === 'si' ? true : m === 'no' ? false : !!((MQ_MOVIL && MQ_MOVIL.matches) || esTelefono()); }
+  function movilActivo() { if (!opc.activo) return false; const m = opc.vistaMovil || 'auto'; return m === 'si' ? true : m === 'no' ? false : !!((MQ_MOVIL && MQ_MOVIL.matches) || esTelefono()); }   // (solo «auto» en uso; «si» / «no» guardados a mano o por las pruebas se respetan)
   const POPIN_ORIG = new Map();                                       // columna (control UI5) -> [minScreenWidth, demandPopin], tal como los puso el portal o el script
   const slugCol = (n) => SIN_ACENTOS(n).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   function tipoTablaMovil(c, t) {
@@ -4592,7 +4743,8 @@
     tablasMovil(m); gestionarFiltrosMovil(m); montarBuscarMovil(m);
     movilPuesto = m;
   }
-  window.__rmdStats.movil = { activo: () => movilActivo(), gestionar: () => gestionarVistaMovil(), popinGuardadas: () => POPIN_ORIG.size };   // (pruebas)
+  window.__rmdStats.movil = { activo: () => movilActivo(), gestionar: () => gestionarVistaMovil(), popinGuardadas: () => POPIN_ORIG.size,
+    modo: (m) => { if (m === 'auto') delete opc.vistaMovil; else opc.vistaMovil = m; guardar(opc); gestionarVistaMovil(); ajustarTodo(); } };   // (pruebas: forzar «si» / «no» o volver a «auto»)
   function quitarVistaMovil() {
     if (!movilPuesto && !html.classList.contains('rmd-movil')) return;
     html.classList.remove('rmd-movil'); tablasMovil(false); gestionarFiltrosMovil(false); montarBuscarMovil(false); movilPuesto = false;
@@ -6869,7 +7021,7 @@
   // El icono del portal ya no exporta directo: abre un menú con el exportado original (el mismo Excel del portal, con sus filtros,
   // y la columna "Producción Estado" al final para no mover las demás), Equipos por master e Indicadores del mes.
   // (el de la lista principal: Configuración Maestra y otras ventanas del portal también tienen un "Exportar" y ahí no va nada del script)
-  const botonExportar = () => [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar' && !b.closest('.sapMDialog'));
+  const botonExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
   const ctlExportar = () => { const b = botonExportar(); return b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); };
   // Controlador de la lista principal (el mismo al que responde el botón Exportar)
   function controladorPrincipal() {
@@ -12555,7 +12707,7 @@ td.ult { position: relative; }
   const GRUPOS_PANEL = [
     ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion', 'orbes']],
     ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'plantillaprod', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
-    ['Configurar el RMD', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
+    ['Configurar el RMD', ['tandas', 'ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec', 'verop', 'documentos', 'vivo']],
     ['Asociar fórmulas', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta']],
     ['Alertas', ['bajas', 'reglasrev', 'reglas', 'ordenest', 'sintipo', 'puesto']],
   ];
@@ -12565,7 +12717,6 @@ td.ult { position: relative; }
     const p = document.createElement('details'); p.id = 'rmd-ui-panel';
     p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary><div class="rmd-panel-cuerpo">' +
       '<div class="rmd-panel-cab"><b>Mejoras de interfaz</b><span>v' + VERSION + '</span></div>' + fila('activo', 'maestro') +
-      '<div class="rmd-movil-sel" role="group" aria-label="Vista móvil" title="Cómo se ven las tablas y las ventanas: Auto = en pantallas de hasta 900 px"><span>Vista móvil</span>' + [['auto', 'Auto'], ['si', 'Siempre'], ['no', 'Nunca']].map(([k, t]) => `<button type="button" data-vm="${k}" class="${(opc.vistaMovil || 'auto') === k ? 'activo' : ''}">${t}</button>`).join('') + '</div>' +
       '<div class="rmd-panel-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear, activar o editar tus reglas de revisión, exportarlas / importarlas y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión…</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
       GRUPOS_PANEL.map(([t, ks]) => `<div class="rmd-grupo">${t}</div>` + ks.map((k) => fila(k)).join('')).join('') +
       '<div class="rmd-panel-pie"><span>Ctrl+K = Ir a… · Ctrl+S = Guardar</span><button type="button" class="rmd-btn rmd-restablecer">Restablecer</button></div></div>';
@@ -12576,10 +12727,9 @@ td.ult { position: relative; }
       document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => { if (c.style.display === 'none') c.style.display = ''; });
       ajustarTodo();
     });
-    p.querySelector('.rmd-movil-sel').addEventListener('click', (e) => { const b = e.target.closest('button[data-vm]'); if (!b) return; opc.vistaMovil = b.dataset.vm; guardar(opc); p.querySelectorAll('.rmd-movil-sel button').forEach((x) => x.classList.toggle('activo', x === b)); gestionarVistaMovil(); ajustarTodo(); });
     p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { p.open = false; abrirModificacionesMasivas('suspender'); });
     p.querySelector('.rmd-abrir-reglas').addEventListener('click', () => { p.open = false; abrirReglas(); });
-    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); opc.vistaMovil = 'auto'; p.querySelectorAll('.rmd-movil-sel button').forEach((x) => x.classList.toggle('activo', x.dataset.vm === 'auto')); guardar(opc); refrescar(); gestionarVistaMovil(); aplicarClases(); ajustarTodo(); });
+    p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); delete opc.vistaMovil; guardar(opc); refrescar(); gestionarVistaMovil(); aplicarClases(); ajustarTodo(); });
     panelEl = p; montarPanel();
   }
   // El botón cuelga de <html>, no de <body>: UI5 usa el <body> como zona de dibujo y, al montar la app (unos segundos después de cargar la página),

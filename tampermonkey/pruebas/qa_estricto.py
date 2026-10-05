@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 1 3; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 1 3 4; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -18,7 +18,7 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · S v1.34: reglas de revisión
   y lista de documentos vigentes (carga del .xls del DMS, aviso del RMD, Documentos citados con Vigente, resaltado en las listas; cortafuegos;
   VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · U v1.37: cambios de recetas en SAP (icono tenue, revisión por tandas, ventana, Excel
-  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · 1 v1.40: plantilla para Producción (numeración frente al PDF del portal, catálogo, archivo sin SAP e importación; COD_PP = RMD Ingresado; solo lectura + cortafuegos) · 3 v1.51: vista móvil en un teléfono emulado de 390 px (tarjetas en las tablas, filtros plegables, ventanas a pantalla completa, lupa para abrir un RMD, «Nunca» y «Auto»; COD_3 = RMD Ingresado; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · 1 v1.40: plantilla para Producción (numeración frente al PDF del portal, catálogo, archivo sin SAP e importación; COD_PP = RMD Ingresado; solo lectura + cortafuegos) · 3 v1.51: vista móvil en un teléfono emulado de 390 px (tarjetas en las tablas, filtros plegables, ventanas a pantalla completa, lupa para abrir un RMD, el modo «no» y «auto»; COD_3 = RMD Ingresado; solo lectura + cortafuegos) · 4 v1.52: pasos por tandas (Fabricación de más de 100 pasos entra en tandas sin congelar el navegador, mismo resultado que con la opción apagada, marcar todos y filtrar completan la tabla, cerrar a mitad y volver a entrar; COD_4 = RMD con una etiqueta de más de 100 pasos; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -42,7 +42,7 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ123D"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ1234D"
 if "D" in SOLO and not RMD_PRUEBA:
     raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
@@ -59,6 +59,8 @@ def prueba(nombre):
             else: registrar(nombre, r[0], r[1])
         except Exception as e:
             registrar(nombre, False, "EXCEPCIÓN " + str(e)[:200]); traceback.print_exc(limit=2)
+            try: print("   [depuración] modales del script abiertos (un aviso de baja u otro modal tapa la pantalla y los clics siguientes caducan):", fr.evaluate("[...document.querySelectorAll('.rmd-modal-fondo')].map(m => m.innerText.slice(0, 300))"), flush=True)
+            except Exception: pass
         return fn
     return deco
 
@@ -482,7 +484,7 @@ with sync_playwright() as p:
         MEDIR_LISTA = """() => { const d=window.__q.top(); const t=d.querySelector('table'); const ths=[...t.querySelectorAll('thead th')].filter(x=>x.getBoundingClientRect().width>0); const sec=d.querySelector('section'); const dr=d.getBoundingClientRect();
           const cab=ths.map(x=>{ const sp=x.querySelector('span.sapMText, span'); const r=x.getBoundingClientRect(); return {n:x.textContent.trim().slice(0,14), w:Math.round(r.width), h:Math.round(r.height), sobra: sp? sp.scrollWidth>sp.clientWidth+1 : false}; });
           const desc=cab.find(c=>/^DESCRIP/i.test(c.n)); const orden=cab.find(c=>/^ORDEN/i.test(c.n)); const codigo=cab.find(c=>/^C.DIGO/i.test(c.n)); const ultima=[...ths].pop();
-          return {desc:desc&&desc.w, alto:Math.max(...cab.map(c=>c.h)), partidas:cab.filter(c=>c.sobra).map(c=>c.n), sec:[sec.clientWidth, sec.scrollWidth], orden:orden&&orden.w, codigo:codigo&&codigo.w, cols:cab.length}; }"""
+          return {desc:desc&&desc.w, alto:Math.max(...cab.map(c=>c.h)), partidas:cab.filter(c=>c.sobra).map(c=>c.n), sec:[sec.clientWidth, sec.scrollWidth], orden:orden&&orden.w, codigo:codigo&&codigo.w, cols:cab.length, formula:t.dataset.rmdFormula||null}; }"""
         for k, etq in enumerate(ETQS_LISTAS):
             abrir_pasos(pg, fr, codigo=RMD_LAYOUT, etq=etq)
             @prueba(f"I{k+1} {etq}: cabecera de una o dos líneas, Descripción no aplastada y sin desplazamiento horizontal en 1415×886, 1920×945, 1600×900 y 1366×650")
@@ -491,7 +493,7 @@ with sync_playwright() as p:
                 for (w, h, minimo) in [(1415, 886, 225), (1920, 945, 300), (1600, 900, 300), (1366, 650, 205)]:
                     pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(1500)
                     m = fr.evaluate(MEDIR_LISTA)
-                    if (m["desc"] or 0) < minimo or m["alto"] > 60 or m["partidas"] or m["sec"][1] > m["sec"][0] + 1:
+                    if (m["desc"] or 0) < minimo or m["alto"] > 60 or m["partidas"] or (m["sec"][1] > m["sec"][0] + 1 and not m["formula"]):   # (con una fracción dibujada —cálculo de Rendimiento— la Descripción reserva su ancho y puede haber desplazamiento horizontal)
                         fallos.append(f"{w}x{h}: {m}")
                 pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(800)
                 return (not fallos), " | ".join(fallos)[:600]
@@ -2352,7 +2354,7 @@ with sync_playwright() as p:
         pgm.route("**/*", guardia3)
         errores3 = []; pgm.on("pageerror", lambda e: errores3.append(str(e)[:200]))
         frm.evaluate(JS_UTIL); pgm.wait_for_timeout(3000)
-        frm.evaluate("() => { const b = document.querySelector('#rmd-ui-panel .rmd-movil-sel button[data-vm=auto]'); if (b) b.click(); }"); pgm.wait_for_timeout(2500)   # (siempre desde «Auto»: un diagnóstico pudo dejar «Nunca» guardado)
+        frm.evaluate("window.__rmdStats.movil.modo('auto')"); pgm.wait_for_timeout(2500)   # (siempre desde «auto»: un diagnóstico pudo dejar «no» guardado)
         frm.evaluate("() => document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove())")
         COD_3 = os.environ.get("COD_3", RMD_PRUEBA)
         TOPE3 = "const ds = [...document.querySelectorAll('.sapMDialog')].filter((x) => x.getClientRects().length).sort((a, b) => (+getComputedStyle(a).zIndex || 0) - (+getComputedStyle(b).zIndex || 0)); const d = ds[ds.length - 1];"
@@ -2428,16 +2430,14 @@ with sync_playwright() as p:
             ok = p["pos"] == "fixed" and p["dentro"] and p["summary"] == "44px" and v["tam"] == [390, frm.evaluate("innerHeight")] and v["cuerpo"] <= 0 and v["pagina"] <= 0
             return ok, json.dumps({"panel": p, "ventana": v})
 
-        @prueba("3-6 «Nunca» devuelve el portal tal cual (tablas en «popin» de UI5, sin marcas ni botón de búsqueda) y «Auto» vuelve a las tarjetas: las columnas recuperan su minScreenWidth y demandPopin originales")
+        @prueba("3-6 El modo «no» (que ya no tiene control en el panel) devuelve el portal tal cual (tablas en «popin» de UI5, sin marcas ni botón de búsqueda) y «auto» vuelve a las tarjetas: las columnas recuperan su minScreenWidth y demandPopin originales")
         def _():
             estado = """() => { const t = document.querySelector('table.sapMListTbl[id*=idTblConfigurationRmd]'), ctl = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')), cols = ctl.getColumns(), fase = cols.find((c) => c.data && c.data('rmdFase'));
               return { clase: document.documentElement.classList.contains('rmd-movil'), marcas: document.querySelectorAll('[data-rmd-mov], td[data-rmd-col], .rmd-filtros-mas').length, sub: t.querySelectorAll('tr.sapMListTblSubRow').length, conMin: cols.filter((c) => c.getMinScreenWidth() !== '').length,
                        fase: fase ? [fase.getMinScreenWidth(), fase.getDemandPopin()] : null, guardadas: window.__rmdStats.movil.popinGuardadas(), buscar: !!document.getElementById('rmd-ui-buscar') && !document.getElementById('rmd-ui-buscar').hidden && document.getElementById('rmd-ui-buscar').isConnected }; }"""
-            frm.evaluate("document.getElementById('rmd-ui-panel').open = true"); pgm.wait_for_timeout(300)
             a = frm.evaluate(estado)
-            frm.evaluate("document.querySelector('#rmd-ui-panel .rmd-movil-sel button[data-vm=no]').click()"); pgm.wait_for_timeout(2500); n = frm.evaluate(estado)
-            frm.evaluate("document.querySelector('#rmd-ui-panel .rmd-movil-sel button[data-vm=auto]').click()"); pgm.wait_for_timeout(2500); v = frm.evaluate(estado)
-            frm.evaluate("document.getElementById('rmd-ui-panel').open = false")
+            frm.evaluate("window.__rmdStats.movil.modo('no')"); pgm.wait_for_timeout(2500); n = frm.evaluate(estado)
+            frm.evaluate("window.__rmdStats.movil.modo('auto')"); pgm.wait_for_timeout(2500); v = frm.evaluate(estado)
             ok = (a["clase"] and a["sub"] == 0 and a["conMin"] == 0 and a["guardadas"] > 0
                   and not n["clase"] and n["marcas"] == 0 and n["sub"] > 0 and n["conMin"] > 0 and n["fase"] == ["Tablet", True] and n["guardadas"] == 0 and not n["buscar"]
                   and v["clase"] and v["marcas"] > 0 and v["sub"] == 0 and v["conMin"] == 0 and v["buscar"])
@@ -2448,6 +2448,191 @@ with sync_playwright() as p:
             e = frm.evaluate("window.__rmdStats.errores || []")
             return (not bq3 and not e and not errores3), f"bloqueadas={bq3[:5]} errores_script={e[:3]} errores_pagina={errores3[:3]}"
         pgm.close()
+
+
+    # ───────────────────────── 4. Pasos por tandas (v1.52) · solo lectura + cortafuegos ─────────────────────────
+    if "4" in SOLO:
+        bq4 = []; errores4 = []
+        COD_4 = os.environ.get("COD_4", "2202609212")                       # un RMD con una etiqueta de más de 100 pasos (Fabricación: 149) y otra pequeña (Rendimiento)
+        def pagina4():
+            pg_, fr_, _ = abrir_con_inyeccion_temprana(b, src, ancho=1728, alto=860)
+            return pg_, fr_
+        pg4, fr4 = pagina4()
+        if fr4.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}').tandas") is False:       # (una ejecución anterior pudo dejarla apagada: el enganche se hace al crearse la tabla, así que se recarga)
+            fr4.evaluate("() => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete o.tandas; localStorage.setItem('rmdUiMejoras', JSON.stringify(o)); }")
+            pg4.close(); pg4, fr4 = pagina4()
+        def guardia4(route):
+            if route.request.method not in ("GET", "HEAD"): bq4.append(route.request.method + " " + route.request.url[:90]); route.abort()
+            else: route.continue_()
+        pg4.route("**/*", guardia4); pg4.on("pageerror", lambda e: errores4.append(str(e)[:200]))
+        fr4.evaluate(JS_UTIL); pg4.wait_for_timeout(2500)
+        fr4.evaluate("() => document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove())")
+        fr4.evaluate("""() => { window.__lt4 = { n: 0, max: 0, suma: 0 }; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { const L = window.__lt4; L.n++; L.suma += e.duration; L.max = Math.max(L.max, e.duration); } }).observe({ entryTypes: ['longtask'] }); } catch (e) { /* sin longtask */ } }""")
+        TOPE4 = "const ds = [...document.querySelectorAll('.sapMDialog')].filter((x) => x.getClientRects().length).sort((a, b) => (+getComputedStyle(a).zIndex || 0) - (+getComputedStyle(b).zIndex || 0)); const d = ds[ds.length - 1];"
+        FILA4 = "([estructura, titulo]) => { " + TOPE4 + """ const fila = [...d.querySelectorAll('tbody tr.sapMListTblRow')].find((r) => r.getClientRects().length && r.textContent.includes(estructura)); if (!fila) return 'sin fila ' + estructura;
+          const b = [...fila.querySelectorAll('button')].find((x) => x.title === titulo); if (!b) return 'sin botón ' + titulo; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"""
+        CERRAR4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); if (!t) return 'sin tabla'; const d = t.closest('.sapMDialog');
+          const b = [...d.querySelectorAll('button')].filter((x) => x.getClientRects().length && !x.closest('table')).find((x) => /^(Cerrar|Cancelar)$/.test(x.textContent.trim())); if (!b) return 'sin botón'; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"""
+        ESTADO4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); if (!t) return null;
+          const c = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')), b = c.getBinding('items'), d = t.closest('.sapMDialog'), bar = d.querySelector('#rmd-filtro-bar');
+          return { filas: c.getItems().length, total: b ? b.getLength() : -1, growing: c.getGrowing(), umbral: c.getGrowingThreshold(), marcadas: c.getSelectedItems().length, clase: c.hasStyleClass('rmd-tandas'),
+                   cuenta: bar ? ((bar.querySelector('.rmd-cuenta') || {}).textContent || '') : null, alerta: bar ? ((bar.querySelector('button.rmd-alerta') || {}).textContent || '').trim() : null,
+                   trigger: [...d.querySelectorAll('.sapMGrowingListTrigger')].some((e) => e.getClientRects().length) }; }"""
+        FIRMA4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const filas = [...t.querySelectorAll('tbody tr')].filter((r) => !/SubRow/.test(r.className));
+          const ocultas = new Set(filas.map((tr) => [...tr.children].map((td, i) => (td.style.display === 'none' ? i : -1)).filter((i) => i >= 0).join(',')));
+          const clases = {}; t.querySelectorAll('[class*="rmd-"]').forEach((e) => e.classList.forEach((c) => { if (/^rmd-/.test(c) && !/^rmd-(recien|entra|sale|hover)/.test(c)) clases[c] = (clases[c] || 0) + 1; }));
+          const d = t.closest('.sapMDialog'), bar = d.querySelector('#rmd-filtro-bar');
+          return { filas: filas.length, ocultas: [...ocultas], clases, cuenta: bar ? (bar.querySelector('.rmd-cuenta') || {}).textContent : null, alerta: bar ? ((bar.querySelector('button.rmd-alerta') || {}).textContent || '').trim() : null,
+                   cols: [...t.querySelectorAll('thead th')].map((th) => (th.style.display === 'none' ? '-' : th.textContent.trim())).join('|') }; }"""
+        def seguir4(maximo=70, parar=None):
+            """Mira la tabla de pasos cada ~30 ms y devuelve (estados con filas distintas, último estado) hasta que llegan todas las filas y el script termina su análisis (o hasta que `parar(estado)`)."""
+            seq = []; t0 = time.time(); ult = None
+            while time.time() - t0 < maximo:
+                st = fr4.evaluate(ESTADO4)
+                if st:
+                    ult = st
+                    if not seq or seq[-1]["filas"] != st["filas"] or seq[-1]["cuenta"] != st["cuenta"]: seq.append(dict(st, t=round(time.time() - t0, 2)))
+                    if parar and parar(st): break
+                    if not parar and st["total"] > 0 and st["filas"] >= st["total"] and (st["cuenta"] or "") == f"{st['total']} pasos" and st["alerta"] and time.time() - t0 > 1.5: break
+                pg4.wait_for_timeout(30)
+            return seq, ult
+        def abrir_etiqueta(nombre):
+            fr4.evaluate("window.__lt4 = { n: 0, max: 0, suma: 0 }")
+            r = fr4.evaluate(FILA4, [nombre, "Adicionar Pasos RMD"])
+            if r != "ok": raise Exception("no abre " + nombre + ": " + r)
+        def a_pagina(xy):
+            """Coordenadas dentro del iframe de la app → coordenadas de la página (el iframe empieza bajo la barra del shell)."""
+            bb = pg4.query_selector("iframe[src*='ui5appruntime']").bounding_box(); return [xy[0] + bb["x"], xy[1] + bb["y"]]
+        def sujetar4(ms=900):
+            """La persona «está tocando» (ruedas de ratón sobre la ventana): el script retrasa las tandas mientras tanto."""
+            t0 = time.time()
+            while (time.time() - t0) * 1000 < ms: pg4.mouse.wheel(0, 1); pg4.wait_for_timeout(110)
+        def abrir_a_medias():
+            """Abre Fabricación y, en cuanto hay filas pero faltan más, sujeta la carga: devuelve el estado de la tabla a medio dibujar (o None si no se pudo)."""
+            abrir_etiqueta("FABRICACION"); pg4.mouse.move(800, 400)
+            seq, ult = seguir4(maximo=40, parar=lambda st: 0 < st["filas"] < st["total"])
+            if ult and 0 < ult["filas"] < ult["total"]: pg4.mouse.wheel(0, 1); return ult
+            return None
+        def cerrar_pasos4():
+            r = fr4.evaluate(CERRAR4); pg4.wait_for_timeout(1800); return r
+        def opcion_tandas(valor):
+            fr4.evaluate("document.querySelector('#rmd-ui-panel').open = true")
+            casilla = fr4.locator("#rmd-ui-panel input[data-k=tandas]")
+            (casilla.check() if valor else casilla.uncheck()); fr4.evaluate("document.querySelector('#rmd-ui-panel').open = false"); pg4.wait_for_timeout(600)
+        try:
+            RmdAutomation(pg4).editor_de_rmd(COD_4); pg4.wait_for_timeout(4000)
+            abrir_dialogo(fr4, pg4, "PROCEDIMIENTO", "Adicionar Etiqueta")
+            FIRMAS4 = {}
+
+            @prueba("4-1 Fabricación (más de 100 pasos) entra por TANDAS: la primera trae pocas filas, llegan todas, la barra pasa de «Cargando pasos… n de N» a «N pasos», el botón «Más» de UI5 no aparece y ninguna tarea larga supera 1,5 s")
+            def _():
+                abrir_etiqueta("FABRICACION"); seq, ult = seguir4()
+                lt = fr4.evaluate("window.__lt4"); pg4.wait_for_timeout(2500)                                      # (UI5 rellena algunos valores tarde y el script los revisa cada 0,7 s)
+                FIRMAS4["on"] = fr4.evaluate(FIRMA4)
+                filas = [x["filas"] for x in seq]; cargando = [x for x in seq if (x["cuenta"] or "").startswith("Cargando")]
+                ok = (ult and ult["total"] >= 100 and ult["filas"] == ult["total"] and len(set(filas)) >= 4 and filas[0] <= 12 and cargando and not any(x["trigger"] for x in seq)
+                      and ult["cuenta"] == f"{ult['total']} pasos" and ult["alerta"] and ult["growing"] and lt["max"] < 1500)
+                return ok, json.dumps({"filas": filas[:12], "total": ult and ult["total"], "barra": ult and ult["cuenta"], "alerta": ult and ult["alerta"], "tareaLargaMax": round(lt["max"]), "largas": lt["n"], "segundos": seq[-1]["t"] if seq else None}, ensure_ascii=False)
+
+            @prueba("4-2 Las columnas que el script oculta quedan igual en TODAS las filas, también en las que llegaron en tandas posteriores")
+            def _():
+                f = FIRMAS4.get("on")
+                return (f and len(f["ocultas"]) == 1 and f["filas"] >= 100), json.dumps({"filas": f and f["filas"], "ocultas": f and f["ocultas"], "cols": f and f["cols"]}, ensure_ascii=False)
+            cerrar_pasos4()
+
+            @prueba("4-3 Marcar todos con la casilla de la cabecera cuando faltan filas por dibujar las dibuja primero: quedan todas dibujadas y todas marcadas")
+            def _():
+                s0 = abrir_a_medias()
+                if not s0: return False, "no se pudo sujetar la carga a medias"
+                sujetar4(300)
+                xy = fr4.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const th = t.querySelector('thead th.sapMListTblSelCol'), q = (th.querySelector('.sapMCb') || th).getBoundingClientRect(); return [Math.round(q.left + q.width / 2), Math.round(q.top + q.height / 2)]; }""")
+                antes = fr4.evaluate(ESTADO4); xy = a_pagina(xy); pg4.mouse.click(xy[0], xy[1]); pg4.wait_for_timeout(2500); despues = fr4.evaluate(ESTADO4)
+                ok = antes["filas"] < antes["total"] and despues["filas"] == despues["total"] and despues["marcadas"] == despues["total"]
+                return ok, json.dumps({"antes": [antes["filas"], antes["total"]], "despues": [despues["filas"], despues["total"], despues["marcadas"]]})
+            cerrar_pasos4()
+
+            @prueba("4-4 Filtrar con el cuadro del script cuando faltan filas por dibujar las dibuja primero (el filtro cuenta sobre todos los pasos)")
+            def _():
+                s0 = abrir_a_medias()
+                if not s0: return False, "no se pudo sujetar la carga a medias"
+                sujetar4(300)
+                xy = fr4.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const i = t.closest('.sapMDialog').querySelector('#rmd-filtro-bar input'); if (!i) return null; const q = i.getBoundingClientRect(); return [Math.round(q.left + q.width / 2), Math.round(q.top + q.height / 2)]; }""")
+                if not xy: return False, "sin cuadro de filtro en la barra"
+                antes = fr4.evaluate(ESTADO4); xy = a_pagina(xy); pg4.mouse.click(xy[0], xy[1]); pg4.keyboard.type("1"); pg4.wait_for_timeout(2500); despues = fr4.evaluate(ESTADO4)
+                ok = antes["filas"] < antes["total"] and despues["filas"] == despues["total"] and re.search(r"de\s+%d\b" % despues["total"], despues["cuenta"] or "") is not None
+                return ok, json.dumps({"antes": [antes["filas"], antes["total"]], "despues": [despues["filas"], despues["total"]], "cuenta": despues["cuenta"]}, ensure_ascii=False)
+            cerrar_pasos4()
+
+            @prueba("4-5 Cerrar la ventana a mitad de la carga no deja errores ni tandas colgadas, y al volver a entrar llegan todas las filas con la barra completa")
+            def _():
+                s0 = abrir_a_medias()
+                if not s0: return False, "no se pudo sujetar la carga a medias"
+                e0 = fr4.evaluate("(window.__rmdStats.errores || []).length"); r = cerrar_pasos4(); pg4.wait_for_timeout(1500)
+                tablas = fr4.evaluate("window.__rmdStats.tandas.tablas().map((c) => [c.filas, c.total, c.conectada])"); e1 = fr4.evaluate("(window.__rmdStats.errores || []).length")
+                abrir_etiqueta("FABRICACION"); seq, ult = seguir4()
+                ok = (r == "ok" and e1 == e0 and not any(t[2] for t in tablas) and ult and ult["filas"] == ult["total"] >= 100 and ult["cuenta"] == f"{ult['total']} pasos" and ult["alerta"])
+                return ok, json.dumps({"cierre": r, "tablas_tras_cerrar": tablas, "errores": [e0, e1], "reentrada": [ult and ult["filas"], ult and ult["total"], ult and ult["cuenta"]]}, ensure_ascii=False)
+            cerrar_pasos4()
+
+            @prueba("4-6 Apagar «Pasos por tandas» con la tabla a medias la completa al instante y deja el «growing» apagado; con la opción apagada la entrada es la de siempre (todas las filas de golpe) y el resultado coincide con el de las tandas")
+            def _():
+                s0 = abrir_a_medias()
+                if not s0: return False, "no se pudo sujetar la carga a medias"
+                opcion_tandas(False); pg4.wait_for_timeout(1500); st = fr4.evaluate(ESTADO4)
+                parcial = st["filas"] == st["total"] and not st["growing"] and not st["clase"]
+                cerrar_pasos4()
+                abrir_etiqueta("FABRICACION"); seq, ult = seguir4(); pg4.wait_for_timeout(2500); firma_off = fr4.evaluate(FIRMA4)
+                de_golpe = [x["filas"] for x in seq]
+                on = FIRMAS4.get("on") or {}
+                igual = {k: (on.get(k) == firma_off.get(k)) for k in ("filas", "ocultas", "clases", "cuenta", "alerta", "cols")}
+                ok = parcial and not ult["growing"] and all(igual.values()) and (len(set(de_golpe)) <= 2)
+                return ok, json.dumps({"apagado_a_medias": [st["filas"], st["total"], st["growing"], st["clase"]], "filas_vistas_sin_tandas": de_golpe[:6], "igual_que_con_tandas": igual, "diferencias": {k: [on.get(k), firma_off.get(k)] for k in igual if not igual[k]}}, ensure_ascii=False)[:1500]
+            cerrar_pasos4()
+
+            FORMULA4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); if (!t) return null;
+              const tr = [...t.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('CALCULO DE RENDIMIENTO')); if (!tr) return null;
+              const sp = [...tr.querySelectorAll('.sapMText')].find((e) => e.textContent.includes('CALCULO DE RENDIMIENTO')), nodo = sp.firstChild, palabras = []; const re = /\\S+/g; let m;
+              while ((m = re.exec(nodo.nodeValue))) { const r = document.createRange(); r.setStart(nodo, m.index); r.setEnd(nodo, m.index + m[0].length); const b = r.getBoundingClientRect(); palabras.push([m[0], Math.round(b.left), Math.round(b.top), Math.round(b.right)]); }
+              const barra = palabras.find((p) => /^-{10,}$/.test(p[0])), cants = palabras.filter((p) => p[0] === 'CANT.');
+              return { ws: getComputedStyle(sp).whiteSpace, lineas: [...new Set(palabras.map((p) => p[2]))].length, ancho: Math.round(sp.getBoundingClientRect().width),
+                       orden: !!barra && cants.length === 2 && palabras[0][2] < cants[0][2] && cants[0][2] < barra[2] && barra[2] < cants[1][2],
+                       numeradorSobreBarra: !!barra && cants.length === 2 && cants[0][1] >= barra[1] - 25 && cants[0][1] < barra[3], denominadorBajoBarra: !!barra && cants.length === 2 && cants[1][1] >= barra[1] - 25 && cants[1][1] < barra[3] }; }"""
+
+            @prueba("4-7 Con una tabla pequeña (hasta 50 filas) las tandas no intervienen: se dibuja entera de una vez, con la barra completa; y la fracción del cálculo de Rendimiento (texto con saltos de línea y espacios) se ve como la escribió quien la redactó: sus líneas en orden, con el numerador y el denominador a cada lado de la barra")
+            def _():
+                r = fr4.evaluate(FILA4, ["RENDIMIENTO", "Adicionar Pasos RMD"]); seq, ult = seguir4(maximo=40); pg4.wait_for_timeout(800)
+                formula = fr4.evaluate(FORMULA4); pequena = None
+                if formula:                                                                                         # (a 1366×768 y a 1280×720 la Descripción reserva el ancho de la fracción: sigue en 4 líneas, con la barra entera)
+                    pequena = {}
+                    for w_, h_ in ((1366, 768), (1280, 720)):
+                        pg4.set_viewport_size({"width": w_, "height": h_}); pg4.wait_for_timeout(1800); pequena[f"{w_}"] = fr4.evaluate(FORMULA4)
+                    pg4.set_viewport_size({"width": 1728, "height": 860}); pg4.wait_for_timeout(800)
+                cerrar_pasos4()
+                formula_ok = formula is None or (formula["ws"] == "pre-wrap" and formula["lineas"] == 4 and formula["orden"] and formula["numeradorSobreBarra"] and formula["denominadorBajoBarra"]
+                                                 and all(p and p["lineas"] == 4 and p["orden"] for p in pequena.values()))    # (None: este RMD no trae ese paso)
+                return (r == "ok" and ult and 0 < ult["total"] <= 50 and len({x["filas"] for x in seq}) == 1 and ult["filas"] == ult["total"] and not any(x["trigger"] for x in seq) and formula_ok), json.dumps({"filas": [x["filas"] for x in seq][:5], "total": ult and ult["total"], "barra": ult and ult["cuenta"], "formula": formula, "pequena": pequena}, ensure_ascii=False)
+
+            @prueba("4-7b Con la tabla ya completa, un paso que el portal agrega al final de su modelo (y uno que quita) se dibuja o se quita solo, sin pulsar «Más» (el portal agrega y quita desde su modelo: con el growing encendido una fila nueva más allá del límite no se vería)")
+            def _():
+                abrir_etiqueta("FABRICACION"); seq, ult = seguir4(); pg4.wait_for_timeout(1500)
+                r = fr4.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const c = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')), info = c.getBindingInfo('items'), b = c.getBinding('items'), m = b.getModel();
+                  const ruta = info.path, datos = m.getProperty(ruta); if (!Array.isArray(datos)) return { error: 'el modelo no es un arreglo: ' + ruta };
+                  window.__antes4 = datos.length; const copia = JSON.parse(JSON.stringify(datos[datos.length - 1])); m.setProperty(ruta, datos.concat([copia])); window.__ruta4 = ruta; window.__m4 = m; return { ruta, antes: datos.length }; }""")
+                if r.get("error"): return False, r["error"]
+                pg4.wait_for_timeout(2500); a = fr4.evaluate(ESTADO4)
+                fr4.evaluate("() => { const m = window.__m4, ruta = window.__ruta4, d = m.getProperty(ruta); m.setProperty(ruta, d.slice(0, d.length - 1)); }"); pg4.wait_for_timeout(2500); b_ = fr4.evaluate(ESTADO4)
+                cerrar_pasos4()
+                ok = a["total"] == r["antes"] + 1 and a["filas"] == a["total"] and b_["total"] == r["antes"] and b_["filas"] == b_["total"] and not a["trigger"]
+                return ok, json.dumps({"modelo": r, "tras_agregar": [a["filas"], a["total"]], "tras_quitar": [b_["filas"], b_["total"]]})
+
+            @prueba("4-8 Ninguna petición de escritura salió del navegador durante el bloque 4 y el script no registró errores")
+            def _():
+                e = fr4.evaluate("window.__rmdStats.errores || []")
+                return (not bq4 and not e and not errores4), f"bloqueadas={bq4[:5]} errores_script={e[:3]} errores_pagina={errores4[:3]}"
+        finally:
+            try: fr4.evaluate("() => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete o.tandas; localStorage.setItem('rmdUiMejoras', JSON.stringify(o)); }")   # (por defecto: encendida)
+            except Exception: pass
+            pg4.close()
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
