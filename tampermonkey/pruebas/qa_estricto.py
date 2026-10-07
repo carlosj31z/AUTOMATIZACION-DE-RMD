@@ -2581,7 +2581,7 @@ with sync_playwright() as p:
                 ok = len(sap_) >= 1 and all(n > 0 and t.startswith("Contiene %d" % n) for t, n in sap_) and plant["utensilios4"] == 4
                 return ok, json.dumps({"sap": sap_, "plantilla": plant}, ensure_ascii=False)
 
-            @prueba("4-7d Trazabilidad RMD: «Exportar PDF» arma con el pdfMake del portal una hoja como la plantilla: la versión nueva completa y numerada, con lo quitado, lo nuevo y lo modificado marcados en su sitio, sin la cabecera")
+            @prueba("4-7d Trazabilidad RMD: «Exportar PDF» arma con el pdfMake del portal el mismo PDF del master de la versión nueva (encabezado, cuadros, Realizado por / V.B.) con lo quitado, lo nuevo y lo modificado marcados en su sitio")
             def _():
                 for _i in range(6):
                     if fr4.evaluate(CERRAR_TOPE) == 'nada': break
@@ -2593,11 +2593,11 @@ with sync_playwright() as p:
                     st = fr4.evaluate("() => { const t = document.querySelector('.rmd-tz').__tz; return { n: t.E.cambios ? t.E.cambios.length : null, cargando: t.E.cargando }; }")
                     if st["n"] is not None and not st["cargando"]: break
                     pg4.wait_for_timeout(1000)
-                r = fr4.evaluate("""async () => { const t = document.querySelector('.rmd-tz').__tz, E = t.E; const [desde, hasta] = E.comparacion.split(/\s*\u2192\s*/); const dd = await window.__rmdStats.tzHoja(E.desde, E.hasta, { codigo: document.querySelector('.rmd-tz').dataset.codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', desde, hasta });
+                r = fr4.evaluate("""async () => { const t = document.querySelector('.rmd-tz').__tz, E = t.E; const [desde, hasta] = E.comparacion.split(/\s*\u2192\s*/); const dd = await window.__rmdStats.tzMaster(E.desde, E.hasta, { codigo: document.querySelector('.rmd-tz').dataset.codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', desde, hasta });
                   const blob = await new Promise((ok, mal) => { const tt = setTimeout(() => mal(new Error('sin respuesta')), 30000); try { const x = window.pdfMake.createPdf(dd).getBlob((b) => { clearTimeout(tt); ok(b); }); if (x && x.then) x.then((b) => { clearTimeout(tt); ok(b); }, mal); } catch (e) { clearTimeout(tt); mal(e); } });
-                  const cab = await blob.slice(0, 5).text(); return { bytes: blob.size, cabecera: cab, tablas: dd.content.filter((x) => x.table).length, cuenta: dd.cuenta, boton: !!document.querySelector('.rmd-tz-pdf'), sinCabecera: !JSON.stringify(dd.content).includes('Observaciones') }; }""")
+                  const cab = await blob.slice(0, 5).text(); return { bytes: blob.size, cabecera: cab, tablas: dd.content.filter((x) => x.table).length, cuenta: dd.__cuenta, boton: !!document.querySelector('.rmd-tz-pdf'), encabezadoMaster: typeof dd.header === 'function' || !!dd.header, leyenda: JSON.stringify(dd.content[0]).includes('Diferencia entre versiones') }; }""")
                 fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(1500)
-                return (r["cabecera"] == "%PDF-" and r["bytes"] > 3000 and r["boton"] and r["tablas"] >= 5 and r["sinCabecera"]), json.dumps(r)
+                return (r["cabecera"] == "%PDF-" and r["bytes"] > 20000 and r["boton"] and r["tablas"] >= 5 and r["encabezadoMaster"] and r["leyenda"]), json.dumps(r)
 
             @prueba("4-8 Ninguna petición de escritura salió del navegador durante el bloque 4 y el script no registró errores")
             def _():

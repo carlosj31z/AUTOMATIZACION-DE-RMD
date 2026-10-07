@@ -9950,11 +9950,124 @@
     const hoy = new Date(), dd = (n) => String(n).padStart(2, '0');
     return tzHojaDoc(A, B, { ...info, fecha: `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()}` });
   }
+  window.__rmdStats.tzMaster = async (a, b, info) => { const m = controladorPrincipal().getView().getModel('mainModelv2'); return tzMarcarMaster(await tzDocMaster(m, a), await tzDocMaster(m, b), info || {}); };   // (pruebas)
   window.__rmdStats.tzHoja = (a, b, info) => tzHoja(controladorPrincipal().getView().getModel('mainModelv2'), a, b, info || {});   // (pruebas)
+  // v1.53 (segundo pedido): el PDF debe ser EL MISMO documento que el PDF del master (encabezado, cuadros, casillas de Realizado por / V.B.…).
+  // Se pide al propio portal el documento de cada versión, como hace «Ver master» (asociarDatos = el RMD, onGetDataEstructuraMD, tratarInformacion),
+  // capturando la definición de pdfMake sin abrir el visor, y sobre el de la versión nueva se marcan los cambios fila por fila.
+  async function tzDocMaster(modelo, mdId) {
+    const ctrl = controladorPrincipal(), V = ctrl.getView(), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JM = sap.ui.require('sap/ui/model/json/JSONModel');
+    const md = (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', mdId)], { $expand: EXPAND_LISTA_MD }))[0]; if (!md) throw new Error('no se encontró la versión en SAP');
+    const nombres = ['asociarDatos', 'listMdEstructura', 'listMdEsPaso', 'listMdEsEquipo', 'listMdEsUtensilio', 'listMdEsEtiqueta', 'listMdEsReInsumo', 'listMdEsEspecificacion', 'listEsPasoInsumoPasoGeneral'];
+    const antes = nombres.map((n) => [n, V.getModel(n)]), pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open; let dd = null;
+    try {
+      V.setModel(new JM(md), 'asociarDatos'); await ctrl.onGetDataEstructuraMD();
+      window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
+      pm.createPdf = function (d) { if (!dd) dd = clonarDoc(d); const x = () => {}; return { open: x, print: x, download: x, getBlob(cb) { if (cb) cb(new Blob()); return Promise.resolve(new Blob()); }, getDataUrl(cb) { if (cb) cb(''); }, getBase64(cb) { if (cb) cb(''); }, getBuffer(cb) { if (cb) cb(new Uint8Array()); } }; };
+      await ctrl.tratarInformacion(false, true);
+      await hasta(() => dd, 20000, 150);
+    } finally {
+      pm.createPdf = cp0; window.open = open0; antes.forEach(([n, mo]) => { if (mo) V.setModel(mo, n); });
+      try { sap.ui.core.BusyIndicator.hide(); } catch (e) { /* sin UI5 */ }
+    }
+    if (!dd) throw new Error('el portal no armó el documento del master');
+    return dd;
+  }
+  function tzMarcarMaster(ddA, ddB, info) {
+    const VERDE = '#e3f4e4', ROJO = '#fbe3e3', AMBAR = '#fff1d6', C = { agregado: '#1e7d32', quitado: '#c62828', mod: '#b26a00' }, cuenta = { agregado: 0, quitado: 0, mod: 0 };
+    const textoDe = (n) => (n == null ? '' : typeof n === 'string' || typeof n === 'number' ? String(n) : Array.isArray(n) ? n.map(textoDe).join('') : typeof n === 'object' ? (n.text != null ? textoDe(n.text) : n.stack ? textoDe(n.stack) : n.columns ? textoDe(n.columns) : n.table ? n.table.body.map((r) => r.map(textoDe).join(' ')).join(' ') : '') : '');
+    const clave = (t) => SIN_ACENTOS(String(t || '')).replace(/[^A-Z0-9%°]+/g, ' ').trim();
+    const esNumero = (t) => /^\s*(\d+(\.\d+)*\.-|-)\s*$/.test(t);
+    // la tabla real de una entrada del contenido (el portal envuelve las de procedimiento en una tabla de una celda)
+    const tablaDe = (it) => { if (!it || !it.table) return null; const b = it.table.body; if (b.length === 1 && b[0].length === 1 && b[0][0] && b[0][0].table) return b[0][0].table; return it.table; };
+    const tituloDe = (it) => { if (!it) return null; if (it.style === 'subheader') return textoDe(it); const t = it.table && it.style === 'tableColocarCheckNoBorder' && it.table.body[0] && textoDe(it.table.body[0][0]); return t && !/^\(Colocar check/.test(t) ? t : null; };
+    const claveTitulo = (t) => clave(String(t).replace(/^\s*\d+(\.\d+)*\.-\s*/, ''));
+    // secciones: título + las entradas que le siguen hasta el siguiente título
+    const secciones = (dd) => { const out = []; let cur = { titulo: '', items: [] }; (dd.content || []).forEach((it, i) => { const t = tituloDe(it); if (t) { out.push(cur); cur = { titulo: t, items: [], idx: i } ; cur.items.push(it); } else cur.items.push(it); }); out.push(cur); return out; };
+    // filas de una tabla en «elementos»: la fila principal (número, «-» o una fila de tabla de equipos) y las filas que dependen de ella (procesos menores)
+    const elementos = (tb) => {
+      const out = []; const hr = tb.headerRows || 0;
+      tb.body.forEach((fila, i) => {
+        if (i < hr) return; const c0 = textoDe(fila[0]), c1 = textoDe(fila[1]);
+        if (/^VERIFICADO POR/.test(c0.trim())) return;
+        const principal = esNumero(c0) || !(c0.trim() === '' && out.length) || hr > 0;
+        if (principal) out.push({ filas: [i], clave: clave(hr > 0 ? c0 + ' ' + c1 : c1), num: c0.trim() }); else out[out.length - 1].filas.push(i);
+      });
+      return out;
+    };
+    const conContenido = (c) => ['text', 'table', 'stack', 'columns', 'image', 'canvas', 'ul', 'ol', 'qr', 'svg'].some((k) => k in c);   // (las celdas vacías que rellenan un colSpan se dejan tal cual: pdfMake no las admite con color)
+    const pintarCelda = (cel, color) => { if (cel && typeof cel === 'object' && !Array.isArray(cel) && conContenido(cel)) cel.fillColor = color; };
+    const pintarFila = (fila, color) => fila.forEach((c, k) => { if (c && typeof c === 'object') pintarCelda(c, color); else if (c != null) fila[k] = { text: String(c), fillColor: color }; });
+    const tachar = (n) => { if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach(tachar); return; } if (n.text != null && typeof n.text !== 'object') { n.decoration = 'lineThrough'; n.color = C.quitado; } if (Array.isArray(n.text)) n.text.forEach((x, k) => { if (typeof x === 'string') n.text[k] = { text: x, decoration: 'lineThrough', color: C.quitado }; else tachar(x); }); if (n.stack) tachar(n.stack); if (n.columns) tachar(n.columns); };
+    let colMarca = 1;                                                     // (columna del texto: la 2.ª en pasos y cuadros; la 1.ª en tablas con cabecera, como equipos)
+    const marcaEn = (fila, etiqueta, color, notas) => {
+      const k = fila.length > 1 ? colMarca : 0, cel = fila[k] && typeof fila[k] === 'object' ? fila[k] : (fila[k] = { text: String(fila[k] || '') });
+      const base = Array.isArray(cel.text) ? cel.text : [{ text: cel.text == null ? '' : cel.text }];
+      cel.text = [...base, { text: '  ' + etiqueta, bold: true, fontSize: 6.5, color, decoration: undefined }, ...(notas || []).map((t) => ({ text: '\n' + t, fontSize: 6.5, color, bold: false, decoration: undefined }))];
+    };
+    const clonar = (x) => clonarDoc({ content: x }).content;
+    const marcarTablas = (tA, tB) => {
+      const eA = elementos(tA), eB = elementos(tB), ops = tzAlinear(eA, eB, (e) => e.clave), inserciones = []; colMarca = (tB.headerRows || 0) > 0 ? 0 : 1;
+      let ultima = (tB.headerRows || 0) - 1;
+      ops.forEach((o) => {
+        if (o.t === 'igual') {
+          const fa = o.a.filas.map((i) => tA.body[i]), fb = o.b.filas.map((i) => tB.body[i]);
+          const sinNum = (f) => JSON.stringify(f.slice(1).map(textoDe)), sinNumCel = (f) => JSON.stringify(f.slice(1), (k, v) => (k === 'positions' || k === '_margin' ? undefined : v));
+          if (sinNumCel(fa[0]) !== sinNumCel(fb[0]) && sinNum(fa[0]) === sinNum(fb[0])) { cuenta.mod++; pintarFila(fb[0], AMBAR); marcaEn(fb[0], 'MODIFICADO', C.mod, ['Cambió su configuración (rango, casillas, tipo de dato o formato).']); }
+          else if (sinNum(fa[0]) !== sinNum(fb[0])) {
+            cuenta.mod++; pintarFila(fb[0], AMBAR);
+            const resto = (f) => f.slice(colMarca + 1).map(textoDe).map((t) => t.trim()).filter(Boolean).join(' · ') || 'ninguna';
+            const notas = textoDe(fa[0][colMarca]).trim() !== textoDe(fb[0][colMarca]).trim() ? ['Texto antes: ' + textoDe(fa[0][colMarca]).trim().slice(0, 300)] : [];
+            if (resto(fa[0]) !== resto(fb[0])) notas.push(`Casillas / campos antes: ${resto(fa[0])} — ahora: ${resto(fb[0])}`);
+            marcaEn(fb[0], 'MODIFICADO', C.mod, notas.length ? notas : ['Cambió su configuración.']);
+          }
+          // procesos menores del paso
+          const sa = o.a.filas.slice(1).map((i) => ({ i, clave: clave(textoDe(tA.body[i][1]) || textoDe(tA.body[i][0])) })), sb = o.b.filas.slice(1).map((i) => ({ i, clave: clave(textoDe(tB.body[i][1]) || textoDe(tB.body[i][0])) }));
+          let ultSub = o.b.filas[0];
+          tzAlinear(sa, sb, (x) => x.clave).forEach((q) => {
+            if (q.t === 'agregado') { cuenta.agregado++; pintarFila(tB.body[q.b.i], VERDE); marcaEn(tB.body[q.b.i], 'NUEVO', C.agregado); ultSub = q.b.i; }
+            else if (q.t === 'quitado') { cuenta.quitado++; const f = clonar(tA.body[q.a.i]); tachar(f); pintarFila(f, ROJO); marcaEn(f, 'QUITADO', C.quitado); inserciones.push({ despues: ultSub, filas: [f] }); }
+            else ultSub = q.b.i;
+          });
+          ultima = o.b.filas[o.b.filas.length - 1];
+        } else if (o.t === 'agregado') {
+          cuenta.agregado++; o.b.filas.forEach((i, k) => { pintarFila(tB.body[i], VERDE); if (!k) marcaEn(tB.body[i], 'NUEVO', C.agregado); });
+          ultima = o.b.filas[o.b.filas.length - 1];
+        } else {
+          cuenta.quitado++; const fs = o.a.filas.map((i) => clonar(tA.body[i])); fs.forEach((f, k) => { tachar(f); pintarFila(f, ROJO); if (!k) marcaEn(f, 'QUITADO', C.quitado); });
+          inserciones.push({ despues: ultima, filas: fs });
+        }
+      });
+      inserciones.forEach((x, n) => { x.n = n; });
+      inserciones.sort((a, b) => b.despues - a.despues || b.n - a.n).forEach((x) => tB.body.splice(x.despues + 1, 0, ...x.filas));   // (varias seguidas en el mismo sitio: en su orden)
+    };
+    const SA = secciones(ddA), SB = secciones(ddB), salida = [];
+    tzAlinear(SA, SB, (x) => claveTitulo(x.titulo)).forEach((o) => {
+      if (o.t === 'igual') {
+        const ta = o.a.items.map(tablaDe).filter((t) => t && t.body && t.body.length > 1 || (t && t.body && t.body[0] && t.body[0].length > 1)), tb = o.b.items.map(tablaDe).filter((t) => t && t.body && t.body.length > 1 || (t && t.body && t.body[0] && t.body[0].length > 1));
+        tb.forEach((t, k) => { if (ta[k] && t.widths && ta[k].widths && t.widths.length === ta[k].widths.length && !/R: Realizado/.test(textoDe(t.body[0]))) marcarTablas(ta[k], t); });
+        salida.push(...o.b.items);
+      } else if (o.t === 'agregado') {
+        cuenta.agregado++; o.b.items.forEach((it) => { const t = tablaDe(it); if (t && t.body) t.body.forEach((f, i) => { if (i >= (t.headerRows || 0)) pintarFila(f, VERDE); }); });
+        if (o.b.items[0]) { const h = o.b.items[0]; if (h.style === 'subheader') { h.text = [{ text: textoDe(h) }, { text: '  NUEVO', color: C.agregado, bold: true, fontSize: 8 }]; } }
+        salida.push(...o.b.items);
+      } else {
+        cuenta.quitado++; const its = clonar(o.a.items); its.forEach((it) => { tachar(it); const t = tablaDe(it); if (t && t.body) t.body.forEach((f) => pintarFila(f, ROJO)); });
+        salida.push(...its);
+      }
+    });
+    const leyenda = { margin: [0, 0, 0, 8], table: { widths: ['*'], body: [[{ fillColor: '#f4f4f4', fontSize: 8, text: [
+      { text: `TRAZABILIDAD · Diferencia entre versiones\n`, bold: true, fontSize: 9 }, { text: `Desde: ${info.desde || '—'}    Hasta: ${info.hasta || '—'}\n` },
+      { text: `${cuenta.agregado} nuevos`, color: C.agregado, bold: true }, '  ·  ', { text: `${cuenta.quitado} quitados`, color: C.quitado, bold: true }, '  ·  ', { text: `${cuenta.mod} modificados`, color: C.mod, bold: true },
+      { text: '\nEs el PDF del master de la versión nueva. En verde lo nuevo, en rojo y tachado lo que se quitó (en su sitio, con su número de la versión anterior) y en ámbar lo que cambió.', fontSize: 7, color: '#555' }] }]] }, layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5 } };
+    ddB.content = [leyenda, ...salida]; ddB.info = { title: `Trazabilidad RMD ${info.codigo}` }; ddB.__cuenta = cuenta;
+    return ddB;
+  }
   async function tzExportarPdf(datos) {
     const pm = window.pdfMake; if (!pm || !pm.createPdf) throw new Error('el generador de PDF del portal (pdfMake) no está disponible');
     const modelo = controladorPrincipal().getView().getModel('mainModelv2'), [desde, hasta] = String(datos.comparacion || '').split(/\s*\u2192\s*/);
-    const doc = await tzHoja(modelo, datos.mdDesde, datos.mdHasta, { codigo: datos.codigo, descripcion: datos.descripcion, desde, hasta });
+    const ddA = await tzDocMaster(modelo, datos.mdDesde), ddB = await tzDocMaster(modelo, datos.mdHasta);
+    const doc = tzMarcarMaster(ddA, ddB, { codigo: datos.codigo, desde, hasta });
     const blob = await blobDe(pm, doc), hoy = new Date(), dd = (n) => String(n).padStart(2, '0');
     const nombre = `Trazabilidad RMD ${datos.codigo} ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.pdf`;
     descargarArchivo(nombre, new Uint8Array(await blob.arrayBuffer()), 'application/pdf');
