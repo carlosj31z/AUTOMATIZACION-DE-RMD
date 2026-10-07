@@ -1733,7 +1733,8 @@
     const cadena = String(actual.codigoversionprincipal || actual.codigo);
     const previas = filas.filter((o) => (String(o.codigoversionprincipal || o.codigo) === cadena || String(o.codigo) === cadena) && Number(o.version) < Number(actual.version));
     previas.sort((a, b) => Number(b.version) - Number(a.version));
-    return { filas, actual, anterior: previas[0] || null };
+    const enlazada = actual.mdIdVersionAnt && filas.find((o) => o.mdId === actual.mdIdVersionAnt);   // (v1.53: las versiones recientes traen su versión anterior en mdIdVersionAnt)
+    return { filas, actual, anterior: enlazada || previas[0] || null };
   }
   function campoDe(d, etiqueta) {
     const lab = [...d.querySelectorAll('label')].find((l) => norm(l.getAttribute('aria-label') || l.textContent).replace(/[:*]\s*$/, '') === etiqueta);
@@ -9751,13 +9752,41 @@
     const [es, et] = await Promise.all([leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion', $orderby: 'estructuraId' }), leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion', $orderby: 'etiquetaId' })]);
     return { estructura: new Map(es.map((x) => [x.estructuraId, norm(x.descripcion)])), etiqueta: new Map(et.map((x) => [x.etiquetaId, norm(x.descripcion)])), tipos: new Map(), estados: new Map() };
   }
+  // Versiones de un master. SAP las une de tres maneras y no siempre llena las tres (v1.53, caso 2202609204 IDELLE 0.1% CRM: su
+  // «codigoversionprincipal» está vacío y antes solo se veía la v7): 1) codigoversionprincipal = código de la primera versión; 2) mdIdVersionAnt = la
+  // versión de la que se creó (las versiones recientes); 3) en las antiguas, ninguna de las dos: se reconocen por la misma descripción, planta, área y etapa.
+  const TZ_EXPAND_MD = 'estadoIdRmd,estadoIdProceso,sucursalId';
+  const tzComparable = (m) => /autoriz|ingres|suspend/i.test((m && m.estado) || '');     // (solo se comparan versiones Autorizadas, Ingresadas o Suspendidas)
   async function tzLinaje(modelo, codigo, cat) {
-    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, uno = (await leerTodoDe(modelo, 'MD', [new F('codigo', 'EQ', isNaN(+codigo) ? codigo : +codigo)], { $orderby: 'mdId' }))[0];
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, L = (f) => leerTodoDe(modelo, 'MD', f, { $expand: TZ_EXPAND_MD, $orderby: 'mdId' });
+    const uno = (await L([new F('codigo', 'EQ', isNaN(+codigo) ? codigo : +codigo)]))[0];
     if (!uno) throw new Error(`no se encontró el RMD ${codigo}`);
-    const P = uno.codigoversionprincipal || uno.codigo;
-    const todos = await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', P), new F('codigo', 'EQ', P)], and: false })], { $expand: 'estadoIdRmd,estadoIdProceso,sucursalId', $orderby: 'mdId' });
-    todos.forEach((m) => { if (m.estadoIdRmd_iMaestraId != null && m.estadoIdRmd) cat.estados.set(m.estadoIdRmd_iMaestraId, m.estadoIdRmd.contenido); if (m.estadoIdProceso_iMaestraId != null && m.estadoIdProceso) cat.estados.set(m.estadoIdProceso_iMaestraId, m.estadoIdProceso.contenido); });
-    const lista = todos.map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' })).sort((a, b) => (+a.version - +b.version) || (new Date(a.fechaRegistro) - new Date(b.fechaRegistro)));
+    const todos = new Map([[uno.mdId, uno]]), add = (xs) => { let n = 0; xs.forEach((m) => { if (m && m.mdId && !todos.has(m.mdId)) { todos.set(m.mdId, m); n++; } }); return n; };
+    const principales = new Set(), porPrincipal = async () => {
+      const ps = [...new Set([...todos.values()].map((m) => String(m.codigoversionprincipal || '').trim()).filter(Boolean))].filter((p) => !principales.has(p));
+      for (const p of ps) { principales.add(p); add(await L([new F({ filters: [new F('codigoversionprincipal', 'EQ', p), new F('codigo', 'EQ', isNaN(+p) ? p : +p)], and: false })])); }
+      return ps.length;
+    };
+    const porEnlace = async () => {                                     // mdIdVersionAnt hacia atrás y hacia adelante
+      let n = 0;
+      const antes = [...todos.values()].map((m) => m.mdIdVersionAnt).filter((id) => id && !todos.has(id));
+      if (antes.length) n += add(await leerPorIds(modelo, 'MD', 'mdId', [...new Set(antes)], { $expand: TZ_EXPAND_MD }));
+      const ids = [...todos.keys()];
+      for (let k = 0; k < ids.length; k += 30) n += add(await L([new F({ filters: ids.slice(k, k + 30).map((id) => new F('mdIdVersionAnt', 'EQ', id)), and: false })]).catch(() => []));
+      return n;
+    };
+    for (let vuelta = 0; vuelta < 6; vuelta++) { const a = await porPrincipal(), b = await porEnlace(); if (!a && !b) break; }
+    // las versiones antiguas sin ningún enlace: misma descripción, planta, área y etapa
+    const vers = [...todos.values()], minV = Math.min(...vers.map((m) => +m.version || 0));
+    if (minV > 1) {
+      const igual = (a, b) => norm(a) === norm(b);
+      const cand = await L([new F('descripcion', 'EQ', uno.descripcion)]).catch(() => []);
+      const mismos = cand.filter((m) => igual(m.descripcion, uno.descripcion) && m.sucursalId_iMaestraId === uno.sucursalId_iMaestraId && igual(m.areaRmdTxt, uno.areaRmdTxt) && igual(m.nivelTxt, uno.nivelTxt) && +m.version < minV);
+      if (add(mismos)) { for (let vuelta = 0; vuelta < 4; vuelta++) { const a = await porPrincipal(), b = await porEnlace(); if (!a && !b) break; } }
+    }
+    const P = String(uno.codigoversionprincipal || '').trim() || [...todos.values()].sort((a, b) => (+a.version || 0) - (+b.version || 0)).map((m) => m.codigo).find(Boolean) || uno.codigo;
+    [...todos.values()].forEach((m) => { if (m.estadoIdRmd_iMaestraId != null && m.estadoIdRmd) cat.estados.set(m.estadoIdRmd_iMaestraId, m.estadoIdRmd.contenido); if (m.estadoIdProceso_iMaestraId != null && m.estadoIdProceso) cat.estados.set(m.estadoIdProceso_iMaestraId, m.estadoIdProceso.contenido); });
+    const lista = [...todos.values()].filter((m) => m.codigo != null).map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' })).sort((a, b) => (+a.version - +b.version) || (new Date(a.fechaRegistro) - new Date(b.fechaRegistro)));
     return { principal: P, versiones: lista, actual: lista.find((m) => String(m.codigo) === String(codigo)) || lista[lista.length - 1] };
   }
   async function tzLeerVersion(modelo, md, cat) {
@@ -10089,7 +10118,7 @@
     // los estados de la tabla nativa de la ventana (Estado · Registrado · Usuario Registro)
     const estadosNativos = () => [...d.querySelectorAll('table tbody tr')].filter((tr) => !raiz.contains(tr) && !/SubRow/.test(tr.className))
       .map((tr) => [...tr.children].map((td) => norm(td.textContent)).filter(Boolean)).filter((c) => c.length >= 3).map((c) => [c[0], c[1], c[2]]);
-    const origenDe = (m) => { const vs = (E.linaje ? E.linaje.versiones : []).filter((x) => +x.version < +m.version && !/cancel/i.test(x.estado)); return vs.length ? vs[vs.length - 1] : null; };
+    const origenDe = (m) => { const vs = (E.linaje ? E.linaje.versiones : []).filter((x) => +x.version < +m.version && tzComparable(x)); return vs.length ? vs[vs.length - 1] : null; };   // (la anterior que se puede comparar)
     const ficha = (m) => { const o = origenDe(m), c = (t, v) => `<div><span>${t}</span><b>${esc(v == null || v === '' ? '—' : String(v))}</b></div>`;
       return `<div class="rmd-tz-ficha">${c('Código', m.codigo)}${c('Versión', m.version)}${c('Descripción', m.descripcion)}${c('Etapa', m.nivelTxt)}${c('Planta', m.sucursalId && m.sucursalId.contenido)}${c('Estado', m.estado)}${c('Versión origen', o ? `v${o.version} · ${o.codigo}` : 'Sin versión origen')}</div>`; };
     const filasVersiones = () => (E.linaje ? E.linaje.versiones : []).map((m) => { const o = origenDe(m); return { codigo: m.codigo, version: m.version, estado: m.estado, descripcion: m.descripcion, etapa: m.nivelTxt, planta: (m.sucursalId && m.sucursalId.contenido) || '', origen: o ? `v${o.version}` : '', fecha: m.fechaRegistro, usuario: m.usuarioRegistro, mdId: m.mdId }; });
@@ -10108,7 +10137,7 @@
     async function iniciar() {
       E.cargando = 'Leyendo las versiones del RMD…'; pintar();
       try {
-        await asegurar(); const vs = E.linaje.versiones, act = E.linaje.actual, i = vs.indexOf(act), previas = vs.slice(0, i).filter((m) => !/cancel/i.test(m.estado));
+        await asegurar(); const vs = E.linaje.versiones, act = E.linaje.actual, i = vs.indexOf(act), previas = vs.slice(0, i).filter(tzComparable);
         E.hasta = act.mdId; E.desde = previas.length ? previas[previas.length - 1].mdId : '';
         if (E.desde) await comparar(); else { E.cambios = []; E.comparacion = ''; E.cargando = ''; pintar(); }
       } catch (e) { E.error = 'No se pudo leer: ' + e.message; E.cargando = ''; pintar(); }
@@ -10161,7 +10190,7 @@
       cuerpo.innerHTML = E.tab === 'vers' ? htmlVersionesLista() : E.tab === 'ver' ? htmlVersiones() : htmlHistorial();
       if (foco) { const el = [...cuerpo.querySelectorAll('input[type=search]')].find((x) => (x.dataset.f || x.className) === foco.n); if (el) { el.focus(); try { el.setSelectionRange(foco.pos, foco.pos); } catch (e) { /* sin selección */ } } }
     }
-    const opcionesVersion = (sel) => E.linaje.versiones.map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
+    const opcionesVersion = (sel) => E.linaje.versiones.filter((m) => tzComparable(m) || m.mdId === sel).map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
     function htmlVersionesLista() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
       if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="searching">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
