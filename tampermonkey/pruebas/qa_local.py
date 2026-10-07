@@ -622,8 +622,7 @@ with sync_playwright() as p:
           igual: T.comparar(A, A).length, orden: A.pasos.map(p => p.key).slice(0, 2) }; }"""))
         c = {(x[0], x[1], x[2]): x for x in r["c"]}
         def hay(*k): return k in c
-        ok = (hay("Cabecera", "Modificado", "Descripción") and c[("Cabecera", "Modificado", "Descripción")][3:5] == ["PRODUCTO", "PRODUCTO NUEVO"]
-              and hay("Cabecera", "Agregado", "Línea agregada") and c[("Cabecera", "Agregado", "Línea agregada")][4] == "linea tres" and c[("Cabecera", "Quitado", "Línea quitada")][3] == "linea dos"
+        ok = (not any(x[0] == "Cabecera" for x in r["c"])            # (v1.53: la cabecera ya no se compara)
               and c[("Pasos", "Modificado", "Val. Inicial")][3:5] == ["1", "2"] and c[("Pasos", "Modificado", "Tab")][3:5] == ["No", "Sí"]
               and hay("Pasos", "Reemplazado", "Paso") and "300" in c[("Pasos", "Reemplazado", "Paso")][3] and "350" in c[("Pasos", "Reemplazado", "Paso")][4]
               and hay("Pasos", "Agregado", "Paso") and "Paso 400" in c[("Pasos", "Agregado", "Paso")][8])
@@ -748,7 +747,7 @@ with sync_playwright() as p:
         with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
         ruta = dl.value.path(); guardado = open(ruta, encoding="utf-8").read(); nombre = dl.value.suggested_filename
         e2 = PP_CTX.new_page(); e2.set_content(guardado); e2.wait_for_selector(".pp-doc", timeout=15000); otra = e2.evaluate("() => ({ contar: window.__pp.estado().contar, sol: window.__pp.estado().SOL.nombre })"); e2.close(); e.close()
-        ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and "★ Se creará" in estado["tags"] and "Paso 2010" in estado["tags"]
+        ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and any(t.startswith("★ Se creará") for t in estado["tags"]) and "Paso 2010" in estado["tags"]
               and estado["contar"]["total"] >= 5 and estado["contar"]["nuevos"] == 1 and "Solicitud" in pide and nombre.startswith("Borrador RMD 2202600001 v3 ") and otra["contar"] == estado["contar"] and otra["sol"] == "Ana Prueba")
         PP_GUARDADO.append(guardado)
         return ok, json.dumps({ "nums": nums[:8], "est1": est1, "est2": est2, "quitados": [quitados1, quitados2], "estado": estado, "nombre": nombre, "reabierta": otra, "errores": errs[:3] }, ensure_ascii=False)[:1800]

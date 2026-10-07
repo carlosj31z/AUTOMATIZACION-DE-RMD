@@ -1373,9 +1373,9 @@ with sync_playwright() as p:
             def _():
                 fr.evaluate("(k) => { const d=" + TOPW + "; const trs=[...d.querySelector('table').querySelectorAll('tbody tr')].filter(r=>!/SubRow/.test(r.className)); sap.ui.getCore().byId(trs[k].id).firePress(); }", FILA_EDIT)
                 fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d => d.getClientRects().length && /^Editar Paso/.test((d.querySelector('h2')||{}).textContent||''))", timeout=30000)
-                try: fr.wait_for_selector(".rmd-ep-aviso", timeout=20000)
+                try: fr.wait_for_selector(".rmd-ep-aviso:not(.rmd-ep-dup)", timeout=20000)
                 except Exception: pass
-                aviso = fr.evaluate("(document.querySelector('.rmd-ep-aviso') || {}).textContent || ''")
+                aviso = fr.evaluate("(document.querySelector('.rmd-ep-aviso:not(.rmd-ep-dup)') || {}).textContent || ''")   # (v1.53: el de «Ya existe el paso…» es aparte)
                 fr.evaluate("""() => { const ctrl=""" + CTRL + """; window.__capt=[]; window.__rest=[]; const cambiar=(o,k,f)=>{ window.__rest.push([o,k,Object.prototype.hasOwnProperty.call(o,k),o[k]]); o[k]=f; };
                   const sim=(tipo)=>function(ruta,datos,params){ window.__capt.push({ tipo, ruta:String(ruta) }); const p2=tipo==='remove'?datos:params; setTimeout(()=>{ if(p2&&p2.success) p2.success(datos||{}); },30); };
                   cambiar(ctrl.mainModelv2,'update',sim('update')); cambiar(ctrl.mainModelv2,'create',sim('create')); cambiar(ctrl.mainModelv2,'remove',sim('remove'));
@@ -2554,6 +2554,50 @@ with sync_playwright() as p:
                 fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2000)
                 bien = lambda f: f is not None and (f["ws"] == "pre-wrap" and f["lineas"] == 4 and f["orden"] and f["dentro"])
                 return (bien(a) and bien(c)), json.dumps({"1415": a, "1280": c})
+
+            @prueba("4-7b Editar Paso: al escribir una descripción que ya tiene otro paso (aunque cambien mayúsculas o los signos del final) aparece «Ya existe el paso … · Usar el paso …»; se cancela sin grabar")
+            def _():
+                fr4.evaluate(FILA4, ["RENDIMIENTO", "Adicionar Pasos RMD"]); esperar_tabla(1)
+                xy = fr4.evaluate("() => { const t = " + TABLA_P + """; const ths = [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim().toUpperCase()); const tr = [...t.querySelectorAll('tbody tr.sapMListTblRow')][0]; const td = tr.children[ths.indexOf('CÓDIGO')]; const q = td.getBoundingClientRect(); return [q.left + q.width / 2, q.top + q.height / 2]; }""")
+                bb = pg4.query_selector("iframe[src*='ui5appruntime']").bounding_box(); pg4.mouse.click(xy[0] + bb["x"], xy[1] + bb["y"]); pg4.wait_for_timeout(4500)
+                r = fr4.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog')].filter((x) => x.getClientRects().length).find((x) => /^Editar Paso/.test((x.querySelector('h2') || {}).textContent || '')); if (!d) return null;
+                  const ta = d.querySelector('textarea'); window.__d0 = ta.value; ta.value = 'Cantidad muestreada (KG)'; ta.dispatchEvent(new Event('input', { bubbles: true })); return 'ok'; }""")
+                pg4.wait_for_timeout(3500)
+                aviso = fr4.evaluate("() => [...document.querySelectorAll('.rmd-ep-dup')].map((x) => x.textContent.slice(0, 600))")
+                fr4.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog')].filter((x) => x.getClientRects().length).find((x) => /^Editar Paso/.test((x.querySelector('h2') || {}).textContent || '')); if (!d) return; const ta = d.querySelector('textarea'); ta.value = window.__d0; ta.dispatchEvent(new Event('input', { bubbles: true }));
+                  const b = [...d.querySelectorAll('button')].find((x) => /^(Cancelar|Cerrar)$/.test(x.textContent.trim())); sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }""")
+                pg4.wait_for_timeout(1500); fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2000)
+                return (r == "ok" and aviso and "Ya existe el paso" in aviso[0] and "Usar el paso" in aviso[0]), json.dumps(aviso, ensure_ascii=False)
+
+            @prueba("4-7c Agrupadores: en EQUIPOS / INSTRUMENTOS / MATERIALES cada agrupador muestra «Contiene n utensilios» con su lista (de SAP), y en la plantilla para Producción cada agrupador trae la misma lista")
+            def _():
+                for _i in range(3):
+                    if fr4.evaluate("() => { " + TOPE4 + " return !!d && [...d.querySelectorAll('tbody tr.sapMListTblRow')].some((r) => r.textContent.includes('EQUIPOS / INSTRUMENTOS')); }"): break
+                    fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2500)
+                fr4.evaluate(FILA4, ["EQUIPOS / INSTRUMENTOS", "Adicionar Equipo"]); pg4.wait_for_timeout(6000)
+                sap_ = fr4.evaluate("() => [...document.querySelectorAll('details.rmd-agr')].map((x) => [x.querySelector('summary').textContent, x.querySelectorAll('li').length])")
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2000)
+                plant = fr4.evaluate("""async (c) => { const x = await window.__rmdStats.plantilla.generar(c, {}); const d = new DOMParser().parseFromString(x.html, 'text/html'); return { tam: x.html.length, utensilios4: (x.paquete.catalogo.utensilios.split('\\n')[0] || '').split('\\t').length }; }""", COD_4)
+                ok = len(sap_) >= 1 and all(n > 0 and t.startswith("Contiene %d" % n) for t, n in sap_) and plant["utensilios4"] == 4
+                return ok, json.dumps({"sap": sap_, "plantilla": plant}, ensure_ascii=False)
+
+            @prueba("4-7d Trazabilidad RMD: «Exportar PDF» arma con el pdfMake del portal una hoja como la plantilla: la versión nueva completa y numerada, con lo quitado, lo nuevo y lo modificado marcados en su sitio, sin la cabecera")
+            def _():
+                for _i in range(6):
+                    if fr4.evaluate(CERRAR_TOPE) == 'nada': break
+                    pg4.wait_for_timeout(1800)
+                fr4.evaluate("(c) => window.__rmdStats.productividad.abrirRmdPorCodigo(c, 'trazabilidad')", COD_4); pg4.wait_for_timeout(3000)
+                fr4.evaluate("async () => { for (let i = 0; i < 80 && !document.querySelector('.rmd-tz'); i++) await new Promise(r => setTimeout(r, 250)); }")
+                fr4.evaluate("() => document.querySelector('.rmd-tz [data-t=ver]').click()")
+                for _i in range(120):
+                    st = fr4.evaluate("() => { const t = document.querySelector('.rmd-tz').__tz; return { n: t.E.cambios ? t.E.cambios.length : null, cargando: t.E.cargando }; }")
+                    if st["n"] is not None and not st["cargando"]: break
+                    pg4.wait_for_timeout(1000)
+                r = fr4.evaluate("""async () => { const t = document.querySelector('.rmd-tz').__tz, E = t.E; const [desde, hasta] = E.comparacion.split(/\s*\u2192\s*/); const dd = await window.__rmdStats.tzHoja(E.desde, E.hasta, { codigo: document.querySelector('.rmd-tz').dataset.codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', desde, hasta });
+                  const blob = await new Promise((ok, mal) => { const tt = setTimeout(() => mal(new Error('sin respuesta')), 30000); try { const x = window.pdfMake.createPdf(dd).getBlob((b) => { clearTimeout(tt); ok(b); }); if (x && x.then) x.then((b) => { clearTimeout(tt); ok(b); }, mal); } catch (e) { clearTimeout(tt); mal(e); } });
+                  const cab = await blob.slice(0, 5).text(); return { bytes: blob.size, cabecera: cab, tablas: dd.content.filter((x) => x.table).length, cuenta: dd.cuenta, boton: !!document.querySelector('.rmd-tz-pdf'), sinCabecera: !JSON.stringify(dd.content).includes('Observaciones') }; }""")
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(1500)
+                return (r["cabecera"] == "%PDF-" and r["bytes"] > 3000 and r["boton"] and r["tablas"] >= 5 and r["sinCabecera"]), json.dumps(r)
 
             @prueba("4-8 Ninguna petición de escritura salió del navegador durante el bloque 4 y el script no registró errores")
             def _():
