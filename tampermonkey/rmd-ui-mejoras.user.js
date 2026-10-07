@@ -9989,6 +9989,7 @@
     const md = (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', mdId)], { $expand: EXPAND_LISTA_MD }))[0]; if (!md) throw new Error('no se encontró la versión en SAP');
     const nombres = ['asociarDatos', 'listMdEstructura', 'listMdEsPaso', 'listMdEsEquipo', 'listMdEsUtensilio', 'listMdEsEtiqueta', 'listMdEsReInsumo', 'listMdEsEspecificacion', 'listEsPasoInsumoPasoGeneral'];
     const antes = nombres.map((n) => [n, V.getModel(n)]), pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open; let dd = null;
+    TZ_ESC.pausa++;                                                     // (el título de «Trazabilidad del RMD» sigue a asociarDatos: que no se rehaga el panel mientras tanto)
     try {
       V.setModel(new JM(md), 'asociarDatos'); await ctrl.onGetDataEstructuraMD();
       window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
@@ -9997,6 +9998,7 @@
       await hasta(() => dd, 20000, 150);
     } finally {
       pm.createPdf = cp0; window.open = open0; antes.forEach(([n, mo]) => { if (mo) V.setModel(mo, n); });
+      setTimeout(() => { TZ_ESC.pausa = Math.max(0, TZ_ESC.pausa - 1); }, 400);
       try { sap.ui.core.BusyIndicator.hide(); } catch (e) { /* sin UI5 */ }
     }
     if (!dd) throw new Error('el portal no armó el documento del master');
@@ -10107,7 +10109,7 @@
   function montarHistorial(d, codigo) {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
     const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d;
-    const raiz = document.createElement('div'); raiz.className = 'rmd-tz est'; raiz.dataset.codigo = codigo; cont.insertBefore(raiz, cont.firstChild);
+    const raiz = document.createElement('div'); raiz.className = 'rmd-tz est'; raiz.dataset.codigo = codigo; cont.insertBefore(raiz, cont.firstChild); d.__rmdTz = raiz; raiz.dataset.titulo = tzTituloDe(d).replace(/^Trazabilidad del RMD:\s*/i, '');
     d.classList.add('rmd-tz-dlg');
     raiz.innerHTML = `<div class="rmd-tz-barra"><div class="rmd-cr-chips" role="tablist"><button type="button" role="tab" data-t="est" class="activo" aria-selected="true">Trazabilidad</button><button type="button" role="tab" data-t="vers" aria-selected="false">Historial de versiones</button><button type="button" role="tab" data-t="ver" aria-selected="false">Diferencia entre versiones</button><button type="button" role="tab" data-t="his" aria-selected="false">Historial post autorización</button></div>
       <button type="button" class="rmd-btn rmd-tz-excel rmd-tz-pdf" title="PDF como la hoja de la plantilla: la versión nueva completa, con lo quitado tachado en rojo, lo nuevo en verde y lo modificado en ámbar (sin la cabecera)">Exportar PDF</button><button type="button" class="rmd-btn rmd-tz-excel" title="Excel con la comparación y el historial cargado">Exportar Excel</button></div><div class="rmd-tz-cuerpo"></div>`;
@@ -10270,7 +10272,7 @@
     cuerpo.addEventListener('change', (e) => { if (e.target.dataset.f === 'desde' || e.target.dataset.f === 'hasta') comparar(); });
     raiz.__tz = { E, filasVersiones, comparar, cargarFila, pintar, iniciar, filas: () => (E.pasosMd ? filasHistorial(E.pasosMd) : []), excel: () => { const historial = [...E.hist.values()].filter((h) => !h.cargando && !h.error && h.entradas.length); return tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, historial, estados: estadosNativos(), versiones: filasVersiones() }); } };
   }
-  const TZ_ESC = { puesto: false };
+  const TZ_ESC = { puesto: false, pausa: 0 };
   function gestionarTrazabilidad() {
     const ctrl = typeof sap !== 'undefined' && controladorPrincipal();
     const d = ctrl && on('historialcambios') && dialogos().find((x) => /^Trazabilidad del RMD:/i.test(tzTituloDe(x)));
@@ -10278,10 +10280,20 @@
       if (e.key !== 'Escape' || document.querySelector('.rmd-modal-fondo')) return;
       const top = dialogos().pop(), b = top && top.querySelector('.rmd-tz') && [...top.querySelectorAll('footer button')].find((x) => /^Cerrar$/.test(x.textContent.trim())); if (!b) return;
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }, true); }
-    if (!d) { document.querySelectorAll('.rmd-tz').forEach((x) => { if (x.__tz) x.__tz.E.cancelar = true; x.remove(); }); document.querySelectorAll('.rmd-tz-dlg').forEach((x) => x.classList.remove('rmd-tz-dlg')); return; }
+    if (TZ_ESC.pausa) {                                                 // armando el PDF: el portal cambia un momento el RMD asociado y vuelve a dibujar la ventana (título incluido)
+      const g = d && d.__rmdTz; if (!g) return;
+      if (!g.isConnected) { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d; cont.insertBefore(g, cont.firstChild); d.classList.add('rmd-tz-dlg'); }
+      const t = d.querySelector('.sapMDialogTitle .sapMTitle, .sapMDialogTitle, header .sapMTitle'), titulo = 'Trazabilidad del RMD: ' + g.dataset.titulo;
+      if (t && g.dataset.titulo && t.textContent !== titulo && /^Trazabilidad del RMD:/.test(t.textContent)) t.textContent = titulo;   // (solo en pantalla; al devolver el modelo el portal pone el suyo, que es el mismo)
+      return;
+    }
+    if (!d) { document.querySelectorAll('.rmd-tz').forEach((x) => { if (x.__tz) x.__tz.E.cancelar = true; x.remove(); }); document.querySelectorAll('.rmd-tz-dlg').forEach((x) => { x.classList.remove('rmd-tz-dlg'); x.__rmdTz = null; }); return; }
     const m = /^Trazabilidad del RMD:\s*(\S+)/i.exec(tzTituloDe(d)), codigo = m && m[1], viejo = d.querySelector('.rmd-tz');
     if (viejo && viejo.dataset.codigo === codigo) return;
     if (viejo) viejo.remove();
+    // si el portal volvió a dibujar el contenido de la ventana, se repone el mismo panel (con su pestaña y su comparación) en vez de uno nuevo
+    const guardado = d.__rmdTz;
+    if (!viejo && guardado && guardado.dataset.codigo === codigo) { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d; cont.insertBefore(guardado, cont.firstChild); d.classList.add('rmd-tz-dlg'); return; }
     if (codigo) montarHistorial(d, codigo);
   }
   window.__rmdStats.trazabilidad = { comparar: tzCompararVersiones, normalizar: tzNormalizar, difEventos: tzDifEventos, parsear: tzParsear, excel: tzArmarExcel, formato: tzFormato, leerAuditoria: tzLeerAuditoria, leerVersion: tzLeerVersion, linaje: tzLinaje, catalogos: tzCatalogos,
