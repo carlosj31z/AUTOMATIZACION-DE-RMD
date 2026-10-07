@@ -18,7 +18,7 @@ Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C 
   Agrupador, todas las tarjetas en una fila, Etapa en una línea, nada del script en Configuración Maestra (cortafuegos) · S v1.34: reglas de revisión
   y lista de documentos vigentes (carga del .xls del DMS, aviso del RMD, Documentos citados con Vigente, resaltado en las listas; cortafuegos;
   VIGENTES_XLS = ruta de la lista, RMD_REGLAS = RMD con documentos citados) · U v1.37: cambios de recetas en SAP (icono tenue, revisión por tandas, ventana, Excel
-  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · 1 v1.40: plantilla para Producción (numeración frente al PDF del portal, catálogo, archivo sin SAP e importación; COD_PP = RMD Ingresado; solo lectura + cortafuegos) · 3 v1.51: vista móvil en un teléfono emulado de 390 px (tarjetas en las tablas, filtros plegables, ventanas a pantalla completa, lupa para abrir un RMD, el modo «no» y «auto»; COD_3 = RMD Ingresado; solo lectura + cortafuegos) · 4 v1.52: pasos por tandas (Fabricación de más de 100 pasos entra en tandas sin congelar el navegador, mismo resultado que con la opción apagada, marcar todos y filtrar completan la tabla, cerrar a mitad y volver a entrar; COD_4 = RMD con una etiqueta de más de 100 pasos; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
+  y observación con el guardado SIMULADO; cortafuegos; CODS_U = RMD Ingresados con la lista de materiales cambiada, RMD_OBS_U = RMD Ingresado) · P v1.38: historial de cambios en Trazabilidad RMD (comparación entre versiones, historial por guardado desde la auditoría y Excel; COD_P = RMD con varias versiones, COD_PH = RMD Ingresado con guardados; solo lectura + cortafuegos) · 1 v1.40: plantilla para Producción (numeración frente al PDF del portal, catálogo, archivo sin SAP e importación; COD_PP = RMD Ingresado; solo lectura + cortafuegos) · 3 v1.51: vista móvil en un teléfono emulado de 390 px (tarjetas en las tablas, filtros plegables, ventanas a pantalla completa, lupa para abrir un RMD, el modo «no» y «auto»; COD_3 = RMD Ingresado; solo lectura + cortafuegos) · 4 v1.53: ventana de equipos ancha, Fabricación entera de una vez, cerrar procesos menores sin descuadre, procesos menores cortos sin hueco, selector de procesos menores como el de pasos y código pegado, fórmula por orden y fracción de Rendimiento (COD_4 = RMD de prueba 2202609224; solo lectura + cortafuegos) · D escritura controlada (¡ESCRIBE en el RMD de prueba y lo restaura!)
 
 Requisitos: Chrome con --remote-debugging-port=9222 y sesión iniciada. Variables de entorno:
   RMD_PRUEBA (RMD de PRUEBA, versión Ingresada con al menos 21 pasos en Procedimiento>Fabricación; los pasos 9 y 19/21 se usan como
@@ -2450,188 +2450,116 @@ with sync_playwright() as p:
         pgm.close()
 
 
-    # ───────────────────────── 4. Pasos por tandas (v1.52) · solo lectura + cortafuegos ─────────────────────────
+    # ───────────────────────── 4. Ventanas de pasos, fórmulas y selector (v1.53) · solo lectura + cortafuegos ─────────────────────────
     if "4" in SOLO:
         bq4 = []; errores4 = []
-        COD_4 = os.environ.get("COD_4", "2202609212")                       # un RMD con una etiqueta de más de 100 pasos (Fabricación: 149) y otra pequeña (Rendimiento)
-        def pagina4():
-            pg_, fr_, _ = abrir_con_inyeccion_temprana(b, src, ancho=1728, alto=860)
-            return pg_, fr_
-        pg4, fr4 = pagina4()
-        if fr4.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}').tandas") is False:       # (una ejecución anterior pudo dejarla apagada: el enganche se hace al crearse la tabla, así que se recarga)
-            fr4.evaluate("() => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete o.tandas; localStorage.setItem('rmdUiMejoras', JSON.stringify(o)); }")
-            pg4.close(); pg4, fr4 = pagina4()
+        COD_4 = os.environ.get("COD_4", "2202609224")                       # RMD de prueba: Fabricación con más de 100 pasos y procesos menores, Rendimiento con la fracción del cálculo
+        pg4, fr4, _ = abrir_con_inyeccion_temprana(b, src, ancho=1415, alto=886)
         def guardia4(route):
             if route.request.method not in ("GET", "HEAD"): bq4.append(route.request.method + " " + route.request.url[:90]); route.abort()
             else: route.continue_()
         pg4.route("**/*", guardia4); pg4.on("pageerror", lambda e: errores4.append(str(e)[:200]))
         fr4.evaluate(JS_UTIL); pg4.wait_for_timeout(2500)
         fr4.evaluate("() => document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove())")
-        fr4.evaluate("""() => { window.__lt4 = { n: 0, max: 0, suma: 0 }; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { const L = window.__lt4; L.n++; L.suma += e.duration; L.max = Math.max(L.max, e.duration); } }).observe({ entryTypes: ['longtask'] }); } catch (e) { /* sin longtask */ } }""")
         TOPE4 = "const ds = [...document.querySelectorAll('.sapMDialog')].filter((x) => x.getClientRects().length).sort((a, b) => (+getComputedStyle(a).zIndex || 0) - (+getComputedStyle(b).zIndex || 0)); const d = ds[ds.length - 1];"
-        FILA4 = "([estructura, titulo]) => { " + TOPE4 + """ const fila = [...d.querySelectorAll('tbody tr.sapMListTblRow')].find((r) => r.getClientRects().length && r.textContent.includes(estructura)); if (!fila) return 'sin fila ' + estructura;
-          const b = [...fila.querySelectorAll('button')].find((x) => x.title === titulo); if (!b) return 'sin botón ' + titulo; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"""
-        CERRAR4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); if (!t) return 'sin tabla'; const d = t.closest('.sapMDialog');
-          const b = [...d.querySelectorAll('button')].filter((x) => x.getClientRects().length && !x.closest('table')).find((x) => /^(Cerrar|Cancelar)$/.test(x.textContent.trim())); if (!b) return 'sin botón'; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"""
-        ESTADO4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); if (!t) return null;
-          const c = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')), b = c.getBinding('items'), d = t.closest('.sapMDialog'), bar = d.querySelector('#rmd-filtro-bar');
-          return { filas: c.getItems().length, total: b ? b.getLength() : -1, growing: c.getGrowing(), umbral: c.getGrowingThreshold(), marcadas: c.getSelectedItems().length, clase: c.hasStyleClass('rmd-tandas'),
-                   cuenta: bar ? ((bar.querySelector('.rmd-cuenta') || {}).textContent || '') : null, alerta: bar ? ((bar.querySelector('button.rmd-alerta') || {}).textContent || '').trim() : null,
-                   trigger: [...d.querySelectorAll('.sapMGrowingListTrigger')].some((e) => e.getClientRects().length) }; }"""
-        FIRMA4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const filas = [...t.querySelectorAll('tbody tr')].filter((r) => !/SubRow/.test(r.className));
-          const ocultas = new Set(filas.map((tr) => [...tr.children].map((td, i) => (td.style.display === 'none' ? i : -1)).filter((i) => i >= 0).join(',')));
-          const clases = {}; t.querySelectorAll('[class*="rmd-"]').forEach((e) => e.classList.forEach((c) => { if (/^rmd-/.test(c) && !/^rmd-(recien|entra|sale|hover)/.test(c)) clases[c] = (clases[c] || 0) + 1; }));
-          const d = t.closest('.sapMDialog'), bar = d.querySelector('#rmd-filtro-bar');
-          return { filas: filas.length, ocultas: [...ocultas], clases, cuenta: bar ? (bar.querySelector('.rmd-cuenta') || {}).textContent : null, alerta: bar ? ((bar.querySelector('button.rmd-alerta') || {}).textContent || '').trim() : null,
-                   cols: [...t.querySelectorAll('thead th')].map((th) => (th.style.display === 'none' ? '-' : th.textContent.trim())).join('|') }; }"""
-        def seguir4(maximo=70, parar=None):
-            """Mira la tabla de pasos cada ~30 ms y devuelve (estados con filas distintas, último estado) hasta que llegan todas las filas y el script termina su análisis (o hasta que `parar(estado)`)."""
-            seq = []; t0 = time.time(); ult = None
-            while time.time() - t0 < maximo:
-                st = fr4.evaluate(ESTADO4)
-                if st:
-                    ult = st
-                    if not seq or seq[-1]["filas"] != st["filas"] or seq[-1]["cuenta"] != st["cuenta"]: seq.append(dict(st, t=round(time.time() - t0, 2)))
-                    if parar and parar(st): break
-                    if not parar and st["total"] > 0 and st["filas"] >= st["total"] and (st["cuenta"] or "") == f"{st['total']} pasos" and st["alerta"] and time.time() - t0 > 1.5: break
-                pg4.wait_for_timeout(30)
-            return seq, ult
-        def abrir_etiqueta(nombre):
-            fr4.evaluate("window.__lt4 = { n: 0, max: 0, suma: 0 }")
-            r = fr4.evaluate(FILA4, [nombre, "Adicionar Pasos RMD"])
-            if r != "ok": raise Exception("no abre " + nombre + ": " + r)
-        def a_pagina(xy):
-            """Coordenadas dentro del iframe de la app → coordenadas de la página (el iframe empieza bajo la barra del shell)."""
-            bb = pg4.query_selector("iframe[src*='ui5appruntime']").bounding_box(); return [xy[0] + bb["x"], xy[1] + bb["y"]]
-        def sujetar4(ms=900):
-            """La persona «está tocando» (ruedas de ratón sobre la ventana): el script retrasa las tandas mientras tanto."""
+        FILA4 = "async ([estructura, titulo]) => { let fila = null, d = null; for (let k = 0; k < 80 && !fila; k++) { " + TOPE4.replace("const d = ", "d = ") + """ fila = d ? [...d.querySelectorAll('tbody tr.sapMListTblRow')].find((r) => r.getClientRects().length && r.textContent.includes(estructura)) : null; if (!fila) await new Promise((r) => setTimeout(r, 250)); }
+          if (!fila) return 'sin fila ' + estructura; const b = [...fila.querySelectorAll('button')].find((x) => x.title === titulo); if (!b) return 'sin botón ' + titulo; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"""
+        TABLA_P = "[...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length)"
+        GEO4 = "() => { const t = " + TABLA_P + """; if (!t) return null; const d = t.closest('.sapMDialog'), q = d.getBoundingClientRect();
+          return { d: [Math.round(q.width), Math.round(q.height)], ths: [...t.querySelectorAll('thead th')].map((th) => Math.round(th.getBoundingClientRect().width)).join(','), clases: [...d.classList].filter((c) => /^rmd-/.test(c)).join(' '), filas: t.querySelectorAll('tbody tr.sapMListTblRow').length }; }"""
+        PULSAR4 = """([orden, titulo]) => { """ + TOPE4 + """ const t = d.querySelector('table.sapMListTbl'); const ths = [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim().toUpperCase()), iO = ths.indexOf('ORDEN');
+          const tr = [...t.querySelectorAll('tbody tr.sapMListTblRow')].find((r) => { const i = r.children[iO] && r.children[iO].querySelector('input'); return i && (orden == null || i.value === String(orden)) && (titulo !== 'Procesos Menores' || [...r.querySelectorAll('button')].some((x) => x.title === titulo)); });
+          if (!tr) return 'sin fila'; tr.scrollIntoView({ block: 'center' }); const b = [...tr.querySelectorAll('button')].find((x) => x.title === titulo); if (!b) return 'sin botón'; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"""
+        CERRAR_TOPE = "() => { " + TOPE4 + " if (!d) return 'nada'; const b = [...d.querySelectorAll('button')].filter((x) => x.getClientRects().length && !x.closest('table')).find((x) => /^(Cerrar|Cancelar)$/.test(x.textContent.trim())); if (!b) return 'sin botón'; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"
+        def esperar_tabla(n_min=1, maximo=60):
             t0 = time.time()
-            while (time.time() - t0) * 1000 < ms: pg4.mouse.wheel(0, 1); pg4.wait_for_timeout(110)
-        def abrir_a_medias():
-            """Abre Fabricación y, en cuanto hay filas pero faltan más, sujeta la carga: devuelve el estado de la tabla a medio dibujar (o None si no se pudo)."""
-            abrir_etiqueta("FABRICACION"); pg4.mouse.move(800, 400)
-            seq, ult = seguir4(maximo=40, parar=lambda st: 0 < st["filas"] < st["total"])
-            if ult and 0 < ult["filas"] < ult["total"]: pg4.mouse.wheel(0, 1); return ult
+            while time.time() - t0 < maximo:
+                g = fr4.evaluate(GEO4)
+                if g and g["filas"] >= n_min: pg4.wait_for_timeout(1500); return fr4.evaluate(GEO4)
+                pg4.wait_for_timeout(300)
             return None
-        def cerrar_pasos4():
-            r = fr4.evaluate(CERRAR4); pg4.wait_for_timeout(1800); return r
-        def opcion_tandas(valor):
-            fr4.evaluate("document.querySelector('#rmd-ui-panel').open = true")
-            casilla = fr4.locator("#rmd-ui-panel input[data-k=tandas]")
-            (casilla.check() if valor else casilla.uncheck()); fr4.evaluate("document.querySelector('#rmd-ui-panel').open = false"); pg4.wait_for_timeout(600)
         try:
             RmdAutomation(pg4).editor_de_rmd(COD_4); pg4.wait_for_timeout(4000)
+            fr4.evaluate("() => document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")   # (aviso de elementos de baja, si lo hubiera)
+
+            @prueba("4-1 Equipos / instrumentos / materiales: la ventana es tan ancha como la del portal (no se comprime) y la columna Estado («MONT-Montado») cabe en una línea")
+            def _():
+                fr4.evaluate(FILA4, ["EQUIPOS", "Adicionar Equipo"]); pg4.wait_for_timeout(4500)
+                r = fr4.evaluate("() => { " + TOPE4 + """ const t = d.querySelector('table.sapMListTbl'), ths = [...t.querySelectorAll('thead th')], iE = ths.findIndex((x) => x.textContent.trim() === 'Estado'), q = d.getBoundingClientRect();
+                  const td = [...t.querySelectorAll('tbody tr.sapMListTblRow')][0].children[iE]; return { ancho: Math.round(q.width), vw: innerWidth, estado: Math.round(ths[iE].getBoundingClientRect().width), alto: Math.round(td.getBoundingClientRect().height), texto: td.textContent.trim() }; }""")
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2000)
+                return (r["ancho"] >= 0.88 * r["vw"] and r["estado"] >= 130 and r["alto"] <= 50), json.dumps(r, ensure_ascii=False)
+
             abrir_dialogo(fr4, pg4, "PROCEDIMIENTO", "Adicionar Etiqueta")
-            FIRMAS4 = {}
 
-            @prueba("4-1 Fabricación (más de 100 pasos) entra por TANDAS: la primera trae pocas filas, llegan todas, la barra pasa de «Cargando pasos… n de N» a «N pasos», el botón «Más» de UI5 no aparece y ninguna tarea larga supera 1,5 s")
+            @prueba("4-2 Fabricación (más de 100 pasos) se dibuja entera de una vez (sin tandas ni botón «Más» de UI5)")
             def _():
-                abrir_etiqueta("FABRICACION"); seq, ult = seguir4()
-                lt = fr4.evaluate("window.__lt4"); pg4.wait_for_timeout(2500)                                      # (UI5 rellena algunos valores tarde y el script los revisa cada 0,7 s)
-                FIRMAS4["on"] = fr4.evaluate(FIRMA4)
-                filas = [x["filas"] for x in seq]; cargando = [x for x in seq if (x["cuenta"] or "").startswith("Cargando")]
-                ok = (ult and ult["total"] >= 100 and ult["filas"] == ult["total"] and len(set(filas)) >= 4 and filas[0] <= 12 and cargando and not any(x["trigger"] for x in seq)
-                      and ult["cuenta"] == f"{ult['total']} pasos" and ult["alerta"] and ult["growing"] and lt["max"] < 1500)
-                return ok, json.dumps({"filas": filas[:12], "total": ult and ult["total"], "barra": ult and ult["cuenta"], "alerta": ult and ult["alerta"], "tareaLargaMax": round(lt["max"]), "largas": lt["n"], "segundos": seq[-1]["t"] if seq else None}, ensure_ascii=False)
+                fr4.evaluate(FILA4, ["FABRICACION", "Adicionar Pasos RMD"]); g = esperar_tabla(100)
+                info = fr4.evaluate("() => { const t = " + TABLA_P + "; const c = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); return { growing: c.getGrowing(), total: c.getBinding('items').getLength(), filas: c.getItems().length, trigger: [...document.querySelectorAll('.sapMGrowingListTrigger')].some((e) => e.getClientRects().length) }; }")
+                return (g and not info["growing"] and info["filas"] == info["total"] >= 100 and not info["trigger"]), json.dumps(info)
 
-            @prueba("4-2 Las columnas que el script oculta quedan igual en TODAS las filas, también en las que llegaron en tandas posteriores")
+            @prueba("4-3 Al cerrar los procesos menores de un paso, el portal vuelve a dibujar toda la lista de pasos y la ventana no se descuadra: ni su tamaño ni el ancho de sus columnas cambian en ningún momento (las medidas viven en una hoja de estilo por tabla)")
             def _():
-                f = FIRMAS4.get("on")
-                return (f and len(f["ocultas"]) == 1 and f["filas"] >= 100), json.dumps({"filas": f and f["filas"], "ocultas": f and f["ocultas"], "cols": f and f["cols"]}, ensure_ascii=False)
-            cerrar_pasos4()
+                antes = fr4.evaluate(GEO4); fr4.evaluate(PULSAR4, [None, "Procesos Menores"]); pg4.wait_for_timeout(4500)
+                fr4.evaluate(CERRAR_TOPE); muestras = []; t0 = time.time()
+                while time.time() - t0 < 10: g = fr4.evaluate(GEO4); muestras.append(g); pg4.wait_for_timeout(100)
+                distintas = [m for m in muestras if m and (m["d"] != antes["d"] or m["ths"] != antes["ths"] or m["clases"] != antes["clases"])]
+                hoja = fr4.evaluate("() => document.querySelectorAll('style[data-rmd-tabla]').length")
+                return (not distintas and hoja >= 1), json.dumps({"antes": antes, "distintas": distintas[:3], "muestras": len(muestras), "hojas": hoja}, ensure_ascii=False)[:1200]
 
-            @prueba("4-3 Marcar todos con la casilla de la cabecera cuando faltan filas por dibujar las dibuja primero: quedan todas dibujadas y todas marcadas")
+            @prueba("4-4 Un proceso menor con pocos pasos: la ventana mide lo que su contenido (sin el gran espacio en blanco de la altura mínima de antes)")
             def _():
-                s0 = abrir_a_medias()
-                if not s0: return False, "no se pudo sujetar la carga a medias"
-                sujetar4(300)
-                xy = fr4.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const th = t.querySelector('thead th.sapMListTblSelCol'), q = (th.querySelector('.sapMCb') || th).getBoundingClientRect(); return [Math.round(q.left + q.width / 2), Math.round(q.top + q.height / 2)]; }""")
-                antes = fr4.evaluate(ESTADO4); xy = a_pagina(xy); pg4.mouse.click(xy[0], xy[1]); pg4.wait_for_timeout(2500); despues = fr4.evaluate(ESTADO4)
-                ok = antes["filas"] < antes["total"] and despues["filas"] == despues["total"] and despues["marcadas"] == despues["total"]
-                return ok, json.dumps({"antes": [antes["filas"], antes["total"]], "despues": [despues["filas"], despues["total"], despues["marcadas"]]})
-            cerrar_pasos4()
+                fr4.evaluate(PULSAR4, [None, "Procesos Menores"]); pg4.wait_for_timeout(4500)
+                r = fr4.evaluate("() => { " + TOPE4 + """ const t = d.querySelector('table.sapMListTbl'), q = d.getBoundingClientRect(), tb = t.getBoundingClientRect(), pie = d.querySelector('footer').getBoundingClientRect(); return { titulo: (d.querySelector('h2') || {}).textContent, filas: t.querySelectorAll('tbody tr.sapMListTblRow').length, alto: Math.round(q.height), hueco: Math.round(pie.top - tb.bottom) }; }""")
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2500)
+                return (r["filas"] > 3 or r["hueco"] <= 60), json.dumps(r, ensure_ascii=False)
 
-            @prueba("4-4 Filtrar con el cuadro del script cuando faltan filas por dibujar las dibuja primero (el filtro cuenta sobre todos los pasos)")
+            @prueba("4-5 El selector «Adicionar Pasos» de los procesos menores se ve igual que el de los pasos mayores (mismo ancho, filtros en una línea con «Ir» y «Nuevo Paso»), y el código de un paso puesto por el script queda en «Código Paso», resaltado y buscado")
             def _():
-                s0 = abrir_a_medias()
-                if not s0: return False, "no se pudo sujetar la carga a medias"
-                sujetar4(300)
-                xy = fr4.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const i = t.closest('.sapMDialog').querySelector('#rmd-filtro-bar input'); if (!i) return null; const q = i.getBoundingClientRect(); return [Math.round(q.left + q.width / 2), Math.round(q.top + q.height / 2)]; }""")
-                if not xy: return False, "sin cuadro de filtro en la barra"
-                antes = fr4.evaluate(ESTADO4); xy = a_pagina(xy); pg4.mouse.click(xy[0], xy[1]); pg4.keyboard.type("1"); pg4.wait_for_timeout(2500); despues = fr4.evaluate(ESTADO4)
-                ok = antes["filas"] < antes["total"] and despues["filas"] == despues["total"] and re.search(r"de\s+%d\b" % despues["total"], despues["cuenta"] or "") is not None
-                return ok, json.dumps({"antes": [antes["filas"], antes["total"]], "despues": [despues["filas"], despues["total"]], "cuenta": despues["cuenta"]}, ensure_ascii=False)
-            cerrar_pasos4()
+                fr4.evaluate(PULSAR4, [None, "Procesos Menores"]); pg4.wait_for_timeout(4500)
+                b_ = fr4.evaluate("() => { " + TOPE4 + " const b = [...d.querySelectorAll('button')].find((x) => x.title === 'Adicionar Pasos RMD'); sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); return 'ok'; }"); pg4.wait_for_timeout(5000)
+                medir = "() => { " + TOPE4 + """ const q = d.getBoundingClientRect(), ir = [...d.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Ir'), cod = d.querySelector('input'); return { titulo: (d.querySelector('h2') || {}).textContent.trim(), ancho: Math.round(q.width), clases: [...d.classList].filter((c) => /^rmd-/.test(c)), mismaLinea: ir && cod ? Math.abs(ir.getBoundingClientRect().top - cod.getBoundingClientRect().top) < 20 : null, filas: d.querySelectorAll('tbody tr.sapMListTblRow').length, valor: cod && cod.value, pegado: !!d.querySelector('.rmd-codigo-pegado') }; }"""
+                pm = fr4.evaluate(medir)
+                pegar = fr4.evaluate("(c) => window.__rmdStats.pegarCodigoEnSelector(c)", "110742"); pg4.wait_for_timeout(5000); tras = fr4.evaluate(medir)
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(1500); fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2500)
+                ok = pm["titulo"].startswith("Adicionar Pasos") and "rmd-selector-ancho" in pm["clases"] and pm["mismaLinea"] and pegar and tras["valor"] == "110742" and tras["pegado"] and tras["filas"] == 1
+                return ok, json.dumps({"selector": pm, "tras_pegar": tras}, ensure_ascii=False)
 
-            @prueba("4-5 Cerrar la ventana a mitad de la carga no deja errores ni tandas colgadas, y al volver a entrar llegan todas las filas con la barra completa")
+            @prueba("4-6 Fórmula de un proceso menor: los términos se ven con su orden real y, debajo del texto del portal (que usa códigos), la línea «Por orden»; si el portal empareja mal un término (dos con el mismo orden), el script lo devuelve a su fila")
             def _():
-                s0 = abrir_a_medias()
-                if not s0: return False, "no se pudo sujetar la carga a medias"
-                e0 = fr4.evaluate("(window.__rmdStats.errores || []).length"); r = cerrar_pasos4(); pg4.wait_for_timeout(1500)
-                tablas = fr4.evaluate("window.__rmdStats.tandas.tablas().map((c) => [c.filas, c.total, c.conectada])"); e1 = fr4.evaluate("(window.__rmdStats.errores || []).length")
-                abrir_etiqueta("FABRICACION"); seq, ult = seguir4()
-                ok = (r == "ok" and e1 == e0 and not any(t[2] for t in tablas) and ult and ult["filas"] == ult["total"] >= 100 and ult["cuenta"] == f"{ult['total']} pasos" and ult["alerta"])
-                return ok, json.dumps({"cierre": r, "tablas_tras_cerrar": tablas, "errores": [e0, e1], "reentrada": [ult and ult["filas"], ult and ult["total"], ult and ult["cuenta"]]}, ensure_ascii=False)
-            cerrar_pasos4()
+                r = fr4.evaluate(PULSAR4, ["116", "Procesos Menores"]); pg4.wait_for_timeout(4500)
+                r2 = fr4.evaluate(PULSAR4, ["6", "Fórmula"]); pg4.wait_for_timeout(5000)
+                if r != "ok" or r2 != "ok": return False, f"no se abrió la fórmula: {r} / {r2}"
+                LEER = "() => { const l = sap.ui.getCore().byId('frgOpenFormula--table2'), bi = l.getBindingInfo('items'), sel = l.getModel(bi.model).getProperty(bi.path) || []; return { ordenes: sel.filter((x) => x.descrPaso).map((x) => x.orden), legible: (document.querySelector('.rmd-formula-legible') || {}).textContent || null }; }"
+                a = fr4.evaluate(LEER)
+                fr4.evaluate("() => { const l = sap.ui.getCore().byId('frgOpenFormula--table2'), bi = l.getBindingInfo('items'), m = l.getModel(bi.model), sel = m.getProperty(bi.path); const ts = sel.filter((x) => x.descrPaso); sel.forEach((x) => delete x.__rmdOk); ts[1].orden = ts[0].orden; ts[1].descrPaso = ts[0].descrPaso; m.refresh(true); }")
+                pg4.wait_for_timeout(3500); bb = fr4.evaluate(LEER)
+                fr4.evaluate("() => { const d = [...document.querySelectorAll('.sapMDialog')].find((x) => x.getClientRects().length && /^F[oó]rmulas/.test((x.querySelector('h2,.sapMTitle') || {}).textContent || '')); const b = [...d.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Cancelar'); sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }")
+                pg4.wait_for_timeout(2000); fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2500)
+                ok = len(a["ordenes"]) >= 2 and len(set(a["ordenes"])) == len(a["ordenes"]) and a["legible"] and a["legible"].startswith("Por orden:") and bb["ordenes"] == a["ordenes"]
+                return ok, json.dumps({"al_abrir": a, "tras_simular_el_error": bb}, ensure_ascii=False)
+            for _i in range(3):                                                  # (vuelve a la ventana de etiquetas)
+                if fr4.evaluate("() => { " + TOPE4 + " return !!d && [...d.querySelectorAll('tbody tr.sapMListTblRow')].some((r) => r.textContent.includes('RENDIMIENTO') && [...r.querySelectorAll('button')].some((x) => x.title === 'Adicionar Pasos RMD')); }"): break
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2500)
 
-            @prueba("4-6 Apagar «Pasos por tandas» con la tabla a medias la completa al instante y deja el «growing» apagado; con la opción apagada la entrada es la de siempre (todas las filas de golpe) y el resultado coincide con el de las tandas")
+            @prueba("4-7 Rendimiento: la fracción del cálculo (texto con saltos de línea y espacios) se ve como se escribió —sus líneas en orden y el numerador y el denominador a cada lado de la barra—, también a 1280×720 (la Descripción reserva su ancho)")
             def _():
-                s0 = abrir_a_medias()
-                if not s0: return False, "no se pudo sujetar la carga a medias"
-                opcion_tandas(False); pg4.wait_for_timeout(1500); st = fr4.evaluate(ESTADO4)
-                parcial = st["filas"] == st["total"] and not st["growing"] and not st["clase"]
-                cerrar_pasos4()
-                abrir_etiqueta("FABRICACION"); seq, ult = seguir4(); pg4.wait_for_timeout(2500); firma_off = fr4.evaluate(FIRMA4)
-                de_golpe = [x["filas"] for x in seq]
-                on = FIRMAS4.get("on") or {}
-                igual = {k: (on.get(k) == firma_off.get(k)) for k in ("filas", "ocultas", "clases", "cuenta", "alerta", "cols")}
-                ok = parcial and not ult["growing"] and all(igual.values()) and (len(set(de_golpe)) <= 2)
-                return ok, json.dumps({"apagado_a_medias": [st["filas"], st["total"], st["growing"], st["clase"]], "filas_vistas_sin_tandas": de_golpe[:6], "igual_que_con_tandas": igual, "diferencias": {k: [on.get(k), firma_off.get(k)] for k in igual if not igual[k]}}, ensure_ascii=False)[:1500]
-            cerrar_pasos4()
-
-            FORMULA4 = """() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); if (!t) return null;
-              const tr = [...t.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('CALCULO DE RENDIMIENTO')); if (!tr) return null;
-              const sp = [...tr.querySelectorAll('.sapMText')].find((e) => e.textContent.includes('CALCULO DE RENDIMIENTO')), nodo = sp.firstChild, palabras = []; const re = /\\S+/g; let m;
-              while ((m = re.exec(nodo.nodeValue))) { const r = document.createRange(); r.setStart(nodo, m.index); r.setEnd(nodo, m.index + m[0].length); const b = r.getBoundingClientRect(); palabras.push([m[0], Math.round(b.left), Math.round(b.top), Math.round(b.right)]); }
-              const barra = palabras.find((p) => /^-{10,}$/.test(p[0])), cants = palabras.filter((p) => p[0] === 'CANT.');
-              return { ws: getComputedStyle(sp).whiteSpace, lineas: [...new Set(palabras.map((p) => p[2]))].length, ancho: Math.round(sp.getBoundingClientRect().width),
-                       orden: !!barra && cants.length === 2 && palabras[0][2] < cants[0][2] && cants[0][2] < barra[2] && barra[2] < cants[1][2],
-                       numeradorSobreBarra: !!barra && cants.length === 2 && cants[0][1] >= barra[1] - 25 && cants[0][1] < barra[3], denominadorBajoBarra: !!barra && cants.length === 2 && cants[1][1] >= barra[1] - 25 && cants[1][1] < barra[3] }; }"""
-
-            @prueba("4-7 Con una tabla pequeña (hasta 50 filas) las tandas no intervienen: se dibuja entera de una vez, con la barra completa; y la fracción del cálculo de Rendimiento (texto con saltos de línea y espacios) se ve como la escribió quien la redactó: sus líneas en orden, con el numerador y el denominador a cada lado de la barra")
-            def _():
-                r = fr4.evaluate(FILA4, ["RENDIMIENTO", "Adicionar Pasos RMD"]); seq, ult = seguir4(maximo=40); pg4.wait_for_timeout(800)
-                formula = fr4.evaluate(FORMULA4); pequena = None
-                if formula:                                                                                         # (a 1366×768 y a 1280×720 la Descripción reserva el ancho de la fracción: sigue en 4 líneas, con la barra entera)
-                    pequena = {}
-                    for w_, h_ in ((1366, 768), (1280, 720)):
-                        pg4.set_viewport_size({"width": w_, "height": h_}); pg4.wait_for_timeout(1800); pequena[f"{w_}"] = fr4.evaluate(FORMULA4)
-                    pg4.set_viewport_size({"width": 1728, "height": 860}); pg4.wait_for_timeout(800)
-                cerrar_pasos4()
-                formula_ok = formula is None or (formula["ws"] == "pre-wrap" and formula["lineas"] == 4 and formula["orden"] and formula["numeradorSobreBarra"] and formula["denominadorBajoBarra"]
-                                                 and all(p and p["lineas"] == 4 and p["orden"] for p in pequena.values()))    # (None: este RMD no trae ese paso)
-                return (r == "ok" and ult and 0 < ult["total"] <= 50 and len({x["filas"] for x in seq}) == 1 and ult["filas"] == ult["total"] and not any(x["trigger"] for x in seq) and formula_ok), json.dumps({"filas": [x["filas"] for x in seq][:5], "total": ult and ult["total"], "barra": ult and ult["cuenta"], "formula": formula, "pequena": pequena}, ensure_ascii=False)
-
-            @prueba("4-7b Con la tabla ya completa, un paso que el portal agrega al final de su modelo (y uno que quita) se dibuja o se quita solo, sin pulsar «Más» (el portal agrega y quita desde su modelo: con el growing encendido una fila nueva más allá del límite no se vería)")
-            def _():
-                abrir_etiqueta("FABRICACION"); seq, ult = seguir4(); pg4.wait_for_timeout(1500)
-                r = fr4.evaluate("""() => { const t = [...document.querySelectorAll('table.sapMListTbl')].find((x) => /idTblPasoCuadro(Process)?-listUl$/.test(x.id) && x.getClientRects().length); const c = sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')), info = c.getBindingInfo('items'), b = c.getBinding('items'), m = b.getModel();
-                  const ruta = info.path, datos = m.getProperty(ruta); if (!Array.isArray(datos)) return { error: 'el modelo no es un arreglo: ' + ruta };
-                  window.__antes4 = datos.length; const copia = JSON.parse(JSON.stringify(datos[datos.length - 1])); m.setProperty(ruta, datos.concat([copia])); window.__ruta4 = ruta; window.__m4 = m; return { ruta, antes: datos.length }; }""")
-                if r.get("error"): return False, r["error"]
-                pg4.wait_for_timeout(2500); a = fr4.evaluate(ESTADO4)
-                fr4.evaluate("() => { const m = window.__m4, ruta = window.__ruta4, d = m.getProperty(ruta); m.setProperty(ruta, d.slice(0, d.length - 1)); }"); pg4.wait_for_timeout(2500); b_ = fr4.evaluate(ESTADO4)
-                cerrar_pasos4()
-                ok = a["total"] == r["antes"] + 1 and a["filas"] == a["total"] and b_["total"] == r["antes"] and b_["filas"] == b_["total"] and not a["trigger"]
-                return ok, json.dumps({"modelo": r, "tras_agregar": [a["filas"], a["total"]], "tras_quitar": [b_["filas"], b_["total"]]})
+                fr4.evaluate(FILA4, ["RENDIMIENTO", "Adicionar Pasos RMD"]); esperar_tabla(1)
+                FORM = "() => { const t = " + TABLA_P + """; const tr = [...t.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('CALCULO DE RENDIMIENTO')); if (!tr) return null;
+                  const sp = [...tr.querySelectorAll('.sapMText')].find((e) => e.textContent.includes('CALCULO DE RENDIMIENTO')), nodo = sp.firstChild, pal = []; const re = /\\S+/g; let m;
+                  while ((m = re.exec(nodo.nodeValue))) { const r = document.createRange(); r.setStart(nodo, m.index); r.setEnd(nodo, m.index + m[0].length); const b = r.getBoundingClientRect(); pal.push([m[0], Math.round(b.left), Math.round(b.top), Math.round(b.right)]); }
+                  const barra = pal.find((p) => /^-{10,}$/.test(p[0])), cants = pal.filter((p) => p[0] === 'CANT.');
+                  return { ws: getComputedStyle(sp).whiteSpace, lineas: [...new Set(pal.map((p) => p[2]))].length, orden: !!barra && cants.length === 2 && cants[0][2] < barra[2] && barra[2] < cants[1][2], dentro: !!barra && cants.length === 2 && cants.every((c) => c[1] >= barra[1] - 25 && c[1] < barra[3]) }; }"""
+                a = fr4.evaluate(FORM); pg4.set_viewport_size({"width": 1280, "height": 720}); pg4.wait_for_timeout(2000); c = fr4.evaluate(FORM); pg4.set_viewport_size({"width": 1415, "height": 886}); pg4.wait_for_timeout(1000)
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(2000)
+                bien = lambda f: f is not None and (f["ws"] == "pre-wrap" and f["lineas"] == 4 and f["orden"] and f["dentro"])
+                return (bien(a) and bien(c)), json.dumps({"1415": a, "1280": c})
 
             @prueba("4-8 Ninguna petición de escritura salió del navegador durante el bloque 4 y el script no registró errores")
             def _():
                 e = fr4.evaluate("window.__rmdStats.errores || []")
                 return (not bq4 and not e and not errores4), f"bloqueadas={bq4[:5]} errores_script={e[:3]} errores_pagina={errores4[:3]}"
         finally:
-            try: fr4.evaluate("() => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete o.tandas; localStorage.setItem('rmdUiMejoras', JSON.stringify(o)); }")   # (por defecto: encendida)
-            except Exception: pass
             pg4.close()
 
     print("\n══ RESUMEN ══")

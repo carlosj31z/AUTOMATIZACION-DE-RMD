@@ -850,138 +850,31 @@ with sync_playwright() as p:
     def _():
         r = pg.evaluate("() => { const f = window.__rmdStats.bajas.equipoDeBaja; return ['MONT-Montado', 'AEQS-Asignado al equipo superior', 'PTBO-Petición de borrado', 'NOAC-Objeto no activo', '', undefined].map((x) => f(x)); }")
         return r == [False, False, True, True, False, False], json.dumps(r)
-    @prueba("LN35 Orbes de espera (v1.48): los 7 estados se pintan en 20 y 64 px; un mensaje con «…» lleva su orbe (64 px si es la espera principal) según su verbo, cambiar el texto no lo quita y al terminar se va; la ventana ocupada más de 1,2 s muestra el brillo del borde y se apaga sola; los tres puntos del portal pasan a ser un orbe; sin orbes el ciclo de dibujo se detiene; apagar la opción lo retira todo")
+    @prueba("LN35 Animaciones (v1.53): el orbe y el brillo del borde solo acompañan «Ver todas las OP» y las esperas de los Excel de reporte (ventanas marcadas como reporte); en cualquier otra ventana del script el mensaje de espera queda en texto, los tres puntos de SAP y su capa de espera se dejan como los dibuja el portal (sin capa propia ni esfera), y copiar no anima el icono")
     def _():
         r = pg.evaluate("""async () => {
           const O = window.__rmdStats.orbes, esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
-          const pinta = ['working', 'searching', 'solving', 'listening', 'connecting', 'composing', 'breathing'].map((e) => [20, 64].every((t) => { const c = O.orbe(e, t); document.body.appendChild(c);
-            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0 ? 1 : 0; c.remove(); return n > 10; }));
-          const estados = ['Leyendo SAP… página 2 de 9', 'Buscando…', 'Revisando el RMD en SAP…', 'Esperando a Status RMD…', 'Armando el Excel con 10 master…', 'Suspendiendo 1 de 3: 2202609126…'].map(O.estadoDeEspera);
-          const f = document.createElement('div'); f.className = 'rmd-modal-fondo';
-          f.innerHTML = '<div class="rmd-modal"><h3>Prueba</h3><div class="rmd-modal-cuerpo"><p class="rmd-progreso rmd-espera">Leyendo los pasos…</p><p class="rmd-progreso chico"></p></div><div class="rmd-modal-pie"></div></div>';
-          document.body.appendChild(f); await esperar(250);
-          const p = f.querySelector('.rmd-progreso.rmd-espera'), chico = f.querySelector('.chico');
-          const a = { orbe: !!p.querySelector(':scope > canvas.rmd-orbe-64'), clase: p.className, texto: p.textContent, alto: Math.round(p.getBoundingClientRect().height) };
-          chico.textContent = 'Comparando 3 de 9…'; await esperar(150);
-          const oc = chico.querySelector('canvas.rmd-orbe'), b = { tam: oc ? oc.__orbe.tam : 0, estado: oc ? oc.__orbe.estado : '' };
-          p.querySelector('.rmd-orbe-txt').textContent = 'Leyendo los pasos… 40 de 80'; await esperar(120);
-          const mismo = p.querySelector('canvas.rmd-orbe') !== null;
-          await esperar(1300);
-          const be = f.querySelector('.rmd-modal > .rmd-beam'), c = { beam: !!be && be.hasAttribute('data-active'), anim: be ? getComputedStyle(be).animationName : '' };
-          p.querySelector('.rmd-orbe-txt').textContent = 'Listo: 12 documentos.'; chico.querySelector('.rmd-orbe-txt').textContent = 'Hecho.'; await esperar(110);
-          const d0 = { sale: !!p.querySelector('canvas.rmd-orbe.rmd-orbe-sale'), texto: (p.querySelector('.rmd-orbe-txt') || {}).className || '' };
-          await esperar(320);
-          const d1 = { orbes: f.querySelectorAll('canvas.rmd-orbe').length, clase: p.className, texto: p.textContent, fin: (f.querySelector('.rmd-beam') || { dataset: {} }).dataset.fin || '' };
-          await esperar(1900); const d2 = { beam: !!f.querySelector('.rmd-beam') };
+          const pinta = ['searching', 'composing'].every((e) => { const c = O.orbe(e, 64); document.body.appendChild(c); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0 ? 1 : 0; c.remove(); return n > 10; });
+          const ventana = (reporte, texto) => { const f = document.createElement('div'); f.className = 'rmd-modal-fondo'; f.innerHTML = '<div class="rmd-modal' + (reporte ? ' rmd-v-reporte' : '') + '"><h3>Prueba</h3><div class="rmd-modal-cuerpo"><p class="rmd-progreso rmd-espera">' + texto + '</p></div><div class="rmd-modal-pie"></div></div>'; document.body.appendChild(f); return f; };
+          const normal = ventana(false, 'Leyendo los pasos…'), rep = ventana(true, 'Armando el Excel con 10 master…');
+          await esperar(1700);
+          const a = { normal: normal.querySelectorAll('canvas.rmd-orbe').length, brilloNormal: !!normal.querySelector('.rmd-beam'), reporte: !!rep.querySelector('canvas.rmd-orbe-64'), brilloReporte: !!rep.querySelector('.rmd-modal > .rmd-beam') };
+          normal.remove(); rep.remove();
           const bi = document.createElement('div'); bi.className = 'sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig'; bi.style.cssText = 'position: fixed; left: 100px; top: 100px; width: 300px; height: 200px'; bi.innerHTML = '<div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div>';
-          document.body.appendChild(bi); await esperar(200);
-          const e = { orbe: !!bi.querySelector('canvas.rmd-orbe-64'), puntos: getComputedStyle(bi.querySelector('.sapUiLocalBusyIndicatorAnimation')).display, centro: (() => { const o = bi.querySelector('canvas.rmd-orbe').getBoundingClientRect(), z = bi.getBoundingClientRect(); return [Math.round(o.left + o.width / 2 - (z.left + z.width / 2)), Math.round(o.top + o.height / 2 - (z.top + z.height / 2))]; })() };
-          f.remove(); bi.remove(); await esperar(200);
-          const g = { vivos: O.vivos(), ciclo: O.ciclo() };
-          return { pinta, estados, a, b, mismo, c, d0, d1, d2, e, g };
+          document.body.appendChild(bi);
+          const capa = document.createElement('div'); capa.id = 'sapUiBusyIndicator'; capa.style.cssText = 'position: fixed; inset: 0; display: block'; capa.innerHTML = '<div class="sapUiLocalBusyIndicator"><div class="sapUiLocalBusyIndicatorAnimation"></div></div>'; document.body.appendChild(capa);
+          await esperar(900);
+          const b = { orbeEnPuntos: !!bi.querySelector('canvas.rmd-orbe'), puntos: getComputedStyle(bi.querySelector('.sapUiLocalBusyIndicatorAnimation')).display, capaPropia: !!document.querySelector('.rmd-eg'), puntosCapa: getComputedStyle(capa.querySelector('.sapUiLocalBusyIndicatorAnimation')).opacity };
+          bi.remove(); capa.remove();
+          const btn = document.createElement('button'); btn.innerHTML = '<svg viewBox="0 0 16 16"></svg>'; document.body.appendChild(btn); O.confirmarCopia(btn); await esperar(50);
+          const c = { swap: !!btn.querySelector('.rmd-ico-swap'), clase: btn.className }; btn.remove();
+          await esperar(300);
+          return { pinta, a, b, c, esperaGlobal: 'esperaGlobal' in O, vivos: O.vivos() };
         }""")
-        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(150)
-        pg.locator("#rmd-ui-panel input[data-k=orbes]").click(); pg.wait_for_timeout(300)
-        apagada = pg.evaluate("""async () => { const x = document.createElement('p'); x.className = 'rmd-progreso'; x.textContent = 'Leyendo…'; document.body.appendChild(x); await new Promise((ok) => setTimeout(ok, 250));
-          const r = { orbe: !!x.querySelector('canvas'), clase: document.documentElement.classList.contains('rmd-orbes') }; x.remove(); return r; }""")
-        pg.locator("#rmd-ui-panel input[data-k=orbes]").click(); pg.wait_for_timeout(300)
-        pg.evaluate("document.getElementById('rmd-ui-panel').open = false")
-        ok = (all(r["pinta"]) and r["estados"] == ["connecting", "searching", "solving", "listening", "composing", "weaving"] and r["a"]["orbe"] and "rmd-espera-on" in r["a"]["clase"] and r["a"]["texto"] == "Leyendo los pasos…" and r["a"]["alto"] >= 160
-              and r["b"] == {"tam": 20, "estado": "solving"} and r["mismo"] and r["c"]["beam"] and "beam-spin" in r["c"]["anim"] and r["d1"]["orbes"] == 0 and "rmd-con-orbe" not in r["d1"]["clase"] and r["d1"]["texto"] == "Listo: 12 documentos."
-              and r["d0"]["sale"] and "rmd-texto-entra" in r["d0"]["texto"] and r["d1"]["fin"] == "ok" and not r["d2"]["beam"] and r["e"]["orbe"] and r["e"]["puntos"] == "none" and all(abs(v) <= 1 for v in r["e"]["centro"]) and r["g"] == {"vivos": 0, "ciclo": False} and apagada == {"orbe": False, "clase": False})
-        return ok, json.dumps({**r, "apagada": apagada}, ensure_ascii=False)[:1500]
-    @prueba("LN36 Transiciones (v1.49, como en libraries.dev): el texto de espera lleva su brillo y solo «entra» al cambiar de fase (no con los contadores); el orbe que se rehace igual no vuelve a entrar; el indicador se desliza a la pestaña elegida y, si el grupo se vuelve a pintar, sale de donde estaba; copiar transforma el icono en ✓ (o el texto en «✓ Copiado») y vuelve; la ventanita «Espere» ya no lleva orbe propio (lo dibuja la capa de LN37) y las tablas el anillo")
-    def _():
-        r = pg.evaluate("""async () => {
-          const O = window.__rmdStats.orbes, esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
-          const fases = [O.faseDe('Leyendo SAP… página 2 de 9') === O.faseDe('Leyendo SAP… página 3 de 9'), O.faseDe('Leyendo SAP… página 9 de 9') === O.faseDe('Armando el libro con 12 RMD…')];
-          const f = document.createElement('div'); f.className = 'rmd-modal-fondo';
-          f.innerHTML = '<div class="rmd-modal"><h3>Prueba</h3><div class="rmd-modal-cuerpo"><div class="rmd-cr-chips" role="tablist"><button type="button" data-t="a" class="activo">Primera</button><button type="button" data-t="b">Segunda pestaña</button></div><p class="rmd-progreso cuenta">Leyendo SAP… página 1 de 9</p></div><div class="rmd-modal-pie"></div></div>';
-          document.body.appendChild(f); await esperar(300);
-          const p = f.querySelector('.cuenta'), s = p.querySelector('.rmd-orbe-txt');
-          const brillo = { texto: s && s.dataset.texto, anim: s ? getComputedStyle(s, '::before').animationName : '' };
-          O.setTxt(p, 'Leyendo SAP… página 2 de 9'); const conContador = s.classList.contains('rmd-texto-entra');
-          O.setTxt(p, 'Armando el libro con 12 RMD…'); const conFase = s.classList.contains('rmd-texto-entra'); await esperar(150);
-          const estado2 = p.querySelector('canvas.rmd-orbe').__orbe.estado;
-          const cuerpo = f.querySelector('.rmd-modal-cuerpo'); p.remove(); const p2 = document.createElement('p'); p2.className = 'rmd-progreso'; p2.textContent = 'Armando el libro con 12 RMD…'; cuerpo.appendChild(p2); await esperar(200);
-          const sinEntrada = !!p2.querySelector('canvas.rmd-orbe.rmd-sin-entrada');
-          const g = f.querySelector('.rmd-cr-chips'), ind = g.querySelector(':scope > .rmd-ind'), [b1, b2] = g.querySelectorAll('button');
-          const i1 = ind && { tr: ind.style.transform, w: ind.style.width, x1: b1.offsetLeft, w1: b1.offsetWidth };
-          b1.classList.remove('activo'); b2.classList.add('activo'); await esperar(120);
-          const i2 = { tr: ind.style.transform, w: ind.style.width, x2: b2.offsetLeft, w2: b2.offsetWidth, fondo: getComputedStyle(b2).backgroundColor, trans: getComputedStyle(ind).transitionProperty };
-          g.innerHTML = '<button type="button" data-t="a">Primera</button><button type="button" data-t="b" class="activo">Segunda pestaña</button>'; await esperar(250);
-          const ind2 = g.querySelector(':scope > .rmd-ind'), i3 = ind2 && { tr: ind2.style.transform, puesto: !!ind2.__rmdPuesto };
-          const bc = document.createElement('button'); bc.className = 'rmd-btn rmd-copiar'; bc.innerHTML = '<svg viewBox="0 0 16 16"><rect x="5" y="5" width="8" height="8"/></svg><span>Copiar configuración</span>'; f.querySelector('.rmd-modal-pie').appendChild(bc);
-          const bt = document.createElement('button'); bt.className = 'rmd-btn'; bt.textContent = 'Copiar código'; f.querySelector('.rmd-modal-pie').appendChild(bt);
-          O.confirmarCopia(bc); O.confirmarCopia(bt); await esperar(60);
-          const c1 = { swap: bc.querySelectorAll('.rmd-ico-swap > svg').length, copiado: bc.classList.contains('rmd-copiado'), texto: bt.textContent };
-          await esperar(1750); const c2 = { copiado: bc.classList.contains('rmd-copiado'), texto: bt.textContent };
-          const dlg = document.createElement('div'); dlg.className = 'sapMBusyDialog'; dlg.innerHTML = '<div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeMedium"><div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div></div>';
-          const tab = document.createElement('div'); tab.innerHTML = '<div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeMedium" style="position:fixed;left:10px;top:10px;width:200px;height:80px"><div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div></div>';
-          document.body.append(dlg, tab); await esperar(200);
-          const sap = [(dlg.querySelector('canvas.rmd-orbe') || {}).__orbe, (tab.querySelector('canvas.rmd-orbe') || {}).__orbe].map((o) => o ? o.estado + ' ' + o.tam : '');
-          f.remove(); dlg.remove(); tab.remove(); await esperar(100);
-          return { fases, brillo, conContador, conFase, estado2, sinEntrada, i1, i2, i3, c1, c2, sap };
-        }""")
-        x1 = f"translate({r['i1']['x1']}px" if r.get("i1") else "?"
-        ok = (r["fases"] == [True, False] and r["brillo"]["texto"] == "Leyendo SAP… página 1 de 9" and r["brillo"]["anim"] == "rmd-brillo-txt" and not r["conContador"] and r["conFase"] and r["estado2"] == "composing"
-              and r["sinEntrada"] and r["i1"] and r["i1"]["tr"].startswith(x1) and r["i1"]["w"] == f"{r['i1']['w1']}px" and r["i2"]["tr"].startswith(f"translate({r['i2']['x2']}px") and r["i2"]["w"] == f"{r['i2']['w2']}px"
-              and "transform" in r["i2"]["trans"] and r["i2"]["fondo"] in ("rgba(0, 0, 0, 0)", "transparent") and r["i3"] and r["i3"]["puesto"] and r["i3"]["tr"] == r["i2"]["tr"]
-              and r["c1"]["swap"] == 2 and r["c1"]["copiado"] and r["c1"]["texto"] == "✓ Copiado" and not r["c2"]["copiado"] and r["c2"]["texto"] == "Copiar código" and r["sap"] == ["", "breathing 20"])
-        return ok, json.dumps(r, ensure_ascii=False)[:1600]
-    @prueba("LN37 Espera de inicio y a pantalla completa (v1.50): al arrancar la página queda envuelta (brillo en sus cuatro bordes y velo suave, SIN recuadro) con una esfera grande (144 px) y «Iniciando…» sin que SAP lo pida; un hueco en blanco de más de un segundo, que SAP quite y vuelva a poner su capa (hueco corto) y que la app se dibuje NO la cortan (es siempre el mismo orbe); solo se va con un fundido cuando terminó de verdad; una espera de menos de 350 ms no muestra nada; la ventanita «Espere» usa la misma capa con su texto y su orbe de la zona desaparece")
-    def _():
-        r = pg.evaluate("""async () => {
-          const O = window.__rmdStats.orbes, G = O.esperaGlobal, esperar = (ms) => new Promise((ok) => setTimeout(ok, ms)), eg = () => document.querySelector('.rmd-eg');
-          const capa = (mostrar) => { let c = document.getElementById('sapUiBusyIndicator');
-            if (!c) { c = document.createElement('div'); c.id = 'sapUiBusyIndicator'; c.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:10';
-              c.innerHTML = '<div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig"><div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div></div>'; document.body.appendChild(c); }
-            c.style.display = mostrar ? 'block' : 'none'; c.style.visibility = mostrar ? 'visible' : 'hidden'; };
-          const hasta = async (pred, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (pred()) return Date.now() - t0; await esperar(40); } return null; };
-          const r = {};
-          // 1) ARRANQUE: la app aún no está dibujada -> la esfera sale sola
-          window.__rmdSinInicio = false; G.reiniciar(); await esperar(450);
-          const e1 = G.estado(), c1 = e1.canvas, cen = document.querySelector('.rmd-eg-centro'), cs = cen && getComputedStyle(cen), bm = document.querySelector('.rmd-eg > .rmd-beam[data-active]'), bmr = bm && bm.getBoundingClientRect();
-          r.inicio = { inicio: e1.inicio, el: e1.el, texto: e1.texto, tam: c1 && Math.round(c1.getBoundingClientRect().width), estado: c1 && c1.__orbe.estado, visible: !!document.querySelector('.rmd-eg.visible'), puntos: c1 && c1.__orbe.opts && (c1.__orbe.opts.latRings || 0),
-            sinCuadro: !!cs && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.boxShadow === 'none' && cs.borderTopLeftRadius === '0px' && !document.querySelector('.rmd-eg-caja'),
-            marco: !!bmr && bmr.width >= innerWidth - 2 && bmr.height >= innerHeight - 2 && /beam-spin-rmdp/.test(getComputedStyle(bm).animationName), velo: !!document.querySelector('.rmd-eg > .rmd-eg-velo') };
-          // 2) hueco en blanco de 1,3 s (SAP sin capa) en pleno arranque: el MISMO orbe sigue, sin cortes
-          await esperar(1300); r.hueco = { el: G.estado().el, mismo: G.estado().canvas === c1, op: eg() ? +getComputedStyle(eg()).opacity : -1 };
-          // 3) SAP muestra su capa: sigue el mismo orbe
-          capa(true); await esperar(300); r.conCapa = { mismo: G.estado().canvas === c1, texto: G.estado().texto };
-          // 4) la app se dibuja (botón «Ir») con la capa aún puesta: cambia el texto y sigue el mismo orbe
-          const go = document.createElement('button'); go.id = 'x--btnGo'; go.textContent = 'Ir'; document.body.appendChild(go); await esperar(300);
-          r.dibujada = { texto: G.estado().texto, mismo: G.estado().canvas === c1 };
-          // 5) SAP quita su capa 200 ms y la vuelve a poner: no se corta
-          capa(false); await esperar(200); capa(true); await esperar(300);
-          r.parpadeo = { el: G.estado().el, mismo: G.estado().canvas === c1, sale: !!document.querySelector('.rmd-eg-sale') };
-          // 6) SAP termina de verdad: ~0,9 s después empieza el fundido y luego se quita
-          capa(false); const t0 = Date.now(); let tSale = null, tFin = null;
-          while (Date.now() - t0 < 4000 && tFin === null) { if (tSale === null && document.querySelector('.rmd-eg-sale')) tSale = Date.now() - t0; if (!G.estado().el) tFin = Date.now() - t0; await esperar(30); }
-          r.fin = { tSale, tFin, vivos: O.vivos() };
-          // 7) fuera del arranque: una espera de 150 ms no muestra nada
-          window.__rmdSinInicio = true; G.reiniciar(); await esperar(200);
-          capa(true); await esperar(150); capa(false); await esperar(700); r.destello = { el: !!eg() };
-          // 8) una espera real: sale tras 250 ms con «Cargando…»; un parpadeo de 220 ms no la corta; al terminar se va
-          capa(true); await esperar(600); const e8 = G.estado(), c8 = e8.canvas; r.espera = { el: e8.el, texto: e8.texto, tam: c8 && c8.__orbe.tam };
-          capa(false); await esperar(220); capa(true); await esperar(300); r.espera.mismo = G.estado().canvas === c8 && !document.querySelector('.rmd-eg-sale');
-          capa(false); r.espera.quitado = await hasta(() => !G.estado().el, 3000);
-          // 9) la ventanita «Espere»: misma capa, con su texto; su zona no lleva orbe y ella no se ve
-          const d = document.createElement('div'); d.className = 'sapMBusyDialog'; d.style.cssText = 'width:300px;height:64px;position:fixed;left:200px;top:200px';
-          d.innerHTML = '<span class="sapMText">Guardando el RMD…</span><div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeMedium"><div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div></div>'; document.body.appendChild(d);
-          await esperar(700); const e9 = G.estado(); r.dialogo = { el: e9.el, texto: e9.texto, opZona: d.querySelectorAll('canvas.rmd-orbe').length, opacidad: getComputedStyle(d).opacity };
-          d.remove(); r.dialogo.quitado = await hasta(() => !G.estado().el, 3000);
-          document.getElementById('sapUiBusyIndicator').remove(); go.remove(); window.__rmdSinInicio = true; G.reiniciar(); await esperar(200); r.limpio = { el: !!eg(), vivos: O.vivos() };
-          return r;
-        }""")
-        ok = (r["inicio"]["inicio"] and r["inicio"]["el"] and r["inicio"]["texto"] == "Iniciando…" and r["inicio"]["tam"] == 144 and r["inicio"]["estado"] == "solving" and r["inicio"]["visible"] and r["inicio"]["puntos"] >= 10 and r["inicio"]["sinCuadro"] and r["inicio"]["marco"] and r["inicio"]["velo"]
-              and r["hueco"]["el"] and r["hueco"]["mismo"] and r["hueco"]["op"] > 0.95 and r["conCapa"]["mismo"] and r["conCapa"]["texto"] == "Iniciando…"
-              and r["dibujada"]["texto"] == "Cargando datos…" and r["dibujada"]["mismo"] and r["parpadeo"]["el"] and r["parpadeo"]["mismo"] and not r["parpadeo"]["sale"]
-              and r["fin"]["tSale"] is not None and 600 <= r["fin"]["tSale"] <= 1900 and r["fin"]["tFin"] is not None and r["fin"]["tFin"] - r["fin"]["tSale"] >= 450 and r["fin"]["tFin"] <= 2800 and r["fin"]["vivos"] == 0
-              and not r["destello"]["el"] and r["espera"]["el"] and r["espera"]["texto"] == "Cargando…" and r["espera"]["tam"] == 144 and r["espera"]["mismo"] and r["espera"]["quitado"] is not None
-              and r["dialogo"]["el"] and r["dialogo"]["texto"] == "Guardando el RMD…" and r["dialogo"]["opZona"] == 0 and r["dialogo"]["opacidad"] == "0" and r["dialogo"]["quitado"] is not None
-              and r["limpio"] == {"el": False, "vivos": 0})
-        return ok, json.dumps(r, ensure_ascii=False)[:1700]
+        ok = (r["pinta"] and r["a"] == {"normal": 0, "brilloNormal": False, "reporte": True, "brilloReporte": True} and not r["b"]["orbeEnPuntos"] and r["b"]["puntos"] != "none" and not r["b"]["capaPropia"]
+              and r["b"]["puntosCapa"] == "1" and not r["c"]["swap"] and "rmd-copiado" not in r["c"]["clase"] and not r["esperaGlobal"])
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
     # ── Vista móvil (v1.51): se prueba con el tamaño de pantalla (390 px) sobre la maqueta ──
     def movil_estado():
         return pg.evaluate("() => { const b = document.getElementById('rmd-ui-buscar'); return { clase: document.documentElement.classList.contains('rmd-movil'), buscar: !!b && b.isConnected && !b.hidden, activo: window.__rmdStats.movil.activo() }; }")
