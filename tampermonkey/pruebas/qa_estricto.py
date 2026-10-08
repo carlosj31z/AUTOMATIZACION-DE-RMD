@@ -327,24 +327,24 @@ with sync_playwright() as p:
     if "E" in SOLO:
         pg.wait_for_timeout(3000); abrir_pasos(pg, fr); provocar_incoherencias(fr, pg)
         def conmutar(texto):
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = true")
+            fr.evaluate("window.__rmdStats.panel.abrir(true)")
             fr.locator(f"#rmd-ui-panel label:has-text('{texto}') input").click(); pg.wait_for_timeout(900)
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+            fr.evaluate("window.__rmdStats.panel.cerrar()")
         cuenta = lambda sel: fr.evaluate(f"window.__q.top().querySelectorAll('{sel}').length")
         @prueba("E1 Copiar/Pegar: apagar retira los botones y el aviso; encender los devuelve")
         def _():
-            a = cuenta('.rmd-copia-grupo'); conmutar('Copiar / Pegar la configuración'); b_ = cuenta('.rmd-copia-grupo'); conmutar('Copiar / Pegar la configuración'); c = cuenta('.rmd-copia-grupo')
+            a = cuenta('.rmd-copia-grupo'); conmutar('Copiar y pegar configuración'); b_ = cuenta('.rmd-copia-grupo'); conmutar('Copiar y pegar configuración'); c = cuenta('.rmd-copia-grupo')
             return (a == 1 and b_ == 0 and c == 1), f"{a}->{b_}->{c}"
         @prueba("E2 Filtro local apagado: desaparece el campo pero quedan las alertas; con filtro y alertas apagados desaparece la barra")
         def _():
-            conmutar('Filtro local'); inp = fr.evaluate("getComputedStyle(window.__q.top().querySelector('#rmd-filtro-bar input')).display"); bar1 = cuenta('#rmd-filtro-bar')
+            conmutar('Filtro en las listas de pasos'); inp = fr.evaluate("getComputedStyle(window.__q.top().querySelector('#rmd-filtro-bar input')).display"); bar1 = cuenta('#rmd-filtro-bar')
             conmutar('Alertas de casillas'); bar2 = cuenta('#rmd-filtro-bar')
-            conmutar('Alertas de casillas'); conmutar('Filtro local'); bar3 = cuenta('#rmd-filtro-bar'); inp3 = fr.evaluate("getComputedStyle(window.__q.top().querySelector('#rmd-filtro-bar input')).display")
+            conmutar('Alertas de casillas'); conmutar('Filtro en las listas de pasos'); bar3 = cuenta('#rmd-filtro-bar'); inp3 = fr.evaluate("getComputedStyle(window.__q.top().querySelector('#rmd-filtro-bar input')).display")
             return (inp == "none" and bar1 == 1 and bar2 == 0 and bar3 == 1 and inp3 != "none"), f"{inp} {bar1} {bar2} {bar3} {inp3}"
         @prueba("E3 Columnas ocultas: apagar las muestra; encender las oculta")
         def _():
             f = "[...window.__q.top().querySelectorAll('thead th')].filter(x=>['ESTADO MOV.','IMAGEN','FORMATO'].includes(x.textContent.trim().toUpperCase())).map(x=>getComputedStyle(x).display)"
-            a = fr.evaluate(f); conmutar('Ocultar Estado Mov'); b_ = fr.evaluate(f); conmutar('Ocultar Estado Mov'); c = fr.evaluate(f)
+            a = fr.evaluate(f); conmutar('Ocultar columnas poco usadas'); b_ = fr.evaluate(f); conmutar('Ocultar columnas poco usadas'); c = fr.evaluate(f)
             return (all(x == "none" for x in a) and all(x != "none" for x in b_) and all(x == "none" for x in c)), f"{a} {b_} {c}"
         @prueba("E4 Columnas ordenadas: apagar devuelve los anchos del portal; encender los aplica")
         def _():
@@ -437,9 +437,9 @@ with sync_playwright() as p:
             RmdAutomation(pg).configuracion.elegir_accion("Asociar fórmulas", fila); pg.wait_for_timeout(5000)
         abrir_asociar()
         def conmutar_panel(texto):
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = true")
+            fr.evaluate("window.__rmdStats.panel.abrir(true)")
             fr.locator(f"#rmd-ui-panel label:has-text('{texto}') input").click(); pg.wait_for_timeout(900)
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+            fr.evaluate("window.__rmdStats.panel.cerrar()")
         medir = """() => { const d=window.__q.top(); const q=window.__q.r(d); const av=d.querySelector('#rmd-aviso-asociar'); const avN=d.querySelector('#rmd-aviso-nomenclatura'); return {t:(d.querySelector('h2')||{}).textContent, w:q.w, h:q.h, clases:[...d.classList].filter(c=>/^rmd-/.test(c)).join(' '), aviso:av?av.textContent:null, avisoH:(av?av.offsetHeight:0)+(avN?avN.offsetHeight:0)}; }"""
         @prueba("H1 'Asociar Fórmula' se deja como el portal la dibuja: sin clases del script y con el mismo ancho (y solo el alto del aviso de más) que con las mejoras apagadas")
         def _():
@@ -671,9 +671,9 @@ with sync_playwright() as p:
             @prueba("J10 Apagar 'Especificaciones: reordenar filas y editar sus textos' retira botones, asas y cuadros de texto (vuelve el texto del portal); encenderlo los devuelve")
             def _():
                 def conmutar(texto):
-                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = true")
+                    fr.evaluate("window.__rmdStats.panel.abrir(true)")
                     fr.locator(f"#rmd-ui-panel label:has-text('{texto}') input").click(); pg.wait_for_timeout(1200)
-                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                    fr.evaluate("window.__rmdStats.panel.cerrar()")
                 a = fr.evaluate(ESTADO_ESPEC); conmutar('reordenar filas'); b_ = fr.evaluate(ESTADO_ESPEC)
                 visibles = fr.evaluate("[...(" + TOP + ").querySelectorAll('td .sapMObjectIdentifierText, tbody td > span.sapMText')].filter(x=>getComputedStyle(x).display!=='none').length")
                 conmutar('reordenar filas'); c = fr.evaluate(ESTADO_ESPEC)
@@ -738,27 +738,55 @@ with sync_playwright() as p:
         cerrar_seguro()
         for (w, h) in [(1415, 886), (1366, 650)]:
             pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(1200)
-            @prueba(f"K1 {w}×{h}: el icono está en la esquina inferior izquierda, es redondo y no tapa contenido importante")
+            @prueba(f"K1 {w}×{h}: el icono queda latente en la esquina inferior izquierda (tenue, asomando su borde) y al pasar el ratón sale completo")
             def _():
-                r = fr.evaluate("""() => { const s=document.querySelector('#rmd-ui-panel summary'); const q=s.getBoundingClientRect(); const cs=getComputedStyle(s); return {l:Math.round(q.left), b:Math.round(innerHeight-q.bottom), w:Math.round(q.width), h:Math.round(q.height), radio:cs.borderRadius, svg:!!s.querySelector('svg'), fixed:getComputedStyle(document.querySelector('#rmd-ui-panel')).position}; }""")
-                return (r["l"] <= 24 and r["b"] <= 24 and r["w"] == r["h"] and 32 <= r["w"] <= 44 and r["svg"] and r["fixed"] == "fixed" and "50%" in r["radio"]), str(r)
-            @prueba(f"K2 {w}×{h}: al abrirlo, la tarjeta cabe en la pantalla, agrupa las opciones y se puede recorrer con desplazamiento")
+                MED = """() => { const s=document.querySelector('#rmd-ui-panel summary'); const q=s.getBoundingClientRect(); const cs=getComputedStyle(s); return {l:Math.round(q.left), r:Math.round(q.right), b:Math.round(innerHeight-q.bottom), w:Math.round(q.width), h:Math.round(q.height), radio:cs.borderRadius, op:+cs.opacity, svg:!!s.querySelector('svg'), fixed:getComputedStyle(s.parentNode).position}; }"""
+                fr.evaluate("() => document.getElementById('rmd-ui-panel').classList.remove('rmd-pn-visible')"); pg.mouse.move(900, 300); pg.wait_for_timeout(400)
+                tenue = fr.evaluate(MED)
+                fr.locator('#rmd-ui-panel summary').hover(); pg.wait_for_timeout(400); fuera = fr.evaluate(MED); pg.mouse.move(900, 300); pg.wait_for_timeout(300)
+                ok = (tenue["l"] < 0 and tenue["r"] >= 12 and tenue["op"] < .6 and tenue["b"] <= 24 and tenue["w"] == tenue["h"] and "50%" in tenue["radio"] and tenue["svg"] and tenue["fixed"] == "fixed"
+                      and fuera["l"] >= 8 and fuera["op"] > .95)
+                return ok, f"latente {tenue} | al pasar el ratón {fuera}"
+            @prueba(f"K2 {w}×{h}: al abrirlo, la tarjeta cabe en la pantalla, muestra 7 grupos con su interruptor y todas las mejoras dentro, y se recorre con desplazamiento")
             def _():
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.wait_for_timeout(500)
-                r = fr.evaluate("""() => { const c=document.querySelector('#rmd-ui-panel .rmd-panel-cuerpo'); const q=c.getBoundingClientRect(); return {l:Math.round(q.left), t:Math.round(q.top), r:Math.round(q.right), b:Math.round(q.bottom), vw:innerWidth, vh:innerHeight, grupos:[...c.querySelectorAll('.rmd-grupo')].map(x=>x.textContent.trim()), filas:c.querySelectorAll('label.rmd-fila').length, ver:c.querySelector('.rmd-panel-cab span').textContent, scroll:c.scrollHeight>c.clientHeight}; }""")
-                pg.screenshot(path=f"data/panel_{w}x{h}.png"); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
-                return (r["l"] >= 0 and r["t"] >= 0 and r["r"] <= r["vw"] and r["b"] <= r["vh"] and len(r["grupos"]) == 5 and r["filas"] >= 18 and r["ver"].startswith("v")), str(r)
+                fr.evaluate("window.__rmdStats.panel.abrir()"); pg.wait_for_timeout(500)
+                r = fr.evaluate("""() => { const c=document.querySelector('#rmd-ui-panel .rmd-panel-cuerpo'); const q=c.getBoundingClientRect(); return {l:Math.round(q.left), t:Math.round(q.top), r:Math.round(q.right), b:Math.round(q.bottom), vw:innerWidth, vh:innerHeight,
+                  grupos:[...c.querySelectorAll('.rmd-pn-grupo')].map(x=>x.querySelector('.rmd-pn-t').textContent), swGrupo:c.querySelectorAll('input[data-g]').length, filas:c.querySelectorAll('input[data-k]').length, ver:c.querySelector('.rmd-pn-sub').textContent,
+                  lista:getComputedStyle(c.querySelector('.rmd-pn-lista')).overflowY}; }""")
+                pg.screenshot(path=f"data/panel_{w}x{h}.png"); fr.evaluate("window.__rmdStats.panel.cerrar()")
+                return (r["l"] >= 0 and r["t"] >= 0 and r["r"] <= r["vw"] and r["b"] <= r["vh"] and len(r["grupos"]) == 7 and r["swGrupo"] == 7 and r["filas"] >= 45 and r["ver"].startswith("Versión") and r["lista"] == "auto"), str(r)
         pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1000)
         @prueba("K3 Cada interruptor cambia su opción y persiste; 'Restablecer' vuelve a los valores por defecto (todas activas salvo RMD en vivo y hoja de ruta)")
         def _():
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = true")
+            fr.evaluate("window.__rmdStats.panel.abrir(true)")
             fr.locator("#rmd-ui-panel input[data-k=enter]").click(); pg.wait_for_timeout(500)
             a = fr.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')||'{}').enter"); marca = fr.evaluate("document.querySelector('#rmd-ui-panel input[data-k=enter]').checked")
             fr.locator("#rmd-ui-panel .rmd-restablecer").click(); pg.wait_for_timeout(500)
             b_ = fr.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')||'{}').enter"); marca2 = fr.evaluate("document.querySelector('#rmd-ui-panel input[data-k=enter]').checked")
             todas = fr.evaluate("[...document.querySelectorAll('#rmd-ui-panel input[data-k]')].every(i => i.checked === !['vivo'].includes(i.dataset.k))")
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+            fr.evaluate("window.__rmdStats.panel.cerrar()")
             return (a is False and marca is False and b_ is True and marca2 is True and todas), f"{a} {marca} {b_} {marca2} {todas}"
+        @prueba("K4 El interruptor de un grupo apaga y enciende todas sus mejoras a la vez (y persiste); con una sola apagada queda «mixto»")
+        def _():
+            fr.evaluate("window.__rmdStats.panel.abrir(true)")
+            ks = fr.evaluate("window.__rmdStats.panel.grupos[1][2]")
+            fr.locator("#rmd-ui-panel input[data-g='1']").click(); pg.wait_for_timeout(400)
+            apag = fr.evaluate("(ks) => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras')||'{}'); return ks.map(k => o[k]); }", ks)
+            fr.locator("#rmd-ui-panel input[data-g='1']").click(); pg.wait_for_timeout(400)
+            enc = fr.evaluate("(ks) => { const o = JSON.parse(localStorage.getItem('rmdUiMejoras')||'{}'); return ks.map(k => o[k]); }", ks)
+            fr.locator(f"#rmd-ui-panel input[data-k='{ks[0]}']").click(); pg.wait_for_timeout(300)
+            mixto = fr.evaluate("() => { const g = document.querySelector(\"#rmd-ui-panel input[data-g='1']\"); return [g.checked, g.indeterminate, g.closest('.rmd-pn-gcab').textContent]; }")
+            fr.locator(f"#rmd-ui-panel input[data-k='{ks[0]}']").click(); pg.wait_for_timeout(300); fr.evaluate("window.__rmdStats.panel.cerrar()")
+            return (not any(apag) and all(enc) and mixto[0] is False and mixto[1] is True), f"apagado {apag} encendido {enc} mixto {mixto}"
+        @prueba("K5 El panel se cierra al hacer clic fuera de él y con Esc; el buscador filtra las mejoras")
+        def _():
+            fr.evaluate("window.__rmdStats.panel.abrir()"); pg.wait_for_timeout(300)
+            fr.locator('#rmd-ui-panel .rmd-pn-buscar input').fill('minusculas'); pg.wait_for_timeout(200)
+            vis = fr.evaluate("() => [...document.querySelectorAll('#rmd-ui-panel .rmd-pn-item')].filter(x => x.getClientRects().length).map(x => x.querySelector('input').dataset.k)")
+            fr.locator('#rmd-ui-panel .rmd-pn-buscar input').fill('')
+            pg.mouse.click(900, 300); pg.wait_for_timeout(300); fuera = fr.evaluate("document.getElementById('rmd-ui-panel').open")
+            fr.evaluate("window.__rmdStats.panel.abrir()"); pg.wait_for_timeout(200); pg.keyboard.press('Escape'); pg.wait_for_timeout(300); esc = fr.evaluate("document.getElementById('rmd-ui-panel').open")
+            return (vis == ['pasominusculas'] and fuera is False and esc is False), f"búsqueda {vis} | abierto tras clic fuera {fuera} | tras Esc {esc}"
 
     # ───────────────────────── L. El botón de mejoras es persistente (no desaparece al cargar la página) ─────────────────────────
     if "L" in SOLO:
@@ -771,7 +799,7 @@ with sync_playwright() as p:
             @prueba("L1 Inyectado antes de que la app se monte (Tampermonkey), el botón sigue visible y encima de todo cuando la app aparece; cuelga de <html>, no del <body>")
             def _():
                 r = fr2.evaluate(MEDIR_BOTON)
-                ok = r["existe"] and r["padre"] == "HTML" and r["encima"] and not r["preservado"] and r["izq"] <= 24 and r["abajo"] <= 24 and r["ancho"] == 40
+                ok = r["existe"] and r["padre"] == "HTML" and r["encima"] and not r["preservado"] and r["izq"] <= 24 and r["abajo"] <= 24 and r["ancho"] == 38
                 return ok, f"inyectado a los {t_inyeccion}s: {r}"
             @prueba("L2 Cuando UI5 aparta los nodos con id que cuelgan del <body> (lo que antes escondía el botón; una sonda con id sí se aparta), el botón sigue visible y encima de todo")
             def _():
@@ -790,7 +818,7 @@ with sync_playwright() as p:
             def _():
                 fr2.evaluate("() => { [...document.querySelectorAll('style')].filter((x) => x.textContent.includes('#rmd-ui-panel')).forEach((x) => x.remove()); }"); pg2.wait_for_timeout(1500)
                 r = fr2.evaluate("() => ({ estilos: [...document.querySelectorAll('style')].filter((x) => x.textContent.includes('#rmd-ui-panel')).length, ancho: Math.round(document.querySelector('#rmd-ui-panel summary').getBoundingClientRect().width) })")
-                return (r["estilos"] == 1 and r["ancho"] == 40), str(r)
+                return (r["estilos"] == 1 and r["ancho"] == 38), str(r)
         finally:
             pg2.close()
 
@@ -901,12 +929,12 @@ with sync_playwright() as p:
             @prueba("M10 Con 'Avisar cambios sin guardar' apagado, Cancelar cierra sin avisar")
             def _():
                 abrir_estructura("PRECAUCIONES", con_editor=False); tocar_casilla(1)
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(700)
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(700)
+                fr.evaluate("window.__rmdStats.panel.cerrar()")
                 cancelar(); av = aviso_propio(); cerrado = n_dialogos() == 1
                 if not cerrado: cerrar_seguro()
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(700)
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(700)
+                fr.evaluate("window.__rmdStats.panel.cerrar()")
                 return (av is None and cerrado), f"aviso={av and av['titulo']} cerrada={cerrado}"
             cerrar_seguro()
 
@@ -1329,7 +1357,7 @@ with sync_playwright() as p:
         @prueba("V5 RMD en vivo (apagado por defecto): al activarlo, la configuración va a la mitad izquierda y el PDF del RMD a la derecha; al cerrar el RMD todo vuelve")
         def _():
             por_defecto = fr.evaluate("document.querySelector(\"#rmd-ui-panel input[data-k='vivo']\").checked")
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").check(); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+            fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").check(); fr.evaluate("window.__rmdStats.panel.cerrar()")
             try:
                 RmdAutomation(pg).editor_de_rmd(RMD_SEL); pg.wait_for_timeout(9000)
                 v = fr.evaluate("""() => { const p=document.querySelector('.rmd-vivo-panel'); const f=p&&p.querySelector('iframe'); const d=""" + TOPV + """; const q=d.getBoundingClientRect(), pq=p&&p.getBoundingClientRect();
@@ -1337,7 +1365,7 @@ with sync_playwright() as p:
                 cerrar_seguro(); pg.wait_for_timeout(1500)
                 fin = fr.evaluate("({ panel: !!document.querySelector('.rmd-vivo-panel'), clase: document.documentElement.classList.contains('rmd-vivo') })")
             finally:
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").uncheck(); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").uncheck(); fr.evaluate("window.__rmdStats.panel.cerrar()")
             return (not por_defecto and v["src"] and v["dialogoDer"] <= v["vw"] / 2 and v["panelIzq"] and abs(v["panelIzq"] - v["vw"] / 2) <= 2 and not fin["panel"] and not fin["clase"]), f"por defecto={por_defecto} {v} al cerrar={fin}"
         @prueba("V6 Documentos citados en todos los master (Autorizados + Ingresados): en el menú Exportar y armado leyendo SAP (sin descargar) en menos de 5 minutos")
         def _():
@@ -1452,7 +1480,7 @@ with sync_playwright() as p:
             print("   (antes de W6 quedaba:", quedan, ")")
             @prueba("W6 RMD en vivo: tras un cambio (hecho SOLO EN MEMORIA) el PDF salta a la página del paso, lo resalta, luego lo muestra normal; sin cambios no recarga")
             def _():
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").check(); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").check(); fr.evaluate("window.__rmdStats.panel.cerrar()")
                 DATOS = "(() => " + CTRL + ".getView().getModel('asociarDatos').getData())()"
                 AVISO = "() => " + CTRL + ".getView().getModel('mainModelv2').fireRequestCompleted({ method: 'POST', url: 'simulado', success: true })"
                 try:
@@ -1472,7 +1500,7 @@ with sync_playwright() as p:
                     sin = fr.evaluate("(document.querySelector('.rmd-vivo-estado')||{}).textContent || ''"); src3 = fr.evaluate("(document.querySelector('.rmd-vivo-panel iframe.rmd-vivo-pdf.activo')||{}).src || ''")
                 finally:
                     fr.evaluate("() => { if (window.__pe) window.__pe[0].pasoId.descripcion = window.__pe[1]; }")
-                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").uncheck(); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                    fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel label:has-text('RMD en vivo') input").uncheck(); fr.evaluate("window.__rmdStats.panel.cerrar()")
                 frag = f"#page={c['pagina']}&"
                 ok = (c["resaltado"] and c["pagina"] and "(CAMBIO EN VIVO)" in c["texto"] and frag in src1 and frag in src2 and src1.split("#")[0] != src2.split("#")[0] and "sin cambios" in sin and src3 == src2)
                 return ok, f"{c} resaltado→normal={src1.split('#')[0] != src2.split('#')[0]} salto={frag in src1 and frag in src2} sin recargar={src3 == src2} sin cambios={sin[-40:]!r}"
@@ -1582,8 +1610,8 @@ with sync_playwright() as p:
         pg.route("**/*", guardia_y)
         cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1200)
         def opcion_y(etiqueta, marcar):
-            fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); loc = fr.locator(f"#rmd-ui-panel label:has-text('{etiqueta}') input")
-            (loc.check() if marcar else loc.uncheck()); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+            fr.evaluate("window.__rmdStats.panel.abrir(true)"); loc = fr.locator(f"#rmd-ui-panel label:has-text('{etiqueta}') input")
+            (loc.check() if marcar else loc.uncheck()); fr.evaluate("window.__rmdStats.panel.cerrar()")
         try:
             ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_BOM)); pg.wait_for_timeout(3000); ra.configuracion.elegir_accion("Asociar fórmulas")
             @prueba("Y1 Receta con la lista de materiales cambiada: aviso compacto y ⚠ junto al código; al pasar el ratón, tabla con componente, descripción, en el RMD → en SAP hoy (reemplazos agrupados) y, v1.36, último cambio de la lista y fecha / n.º de cambio en SAP de cada componente")
@@ -1668,7 +1696,7 @@ with sync_playwright() as p:
                 return (len(e["alturas"]) == 1 and e["alturas"][0] < 26 and bool(m) and "Maestra" in m["titulo"] and m["delScript"] == 0), f"etapa={e} maestra={m}"
             @prueba("Z5 'Modificaciones masivas' desde el panel de mejoras (no en la barra): pestañas Suspender / Agregar observación; Revisar dice qué master aplica según su estado (sin ejecutar)")
             def _():
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel .rmd-mod-masivas").click(); pg.wait_for_timeout(800)
+                fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel .rmd-mod-masivas").click(); pg.wait_for_timeout(800)
                 tabs = fr.evaluate("[...document.querySelectorAll('.rmd-mm-modo')].map(b => b.textContent + (b.classList.contains('activo') ? '*' : ''))")
                 fr.locator(".rmd-susp-codigos").fill("2202609126 2202609130 2202609133"); fr.locator(".rmd-modal-pie button", has_text="Revisar").click()
                 fr.wait_for_function("document.querySelectorAll('.rmd-susp-res tbody tr').length === 3", timeout=60000)
@@ -1712,7 +1740,7 @@ with sync_playwright() as p:
                 if not real:   # sin la lista real: un CSV con los mismos encabezados
                     import tempfile
                     ruta = os.path.join(tempfile.mkdtemp(), "vigentes.csv"); open(ruta, "w", encoding="utf-8").write("S;Identificador;Título\nAprobado;PCPR-202;INSPECCION\n")
-                fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(700)
+                fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(700)
                 fr.locator(".rmd-reglas .rmd-rg-tabs button[data-p=vigentes]").click(); pg.wait_for_timeout(300)
                 with pg.expect_file_chooser() as fc:
                     fr.locator(".rmd-reglas .rmd-rg-barra button[data-a=cargar]").click()
@@ -1784,7 +1812,7 @@ with sync_playwright() as p:
             @prueba("S7 'Columnas ordenadas' apagado: la lista vuelve al orden y anchos del portal (con Fase tras Estado); 'Fase' apagado quita la columna y sus celdas; encendidos vuelven")
             def _():
                 def conm(k):
-                    fr.evaluate("document.querySelector('#rmd-ui-panel').open = true"); fr.locator(f"#rmd-ui-panel input[data-k={k}]").click(); pg.wait_for_timeout(1500); fr.evaluate("document.querySelector('#rmd-ui-panel').open = false")
+                    fr.evaluate("window.__rmdStats.panel.abrir(true)"); fr.locator(f"#rmd-ui-panel input[data-k={k}]").click(); pg.wait_for_timeout(1500); fr.evaluate("window.__rmdStats.panel.cerrar()")
                 conm("columnas"); a = fr.evaluate(LISTA_S)
                 conm("fase"); b_ = fr.evaluate(LISTA_S)
                 conm("fase"); conm("columnas"); pg.wait_for_timeout(800); c = fr.evaluate(LISTA_S)
@@ -2598,6 +2626,40 @@ with sync_playwright() as p:
                   const cab = await blob.slice(0, 5).text(); return { bytes: blob.size, cabecera: cab, tablas: dd.content.filter((x) => x.table).length, cuenta: dd.__cuenta, boton: !!document.querySelector('.rmd-tz-pdf'), encabezadoMaster: typeof dd.header === 'function' || !!dd.header, leyenda: JSON.stringify(dd.content[0]).includes('Diferencia entre versiones') }; }""")
                 fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(1500)
                 return (r["cabecera"] == "%PDF-" and r["bytes"] > 20000 and r["boton"] and r["tablas"] >= 5 and r["encabezadoMaster"] and r["leyenda"]), json.dumps(r)
+
+            @prueba("4-7e Trazabilidad RMD: tras «Exportar PDF» la ventana se queda en «Diferencia entre versiones» con la misma comparación")
+            def _():
+                fr4.evaluate("(c) => window.__rmdStats.productividad.abrirRmdPorCodigo(c, 'trazabilidad')", COD_4); pg4.wait_for_timeout(3000)
+                fr4.evaluate("async () => { for (let i = 0; i < 80 && !document.querySelector('.rmd-tz'); i++) await new Promise(r => setTimeout(r, 250)); }")
+                fr4.evaluate("() => document.querySelector('.rmd-tz [data-t=ver]').click()")
+                for _i in range(120):
+                    st = fr4.evaluate("() => { const t = document.querySelector('.rmd-tz').__tz; return { n: t.E.cambios ? t.E.cambios.length : null, cargando: t.E.cargando }; }")
+                    if st["n"] is not None and not st["cargando"]: break
+                    pg4.wait_for_timeout(1000)
+                fr4.evaluate("() => { document.querySelector('.rmd-tz').__marca = 1; document.querySelector('.rmd-tz-pdf').click(); }")
+                for _i in range(60):
+                    pg4.wait_for_timeout(1000)
+                    if fr4.evaluate("() => { const b = document.querySelector('.rmd-tz-pdf'); return !!b && !b.disabled; }"): break
+                r = fr4.evaluate("() => { const x = document.querySelector('.rmd-tz'); return { mismo: !!x && x.__marca === 1, pestana: x && (x.querySelector('[role=tab].activo') || {}).textContent, n: x && x.__tz.E.cambios && x.__tz.E.cambios.length }; }")
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(1500)
+                return (r["mismo"] and r["pestana"] == "Diferencia entre versiones" and r["n"] == st["n"]), json.dumps(r, ensure_ascii=False)
+
+            @prueba("4-7f Asociar fórmulas: sin pasadas del script en reposo; un master con más de 15 recetas (REAC genérico) no se revisa solo contra SAP")
+            def _():
+                for _i in range(6):
+                    if fr4.evaluate(CERRAR_TOPE) == 'nada': break
+                    pg4.wait_for_timeout(1800)
+                cod = os.environ.get("COD_REA", "2202402691"); pedidas = []
+                oyente = lambda q: pedidas.append(q.url) if re.search(r"/(MaterialSet|ProduccionVSet|PuestoTrabSet)\b", q.url) else None
+                pg4.on("request", oyente)
+                try:
+                    fr4.evaluate("(c) => window.__rmdStats.productividad.abrirRmdPorCodigo(c, 'asociar')", cod); pg4.wait_for_timeout(12000)
+                    a0 = fr4.evaluate("() => window.__rmdStats.ajustes"); pg4.wait_for_timeout(5000); pasadas = fr4.evaluate("() => window.__rmdStats.ajustes") - a0
+                    r = fr4.evaluate("() => { const b = document.querySelector('.rmd-revisar-recetas'); return { boton: !!b, titulo: b && b.title, filas: document.querySelectorAll('.sapMDialog tbody tr').length }; }")
+                finally:
+                    pg4.remove_listener("request", oyente)
+                fr4.evaluate(CERRAR_TOPE); pg4.wait_for_timeout(1500)
+                return (pasadas <= 2 and not pedidas and r["boton"] and "no se hace sola" in (r["titulo"] or "")), json.dumps({"pasadas_5s": pasadas, "lecturas_erp": len(pedidas), **r}, ensure_ascii=False)
 
             @prueba("4-8 Ninguna petición de escritura salió del navegador durante el bloque 4 y el script no registró errores")
             def _():

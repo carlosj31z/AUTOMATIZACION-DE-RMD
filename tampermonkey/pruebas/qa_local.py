@@ -184,11 +184,13 @@ with sync_playwright() as p:
         pg.locator(".sapMMessageDialog button").click(); pg.wait_for_timeout(400)
         s_ = sucia(pg); cancelar(pg); av = aviso(pg); cerrar_todo(pg)
         return (s_ is True and av is not None), f"sucia={s_} aviso={av and av['titulo']}"
-    @prueba("LM7 Éxito al guardar: el mensaje se cierra solo y la ventana queda limpia")
+    @prueba("LM7 Éxito al guardar: el mensaje NO se cierra solo (se cierra con OK) y la ventana queda limpia")
     def _():
         abrir(pg, PRECAUCIONES, respuesta="exito"); tocar_casilla(pg, 1); guardar(pg); pg.wait_for_timeout(2600)
-        cerrado_solo = pg.evaluate("!document.querySelector('.sapMMessageDialog')"); cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
-        return (cerrado_solo and ok), f"mensaje cerrado solo={cerrado_solo}"
+        sigue = pg.evaluate("!!document.querySelector('.sapMMessageDialog')")
+        pg.evaluate("() => { const b = [...document.querySelectorAll('.sapMMessageDialog button')].find((x) => /^OK$/.test(x.textContent.trim())); if (b) b.click(); }"); pg.wait_for_timeout(400)
+        cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
+        return (sigue and ok), f"mensaje abierto tras 2,6 s={sigue}"
     @prueba("LM8 Cambios del portal sin que la persona toque nada (cargar, refrescar) no cuentan; marcar filas y escribir en el filtro local tampoco")
     def _():
         abrir(pg, PRECAUCIONES)
@@ -207,10 +209,10 @@ with sync_playwright() as p:
     @prueba("LM10 Con 'Avisar cambios sin guardar' apagado, Cancelar cierra sin avisar")
     def _():
         abrir(pg, PRECAUCIONES); tocar_casilla(pg, 1)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(500)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false"); cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(300)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false"); return ok, ""
+        pg.evaluate("window.__rmdStats.panel.abrir(true)"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(500)
+        pg.evaluate("window.__rmdStats.panel.cerrar()"); cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
+        pg.evaluate("window.__rmdStats.panel.abrir(true)"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(300)
+        pg.evaluate("window.__rmdStats.panel.cerrar()"); return ok, ""
 
     # ───────── N. Predecesor obligatorio y textos ─────────
     @prueba("LN1 Precauciones: el primer paso (cabeza de la cadena) no necesita predecesor; los demás con tipo de dato sí (se marca la celda Depende y cuenta en el aviso)")
@@ -390,7 +392,7 @@ with sync_playwright() as p:
         return ok, json.dumps(r, ensure_ascii=False)[:900]
     @prueba("LN16 Reglas: al apagar 'Reglas de revisión' en el panel desaparecen los resaltados (y la advertencia de la barra); al encenderla vuelven")
     def _():
-        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(200)
+        pg.evaluate("window.__rmdStats.panel.abrir(true)"); pg.wait_for_timeout(200)
         pg.locator("#rmd-ui-panel input[data-k=reglasrev]").click(); pg.wait_for_timeout(700)
         apagada = pg.evaluate(MARCAS_JS)
         pg.locator("#rmd-ui-panel input[data-k=reglasrev]").click(); pg.wait_for_timeout(700)
