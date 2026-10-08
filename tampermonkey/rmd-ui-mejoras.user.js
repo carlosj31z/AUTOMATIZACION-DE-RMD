@@ -1,17 +1,20 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.54.0
+// @version      1.55.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
+// @updateURL    https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras.user.js
+// @downloadURL  https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras.user.js
 // ==/UserScript==
 
 (function () {
   'use strict';
-  const VERSION = '1.54.0';                                                       // mantener igual a @version
+  const VERSION = '1.55.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
+  const URL_ACTUALIZACION = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras.user.js';   // mantener igual a @downloadURL
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   const OPC = [
@@ -23,7 +26,7 @@
     ['singuardar', 'Avisar cambios sin guardar', 'Avisa antes de cerrar una ventana con cambios. Ctrl+S guarda.'],
     ['sesion', 'Mantener la sesión abierta', 'Pulsa «Continuar trabajando» por ti y evita el error del refresco automático al volver.'],
     ['orbes', 'Animaciones de espera', 'Solo al cargar todas las OP y al preparar reportes en Excel.'],
-    ['barrafiltros', 'Barra de filtros compacta', 'Todos los filtros en una sola fila; «Restablecer» como un ícono.'],
+    ['barrafiltros', 'Barra de filtros compacta', 'Todos los filtros en una sola fila; «Restablecer» como el ícono de quitar filtros de SAP.'],
     ['fase', 'Columna «Fase»', 'Tomada de la 1.ª línea de Observaciones (F1 = Fase 1, F1R = Fase 1 R…).'],
     ['buscarequipo', 'Filtro «Equipo»', 'Muestra los master que tienen un equipo, instrumento, utensilio o agrupador.'],
     ['revisor', 'Destinatarios de la revisión', 'Nombre del jefe y del gerente en «Producción Estatus».'],
@@ -62,7 +65,7 @@
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
     ['citastodos', 'Documentos citados en todos los master', 'Qué master citan cada instructivo, procedimiento o formato.'],
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
-    ['verop', 'Ver OP completo', 'Todas las OP de una vez, con filtro por columna y exportación a CSV.'],
+    ['verop', 'Ver OP completo', 'Al abrir, todas las OP asociadas ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master o agrégales una observación.'],
@@ -120,7 +123,13 @@
   const GESTIONADAS = /^\d{6,}\s*-|^Procesos Menores para el Paso|^Adicionar /i;
   const cabecera = (d) => norm((d.querySelector('h2') || {}).textContent);
   const gestionada = (d) => GESTIONADAS.test(cabecera(d));
-  const dialogos = () => [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter((d) => d.getClientRects().length);
+  // abierta según UI5 (sin medir la página); si no hay control, por su caja
+  const abierta = (d) => { const c = window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore().byId(d.id); return c && typeof c.isOpen === 'function' ? c.isOpen() : d.getClientRects().length > 0; };
+  const dialogosVisibles = () => [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(abierta);
+  let dlgPasada = null;                                                // visibles durante una pasada (se calcula una vez)
+  const dialogos = () => (dlgPasada ? dlgPasada.slice() : dialogosVisibles());
+  const anotarError = (nombre, e) => { const s = window.__rmdStats; if (s) s.errores = (s.errores || []).slice(-9).concat(nombre + ': ' + ((e && e.message) || e)); };
+  const aislar = (nombre, f) => { try { return f(); } catch (e) { anotarError(nombre, e); return undefined; } };
 
   // ---- utilidades UI5 ---------------------------------------------------------------------------
   function pulsar(btn) {
@@ -308,7 +317,8 @@
   .rmd-tz-detalle { padding: 2px 8px 12px 20px; background: rgba(128,140,155,.07); } .rmd-tz [hidden] { display: none !important; } .rmd-tz-aut { margin-left: 4px; font-size: 11px; color: var(--rmd-apagado); cursor: help; }
   html.rmd-ui .sapMDialog.rmd-medio.rmd-selector-ancho { width: min(1480px, 96vw) !important; }
   .sapMToken.rmd-token-rep { display: inline-flex !important; align-items: center; }
-  .rmd-restablecer-ui5 .sapMBtnIcon, .rmd-restablecer-ui5 .sapUiIcon { color: var(--rmd-rojo) !important; } .rmd-restablecer-ui5 .sapMBtnInner { border-color: transparent !important; background: transparent !important; }
+  .rmd-restablecer-ui5 .sapMBtnIcon, .rmd-restablecer-ui5 .sapUiIcon { color: var(--rmd-acento-texto) !important; } .rmd-restablecer-ui5 .sapMBtnInner { border-color: transparent !important; background: transparent !important; border-radius: 0.25rem; }
+  .rmd-restablecer-ui5:hover .sapMBtnInner { background: rgba(27,141,236,.14) !important; } .rmd-restablecer-ui5:active .sapMBtnInner { background: var(--rmd-acento) !important; } .rmd-restablecer-ui5:active .sapUiIcon { color: #fff !important; }
   .rmd-mm-modos { display: flex; gap: 0; margin: 0 0 10px; border-bottom: 1px solid var(--rmd-borde); }
   .rmd-mm-modo { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-mm-modo.activo { color: var(--rmd-texto); border-bottom-color: var(--rmd-acento); }
   .rmd-sel-panel { margin: 6px 16px 8px; padding: 8px 10px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: rgba(27,141,236,.07); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
@@ -343,7 +353,7 @@
   .rmd-chev svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
   td.rmd-grip-td { position: relative; padding-left: 26px !important; }
   .rmd-revisor { display: inline-block; vertical-align: middle; margin: 2px 0 2px 6px; text-align: left; font-size: 11.5px; line-height: 1.25; color: var(--rmd-apagado); white-space: pre-line; }
-  .sapMListTbl td:has(> .rmd-revisor) > .sapMBtn { vertical-align: middle; }
+  .sapMListTbl td.rmd-con-revisor > .sapMBtn { vertical-align: middle; }
   .rmd-borrar-recetas { margin: 0 8px; height: 30px; }
   html.rmd-vivo .sapMDialog:not(.sapMMessageDialog) { position: fixed !important; left: 8px !important; top: 8px !important; transform: none !important; width: calc(50vw - 16px) !important; max-width: calc(50vw - 16px) !important; max-height: calc(100vh - 16px) !important; }
   html.rmd-vivo .sapMDialog.sapMMessageDialog { left: 25vw !important; }
@@ -553,7 +563,8 @@
   #rmd-ui-panel .rmd-pn-acciones { display: flex; gap: 8px; } #rmd-ui-panel .rmd-pn-acciones .rmd-btn { flex: 1 1 auto; justify-content: center; padding: 0 10px; white-space: nowrap; }
   #rmd-ui-panel .rmd-pn-pie2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--rmd-apagado); font-size: 12px; }
   #rmd-ui-panel kbd { padding: 0 4px; border: 1px solid var(--rmd-borde); border-radius: 3px; font: 11px var(--rmd-fuente); }
-  #rmd-ui-panel .rmd-restablecer { border-color: transparent; background: none; }
+  #rmd-ui-panel .rmd-restablecer, #rmd-ui-panel .rmd-pn-actualizar { border-color: transparent; background: none; white-space: nowrap; }
+  #rmd-ui-panel .rmd-pn-version { margin-top: 4px; align-items: flex-start; } #rmd-ui-panel .rmd-pn-version > span { line-height: 1.35; }
   /* ── Reglas de revisión ── */
   .rmd-c-amarillo { --rmd-c: #e0a100; --rmd-cf: rgba(242,176,30,.36); } .rmd-c-rojo { --rmd-c: #e53935; --rmd-cf: rgba(229,57,53,.24); } .rmd-c-azul { --rmd-c: #1e88e5; --rmd-cf: rgba(30,136,229,.24); }
   .rmd-c-verde { --rmd-c: #2e9d4a; --rmd-cf: rgba(67,160,71,.26); } .rmd-c-morado { --rmd-c: #8e24aa; --rmd-cf: rgba(142,36,170,.24); }
@@ -792,23 +803,23 @@
     initial-value: 0;
     inherits: true;
   }
-  [data-beam="rmd"] {
+  .rmd-beam[data-beam="rmd"] {
     position: relative;
     border-radius: 12px;
     overflow: hidden;
   }
-  [data-beam="rmd"][data-active] {
+  .rmd-beam[data-beam="rmd"][data-active] {
     animation:
       beam-spin-rmd 1.96s linear infinite,
       beam-fade-in-rmd 0.6s ease forwards;
   }
-  [data-beam="rmd"][data-fading] {
+  .rmd-beam[data-beam="rmd"][data-fading] {
     animation:
       beam-spin-rmd 1.96s linear infinite,
       beam-fade-out-rmd 0.5s ease forwards;
   }
-  [data-beam="rmd"][data-active]::after,
-  [data-beam="rmd"][data-fading]::after {
+  .rmd-beam[data-beam="rmd"][data-active]::after,
+  .rmd-beam[data-beam="rmd"][data-fading]::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -864,8 +875,8 @@
     opacity: calc(var(--beam-opacity-rmd) * 0.26 * var(--beam-stroke-opacity, 1) * var(--beam-strength, 1));
     animation: beam-hue-shift-rmd 12s ease-in-out infinite;
   }
-  [data-beam="rmd"][data-active]::before,
-  [data-beam="rmd"][data-fading]::before {
+  .rmd-beam[data-beam="rmd"][data-active]::before,
+  .rmd-beam[data-beam="rmd"][data-fading]::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -910,7 +921,7 @@
     clip-path: inset(0 round 12px);
     animation: beam-hue-shift-rmd 12s ease-in-out infinite;
   }
-  [data-beam="rmd"] [data-beam-bloom] {
+  .rmd-beam[data-beam="rmd"] .rmd-bloom {
     display: none;
     position: absolute;
     inset: 0;
@@ -941,8 +952,8 @@
     z-index: 3;
     opacity: 0;
   }
-  [data-beam="rmd"][data-active] [data-beam-bloom],
-  [data-beam="rmd"][data-fading] [data-beam-bloom] {
+  .rmd-beam[data-beam="rmd"][data-active] .rmd-bloom,
+  .rmd-beam[data-beam="rmd"][data-fading] .rmd-bloom {
     display: block;
     opacity: calc(var(--beam-opacity-rmd) * 0.24 * var(--beam-bloom-opacity, 1) * var(--beam-strength, 1));
   }
@@ -961,10 +972,10 @@
     50% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) + 30deg)) brightness(1.30) saturate(1.20); }
     100% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) - 30deg)) brightness(1.30) saturate(1.20); }
   }
-  [data-beam="rmd"][data-paused],
-  [data-beam="rmd"][data-paused]::after,
-  [data-beam="rmd"][data-paused]::before,
-  [data-beam="rmd"][data-paused] [data-beam-bloom] {
+  .rmd-beam[data-beam="rmd"][data-paused],
+  .rmd-beam[data-beam="rmd"][data-paused]::after,
+  .rmd-beam[data-beam="rmd"][data-paused]::before,
+  .rmd-beam[data-beam="rmd"][data-paused] .rmd-bloom {
     animation-play-state: paused !important;
   }
   @property --beam-angle-rmdc {
@@ -977,23 +988,23 @@
     initial-value: 0;
     inherits: true;
   }
-  [data-beam="rmdc"] {
+  .rmd-beam[data-beam="rmdc"] {
     position: relative;
     border-radius: 12px;
     overflow: hidden;
   }
-  [data-beam="rmdc"][data-active] {
+  .rmd-beam[data-beam="rmdc"][data-active] {
     animation:
       beam-spin-rmdc 1.96s linear infinite,
       beam-fade-in-rmdc 0.6s ease forwards;
   }
-  [data-beam="rmdc"][data-fading] {
+  .rmd-beam[data-beam="rmdc"][data-fading] {
     animation:
       beam-spin-rmdc 1.96s linear infinite,
       beam-fade-out-rmdc 0.5s ease forwards;
   }
-  [data-beam="rmdc"][data-active]::after,
-  [data-beam="rmdc"][data-fading]::after {
+  .rmd-beam[data-beam="rmdc"][data-active]::after,
+  .rmd-beam[data-beam="rmdc"][data-fading]::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -1049,8 +1060,8 @@
     opacity: calc(var(--beam-opacity-rmdc) * 0.12 * var(--beam-stroke-opacity, 1) * var(--beam-strength, 1));
     animation: beam-hue-shift-rmdc 12s ease-in-out infinite;
   }
-  [data-beam="rmdc"][data-active]::before,
-  [data-beam="rmdc"][data-fading]::before {
+  .rmd-beam[data-beam="rmdc"][data-active]::before,
+  .rmd-beam[data-beam="rmdc"][data-fading]::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -1095,7 +1106,7 @@
     clip-path: inset(0 round 12px);
     animation: beam-hue-shift-rmdc 12s ease-in-out infinite;
   }
-  [data-beam="rmdc"] [data-beam-bloom] {
+  .rmd-beam[data-beam="rmdc"] .rmd-bloom {
     display: none;
     position: absolute;
     inset: 0;
@@ -1126,8 +1137,8 @@
     z-index: 3;
     opacity: 0;
   }
-  [data-beam="rmdc"][data-active] [data-beam-bloom],
-  [data-beam="rmdc"][data-fading] [data-beam-bloom] {
+  .rmd-beam[data-beam="rmdc"][data-active] .rmd-bloom,
+  .rmd-beam[data-beam="rmdc"][data-fading] .rmd-bloom {
     display: block;
     opacity: calc(var(--beam-opacity-rmdc) * 0.34 * var(--beam-bloom-opacity, 1) * var(--beam-strength, 1));
   }
@@ -1146,10 +1157,10 @@
     50% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) + 30deg)) brightness(1.30) saturate(1.50); }
     100% { filter: hue-rotate(calc(var(--beam-hue-base, 0deg) - 30deg)) brightness(1.30) saturate(1.50); }
   }
-  [data-beam="rmdc"][data-paused],
-  [data-beam="rmdc"][data-paused]::after,
-  [data-beam="rmdc"][data-paused]::before,
-  [data-beam="rmdc"][data-paused] [data-beam-bloom] {
+  .rmd-beam[data-beam="rmdc"][data-paused],
+  .rmd-beam[data-beam="rmdc"][data-paused]::after,
+  .rmd-beam[data-beam="rmdc"][data-paused]::before,
+  .rmd-beam[data-beam="rmdc"][data-paused] .rmd-bloom {
     animation-play-state: paused !important;
   }
   `;
@@ -1302,11 +1313,14 @@
   const inputDe = (td) => td && td.querySelector('input:not([type=checkbox])');
   const marcada = (td) => { const c = td && td.querySelector('[role=checkbox]'); return !!c && c.getAttribute('aria-checked') === 'true'; };
   const deshabilitado = (i) => !i || i.disabled || i.readOnly || !!i.closest('.sapMInputBaseDisabled') || i.getAttribute('aria-disabled') === 'true';
-  function anchoTexto(el, texto) {
-    const cs = getComputedStyle(el);
-    lienzo.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-    return Math.ceil(lienzo.measureText(texto).width);
+  const MEDIDAS = new Map();                                           // fuente + texto -> ancho (px)
+  const fuenteDe = (el) => { const cs = getComputedStyle(el); return `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; };
+  function anchoFuente(fuente, texto) {
+    const k = fuente + '\u0001' + texto; let w = MEDIDAS.get(k);
+    if (w === undefined) { if (MEDIDAS.size > 4000) MEDIDAS.clear(); lienzo.font = fuente; w = Math.ceil(lienzo.measureText(texto).width); MEDIDAS.set(k, w); }
+    return w;
   }
+  const anchoTexto = (el, texto) => anchoFuente(fuenteDe(el), texto);
   function limpiarMarcas(td) { if (td.matches('.rmd-marcar,.rmd-desmarcar,.rmd-falta')) td.removeAttribute('title'); td.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta'); td.removeAttribute('data-rmd-aviso'); }
 
   // Anchos y columnas ocultas también en un <style> por tabla (reglas por id): el portal redibuja la lista completa al cerrar un PM y las celdas nuevas
@@ -1360,36 +1374,53 @@
   }
   // Reparto del ancho: columnas fijas (escala hasta 20 %) y la descripción con el resto, con mínimo; si no cabe, desplazamiento horizontal.
   const MIN_FIJOS = { 'ORDEN': 48, 'TIPO DATO': 104, 'CLAVE MODELO': 76, 'PUESTO TRABAJO': 84, 'VAL. INICIAL': 54, 'VAL. FINAL': 54, 'MARGEN': 52, 'DECIMAL': 54, 'DECIM.': 54 };
+  // Ancho útil de cada contenedor de tabla: lo actualiza un ResizeObserver (después del diseño, sin forzarlo); la primera vez se mide.
+  const RO_ANCHO = typeof ResizeObserver === 'function' ? new ResizeObserver((es) => {
+    let cambio = false; es.forEach((e) => { const w = e.target.clientWidth; if (w !== e.target.__rmdAncho) { e.target.__rmdAncho = w; cambio = true; } });
+    if (cambio) programarAjuste();                                     // (otro ancho: los anchos de columna se recalculan)
+  }) : null;
+  function anchoUtil(cont) {
+    if (!cont) return 0;
+    if (cont.__rmdAncho == null || !RO_ANCHO) { cont.__rmdAncho = cont.clientWidth; if (RO_ANCHO && !cont.__rmdObs) { cont.__rmdObs = true; RO_ANCHO.observe(cont); } }
+    return cont.__rmdAncho;
+  }
   function ordenarColumnas(tabla, ths, nombres, filas, tipoTabla) {
     const cont = tabla.closest('.sapMDialogScrollCont') || tabla.parentElement;
-    const C = Math.floor(cont ? cont.clientWidth : 0); if (C < 300) return;               // aún sin medidas
+    const C = Math.floor(anchoUtil(cont)); if (C < 300) { if (cont) cont.__rmdAncho = null; return; }   // aún sin medidas
     const compacto = C < 1700, iDep = nombres.indexOf('DEPENDE'), iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iTipo = nombres.indexOf('TIPO DATO');
-    tabla.classList.toggle('rmd-compacto', compacto);                                       // cabeceras algo más pequeñas en ventanas estrechas
+    const iDesc = nombres.findIndex((n) => /^DESCRIPCI/.test(n)), iEst = nombres.indexOf('ESTADO');
+    // mismas cabeceras, ancho y valores que la última vez: los anchos puestos siguen valiendo
+    const valores = (idx) => (idx < 0 ? '' : filas.map((tr) => (inputDe(celda(tr, idx)) || {}).value || '').join('\u0001'));
+    const textosDesc = tipoTabla === 'pasos' && iDesc >= 0 ? filas.map((tr) => { const el = celda(tr, iDesc) && celda(tr, iDesc).querySelector('.sapMText'); return el ? el.textContent : ''; }) : [];
+    const firma = [C, tipoTabla, filas.length, nombres.join('|'), valores(iDep), valores(iTipo), iCod >= 0 ? filas.slice(0, 60).map((tr) => celda(tr, iCod) ? celda(tr, iCod).textContent : '').join('|') : '',
+      textosDesc.filter((t) => t.indexOf('\n') > -1).join('\u0001'), iEst >= 0 ? filas.map((tr) => (celda(tr, iEst) ? celda(tr, iEst).textContent : '')).join('|') : '', tabla.dataset.rmdPmop || '', on('ocultar') ? 1 : 0].join('\u0002');
+    // (UI5 puede volver a escribir sus anchos en las mismas cabeceras: se comprueban todas)
+    const previa = tabla.__rmdAnchos;
+    if (previa && previa.firma === firma && previa.tw === tabla.style.getPropertyValue('width') && previa.anchos.length === ths.length && ths.every((th, i) => th.style.getPropertyValue('width') === previa.anchos[i])) return;
+    tabla.classList.toggle('rmd-compacto', compacto);                                       // cabeceras algo más pequeñas en ventanas estrechas (antes de medir: cambia letra y márgenes)
     const minDesc = tipoTabla === 'pasos' ? (C >= 1600 ? 340 : C >= 1500 ? 300 : C >= 1400 ? 250 : 225) : (tipoTabla === 'pm' ? 260 : tipoTabla === 'espec' ? 520 : 240);
     // ventanas estrechas: se oculta «Estado» (siempre «Activo»)
-    const iEst = nombres.indexOf('ESTADO');
     const ocultarEstado = tipoTabla === 'pasos' && compacto && C < 1500 && iEst >= 0 && filas.length > 0 && filas.every((tr) => celda(tr, iEst) && norm(celda(tr, iEst).textContent) === 'Activo');
     if (ocultarEstado) tabla.dataset.rmdOcultaEstado = '1'; else delete tabla.dataset.rmdOcultaEstado;
     let depW = null;
     if (iDep >= 0) {                                                                       // Depende: ancho para ver siempre el valor completo
-      let max = anchoTexto(ths[iDep], 'Depende');
-      filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
+      let max = anchoTexto(ths[iDep], 'Depende'), f = null;
+      filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) { f = f || fuenteDe(i); max = Math.max(max, anchoFuente(f, i.value)); } });
       depW = Math.min(Math.max(max + 62, compacto ? 116 : 130), 300);
     }
     let tipoW = null;
     if (iTipo >= 0) {                                                                      // Tipo Dato: sin cortar los valores habituales
-      let max = anchoTexto(ths[iTipo], 'Tipo Dato');
-      filas.forEach((tr) => { const i = inputDe(celda(tr, iTipo)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
+      let max = anchoTexto(ths[iTipo], 'Tipo Dato'), f = null;
+      filas.forEach((tr) => { const i = inputDe(celda(tr, iTipo)); if (i && i.value) { f = f || fuenteDe(i); max = Math.max(max, anchoFuente(f, i.value)); } });
       // tope 180 px: el valor más largo se trunca levemente a favor de la Descripción
       tipoW = Math.min(Math.max(max + 46, compacto ? 110 : 130), 180);
     }
     let codW = 0;
-    if (iCod >= 0) filas.slice(0, 60).forEach((tr) => { const td = celda(tr, iCod); if (td) { const cs = getComputedStyle(td); codW = Math.max(codW, anchoTexto(td, norm(td.textContent)) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 6); } });
+    if (iCod >= 0) { let f = null, pad = 0; filas.slice(0, 60).forEach((tr) => { const td = celda(tr, iCod); if (td) { if (!f) { const cs = getComputedStyle(td); f = fuenteDe(td); pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0); } codW = Math.max(codW, anchoFuente(f, norm(td.textContent)) + pad + 6); } }); }
     let formulaW = 0;                                                                      // fracción dibujada con guiones: la línea más larga debe caber
-    const iDesc = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
-    if (tipoTabla === 'pasos' && iDesc >= 0) filas.forEach((tr) => {
-      const el = celda(tr, iDesc) && celda(tr, iDesc).querySelector('.sapMText'), t = el ? el.textContent : '';
-      if (t.indexOf('\n') > -1 && /[-_=]{8,}/.test(t)) t.split('\n').forEach((l) => { formulaW = Math.max(formulaW, anchoTexto(el, l.replace(/\u00a0/g, ' ').replace(/\s+$/, ''))); });
+    if (tipoTabla === 'pasos' && iDesc >= 0) filas.forEach((tr, k) => {
+      const t = textosDesc[k] || '';
+      if (t.indexOf('\n') > -1 && /[-_=]{8,}/.test(t)) { const el = celda(tr, iDesc).querySelector('.sapMText'), f = fuenteDe(el); t.split('\n').forEach((l) => { formulaW = Math.max(formulaW, anchoFuente(f, l.replace(/\u00a0/g, ' ').replace(/\s+$/, ''))); }); }
     });
     if (formulaW) formulaW = Math.min(Math.ceil(formulaW) + 16, 420);                       // relleno + margen, con tope
     if (formulaW) tabla.dataset.rmdFormula = String(formulaW); else delete tabla.dataset.rmdFormula;
@@ -1431,6 +1462,7 @@
       th.style.setProperty('width', w + 'px', 'important'); th.style.setProperty('min-width', w + 'px', 'important');
     });
     tabla.style.setProperty('width', (sumaF + W) + 'px', 'important');
+    tabla.__rmdAnchos = { firma, tw: tabla.style.getPropertyValue('width'), anchos: ths.map((th) => th.style.getPropertyValue('width')) };
   }
 
   // Nombre de la lista (PRECAUCIONES, NOTAS…, etiqueta del PROCEDIMIENTO). Del modelo: mdEsEtiquetaId + listMdEsEtiqueta, o
@@ -1479,7 +1511,7 @@
     d.classList.toggle('rmd-sticky', esPasos || esPM);
 
     // tooltips de las cabeceras
-    ths.forEach((th, i) => { if (on('grupos') && TIP[nombres[i]]) th.title = TIP[nombres[i]]; });
+    ths.forEach((th, i) => { if (on('grupos') && TIP[nombres[i]] && th.title !== TIP[nombres[i]]) th.title = TIP[nombres[i]]; });
     // PM OP marcada en algún paso: la columna se muestra
     const iPmop = nombres.indexOf('PM OP');
     if (iPmop >= 0 && filas.some((tr) => marcada(celda(tr, iPmop)))) tabla.dataset.rmdPmop = '1'; else delete tabla.dataset.rmdPmop;
@@ -1492,8 +1524,8 @@
     // columnas ocultas
     ths.forEach((th, i) => {
       const oculta = columnaOculta(nombres[i], tabla, esPM) || (tabla.dataset.rmdOcultaEstado === '1' && nombres[i] === 'ESTADO');
-      th.style.display = oculta ? 'none' : '';
-      filas.forEach((tr) => { if (celda(tr, i)) celda(tr, i).style.display = oculta ? 'none' : ''; });
+      const v = oculta ? 'none' : ''; if (th.style.display !== v) th.style.display = v;
+      filas.forEach((tr) => { const c = celda(tr, i); if (c && c.style.display !== v) c.style.display = v; });
     });
     fijarHojaTabla(tabla, ths);
 
@@ -1609,9 +1641,24 @@
     actualizarBarra(d, tabla);
     if (esEspec) sincronizarEspec(d, tabla);
     // alturas: filtro, título y cabecera siempre visibles
-    const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
-    const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = (esPasos || esPM) && hdr ? hdr.offsetHeight : 0;
-    d.style.setProperty('--rmd-h1', h1 + 'px'); d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
+    const usar = esPasos || esPM, bar = usar ? d.querySelector('#rmd-filtro-bar') : null, hdr = usar ? d.querySelector('.sapMListHdr') : null;
+    vigilarAlturas(d, bar, hdr);
+  }
+  // Las alturas se leen cuando cambian (ResizeObserver: después del diseño, sin forzarlo) y no en cada pasada.
+  const RO_ALTURAS = typeof ResizeObserver === 'function' ? new ResizeObserver((es) => { new Set(es.map((e) => e.target.__rmdDlg).filter(Boolean)).forEach(fijarAlturas); }) : null;
+  function fijarAlturas(d) {
+    const a = d.__rmdAlt; if (!a) return;
+    const h1 = a.bar && a.bar.isConnected ? a.bar.offsetHeight : 0, h2 = a.hdr && a.hdr.isConnected ? a.hdr.offsetHeight : 0;
+    if (d.style.getPropertyValue('--rmd-h1') !== h1 + 'px') d.style.setProperty('--rmd-h1', h1 + 'px');
+    if (d.style.getPropertyValue('--rmd-top') !== (h1 + h2) + 'px') d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
+  }
+  function vigilarAlturas(d, bar, hdr) {
+    const a = d.__rmdAlt || (d.__rmdAlt = { bar: null, hdr: null });
+    if (a.bar === bar && a.hdr === hdr && (bar || hdr || d.style.getPropertyValue('--rmd-top'))) return;
+    [a.bar, a.hdr].forEach((x) => { if (x && RO_ALTURAS) RO_ALTURAS.unobserve(x); });
+    a.bar = bar; a.hdr = hdr;
+    [bar, hdr].forEach((x) => { if (x) { x.__rmdDlg = d; if (RO_ALTURAS) RO_ALTURAS.observe(x); } });
+    if (!RO_ALTURAS || (!bar && !hdr)) fijarAlturas(d);
   }
 
   // ---- 5. Filtro local + contador + alertas -----------------------------------------------------
@@ -2155,8 +2202,9 @@
   // métricas: __rmdStats.ajusteMs / ajusteMax / ajusteTotalMs
   let ajusteIni = 0;
   function ajustarTodo() {
-    const t0 = performance.now(); ajusteIni = t0;
+    const t0 = performance.now(); ajusteIni = t0; const previo = dlgPasada, previoE = exportarMemo; dlgPasada = dialogosVisibles(); exportarMemo = null;
     try { ajustarTodoCuerpo(); } finally {
+      dlgPasada = previo; exportarMemo = previoE;
       const s = window.__rmdStats, ms = performance.now() - t0; s.ajusteMs = Math.round(ms * 10) / 10; s.ajusteMax = Math.max(s.ajusteMax || 0, s.ajusteMs); s.ajusteTotalMs = Math.round((s.ajusteTotalMs || 0) + ms);
     }
   }
@@ -2168,26 +2216,22 @@
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
     const nDlg = dialogos().length; if (nDlg < dialogosAntes) generacionRmd++; dialogosAntes = nDlg;
     if (on('sesion')) instalarFiltroLatido();
-    document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
-    decorarCabeceras();
-    gestionarVerOP();
-    gestionarDocumentosCitados();
-    gestionarBotonStatusRmd();
-    gestionarMenuExportar();
-    gestionarBotonesLista();
-    gestionarRecetasAsociar();
+    document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
-      try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
+    [decorarCabeceras, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+      try { f(); } catch (e) { anotarError(f.name, e); }
     });
-    gestionarTextosMayusculas();
+    aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
   }
   const esPropio = (n) => n.nodeType === 1 && ((n.id && n.id.startsWith('rmd')) || /(^|\s)rmd-/.test(n.getAttribute('class') || ''));
+  function programarAjuste() {
+    if (pendiente) return; pendiente = true; ultimaActividad = Date.now();
+    setTimeout(() => { pendiente = false; ajustarTodo(); }, 30);   // setTimeout (no rAF) para que corra con la pestaña en segundo plano
+  }
   new MutationObserver((ms) => {
     if (pendiente) return;
     if (ms.every((m) => m.type === 'attributes' && esPropio(m.target))) return;   // atributos de elementos del script: no requieren otra pasada
-    pendiente = true;
-    setTimeout(() => { pendiente = false; ajustarTodo(); }, 30);   // setTimeout (no rAF) para que corra con la pestaña en segundo plano
+    programarAjuste();
   }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked', 'readonly', 'disabled', 'aria-readonly', 'aria-disabled'] });  // aria-checked: casillas tardías; readonly/disabled: campos habilitados después
   // UI5 rellena valores sin cambiar el DOM: se compara una firma de las tablas
   let firmaPrev = '';
@@ -2210,7 +2254,17 @@
     if (!opc.activo || !document.querySelector('.sapMDialog')) { firmaPrev = ''; return; }
     const f = firmaTablas(); if (f !== firmaPrev) { firmaPrev = f; ajustarTodo(); }
   }
-  setInterval(() => { const t0 = performance.now(); revisionPeriodica(); window.__rmdStats.pollMs = Math.round((performance.now() - t0) * 10) / 10; }, 700);
+  let ultimaActividad = Date.now(), tic = 0;
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'input'].forEach((ev) => document.addEventListener(ev, () => { ultimaActividad = Date.now(); }, { capture: true, passive: true }));
+  const revisarAhora = () => { const t0 = performance.now(); const previo = dlgPasada, previoE = exportarMemo; dlgPasada = dialogosVisibles(); exportarMemo = null;
+    try { revisionPeriodica(); } catch (e) { anotarError('revisionPeriodica', e); } finally { dlgPasada = previo; exportarMemo = previoE; } window.__rmdStats.pollMs = Math.round((performance.now() - t0) * 10) / 10; };
+  setInterval(() => {
+    tic++;
+    if (document.hidden) return;                                         // pestaña oculta: en pausa
+    if (Date.now() - ultimaActividad > 10000 && tic % 4) return;         // en reposo (10 s sin actividad): cada 2,8 s
+    revisarAhora();
+  }, 700);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { ultimaActividad = Date.now(); revisarAhora(); } });
   window.addEventListener('resize', () => setTimeout(ajustarTodo, 150));
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
   document.addEventListener('click', (e) => {
@@ -2481,7 +2535,31 @@
   const TIPOS_FIJOS = { 432: 'Verificación Check', 433: 'Texto', 434: 'Cantidad', 435: 'Fecha', 436: 'Fecha y Hora', 437: 'Hora', 438: 'Números', 439: 'Realizado por',
     440: 'Visto bueno', 441: 'Realizado por y Visto bueno', 442: 'Múltiple check', 443: 'Rango', 444: 'Lote', 445: 'Fórmula', 446: 'Sin tipo de dato', 447: 'Notificacion',
     448: 'MuestraCC', 449: 'Fecha Vencimiento', 450: 'Entrega' };
-  async function leerPMsModelo(modelo, filtrosPor) {
+  // Lecturas del script en una conexión aparte (misma URL y sesión): lo leído no queda guardado en la conexión del portal y se libera al terminar.
+  const CONEXIONES = new Map();                                        // URL del servicio -> { m, activas }
+  function conexionLectura(modelo) {
+    try {
+      const M = sap.ui.require('sap/ui/model/odata/v2/ODataModel'), url = modelo && modelo.sServiceUrl;
+      if (!M || !url || !(modelo instanceof M)) return null;
+      if (modelo.oMetadata && typeof modelo.oMetadata.isLoaded === 'function' && !modelo.oMetadata.isLoaded()) return null;   // (portal aún sin metadatos, p. ej. al arrancar: se lee con su conexión)
+      let x = CONEXIONES.get(url);
+      if (!x) { x = { url, activas: 0, m: new M(url, { json: true, useBatch: false, tokenHandling: false, headers: Object.assign({}, modelo.mCustomHeaders || {}), metadataUrlParams: modelo.mMetadataUrlParams || {}, serviceUrlParams: modelo.mServiceUrlParams || {} }) }; CONEXIONES.set(url, x); }
+      x.m.setHeaders(Object.assign({}, modelo.mCustomHeaders || {}));     // (la sesión del portal puede renovar sus cabeceras)
+      return x;
+    } catch (e) { return null; }
+  }
+  async function conLectura(modelo, f) {
+    const x = conexionLectura(modelo); if (!x) return f(modelo);
+    x.activas++;
+    try { return await f(x.m); } finally {
+      if (--x.activas === 0) {
+        CONEXIONES.delete(x.url); const m = x.m, fin = () => { try { m.destroy(); } catch (e) { /* ya destruida */ } };
+        if (m.oMetadata && m.oMetadata.isLoaded && !m.oMetadata.isLoaded()) m.metadataLoaded().then(fin, fin); else fin();   // (no se corta una carga de metadatos en curso)
+      }
+    }
+  }
+  async function leerPMsModelo(modeloPortal, filtrosPor) { return conLectura(modeloPortal, (modelo) => leerPMsModeloCon(modelo, filtrosPor)); }
+  async function leerPMsModeloCon(modelo, filtrosPor) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
     const filtros = Object.entries(filtrosPor).filter(([, v]) => v != null && v !== '').map(([k, v]) => new Filtro(k, 'EQ', v));
     const leer = (skip) => new Promise((ok, mal) => modelo.read('/MD_ES_PASO_INSUMO_PASO', {
@@ -3530,7 +3608,7 @@
   // Brillo del borde (border-beam: https://libraries.dev/beam, MIT © 2026 Jakub Antalik)
   function brillo() {
     const b = document.createElement('div'); b.className = 'rmd-beam'; b.dataset.beam = temaOscuro() ? 'rmd' : 'rmdc';
-    b.setAttribute('data-active', ''); b.setAttribute('aria-hidden', 'true'); b.innerHTML = '<div data-beam-bloom></div>'; return b;
+    b.setAttribute('data-active', ''); b.setAttribute('aria-hidden', 'true'); b.innerHTML = '<div class="rmd-bloom" data-beam-bloom></div>'; return b;
   }
   function apagarBrillo(b) { if (!b || b.hasAttribute('data-fading')) return; b.removeAttribute('data-active'); b.setAttribute('data-fading', ''); setTimeout(() => b.remove(), 650); }
   function quitarOrbes() {
@@ -4009,7 +4087,7 @@
     const filtros = [new Filtro('mdId_mdId', 'EQ', mdId), new Filtro('estadoIdRmd_iMaestraId', 'NE', null)];
     const fOP = local.getProperty('/filterOP'), fLote = local.getProperty('/filterLote');
     if (fOP) filtros.push(new Filtro('ordenSAP', 'EQ', fOP)); if (fLote) filtros.push(new Filtro('lote', 'EQ', fLote));
-    const leer = (ruta, params) => new Promise((ok, mal) => modelo.read(ruta, { filters: filtros, urlParameters: params, success: ok, error: (e) => mal(new Error(`el servidor no respondió (${(e && e.statusCode) || 'sin código'})`)) }));
+    const leer = (ruta, params) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read(ruta, { filters: filtros, urlParameters: params, success: ok, error: (e) => mal(new Error(`el servidor no respondió (${(e && e.statusCode) || 'sin código'})`)) })));
     const total = Number(await leer('/RMD/$count', {})) || 0, TAM = 5, paginas = Math.ceil(total / TAM), resultado = new Array(paginas);
     const pagina = async (k) => {
       const skip = k * TAM, [i, r, s, n, dd, l, cc, g, f, p] = await Promise.all(EXPANDS_VER_OP.map((x) => leer('/RMD', { $expand: x, $top: String(TAM), $skip: String(skip) })));
@@ -4048,22 +4126,54 @@
       }
     } finally { av.quitar(); }
   }
+  // Orden por Fecha Inicio (fechaInicio) de menor a mayor; sin fecha, al final. Item se renumera.
+  const inicioOP = (o) => { const v = o && o.fechaInicio, ms = v instanceof Date ? v.getTime() : v ? Date.parse(v) : NaN; return isNaN(ms) ? Infinity : ms; };
+  const ordenarOP = (filas) => filas.slice().sort((a, b) => inicioOP(a) - inicioOP(b)).map((o, i) => { o.item = i + 1; return o; });
+  // flecha de orden nativa en la columna «Fecha Inicio»
+  function indicarOrdenVerOP(t, activo) {
+    const ctl = ctlDe(t), col = ctl && ctl.getColumns && ctl.getColumns().find((c) => { const h = c.getHeader && c.getHeader(); return h && h.getText && /^Fecha Inicio$/i.test(norm(h.getText())); });
+    const v = activo ? 'Ascending' : 'None'; if (col && col.getSortIndicator && col.getSortIndicator() !== v) col.setSortIndicator(v);
+  }
+  function ordenarVerOPEnSitio(d, t) {
+    const ctl = ctlDe(t), bi = ctl && ctl.getBinding && ctl.getBinding('items'); if (!bi) return;
+    const m = bi.getModel(), ruta = bi.getPath(), filas = m && m.getProperty(ruta); if (!Array.isArray(filas)) return;
+    d.__rmdOpCompletas = filas.length; indicarOrdenVerOP(t, true);
+    if (filas.length > 1) m.setProperty(ruta, ordenarOP(filas));
+  }
   // el rótulo «1 - 5» muestra el total
   const rotuloTodas = (r) => { try { const m = r.ctrl.getView().getModel('oModelTemp'); if (m) m.setProperty('/pageRange', `1 - ${r.filas.length}${r.detenido ? ' (detenido)' : ''}`); } catch (e) { /* sin rótulo */ } };
-  async function verTodasOP(d, t, boton) {
-    boton.disabled = true;
+  async function verTodasOP(d, t, boton, auto) {
+    if (boton) boton.disabled = true;
     try {
       const t0 = Date.now(), r = await obtenerTodasOP(d, t);
-      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r);
-      toast(r.detenido ? `Detenido: se muestran ${r.filas.length} de ${r.total || '?'} OP.` : `Se muestran las ${r.filas.length} OP asociadas (${Math.max(1, Math.round((Date.now() - t0) / 1000))} s).`);
+      r.filas = ordenarOP(r.filas);
+      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r); indicarOrdenVerOP(t, true); d.__rmdOpCompletas = r.detenido ? 0 : r.filas.length;
+      if (!auto || r.detenido) toast(r.detenido ? `Detenido: se muestran ${r.filas.length} de ${r.total || '?'} OP.` : `Se muestran las ${r.filas.length} OP asociadas, por fecha de inicio (${Math.max(1, Math.round((Date.now() - t0) / 1000))} s).`);
     } catch (e) { toast('No se pudieron cargar todas las OP: ' + e.message, true); }
-    finally { boton.disabled = false; }
+    finally { if (boton) boton.disabled = false; }
   }
+  // Al abrir Ver OP: cuando el portal termina su primera página, se cargan todas (si hay más de una página) y se ordenan por fecha de inicio.
+  const botonTodasVerOP = (d) => [...d.querySelectorAll('.rmd-exportar-op')].find((b) => /Ver todas/.test(b.textContent));
+  async function autoVerOP(d, t) {
+    await esperar(400);
+    const listo = await hasta(() => !d.isConnected || !dialogos().includes(d) || (!ocupadoGlobal() && filasPrincipales(t).length > 0), 45000, 250);
+    if (!listo || !d.isConnected || !dialogos().includes(d) || !on('verop')) return;
+    const der = [...d.querySelectorAll('button')].find((b) => b.title === 'navigation-right-arrow'), cDer = der && ctlDe(der);
+    if (cDer && cDer.getEnabled && cDer.getEnabled()) await verTodasOP(d, t, botonTodasVerOP(d), true);
+    else ordenarVerOPEnSitio(d, t);
+  }
+  window.__rmdStats.verOP = { ordenarOP, inicioOP };   // pruebas
   async function exportarVerOP(d, t, boton) {
     boton.disabled = true;
     try {
+      const ctl = ctlDe(t), bi = ctl && ctl.getBinding && ctl.getBinding('items'), actuales = bi && bi.getModel().getProperty(bi.getPath());
+      if (d.__rmdOpCompletas && Array.isArray(actuales) && actuales.length === d.__rmdOpCompletas) {   // ya están todas (al abrir): sin volver a leer
+        const rmd = (/RMD:\s*(\d+)/.exec(cabecera(d)) || [])[1] || 'rmd';
+        descargarTexto(`OP_asociadas_${rmd}.csv`, csvVerOP(t)); return;
+      }
       const r = await obtenerTodasOP(d, t);
-      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r);
+      r.filas = ordenarOP(r.filas);
+      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r); indicarOrdenVerOP(t, true); d.__rmdOpCompletas = r.detenido ? 0 : r.filas.length;
       const rmd = (/RMD:\s*(\d+)/.exec(cabecera(d)) || [])[1] || 'rmd';
       descargarTexto(`OP_asociadas_${rmd}.csv`, csvVerOP(t));
     } catch (e) { toast('No se pudo exportar: ' + e.message, true); }
@@ -4148,15 +4258,18 @@
     }
     aplicarFiltrosColumnaVerOP(t); actualizarIconosFiltroVerOP(t);
   }
+  const VEROP_ABIERTAS = new Set();                                    // ventanas Ver OP ya cargadas en esta apertura
   function gestionarVerOP() {
     if (!on('verop')) { quitarBotonesVerOP(); return; }
-    dialogos().forEach((d) => {
-      if (!RX_VER_OP.test(cabecera(d))) return;
+    const abiertas = dialogos().filter((d) => RX_VER_OP.test(cabecera(d)));
+    VEROP_ABIERTAS.forEach((d) => { if (!abiertas.includes(d)) { VEROP_ABIERTAS.delete(d); delete d.__rmdOpCompletas; } });
+    abiertas.forEach((d) => {
       const t = d.querySelector('table.sapMListTbl'); if (!t) return;
       instalarFiltrosVerOP(d, t);
+      if (!VEROP_ABIERTAS.has(d)) { VEROP_ABIERTAS.add(d); autoVerOP(d, t); }
       const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-exportar-op')) return;
       const bT = botonIcono(ICONO_VER_TODAS, 'Ver todas', 'rmd-exportar-op', () => verTodasOP(d, t, bT));
-      bT.title = 'Recorre las páginas (5 en 5, con la misma flecha "▷" del portal) y las muestra todas juntas en esta tabla.';
+      bT.title = 'Vuelve a cargar todas las OP asociadas (al abrir la ventana ya se cargan solas) y las ordena por fecha de inicio.';
       const bE = botonIcono(ICONO_EXPORTAR, 'Exportar a CSV', 'rmd-exportar-op', () => exportarVerOP(d, t, bE));
       bE.title = 'Exporta a CSV todas las OP asociadas (primero las carga todas, como "Ver todas").';
       const cuenta = document.createElement('span'); cuenta.className = 'rmd-cuenta-verop';
@@ -4165,6 +4278,8 @@
     });
   }
   function quitarBotonesVerOP() {
+    try { dialogos().filter((d) => RX_VER_OP.test(cabecera(d))).forEach((d) => { const t = d.querySelector('table.sapMListTbl'); if (t) indicarOrdenVerOP(t, false); }); } catch (e) { /* sin UI5 */ }
+    VEROP_ABIERTAS.clear();
     document.querySelectorAll('.rmd-exportar-op, .rmd-cuenta-verop').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
@@ -5406,7 +5521,8 @@
   // pruebas: .xlsx en base64
   const aBase64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   // Todas las filas de una entidad (páginas de 1000, límite del servicio)
-  async function leerTodoDe(modelo, entidad, filtros, params) {
+  async function leerTodoDe(modeloPortal, entidad, filtros, params) { return conLectura(modeloPortal, (modelo) => leerTodoCon(modelo, entidad, filtros, params)); }
+  async function leerTodoCon(modelo, entidad, filtros, params) {
     const leer = (skip) => new Promise((ok, mal) => modelo.read('/' + entidad, { filters: filtros, urlParameters: { ...params, $top: '1000', $skip: String(skip) },
       success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
     const out = []; for (let skip = 0; skip < 50000; skip += 1000) { const p = await leer(skip); out.push(...p); if (p.length < 1000) break; }
@@ -5513,7 +5629,8 @@
     'estadoIdRmd/contenido', 'sucursalId/contenido', 'motivoId/descripcion',
     'aReceta/recetaId/Matnr', 'aReceta/recetaId/Verid', 'aReceta/recetaId/Atwrt', 'aReceta/recetaId/Text1', 'aReceta/recetaId/Mdv01',
     'aReceta/recetaId/Plnnr', 'aReceta/recetaId/Alnal'].join(',');
-  async function leerMDPaginado(modelo, filtros, avisar) {
+  async function leerMDPaginado(modeloPortal, filtros, avisar) { return conLectura(modeloPortal, (modelo) => leerMDPaginadoCon(modelo, filtros, avisar)); }
+  async function leerMDPaginadoCon(modelo, filtros, avisar) {
     const leer = (ruta, params) => new Promise((resolve, reject) => modelo.read(ruta, {
       filters: filtros, urlParameters: params, success: (d) => resolve(d),
       error: (e) => reject(new Error(`el servidor no respondió la consulta (${(e && e.statusCode) || 'sin código'}); prueba filtrando más`)),
@@ -5682,7 +5799,7 @@
   const N_REFS_ORDEN = 5, refsOrden = new Map();
   async function referenciasDeOrden(modelo, md) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
-    const leer = (ruta, filtros, u) => new Promise((ok, mal) => modelo.read(ruta, { filters: filtros, urlParameters: u, success: ok, error: () => mal(new Error('sin respuesta')) }));
+    const leer = (ruta, filtros, u) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read(ruta, { filters: filtros, urlParameters: u, success: ok, error: () => mal(new Error('sin respuesta')) })));
     const buscar = async (filtros) => ((await leer('/MD', [...filtros, new Filtro('fechaAutorizacion', 'NE', null)],
       { $expand: 'estadoIdRmd', $select: 'mdId,codigo,version,estadoIdRmd/contenido', $orderby: 'fechaAutorizacion desc', $top: '60' })).results || [])
       .filter((x) => x.mdId !== md.mdId && x.estadoIdRmd && x.estadoIdRmd.contenido === 'Autorizado').slice(0, N_REFS_ORDEN);
@@ -5749,7 +5866,8 @@
   // ---- Equipos por master ----
   // MD_ES_EQUIPO y MD_ES_UTENSILIO en páginas de 1000 (6 en paralelo); una fila por master y equipo.
   const ICONO_EQUIPOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M6.5 6.2v7.3"/></svg>';
-  async function leerEntidadCompleta(modelo, entidad, params, clave, avisar) {
+  async function leerEntidadCompleta(modeloPortal, entidad, params, clave, avisar) { return conLectura(modeloPortal, (modelo) => leerEntidadCompletaCon(modelo, entidad, params, clave, avisar)); }
+  async function leerEntidadCompletaCon(modelo, entidad, params, clave, avisar) {
     const leer = (ruta, u) => new Promise((ok, mal) => modelo.read(ruta, { urlParameters: u, success: ok, error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
     const POR = 1000, total = Number(await leer(`/${entidad}/$count`, {})) || 0, paginas = Math.max(1, Math.ceil(total / POR)), out = new Array(paginas);
     const pagina = async (i) => ((await leer(`/${entidad}`, { ...params, $orderby: clave, $top: String(POR), $skip: String(i * POR) })).results || []);
@@ -5858,7 +5976,16 @@
   }
   // ---- Menú del icono «Exportar» de la lista principal ----
   // Exportado original (+ «Producción Estado» al final), Equipos por master e Indicadores.
-  const botonExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
+  const buscarExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
+  let exportarMemo = null, exportarUltimo = null;                       // durante una pasada: { b }; el último hallado
+  const botonExportar = () => {
+    if (!dlgPasada) return (exportarUltimo = buscarExportar());
+    if (!exportarMemo || (exportarMemo.b && !exportarMemo.b.isConnected)) {
+      // con una ventana encima la lista principal no cambia: sirve el último botón hallado
+      exportarMemo = { b: dlgPasada.length && exportarUltimo && exportarUltimo.isConnected && !exportarUltimo.closest('.sapMDialog') ? exportarUltimo : (exportarUltimo = buscarExportar()) };
+    }
+    return exportarMemo.b;
+  };
   const ctlExportar = () => { const b = botonExportar(); return b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); };
   // Controlador de la lista principal
   function controladorPrincipal() {
@@ -6372,8 +6499,8 @@
   const contextosRmd = new Map();                                         // mdId -> { t, p: Promise<{ puestos, anterior }> }
   const cantidadNum = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
   const numTxt = (n) => (n == null ? '' : (Math.round(n * 1000) / 1000).toLocaleString('es-PE', { maximumFractionDigits: 3 }));
-  function leerErp(erp, entidad, filtros) {
-    return new Promise((ok, mal) => erp.read('/' + entidad, { filters: filtros, success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no respondió (${entidad}, ${(e && e.statusCode) || 'sin código'})`)) }));
+  function leerErp(erpPortal, entidad, filtros) {
+    return conLectura(erpPortal, (erp) => new Promise((ok, mal) => erp.read('/' + entidad, { filters: filtros, success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no respondió (${entidad}, ${(e && e.statusCode) || 'sin código'})`)) })));
   }
   // ValidFrom / ChangeNo de la lista y Adatu de la versión de fabricación
   const fechaBom = (v) => { const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(norm(v)); if (!m) return null; const d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])); return isNaN(d) ? null : d; };
@@ -6996,8 +7123,9 @@
       .finally(() => { pidiendoUsuarios = null; setTimeout(gestionarRevisores, 0); });
   }
   function gestionarRevisores() {
+    if (dlgPasada && dlgPasada.length) return;                          // (con una ventana encima la lista principal no cambia)
     const tabla = [...document.querySelectorAll('table.sapMListTbl')].find((t) => visible(t) && !t.closest('.sapMDialog'));
-    if (!tabla || !on('revisor') || typeof sap === 'undefined') { document.querySelectorAll('.rmd-revisor').forEach((e) => e.remove()); return; }
+    if (!tabla || !on('revisor') || typeof sap === 'undefined') { document.querySelectorAll('.rmd-revisor').forEach((e) => e.remove()); document.querySelectorAll('.rmd-con-revisor').forEach((e) => e.classList.remove('rmd-con-revisor')); return; }
     const i = columnas(tabla).indexOf('PRODUCCIÓN ESTATUS'); if (i < 0) return;
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
     const filas = filasPrincipales(tabla).map((tr) => ({ tr, o: objetoDeFila(tr) })).filter((x) => x.o);
@@ -7013,8 +7141,9 @@
       const texto = [linea('Jefe', jefe, corto ? 'corto' : 'completo'), linea('Gerente', gerente, corto ? 'corto' : 'completo')].filter(Boolean).join(corto ? '\n' : ' · ');
       const titulo = 'Enviado a revisión a: ' + [linea('Jefe', jefe, 'completo'), linea('Gerente', gerente, 'completo')].filter(Boolean).join(' · ');
       let s = td.querySelector('.rmd-revisor');
-      if (!texto) { if (s) s.remove(); return; }
+      if (!texto) { if (s) s.remove(); if (td.classList.contains('rmd-con-revisor')) td.classList.remove('rmd-con-revisor'); return; }
       if (!s) { s = document.createElement('span'); s.className = 'rmd-revisor'; td.appendChild(s); }
+      if (!td.classList.contains('rmd-con-revisor')) td.classList.add('rmd-con-revisor');
       if (s.textContent !== texto) s.textContent = texto;
       if (s.title !== titulo) s.title = titulo;
     });
@@ -7493,10 +7622,10 @@
     if (ocupado_) sap.ui.core.BusyIndicator.show(0);
     try {
       const partes = []; for (let i = 0; i < ids.length; i += 30) partes.push(ids.slice(i, i + 30));
-      const res = (await Promise.all(partes.map((p) => new Promise((ok, mal) => modelo.read('/MD', {
+      const res = (await conLectura(modelo, (m) => Promise.all(partes.map((p) => new Promise((ok, mal) => m.read('/MD', {
         filters: filtros.concat([new F({ filters: p.map((id) => new F('mdId', 'EQ', id)), and: false })]),
         urlParameters: { $expand: EXPAND_LISTA_MD, $top: '1000', $orderby: 'fechaRegistro desc' }, success: (d) => ok((d && d.results) || []), error: mal,
-      }))))).flat();
+      })))))).flat();
       res.sort((a, b) => b.codigo - a.codigo || b.version - a.version);
       (window.__rmdStats.filtroEquipoPasos || []).push('lista ' + res.length);
       return { results: res };
@@ -7558,7 +7687,7 @@
       ctrl.onGetMd = function (filtros, formula, valor, ocupado_) { return filtroEquipo.ids ? leerListaConEquipo(ctrl, filtros, ocupado_) : orig.apply(this, arguments); };
     }
   }
-  // «Código Agrupador» -> «Agrupador», «Restablecer» -> ⟳ y tarjetas más estrechas
+  // «Código Agrupador» -> «Agrupador», «Restablecer» -> ícono «clear-filter» y tarjetas más estrechas
   function compactarBarraFiltros(fb, items) {
     const agr = items.find((x) => x.getName() === 'D'), dom = fb.getDomRef(), layout = dom && sap.ui.getCore().byId((dom.querySelector('.sapUiAFLayout') || {}).id);
     const rest = dom && [...dom.querySelectorAll('button')].map((b) => sap.ui.getCore().byId(b.id.replace(/-(inner|img)$/, ''))).find((c) => c && c.getText && (c.getText() === 'Restablecer' || c.__rmdRestablecer));
@@ -7570,7 +7699,7 @@
     }
     if (agr && agr.getLabel() === 'Código Agrupador') { agr.setLabel('Agrupador'); if (agr.getControl().setPlaceholder) agr.getControl().setPlaceholder('Agrupador'); }
     if (layout && layout.setMinItemWidth && !layout.__rmdAncho) { layout.__rmdAncho = layout.getMinItemWidth(); layout.setMinItemWidth('9rem'); }
-    if (rest && !rest.__rmdRestablecer) { rest.__rmdRestablecer = true; rest.setText(''); rest.setIcon('sap-icon://refresh'); rest.setTooltip('Restablecer los filtros'); rest.addStyleClass('rmd-restablecer-ui5'); }
+    if (rest && !rest.__rmdRestablecer) { rest.__rmdRestablecer = true; rest.setText(''); rest.setIcon('sap-icon://clear-filter'); rest.setTooltip('Restablecer los filtros'); rest.addStyleClass('rmd-restablecer-ui5'); }
   }
   function enfocarFiltroEquipo() {
     if (!filtroEquipo.input || !filtroEquipo.input.getDomRef()) { toast('Activa "Filtro Equipo" en el panel de mejoras y abre la lista principal.', true); return; }
@@ -7624,7 +7753,7 @@
       cols.forEach((c) => { if (c.__rmdOrig) { if (c.getWidth() !== c.__rmdOrig.width) c.setWidth(c.__rmdOrig.width); if (c.getHAlign() !== c.__rmdOrig.hAlign) c.setHAlign(c.__rmdOrig.hAlign); delete c.__rmdOrig; } });
       if (t.hasStyleClass('rmd-lista-compacta')) t.removeStyleClass('rmd-lista-compacta');
       delete t.__rmdAnchosFirma;
-    } else {
+    } else if (!(dlgPasada && dlgPasada.length)) {                                  // (con una ventana encima la lista no cambia)
       const W = (dom.clientWidth || 0) - 50;
       if (W >= 600) {
         const compacta = W < ANCHO_COMPACTO;                                  // pantallas estrechas: menos relleno
@@ -8411,7 +8540,7 @@
     const g = BAJAS.erp.get(String(swerk)); if (g && Date.now() - g.t < 3600000) return g.p;
     const erp = ctrl && ctrl.oModelErpNec; if (!erp || !swerk) return Promise.resolve(null);
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, reg = { t: Date.now(), mapa: null };
-    reg.p = new Promise((ok) => erp.read('/EquipoSet', { filters: [new F('Swerk', 'EQ', String(swerk)), new F('Eqtyp', 'EQ', '')], success: (r) => { reg.mapa = new Map((r.results || []).map((x) => [sinCeros(x.Equipment), norm(x.Txt30)])); ok(reg.mapa); }, error: () => ok(null) }));
+    reg.p = conLectura(erp, (e) => new Promise((ok) => e.read('/EquipoSet', { filters: [new F('Swerk', 'EQ', String(swerk)), new F('Eqtyp', 'EQ', '')], success: (r) => { reg.mapa = new Map((r.results || []).map((x) => [sinCeros(x.Equipment), norm(x.Txt30)])); ok(reg.mapa); }, error: () => ok(null) })));
     BAJAS.erp.set(String(swerk), reg); reg.p.then((m) => { if (!m) BAJAS.erp.delete(String(swerk)); }); return reg.p;
   }
   const equipoDeBaja = (estado) => !!estado && !/^(MONT|AEQS)-/i.test(estado.trim());      // AEQS = accesorio, no baja
@@ -9129,9 +9258,10 @@
       if (RS.cancelar) throw new Error('Revisión detenida.');
       // SAP actual: MaterialSet por receta y ProduccionVSet por bloques
       const bom = new Map(), triples = debidas.map((x) => x.t), limite = forzar ? Infinity : t0 + (opciones.topeMs != null ? opciones.topeMs : RS_TOPE_AUTO_MS);
-      let hechas = 0, fallos = 0, salteadas = 0;
+      let hechas = 0, fallos = 0, salteadas = 0, visto = 0, ocupado = false;
+      const enUso = () => { if (forzar) return false; const t = Date.now(); if (t - visto > 1000) { visto = t; ocupado = rsOcupado(); } return ocupado; };
       await rsPool(triples, RS_PARALELO, async (t) => {
-        if (Date.now() > limite) { salteadas++; return; }                     // tope de tiempo de la tanda automática
+        if (Date.now() > limite || enUso()) { salteadas++; return; }          // tope de tiempo de la tanda automática; se cede si se abre una ventana del portal
         const [matnr, werks, stlal] = t.split('|');
         try { bom.set(t, (await leerErp(erp, 'MaterialSet', [new F('Matnr', 'EQ', matnr), new F('Werks', 'EQ', werks), new F('Stlal', 'EQ', stlal)])).map((x) => ({ Component: x.Component, CompQty: x.CompQty, CompUnit: x.CompUnit, Maktx: x.Maktx, ItemText1: x.ItemText1, ValidFrom: x.ValidFrom, ChangeNo: x.ChangeNo }))); }
         catch (e) { fallos++; if (fallos > 30 && fallos > hechas / 4) throw new Error('SAP no está respondiendo las lecturas de las listas de materiales.'); }
@@ -9164,8 +9294,10 @@
     } catch (e) { RS.error = e.message; }
     finally { RS.leyendo = false; RS.progreso = ''; if (auto) rsSoltarBloqueo(); rsPintar(); }
   }
+  const rsOcupado = () => document.hidden || dialogosVisibles().length > 0;
   async function rsAuto() {
     if (!on('cambiosrecetas') || !on('recetasauto') || RS.leyendo || rsBloqueado() || !controladorPrincipal()) return;
+    if (rsOcupado()) { clearTimeout(RS.reintento); RS.reintento = setTimeout(rsAuto, 60000); return; }   // se trabaja en el portal: se intenta en 1 min
     const d = await rsDatos(), ahora = Date.now();
     if (d.proximo && ahora < d.proximo && ahora - (d.ultimaLista || 0) < 3600000) return;   // todo al día: nada que hacer
     d.ultimaLista = ahora; await rsRevisar('auto', true);
@@ -9218,6 +9350,7 @@
     if (b.title !== t) b.title = t;
   }
   function gestionarAlertaRecetas() {
+    if (dlgPasada && dlgPasada.length && RS.arrancado) return;          // (con una ventana encima la lista principal no cambia; el ícono se repinta al terminar cada revisión)
     const viejo = document.querySelector('.rmd-alerta-rec'), ctrl = typeof sap !== 'undefined' && controladorPrincipal();
     if (!ctrl || !on('cambiosrecetas')) { if (viejo) viejo.remove(); return; }
     const tit = ctrl.getView().byId('titHeader'), dom = tit && tit.getDomRef(); if (!dom || !visible(dom)) return;
@@ -11907,7 +12040,8 @@ td.ult { position: relative; }
           `${sw(`data-g="${g}" aria-label="Activar o desactivar todo el grupo ${esc(nombre)}" title="Activar o desactivar todo el grupo"`, false)}</div><div class="rmd-pn-items">${ks.map(fila).join('')}</div></section>`).join('') +
         '<p class="rmd-pn-vacio" hidden>Ninguna mejora coincide con la búsqueda.</p></div>' +
         '<div class="rmd-pn-pie"><div class="rmd-pn-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear o activar tus reglas de revisión y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión…</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
-        '<div class="rmd-pn-pie2"><span class="rmd-pn-atajos"><kbd>Ctrl</kbd>+<kbd>K</kbd> Ir a… · <kbd>Ctrl</kbd>+<kbd>S</kbd> Guardar</span><button type="button" class="rmd-btn rmd-restablecer" title="Deja todas las mejoras como vienen de inicio">Restablecer</button></div></div>' +
+        '<div class="rmd-pn-pie2"><span class="rmd-pn-atajos"><kbd>Ctrl</kbd>+<kbd>K</kbd> Ir a… · <kbd>Ctrl</kbd>+<kbd>S</kbd> Guardar</span><button type="button" class="rmd-btn rmd-restablecer" title="Deja todas las mejoras como vienen de inicio">Restablecer</button></div>' +
+        '<div class="rmd-pn-pie2 rmd-pn-version"><span>Se actualiza sola una vez al día desde la carpeta MEJORAS DE INTERFAZ de SharePoint.</span><button type="button" class="rmd-btn rmd-pn-actualizar" title="Abre el archivo publicado: Tampermonkey muestra su versión y permite instalarla ahora">Instalar la última versión</button></div></div>' +
       '</div>';
     const grupos = [...p.querySelectorAll('.rmd-pn-grupo')], buscar = p.querySelector('.rmd-pn-buscar input');
     const pintar = () => {
@@ -11955,6 +12089,7 @@ td.ult { position: relative; }
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && p.open && !document.querySelector('.rmd-modal-fondo')) { e.stopPropagation(); e.preventDefault(); cerrar(); p.querySelector('summary').focus(); } }, true);
     p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { cerrar(); abrirModificacionesMasivas('suspender'); });
     p.querySelector('.rmd-abrir-reglas').addEventListener('click', () => { cerrar(); abrirReglas(); });
+    p.querySelector('.rmd-pn-actualizar').addEventListener('click', () => { cerrar(); window.open(URL_ACTUALIZACION, '_blank', 'noopener'); });
     p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); delete opc.vistaMovil; gestionarVistaMovil(); aplicar(); });
     setTimeout(() => p.classList.remove('rmd-pn-visible'), 4000);     // al cargar se ve completo unos segundos; luego queda latente
     window.__rmdStats.panel = { abrir: (todo) => { p.open = true; if (todo) grupos.forEach((sec) => sec.classList.add('abierto')); }, cerrar, grupos: GRUPOS_PANEL };

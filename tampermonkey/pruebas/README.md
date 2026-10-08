@@ -59,3 +59,5 @@ ejecutarse sobre un RMD real Ingresado (`RMD_PRUEBA`, `RMD_LAYOUT`, `RMD_ASOCIAR
 Los casos que un RMD no trae (Puesto faltante, casillas incoherentes) se provocan en memoria.
 
 Las mejoras añadidas en v1.11-1.14 (botón "Nuevo Paso", "Ver OP" con paginación real, filtro por columna estilo Excel en Ver OP, exportar OP y recetas asociadas por separado, "Documentos citados", nomenclatura de Observaciones, ortografía/concordancia en mayúsculas y tildes/puntuación en minúsculas) se comprobaron a mano contra el portal real (capturas, lectura del DOM y descargas reales), sin escribir nada, pero **no tienen todavía un bloque propio** en `qa_estricto.py` como H/I/J/K/L/M/N. El bloque **I** (layout de listas a varios tamaños) sí cubre indirectamente el ancho de la columna Tipo Dato, ya usado por todas las listas de pasos.
+
+`qa_cabecera.mjs` (node, sin navegador): la cabecera del script tiene `@version` igual a `VERSION`, `@updateURL` = `@downloadURL` = `URL_ACTUALIZACION` (archivo de SharePoint) y `@grant none`.

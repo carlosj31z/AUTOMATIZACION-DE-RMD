@@ -1120,15 +1120,19 @@ with sync_playwright() as p:
             visible = fr.evaluate("[...document.querySelectorAll('.sapMMessageDialog')].some(x=>x.getClientRects().length && /PRUEBA RMD: error normal/.test(x.textContent))")
             fr.evaluate("(() => { const m=[...document.querySelectorAll('.sapMMessageDialog')].filter(x=>x.getClientRects().length).pop(); if(m){ const b=m.querySelector('footer button'); if(b) sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); } })()"); pg.wait_for_timeout(600)
             return (oculto and visible), f"omitido={oculto} normal visible={visible}"
-        @prueba("Q7 Ver todas las OP: carga rápida con la misma primera página del portal y los datos de cada fila completos")
+        @prueba("Q7 Ver OP (v1.55): al abrir se cargan solas todas las OP asociadas (carga rápida, sin pulsar «Ver todas») y quedan ordenadas por Fecha Inicio de menor a mayor, con Item 1..n, la flecha de orden en la columna y los datos de cada fila completos")
         def _():
-            ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_VER_OP)); pg.wait_for_timeout(2500); ra.configuracion.elegir_accion("Ver OP")
-            fr.wait_for_function("() => [...document.querySelectorAll('.sapMDialog')].some(d=>d.getClientRects().length && /Ordenes de Producci/.test((d.querySelector('h2')||{}).textContent||''))", timeout=60000); pg.wait_for_timeout(9000)
-            leer = "() => { const d=" + TOPQ + "; const t=d.querySelector('table.sapMListTbl'); const c=sap.ui.getCore().byId(t.id.replace(/-listUl$/,'')); return c.getItems().map(it=>it.getBindingContext('localModel').getObject()).map(o=>[o.ordenSAP, !!(o.aEstructura&&o.aEstructura.results)]); }"
-            primera = [x[0] for x in fr.evaluate(leer)]; t0 = time.time()
-            fr.locator(".rmd-exportar-op", has_text="Ver todas").click(); fr.wait_for_function("() => !document.querySelector('.rmd-op-avance')", timeout=600000); pg.wait_for_timeout(800)
-            todas = fr.evaluate(leer); s_ = round(time.time() - t0, 1); igual = [x[0] for x in todas][:len(primera)] == primera
-            return (bool(primera) and igual and all(x[1] for x in todas) and s_ < 60), f"{len(todas)} OP en {s_} s; primera página igual={igual}"
+            ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_VER_OP)); pg.wait_for_timeout(2500); t0 = time.time(); ra.configuracion.elegir_accion("Ver OP")
+            leer = """() => { const d=""" + TOPQ + """; if (!d || !/Ordenes de Producci/.test((d.querySelector('h2')||{}).textContent||'')) return null; const t=d.querySelector('table.sapMListTbl'); const c=sap.ui.getCore().byId(t.id.replace(/-listUl$/,''));
+              const os=c.getItems().map(it=>it.getBindingContext('localModel')).filter(Boolean).map(x=>x.getObject()); const col=c.getColumns().find(k=>k.getHeader&&/Fecha Inicio/.test(k.getHeader().getText?k.getHeader().getText():''));
+              return { n: os.length, avance: !!d.querySelector('.rmd-op-avance'), orden: col && col.getSortIndicator(), fechas: os.map(o=>o.fechaInicio?new Date(o.fechaInicio).getTime():null), items: os.map(o=>o.item), completas: os.every(o=>o.aEstructura&&o.aEstructura.results), rotulo: (d.textContent.match(/1 - \d+/)||[])[0] }; }"""
+            e = None
+            for _i in range(90):
+                pg.wait_for_timeout(1000); e = fr.evaluate(leer)
+                if e and not e["avance"] and e["n"] > 5 and e["orden"] == "Ascending": break
+            s_ = round(time.time() - t0, 1); f = [x for x in e["fechas"] if x is not None]
+            ok = (e["n"] > 5 and f == sorted(f) and all(x is None for x in e["fechas"][len(f):]) and e["items"] == list(range(1, e["n"] + 1)) and e["completas"] and e["orden"] == "Ascending" and e["rotulo"] == f"1 - {e['n']}" and s_ < 90)
+            return ok, f"{e['n']} OP en {s_} s desde abrir; ordenadas={f == sorted(f)} item 1..n={e['items'] == list(range(1, e['n'] + 1))} flecha={e['orden']} rótulo={e['rotulo']}"
         cerrar_seguro()
         RMD_PH = os.environ.get("RMD_PH", "2202609126")   # RMD con algún paso de Fabricación en MAYÚSCULAS que lleve "pH" o "mL"
         @prueba("Q8 'Aa' sale en 'Editar Paso' de un paso en MAYÚSCULAS con 'pH'/'mL' (v1.21.1) y redacta sin tocarlos (se cancela: nunca Grabar)")
@@ -1662,14 +1666,14 @@ with sync_playwright() as p:
         pg.route("**/*", guardia_z)
         cerrar_seguro(); pg.set_viewport_size({"width": 1728, "height": 860}); pg.wait_for_timeout(2500)   # ≈ una pantalla de 1920 al 100 %
         try:
-            @prueba("Z1 Barra de filtros: 'Agrupador' (antes 'Código Agrupador'), tarjeta 'Equipo', las 10 tarjetas en una sola fila y ⟳ rojo en lugar de 'Restablecer'")
+            @prueba("Z1 Barra de filtros: 'Agrupador' (antes 'Código Agrupador'), tarjeta 'Equipo', las 10 tarjetas en una sola fila y el ícono de SAP para quitar filtros (clear-filter, color de acento) en lugar de 'Restablecer'")
             def _():
                 b_ = fr.evaluate("""() => { const fb = [...document.querySelectorAll('.sapUiCompFilterBar')].find(x => !x.closest('.sapMDialog')); const tj = [...fb.querySelectorAll('.sapUiAFLayoutItem')].filter(x => x.getClientRects().length && x.querySelector('label'));
                   const r = fb.querySelector("button[title='Restablecer los filtros']"), ic = r && r.querySelector('.sapUiIcon');
-                  return { vw: innerWidth, tarjetas: tj.map(t => [t.querySelector('label').textContent.trim(), Math.round(t.getBoundingClientRect().top)]), restablecer: r && { texto: ((r.querySelector('.sapMBtnContent') || {}).textContent || '').trim(), color: ic && getComputedStyle(ic).color } }; }""")
+                  return { vw: innerWidth, tarjetas: tj.map(t => [t.querySelector('label').textContent.trim(), Math.round(t.getBoundingClientRect().top)]), restablecer: r && { texto: ((r.querySelector('.sapMBtnContent') || {}).textContent || '').trim(), color: ic && getComputedStyle(ic).color, icono: sap.ui.getCore().byId(r.id).getIcon() } }; }""")
                 nombres = [t[0] for t in b_["tarjetas"]]; filas = {t[1] for t in b_["tarjetas"]}; rs = b_["restablecer"] or {}
-                rojo = bool(re.match(r"rgb\((\d+), (\d+), (\d+)", rs.get("color") or "")) and int(re.match(r"rgb\((\d+)", rs["color"]).group(1)) > 180
-                return ("Agrupador" in nombres and "Código Agrupador" not in nombres and "Equipo" in nombres and len(nombres) == 10 and len(filas) == 1 and rs and "Restablecer" not in rs.get("texto", "") and rojo), str(b_)
+                m_ = re.match(r"rgb\((\d+), (\d+), (\d+)", rs.get("color") or ""); acento = bool(m_) and int(m_.group(3)) > int(m_.group(1)) + 60
+                return ("Agrupador" in nombres and "Código Agrupador" not in nombres and "Equipo" in nombres and len(nombres) == 10 and len(filas) == 1 and rs and "Restablecer" not in rs.get("texto", "") and rs.get("icono") == "sap-icon://clear-filter" and acento), str(b_)
             @prueba("Z2 Filtro 'Equipo' (con sugerencias del catálogo): Ir deja solo los master que tienen ese equipo (con los demás filtros) y Restablecer lo vacía")
             def _():
                 fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(5000)   # sin filtros de pruebas anteriores
