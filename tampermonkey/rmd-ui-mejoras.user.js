@@ -2,7 +2,7 @@
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
 // @version      1.53.0
-// @description  Vista móvil (tablas como tarjetas, ventanas a pantalla completa, filtros plegables y botón de búsqueda), Reglas de revisión propias (palabras, documentos, equipos; resaltado y avisos), documentos no vigentes según tu lista del DMS y equipos sin calificación según el registro OQ / PQ, columna Fase en la lista principal, Saludo al entrar con tus RMD en Ingresado y "Continuar con" el último, Ctrl+K = Ir a… (abrir un RMD o una herramienta), etapa y descripción del RMD en la pestaña, filtro "Equipo" en la barra de filtros (compacta, en una fila), Modificaciones masivas (suspender y observaciones), Enter = "Ir", diálogos a medida, columnas ordenadas, estado del RMD, alertas de casillas incoherentes y predecesor obligatorio, copiar/pegar un paso en uno o varios pasos, pasos en minúsculas desde uno en MAYÚSCULAS, procesos menores mal configurados marcados sin abrirlos, PM OP marcada a la vista, reordenar y editar Especificaciones, aviso de códigos y de nomenclatura en Asociar Fórmula, botón Nuevo Paso al adicionar pasos, Ver OP sin límite de 5 (carga rápida), filtrable y exportable a CSV, Documentos citados de todo el RMD (en segundos, Excel), menú Exportar (original con Producción Estado, Equipos por master e Indicadores del mes), Buscar RMD por equipo, Suspensión masiva, plantilla para Producción (borrador de cambios a un RMD sin SAP en un archivo .html con la hoja del PDF y búsqueda de pasos existentes, importado como plan de ingreso solo en RMD Ingresados), historial de cambios en Trazabilidad RMD (qué cambió entre versiones y cada guardado con su usuario, con Excel), aviso de recetas con la lista de materiales cambiada en SAP (⚠ con el detalle junto al código, al día sin cerrar la ventana; hoja de ruta y puesto opcional), panel "Pasos a agregar" (cantidad y orden de cada paso, también en procesos menores), Cambiar un paso o proceso menor por otro código conservando su configuración (y los procesos menores del paso), Editar Paso que avisa si el paso lo usan otros RMD y deja elegir dónde aplicar el cambio (sin duplicar pasos), reordenar fórmulas, varias recetas a la vez y mismo puesto de trabajo, jefe de revisión en Producción Estatus, RMD en vivo que va a lo que cambió (opcional), aviso del orden de las estructuras según los últimos autorizados, envío directo del maestro de RMD con sus recetas a Status RMD, sesión prolongada automáticamente (sin el error del refresco al volver) y más.
+// @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
@@ -58,21 +58,18 @@
     ['reglasrev', 'Reglas de revisión: resaltar y avisar lo que definas (palabras, códigos de documento o de equipo) y los documentos citados que no están en tu lista de vigentes (botón «Reglas de revisión…»)'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
-  opc.recetaruta = true;                                                  // (siempre activo: el aviso de recetas incluye la hoja de ruta y el puesto de trabajo)
+  opc.recetaruta = true;
   const on = (k) => opc.activo && opc[k];
-  // Apagadas por defecto: "RMD en vivo" cambia la disposición de las ventanas; solo se activa si la persona lo elige.
+  // Desactivadas por defecto: alteran la disposición de las ventanas.
   const APAGADAS_POR_DEFECTO = ['vivo'];
   APAGADAS_POR_DEFECTO.forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
-  // Por defecto apagadas: pasar a minúsculas es una redacción automática y la ortografía usa un diccionario reducido; ambas piden revisar el resultado.
-
-  // ---- 0. Shell de Fiori (fuera del iframe de la app): solo el aviso de sesión por inactividad -------------------------------
-  // El aviso "Debido a la inactividad, se finalizará su sesión en N minutos." (Continuar trabajando / Salir) lo pinta el shell del
-  // portal, no la app: esta ventana está fuera del iframe ui5appruntime.html, así que se vigila aquí, antes del resto del script.
-  // No se puede alargar el tiempo (lo controla el servidor): en su lugar se pulsa "Continuar trabajando" en cuanto aparece.
+  // Desactivadas por defecto: transformación heurística del texto.
+  // ---- 0. Shell de Fiori (fuera del iframe): aviso de sesión por inactividad ----
+  // El diálogo lo pinta el shell, no la app; el tiempo lo controla el servidor: se pulsa «Continuar trabajando» al aparecer.
   if (!/ui5appruntime/.test(location.pathname)) {
     if (window.__rmdSesionShell) return;
     window.__rmdSesionShell = true;
-    const activaSesion = () => { const o = leer(); return o.activo !== false && o.sesion !== false; };   // se relee por si se cambia en el otro marco
+    const activaSesion = () => { const o = leer(); return o.activo !== false && o.sesion !== false; };
     const vistos = new WeakSet();
     function prolongarSesion() {
       if (!activaSesion()) return;
@@ -92,9 +89,7 @@
     return;
   }
 
-  // A partir de aquí, solo dentro del iframe de la app UI5 (ui5appruntime.html). Solo cambia la vista; lo único que "pulsa" son
-  // botones de búsqueda (Ir), el OK de mensajes de éxito, "Continuar trabajando" del aviso de sesión y, si el usuario lo pide
-  // con Ctrl+S, el botón Guardar del diálogo abierto.
+  // Desde aquí, solo dentro del iframe de la app (ui5appruntime.html).
   if (window.__rmdUiMejoras) return;
   window.__rmdUiMejoras = true;
 
@@ -103,16 +98,15 @@
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
   const faseDe = (x) => String(x).split('…')[0].replace(/[\d.,:~]+/g, '#');
   const setTxt = (el, t) => {
-    if (!el) return; const s = el.classList && el.classList.contains('rmd-con-orbe') ? el.querySelector(':scope > .rmd-orbe-txt') : null;   // (mensaje con su orbe de espera: solo cambia el texto)
+    if (!el) return; const s = el.classList && el.classList.contains('rmd-con-orbe') ? el.querySelector(':scope > .rmd-orbe-txt') : null;
     if (!s) { if (el.textContent !== t) el.textContent = t; return; }
     if (s.textContent === t) return;
     const otraFase = faseDe(s.textContent) !== faseDe(t); s.textContent = t; if (s.dataset.texto != null) s.dataset.texto = t;
-    if (otraFase) { s.classList.remove('rmd-texto-entra'); void s.offsetWidth; s.classList.add('rmd-texto-entra'); }   // (otra fase: el texto entra deslizándose; los contadores no)
+    if (otraFase) { s.classList.remove('rmd-texto-entra'); void s.offsetWidth; s.classList.add('rmd-texto-entra'); }
   };
-  const visible = (e) => !!e && e.getClientRects().length > 0;                   // (offsetParent es null en elementos con position:fixed)
+  const visible = (e) => !!e && e.getClientRects().length > 0;                   // offsetParent es null con position:fixed
   const enDialogo = (el) => el.closest && el.closest('.sapMDialog:not(.sapMMessageDialog)');
-  // Ventanas que el script ajusta: las del RMD ("<código> - <descripción>"), procesos menores y selectores "Adicionar…".
-  // Las demás (p. ej. "Asociar Fórmula") se dejan exactamente como las dibuja el portal.
+  // Ventanas ajustadas: RMD («<código> - <descripción>»), procesos menores y selectores «Adicionar…». El resto se deja como lo dibuja el portal.
   const GESTIONADAS = /^\d{6,}\s*-|^Procesos Menores para el Paso|^Adicionar /i;
   const cabecera = (d) => norm((d.querySelector('h2') || {}).textContent);
   const gestionada = (d) => GESTIONADAS.test(cabecera(d));
@@ -135,7 +129,7 @@
 
   // ---- 1. Enter en un filtro = pulsar "Ir"; Ctrl+S = Guardar -----------------------------------
   document.addEventListener('keydown', (e) => {
-    if (e.key === 's' && (e.ctrlKey || e.metaKey) && opc.activo && document.querySelector('.rmd-modal-fondo')) {   // Ctrl+S es de la ventana del script (no guarda la de SAP de debajo)
+    if (e.key === 's' && (e.ctrlKey || e.metaKey) && opc.activo && document.querySelector('.rmd-modal-fondo')) {
       const propia = [...document.querySelectorAll('.rmd-modal-fondo')].pop(); e.preventDefault(); e.stopPropagation(); if (propia.__ctrlS) propia.__ctrlS(); return;
     }
     if (e.key === 's' && (e.ctrlKey || e.metaKey) && on('singuardar')) {
@@ -149,7 +143,7 @@
     if (!(t instanceof HTMLInputElement) || t.type === 'checkbox' || t.type === 'radio' || t.readOnly) return;
     if (t.getAttribute('aria-expanded') === 'true') return;                        // lista desplegada: Enter elige la opción
     if (t.closest('table') || t.classList.contains('rmd-filtro')) return;         // dentro de la tabla de pasos: no buscar
-    if (t.closest('.rmd-sel-panel, .rmd-modal, .rmd-paleta, .rmd-vivo-panel, #rmd-ui-panel')) return;   // campos del propio script (p. ej. la cantidad de "Pasos a agregar")
+    if (t.closest('.rmd-sel-panel, .rmd-modal, .rmd-paleta, .rmd-vivo-panel, #rmd-ui-panel')) return;   // campos propios del script
     const btn = botonIr(t);
     if (!btn) return;
     e.preventDefault(); e.stopPropagation();
@@ -159,17 +153,17 @@
 
   // ---- 2. Estilos --------------------------------------------------------------------------------
   const CSS = `
-  /* ── Paleta: se apoya en los colores del propio tema Fiori (oscuro por defecto; claro si el portal cambia de tema) ── */
+  /* ── Paleta: variables del tema Fiori ── */
   html { --rmd-texto: #fafafa; --rmd-apagado: #b8bec1; --rmd-superficie: #29313a; --rmd-barra: #1e242b; --rmd-cabecera: #232931; --rmd-borde: #3a4552; --rmd-borde-campo: #4a5666;
     --rmd-acento: #1b8dec; --rmd-acento-texto: #6bb6f5; --rmd-rojo: #ff8a8a; --rmd-ambar: #f0b45a; --rmd-verde: #8fd19e; --rmd-fuente: "72", "72full", Arial, Helvetica, sans-serif; }
   html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-texto: #32363a; --rmd-apagado: #6a6d70; --rmd-superficie: #ffffff; --rmd-barra: #f7f7f7; --rmd-cabecera: #f2f2f2; --rmd-borde: #d9d9d9;
     --rmd-borde-campo: #89919a; --rmd-acento: #0a6ed1; --rmd-acento-texto: #0a6ed1; --rmd-rojo: #bb0000; --rmd-ambar: #b45f06; --rmd-verde: #107e3e; }
 
-  /* ── Ventanas emergentes: centradas y con el pie (Cancelar/Cerrar) siempre visible ── */
+  /* ── Diálogos: centrados, pie siempre visible ── */
   html.rmd-ui .sapMDialog.rmd-g { position: fixed !important; box-sizing: border-box !important; margin: 0 !important; display: flex !important; flex-direction: column !important;
-    transition: width .14s ease, height .14s ease, left .14s ease, top .14s ease; }   /* suaviza el "salto" al volver de un diálogo hijo (p. ej. cerrar Procesos Menores) mientras se reaplican estas medidas */
+    transition: width .14s ease, height .14s ease, left .14s ease, top .14s ease; }   /* transición al volver de un diálogo hijo */
   @media (prefers-reduced-motion: reduce) { html.rmd-ui .sapMDialog.rmd-g { transition: none; } }
-  html.rmd-ui .sapMDialog.rmd-g > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; scrollbar-gutter: stable; }   /* el ancho útil no cambia al aparecer la barra vertical */
+  html.rmd-ui .sapMDialog.rmd-g > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; scrollbar-gutter: stable; }   /* ancho útil estable con barra vertical */
   html.rmd-ui .sapMDialog.rmd-g > footer, html.rmd-ui .sapMDialog.rmd-g > header { flex: 0 0 auto !important; }
   html.rmd-ui .sapMDialog.rmd-pasos {
     width: 98vw !important; max-width: 98vw !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
@@ -177,10 +171,10 @@
   html.rmd-ui .sapMDialog.rmd-medio {
     width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 24px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
-  html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: 90vw !important; max-width: 97vw !important; }   /* (v1.53: sin altura mínima: con 1 o 2 procesos menores la ventana mide lo que su contenido, como en el portal) */
+  html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: 90vw !important; max-width: 97vw !important; }   /* sin altura mínima */
   html.rmd-ui .sapMDialog.sapMMessageDialog { position: fixed !important; margin: 0 !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
 
-  /* ── Tablas: mismas filas del portal, un poco más de aire; cabecera fija ── */
+  /* ── Tablas: cabecera fija ── */
   html.rmd-cols .sapMDialog.rmd-g table.sapMListTbl { table-layout: fixed; }
   html.rmd-ui .sapMDialog.rmd-g thead th { position: sticky; top: var(--rmd-top, 0px); z-index: 3; background: var(--rmd-cabecera); }
   html.rmd-ui .sapMDialog.rmd-sticky .sapMListHdr { position: sticky; top: var(--rmd-h1, 0px); z-index: 8; background: var(--rmd-barra); }
@@ -191,10 +185,10 @@
   html.rmd-ui .sapMDialog.rmd-g tbody tr.sapMLIB > td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
   html.rmd-ui .sapMDialog.rmd-g tbody tr.sapMLIB:hover > td { background: rgba(27,141,236,.09) !important; }
   html.rmd-ui .sapMDialog.rmd-g td .sapMText:not(.sapMTextRenderWhitespaceWrap), html.rmd-ui .sapMDialog.rmd-g td .sapMLabel { white-space: normal; line-height: 1.35; }
-  html.rmd-ui .sapMDialog.rmd-g td .sapMText.sapMTextRenderWhitespaceWrap { white-space: pre-wrap; line-height: 1.35; }                     /* (los saltos de línea y los espacios de la descripción se respetan, como en el portal: fórmulas, listas…) */
+  html.rmd-ui .sapMDialog.rmd-g td .sapMText.sapMTextRenderWhitespaceWrap { white-space: pre-wrap; line-height: 1.35; }                     /* pre-wrap como el portal */
   html.rmd-ui .sapMDialog.rmd-g input:focus { outline: 1px solid var(--rmd-acento) !important; outline-offset: -1px; }
 
-  /* ── Señales sobre la tabla (discretas: tinte suave + marca lateral, sin contornos) ── */
+  /* ── Señales sobre la tabla ── */
   html.rmd-sintipo td.rmd-td-sintipo input, html.rmd-sintipo td.rmd-td-sintipo .sapMSltLabel { color: var(--rmd-rojo) !important; -webkit-text-fill-color: var(--rmd-rojo) !important; font-weight: 700 !important; }
   @keyframes rmdPulso { 0%, 100% { box-shadow: 0 0 0 1px rgba(255,138,138,.95); background: rgba(255,138,138,.16); } 50% { box-shadow: 0 0 0 1px rgba(255,138,138,.25); background: transparent; } }
   html.rmd-puesto td.rmd-sin-puesto .sapMInputBase, html.rmd-puesto td.rmd-sin-puesto .sapMComboBoxBase { animation: rmdPulso 2.4s ease-in-out infinite; border-radius: 3px; }
@@ -221,7 +215,7 @@
   .rmd-rec-detalle hr { border: 0; border-top: 1px solid var(--rmd-borde); margin: 10px 0; }
   .rmd-rec-cab b { font-size: 14px; } .rmd-rec-cab span { color: var(--rmd-apagado); }
   .rmd-rec-sub { margin: 8px 0 4px; font-weight: 600; color: var(--rmd-ambar); }
-  /* v1.37: icono tenue junto al título de la lista y ventana «Cambios de recetas en SAP» */
+  /* Cambios de recetas en SAP */
   .rmd-alerta-rec { display: inline-flex; align-items: center; gap: 3px; margin: 0 0 0 6px; padding: 2px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--rmd-ambar); font: 600 11px var(--rmd-fuente); cursor: pointer; opacity: .5; vertical-align: middle; }
   .rmd-alerta-rec svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .rmd-alerta-rec:hover, .rmd-alerta-rec:focus-visible { opacity: 1; background: rgba(240,180,90,.14); outline: none; }
@@ -246,7 +240,7 @@
   tr.rmd-rec-quitado td:nth-child(n+2) { color: var(--rmd-apagado); text-decoration: line-through; } tr.rmd-rec-cambia td:nth-child(n+3) { color: var(--rmd-texto); } tr.rmd-rec-cambia td:last-child, tr.rmd-rec-nuevo td:last-child { font-weight: 600; }
   .rmd-rec-delta { color: var(--rmd-ambar); font-weight: 600; } .rmd-rec-linea { margin: 6px 0 0; } .rmd-rec-rojo { color: var(--rmd-rojo); } .rmd-rec-nuevo { color: var(--rmd-verde); font-weight: 600; } span.rmd-rec-quitado { color: var(--rmd-rojo); font-weight: 600; }
   .rmd-rec-pie { margin-top: 10px; color: var(--rmd-apagado); font-size: 12px; }
-  /* v1.40–v1.41: Plantilla para Producción e importación del borrador */
+  /* Plantilla para Producción e importación */
   .rmd-modal.rmd-pp { width: min(760px, 96vw); } .rmd-modal.rmd-pp-imp { width: min(1280px, 97vw); height: min(860px, 94vh); }
   .rmd-pp-campo { display: block; margin: 12px 0 8px; font-weight: 600; } .rmd-pp-campo input { display: block; width: 260px; height: 32px; margin-top: 4px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
   .rmd-pp-cab { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; } .rmd-pp-checks { margin: 6px 0 10px; padding-left: 4px; list-style: none; } .rmd-pp-checks li { margin: 3px 0; }
@@ -255,7 +249,7 @@
   .rmd-pp-crea { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 9px; background: rgba(122,63,191,.16); color: #b48cf0; font: 700 11px/18px var(--rmd-fuente); }
   html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-pp-crea { color: #7a3fbf; } .rmd-pp-av { margin-top: 3px; font-size: 12px; } .rmd-pp-av.error { color: var(--rmd-rojo); } .rmd-pp-av.aviso { color: var(--rmd-ambar); }
   .rmd-modal.rmd-pp-ing { width: min(1100px, 96vw); height: min(860px, 94vh); }
-  /* v1.43: ingreso automático del borrador (asistente, tarjetas, avance) y marcas en las ventanas de pasos */
+  /* Ingreso automático del borrador y marcas */
   .rmd-ing-pasos { display: flex; gap: 8px; list-style: none; margin: 0 0 12px; padding: 0; } .rmd-ing-pasos li { display: flex; align-items: center; gap: 8px; padding: 5px 14px 5px 6px; border-radius: 16px; background: rgba(128,128,128,.14); color: var(--rmd-texto-tenue, #8a94a0); font-size: 12.5px; }
   .rmd-ing-pasos li b { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; background: rgba(128,128,128,.3); color: #fff; font-size: 12px; }
   .rmd-ing-pasos li.actual { background: rgba(10,110,209,.18); color: var(--rmd-acento-texto); font-weight: 600; } .rmd-ing-pasos li.actual b { background: var(--rmd-acento); } .rmd-ing-pasos li.hecho { color: var(--rmd-verde); } .rmd-ing-pasos li.hecho b { background: var(--rmd-verde); }
@@ -273,7 +267,7 @@
   .rmd-ing-res { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; padding: 12px 16px; border-radius: 10px; } .rmd-ing-res b { font-size: 17px; } .rmd-ing-res.ok { background: rgba(46,160,67,.16); } .rmd-ing-res.mal { background: rgba(224,160,0,.2); }
   .rmd-ing-aviso { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; padding: 7px 12px; border-radius: 8px; background: rgba(155,107,214,.16); border-left: 4px solid #9b6bd6; font-size: 12.5px; } .rmd-ing-aviso .rmd-btn { margin-left: 6px; }
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
-  /* v1.47: elementos dados de baja */
+  /* elementos de baja */
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-bajas-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #f0b400; color: #1d2733; font: 700 14px/22px var(--rmd-fuente); text-align: center; animation: rmd-baja-pulso 2.4s ease-in-out 2; }
   .rmd-bajas-aviso button { margin-left: auto; padding: 2px 10px; border: 1px solid rgba(240,180,0,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; } .rmd-bajas-aviso button:hover { background: rgba(240,180,0,.25); }
@@ -288,7 +282,7 @@
   @keyframes rmd-ing-vaiven { from { margin-left: 0; width: 15% !important; } to { margin-left: 85%; width: 15% !important; } } .rmd-ing-rev ul { margin: 6px 0 0; padding-left: 18px; } .rmd-ing-rev-ok { color: var(--rmd-verde); }
   .rmd-pp-e-hecho td:last-child { color: var(--rmd-verde); } .rmd-pp-e-simulado td:last-child { color: var(--rmd-acento-texto); } .rmd-pp-e-error td { background: rgba(220,53,69,.12); } .rmd-pp-e-error td:last-child { color: var(--rmd-rojo); }
   .rmd-pp-rojo { color: var(--rmd-rojo); } .rmd-pp-sap { margin: 10px 0; } .rmd-pp-sap summary { cursor: pointer; color: var(--rmd-acento-texto); }
-  /* v1.38: historial de cambios dentro de «Trazabilidad del RMD» (pestañas; la original no se toca) */
+  /* Historial en «Trazabilidad del RMD» */
   html.rmd-ui .sapMDialog.rmd-tz-on, html.rmd-ui .sapMDialog.rmd-medio.rmd-tz-on { position: fixed !important; width: min(1500px, 97vw) !important; max-width: 97vw !important; height: auto !important; max-height: none !important;
     top: 12px !important; bottom: 12px !important; left: 50% !important; transform: translateX(-50%) !important; display: flex !important; flex-direction: column !important; }
   html.rmd-ui .sapMDialog.rmd-tz-on > section { flex: 1 1 auto !important; min-height: 0 !important; height: auto !important; overflow: auto !important; } html.rmd-ui .sapMDialog.rmd-tz-on > header, html.rmd-ui .sapMDialog.rmd-tz-on > footer { flex: 0 0 auto !important; }
@@ -341,7 +335,7 @@
   .rmd-chev:first-child { border-radius: 6px 0 0 6px; } .rmd-chev:last-child { border-radius: 0 6px 6px 0; border-left: 0; } .rmd-chev:hover { background: rgba(27,141,236,.18); } .rmd-chev:active { transform: scale(.92); }
   .rmd-chev svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
   td.rmd-grip-td { position: relative; padding-left: 26px !important; }
-  .rmd-revisor { display: inline-block; vertical-align: middle; margin: 2px 0 2px 6px; text-align: left; font-size: 11.5px; line-height: 1.25; color: var(--rmd-apagado); white-space: pre-line; }   /* junto al icono si cabe; si no, debajo */
+  .rmd-revisor { display: inline-block; vertical-align: middle; margin: 2px 0 2px 6px; text-align: left; font-size: 11.5px; line-height: 1.25; color: var(--rmd-apagado); white-space: pre-line; }
   .sapMListTbl td:has(> .rmd-revisor) > .sapMBtn { vertical-align: middle; }
   .rmd-borrar-recetas { margin: 0 8px; height: 30px; }
   html.rmd-vivo .sapMDialog:not(.sapMMessageDialog) { position: fixed !important; left: 8px !important; top: 8px !important; transform: none !important; width: calc(50vw - 16px) !important; max-width: calc(50vw - 16px) !important; max-height: calc(100vh - 16px) !important; }
@@ -375,15 +369,15 @@
   .rmd-paleta-vacio { padding: 16px; color: var(--rmd-apagado); }
   .rmd-paleta-pie { display: flex; justify-content: space-between; gap: 12px; padding: 7px 16px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font-size: 12px; }
   .rmd-vivo-estado { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .rmd-vivo-ir[hidden] { display: none; }
-  /* paso con procesos menores mal configurados (revisados sin abrir su ventana): la celda "Proc. Men." con un contador rojo */
+  /* PM con incoherencias: contador en «Proc. Men.» */
   html.rmd-reglas td.rmd-pm-mal { position: relative; outline: 2px solid #ff4d4d; outline-offset: -3px; background: rgba(255,77,77,.14) !important; }
   html.rmd-reglas td.rmd-pm-mal::after { content: attr(data-rmd-pm); position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #ff4d4d; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; pointer-events: none; }
 
-  /* ── Estado del RMD: etiqueta con contorno, sin relleno ── */
+  /* ── Estado del RMD ── */
   .rmd-estado { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 2; margin: 0; padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font: 600 11px/18px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; background: transparent; }
   .rmd-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-estado.autorizado { color: var(--rmd-verde); } .rmd-estado.suspendido { color: var(--rmd-ambar); } .rmd-estado.otro { color: var(--rmd-apagado); }
 
-  /* ── Título del paso menor: hasta 2 líneas ── */
+  /* ── Título del PM: máx. 2 líneas ── */
   .sapMDialog h2.rmd-pm-titulo { white-space: normal !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; max-width: 100%; }
   .sapMDialog .rmd-con-estado .sapMBarMiddle { box-sizing: border-box; padding-right: 128px; }
   .sapMDialog .rmd-pm-cab { height: auto !important; min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
@@ -397,7 +391,7 @@
   #rmd-filtro-bar button.rmd-alerta { border: 0; background: transparent; color: var(--rmd-ambar); font: inherit; font-size: 13px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
   #rmd-filtro-bar button.rmd-alerta:hover { background: rgba(240,180,90,.12); }
   #rmd-filtro-bar button.rmd-alerta.ok { color: var(--rmd-verde); cursor: default; } #rmd-filtro-bar button.rmd-alerta.ok:hover { background: transparent; }
-  /* ── Especificaciones: subir/bajar, asa para arrastrar y textos editables ── */
+  /* ── Especificaciones: orden y edición ── */
   .rmd-orden-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-right: 10px; }
   .rmd-espec-nota { color: var(--rmd-ambar); font: 600 12px var(--rmd-fuente); white-space: nowrap; }
   td.rmd-ed .sapMObjectIdentifierText, td.rmd-ed > .sapMText { display: none !important; }
@@ -431,14 +425,14 @@
   .rmd-nuevo-paso-grupo .rmd-btn { height: 32px; }
   details.rmd-agr { margin: 3px 0 0; font-size: 12px; color: var(--rmd-apagado); } details.rmd-agr summary { cursor: pointer; color: var(--rmd-acento-texto); } details.rmd-agr ul { margin: 3px 0 0; padding-left: 16px; } details.rmd-agr li { margin: 1px 0; color: var(--rmd-texto); }
   .rmd-formula-legible { margin: 4px 16px 0; color: var(--rmd-apagado); font: 12.5px/1.45 var(--rmd-fuente); } .rmd-formula-legible.rmd-formula-rep { color: var(--rmd-texto); }
-  .rmd-codigo-pegado .sapMInputBaseContentWrapper { box-shadow: 0 0 0 2px rgba(240,180,90,.6); background: rgba(240,180,90,.12) !important; }   /* código del paso recién creado, puesto por el script */
+  .rmd-codigo-pegado .sapMInputBaseContentWrapper { box-shadow: 0 0 0 2px rgba(240,180,90,.6); background: rgba(240,180,90,.12) !important; }   /* código pegado en el selector */
   .rmd-exportar-op, .rmd-documentos-citados { margin: 0 4px; height: 32px; }
   .rmd-cuenta-verop { align-self: center; margin: 0 4px; color: var(--rmd-apagado); font-size: 12.5px; white-space: nowrap; }
   .rmd-op-avance { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0,0,0,.38); }
   .rmd-op-caja { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 300px; padding: 18px 22px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.4); font: 14px/1.4 var(--rmd-fuente); }
   .rmd-op-barra { width: 260px; height: 6px; border-radius: 3px; background: rgba(128,140,155,.25); overflow: hidden; } .rmd-op-barra > div { width: 0; height: 100%; background: var(--rmd-acento); transition: width .25s ease; }
   .rmd-op-txt { color: var(--rmd-apagado); font-size: 13px; }
-  /* ── Filtro por columna de Ver OP (estilo Autofiltro de Excel): icono junto al encabezado + desplegable de valores ── */
+  /* ── Filtro por columna de Ver OP ── */
   .rmd-th-filtro { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 4px; padding: 0; border: 0; background: transparent; color: var(--rmd-apagado); cursor: pointer; border-radius: 3px; vertical-align: middle; }
   .rmd-th-filtro:hover { background: rgba(27,141,236,.16); color: var(--rmd-acento-texto); }
   .rmd-th-filtro.activo { color: var(--rmd-acento-texto); }
@@ -462,19 +456,19 @@
   .rmd-clip-x:hover { color: var(--rmd-rojo); border-color: var(--rmd-rojo); }
   .rmd-min-texto { width: 100%; min-height: 64px; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13.5px/1.45 var(--rmd-fuente); resize: vertical; }
 
-  /* ── Botones (discretos: contorno fino y texto de acento; el relleno solo en la acción principal) ── */
+  /* ── Botones ── */
   .rmd-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: transparent; color: var(--rmd-acento-texto); font: 14px var(--rmd-fuente); cursor: pointer; }
   .rmd-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .rmd-btn:hover:not(:disabled) { background: rgba(27,141,236,.12); border-color: var(--rmd-acento); } .rmd-btn:disabled { opacity: .4; cursor: default; }
   .rmd-btn.primario { background: var(--rmd-acento); border-color: var(--rmd-acento); color: #fff; } .rmd-btn.primario:hover:not(:disabled) { filter: brightness(1.1); }
 
-  /* ── Ventana de vista previa / registro ── */
+  /* ── Vista previa / registro ── */
   .rmd-modal-fondo { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; background: rgba(0,0,0,.5); }
   .rmd-modal { display: flex; flex-direction: column; width: min(920px, 94vw); max-height: 88vh; padding: 20px 24px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,.45); font: 14px/1.45 var(--rmd-fuente); }
   .rmd-modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
   .rmd-modal-cuerpo { flex: 1 1 auto; min-height: 0; overflow: auto; } .rmd-modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
   .rmd-modal p { margin: 0 0 10px; } .rmd-modal label { color: var(--rmd-texto); } .rmd-modal input[type=checkbox] { accent-color: var(--rmd-acento); }
-  /* ── Aviso propio (centrado en la página) en lugar del cuadro del navegador ── */
+  /* ── Confirmación propia ── */
   .rmd-modal.rmd-modal-aviso { width: min(460px, 92vw); padding: 24px 26px 18px; }
   .rmd-aviso-cab { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; } .rmd-aviso-cab h3 { margin: 0; font-size: 17px; }
   .rmd-aviso-ico { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(240,180,90,.16); color: var(--rmd-ambar); }
@@ -498,7 +492,7 @@
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-asociar.ok, #rmd-aviso-nomenclatura.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
   .rmd-campo-aviso .sapMInputBaseContentWrapper, .rmd-campo-aviso .sapMInputBaseInner { box-shadow: 0 0 0 2px var(--rmd-ambar) !important; border-radius: 2px; }
-  /* ── Botón de mejoras (esquina inferior izquierda) y su panel ── */
+  /* ── Botón y panel de mejoras ── */
   #rmd-ui-panel { position: fixed; left: 14px; bottom: 14px; z-index: 99999; font: 13px var(--rmd-fuente); color: var(--rmd-texto); }
   #rmd-ui-panel summary { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; list-style: none; cursor: pointer; border-radius: 50%;
     background: var(--rmd-superficie); color: var(--rmd-acento-texto); border: 1px solid var(--rmd-acento); box-shadow: 0 2px 10px rgba(0,0,0,.4); transition: transform .12s, background .12s; }
@@ -519,7 +513,7 @@
   #rmd-ui-panel input[type=checkbox]:checked { background: var(--rmd-acento); } #rmd-ui-panel input[type=checkbox]:checked::after { transform: translateX(15px); }
   #rmd-ui-panel input[type=checkbox]:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
   #rmd-ui-panel .rmd-panel-pie { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font-size: 12px; }
-  /* ── Reglas de revisión (v1.34): resaltado, aviso en la ventana del RMD y su ventana ── */
+  /* ── Reglas de revisión ── */
   .rmd-c-amarillo { --rmd-c: #e0a100; --rmd-cf: rgba(242,176,30,.36); } .rmd-c-rojo { --rmd-c: #e53935; --rmd-cf: rgba(229,57,53,.24); } .rmd-c-azul { --rmd-c: #1e88e5; --rmd-cf: rgba(30,136,229,.24); }
   .rmd-c-verde { --rmd-c: #2e9d4a; --rmd-cf: rgba(67,160,71,.26); } .rmd-c-morado { --rmd-c: #8e24aa; --rmd-cf: rgba(142,36,170,.24); }
   mark.rmd-regla { padding: 0 1px; border-radius: 2px; background: var(--rmd-cf); color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
@@ -577,14 +571,14 @@
   .rmd-rg-okcal input { box-sizing: border-box; width: 100%; min-height: 30px; padding: 4px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-rg-okcal input:disabled, .rmd-rg-barra .rmd-btn:disabled, .rmd-rg-okcal .rmd-btn:disabled { opacity: .45; cursor: default; }
   .rmd-modal-pie .rmd-rg-izq { margin-right: auto; } .rmd-modal-pie .rmd-rg-estado + .rmd-btn.peligro { margin-left: auto; }
-  /* ── Orbes de espera (thinking-orbs) y brillo en el borde de las ventanas ocupadas (border-beam) ── */
+  /* ── Orbes de espera y border-beam ── */
   canvas.rmd-orbe { display: inline-block; flex: 0 0 auto; vertical-align: middle; } canvas.rmd-orbe-20 { width: 20px; height: 20px; } canvas.rmd-orbe-64 { width: 64px; height: 64px; }
   .rmd-con-orbe { display: flex; align-items: center; gap: 8px; } .rmd-espera-mini.rmd-con-orbe { display: inline-flex; gap: 5px; } .rmd-espera-mini > canvas.rmd-orbe { width: 16px; height: 16px; }
   .rmd-con-orbe.rmd-espera-on { flex-direction: column; justify-content: center; gap: 14px; min-height: 170px; margin: 6px 0; text-align: center; color: var(--rmd-apagado); font-size: 13.5px; animation: rmd-espera-entra .35s ease-out; }
   @keyframes rmd-espera-entra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .rmd-modal, .rmd-op-caja { position: relative; } .rmd-op-caja { border-radius: 12px; }
   .rmd-beam[data-beam] { position: absolute; inset: -1px; z-index: 4; pointer-events: none; } .rmd-paleta-caja { position: relative; }
-  /* ── Entrada y salida del orbe (solo en «Ver todas las OP» y en las esperas de los Excel de reporte, v1.53) ── */
+  /* ── Entrada y salida del orbe ── */
   html { --rmd-curva: cubic-bezier(.22, 1, .36, 1); --rmd-brillo-txt: #ffffff; } html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-brillo-txt: #0d0d0d; }
   canvas.rmd-orbe { animation: rmd-orbe-entra .32s var(--rmd-curva) both; } canvas.rmd-orbe.rmd-sin-entrada { animation: none; }
   @keyframes rmd-orbe-entra { from { opacity: 0; scale: .25; filter: blur(4px); } }
@@ -598,11 +592,11 @@
   @property --beam-hue-base { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
   .rmd-beam[data-beam] { transition: --beam-hue-base .7s var(--rmd-curva); } .rmd-beam[data-fin="ok"] { --beam-hue-base: -110deg; } .rmd-beam[data-fin="mal"] { --beam-hue-base: 165deg; }
 
-  /* Insumos ya procesados: el portal los pinta con un celeste claro pensado para el tema claro (rgb 221,244,255) y en el tema oscuro su texto claro no se leía */
+  /* Insumos procesados: contraste en tema oscuro */
   html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.30); }
-  /* ── Vista móvil (v1.51): tablas como tarjetas, ventanas a pantalla completa y controles de tamaño táctil. Todo cuelga de html.rmd-movil: en escritorio no cambia nada ── */
+  /* ── Vista móvil (html.rmd-movil) ── */
   html.rmd-movil, html.rmd-movil body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
-  /* tabla -> tarjetas (todas las columnas siguen en el DOM: solo cambia cómo se dibujan) */
+  /* tabla -> tarjetas */
   html.rmd-movil table.sapMListTbl[data-rmd-mov] { display: block; width: 100% !important; min-width: 0 !important; table-layout: auto !important; border-collapse: collapse; }
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > thead { display: none !important; } html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody { display: block; }
   html.rmd-movil table.sapMListTbl[data-rmd-mov] > tbody > tr.sapMListTblRow { display: flex !important; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 6px 14px; position: relative; box-sizing: border-box; height: auto !important; padding: 10px 14px 12px; border-bottom: 1px solid var(--rmd-borde); }
@@ -694,7 +688,7 @@
   html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=tipo] { order: 7; }
   html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=acciones] { order: 20; flex: 1 0 100%; }
   html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=orden]::before, html.rmd-movil table[data-rmd-mov=equipos] td[data-rmd-col=descripcion]::before { content: none; }
-  /* cualquier otra tabla: dos campos por línea */
+  /* resto de tablas: dos campos por línea */
   html.rmd-movil :where(table[data-rmd-mov=otra] > tbody > tr.sapMListTblRow) > td { flex: 1 1 calc(50% - 7px); }
   html.rmd-movil table[data-rmd-mov=otra] td[data-rmd-col^=descripcion], html.rmd-movil table[data-rmd-mov=otra] td[data-rmd-col^=especificacion], html.rmd-movil table[data-rmd-mov=otra] td[data-rmd-col^=observ] { flex: 1 0 100%; }
   /* ventanas a pantalla completa y barras de herramientas */
@@ -711,7 +705,7 @@
   #rmd-ui-buscar { position: fixed; left: 62px; bottom: 10px; z-index: 99999; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: var(--rmd-acento); color: #fff; border: 1px solid var(--rmd-acento); box-shadow: 0 2px 10px rgba(0,0,0,.4); cursor: pointer; }
   #rmd-ui-buscar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; } #rmd-ui-buscar[hidden] { display: none; }
   html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo { position: fixed; left: 8px; right: 8px; bottom: 62px; width: auto; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); padding: 14px 14px 12px; }
-  html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo, html.rmd-movil .rmd-modal-cuerpo, html.rmd-movil .rmd-paleta-res { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }   /* (al llegar al final no se desplaza la página de detrás) */
+  html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo, html.rmd-movil .rmd-modal-cuerpo, html.rmd-movil .rmd-paleta-res { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   html.rmd-movil #rmd-ui-panel summary, html.rmd-movil #rmd-ui-buscar, html.rmd-movil .rmd-filtros-mas, html.rmd-movil .rmd-paleta-it { -webkit-tap-highlight-color: transparent; }
   html.rmd-movil #rmd-ui-panel .rmd-fila { padding: 9px 0; gap: 14px; } html.rmd-movil #rmd-ui-panel .rmd-btn { height: 40px; }
   html.rmd-movil #rmd-ui-panel input[type=checkbox] { width: 44px; height: 26px; border-radius: 13px; } html.rmd-movil #rmd-ui-panel input[type=checkbox]::after { top: 3px; left: 3px; width: 20px; height: 20px; } html.rmd-movil #rmd-ui-panel input[type=checkbox]:checked::after { transform: translateX(18px); }
@@ -741,7 +735,7 @@
   html.rmd-movil .rmd-paleta-it .desc { order: 4; flex: 1 0 100%; white-space: normal; } html.rmd-movil .rmd-paleta-it .desc .meta { white-space: normal; }
   html.rmd-movil .rmd-paleta-acc { order: 5; display: inline-flex !important; flex: 1 0 100%; gap: 8px; } html.rmd-movil .rmd-paleta-acc button { padding: 7px 12px; }
   html.rmd-movil .rmd-paleta-pie { padding-bottom: 66px; }
-  html.rmd-movil .rmd-vivo-panel { display: none !important; }   /* «RMD en vivo» (PDF a la derecha, apagado por defecto) no cabe en un teléfono */
+  html.rmd-movil .rmd-vivo-panel { display: none !important; }   /* «RMD en vivo» no aplica en móvil */
   /* controles del portal con tamaño táctil */
   html.rmd-movil .sapMBtn, html.rmd-movil .sapMBtn > .sapMBtnInner { min-height: 36px; } html.rmd-movil .sapMBtnIconFirst.sapMBtnIcon:not(.sapMBtnText) { min-width: 36px; }
   /* fin de la vista móvil */
@@ -1132,24 +1126,21 @@
   const CON_EDIT = new Set(['FECHA Y HORA', 'FECHA', 'HORA', 'NUMEROS', 'RANGO', 'TEXTO', 'LOTE', 'FECHA VENCIMIENTO', 'FORMULA', 'ENTREGA', 'MUESTRACC', 'CANTIDAD', 'NOTIFICACION']);
   const NUMERICOS = new Set(['NUMEROS', 'RANGO', 'FORMULA', 'ENTREGA', 'MUESTRACC']);
   const CLAVES = ['SETUP PRE PROCESO', 'PROCESO', 'SETUP POST PROCESO'];
-  // Redacciones con "CONTROL DE CALIDAD" que son correctas y no se alertan (confirmadas por el usuario):
-  // - "…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE" (nota del granel de Envase): nombra a Calidad en Operaciones;
-  // - "FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL
-  //   SISTEMA, ASI COMO EL SOBRE TECNICO…" (cierre de Acondicionado). Se quita solo esa frase: otro "CONTROL DE CALIDAD" en el mismo paso sí se alerta.
+  // Textos con «CONTROL DE CALIDAD» que no se alertan:
+  // - «…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE» (granel de Envase)
+  // - «…(FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA…» (cierre de Acondicionado); solo se excluye esa frase
   const ALTERNATIVA_CALIDAD = /CONTROL DE CALIDAD\s+O\s+CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES\s+O\s+CONTROL DE CALIDAD/g;
   const ENTREGA_FORMATO_INSPECCION = /FINALMENTE\s+ENTREGAR\s+EL\s+FORMATO\s+DE\s+INSPECCION\s+EN\s+LINEAS\s+DE\s+PRODUCCION\s*\(FPRO-\d+(?:\s+VIGENTE)?\)\s*A\s+CONTROL\s+DE\s+CALIDAD\s+PARA\s+SU\s+APROBACION\s+EN\s+EL\s+SISTEMA/g;
   const sinCalidadCorrecta = (d) => d.replace(ALTERNATIVA_CALIDAD, 'CALIDAD EN OPERACIONES').replace(ENTREGA_FORMATO_INSPECCION, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION');
-  // - Pasos mayores de BIOCARGA ("EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA, SEGUN LO INDICADO EN EL
-  //   PROCEDIMIENTO PCMB-200 VIGENTE."): el análisis de biocarga es de Control de Calidad; ningún paso mayor que mencione biocarga se alerta.
+  // - Pasos mayores de BIOCARGA (PCMB-200): no se alertan.
   const BIOCARGA = /\bBIOCARGA\b/;
-  // Pasos que por su redacción pueden ir sin predecesor (condicionales, en paralelo o de cierre; ver docs/como_se_configura_un_rmd.md §5)
+  // Pasos que pueden ir sin predecesor (condicionales, en paralelo o de cierre)
   const INDEPENDIENTES = /\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA/;
   const LISTAS_SIN_PREDECESOR = /^(RENDIMIENTO|CONDICIONES AMBIENTALES)/;
-  // devuelve { casilla: true|false } = estado que debe tener; solo las casillas que la regla fija
+  // devuelve { casilla: bool } solo para las casillas que fija la regla
   function reglaCasillas(tipo, esPM) {
     const t = SIN_ACENTOS(tipo);
     if (!t) return null;
-    // Verificación Check: en pasos mayores (precauciones/notas) sin casillas; en procesos menores lleva Edit
     if (t === 'VERIFICACION CHECK') return esPM ? { 'EDIT': true } : { 'EDIT': false, 'R. POR': false, 'V.B.': false };
     if (t === 'REALIZADO POR') return { 'R. POR': true, 'V.B.': false, 'EDIT': false };
     if (t === 'REALIZADO POR Y VISTO BUENO') return { 'R. POR': true, 'V.B.': true, 'EDIT': false };
@@ -1161,21 +1152,16 @@
     return null;
   }
   const NOMBRE_CASILLA = { 'EDIT': 'Edit', 'R. POR': 'R. Por', 'V.B.': 'V.B.', 'ESTADO CC': 'Estado CC', 'PM OP': 'PM OP', 'GEN PP': 'Gen PP', 'TAB': 'Tab' };
-  // Reglas de UNA fila (paso mayor o proceso menor) sobre sus datos, sin tocar la pantalla. Las usa ajustarTabla para marcar la
-  // tabla que se ve y también la revisión de procesos menores leídos del modelo (sin abrir su ventana): así ambas dicen lo mismo.
-  // f = { esPM, tipo (texto del Tipo Dato), desc, chk: { 'EDIT': bool, … } solo con las casillas que tiene la tabla, cant, um, dec,
-  //       vi, vf, clave, dep } (undefined = la tabla no tiene esa columna). Devuelve [{ col, clase, msg }]; el predecesor obligatorio
-  //       (que depende de toda la lista) se revisa aparte, en ajustarTabla.
+  // Reglas por fila (paso mayor o PM). Comparten la tabla visible y la revisión de PM desde el modelo.
+  // f = { esPM, tipo, desc, chk, cant, um, dec, vi, vf, clave, dep } (undefined = columna ausente) -> [{ col, clase, msg }]
+  // El predecesor obligatorio se valida en ajustarTabla.
   function reglasDeFila(f) {
     const out = [], tipo = f.tipo || '', t = SIN_ACENTOS(tipo), desc = SIN_ACENTOS(f.desc || ''), chk = f.chk || {};
     const regla = reglaCasillas(tipo, f.esPM);
-    // Procesos menores que son INSUMOS de la receta (llevan Cantidad Insumos / UM): nunca llevan Edit.
+    // PM de insumos (Cantidad Insumos / UM): sin Edit.
     if (f.esPM && regla && (norm(f.cant) || norm(f.um))) regla.EDIT = false;
-    // Calidad en Operaciones: el paso mayor "PERSONAL DE CALIDAD EN OPERACIONES..." (Realizado por) y los procesos menores de
-    // muestreo (cantidad / fecha-hora de muestreo, exactamente) llevan Estado CC; los de muestreo, además, Edit.
-    // Excepciones vistas en RMD autorizados: CONDICIONES AMBIENTALES (Realizado por + V.B. cuando el proceso lleva luz inactínica),
-    // CONTRAMUESTRA (MuestraCC solo con Edit) y la verificación del jefe/supervisor ("...VERIFICA EL PROCESO DE MUESTREO..."),
-    // que solo menciona "muestreo" de paso pero no es a Control de Calidad a quien le toca verificarla.
+    // Calidad en Operaciones: paso «PERSONAL DE CALIDAD EN OPERACIONES...» y PM de muestreo llevan Estado CC (muestreo además Edit).
+    // Excepciones: CONDICIONES AMBIENTALES, CONTRAMUESTRA y la verificación del supervisor del muestreo.
     if (regla && t === 'REALIZADO POR' && /^CONDICIONES AMBIENTALES/.test(desc)) delete regla['V.B.'];
     if (regla && t === 'MUESTRACC' && /CONTRAMUESTRA/.test(desc)) delete regla['ESTADO CC'];
     if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
@@ -1185,7 +1171,7 @@
       out.push({ col: c, clase: debe ? 'rmd-marcar' : 'rmd-desmarcar', msg: `${debe ? 'MARCAR' : 'DESMARCAR'} ${NOMBRE_CASILLA[c]} (Tipo Dato: ${tipo})` +
         (t === 'REALIZADO POR' && c === 'V.B.' && !debe ? ' — o cambiar el tipo a "Realizado por y Visto bueno"' : '') });
     }
-    // PM OP: ningún paso debe llevarla marcada (indicación del equipo, septiembre de 2026).
+    // PM OP: no debe ir marcada en ningún paso.
     if (chk['PM OP']) out.push({ col: 'PM OP', clase: 'rmd-desmarcar', msg: 'DESMARCAR PM OP: ningún paso debe llevarla marcada' });
     if (f.desc != null && (f.esPM || !BIOCARGA.test(desc))) {
       if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"' });
@@ -1209,13 +1195,13 @@
     'ESTADO CC': 60, 'PM OP': 56, 'GEN PP': 56, 'EDIT': 50, 'R. POR': 56, 'V.B.': 50, 'PROC. MEN.': 70, 'ESTADO': 80, 'ACC.': 150,
     'CONFORME': 110, 'PROCESO MENOR': 130, 'ACCIONES': 110, 'CANTIDAD INSUMOS': 150, 'UM': 64, 'TAB': 56, 'FORMATO': 66,
   };
-  // versión compacta de los mismos anchos (ventanas de menos de ~1700 px de contenido)
+  // anchos compactos (< ~1700 px de contenido)
   const ANCHOS_COMPACTOS = {
     'ORDEN': 50, 'CÓDIGO': 70, 'CODIGO': 70, 'TIPO DATO': 108, 'CLAVE MODELO': 80, 'PUESTO TRABAJO': 88, 'VAL. INICIAL': 56, 'VAL. FINAL': 56, 'MARGEN': 54, 'DECIMAL': 56, 'DECIM.': 56,
     'ESTADO CC': 52, 'PM OP': 40, 'GEN PP': 42, 'EDIT': 40, 'R. POR': 40, 'V.B.': 40, 'PROC. MEN.': 52, 'ESTADO': 58, 'FORMATO': 58,
   };
   const OCULTAS = ['ESTADO MOV.', 'IMAGEN', 'FORMATO', 'PM OP', 'GEN PP'];
-  // «Formato» trae el matraz del tipo de dato «Fórmula» (abre la ventana de fórmulas): en los procesos menores se muestra (v1.37); en las demás tablas sigue oculta.
+  // «Formato» (matraz de Fórmula): visible solo en procesos menores.
   const columnaOculta = (n, tabla, esPM) => on('ocultar') && OCULTAS.includes(n) && !(n === 'PM OP' && tabla.dataset.rmdPmop === '1') && !(n === 'FORMATO' && esPM);
   const TIP = {
     'ESTADO CC': 'Estado CC: el paso queda sujeto al estado de Control de Calidad',
@@ -1225,12 +1211,10 @@
     'CLAVE MODELO': 'Clave Modelo: solo Setup Pre Proceso, Proceso y Setup Post Proceso',
     'PROC. MEN.': 'Procesos menores del paso', 'MARGEN': 'Margen de tolerancia', 'DECIMAL': 'Cantidad de decimales',
   };
-  // ---- Pasar MAYÚSCULAS a minúsculas con redacción correcta ("En minúsculas" y "Aa"): heurísticas (mayúscula tras punto y un
-  // diccionario reducido de acentos), no un corrector real. Nunca escriben solas: solo actúan cuando la persona pulsa el botón.
+  // ---- MAYÚSCULAS -> minúsculas («En minúsculas» y «Aa»): heurística con diccionario reducido; solo a demanda.
   const DICCIONARIO_ACENTOS = Object.fromEntries([
-    // palabras frecuentes en procedimientos: se guarda su forma acentuada; la clave (SIN_ACENTOS) es la que se busca
+    // clave sin acentos -> forma acentuada
     'según', 'también', 'así', 'además', 'después', 'través', 'única', 'único', 'únicas', 'únicos', 'está', 'están', 'estará', 'estarán', 'será', 'serán', 'aún', 'ésta', 'éste', 'ésa', 'ése', 'cómo', 'cuándo', 'dónde', 'qué', 'quién', 'cuál', 'condición', 'condiciones', 'operación', 'operaciones', 'verificación', 'verificaciones', 'aprobación', 'aprobaciones', 'documentación', 'información', 'preparación', 'fabricación', 'inspección', 'inspecciones', 'sanitización', 'limpieza', 'identificación', 'especificación', 'especificaciones', 'notificación', 'notificaciones', 'formulación', 'presión', 'revisión', 'revisiones', 'decisión', 'versión', 'versiones', 'posición', 'posiciones', 'producción', 'función', 'estación', 'validación', 'calibración', 'evaluación', 'rotación', 'situación', 'acción', 'reacción', 'atención', 'sección', 'sesión', 'expresión', 'impresión', 'dimensión', 'extensión', 'conexión', 'transición', 'distribución', 'administración', 'configuración', 'autorización', 'organización', 'generación', 'agitación', 'filtración', 'destilación', 'granulación', 'compresión', 'dispersión', 'suspensión', 'solución', 'disolución', 'estabilización', 'despeje', 'técnico', 'técnica', 'técnicos', 'técnicas', 'básico', 'básica', 'básicos', 'básicas', 'práctico', 'práctica', 'químico', 'química', 'químicos', 'químicas', 'físico', 'física', 'físicos', 'físicas', 'automático', 'automática', 'automáticos', 'automáticas', 'electrónico', 'electrónica', 'público', 'pública', 'lógico', 'lógica', 'crítico', 'crítica', 'críticos', 'críticas', 'numérico', 'numérica', 'específico', 'específica', 'específicos', 'específicas', 'periódico', 'periódica', 'periódicamente', 'máximo', 'máxima', 'máximos', 'máximas', 'mínimo', 'mínima', 'mínimos', 'mínimas', 'rápido', 'rápida', 'rápidamente', 'código', 'códigos', 'número', 'números', 'área', 'áreas', 'línea', 'líneas', 'máquina', 'máquinas', 'título', 'período', 'régimen', 'límite', 'límites', 'análisis', 'fórmula', 'fórmulas', 'estándar', 'estándares', 'párrafo', 'ítem', 'ítems', 'módulo', 'módulos', 'símbolo', 'símbolos', 'válido', 'válida', 'válidos', 'válidas',
-    // ampliación: verbos conjugados y términos frecuentes en instructivos de manufactura
     'verificará', 'verificarán', 'deberá', 'deberán', 'podrá', 'podrán', 'tendrá', 'tendrán', 'permitirá', 'permitirán',
     'requerirá', 'requerirán', 'garantizará', 'asegurará', 'confirmará', 'registrará', 'indicará', 'señalará', 'señal', 'señales',
     'válvula', 'válvulas', 'rótulo', 'rótulos', 'próximo', 'próxima', 'próximos', 'próximas', 'último', 'última', 'últimos', 'últimas',
@@ -1239,7 +1223,6 @@
     'interrupción', 'producción', 'reproducción', 'introducción', 'conducción', 'deducción', 'reducción', 'construcción', 'destrucción',
     'instrucción', 'obstrucción', 'traducción', 'protección', 'inyección', 'proyección', 'reflexión', 'conexión', 'perfección',
     'confección', 'infección',
-    // términos de proceso frecuentes en los pasos (para "En minúsculas", v1.21)
     'adición', 'adiciones', 'nitrogenación', 'recolección', 'esterilización', 'medición', 'mediciones', 'dosificación', 'recepción', 'liberación',
     'desinfección', 'rotulación', 'lubricación', 'homogenización', 'homogeneización', 'dilución', 'emulsión', 'purificación', 'clarificación',
     'vacío', 'térmico', 'térmica', 'hermético', 'hermética', 'estéril', 'estériles', 'depósito', 'depósitos', 'nitrógeno', 'oxígeno', 'ácido',
@@ -1249,9 +1232,8 @@
     'magnética', 'volumétrico', 'volumétrica', 'cámara', 'cámaras', 'lámpara', 'lámparas', 'balón', 'almacén', 'vía', 'vías', 'energía',
     'pérdida', 'pérdidas',
   ].map((p) => [SIN_ACENTOS(p), p]));
-  delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // "mas" (cantidad, con tilde) es ambiguo con "mas" (pero, sin tilde): no se acentua solo
-  // siglas que se conservan tal cual (no se protege ninguna otra secuencia en mayusculas: el texto de entrada ya viene
-  // todo en mayusculas, asi que "proteger cualquier palabra en mayusculas" dejaria todo el texto sin tocar)
+  delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // «mas» es ambiguo: no se acentúa
+  // siglas que se conservan
   const SIGLAS_CONOCIDAS = new Set(['RMD', 'CC', 'UM', 'OP', 'PM', 'SAP', 'GMP', 'ID', 'OK', 'CT', 'POE', 'EPP', 'HEPA', 'UV', 'CIP', 'SIP', 'BPM',
     'BPF', 'WFI', 'USP', 'LAL', 'IPC', 'PVC', 'AISI', 'FEFO', 'FIFO', 'QR']);
   const MARCA = (i) => String.fromCharCode(1) + i + String.fromCharCode(2);
@@ -1288,9 +1270,8 @@
   }
   function limpiarMarcas(td) { if (td.matches('.rmd-marcar,.rmd-desmarcar,.rmd-falta')) td.removeAttribute('title'); td.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta'); td.removeAttribute('data-rmd-aviso'); }
 
-  // Los anchos y las columnas ocultas se escriben además en una hoja de estilo propia de cada tabla (reglas por id). Al cerrar unos procesos menores el portal
-  // vuelve a leer y dibujar toda la lista de pasos (con 149 pasos, varios segundos en un equipo lento): las celdas nuevas nacen sin los estilos en línea y la
-  // tabla se veía con las columnas del portal hasta la siguiente pasada del script. Con la hoja, nacen ya con su ancho y sin las columnas ocultas.
+  // Anchos y columnas ocultas también en un <style> por tabla (reglas por id): el portal redibuja la lista completa al cerrar un PM y las celdas nuevas
+  // nacen sin estilos en línea.
   const HOJAS_TABLA = new Map();                                       // id de la tabla -> <style>
   const selId = (id) => '#' + (window.CSS && CSS.escape ? CSS.escape(id) : id.replace(/([^\w-])/g, '\\$1'));
   function fijarHojaTabla(tabla, ths) {
@@ -1306,7 +1287,7 @@
     });
     const txt = r.join('\n'); if (st.textContent !== txt) st.textContent = txt;
   }
-  // v1.53: en EQUIPOS / INSTRUMENTOS / MATERIALES cada AGRUPADOR muestra los utensilios que contiene (los de su clasificación en SAP: UTENSILIO.clasificacionId)
+  // Agrupadores: utensilios de su clasificación (UTENSILIO.clasificacionId)
   const MIEMBROS_AGR = new Map();                                      // clasificacionUtensilioId -> [[código, descripción]] | 'leyendo'
   let leyendoAgr = false;
   function miembrosAgrupadores(tabla, filas, nombres) {
@@ -1329,7 +1310,7 @@
       if (det && det.dataset.firma === firma) return; if (det) det.remove();
       det = document.createElement('details'); det.className = 'rmd-agr'; det.dataset.firma = firma;
       det.innerHTML = `<summary>${ms.length ? `Contiene ${ms.length} utensilio${ms.length === 1 ? '' : 's'}` : 'Agrupador sin utensilios activos en SAP'}</summary>${ms.length ? `<ul>${ms.map(([c, d]) => `<li><b>${esc(c)}</b> ${esc(d)}</li>`).join('')}</ul>` : ''}`;
-      ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'].forEach((ev) => det.addEventListener(ev, (e) => e.stopPropagation()));   // (abrir la lista no selecciona la fila)
+      ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'].forEach((ev) => det.addEventListener(ev, (e) => e.stopPropagation()));
       td.appendChild(det);
     });
   }
@@ -1338,9 +1319,7 @@
     ths.forEach((th) => { th.style.removeProperty('width'); th.style.removeProperty('min-width'); });
     tabla.style.removeProperty('width');
   }
-  // Reparte el ancho: columnas con ancho fijo (escaladas hasta un 20 % si la ventana es estrecha) y la descripción con lo que sobra,
-  // nunca menos de un mínimo; si no cabe, la tabla se ensancha y aparece desplazamiento horizontal (en vez de aplastar la descripción).
-  // mínimos que mantienen legibles las cabeceras (una palabra nunca se parte) y los controles de cada columna
+  // Reparto del ancho: columnas fijas (escala hasta 20 %) y la descripción con el resto, con mínimo; si no cabe, desplazamiento horizontal.
   const MIN_FIJOS = { 'ORDEN': 48, 'TIPO DATO': 104, 'CLAVE MODELO': 76, 'PUESTO TRABAJO': 84, 'VAL. INICIAL': 54, 'VAL. FINAL': 54, 'MARGEN': 52, 'DECIMAL': 54, 'DECIM.': 54 };
   function ordenarColumnas(tabla, ths, nombres, filas, tipoTabla) {
     const cont = tabla.closest('.sapMDialogScrollCont') || tabla.parentElement;
@@ -1348,7 +1327,7 @@
     const compacto = C < 1700, iDep = nombres.indexOf('DEPENDE'), iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iTipo = nombres.indexOf('TIPO DATO');
     tabla.classList.toggle('rmd-compacto', compacto);                                       // cabeceras algo más pequeñas en ventanas estrechas
     const minDesc = tipoTabla === 'pasos' ? (C >= 1600 ? 340 : C >= 1500 ? 300 : C >= 1400 ? 250 : 225) : (tipoTabla === 'pm' ? 260 : tipoTabla === 'espec' ? 520 : 240);
-    // en ventanas estrechas la columna "Estado" (siempre "Activo") se oculta para dar espacio a las casillas
+    // ventanas estrechas: se oculta «Estado» (siempre «Activo»)
     const iEst = nombres.indexOf('ESTADO');
     const ocultarEstado = tipoTabla === 'pasos' && compacto && C < 1500 && iEst >= 0 && filas.length > 0 && filas.every((tr) => celda(tr, iEst) && norm(celda(tr, iEst).textContent) === 'Activo');
     if (ocultarEstado) tabla.dataset.rmdOcultaEstado = '1'; else delete tabla.dataset.rmdOcultaEstado;
@@ -1359,23 +1338,21 @@
       depW = Math.min(Math.max(max + 62, compacto ? 116 : 130), 300);
     }
     let tipoW = null;
-    if (iTipo >= 0) {                                                                      // Tipo Dato: ancho para que "Verificación Check", "Realizado por"… no se corten
+    if (iTipo >= 0) {                                                                      // Tipo Dato: sin cortar los valores habituales
       let max = anchoTexto(ths[iTipo], 'Tipo Dato');
       filas.forEach((tr) => { const i = inputDe(celda(tr, iTipo)); if (i && i.value) max = Math.max(max, anchoTexto(i, i.value)); });
-      // tope 180 (no 260): "Realizado por y Visto bueno" (el valor más largo real) aun así se trunca un poco, pero deja
-      // sitio a la Descripción en tablas con muchas columnas (p. ej. Fabricación); los valores cortos habituales
-      // ("Verificación Check", "Sin tipo de dato", "Notificación"…) caben completos de sobra con este tope.
+      // tope 180 px: el valor más largo se trunca levemente a favor de la Descripción
       tipoW = Math.min(Math.max(max + 46, compacto ? 110 : 130), 180);
     }
-    let codW = 0;                                                                          // Código: que un código de 6-10 dígitos no se parta
+    let codW = 0;
     if (iCod >= 0) filas.slice(0, 60).forEach((tr) => { const td = celda(tr, iCod); if (td) { const cs = getComputedStyle(td); codW = Math.max(codW, anchoTexto(td, norm(td.textContent)) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 6); } });
-    let formulaW = 0;                                                                      // Descripción con una fracción dibujada con guiones (p. ej. el cálculo de Rendimiento): que su línea más larga quepa y la barra no se parta
+    let formulaW = 0;                                                                      // fracción dibujada con guiones: la línea más larga debe caber
     const iDesc = nombres.findIndex((n) => /^DESCRIPCI/.test(n));
     if (tipoTabla === 'pasos' && iDesc >= 0) filas.forEach((tr) => {
       const el = celda(tr, iDesc) && celda(tr, iDesc).querySelector('.sapMText'), t = el ? el.textContent : '';
       if (t.indexOf('\n') > -1 && /[-_=]{8,}/.test(t)) t.split('\n').forEach((l) => { formulaW = Math.max(formulaW, anchoTexto(el, l.replace(/\u00a0/g, ' ').replace(/\s+$/, ''))); });
     });
-    if (formulaW) formulaW = Math.min(Math.ceil(formulaW) + 16, 420);                       // (+ relleno de la celda y un margen; tope para que una línea enorme no ensanche la tabla sin fin)
+    if (formulaW) formulaW = Math.min(Math.ceil(formulaW) + 16, 420);                       // relleno + margen, con tope
     if (formulaW) tabla.dataset.rmdFormula = String(formulaW); else delete tabla.dataset.rmdFormula;
     const minimo = (th, i, n) => {
       const palabras = norm(th.textContent).split(' ').filter(Boolean);
@@ -1390,7 +1367,7 @@
       if (/^DESCRIPCI/.test(n) || (tipoTabla === 'espec' && n === 'ESPECIFICACIONES')) return null;   // columnas flexibles (en Especificaciones: descripción y texto de la especificación)
       if (i === iDep) return depW;
       if (i === iTipo) return tipoW;
-      if (tipoTabla === 'equipos' && n === 'ESTADO') return 150;                             // (el estado del equipo, «MONT-Montado», en una línea)
+      if (tipoTabla === 'equipos' && n === 'ESTADO') return 150;
       const w = (compacto && ANCHOS_COMPACTOS[n]) || ANCHOS[n]; if (w) return w;
       if (n === '' && th.classList.contains('sapMListTblSelCol')) return compacto ? 34 : 36;
       if (n === '' && th.classList.contains('sapMListTblNavCol')) return compacto ? 28 : 40;
@@ -1408,7 +1385,7 @@
       const n = nombres[i], esControl = n === '' ;                                          // selección y navegación no se tocan
       return esControl ? w : Math.max(minimo(ths[i], i, n), Math.round(w * f));
     });
-    const sumaF = finales.reduce((a, w) => a + (w || 0), 0), W = Math.max(tipoTabla === 'espec' ? 420 : Math.min(minDesc, 205), C - sumaF, formulaW);   // la descripción cede hasta 205 px antes de que aparezca desplazamiento horizontal (con una fracción dibujada, no cede por debajo de su línea más larga)
+    const sumaF = finales.reduce((a, w) => a + (w || 0), 0), W = Math.max(tipoTabla === 'espec' ? 420 : Math.min(minDesc, 205), C - sumaF, formulaW);   // mínimo 205 px de descripción (o la línea más larga de una fracción)
     const wDes = tipoTabla === 'espec' ? Math.round(W * 0.4) : W, wEsp = W - wDes;
     ths.forEach((th, i) => {
       const w = finales[i] === null ? (tipoTabla === 'espec' && nombres[i] === 'ESPECIFICACIONES' ? wEsp : wDes) : finales[i]; if (!w) return;
@@ -1417,9 +1394,8 @@
     tabla.style.setProperty('width', (sumaF + W) + 'px', 'important');
   }
 
-  // Nombre de la lista de pasos que muestra la ventana (PRECAUCIONES, NOTAS IMPORTANTES…, una etiqueta del PROCEDIMIENTO…). El portal no lo escribe en la ventana,
-  // pero sí en su modelo: las filas de una etiqueta llevan mdEsEtiquetaId (y listMdEsEtiqueta trae su nombre); las de una estructura, el nombre está en
-  // headerAddEstructura.descripcion_est. Si el modelo no está disponible se deduce del contenido (Rendimiento: MuestraCC/Entrega; Precauciones: su primer paso).
+  // Nombre de la lista (PRECAUCIONES, NOTAS…, etiqueta del PROCEDIMIENTO). Del modelo: mdEsEtiquetaId + listMdEsEtiqueta, o
+  // headerAddEstructura.descripcion_est; si no, se deduce del contenido.
   function nombreDeLista(tabla, filas, iTipo, iDes) {
     try {
       const ctl = sap.ui.getCore().byId(tabla.id.replace(/-listUl$/, '')), it = ctl && ctl.getItems && ctl.getItems()[0], c = it && contextoDe(it), fila = c && c.getObject();
@@ -1439,8 +1415,7 @@
   }
   function ajustarTabla(tabla) {
     const d = enDialogo(tabla); if (!d || !gestionada(d)) return;
-    // Ventana raíz del RMD ("Estructura de RMD"): se deja con el ancho y las filas del portal (90 % de la pantalla), que es como
-    // la conocen los usuarios; solo se revisa el orden de sus estructuras.
+    // Ventana raíz («Estructura de RMD»): ancho del portal; solo se revisa el orden de estructuras.
     if (/^Estructura de RMD\b/i.test(norm((barraDeLista(tabla) || {}).textContent))) {
       d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla);
       try { avisoBajasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoBajasRaiz: ' + e.message); }
@@ -1457,9 +1432,8 @@
     const esEquipos = /idTblEquipmentEstructure/.test(tabla.id) || nombres.includes('CÓDIGO DE REFERENCIA') || nombres.includes('CODIGO DE REFERENCIA');   // EQUIPOS / INSTRUMENTOS / MATERIALES
     const filas = filasPrincipales(tabla);
 
-    // tamaño del diálogo
-    // (mientras el portal vuelve a dibujar la lista —p. ej. al cerrar unos procesos menores— la tabla queda un instante sin filas: la ventana conserva su tamaño, no se encoge y vuelve a crecer)
-    const grande = esPasos && (filas.length > 12 || (filas.length === 0 && d.classList.contains('rmd-pasos')));                      // muchas filas: casi pantalla completa; pocas: solo el alto que necesitan
+    // tamaño del diálogo; se conserva mientras la tabla se redibuja sin filas
+    const grande = esPasos && (filas.length > 12 || (filas.length === 0 && d.classList.contains('rmd-pasos')));
     d.classList.toggle('rmd-pasos', grande);
     d.classList.toggle('rmd-medio', !grande);
     d.classList.toggle('rmd-ancho', !grande && (esPM || esEquipos || ths.length > 12));
@@ -1467,11 +1441,11 @@
 
     // tooltips de las cabeceras
     ths.forEach((th, i) => { if (on('grupos') && TIP[nombres[i]]) th.title = TIP[nombres[i]]; });
-    // PM OP no debe marcarse nunca: si algún paso la tiene marcada, la columna deja de ocultarse para que se vea y se corrija
+    // PM OP marcada en algún paso: la columna se muestra
     const iPmop = nombres.indexOf('PM OP');
     if (iPmop >= 0 && filas.some((tr) => marcada(celda(tr, iPmop)))) tabla.dataset.rmdPmop = '1'; else delete tabla.dataset.rmdPmop;
     if (on('columnas') && !html.classList.contains('rmd-movil')) ordenarColumnas(tabla, ths, nombres, filas, esPasos ? 'pasos' : esPM ? 'pm' : esEspec ? 'espec' : esEquipos ? 'equipos' : 'otro');
-    else {                                                                                  // (en móvil las filas son tarjetas: sin anchos fijos; «Estado» sigue oculto si todos son «Activo»)
+    else {                                                                                  // móvil: filas como tarjetas, sin anchos fijos
       quitarAnchos(tabla, ths); delete tabla.dataset.rmdOcultaEstado;
       const iEst = nombres.indexOf('ESTADO');
       if (html.classList.contains('rmd-movil') && esPasos && iEst >= 0 && filas.length > 0 && filas.every((tr) => celda(tr, iEst) && norm(celda(tr, iEst).textContent) === 'Activo')) tabla.dataset.rmdOcultaEstado = '1';
@@ -1490,8 +1464,8 @@
     const iCant = nombres.indexOf('CANTIDAD INSUMOS'), iUM = nombres.indexOf('UM'), iProcMen = nombres.indexOf('PROC. MEN.');
     const iChk = Object.fromEntries(CHK.map((c) => [c, nombres.indexOf(c)]));
     const idxCol = { ...iChk, 'PM OP': iPmop, 'DESCRIPCION': iDes, 'DECIMAL': iDec, 'VAL. INICIAL': iVI, 'VAL. FINAL': iVF, 'CLAVE MODELO': iClave, 'DEPENDE': iDep };
-    const valor = (tr, idx) => (idx >= 0 ? (inputDe(celda(tr, idx)) || {}).value || '' : undefined);   // undefined: la tabla no tiene esa columna
-    // procesos menores de cada paso, revisados sin abrir su ventana (se leen del modelo en segundo plano: revisarPMsDeLista)
+    const valor = (tr, idx) => (idx >= 0 ? (inputDe(celda(tr, idx)) || {}).value || '' : undefined);
+    // PM de cada paso revisados desde el modelo (revisarPMsDeLista)
     if (esPasos && on('reglas')) revisarPMsDeLista(tabla, filas);
     const pmDe = esPasos && tabla.__rmdPM && tabla.__rmdPM.porPaso;
     tabla.querySelectorAll('td.rmd-pm-mal').forEach((td) => { td.classList.remove('rmd-pm-mal'); delete td.dataset.rmdPm; });
@@ -1505,8 +1479,7 @@
     });
 
     let alertas = 0; const primeras = [];
-    // Predecesores: todo paso con tipo de dato lleva predecesor (Depende), salvo el primero de PRECAUCIONES (cabeza de la cadena), los pasos
-    // condicionales o en paralelo y las listas que no los usan (RENDIMIENTO, CONDICIONES AMBIENTALES).
+    // Predecesor obligatorio con tipo de dato, salvo el primero de PRECAUCIONES, condicionales/paralelos y RENDIMIENTO / CONDICIONES AMBIENTALES.
     const lista = esPasos ? nombreDeLista(tabla, filas, iTipo, iDes) : ''; d.__rmdListaEfectiva = lista;
     const tipadoFila = (tr) => { const t = SIN_ACENTOS((inputDe(celda(tr, iTipo)) || {}).value || ''); return !!t && t !== 'SIN TIPO DE DATO'; };
     const aplicaPred = esPasos && iDep >= 0 && !LISTAS_SIN_PREDECESOR.test(lista);
@@ -1548,24 +1521,22 @@
         if (v && !mm) marcarFalta(iDep, 'Predecesor colgante (sin orden): reasignar Depende');
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
         else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
-          // (el portal vacía el predecesor de la fila en cuanto se marca la casilla Estado CC: se avisa para asignarlo después de marcarla)
+          // el portal vacía el predecesor al marcar Estado CC
           const cc = iChk['ESTADO CC'] >= 0 && celda(tr, iChk['ESTADO CC']) && marcada(celda(tr, iChk['ESTADO CC']));
           marcarFalta(iDep, 'Falta el predecesor (Depende): todo paso con tipo de dato debe depender de un paso anterior con tipo de dato; solo se omite en pasos condicionales o en paralelo.' +
             (cc ? ' Ojo: el portal vacía este campo al marcar Estado CC; asígnalo después de marcarla.' : ''));
         }
       }
-      // procesos menores del paso con incoherencias (sin abrir su ventana): la celda "Proc. Men." se marca con cuántas son y el detalle
-      // queda en su tooltip; cuentan en el aviso de incoherencias de la lista y "ir a la siguiente" también se detiene en este paso.
+      // incoherencias de los PM del paso: contador y detalle en la celda «Proc. Men.»
       const pmMal = pmDe ? pmDe.get((objetoDeFila(tr) || {}).mdEstructuraPasoId) || [] : [];
       const avisosPM = pmMal.flatMap((x) => x.avisos.map((a) => `Proceso menor ${x.orden} (${x.codigo} ${x.desc.slice(0, 40)}): ${a}`));
       const tdPM = iProcMen >= 0 ? celda(tr, iProcMen) : null;
       if (avisosPM.length && tdPM) { tdPM.classList.add('rmd-pm-mal'); tdPM.dataset.rmdPm = String(avisosPM.length); tdPM.title = 'Procesos menores con incoherencias (ábrelos para ver dónde):\n' + avisosPM.join('\n'); }
       else if (tdPM && tdPM.title && /^Procesos menores con incoherencias/.test(tdPM.title)) tdPM.removeAttribute('title');
-      // todos: solo las del propio paso ("Documentos citados" revisa los procesos menores aparte); pm: las de sus procesos menores
+      // todos: solo el paso; pm: sus procesos menores
       if (avisos.length || avisosPM.length) { alertas += avisos.length + avisosPM.length; primeras.push({ tr, texto: avisos[0] || avisosPM[0], todos: avisos.slice(), pm: avisosPM }); }
     });
-    // Reglas de revisión (v1.34): se resalta lo que encuentran en la descripción y sus advertencias se suman a las de la lista
-    // v1.35: en la ventana de la estructura EQUIPOS / INSTRUMENTOS / MATERIALES, los equipos que avisan las reglas de equipo
+    // Reglas de revisión: resaltado en la descripción y avisos de la lista; en EQUIPOS / INSTRUMENTOS / MATERIALES, equipos con aviso
     let nReglas = 0;
     if (esEquipos) { try { miembrosAgrupadores(tabla, filas, nombres); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('agrupadores: ' + e.message); } }
     if (esEquipos) {
@@ -1598,7 +1569,7 @@
     else if (esEquipos) { const bar = d.querySelector('#rmd-filtro-bar'); if (bar) bar.remove(); }
     actualizarBarra(d, tabla);
     if (esEspec) sincronizarEspec(d, tabla);
-    // alturas para que barra de filtro, título de la tabla (con Guardar) y cabecera de columnas queden siempre visibles
+    // alturas: filtro, título y cabecera siempre visibles
     const bar = d.querySelector('#rmd-filtro-bar'), hdr = d.querySelector('.sapMListHdr');
     const h1 = (esPasos || esPM) && bar ? bar.offsetHeight : 0, h2 = (esPasos || esPM) && hdr ? hdr.offsetHeight : 0;
     d.style.setProperty('--rmd-h1', h1 + 'px'); d.style.setProperty('--rmd-top', (h1 + h2) + 'px');
@@ -1608,7 +1579,7 @@
   function filtroLocal(tabla, conFiltro, nombre) {
     const d = enDialogo(tabla); if (!d) return;
     let barra = d.querySelector('#rmd-filtro-bar');
-    if (barra && (barra.dataset.nombre || '') !== (nombre || '')) { barra.remove(); barra = null; }   // (otra clase de lista en la misma ventana)
+    if (barra && (barra.dataset.nombre || '') !== (nombre || '')) { barra.remove(); barra = null; }
     if (!barra) {
       barra = document.createElement('div'); barra.id = 'rmd-filtro-bar'; if (nombre) barra.dataset.nombre = nombre;
       barra.innerHTML = (conFiltro ? '<input class="rmd-filtro" type="text" placeholder="Filtrar pasos por texto, código u orden…">' : '') + '<span class="rmd-cuenta"></span><button type="button" class="rmd-alerta ok"></button>';
@@ -1643,7 +1614,7 @@
     if (!on('reglas') && !reglasVivas()) { b.style.display = 'none'; return; }
     b.style.display = '';
     b.classList.toggle('ok', n === 0);
-    const inc = `${nI} incoherencia${nI === 1 ? '' : 's'}`, av = `${nR} aviso${nR === 1 ? '' : 's'} de reglas`;   // (avisos de las reglas de revisión)
+    const inc = `${nI} incoherencia${nI === 1 ? '' : 's'}`, av = `${nR} aviso${nR === 1 ? '' : 's'} de reglas`;
     setTxt(b, n === 0 ? (on('reglas') && a.tipo !== 'equipos' ? '✓ Sin incoherencias' : '✓ Sin avisos de reglas') : `⚠ ${nI && nR ? `${inc} + ${av}` : nI ? inc : av} · ir a la siguiente ›`);
   }
   function irAlSiguiente(d) {
@@ -1665,8 +1636,7 @@
     }
     return '';
   }
-  // El portal recorta la descripción del paso mayor en el título; se reconstruye con la descripción completa
-  // de la fila del paso en la tabla de Pasos que quedó debajo (se muestran hasta 2 líneas).
+  // Título del PM: descripción completa del paso mayor tomada de la tabla de Pasos (máx. 2 líneas).
   function tituloPMCompleto(h2) {
     const m = /^Procesos Menores para el Paso:\s*(\S+)/i.exec(norm(h2.textContent)); if (!m) return;
     const cod = m[1];
@@ -1703,9 +1673,8 @@
     });
   }
 
-  // ---- 6b. Ventana "Asociar Fórmula": avisar si Código Agrupador / Código faltan o difieren de la versión anterior -----------
-  // Los datos de todas las versiones están en el modelo de la tabla principal (codAgrupadorReceta = "Código Agrupador",
-  // codDefectoReceta = "Código"; codigoversionprincipal une las versiones de un mismo RMD). Solo se lee: no se cambia nada.
+  // ---- 6b. «Asociar Fórmula»: Código Agrupador / Código vacíos o distintos de la versión anterior (solo lectura) ----
+  // codAgrupadorReceta, codDefectoReceta; codigoversionprincipal agrupa versiones.
   const CACHE_RMD = new Map();                                       // código -> datos de las filas que la tabla principal ha mostrado en esta sesión
   function tablaPrincipal() {
     if (!(window.sap && sap.ui && sap.ui.getCore)) return null;                                // UI5 aún cargando
@@ -1721,7 +1690,7 @@
     return filas;
   }
   const cachearFilas = (ctl) => filasDe(ctl).forEach((o) => CACHE_RMD.set(String(o.codigo), o));
-  // Se recuerdan las filas de cada búsqueda para poder comparar con la versión anterior aunque ahora la lista esté filtrada por un solo código
+  // filas por búsqueda, para comparar con la versión anterior aunque la lista esté filtrada
   function vigilarListaPrincipal() {
     const ctl = tablaPrincipal(); if (!ctl || ctl.__rmdVigila) return;
     ctl.__rmdVigila = true; ctl.attachUpdateFinished(() => cachearFilas(ctl)); cachearFilas(ctl);
@@ -1733,7 +1702,7 @@
     const cadena = String(actual.codigoversionprincipal || actual.codigo);
     const previas = filas.filter((o) => (String(o.codigoversionprincipal || o.codigo) === cadena || String(o.codigo) === cadena) && Number(o.version) < Number(actual.version));
     previas.sort((a, b) => Number(b.version) - Number(a.version));
-    const enlazada = actual.mdIdVersionAnt && filas.find((o) => o.mdId === actual.mdIdVersionAnt);   // (v1.53: las versiones recientes traen su versión anterior en mdIdVersionAnt)
+    const enlazada = actual.mdIdVersionAnt && filas.find((o) => o.mdId === actual.mdIdVersionAnt);   // mdIdVersionAnt: versión anterior (versiones recientes)
     return { filas, actual, anterior: enlazada || previas[0] || null };
   }
   function campoDe(d, etiqueta) {
@@ -1744,13 +1713,11 @@
   function marcarCampo(d, etiqueta, mal) {
     const el = campoDe(d, etiqueta), base = el && el.closest('.sapMInputBase'); if (base) base.classList.toggle('rmd-campo-aviso', !!mal);
   }
-  // Nomenclatura de la 1ª línea de "Observaciones" en Asociar Fórmula: AAAAMMDD + 2 iniciales - prioridad - Ccomplejidad - FI1.0 - FA1.0 - Ffase
-  // (ejemplo real visto: "20260918CJ-1-C2-FI1.0-FA1.0-F2"). FI y FA son literales fijos ("1.0"): si alguna vez varían, hay que revisar esta regla.
+  // Observaciones, 1.ª línea: AAAAMMDD + 2 iniciales - prioridad - C<complejidad> - FI1.0 - FA1.0 - F<fase> (p. ej. 20260918CJ-1-C2-FI1.0-FA1.0-F2)
   function analizarNomenclatura(linea) {
     const bruta = (linea || '').trim();
     if (!bruta) return { ok: false, avisos: ['La primera línea de Observaciones está vacía: falta la nomenclatura (AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase).'] };
-    // Solo el primer "token" (hasta el primer espacio) es la nomenclatura: lo que venga después de un espacio es texto
-    // aparte (p. ej. "PENDIENTE CC" u otra nota) y no se evalúa ni cuenta como "sobra".
+    // solo se evalúa el primer token
     const l = bruta.split(/\s+/)[0];
     const avisos = [];
     const mFecha = /^(\d{4})(\d{2})(\d{2})/.exec(l);
@@ -1769,14 +1736,14 @@
     if (partes[0] !== '') avisos.push(`Falta el guion después de las iniciales${iniciales ? ` ("${iniciales}")` : ''}.`);
     const prioridad = partes[1] || '';
     if (!/^[123]$/.test(prioridad)) avisos.push(`La prioridad ("${prioridad}") debe ser 1, 2 o 3.`);
-    // Complejidad: siempre con 1 decimal (C0.5, C1.0, C1.5, C2.0, C2.5, C3.0); "C1" o "C2" (sin el ".0") no es válido.
+    // Complejidad con 1 decimal (C0.5 … C3.0)
     const complejidad = partes[2] || '', mComp = /^C(0\.5|1\.0|1\.5|2\.0|2\.5|3\.0)$/.exec(complejidad);
     if (!mComp) avisos.push(`La complejidad ("${complejidad}") debe ser C0.5, C1.0, C1.5, C2.0, C2.5 o C3.0 (siempre con 1 decimal).`);
     const fi = partes[3] || '';
     if (fi !== 'FI1.0') avisos.push(`El campo fijo debe ser exactamente "FI1.0" (aparece "${fi}").`);
     const fa = partes[4] || '';
     if (fa !== 'FA1.0') avisos.push(`El campo fijo debe ser exactamente "FA1.0" (aparece "${fa}").`);
-    // Fase: un dígito (0-9) y, si aplica, revisión "R" pegada o con guion (F2, F2R, F2-R…).
+    // Fase: dígito + revisión opcional (F2, F2R, F2-R)
     const fase = partes.slice(5).join('-'), mFase = /^F(\d)(-?R)?$/.exec(fase);
     if (!mFase) avisos.push(`La fase ("${fase}") debe ser F seguido de un número y, si aplica, "R" (ej. F1, F1R, F2, F2-R).`);
     const ok = avisos.length === 0;
@@ -1794,7 +1761,7 @@
     }
     const codigoRmd = (/^Asociar F[óo]rmula:\s*(\d+)/i.exec(cabecera(d)) || [])[1];
     const agr = valorDeCampo(d, 'Código Agrupador'), cod = valorDeCampo(d, 'Código');
-    const elObs = campoDe(d, 'Observaciones'), obs = elObs ? elObs.value : null;   // sin normalizar: se necesitan los saltos de línea
+    const elObs = campoDe(d, 'Observaciones'), obs = elObs ? elObs.value : null;   // conserva saltos de línea
     if (agr === null || cod === null) return;                                           // aún no está dibujada
     const avisos = []; let malAgr = false, malCod = false;
     if (!agr) { avisos.push('El Código Agrupador está vacío.'); malAgr = true; }
@@ -1829,13 +1796,11 @@
     } else if (avN) avN.remove();
   }
 
-  // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones -------------------------------------
-  // El Guardar del portal solo envía Tipo Dato y valores numéricos de cada especificación (MD_ES_ESPECIFICACION). Aquí las filas se
-  // pueden mover (Subir / Bajar o arrastrando el asa) y sus textos se pueden editar; al pulsar ese mismo Guardar, los cambios viajan
-  // en la actualización de cada fila (ensayoHijo, especificacion, orden) con la conexión del propio portal: no se abre otra vía.
-  // Las especificaciones importadas de SAP ("Ensayos SAP") las ordena el portal por su número de característica (Merknr):
-  // en ellas no se reordena. Si se cierra la ventana sin guardar, los cambios se descartan (el portal comparte los objetos en memoria).
-  const BASE_ESPEC = new WeakMap();                                   // fila -> textos y orden tal como están guardados
+  // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
+  // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
+  // orden).
+  // «Ensayos SAP» se ordenan por Merknr (no se reordenan). Sin guardar, se descartan.
+  const BASE_ESPEC = new WeakMap();                                   // fila -> textos y orden guardados
   const CAMPOS_ESPEC = ['ensayoHijo', 'especificacion', 'orden'];
   const MSG_SAP = 'Estas especificaciones vienen de SAP y el portal las ordena por su número de característica: no se pueden reordenar.';
   let espAbierta = null, espSinVer = 0, espEnviando = 0;              // ventana de Especificaciones abierta: { d, datos }; guardados en curso
@@ -1866,7 +1831,7 @@
   const filaDeTr = (tr) => { const it = tr && sap.ui.getCore().byId(tr.id), c = it && contextoDe(it); return c && c.getObject(); };
   const autoAltura = (ta) => { if (!visible(ta)) return; ta.style.height = 'auto'; ta.style.height = Math.max(28, ta.scrollHeight + 2) + 'px'; };
 
-  // La orden se reparte entre las filas conservando el conjunto de valores que ya tenían (así no chocan con otras estructuras del RMD)
+  // reparte los valores de orden existentes (sin chocar con otras estructuras)
   function aplicarOrden(e, arr, mover) {
     const previos = e.datos.map((r) => Number(r.orden)), validos = previos.every(Number.isFinite) && new Set(previos).size === previos.length;
     const valores = validos ? previos.slice().sort((a, b) => a - b) : arr.map((_, i) => i + 1);
@@ -1918,9 +1883,8 @@
     t.addEventListener('dragend', () => { origen = null; limpiar(); });
   }
 
-  // El Guardar del portal recorre todas las filas y actualiza cada una (model.update, de forma síncrona): mientras se ejecuta,
-  // se añaden a esa misma petición los textos y la orden modificados. Si algo no encaja, la edición no se ofrece (nunca se pierde un cambio).
-  // controlador de la vista que contiene un control UI5 (es el que el Guardar del portal usa como "b": b.mainModelv2 = modelo OData v2)
+  // Se engancha al Guardar del portal (model.update síncrono por fila) para añadir textos y orden.
+  // controlador de la vista del control (mainModelv2)
   function controladorDe(ctl) { let c = ctl; while (c && !c.getController) c = c.getParent && c.getParent(); return c && c.getController(); }
   function enganchar(d) {
     if (d.__rmdEng) return true;
@@ -1945,13 +1909,13 @@
           return upd.call(this, ruta, Object.assign({}, datos, extra), p);
         };
         try { return original.apply(this, arguments); }
-        finally { if (propio) modelo.update = upd; else delete modelo.update; setTimeout(() => { espEnviando = 0; }, 60000); }   // válvula: si una respuesta no llega, no se retiene el descarte para siempre
+        finally { if (propio) modelo.update = upd; else delete modelo.update; setTimeout(() => { espEnviando = 0; }, 60000); }   // tope por si no llega la respuesta
       };
       l.rmdEnganchado = true;
     }
     d.__rmdEng = true; return true;
   }
-  // longitudes máximas de la entidad (el servicio las declara en $metadata: 150 y 500); así el cuadro no deja escribir de más
+  // longitudes máximas del $metadata (150 / 500)
   function limitesEspec(e) {
     if (e.t.__rmdLim) return e.t.__rmdLim;
     const lim = { ensayoHijo: 150, especificacion: 500 };
@@ -1964,7 +1928,7 @@
   }
   function escribirEspec(d, ta) {
     const tr = ta.closest('tr'), it = tr && sap.ui.getCore().byId(tr.id), c = it && contextoDe(it); if (!c) return;
-    if (ta.dataset.campo === 'ensayoHijo' && /[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/[\r\n]+/g, ' ');   // (también si se pega texto con saltos de línea)
+    if (ta.dataset.campo === 'ensayoHijo' && /[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/[\r\n]+/g, ' ');
     if (ta.maxLength > 0 && ta.value.length > ta.maxLength) ta.value = ta.value.slice(0, ta.maxLength);
     c.getModel().setProperty(c.getPath() + '/' + ta.dataset.campo, ta.value);
     autoAltura(ta); ta.classList.toggle('rmd-vacio', ta.dataset.campo === 'ensayoHijo' && !norm(ta.value));
@@ -1974,7 +1938,7 @@
   const ICONO_BAJAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4"/></svg>';
   const ICONO_ASA = '<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></svg>';
   const ICONO_LAPIZ = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5l.7-3L11 2.7a1.2 1.2 0 011.7 0l.6.6a1.2 1.2 0 010 1.7L5.5 12.8l-3 .7z"/><path d="M9.8 3.9l2.3 2.3"/></svg>';
-  // Mensajes con el aspecto del BPD: «Confirmación» (azul, con «?») y «Éxito» (verde, con ✓; se cierra solo)
+  // Mensajes estilo BPD: Confirmación y Éxito
   function mensajeEspec(tipo, titulo, texto, botones) {
     return new Promise((resolve) => {
       let hecho = false, tm = null;
@@ -1988,7 +1952,7 @@
       else { const si = botonModal(botones[0], 'primario', () => fin(true)), no = botonModal(botones[1], '', () => fin(false)); w.pie.append(si, no); setTimeout(() => si.focus(), 30); }
     });
   }
-  // Lápiz de cada fila: abre «Modificar Especificaciones» (Ensayo Hijo y Especificaciones editables); Guardar pide confirmación, graba con el Guardar del portal y avisa
+  // Lápiz por fila: «Modificar Especificaciones»
   function abrirModificarEspec(d, tr) {
     const e = estadoEspec(d), it = tr && sap.ui.getCore().byId(tr.id), c = it && contextoDe(it), fila = c && c.getObject(); if (!e || !fila || document.querySelector('.rmd-espec-form')) return;
     const lim = limitesEspec(e), cols = [...e.t.querySelectorAll('thead th')].map((th) => NORM(th.textContent)), celda = (n) => tr.children[cols.indexOf(n)];
@@ -2057,7 +2021,7 @@
           ta = document.createElement('textarea'); ta.className = 'rmd-edit'; ta.rows = 1; ta.spellcheck = false; ta.dataset.campo = campo;
           ta.setAttribute('aria-label', campo === 'ensayoHijo' ? 'Descripción' : 'Especificaciones'); ta.maxLength = lim[campo];
           ta.addEventListener('input', () => escribirEspec(d, ta));
-          // que la lista de UI5 no reaccione (marcar la fila, mover el foco con las flechas, Enter = abrir…) a lo que se hace dentro del texto
+          // aislar el texto de la navegación por teclado de la lista
           ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'keyup', 'keypress'].forEach((ev) => ta.addEventListener(ev, (e) => e.stopPropagation()));
           ta.addEventListener('keydown', (e) => { if (campo === 'ensayoHijo' && e.key === 'Enter') e.preventDefault(); if (e.key !== 'Escape' && e.key !== 'Tab') e.stopPropagation(); });   // la Descripción es de una sola línea
           td.appendChild(ta);
@@ -2084,8 +2048,8 @@
   }
 
   let pendiente = false;
-  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec } };   // (diagnóstico y pruebas)
-  // Al apagar "Mejoras activas" se retira todo lo que el script había añadido a las ventanas del portal
+  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec } };   // pruebas
+  // Al desactivar las mejoras se retira todo lo añadido
   function limpiezaTotal() {
     quitarHojasTabla(); document.querySelectorAll('details.rmd-agr').forEach((x) => x.remove());
     try { quitarVistaMovil(); } catch (e) { /* sin UI5 */ }
@@ -2110,15 +2074,12 @@
     document.querySelectorAll('.sapMDialog table.sapMListTbl').forEach((t) => t.style.removeProperty('width'));
     document.querySelectorAll('.sapMDialog').forEach((d) => d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky', 'rmd-tz-dlg'));
   }
-  // ---- El "latido" de la lista principal: prolongar la sesión sin el error al volver ----
-  // Cada 30 s el propio portal vuelve a buscar la lista principal (intervalTriggerActualizar -> onSearch() sin evento, y luego
-  // escribe "Actualizado!" en la consola). Si esa lectura falla porque la red o la sesión aún se están recuperando (al volver de
-  // una ausencia o de suspender el equipo), el portal muestra un error que hay que cerrar, aunque la siguiente vuelta ya funcione.
-  // Con "Prolongar la sesión" activo, SOLO el error de ese refresco automático se omite (queda en la consola y en
-  // __rmdStats.latido) si la persona no hizo clic ni tecleó desde que empezó; los errores de lo que ella haga se ven igual.
+  // ---- Latido de la lista principal ----
+  // El portal refresca la lista cada 30 s (intervalTriggerActualizar -> onSearch). Con «Prolongar la sesión», un error de ese refresco se omite si no hubo
+  // interacción (queda en __rmdStats.latido).
   const latido = { enCurso: 0, inicio: 0, fin: 0, esLatido: false, interaccion: 0, omitidos: 0, ultimo: '' };
   window.__rmdStats.latido = latido;
-  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove'].forEach((ev) => document.addEventListener(ev, () => { latido.interaccion = Date.now(); }, { capture: true, passive: true }));   // (touchmove: arrastrar el dedo por la lista también cuenta como «estar tocando»)
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove'].forEach((ev) => document.addEventListener(ev, () => { latido.interaccion = Date.now(); }, { capture: true, passive: true }));   // touchmove cuenta como interacción
   (() => { const log0 = console.log; console.log = function (...a) { if (a[0] === 'Actualizado!' && Date.now() - latido.inicio < 1500) latido.esLatido = true; return log0.apply(this, a); }; })();
   function instalarFiltroLatido() {
     try {
@@ -2128,7 +2089,7 @@
         if (!obj || !Object.prototype.hasOwnProperty.call(obj, 'onSearch') || typeof obj.onSearch !== 'function' || obj.onSearch.__rmd) return;
         const original = obj.onSearch;
         const envuelto = async function (ev) {
-          if (ev) return original.apply(this, arguments);                         // búsqueda pedida por la persona ("Ir")
+          if (ev) return original.apply(this, arguments);                         // búsqueda manual («Ir»)
           latido.enCurso++; latido.inicio = Date.now(); latido.esLatido = false;
           try { return await original.apply(this, arguments); } finally { latido.enCurso = Math.max(0, latido.enCurso - 1); latido.fin = Date.now(); }
         };
@@ -2148,11 +2109,11 @@
         };
         filtrado.__rmd = true; MB.error = filtrado;
       }
-    } catch (e) { /* el portal aún no está listo: se reintenta en el próximo ajuste */ }
+    } catch (e) { /* portal no listo: reintento en el próximo ajuste */ }
   }
 
   let habiaVentanaPM = false;
-  // cuánto tarda cada ajuste (diagnóstico de rendimiento: __rmdStats.ajusteMs / ajusteMax / ajusteTotalMs)
+  // métricas: __rmdStats.ajusteMs / ajusteMax / ajusteTotalMs
   let ajusteIni = 0;
   function ajustarTodo() {
     const t0 = performance.now(); ajusteIni = t0;
@@ -2164,9 +2125,9 @@
     if (!opc.activo) { limpiezaTotal(); return; }
     try { gestionarVistaMovil(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('vista móvil: ' + e.message); }
     window.__rmdStats.ajustes++;
-    // al cerrarse una ventana de procesos menores (pudo corregirse algo) se vuelven a revisar los de la lista de pasos
+    // al cerrar un PM se revisan de nuevo los de la lista
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
-    const nDlg = dialogos().length; if (nDlg < dialogosAntes) generacionRmd++; dialogosAntes = nDlg;   // (se cerró una ventana: el aviso de reglas del RMD se vuelve a leer)
+    const nDlg = dialogos().length; if (nDlg < dialogosAntes) generacionRmd++; dialogosAntes = nDlg;
     if (on('sesion')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach(ajustarTabla);
     decorarCabeceras();
@@ -2176,7 +2137,7 @@
     gestionarMenuExportar();
     gestionarBotonesLista();
     gestionarRecetasAsociar();
-    // (las de v1.24–v1.25 van aisladas: si una falla — p. ej. el portal aún sin UI5 — las demás siguen)
+    // aisladas: un fallo no detiene las demás
     [registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat(f.name + ': ' + e.message); }
     });
@@ -2184,13 +2145,13 @@
   }
   new MutationObserver(() => {
     if (pendiente) return; pendiente = true;
-    setTimeout(() => { pendiente = false; ajustarTodo(); }, 30);   // setTimeout (no rAF): también corre con la pestaña en segundo plano; más corto que antes (60ms) para que el tamaño del diálogo (rmd-pasos/rmd-medio) se reaplique más rápido al cerrar un diálogo hijo
-  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked', 'readonly', 'disabled', 'aria-readonly', 'aria-disabled'] });  // aria-checked: casillas que se pintan tarde; readonly/disabled: campos (p. ej. Descripción Paso) que el portal habilita un instante después de abrir el diálogo
-  // UI5 rellena valores (Tipo Dato, casillas…) de forma tardía y sin cambiar el DOM: se vigila una "firma" de las tablas abiertas
+    setTimeout(() => { pendiente = false; ajustarTodo(); }, 30);   // setTimeout (no rAF) para que corra con la pestaña en segundo plano
+  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-checked', 'readonly', 'disabled', 'aria-readonly', 'aria-disabled'] });  // aria-checked: casillas tardías; readonly/disabled: campos habilitados después
+  // UI5 rellena valores sin cambiar el DOM: se compara una firma de las tablas
   let firmaPrev = '';
   const firmaTablas = () => {
     let f = ''; const ts = document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl');
-    ts.forEach((t) => { f += ((t.closest('.sapMDialogScrollCont') || t.parentElement || {}).clientWidth || 0) + ';';   // el ancho útil cambia si aparece una barra de desplazamiento o se redimensiona
+    ts.forEach((t) => { f += ((t.closest('.sapMDialogScrollCont') || t.parentElement || {}).clientWidth || 0) + ';';
       t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody td:not(.sapMListTblSelCol) [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
     return f + ts.length;
   };
@@ -2200,7 +2161,7 @@
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
     if (opc.activo) { vigilarListaPrincipal(); revisarAsociar(); }
-    if (espAbierta) {                                                    // ventana de Especificaciones cerrada sin guardar: se descartan sus cambios
+    if (espAbierta) {                                                    // Especificaciones cerrada sin guardar: se descartan cambios
       if (dialogos().includes(espAbierta.d)) espSinVer = 0;
       else if (++espSinVer >= 2 && !espEnviando) { descartarEspec(espAbierta.datos); espAbierta = null; espSinVer = 0; }   // (no mientras haya un guardado en curso)
     }
@@ -2211,19 +2172,17 @@
   window.addEventListener('resize', () => setTimeout(ajustarTodo, 150));
   document.addEventListener('change', () => setTimeout(ajustarTodo, 80), true);
   document.addEventListener('click', (e) => {
-    const t = performance.now(), solo = !!(e.target && e.target.closest && e.target.closest('.sapMListTblSelCol'));        // (marcar filas: el observador ya provoca la pasada; una segunda 120 ms después no cambia nada)
+    const t = performance.now(), solo = !!(e.target && e.target.closest && e.target.closest('.sapMListTblSelCol'));
     setTimeout(() => { if (solo && ajusteIni > t) return; ajustarTodo(); }, 120);
   }, true);
 
-  // ---- 7. Avisar cambios sin guardar -----------------------------------------------------------
-  // Una ventana está "sucia" cuando la persona TOCÓ algo (bandera __rmdInter) y la firma de la tabla (valores y casillas) difiere de la del
-  // último momento limpio (carga o guardado). Lo que hace el propio portal —cargar, refrescar tras guardar, rellenar valores tardíos— no cuenta:
-  // mientras la persona no haya tocado nada, la base se va actualizando sola. Así, tras guardar y cancelar no aparece un aviso falso.
-  // (Las casillas de UI5 no lanzan el evento "change" del navegador, por eso se compara el estado y no se vigilan solo eventos.)
+  // ---- 7. Aviso de cambios sin guardar ----
+  // Sucia = hubo interacción (__rmdInter) y la firma de la tabla difiere de la última base limpia. Los cambios del portal actualizan la base.
+  // Las casillas UI5 no disparan «change»: se compara estado.
   function firmaDialogo(d) {
     let f = '';
     d.querySelectorAll('table tbody input, table tbody [role=checkbox]').forEach((x) => {
-      if (x.closest('.sapMListTblSelCol')) return;                    // marcar filas para copiar/borrar no es un cambio de datos
+      if (x.closest('.sapMListTblSelCol')) return;
       f += (x.tagName === 'INPUT' ? x.value : (x.getAttribute('aria-checked') || '')[0]) + '|';
     });
     return f + firmaEspec(d);                                          // Especificaciones: orden y textos (viven en el modelo)
@@ -2234,14 +2193,13 @@
       if (!d.querySelector('table tbody')) return;
       const n = d.querySelectorAll('table tbody tr').length;
       if (d.__rmdBase === undefined || d.__rmdN !== n) { rebase(d); return; }          // filas nuevas o quitadas: la lista se volvió a cargar
-      if (!d.__rmdInter) { const f = firmaDialogo(d); if (f !== d.__rmdBase) d.__rmdBase = f; }   // cambios del portal, no de la persona: se aceptan
+      if (!d.__rmdInter) { const f = firmaDialogo(d); if (f !== d.__rmdBase) d.__rmdBase = f; }   // cambios del portal: se aceptan como base
     });
   }
   const sucia = (d) => d.__rmdBase !== undefined && !!d.__rmdInter && firmaDialogo(d) !== d.__rmdBase;
-  window.__rmdStats.sucias = () => dialogos().map((d) => [d.__rmdBase === undefined ? null : sucia(d), d.__rmdN, !!d.__rmdInter]);   // diagnóstico
+  window.__rmdStats.sucias = () => dialogos().map((d) => [d.__rmdBase === undefined ? null : sucia(d), d.__rmdN, !!d.__rmdInter]);
 
-  // Qué toques cuentan como "editar": teclear, marcar casillas, elegir opciones de listas (incluido el selector de predecesores) o pegar/soltar.
-  // No cuentan: el botón de mejoras, los avisos, el filtro local, marcar filas, la barra del título ni pulsar en las celdas de la tabla.
+  // Interacciones que cuentan como edición: teclado, casillas, listas, pegar/soltar.
   const EXCLUIDOS_EDICION = '#rmd-ui-panel, .rmd-modal-fondo, .sapMMessageDialog, .rmd-filtro, .sapMListTblSelCol, .sapMListHdr';
   function marcarEdicion(e) {
     if (!e.isTrusted || !opc.activo) return;
@@ -2249,8 +2207,8 @@
     let edita = false;
     if (e.type === 'input' || e.type === 'change' || e.type === 'paste' || e.type === 'cut') edita = !!t.closest('input, textarea, select');
     else if (e.type === 'drop') edita = true;
-    else {                                                              // clic, o Espacio/Enter sobre el control
-      const enTablaRmd = !!t.closest('.sapMDialog.rmd-g table');       // (elegir una fila del selector "Adicionar Pasos" no edita esta ventana)
+    else {
+      const enTablaRmd = !!t.closest('.sapMDialog.rmd-g table');
       edita = !!t.closest('[role=checkbox], .sapMCb') || (!enTablaRmd && !!t.closest('[role=option], .sapMSelectList li, li.sapMLIB, .sapMSltItem'));
     }
     if (edita) dialogos().forEach((d) => { d.__rmdInter = true; });
@@ -2258,8 +2216,7 @@
   ['input', 'change', 'paste', 'cut', 'click', 'drop'].forEach((ev) => document.addEventListener(ev, marcarEdicion, true));
   document.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') marcarEdicion(e); }, true);
 
-  // Al pulsar Guardar (o Ctrl+S) lo que hay en pantalla pasa a ser la base; si el portal responde con una advertencia o un error,
-  // no se guardó nada y la ventana vuelve a estar sin guardar (ver más abajo, en la lectura de mensajes).
+  // Guardar fija la base; si el portal responde advertencia o error, vuelve a sucia.
   function alGuardar(d) { d.__rmdPrev = { base: d.__rmdBase, inter: !!d.__rmdInter }; d.__rmdGuardando = Date.now(); rebase(d); }
   function resultadoGuardado(exito) {
     dialogos().forEach((d) => {
@@ -2269,8 +2226,7 @@
     });
   }
 
-  // Aviso propio, centrado en la página y con botones claros (sustituye al cuadro del navegador, que salía arriba y con texto seco).
-  // Devuelve una promesa: true = confirma (botón "si"); false = "no", Escape o Enter (por defecto se conserva el trabajo).
+  // Confirmación propia; resuelve true (sí) / false (no, Escape, Enter).
   const ICONO_AVISO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6 2.9 19.4h18.2L12 3.6z"/><path d="M12 10v4.4"/><path d="M12 17.1v.1"/></svg>';
   function confirmar(titulo, mensaje, ayuda, { si = 'Aceptar', no = 'Cancelar', peligro = false } = {}) {
     return new Promise((resolve) => {
@@ -2297,7 +2253,7 @@
     if (!on('singuardar')) return;
     const b = e.target.closest && e.target.closest('button'); const d = b && enDialogo(b); if (!d) return;
     if (b.title === 'Guardar') { alGuardar(d); return; }
-    // Agregar / Eliminar / Ensayos SAP vuelven a leer las especificaciones del servidor: los textos u orden sin guardar se perderían
+    // Agregar / Eliminar / Ensayos SAP releen del servidor: se perderían cambios sin guardar
     if (['Agregar', 'Eliminar', 'Ensayos SAP'].includes(b.title) && espAbierta && espAbierta.d === d && Object.keys(pendientesEspec(espAbierta.datos)).length) {
       e.preventDefault(); e.stopPropagation();
       confirmar('Textos u orden sin guardar', 'Esta acción vuelve a cargar las especificaciones desde el servidor y perderías lo que editaste.',
@@ -2327,7 +2283,7 @@
     });
   }).observe(document.body, { childList: true, subtree: true });
 
-  // ---- 9. Foco automático en el primer filtro de los selectores -------------------------------
+  // ---- 9. Foco en el primer filtro de los selectores ----
   new MutationObserver((muts) => {
     if (!opc.activo) return;
     for (const m of muts) for (const n of m.addedNodes) {
@@ -2342,11 +2298,8 @@
     }
   }).observe(document.body, { childList: true, subtree: true });
 
-  // ---- 9b. Copiar la configuración de un paso (y sus procesos menores) a otro paso -------------------------
-  // Flujo: se marca la casilla del paso de referencia -> "Copiar configuración"; se marca la casilla del paso nuevo ->
-  // "Pegar en el paso marcado". Muestra una vista previa y solo escribe al pulsar "Aplicar". Usa los propios controles de
-  // SAP (Tipo Dato, casillas, selector "Adicionar Pasos RMD" de los procesos menores) y los botones Guardar del portal.
-  // El portapapeles es temporal: dura mientras el RMD siga abierto.
+  // ---- 9b. Copiar / pegar configuración de un paso (y sus PM) ----
+  // Vista previa antes de escribir; usa los controles y el Guardar del portal. Portapapeles en memoria mientras el RMD esté abierto.
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   async function hasta(pred, ms = 15000, paso = 200) {
     const t0 = Date.now();
@@ -2389,13 +2342,13 @@
   const cabeceraDe = (d) => norm((d.querySelector('h2') || {}).textContent);
   const esDialogoPM = (d) => /^Procesos Menores para el Paso/i.test(cabeceraDe(d));
 
-  // escribe un valor en una celda usando el control de SAP (ComboBox, Input o CheckBox); devuelve true si lo aplicó
+  // escribe un valor con el control UI5 (ComboBox, Input, CheckBox); true si se aplicó
   function fijarCelda(tr, i, valor) {
     const td = celda(tr, i); if (!td) return false;
     const cb = td.querySelector('[role=checkbox]');
     if (cb) { const c = ctlDe(cb); if (!c || !c.setSelected) return false; if (c.getSelected() !== !!valor) { c.setSelected(!!valor); c.fireSelect({ selected: !!valor }); } return true; }
     const inp = inputDe(td), c = ctlDe(inp); if (!c) return false;
-    if (c.getEnabled && !c.getEnabled()) return null;                      // campo bloqueado por el tipo de dato: se omite
+    if (c.getEnabled && !c.getEnabled()) return null;                      // campo bloqueado por el tipo de dato
     if (c.getItems) {                                                        // ComboBox
       const it = valor ? c.getItems().find((x) => x.getText() === valor) : null;
       if (valor && !it) return false;
@@ -2404,7 +2357,7 @@
     }
     c.setValue(valor == null ? '' : String(valor)); c.fireChange({ value: c.getValue() }); return true;
   }
-  // aplica una configuración a una fila (por id, porque UI5 vuelve a dibujar la fila al cambiar el tipo de dato)
+  // aplica la configuración a una fila (por id: UI5 la redibuja al cambiar el tipo)
   async function aplicarFila(tabla, trId, cfg, nombres, log) {
     const n = columnas(tabla), fila = () => document.getElementById(trId);
     const poner = async (nom, valor, etiqueta, espera = 250) => {
@@ -2414,14 +2367,14 @@
       log(ok === null ? `ℹ ${etiqueta}: bloqueado por el tipo de dato (se omite)` : `${ok ? '✔' : '⚠'} ${etiqueta}: ${txt}${ok ? '' : ' — no se pudo aplicar (¿valor inexistente en la lista?)'}`);
       await esperar(espera);
     };
-    if (cfg.tipo != null) await poner('TIPO DATO', cfg.tipo, 'Tipo Dato', 900);   // el tipo habilita/bloquea otros campos
+    if (cfg.tipo != null) await poner('TIPO DATO', cfg.tipo, 'Tipo Dato', 900);
     for (const [nom, k, et] of [['CLAVE MODELO', 'clave', 'Clave Modelo'], ['PUESTO TRABAJO', 'puesto', 'Puesto Trabajo']]) if (cfg[k] != null) await poner(nom, cfg[k], et, 500);
     for (const [nom, k, et] of [['VAL. INICIAL', 'vi', 'Val. Inicial'], ['VAL. FINAL', 'vf', 'Val. Final'], ['MARGEN', 'mg', 'Margen'], ['DECIMAL', 'dec', 'Decimal'], ['DECIM.', 'dec', 'Decimal']])
       if (cfg[k] != null && n.indexOf(nom) >= 0) await poner(nom, cfg[k], et);
     for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 120);
   }
 
-  // mensajes del portal (Confirmación / Éxito): acepta los de guardado; si aparece una advertencia o un error, se detiene
+  // mensajes del portal: acepta los de guardado; se detiene ante advertencia o error
   async function atenderMensajes(ms = 20000, quietoMs = 1800) {
     const t0 = Date.now(); let ultimo = Date.now(); const vistos = [];
     while (Date.now() - t0 < ms) {
@@ -2450,7 +2403,7 @@
     return ctl;
   }
   const tablaDe = (d) => d.querySelector('table.sapMListTbl');
-  // botón "Procesos Menores" de la fila de un paso (resaltado, tipo Ghost, cuando el paso tiene procesos menores)
+  // botón «Procesos Menores» de la fila
   const botonPM = (tr) => [...tr.querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
   async function abrirPM(tabla, trId) {
     const tr = document.getElementById(trId); const b = tr && [...tr.querySelectorAll('button')].find((x) => x.title === 'Procesos Menores');
@@ -2469,13 +2422,10 @@
   }
   const filasPMde = (d) => { const t = tablaDe(d); return t ? filasPrincipales(t).filter((tr) => tr.querySelector('input,[role=checkbox]')).slice(0) : []; };
 
-  // ---- Procesos menores leídos del modelo, sin abrir su ventana ----
-  // El portal los carga con onGetMdPasoInsumoPaso: entidad MD_ES_PASO_INSUMO_PASO de su modelo mainModelv2, filtrada por RMD,
-  // estructura y etiqueta (y por paso). Aquí se hace la misma lectura (mismo modelo, misma entidad y filtros; solo lectura) para
-  // toda la lista de una vez: es exacta (cada fila trae su paso en pasoId_mdEstructuraPasoId) y tarda un segundo, mientras que
-  // abrir la ventana de cada paso tarda varios y a veces muestra un instante los procesos de toda la etiqueta.
+  // ---- PM desde el modelo, sin abrir la ventana ----
+  // Misma lectura que onGetMdPasoInsumoPaso (MD_ES_PASO_INSUMO_PASO, mainModelv2) para toda la lista; cada fila trae pasoId_mdEstructuraPasoId.
   const modeloDe = (tabla) => { const c = tabla && nucleo().byId(tabla.id.replace(/-listUl$/, '')); return (c && c.getModel && c.getModel('mainModelv2')) || modeloListaPrincipal(); };
-  const TIPOS_POR_ID = new Map();                                     // iMaestraId del Tipo Dato -> su texto (de los combos del portal)
+  const TIPOS_POR_ID = new Map();                                     // iMaestraId del Tipo Dato -> texto
   function nombreTipo(id, tabla) {
     if (id == null || id === '') return '';
     if (!TIPOS_POR_ID.has(String(id)) && tabla) {
@@ -2487,8 +2437,7 @@
     }
     return TIPOS_POR_ID.get(String(id)) || TIPOS_FIJOS[id] || '';
   }
-  // Tipos de dato del portal (iMaestraId -> texto de su combo). Solo se usan si los combos de la tabla aún no los cargaron: sin
-  // el nombre del tipo, "Copiar" abría la ventana de procesos menores para leerlo (varios segundos por paso).
+  // Tipos de dato (iMaestraId -> texto) cuando los combos aún no cargaron.
   const TIPOS_FIJOS = { 432: 'Verificación Check', 433: 'Texto', 434: 'Cantidad', 435: 'Fecha', 436: 'Fecha y Hora', 437: 'Hora', 438: 'Números', 439: 'Realizado por',
     440: 'Visto bueno', 441: 'Realizado por y Visto bueno', 442: 'Múltiple check', 443: 'Rango', 444: 'Lote', 445: 'Fórmula', 446: 'Sin tipo de dato', 447: 'Notificacion',
     448: 'MuestraCC', 449: 'Fecha Vencimiento', 450: 'Entrega' };
@@ -2502,7 +2451,7 @@
     const todos = []; for (let skip = 0; skip < 20000; skip += 1000) { const p = await leer(skip); todos.push(...p); if (p.length < 1000) break; }
     return todos;
   }
-  // Un proceso menor del modelo con los mismos datos que muestra su fila (el portal arma código/descripción/UM igual: onObtenerProcMenores).
+  // PM del modelo con los mismos campos que su fila (como onObtenerProcMenores).
   function pmNormalizado(x, tabla) {
     const obj = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null), hijo = obj(x.pasoHijoId), ins = obj(x.estructuraRecetaInsumoId);
     const s = (v) => (v == null ? '' : String(v));
@@ -2510,9 +2459,8 @@
     return { paso: x.pasoId_mdEstructuraPasoId, orden: s(x.orden), codigo: s(codigo), desc: norm(desc), tipo: nombreTipo(x.tipoDatoId_iMaestraId != null ? x.tipoDatoId_iMaestraId : (hijo || {}).tipoDatoId_iMaestraId, tabla), cant: s(x.cantidadInsumo), um: s(um), insumo: !hijo,
       vi: s(x.valorInicial), vf: s(x.valorFinal), mg: s(x.margen), dec: s(x.decimales), chk: { 'TAB': !!x.tab, 'EDIT': !!x.edit, 'GEN PP': !!x.genpp, 'ESTADO CC': !!x.estadoCC } };
   }
-  // Las mismas reglas que se ven al abrir la ventana de procesos menores (su tabla tiene las casillas Edit y Estado CC).
   const avisosDePM = (q) => reglasDeFila({ esPM: true, tipo: q.tipo, desc: q.desc, chk: { 'EDIT': q.chk.EDIT, 'ESTADO CC': q.chk['ESTADO CC'] }, cant: q.cant, um: q.um, dec: q.dec, vi: q.vi, vf: q.vf }).map((x) => x.msg);
-  // Todos los procesos menores de la lista que muestra `tabla` (por paso), leídos del modelo. null si no se pueden leer.
+  // PM de la lista de `tabla`, por paso; null si no se pueden leer.
   async function pmsDeLista(tabla, filas) {
     const objs = filas.map(objetoDeFila).filter(Boolean), o = objs[0]; if (!o || !o.mdId_mdId) return null;
     const modelo = modeloDe(tabla); if (!modelo) return null;
@@ -2522,8 +2470,7 @@
     porPaso.forEach((l) => l.sort((a, b) => (+a.orden || 0) - (+b.orden || 0)));
     return porPaso;
   }
-  // Revisión en segundo plano de los procesos menores de la lista abierta: se hace una vez por lista y se repite cuando se cierra
-  // una ventana de procesos menores (pudo haberse corregido algo). Al terminar se vuelve a pintar la tabla con los avisos.
+  // Revisión en segundo plano de los PM de la lista; se repite al cerrar una ventana de PM.
   let pmSucio = 0;
   function revisarPMsDeLista(tabla, filas) {
     const c = tabla.__rmdPM, o = objetoDeFila(filas[0]); if (!o) return;
@@ -2540,8 +2487,7 @@
     }).catch((e) => { estado.cargando = false; estado.error = e.message; try { console.info('[RMD] no se pudieron revisar los procesos menores de la lista:', e.message); } catch (e2) { /* sin consola */ } });
   }
 
-  // Procesos menores de UN paso con los datos que usa Copiar/Pegar (los de leerPMfila). Primero del modelo (exacto y rápido); si no
-  // se puede, abriendo su ventana y quedándose solo con las filas de ese paso.
+  // PM de un paso para Copiar/Pegar: del modelo; si falla, desde su ventana filtrando por paso.
   async function leerPMsDe(tabla, trId) {
     const tr = document.getElementById(trId), o = objetoDeFila(tr);
     if (o && o.mdEstructuraPasoId) {
@@ -2550,7 +2496,7 @@
         if (modelo) {
           const lista = (await leerPMsModelo(modelo, { mdId_mdId: o.mdId_mdId, mdEstructuraId_mdEstructuraId: o.mdEstructuraId_mdEstructuraId, pasoId_mdEstructuraPasoId: o.mdEstructuraPasoId }))
             .map((x) => pmNormalizado(x, tabla)).filter((q) => q.paso === o.mdEstructuraPasoId).sort((a, b) => (+a.orden || 0) - (+b.orden || 0));
-          if (lista.every((q) => q.tipo || q.insumo)) return lista;   // (sin el nombre del tipo no se podría pegar: se usa la ventana)
+          if (lista.every((q) => q.tipo || q.insumo)) return lista;
         }
       } catch (e) { /* se lee abriendo la ventana */ }
     }
@@ -2568,7 +2514,7 @@
     const fondo = document.createElement('div'); fondo.className = 'rmd-modal-fondo';
     fondo.innerHTML = `<div class="rmd-modal"><h3></h3><div class="rmd-modal-cuerpo"></div><div class="rmd-modal-pie"></div></div>`;
     fondo.querySelector('h3').textContent = titulo; if (opciones.reporte) fondo.querySelector('.rmd-modal').classList.add('rmd-v-reporte'); document.body.appendChild(fondo);
-    // Escape solo actúa sobre esta ventana: no debe cerrar la ventana de SAP que está debajo
+    // Escape solo cierra esta ventana
     const teclas = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (opciones.cancelar) opciones.cancelar(); } };
     document.addEventListener('keydown', teclas, true);
     return { fondo, cuerpo: fondo.querySelector('.rmd-modal-cuerpo'), pie: fondo.querySelector('.rmd-modal-pie'), cerrar: () => { document.removeEventListener('keydown', teclas, true); fondo.remove(); } };
@@ -2580,11 +2526,7 @@
     const t = document.createElement('div'); t.className = 'rmd-toast' + (error ? ' error' : ''); t.textContent = txt; document.body.appendChild(t);
     setTimeout(() => { t.classList.add('rmd-sale'); setTimeout(() => t.remove(), 220); }, error ? 9000 : 5500);
   }
-  // ---- Orbes de espera (v1.48) ----
-  // Las esperas usan los orbes de «thinking-orbs» 0.3.2 (https://libraries.dev/orbs): puntos sobre una esfera que se mueven mientras
-  // se espera, uno por tipo de tarea. Se incluye su motor tal cual (geometría por estado y tamaño, pintada en un canvas 2D; sin React
-  // ni dependencias) y aquí solo se le da vida: un reloj y un ciclo de dibujo compartidos por todos los orbes, que se detiene cuando
-  // ninguno está a la vista (fuera de pantalla, pestaña oculta o quitado de la página) y con movimiento reducido dibuja un cuadro fijo.
+  // ---- Orbes de espera (thinking-orbs 0.3.2, https://libraries.dev/orbs) ----
   // Licencia de thinking-orbs:
   // MIT License
   //
@@ -2721,7 +2663,7 @@
     ];
     function scaleCounts(opts, scale) {
       const out = { ...opts };
-      const done = /* @__PURE__ */ new Set();
+      const done = new Set();
       const rt = Math.sqrt(scale);
       for (const [a, b] of COUNT_PAIRS) {
         const va = out[a];
@@ -2754,7 +2696,7 @@
     }
     function countDots(opts) {
       let total = 0;
-      const done = /* @__PURE__ */ new Set();
+      const done = new Set();
       for (const [a, b] of COUNT_PAIRS) {
         const va = opts[a];
         const vb = opts[b];
@@ -3445,7 +3387,7 @@
         20: { speed: 2.08, count: 0.53, size: 1.011, extra: { spread: 1.45 } }
       }
     };
-    const cache = /* @__PURE__ */ new Map();
+    const cache = new Map();
     function resolvePreset(state, size) {
       const key = `${state}-${size}`;
       const hit = cache.get(key);
@@ -3465,8 +3407,7 @@
   const ORBE_ROTULOS = { working: 'Trabajando…', searching: 'Buscando…', solving: 'Analizando…', listening: 'Esperando…', connecting: 'Conectando con SAP…', composing: 'Generando…', breathing: 'En espera…', weaving: 'Escribiendo en SAP…', shaping: 'Armando…' };
   const ORBES = { vivos: new Set(), raf: 0, io: null, reducido: window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false } };
   const temaOscuro = () => html.classList.contains('sapUiTheme-sap_fiori_3_dark');
-  // Un orbe: 20 px junto a un texto o 64 px para la espera principal de una ventana (son dos diseños distintos, no una escala)
-  // (los orbes grandes —la espera de inicio— usan el diseño de 64 px con más puntos, proporcional al área, para que se vea una esfera definida)
+  // Orbe: 20 px junto a texto o 64 px para la espera principal (diseños distintos).
   function opcionesGrande(estado, tam) {
     const M = MOTOR_ORBES, modo = M.STATE_TO_MODE[estado], pr = M.PRESETS[modo][64], k = Math.min(1.3, 0.18 * Math.pow(tam / 64, 2));
     let o = M.scaleCounts({ ...M.BASE_PROFILES[modo] }, k); if (pr.size !== 1) o = M.scaleRadii(o, pr.size * 0.9);
@@ -3492,7 +3433,7 @@
     ORBES.vivos.add(c);
     if (!ORBES.io && typeof IntersectionObserver !== 'undefined') ORBES.io = new IntersectionObserver((es) => es.forEach((e) => {
       if (!e.target.__orbe) return; e.target.__orbe.visible = e.isIntersecting;
-      if (e.isIntersecting && !ORBES.raf && !document.hidden) ORBES.raf = requestAnimationFrame(cicloOrbes);   // (vuelve a la vista: se reanuda el ciclo)
+      if (e.isIntersecting && !ORBES.raf && !document.hidden) ORBES.raf = requestAnimationFrame(cicloOrbes);
     }));
     if (ORBES.io) ORBES.io.observe(c);
     if (!ORBES.raf && !document.hidden) ORBES.raf = requestAnimationFrame(cicloOrbes);
@@ -3504,49 +3445,40 @@
       if (!c.isConnected) soltarOrbe(c);
       else if (c.__orbe.visible) { alguno = true; pintarOrbe(c, t * c.__orbe.velocidad); }
     });
-    if (alguno && !document.hidden) ORBES.raf = requestAnimationFrame(cicloOrbes);   // (sin ninguno a la vista el ciclo se detiene)
+    if (alguno && !document.hidden) ORBES.raf = requestAnimationFrame(cicloOrbes);
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden && ORBES.vivos.size && !ORBES.raf) ORBES.raf = requestAnimationFrame(cicloOrbes); });
-  // Qué orbe acompaña cada espera: uno por tipo de tarea, según el verbo del mensaje
-  //   listening  (onda)          esperar a otro: Status RMD, el portal copiando una versión
-  //   weaving    (trenza)        escribir en SAP: ingreso del borrador, modificaciones masivas, deshacer
-  //   shaping    (forma)         armar una estructura: crear la versión, preparar las escrituras, rehacer el borrador
-  //   solving    (bandas)        revisar, comparar, comprobar
-  //   composing  (cinta)         generar un documento: Excel, PDF, plantilla
-  //   connecting (constelación)  leer de SAP por páginas, la auditoría, tus RMD
-  //   searching  (globo)         buscar o recorrer: pasos, equipos, OP, documentos citados
-  //   breathing  (anillo)        trabajo en segundo plano y las tablas del portal; working (órbitas): lo demás
+  // Orbe por tipo de tarea (según el verbo del mensaje): listening, weaving, shaping, solving, composing, connecting, searching, breathing; working por
+  // defecto.
   const estadoDeEspera = (t) => (/esperando|procesando en|confirma tu|está copiando/i.test(t) ? 'listening'
     : /escribiendo|simulando|suspendiendo|agregando la observación|deshaciendo|guardando/i.test(t) ? 'weaving'
       : /creando la versión|preparando|rehaciendo|comprobando que la copia/i.test(t) ? 'shaping'
         : /revisando|comprobando|comparando|analizando|calculando|verificando/i.test(t) ? 'solving'
           : /armando|generando|redactando/i.test(t) ? 'composing'
             : /\bsap\b|consultando|enviando|conectando|tus rmd|página \d+ de/i.test(t) ? 'connecting'
-              : /busc|leyendo|cargando|contando/i.test(t) ? 'searching' : 'searching');   // (las «órbitas», puntos sueltos, ya no son el orbe por defecto: no parecen una esfera)
+              : /busc|leyendo|cargando|contando/i.test(t) ? 'searching' : 'searching');
   const ESPERAS = '.rmd-progreso, .rmd-vivo-estado, .rmd-espera-mini, .rmd-paleta-estado';
-  // v1.53: las animaciones nuevas (orbe y brillo del borde) solo acompañan las esperas largas que lo merecen: cargar todas las OP y armar un Excel de reporte
-  // (Indicadores, Equipos por master, Documentos citados en todos los master, Cambios de recetas). Lo demás usa el texto de siempre y los puntos de SAP.
+  // Orbes y brillo solo en «Ver todas las OP» y en los Excel de reporte.
   const CON_ORBES = '.rmd-op-caja, .rmd-modal.rmd-v-reporte';
-  // Las ventanas que se vuelven a pintar (p. ej. Trazabilidad con cada fila cargada) recrean su mensaje: si el orbe es el mismo
-  // de hace un momento, no vuelve a «entrar» (todos comparten el reloj, así que sigue en su punto) y el brillo del texto sigue en fase
+  // Al repintar, un orbe igual no se reinicia (reloj compartido).
   const ORBE_MEMORIA = new WeakMap();
   const raizDeOrbe = (el) => el.closest('.rmd-modal, .rmd-tz, .rmd-vivo-panel, .rmd-paleta, .sapMDialog') || document.body;
   function ponerOrbeEn(el, estado, tam) {
     let s = el.querySelector(':scope > .rmd-orbe-txt');
     if (!s) { s = document.createElement('span'); s.className = 'rmd-orbe-txt'; while (el.firstChild) s.appendChild(el.firstChild); el.appendChild(s); }
-    if (!s.children.length) { s.dataset.texto = s.textContent; s.style.setProperty('--rmd-fase', `-${Math.round(performance.now() % 2000)}ms`); }   // (el brillo que recorre el texto)
+    if (!s.children.length) { s.dataset.texto = s.textContent; s.style.setProperty('--rmd-fase', `-${Math.round(performance.now() % 2000)}ms`); }
     const viejo = el.querySelector(':scope > canvas.rmd-orbe'), nuevo = orbe(estado, tam), r = raizDeOrbe(el), m = ORBE_MEMORIA.get(r);
     if (!viejo && m && m.estado === estado && m.tam === tam && Date.now() - m.t < 2500) nuevo.classList.add('rmd-sin-entrada');
     ORBE_MEMORIA.set(r, { estado, tam, t: Date.now() });
-    if (viejo) viejo.replaceWith(nuevo); else el.insertBefore(nuevo, s);   // (otro tipo de tarea: el orbe nuevo entra con un leve desenfoque)
+    if (viejo) viejo.replaceWith(nuevo); else el.insertBefore(nuevo, s);
     el.classList.remove('rmd-orbe-saliendo'); el.classList.add('rmd-con-orbe'); el.classList.toggle('rmd-espera-on', tam === 64);
   }
-  // Al terminar la espera el orbe se encoge y se desenfoca, y el mensaje final entra con un leve desenfoque (como en libraries.dev)
+  // salida: el orbe se encoge y el mensaje final entra con desenfoque
   function quitarOrbeDe(el, suave) {
     const o = el.querySelector(':scope > canvas.rmd-orbe'), s = el.querySelector(':scope > .rmd-orbe-txt');
     if (s) { delete s.dataset.texto; s.style.removeProperty('--rmd-fase'); }
     const fin = () => {
-      if (suave && !el.classList.contains('rmd-orbe-saliendo')) return;   // (volvió a esperar mientras salía)
+      if (suave && !el.classList.contains('rmd-orbe-saliendo')) return;
       if (o) o.remove(); const s2 = el.querySelector(':scope > .rmd-orbe-txt'); if (s2) s2.replaceWith(...s2.childNodes);
       el.classList.remove('rmd-con-orbe', 'rmd-espera-on', 'rmd-orbe-saliendo');
     };
@@ -3555,7 +3487,7 @@
     if (s) { s.classList.remove('rmd-texto-entra'); void s.offsetWidth; s.classList.add('rmd-texto-entra'); }
     setTimeout(fin, 270);
   }
-  // Brillo que recorre el borde de una ventana mientras trabaja (border-beam: https://libraries.dev/beam, MIT © 2026 Jakub Antalik)
+  // Brillo del borde (border-beam: https://libraries.dev/beam, MIT © 2026 Jakub Antalik)
   function brillo() {
     const b = document.createElement('div'); b.className = 'rmd-beam'; b.dataset.beam = temaOscuro() ? 'rmd' : 'rmdc';
     b.setAttribute('data-active', ''); b.setAttribute('aria-hidden', 'true'); b.innerHTML = '<div data-beam-bloom></div>'; return b;
@@ -3572,33 +3504,33 @@
   function gestionarOrbes() {
     if (!on('orbes')) { if (html.classList.contains('rmd-orbes') || document.querySelector('canvas.rmd-orbe, .rmd-beam')) quitarOrbes(); return; }
     html.classList.add('rmd-orbes');
-    ORBES.vivos.forEach((c) => { if (!c.isConnected) soltarOrbe(c); });   // (los que se quitaron con su ventana)
-    // 1) los mensajes de espera del script: el que dice «…» lleva su orbe (de 64 px si es la espera principal de la ventana)
+    ORBES.vivos.forEach((c) => { if (!c.isConnected) soltarOrbe(c); });
+    // 1) mensajes de espera con «…» llevan orbe
     document.querySelectorAll(ESPERAS).forEach((el) => {
-      if (!el.closest(CON_ORBES)) { if (el.classList.contains('rmd-con-orbe')) quitarOrbeDe(el); return; }   // (v1.53: solo en «Ver todas las OP» y en los Excel de reporte)
+      if (!el.closest(CON_ORBES)) { if (el.classList.contains('rmd-con-orbe')) quitarOrbeDe(el); return; }
       const t = norm(el.textContent), espera = /…|\.\.\./.test(t) && !el.classList.contains('error') && !el.hidden;
       if (!espera) { if (el.classList.contains('rmd-con-orbe') && !el.classList.contains('rmd-orbe-saliendo')) quitarOrbeDe(el, true); return; }
       const estado = el.dataset.orbe || estadoDeEspera(t), tam = el.classList.contains('rmd-espera') ? 64 : 20, o = el.querySelector(':scope > canvas.rmd-orbe');
       if (!o || o.__orbe.estado !== estado || o.__orbe.tam !== tam || el.classList.contains('rmd-orbe-saliendo')) ponerOrbeEn(el, estado, tam);
       else ORBE_MEMORIA.set(raizDeOrbe(el), { estado, tam, t: Date.now() });
     });
-    // 4) la ventana que lleva más de 1,2 s esperando algo muestra el brillo en su borde; se apaga sola al terminar
+    // 4) brillo en el borde tras 1,2 s de espera
     document.querySelectorAll(CON_ORBES).forEach((v) => {
       const ocupada = !ORBES.reducido.matches && !!v.querySelector('canvas.rmd-orbe:not(.rmd-orbe-sale)'), b = v.querySelector(':scope > .rmd-beam');
       if (!ocupada) {
         v.__rmdOcupada = 0; if (!b || b.dataset.fin) return;
         if (!b.hasAttribute('data-active')) { apagarBrillo(b); return; }
-        b.dataset.fin = v.querySelector('.rmd-progreso.error') ? 'mal' : 'ok'; setTimeout(() => apagarBrillo(b), 1300);   // (terminó: el brillo toma el color del resultado y se apaga)
+        b.dataset.fin = v.querySelector('.rmd-progreso.error') ? 'mal' : 'ok'; setTimeout(() => apagarBrillo(b), 1300);
         return;
       }
-      if (b && b.dataset.fin && !b.hasAttribute('data-fading')) delete b.dataset.fin;   // (volvió a trabajar)
+      if (b && b.dataset.fin && !b.hasAttribute('data-fading')) delete b.dataset.fin;
       if (!v.__rmdOcupada) { v.__rmdOcupada = Date.now(); setTimeout(() => { try { gestionarOrbes(); } catch (e) { /* se reintenta en el próximo ajuste */ } }, 1250); return; }
       if (Date.now() - v.__rmdOcupada >= 1200 && (!b || b.hasAttribute('data-fading'))) { if (b) b.remove(); v.appendChild(brillo()); }
     });
   }
-  // ---- Pestañas y filtros con un indicador que se desliza a la elegida (como las pestañas de libraries.dev) ----
+  // ---- Pestañas y filtros ----
   const GRUPOS_PESTANAS = '.rmd-cr-chips, .rmd-rg-tabs, .rmd-mm-modos';
-  const IND_MEMORIA = new WeakMap();   // ventana → { grupo: posición }: si la ventana se vuelve a pintar, el indicador sale de donde estaba
+  const IND_MEMORIA = new WeakMap();   // ventana -> { grupo: posición }
   const activaDe = (g) => [...g.children].find((x) => x.tagName === 'BUTTON' && (x.classList.contains('activo') || x.classList.contains('activa')));
   function colocarIndicador(g, animar) {
     const ind = g.__rmdInd; if (!ind || !ind.isConnected) return;
@@ -3613,7 +3545,7 @@
     ind.__rmdPuesto = true; mem[g.__rmdClave] = p;
   }
   function gestionarPestanas() {
-    return;                                                              // (v1.53: sin indicador deslizante)
+    return;
     document.querySelectorAll(GRUPOS_PESTANAS).forEach((g) => {
       if (g.__rmdInd && g.__rmdInd.isConnected) return;
       const linea = !g.classList.contains('rmd-cr-chips'), ind = document.createElement('i'); ind.className = 'rmd-ind' + (linea ? ' rmd-ind-linea' : ''); ind.setAttribute('aria-hidden', 'true');
@@ -3628,28 +3560,25 @@
       colocarIndicador(g, false);
     });
   }
-  // ---- Copiar: el icono se transforma en ✓ un momento (como el botón de copiar de libraries.dev) ----
+  // ---- Copiar ----
   const ICONO_OK = '<svg class="rmd-ico-ok" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 8.4l2.9 2.9 6.2-6.6"/></svg>';
   function confirmarCopia(b) {
-    return;                                                              // (v1.53: sin animación al copiar; el aviso de siempre basta)
+    return;
     const svg = b.querySelector(':scope > svg, :scope > .rmd-ico-swap');
     if (svg && !svg.classList.contains('rmd-ico-swap')) { const sw = document.createElement('span'); sw.className = 'rmd-ico-swap'; svg.replaceWith(sw); sw.appendChild(svg); sw.insertAdjacentHTML('beforeend', ICONO_OK); }
-    if (!svg) {   // (botón de solo texto: el texto cambia a «✓ Copiado» y vuelve)
+    if (!svg) {   // botón de texto: «✓ Copiado» temporal
       if (!b.__rmdTexto) b.__rmdTexto = b.textContent;
       b.textContent = '✓ Copiado'; b.classList.remove('rmd-texto-entra'); void b.offsetWidth; b.classList.add('rmd-texto-entra');
     }
     b.classList.add('rmd-copiado'); clearTimeout(b.__rmdCopiado);
     b.__rmdCopiado = setTimeout(() => { b.classList.remove('rmd-copiado'); if (b.__rmdTexto) { b.textContent = b.__rmdTexto; b.classList.remove('rmd-texto-entra'); void b.offsetWidth; b.classList.add('rmd-texto-entra'); } }, 1600);
   }
-  // ---- Vista móvil (v1.51) ----
-  // En un teléfono UI5 pasa cada fila de una tabla a una «tarjeta» de un solo campo por línea (un paso mide ~900 px) y esconde las columnas
-  // que el script necesita para sus avisos. Aquí se hace al revés: las tablas conservan TODAS sus columnas y celdas (así siguen funcionando las
-  // alertas, copiar y pegar, la selección, etc.) y solo cambia su presentación: cada fila es una tarjeta compacta hecha con CSS, con el nombre
-  // de cada campo tomado de la cabecera. Se activa sola con pantallas de hasta 700 px (o un teléfono, también en horizontal); no hay control en el panel.
+  // ---- Vista móvil ----
+  // Las tablas conservan todas sus columnas (alertas, copiar/pegar, selección); cada fila se presenta como tarjeta con CSS. Automática con ancho ≤ 700 px.
   const MQ_MOVIL = window.matchMedia ? window.matchMedia('(max-width: 700px)') : null;
   const esTelefono = () => !!(window.sap && sap.ui && sap.ui.Device && sap.ui.Device.system && sap.ui.Device.system.phone);
-  function movilActivo() { if (!opc.activo) return false; const m = opc.vistaMovil || 'auto'; return m === 'si' ? true : m === 'no' ? false : !!((MQ_MOVIL && MQ_MOVIL.matches) || esTelefono()); }   // (solo «auto» en uso; «si» / «no» guardados a mano o por las pruebas se respetan)
-  const POPIN_ORIG = new Map();                                       // columna (control UI5) -> [minScreenWidth, demandPopin], tal como los puso el portal o el script
+  function movilActivo() { if (!opc.activo) return false; const m = opc.vistaMovil || 'auto'; return m === 'si' ? true : m === 'no' ? false : !!((MQ_MOVIL && MQ_MOVIL.matches) || esTelefono()); }   // solo «auto»; «si» / «no» guardados se respetan
+  const POPIN_ORIG = new Map();                                       // columna -> [minScreenWidth, demandPopin] originales
   const slugCol = (n) => SIN_ACENTOS(n).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   function tipoTablaMovil(c, t) {
     const tiene = (x) => c.includes(x);
@@ -3674,7 +3603,7 @@
       for (let i = 0; i < cols.length; i++) {
         const td = tr.children[i]; if (!td || td.tagName !== 'TD') continue;
         if (cols[i]) { if (td.dataset.rmdCol !== cols[i]) td.dataset.rmdCol = cols[i]; if (td.dataset.rmdEtq !== nombres[i]) td.dataset.rmdEtq = nombres[i]; }
-        const vacio = !(td.textContent || '').trim() && !td.querySelector('button, [role=checkbox], [role=button], .sapUiIcon, img, svg, canvas') && [...td.querySelectorAll('input, textarea, select')].every((i) => !i.value && deshabilitado(i));   // (un campo vacío y deshabilitado no aporta nada en una tarjeta; uno editable sí)
+        const vacio = !(td.textContent || '').trim() && !td.querySelector('button, [role=checkbox], [role=button], .sapUiIcon, img, svg, canvas') && [...td.querySelectorAll('input, textarea, select')].every((i) => !i.value && deshabilitado(i));   // campo vacío y deshabilitado: se oculta en la tarjeta
         if (vacio !== (td.dataset.rmdVacio === '1')) { if (vacio) td.dataset.rmdVacio = '1'; else delete td.dataset.rmdVacio; }
       }
     });
@@ -3685,7 +3614,7 @@
       document.querySelectorAll('table.sapMListTbl').forEach((t) => {
         const ctl = ui5 ? sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')) : null;
         let cambio = false;
-        if (ctl && ctl.getColumns) ctl.getColumns().forEach((c) => {     // (en cada ajuste: también las columnas que se añaden más tarde, como «Fase»)
+        if (ctl && ctl.getColumns) ctl.getColumns().forEach((c) => {
           if (c.getMinScreenWidth() === '' && !c.getDemandPopin()) return;
           if (!POPIN_ORIG.has(c)) POPIN_ORIG.set(c, [c.getMinScreenWidth(), c.getDemandPopin()]);
           if (c.getMinScreenWidth() !== '') c.setMinScreenWidth('');
@@ -3701,13 +3630,10 @@
       document.querySelectorAll('td[data-rmd-col], td[data-rmd-etq], td[data-rmd-vacio]').forEach((td) => { delete td.dataset.rmdCol; delete td.dataset.rmdEtq; delete td.dataset.rmdVacio; });
     }
   }
-  // Filtros de la lista principal: en el teléfono quedan a la vista «Código RMD», «Descripción» y el último campo (Equipo); los del medio (estado,
-  // planta, etapa…) van tras «Más filtros». Los campos siguen ahí con su valor: «Ir» busca con todos. El botón indica cuántos ocultos están en uso.
-  // OJO con el AlignedFlowLayout de SAP: su reflow() escribe alto y ancho en el ÚLTIMO HIJO del layout y mide el último campo (si ese campo
-  // está oculto sus medidas son 0 y coloca mal el botón «Ir»): por eso el botón es hermano del layout y el último campo nunca se oculta.
+  // Filtros en móvil: visibles «Código RMD», «Descripción» y el último; el resto tras «Más filtros».
+  // AlignedFlowLayout.reflow() mide el último hijo: el botón va fuera del layout y el último campo nunca se oculta.
   function reflujoFiltros(lay) { try { const c = sap.ui.getCore().byId(lay.id); if (c && c.reflow) c.reflow(); } catch (e) { /* sin AlignedFlowLayout */ } }
-  // La barra de filtros de la PÁGINA: la ventana raíz del RMD trae su propio «btnGo» invisible (sap-ui-invisible-…-btnGo), que sale antes en el DOM
-  // porque las ventanas cuelgan de la zona estática de UI5 y su formulario de cabecera también es un AlignedFlowLayout: no es la barra de filtros.
+  // Barra de filtros de la página (la ventana raíz trae su propio btnGo invisible con otro AlignedFlowLayout).
   let layFiltrosPag = null;
   function layoutFiltrosPagina() {
     if (layFiltrosPag && layFiltrosPag.isConnected && !layFiltrosPag.closest('.sapMDialog')) return layFiltrosPag;
@@ -3743,7 +3669,7 @@
     b.setAttribute('aria-expanded', abierto ? 'true' : 'false');
     if (cambio) reflujoFiltros(lay);
   }
-  // Botón flotante de búsqueda (junto al de ajustes): en el teléfono no hay Ctrl+K, y «ir a un RMD» es lo más usado
+  // Botón flotante de búsqueda en móvil
   let buscarEl = null;
   function montarBuscarMovil(m) {
     if (!buscarEl) {
@@ -3753,30 +3679,30 @@
     const ver = m && on('paleta'); if (buscarEl.hidden === ver) buscarEl.hidden = !ver;
     if (ver && buscarEl.parentNode !== html) html.appendChild(buscarEl); else if (!ver && buscarEl.isConnected) buscarEl.remove();
   }
-  let movilPuesto = false;                                            // hay algo de la vista móvil puesto (marcas, botón, filtros): al salir se limpia una sola vez
+  let movilPuesto = false;                                            // limpieza única al salir de la vista móvil
   function gestionarVistaMovil() {
     const m = movilActivo(), clase = html.classList.contains('rmd-movil');
-    if (!m && !movilPuesto && !clase) return;                         // (escritorio sin nada puesto: no se recorre el DOM en cada ajuste)
+    if (!m && !movilPuesto && !clase) return;
     if (clase !== m) html.classList.toggle('rmd-movil', m);
     tablasMovil(m); gestionarFiltrosMovil(m); montarBuscarMovil(m);
     movilPuesto = m;
   }
   window.__rmdStats.movil = { activo: () => movilActivo(), gestionar: () => gestionarVistaMovil(), popinGuardadas: () => POPIN_ORIG.size,
-    modo: (m) => { if (m === 'auto') delete opc.vistaMovil; else opc.vistaMovil = m; guardar(opc); gestionarVistaMovil(); ajustarTodo(); } };   // (pruebas: forzar «si» / «no» o volver a «auto»)
+    modo: (m) => { if (m === 'auto') delete opc.vistaMovil; else opc.vistaMovil = m; guardar(opc); gestionarVistaMovil(); ajustarTodo(); } };   // pruebas: forzar «si» / «no» / «auto»
   function quitarVistaMovil() {
     if (!movilPuesto && !html.classList.contains('rmd-movil')) return;
     html.classList.remove('rmd-movil'); tablasMovil(false); gestionarFiltrosMovil(false); montarBuscarMovil(false); movilPuesto = false;
   }
   if (MQ_MOVIL && MQ_MOVIL.addEventListener) MQ_MOVIL.addEventListener('change', () => setTimeout(() => { try { gestionarVistaMovil(); } catch (e) { /* se reintenta en el siguiente ajuste */ } }, 50));
-  try { if (movilActivo()) html.classList.add('rmd-movil'); } catch (e) { /* sin matchMedia */ }   // (desde el primer instante: sin un destello con el diseño de escritorio)
+  try { if (movilActivo()) html.classList.add('rmd-movil'); } catch (e) { /* sin matchMedia */ }   // antes del primer render
   window.__rmdStats.orbes = { orbe, estadoDeEspera, faseDe, setTxt, confirmarCopia, colocarIndicador, vivos: () => ORBES.vivos.size, ciclo: () => !!ORBES.raf, motor: MOTOR_ORBES,
   };
   const resumenCasillas = (c) => Object.entries(c || {}).filter(([, v]) => v).map(([k]) => NOMBRE_CASILLA[k] || k).join(' + ') || 'sin casillas';
   const resumenPaso = (p) => `${p.tipo || '(sin tipo)'}${p.clave ? ' · ' + p.clave : ''}${p.puesto ? ' · ' + p.puesto : ''}${p.dec !== '' && p.dec != null ? ' · dec ' + p.dec : ''} · ${resumenCasillas(p.chk)}`;
 
-  // El portapapeles vive solo en memoria y mientras el RMD siga abierto: al cerrar todas las ventanas (o abrir otro RMD) se descarta.
+  // Portapapeles en memoria; se descarta al cerrar el RMD.
   let portapapeles = null;
-  try { localStorage.removeItem('rmdUiPortapapeles'); } catch (e) { /* versiones anteriores lo guardaban en el navegador: se elimina */ }
+  try { localStorage.removeItem('rmdUiPortapapeles'); } catch (e) { /* limpieza de almacenamiento antiguo */ }
   function limpiarPortapapeles() { portapapeles = null; pintarEstadoPortapapeles(); }
   function pintarEstadoPortapapeles() {
     document.querySelectorAll('.rmd-clip').forEach((sp) => {
@@ -3811,7 +3737,7 @@
     } catch (e) { toast('No se pudo copiar: ' + e.message, true); } finally { ocupadoCopia = false; }
   }
 
-  // Qué cambiaría en un proceso menor que ya existe en el destino (tipo, valores y casillas), en texto: "Edit: no → sí".
+  // Diferencias de un PM existente en el destino, en texto («Edit: no → sí»).
   const CAMPOS_PM = [['tipo', 'Tipo'], ['vi', 'Val. Inicial'], ['vf', 'Val. Final'], ['mg', 'Margen'], ['dec', 'Decimal']];
   function cambiosPM(o, a) {
     const c = CAMPOS_PM.filter(([k]) => norm(o[k]) !== norm(a[k])).map(([k, et]) => `${et}: ${norm(a[k]) || '—'} → ${norm(o[k]) || '—'}`);
@@ -3820,8 +3746,7 @@
   }
   const resumenValores = (vals) => { const m = new Map(); vals.forEach((x) => { const k = norm(x) || '—'; m.set(k, (m.get(k) || 0) + 1); }); return [...m].map(([k, n]) => (vals.length > 1 ? `${k} (${n})` : k)).join(' · '); };
 
-  // La vista previa (uno o varios destinos) devuelve las opciones elegidas o null si se cancela. En los procesos menores que ya
-  // existen en el destino muestra exactamente qué cambiaría; los que no cambiarían nada vienen desmarcados.
+  // Vista previa: devuelve las opciones o null si se cancela; PM sin cambios vienen desmarcados.
   function vistaPrevia(destinos) {
     return new Promise((resolver) => {
       const o = portapapeles.paso, varios = destinos.length > 1;
@@ -3868,7 +3793,7 @@
     else log(`⚠ El portal no mostró el mensaje de éxito: verifica que ${que} se guardaron.`);
   }
 
-  // Pega en UNO o VARIOS pasos marcados: la configuración se aplica a todos y se guarda una vez; los procesos menores, paso por paso.
+  // Pegar en uno o varios pasos: configuración con un solo Guardar; PM paso por paso.
   async function pegarPaso(d, tabla) {
     if (ocupadoCopia) return; ocupadoCopia = true;
     try {
@@ -3895,17 +3820,17 @@
       const log = (t) => { lineas.push(t); v.cuerpo.innerHTML = '<pre class="rmd-log">' + esc(lineas.join('\n')) + '</pre>'; v.cuerpo.scrollTop = v.cuerpo.scrollHeight; };
       const listo = botonModal('Cerrar', 'primario', () => v.cerrar()); listo.disabled = true; v.pie.append(listo);
       try {
-        // 1) configuración de los pasos mayores (todos los destinos) y un solo Guardar
+        // 1) pasos mayores y un Guardar
         const cfg = {}; for (const k of op.campos) cfg[k] = portapapeles.paso[k];
         cfg.chk = {}; for (const k of op.casillas) cfg.chk[k] = portapapeles.paso.chk[k];
         const hayCfg = op.campos.length || op.casillas.length;
         if (hayCfg) {
           for (const dd of destinos) { log(`Paso #${dd.paso.orden} · ${dd.paso.desc}`); await aplicarFila(tabla, dd.trId, cfg, columnas(tabla), log); }
-          d.__rmdInter = true;   // lo aplicado por el script cuenta como cambio sin guardar hasta que se guarde
+          d.__rmdInter = true;
           if (op.guardar) { await guardarYConfirmar(d, log, destinos.length > 1 ? 'los pasos' : 'el paso'); await esperar(1200); }
           else log('ℹ Configuración aplicada sin guardar: revisa y pulsa Guardar.');
         }
-        // 2) procesos menores, paso por paso (en su ventana solo se miran las filas de ESE paso: a veces el portal muestra toda la etiqueta)
+        // 2) PM paso por paso (solo filas de ese paso: el portal puede mostrar toda la etiqueta)
         const elegidos = op.pms.map((i) => portapapeles.pms[i]).filter((x) => !x.insumo);
         if (elegidos.length) for (const dd of destinos) {
           log(`\nProcesos menores del paso #${dd.paso.orden} (${elegidos.length} por revisar)…`);
@@ -3941,7 +3866,7 @@
     } catch (e) { toast('No se pudo pegar: ' + e.message, true); } finally { ocupadoCopia = false; ajustarTodo(); }
   }
 
-  // agrega un proceso menor (por código de paso) desde el selector "Adicionar Pasos RMD"; filtro: filas que son del paso abierto
+  // agrega un PM por código desde «Adicionar Pasos RMD»
   async function agregarPM(dPM, x, log, filtro = () => true) {
     const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
     const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
@@ -3959,7 +3884,7 @@
       return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(x.codigo));
     };
     let fila = await buscar();
-    if (!fila) {                                       // el selector viene filtrado por la estructura/etiqueta del paso: se quitan
+    if (!fila) {                                       // se quitan los filtros de estructura/etiqueta del selector
       for (const lab of ['Estructura', 'Etiqueta']) { const c = ctlFiltro(lab); if (c && c.setSelectedItem) { c.setSelectedItem(null); c.setValue(''); c.fireSelectionChange({ selectedItem: null }); c.fireChange({ value: '' }); } }
       await esperar(400); fila = await buscar();
     }
@@ -3977,23 +3902,20 @@
     log(`✔ ${x.codigo} agregado`);
   }
 
-  // ---- Ventana "Ver OP" (Ordenes de Produccion Asociadas): ver todas a la vez y exportar a CSV para filtrar/ordenar por fecha ----------
-  // La tabla NO usa "growing" (no basta con requestNewPage / subir el growingThreshold, como se probó primero): cada página son 5 OP
-  // que el propio controlador vuelve a pedir al servidor al pulsar la flecha "▷" (controller._currentSkip += controller._pageSize,
-  // vuelve a leer y REEMPLAZA el array del modelo). Por eso, para verlas o exportarlas todas a la vez, se pulsa esa misma flecha
-  // (con la API de UI5: no se inventa ninguna llamada propia) las veces que haga falta, se junta cada página y, al final, se
-  // sustituye el array del modelo por la unión completa: la tabla las pinta todas juntas, sin seguir paginando.
+  // ---- «Ver OP»: todas a la vez y exportación CSV ----
+  // Sin growing: cada página (5 OP) la relee el controlador con «▷» (_currentSkip += _pageSize) y reemplaza el array del modelo. Se recorren las páginas y
+  // se asigna la unión al modelo.
   const RX_VER_OP = /^Visualizar las Ordenes de Producci[oó]n/i;
   const ICONO_EXPORTAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8.2M4.8 6.9 8 10.1l3.2-3.2"/><path d="M2.5 11.5v1.8A1.2 1.2 0 0 0 3.7 14.5h8.6a1.2 1.2 0 0 0 1.2-1.2v-1.8"/></svg>';
   const ICONO_VER_TODAS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/></svg>';
   const csvCelda = (t) => '"' + String(t == null ? '' : t).replace(/"/g, '""').replace(/\s+/g, ' ').trim() + '"';
   function csvVerOP(t) {
-    // las celdas de Item/Acciones son iconos sin texto: se usan solo las columnas con encabezado de texto
+    // solo columnas con encabezado de texto
     const thsTodas = [...t.querySelectorAll('thead th')]; const idx = thsTodas.map((th, i) => [i, norm(th.textContent)]).filter(([, n]) => n);
     const filas = filasPrincipales(t);
     const lineas = [idx.map(([, n]) => csvCelda(n)).join(';')];
     filas.forEach((tr) => { lineas.push(idx.map(([i]) => csvCelda(celda(tr, i) && celda(tr, i).textContent)).join(';')); });
-    return String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10));   // BOM: para que Excel abra los acentos bien
+    return String.fromCharCode(0xfeff) + lineas.join(String.fromCharCode(13, 10));   // BOM UTF-8 para Excel
   }
   function descargarTexto(nombre, texto) {
     const blob = new Blob([texto], { type: 'text/csv;charset=utf-8' }), url = URL.createObjectURL(blob);
@@ -4001,9 +3923,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
   const objetoDeFila = (tr) => { const it = tr && typeof sap !== 'undefined' && sap.ui && sap.ui.getCore().byId(tr.id); if (!it || !it.oBindingContexts) return null; const n = Object.keys(it.oBindingContexts); const c = n.length && it.getBindingContext(n[0] === 'undefined' ? undefined : n[0]); return c && c.getObject(); };
-  // Recorre TODAS las páginas de "Ver OP" con la flecha "▷" del propio portal y junta lo que va mostrando cada una.
-  // Productos con mucho histórico (muchas campañas a lo largo de los años) pueden tener bastantes OP asociadas: se avisa el
-  // avance (por si tarda) y, pasadas 40 páginas (200 OP), se pregunta si seguir en vez de quedarse cargando sin más.
+  // Recorre todas las páginas con «▷»; confirma al pasar de 40 páginas (200 OP).
   async function cargarTodasOP(d, t, avisar) {
     const ctl = ctlDe(t); let c = ctl; while (c && !c.getController) c = c.getParent && c.getParent();
     const ctrl = c && c.getController(); const bi = ctl && ctl.getBinding && ctl.getBinding('items');
@@ -4018,10 +3938,7 @@
       const antes = ctrl._currentSkip;
       pulsar(btnDer);
       if (!(await hasta(() => ctrl._currentSkip !== antes, 15000))) break;
-      // El grueso del tiempo lo consume el propio portal (onGetRMDVerOP hace 10 llamadas OData anidadas por página: RMD, receta,
-      // estructura, equipo, paso, insumo, utensilio, especificación y etiqueta); probado en vivo que subir el tamaño de página
-      // NO ayuda (una página de 20 tardó más que 4 páginas de 5), así que no se toca `_pageSize`. Aquí solo se recorta la espera
-      // propia tras el indicador de ocupado (antes 500ms) al mínimo para que el DOM termine de pintar la página.
+      // onGetRMDVerOP hace 10 lecturas OData por página; páginas más grandes no mejoran. Solo se reduce la espera tras el busy indicator.
       await hasta(() => !ocupado(), 15000); await esperar(150);
       const pag = leerPagina(); if (!pag.length) break;
       agregar(pag); vueltas++;
@@ -4031,20 +3948,14 @@
     }
     return { ctrl, modelo: bi.getModel(), ruta: bi.getPath(), filas: acumulado };
   }
-  // Tras juntar todas las páginas, se pinta la tabla completa: apagar "growing" (no solo subir el umbral) es necesario porque
-  // cambiar growingThreshold después de que la tabla ya está pintada no la vuelve a pintar sola con más filas; con growing
-  // apagado, la tabla pinta TODO el arreglo del modelo sin ningún tope. Se espera a que el DOM realmente tenga esas filas
-  // antes de seguir (el CSV se arma leyendo la tabla ya pintada, así que si esto no se espera, se exportarían de menos).
+  // Con growing desactivado la tabla pinta todo el array; se espera a que el DOM tenga las filas (el CSV se lee de la tabla).
   async function pintarTodasEnTabla(t, modelo, ruta, filas) {
     const ctl = ctlDe(t); if (ctl && ctl.setGrowing) ctl.setGrowing(false);
     modelo.setProperty(ruta, filas);
     await hasta(() => filasPrincipales(t).length >= filas.length, 8000);
   }
-  // Carga rápida de TODAS las OP (v1.21): las mismas 10 lecturas que hace el portal por página (onGetRMDVerOP: la OP con su estado,
-  // receta, estructura, equipos, pasos, procesos menores, utensilios, especificaciones, insumos y etiquetas; mismo modelo, entidad,
-  // filtros, tamaño de página y orden) pero en paralelo y 3 páginas a la vez, sin el aviso "Cargando" de 8 s que el portal abre en
-  // cada página; al final se unen igual que lo hace el portal, así los botones de cada fila (Ver datos OP, Ver Registros,
-  // Desasociar) reciben lo mismo de siempre. Si algo falla, se usa la carga anterior (la flecha "▷" del portal, página por página).
+  // Carga rápida: las mismas 10 lecturas de onGetRMDVerOP, en paralelo (3 páginas a la vez), unidas como el portal. Si falla, se usa la paginación con
+  // «▷».
   const EXPANDS_VER_OP = ['mdId/estadoIdRmd,estadoIdRmd', 'aReceta/recetaId', 'aEstructura/estructuraId', 'aEstructura/aEquipo/equipoId', 'aEstructura/aPaso/pasoId',
     'aEstructura/aPasoInsumoPaso/pasoHijoId,aEstructura/aPasoInsumoPaso/rmdEstructuraRecetaInsumoId', 'aEstructura/aUtensilio/utensilioId,aEstructura/aUtensilio/agrupadorId',
     'aEstructura/aEspecificacion', 'aEstructura/aInsumo', 'aEstructura/aEtiqueta/etiquetaId'];
@@ -4073,7 +3984,7 @@
     const filas = resultado.filter(Boolean).flat();
     return { ctrl, modelo: local, ruta: '/Estructura', filas, total };
   }
-  // Aviso de avance encima de la tabla de "Ver OP" (barra, cuántas van y "Detener"): la tabla no parpadea página a página.
+  // Barra de avance sobre la tabla
   function avanceVerOP(d, alDetener) {
     const cont = d.querySelector('.sapMDialogSection') || d, o = document.createElement('div'); o.className = 'rmd-op-avance';
     o.innerHTML = '<div class="rmd-op-caja"><b>Cargando todas las OP…</b><div class="rmd-op-barra"><div></div></div><span class="rmd-op-txt">Contando las OP…</span></div>';
@@ -4097,7 +4008,7 @@
       }
     } finally { av.quitar(); }
   }
-  // tras mostrar todas, el rótulo de página del portal ("1 - 5") pasa a decir cuántas se ven
+  // el rótulo «1 - 5» muestra el total
   const rotuloTodas = (r) => { try { const m = r.ctrl.getView().getModel('oModelTemp'); if (m) m.setProperty('/pageRange', `1 - ${r.filas.length}${r.detenido ? ' (detenido)' : ''}`); } catch (e) { /* sin rótulo */ } };
   async function verTodasOP(d, t, boton) {
     boton.disabled = true;
@@ -4112,18 +4023,15 @@
     boton.disabled = true;
     try {
       const r = await obtenerTodasOP(d, t);
-      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r);   // así el CSV (que lee de la tabla ya pintada) las incluye todas
+      await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r);
       const rmd = (/RMD:\s*(\d+)/.exec(cabecera(d)) || [])[1] || 'rmd';
       descargarTexto(`OP_asociadas_${rmd}.csv`, csvVerOP(t));
     } catch (e) { toast('No se pudo exportar: ' + e.message, true); }
     finally { boton.disabled = false; }
   }
-  window.__rmdStats.cargarTodasOPRapido = (d, t) => cargarTodasOPRapido(d, t);   // (diagnóstico)
-  window.__rmdStats.csvVerOP = csvVerOP;   // diagnóstico: genera el CSV sin descargarlo
-  // Filtro por columna al estilo Excel: un icono de embudo junto a cada encabezado abre un desplegable con los valores
-  // únicos de esa columna (con buscador y casillas, como el AutoFiltro de Excel); desmarcar valores oculta esas filas.
-  // El estado (qué valores quedan marcados por columna) vive en la propia tabla (t.__rmdFiltrosCol) y se reaplica cada vez
-  // que se llama (idempotente): sigue filtrando tras "Ver todas" o la flecha "▷". Se combinan varias columnas con Y.
+  window.__rmdStats.cargarTodasOPRapido = (d, t) => cargarTodasOPRapido(d, t);   // pruebas
+  window.__rmdStats.csvVerOP = csvVerOP;   // pruebas: CSV sin descarga
+  // Filtro por columna tipo AutoFiltro de Excel. Estado en t.__rmdFiltrosCol; idempotente; columnas combinadas con Y.
   const ICONO_FILTRO_COL = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1.5h10l-3.7 4.6V10l-2.6 1.3V6.1Z"/></svg>';
   function valoresColumnaVerOP(t, i) {
     const vistos = new Map();
@@ -4222,11 +4130,9 @@
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
   }
 
-  // ==XLSX-INICIO== (no quitar esta marca ni la de cierre: las pruebas extraen este bloque para correrlo fuera del portal)
-  // Libro .xlsx propio, sin librerías (el portal no trae ninguna que escriba tablas dinámicas): celdas con estilo, fórmulas con
-  // su valor ya calculado, autofiltro, paneles fijos y TABLAS DINÁMICAS reales: su caché lleva los registros y la tabla va ya
-  // pintada, así se ven y se pueden filtrar apenas se abre el archivo, en Excel de escritorio o en Excel para la web. También
-  // lee .xlsx (para tomar las listas del mes anterior). Comprime con CompressionStream (deflate-raw), del propio navegador.
+  // ==XLSX-INICIO==
+  // Escritor/lector .xlsx sin dependencias: estilos, fórmulas con valor en caché, autofiltro, paneles fijos y tablas dinámicas con caché. Comprime con
+  // CompressionStream (deflate-raw).
   const Xlsx = (() => {
     const utf8 = new TextEncoder(), deUtf8 = new TextDecoder();
     const TABLA_CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -4236,7 +4142,7 @@
     const descomprimir = (u8) => porTubo(u8, new DecompressionStream('deflate-raw'));
     const unir = (partes) => { const n = partes.reduce((s, p) => s + p.length, 0), out = new Uint8Array(n); let o = 0; partes.forEach((p) => { out.set(p, o); o += p.length; }); return out; };
 
-    // ---- ZIP (el contenedor del .xlsx) ----
+    // ---- ZIP ----
     async function zip(archivos) {
       const partes = [], central = []; let desplazamiento = 0;
       const d = new Date(), hora = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), fecha = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
@@ -4273,29 +4179,28 @@
 
     // ---- XML ----
     const escXml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    // Caracteres que XML no admite (y, dentro de atributos, los saltos de línea) van como _xHHHH_, igual que los escribe Excel.
+    // Caracteres no válidos en XML (y saltos en atributos) como _xHHHH_.
     const escX = (s, enAtributo) => escXml(String(s).replace(/_x([0-9A-Fa-f]{4})_/g, '_x005F_x$1_')
       .replace(enAtributo ? /[\u0000-\u001F\uFFFE\uFFFF]/g : /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, (c) => '_x' + c.charCodeAt(0).toString(16).padStart(4, '0') + '_'));
     const desX = (s) => String(s).replace(/&(lt|gt|quot|apos|amp|#(\d+)|#x([0-9a-f]+));/gi, (m, n, dec, hex) => (dec ? String.fromCodePoint(+dec) : hex ? String.fromCodePoint(parseInt(hex, 16)) : { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' }[n.toLowerCase()]))
       .replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
     const letra = (c) => { let s = ''; for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s; };
-    const ref = (c, r) => letra(c) + (r + 1);                                            // columna y fila desde 0
+    const ref = (c, r) => letra(c) + (r + 1);
     const deRef = (x) => { const m = /^([A-Z]+)(\d+)$/.exec(x); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return { c: c - 1, r: +m[2] - 1 }; };
     const numXml = (n) => (Number.isInteger(n) ? String(n) : String(+n.toPrecision(15)));
 
-    // ---- fechas de Excel (sistema 1900) ----
-    // Una fecha se escribe con su hora UTC, igual que el "Exportar" nativo del portal (sap.ui.export escribe las fechas en UTC):
-    // así el archivo muestra lo mismo que el exportado a mano, en cualquier zona horaria. Para un día sin hora: Date.UTC(a, m, d).
+    // ---- Fechas Excel (1900) ----
+    // Se escriben en UTC, como sap.ui.export. Día sin hora: Date.UTC(a, m, d).
     const serialDeFecha = (d) => d.getTime() / 86400000 + 25569;
     const isoFecha = (d) => d.toISOString().slice(0, 19);
     const ERRORES = new Set(['#NULL!', '#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#NUM!', '#N/A']);
     const esError = (v) => !!v && typeof v === 'object' && !!v.error;
     const error = (codigo) => ({ error: codigo });
 
-    // ---- estilos (índices fijos que usan las hojas) ----
-    // [nombre, formato de número, fuente, relleno, borde, alineación]. Fuentes: 0 normal, 1 negrita, 2 título, 3 nota, 4 negrita
-    // blanca, 5 negrita roja, 6 negrita 10. Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo,
-    // 9 amarillo claro. Formatos propios: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0, 167 dd/mm/aaaa, 168 0.0%; 17 = mmm-aa.
+    // ---- Estilos (índices fijos) ----
+    // [nombre, numFmt, fuente, relleno, borde, alineación]. Fuentes: 0 normal, 1 negrita, 2 título, 3 nota, 4 negrita blanca, 5 negrita roja, 6 negrita 10.
+    // Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo, 9 amarillo claro. numFmt: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0,
+    // 167 dd/mm/aaaa, 168 0.0%, 17 mmm-aa.
     const ESTILOS = [['normal', 0, 0, 0, 0], ['cabecera', 0, 1, 2, 0], ['cabeceraVerde', 0, 0, 3, 0, 'horizontal="center"'],
       ['cabeceraVerdeFecha', 165, 0, 3, 0, 'horizontal="center" wrapText="1"'], ['cabeceraAmbar', 0, 1, 4, 0, 'horizontal="center"'],
       ['cabeceraGris', 0, 1, 5, 0, 'horizontal="center"'], ['fecha', 164, 0, 0, 0], ['texto', 0, 0, 0, 0, 'horizontal="left"'],
@@ -4316,24 +4221,20 @@
 <cellXfs count="${ESTILOS.length}">${ESTILOS.map(([, nf, fo, fi, bo, al]) => `<xf numFmtId="${nf}" fontId="${fo}" fillId="${fi}" borderId="${bo}" xfId="0"${nf ? ' applyNumberFormat="1"' : ''}${fo ? ' applyFont="1"' : ''}${fi ? ' applyFill="1"' : ''}${bo ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1"><alignment ${al}/></xf>` : '/>'}`).join('')}</cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 
-    // ---- libro ----
-    // hoja.celdas: Map "fila,columna" -> { v, f, s }; v puede ser texto, número, Date, booleano, null o error('#VALUE!').
+    // ---- Libro ----
+    // hoja.celdas: Map "fila,col" -> { v, f, s }; v: texto, número, Date, booleano, null o error('#VALUE!').
     function crearLibro() {
       const hojas = [], cachés = [], dinamicas = [];
       const hoja = (nombre, op = {}) => {
-        // tabla: { nombre, ref } convierte ese rango (con su fila de encabezados) en una tabla de Excel, con su propio autofiltro;
-        // con estilo (p. ej. 'TableStyleMedium2') lleva ese diseño de Excel con filas en franjas.
+        // tabla: { nombre, ref, estilo? } -> tabla de Excel con autofiltro
         const h = { nombre, filas: new Map(), cols: op.cols || [], congelar: op.congelar || null, filtro: op.tabla ? null : op.filtro || null, tabla: op.tabla || null, activa: !!op.activa, dinamicas: [], combinadas: [] };
         h.poner = (celda, v, s, f) => { const { c, r } = typeof celda === 'string' ? deRef(celda) : celda; let fila = h.filas.get(r); if (!fila) { fila = new Map(); h.filas.set(r, fila); } fila.set(c, { v, s: s == null ? undefined : (typeof s === 'string' ? S[s] : s), f }); };
         h.combinar = (rango) => { h.combinadas.push(rango); };
         hojas.push(h); return h;
       };
-      // Caché de tabla dinámica: los datos de origen tal como los ve Excel (una fila por registro, un valor por campo). extras:
-      // { campo: [valores] } que no están en los datos pero que los filtros deben conocer (Excel los guarda como elementos "sin
-      // uso"): así, si alguien escribe luego ese valor en la hoja y actualiza, el filtro ya sabe si lo muestra o lo oculta.
-      // op.tabla: nombre de la tabla de Excel de origen (así, al actualizar, la tabla dinámica toma también las filas agregadas).
+      // Caché de tabla dinámica: registros de origen. extras: { campo: [valores] } sin uso. op.tabla: tabla de origen.
       const cache = (hojaOrigen, campos, registros, rango, op = {}) => { const c = { id: cachés.length + 1, hoja: hojaOrigen, campos, registros, rango, tabla: op.tabla || null, usados: new Set(), extras: op.extras || {} }; cachés.push(c); return c; };
-      // La tabla se calcula y se pinta en el momento (así quien la crea sabe cuánto ocupa y dónde poner lo siguiente).
+      // La tabla se calcula y se pinta al crearla (devuelve su extensión).
       const dinamica = (hojaDestino, cacheDinamica, def) => {
         const d = { ...def, cache: cacheDinamica, hoja: hojaDestino }; [...def.filas, ...(def.columnas || []), ...(def.paginas || []).map((p) => p.campo)].forEach((n) => cacheDinamica.usados.add(n));
         d.pintada = pintarDinamica(d); hojaDestino.dinamicas.push(d); dinamicas.push(d); return d.pintada;
@@ -4341,8 +4242,7 @@
       return { hoja, cache, dinamica, generar: () => generarLibro(hojas, cachés, dinamicas), hojas };
     }
 
-    // Orden de Excel para los elementos de una tabla dinámica: números, textos (sin distinguir mayúsculas), lógicos, errores y
-    // al final el vacío "(en blanco)".
+    // Orden de elementos: números, textos (sin mayúsculas), lógicos, errores, vacío.
     const claseOrden = (v) => (v == null || v === '' ? 4 : typeof v === 'number' ? 0 : v instanceof Date ? 0 : typeof v === 'boolean' ? 2 : esError(v) ? 3 : 1);
     const comparar = (a, b) => {
       const ca = claseOrden(a), cb = claseOrden(b); if (ca !== cb) return ca - cb;
@@ -4353,7 +4253,7 @@
       return 0;
     };
     const claveElemento = (v) => (v == null || v === '' ? (v === '' ? 's:' : 'm') : typeof v === 'number' ? 'n:' + v : v instanceof Date ? 'd:' + v.getTime() : typeof v === 'boolean' ? 'b:' + v : esError(v) ? 'e:' + v.error : 's:' + String(v).toLowerCase());
-    // Celda vacía: "(en blanco)"; texto vacío (una fórmula que devuelve ""): elemento sin rótulo, como lo muestra Excel.
+    // Vacío: «(en blanco)»; texto "": elemento sin rótulo.
     const rotulo = (v) => (v == null ? '(en blanco)' : v === '' ? '' : v instanceof Date ? isoFecha(v).slice(0, 10) : esError(v) ? v.error : v);
 
     function xmlCelda(c, r, x) {
@@ -4371,14 +4271,14 @@
       if (v instanceof Date) return `<c ${at}><v>${numXml(serialDeFecha(v))}</v></c>`;
       if (typeof v === 'boolean') return `<c ${at} t="b"><v>${v ? 1 : 0}</v></c>`;
       if (esError(v)) return `<c ${at} t="e"><v>${v.error}</v></c>`;
-      return null;                                                                           // texto: va a las cadenas compartidas
+      return null;                                                                           // texto -> sharedStrings
     }
 
     async function generarLibro(hojas, cachés, dinamicas) {
       const compartidas = new Map(), lista = [];
       const idTexto = (t) => { let i = compartidas.get(t); if (i === undefined) { i = lista.length; compartidas.set(t, i); lista.push(t); } return i; };
       const archivos = [];
-      const pintadas = dinamicas.map((d) => d.pintada), tablas = [];                         // (las dinámicas se pintaron al crearlas)
+      const pintadas = dinamicas.map((d) => d.pintada), tablas = [];
       hojas.forEach((h, ih) => {
         const filas = [...h.filas.keys()].sort((a, b) => a - b); let maxC = 0, maxR = 0;
         const cuerpo = filas.map((r) => {
@@ -4430,9 +4330,8 @@
       return zip(archivos);
     }
 
-    // ---- tablas dinámicas ----
-    // Por cada campo usado en alguna tabla: sus elementos únicos (sin distinguir mayúsculas, como Excel), en el orden en que
-    // aparecen; y el orden en que se muestran (ascendente).
+    // ---- Tablas dinámicas ----
+    // Por campo: elementos únicos (sin mayúsculas) en orden de aparición y orden ascendente de visualización.
     function elementosDe(c, nombre) {
       c.elementos = c.elementos || {};
       if (c.elementos[nombre]) return c.elementos[nombre];
@@ -4477,7 +4376,7 @@
       const campos = c.campos.map((nombre, i) => {
         const valores = c.registros.map((r) => r[i]), t = tipoCampo(valores);
         if (!conElementos.has(nombre)) return `<cacheField name="${escXml(nombre)}" numFmtId="0"><sharedItems ${atributosElementos(t)}/></cacheField>`;
-        const e = elementosDe(c, nombre), te = e.sinUso.size ? tipoCampo(e.valores) : t;         // los elementos sin uso también cuentan
+        const e = elementosDe(c, nombre), te = e.sinUso.size ? tipoCampo(e.valores) : t;
         return `<cacheField name="${escXml(nombre)}" numFmtId="0"><sharedItems ${atributosElementos(te, e.valores.length)}>${e.valores.map((v, k) => xmlValorCache(v, e.sinUso.has(k))).join('')}</sharedItems></cacheField>`;
       });
       const idx = c.campos.map((n) => (conElementos.has(n) ? elementosDe(c, n) : null));
@@ -4492,16 +4391,14 @@
       ];
     }
 
-    // Calcula y pinta una tabla dinámica en formato tabular (como las del archivo de indicadores): filtros de página arriba, una
-    // fila de encabezados, las filas con sus subtotales ("Total …") y el "Total general". def: { nombre, celda, filas[], columnas[],
-    // paginas[{ campo, visible(v) }], ocultar{ campo: fn(v) }, valor{ campo, funcion 'count'|'sum', nombre } }.
+    // Tabla dinámica tabular: filtros de página, encabezados, subtotales y total general.
+    // def: { nombre, celda, filas[], columnas[], paginas[{ campo, visible(v) }], ocultar{ campo: fn }, valor{ campo, funcion 'count'|'sum', nombre } }
     function pintarDinamica(d) {
       const c = d.cache, h = d.hoja, cols = d.columnas || [], pags = d.paginas || [];
       const E = {}; [...d.filas, ...cols, ...pags.map((p) => p.campo)].forEach((n) => { E[n] = elementosDe(c, n); });
       const visibleEn = (n) => { const p = pags.find((x) => x.campo === n), o = d.ocultar && d.ocultar[n]; return (v) => (!p || p.visible(v)) && (!o || !o(v)); };
       const filtros = Object.keys(E).map((n) => ({ i: E[n].i, ok: visibleEn(n) }));
       const iValor = c.campos.indexOf(d.valor.campo);
-      // registros que pasan todos los filtros
       const regs = c.registros.filter((r) => filtros.every((f) => f.ok(r[f.i])));
       const posDe = (n, v) => E[n].posicion.get(E[n].indice.get(claveElemento(v)));
       const acumular = (acc, v) => {
@@ -4511,7 +4408,6 @@
       };
       const nuevo = () => ({ n: 0, s: 0, err: null, hay: false });
       const final = (acc) => (d.valor.funcion === 'count' ? (acc.n ? acc.n : null) : acc.err ? error(acc.err) : acc.n ? +acc.s.toPrecision(15) : null);
-      // árbol de filas y columnas con los agregados
       const R = d.filas.length, iF = d.filas.map((n) => E[n].i), iC = cols.map((n) => E[n].i);
       const raiz = { hijos: new Map(), acc: nuevo(), porCol: new Map() }, totalCol = new Map(), colsVistas = new Set();
       regs.forEach((reg) => {
@@ -4527,7 +4423,6 @@
         }
       });
       const colsOrden = [...colsVistas].sort((a, b) => a - b);
-      // geometría
       const { c: c0, r: r0 } = deRef(d.celda), encab = cols.length ? 2 : 1, ancho = R + (cols.length ? colsOrden.length + 1 : 1);
       const lineas = [];                                                                     // { tipo, nivel, ruta[], nodo, r }
       const recorrer = (nodo, nivel, ruta, rep) => {
@@ -4543,8 +4438,7 @@
       const valorDe = (nodo, kc) => final(kc == null ? nodo.acc : nodo.porCol.get(kc) || nuevo());
       const poner = (cc, rr, v, s) => { if (v != null) h.poner({ c: cc, r: rr }, v, s); };
       const valorCampo = (n, p) => rotulo(E[n].valores[E[n].orden[p]]);
-      // filtros de página: rótulo y lo que muestra ("(Todas)", "(Varios elementos)", el único elemento o "(en blanco)"); como en
-      // Excel, solo cuentan los elementos que están en los datos (no los "sin uso").
+      // filtros de página: «(Todas)», «(Varios elementos)», el elemento o «(en blanco)»; solo elementos presentes en los datos
       pags.forEach((p, k) => {
         const e = E[p.campo], usados = e.orden.filter((x) => !e.sinUso.has(x)), vis = usados.filter((x) => p.visible(e.valores[x]));
         const texto = vis.length === usados.length ? '(Todas)' : vis.length === 1 ? rotulo(e.valores[vis[0]]) : '(Varios elementos)';
@@ -4564,7 +4458,6 @@
         else poner(c0 + R, rr, valorDe(L.nodo, null));
       });
       const rFin = rEnc + lineas.length;
-      // XML de la tabla
       const x = (p) => (p ? `<x v="${p}"/>` : '<x/>');
       const rowItems = lineas.map((L) => (L.tipo === 'dato' ? `<i${L.r ? ` r="${L.r}"` : ''}>${L.ruta.slice(L.r).map(x).join('')}</i>`
         : L.tipo === 'sub' ? `<i t="default"${L.nivel ? ` r="${L.nivel}"` : ''}>${x(L.ruta[L.nivel])}</i>` : '<i t="grand"><x/></i>')).join('');
@@ -4581,7 +4474,7 @@
       const ubic = `<location ref="${ref(c0, r0)}:${ref(c0 + ancho - 1, rFin)}" firstHeaderRow="1" firstDataRow="${cols.length ? 2 : 1}" firstDataCol="${R}"${pags.length ? ` rowPageCount="${pags.length}" colPageCount="1"` : ''}/>`;
       const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="${escXml(d.nombre)}" cacheId="${c.id}" applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Valores" updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" createdVersion="8" indent="0" compact="0" compactData="0" multipleFieldFilters="0">${ubic}<pivotFields count="${campos.length}">${campos.join('')}</pivotFields><rowFields count="${R}">${d.filas.map((n) => `<field x="${E[n].i}"/>`).join('')}</rowFields><rowItems count="${lineas.length}">${rowItems}</rowItems>${cols.length ? `<colFields count="1"><field x="${E[cols[0]].i}"/></colFields>` : ''}<colItems count="${cols.length ? colsOrden.length + 1 : 1}">${colItems}</colItems>${pags.length ? `<pageFields count="${pags.length}">${pags.map((p) => `<pageField fld="${E[p.campo].i}" hier="-1"/>`).join('')}</pageFields>` : ''}<dataFields count="1"><dataField name="${escXml(d.valor.nombre)}" fld="${iValor}"${d.valor.funcion === 'count' ? ' subtotal="count"' : ''} baseField="0" baseItem="0"/></dataFields><pivotTableStyleInfo name="PivotStyleLight16" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/></pivotTableDefinition>`;
-      // valorDe(['PLANTA ATE', 'NC']) -> el total de esa fila (o de ese subtotal) tal como queda en la tabla; null si no aparece.
+      // valorDe(ruta) -> total de esa fila o subtotal; null si no aparece
       const valorDeFila = (etiquetas) => {
         let nodo = raiz;
         for (let k = 0; k < etiquetas.length; k++) {
@@ -4593,7 +4486,7 @@
       return { xml, cache: c, celda: ref(c0, r0), rango: `${ref(c0, r0)}:${ref(c0 + ancho - 1, rFin)}`, filaIni: r0, filaFin: rFin, colIni: c0, colFin: c0 + ancho - 1, lineas: lineas.length, valorDe: valorDeFila };
     }
 
-    // ---- lectura mínima de un .xlsx (valores de las hojas) ----
+    // ---- Lectura mínima de .xlsx ----
     async function leerLibro(u8) {
       const z = await leerZip(u8);
       const wb = await z.leer('xl/workbook.xml'), rels = await z.leer('xl/_rels/workbook.xml.rels');
@@ -4604,7 +4497,7 @@
       if (ss) for (const m of ss.matchAll(/<si>([\s\S]*?)<\/si>/g)) compartidas.push([...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*?(?:\/>|>([\s\S]*?)<\/t>)/g)].map((t) => desX(t[1] || '')).join(''));
       return {
         hojas: hojas.map((h) => h.nombre),
-        async filas(nombre) {                                                                   // [[valor…]…], con los huecos en null
+        async filas(nombre) {
           const h = hojas.find((x) => x.nombre === nombre); if (!h) return null;
           const xml = await z.leer(h.ruta); if (!xml) return null;
           const filas = [];
@@ -4625,9 +4518,8 @@
       };
     }
 
-    // ---- .xls de Excel 97-2003 (v1.34, para la lista de documentos vigentes que exporta el DMS): archivo compuesto (CFB) con el
-    // libro BIFF8 dentro. Solo lee valores: texto (tabla de cadenas compartidas SST y LABEL), números (NUMBER, RK, MULRK), lógicos y
-    // el valor ya calculado de las fórmulas. Misma forma que leerLibro: { hojas, filas(nombre) } con las filas en [[valor…]…].
+    // ---- .xls (BIFF8 en CFB) ----
+    // Solo valores: SST/LABEL, NUMBER/RK/MULRK, lógicos y valor en caché de fórmulas. Misma interfaz que leerLibro.
     function leerXls(u8) {
       const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), u16 = (o) => dv.getUint16(o, true), u32 = (o) => dv.getUint32(o, true);
       if (![0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1].every((b, i) => u8[i] === b)) throw new Error('no es un archivo .xls de Excel 97-2003');
@@ -4655,7 +4547,7 @@
       const regs = []; for (let o = 0; o + 4 <= wb.length;) { const tipo = v.getUint16(o, true), lon = v.getUint16(o + 2, true); regs.push({ tipo, o: o + 4, lon }); o += 4 + lon; }
       if (!regs.length || regs[0].tipo !== 0x0809 || v.getUint16(regs[0].o, true) !== 0x0600) throw new Error('es un .xls de una versión antigua de Excel (anterior a 97): ábrelo y guárdalo como .xlsx');
       const cp1252 = new TextDecoder('windows-1252'), utf16 = new TextDecoder('utf-16le');
-      // cadena Unicode de BIFF8, que puede seguir en registros CONTINUE (cada tramo trae su propio byte de opciones)
+      // cadena Unicode BIFF8, puede continuar en registros CONTINUE
       function lectorCadenas(partes) {
         let p = 0, o = 0;
         const byte = () => { if (o >= partes[p].lon) { p++; o = 0; } return wb[partes[p].o + o++]; };
@@ -4715,11 +4607,9 @@
   })();
   // ==XLSX-FIN==
 
-  // ==INDICADORES-INICIO== (no quitar esta marca ni la de cierre: las pruebas extraen este bloque para correrlo fuera del portal)
-  // Indicadores del mes: arma "BD RMD <MES> <AÑO> - P1-P2.xlsx" igual al que el equipo prepara a mano cada mes a partir del
-  // "Exportar" nativo: hoja "Exportación SAPUI5" (las 18 columnas del Exportar + las 12 calculadas, con las mismas fórmulas),
-  // PEND PL1, PEND PL2, RESUMEN (las 7 tablas dinámicas en las mismas celdas y con los mismos filtros) y Hoja1 (productividad
-  // por persona). Este bloque solo calcula: los RMD los lee de SAP quien lo llama (la misma lectura de "Enviar a Status RMD").
+  // ==INDICADORES-INICIO==
+  // Indicadores mensuales: «BD RMD <MES> <AÑO> - P1-P2.xlsx» (datos + 12 columnas calculadas, PEND PL1, PEND PL2, RESUMEN con 7 tablas dinámicas y Hoja1).
+  // Solo cálculo; la lectura de SAP la hace quien llama.
   const Indicadores = (() => {
     const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
     const HOJA_DATOS = 'Exportación SAPUI5', REF_DATOS = "'Exportación SAPUI5'", TABLA_DATOS = 'DatosRMD';
@@ -4728,8 +4618,7 @@
       'Fec Ingreso Real', 'F.I Real', 'Dias', 'Usuario', 'Prioridad', 'No contar', 'FC', 'FI', 'FA', 'Por revisar', 'RMD ING', 'RMD APR'];
     const C = Object.fromEntries(CAMPOS.map((n, i) => [n, i]));
     const L = Object.fromEntries(CAMPOS.map((n, i) => [n, Xlsx.letra(i)]));
-    // Las columnas calculadas llevan las mismas fórmulas del archivo del equipo (n = fila de Excel); su valor se calcula aquí
-    // con las mismas reglas de Excel, para que el archivo se vea completo aun sin recalcular y las tablas dinámicas coincidan.
+    // Columnas calculadas: mismas fórmulas del archivo manual; el valor se calcula aquí para no depender del recálculo.
     const FORMULAS = {
       'Fec Ingreso Real': (n) => `MID(R${n},1,8)`, 'F.I Real': (n) => `TEXT(S${n},"0000-00-00")`, Dias: (n) => `NETWORKDAYS(T${n},K${n})`,
       Usuario: (n) => `MID(R${n},9,2)`, Prioridad: (n) => `MID(R${n},12,1)`, FC: (n) => `MID(R${n},15,3)`, FI: (n) => `MID(R${n},21,3)`,
@@ -4742,10 +4631,10 @@
       [19, 19, 11.5], [20, 23, 9], [24, 24, 12.375], [25, 27, 7], [28, 28, 34], [29, 30, 10]];
     const ANCHOS_RESUMEN = [[1, 1, 18.75], [2, 2, 21.25], [3, 7, 7], [16, 16, 17.25], [17, 17, 22.75], [18, 18, 18.375], [30, 30, 15.375], [31, 31, 19.5],
       [32, 32, 17.75], [52, 52, 13.375], [53, 53, 19.5], [54, 54, 21.75], [67, 67, 26.375], [68, 68, 12]];
-    // Personas de Hoja1 (las del archivo de agosto): planta, nombre, iniciales en la Observación y usuario de SAP que autoriza.
+    // Hoja1: planta, nombre, iniciales en Observación y usuario SAP que autoriza.
     const PERSONAS = [['PLANTA 1', 'CUELLAR LOYOLA NOELIA ROSA', 'NC', 'NCUELLARL'], ['PLANTA 1', 'QUISPE JIMENA', 'JQ', 'JQUISPEP'],
       ['PLANTA 2', 'MORENO KARLA VANESSA', 'VM', 'KMORENOM'], ['PLANTA 2', 'DINA  VALDERRAMA', 'DV', '']];
-    // Plazos del "% dentro de plazo" (días hábiles de ingreso a autorización), los mismos con que se calculó "% PRIO" en julio.
+    // Plazos del «% dentro de plazo» (días hábiles ingreso -> autorización).
     const PLAZOS = [['1', 5], ['2', 10], ['3', 30]];
     const PLANTAS = ['PLANTA ATE', 'PLANTA LIMA'];
     const NO_CONTAR_CONOCIDOS = ['PEND CC', 'PEND JEFE/GER', 'NO CONTAR', 'REVISAR', 'POR INGRESAR'];
@@ -4755,12 +4644,10 @@
     const texto = (v) => (v == null ? '' : Xlsx.esError(v) ? v.error : limpio(v));
     const vacio = (v) => v == null || v === '';
 
-    // ---- funciones de Excel que usan las columnas calculadas ----
+    // ---- Funciones de Excel ----
     const VALOR = Xlsx.error('#VALUE!');
     const mid = (t, ini, n) => (t == null ? '' : String(t)).substr(ini - 1, n);                          // MID
-    // Texto -> número como lo convierte Excel (en español) al operar: ignora solo espacios (un salto de línea da #VALUE!), signo
-    // (también "- 2"), miles con coma, punto decimal, exponente y %; y también fechas y horas cortas: AAAA-MM-DD, d-m, d/m/aa
-    // (día primero; sin año, el año en curso) y h:mm. Comprobado contra lo que calculó Excel en las 11 013 filas de agosto.
+    // Texto -> número como Excel (es): espacios, signo, miles, decimal, exponente, %, fechas cortas (AAAA-MM-DD, d-m, d/m/aa) y h:mm.
     const DIA_CERO = Date.UTC(1899, 11, 30), ANIO_ACTUAL = new Date().getFullYear();
     const serialDe = (a, me, d) => { if (a < 1900 || a > 9999 || me < 1 || me > 12 || d < 1) return null; const x = Date.UTC(a, me - 1, d); return new Date(x).getUTCDate() === d ? (x - DIA_CERO) / 86400000 : null; };
     function aNumero(v) {
@@ -4778,7 +4665,7 @@
       if ((m = /^(\d{1,2}):(\d{0,2})(?::(\d{1,2}))?$/.exec(t)) && +m[1] < 24) return (+m[1] + (+m[2] || 0) / 60 + (+m[3] || 0) / 3600) / 24;
       return null;
     }
-    // TEXT(v;"0000-00-00"): un texto que Excel lee como número (o fecha) se escribe con ese formato; otro texto queda igual.
+    // TEXT(v;"0000-00-00")
     function texto0000(v) {
       if (v == null || v === '') return '';
       const n = aNumero(v);
@@ -4786,10 +4673,9 @@
       const r = Math.round(Math.abs(n)), s = String(r).padStart(8, '0');
       return (n < 0 && r ? '-' : '') + s.slice(0, s.length - 4) + '-' + s.slice(-4, -2) + '-' + s.slice(-2);
     }
-    // NETWORKDAYS: días de lunes a viernes entre dos fechas, ambas incluidas (negativo si la primera es posterior). Una celda
-    // vacía vale 0 (el "sábado 00/01/1900" de Excel: por eso sin Fecha Autorización sale un número negativo muy grande).
+    // NETWORKDAYS: lunes a viernes, ambos extremos incluidos; vacío = 0 (como Excel).
     const aSerial = (v) => (v == null ? 0 : aNumero(v));
-    const diaSemana = (s) => (((s - 1) % 7) + 7) % 7;                                                  // 0 = domingo (serie 1)
+    const diaSemana = (s) => (((s - 1) % 7) + 7) % 7;
     function diasHabiles(a, b) {
       a = Math.floor(a); b = Math.floor(b);
       const x = Math.min(a, b), y = Math.max(a, b), semanas = Math.floor((y - x + 1) / 7); let n = semanas * 5;
@@ -4798,15 +4684,14 @@
     }
     const networkdays = (ini, fin) => { const a = aSerial(ini), b = aSerial(fin); return a == null || b == null ? VALOR : a < 0 || b < 0 ? Xlsx.error('#NUM!') : diasHabiles(a, b); };
     const producto = (a, b) => { const x = aNumero(a), y = aNumero(b); return x == null || y == null ? VALOR : x * y; };
-    // Las 10 columnas con fórmula de una fila (la Observación trae "AAAAMMDD" + iniciales + prioridad + FC/FI/FA en posiciones fijas).
+    // Las 10 columnas con fórmula de una fila (Observación: AAAAMMDD + iniciales + prioridad + FC/FI/FA).
     function calculadas(obs, fechaAut) {
       const S = mid(obs, 1, 8), T = texto0000(S), Y = mid(obs, 15, 3), Z = mid(obs, 21, 3), AA = mid(obs, 27, 3);
       return { S, T, U: networkdays(T, fechaAut || null), V: mid(obs, 9, 2), W: mid(obs, 12, 1), Y, Z, AA, AC: producto(Y, Z), AD: producto(Y, AA) };
     }
 
-    // ---- A/F: el mes si el RMD se registró, se autorizó o ingresó (fecha al inicio de la Observación) en el mes, o si sin
-    // registro se solicitó en el mes; "ANTIGUO" si sigue abierto (Ingresado, Solicitado o Solicitud Aprobada) y ya existía al
-    // cierre del mes; si no, el valor de SAP. Es lo que el equipo marca a mano (coincide en 11 011 de 11 013 filas de agosto).
+    // ---- A/F ----
+    // Mes si se registró, autorizó o ingresó en el mes (o se solicitó sin registro); ANTIGUO si sigue abierto y existía al cierre; si no, el valor de SAP.
     const ABIERTOS = /^(Ingresado|Solicitado|Solicitud Aprobada)$/i;
     const fechaOk = (d) => (d instanceof Date && !isNaN(d) ? d : null);
     function afDelMes(f, mes, anio) {
@@ -4818,23 +4703,21 @@
       return limpio(f.af);
     }
 
-    // ---- "No contar": el equipo lo llena a mano. Se sugiere (marcado para revisar) solo en las filas que entran a los
-    // indicadores (A/F del mes o ANTIGUO), con los mismos criterios que se ven en los archivos de julio y agosto: NO CONTAR si
-    // su RMD ING/APR da #VALUE! (Observación sin el formato AAAAMMDD-II-P-C…-FI…-FA…) y entraría a una suma del mes (dejaría
-    // el total en error); lo que ya estaba marcado el mes anterior; NO CONTAR / PEND JEFE/GER / PEND CC si la Observación lo
-    // dice; y PEND CC si sigue abierto pese a tener fecha de autorización del mes. Nunca se sugiere un PEND en un RMD ya
-    // Autorizado o Suspendido (lo sacaría de los autorizados del mes).
+    // ---- «No contar» (sugerencia) ----
+    // Solo filas del mes o ANTIGUO: NO CONTAR si da #VALUE! en una suma, lo marcado el mes anterior o lo que indique la Observación; PEND CC si sigue
+    // abierto con autorización del mes.
+    // Nunca PEND en Autorizado o Suspendido.
     const RX_NO_CONTAR = /\bNO\s+CONTAR(?![A-ZÁÉÍÓÚÑ])/i;
     const RX_PEND_JEFE = /\bPEND(?:IENTE|\.)?\s*(?:DE\s+)?(?:APROB(?:ACI[OÓ]N)?\s+(?:DEL?\s+)?)?(?:JEF|GER)/i;
     const RX_PEND_CC = /\bPEND(?:IENTE|\.)?\s*(?:DE\s+)?(?:APROB(?:ACI[OÓ]N)?\s+(?:DEL?\s+)?)?(?:CC\b|C\.C|CALIDAD)/i;
     function normalizarNoContar(v) {
       const t = limpio(v).toUpperCase(); if (!t) return '';
-      if (/^PEND\.?\s*JEF/.test(t)) return 'PEND JEFE/GER';                                      // PEND JEF/GER, PEND JEFE/GEREN…
+      if (/^PEND\.?\s*JEF/.test(t)) return 'PEND JEFE/GER';
       if (/^PEND\.?\s*(CC|NC|C\.C\.?)$/.test(t)) return 'PEND CC';
       return t;
     }
     const claveFila = (codigo, solicitud, version) => (limpio(codigo) ? 'C:' + limpio(codigo) : 'S:' + limpio(solicitud) + '|' + limpio(version));
-    // x: { errorEnSuma, autEnMes } (los calcula construir con el A/F y las columnas calculadas de la fila)
+    // x: { errorEnSuma, autEnMes }
     function sugerirNoContar(f, anteriores, x = {}) {
       const abierto = ABIERTOS.test(limpio(f.estado)), obs = f.observacion || '';
       if (x.errorEnSuma) return { valor: 'NO CONTAR', origen: 'formato', nota: 'la Observación no tiene el formato AAAAMMDD-II-P-C…-FI…-FA… y su RMD ING/APR da #VALUE! (dejaría el total en error)' };
@@ -4847,7 +4730,7 @@
       return null;
     }
 
-    // ---- archivo del mes anterior (opcional): sus listas PEND PL1 / PEND PL2 y los "No contar" que el equipo ya marcó ----
+    // ---- Archivo del mes anterior (opcional): PEND PL1 / PEND PL2 y «No contar» ----
     async function leerListaPend(libro, nombre) {
       const filas = await libro.filas(nombre); if (!filas) return [];
       const r = filas.findIndex((f) => f && f.some((x) => clave(x) === 'DESCRIPCION') && f.some((x) => clave(x) === 'ESTADO')); if (r < 0) return [];
@@ -4878,12 +4761,11 @@
     const dd = (n) => String(n).padStart(2, '0');
     const fechaHora = (d) => `${dd(d.getDate())}/${dd(d.getMonth() + 1)}/${d.getFullYear()} ${dd(d.getHours())}:${dd(d.getMinutes())}`;
 
-    // op: { filas: [datosBaseDeMD…], mes: 1-12, anio, previo: leerPrevio() | null, sugerir: true, generado: Date,
-    //       ajustar: (fila) => ({ af, noContar }) solo para pruebas (reproducir a mano un mes ya cerrado) }
+    // op: { filas, mes, anio, previo, sugerir, generado, ajustar? (pruebas) }
     function construir(op) {
       const { mes, anio } = op, MES = MESES[mes - 1], pref = `${anio}-${dd(mes)}`, prefS = `${anio}${dd(mes)}`;
       const previo = op.previo || null, libro = Xlsx.crearLibro();
-      // como el "Exportar" nativo (onExportXLS): sin filtro de estado, el portal deja fuera los RMD Cancelados
+      // sin filtro de estado se excluyen Cancelados (como onExportXLS)
       op = { ...op, filas: op.filas.filter((f) => !/^CANCELAD/.test(clave(f.estado))) };
       const est = { sap: 0, mes: 0, antiguo: 0, sugeridos: { formato: 0, anterior: 0, observacion: 0, estado: 0 }, pl1: 0, pl2: 0, posibles: 0 };
       const nulo = (x) => (vacio(x) ? null : x);
@@ -4906,10 +4788,7 @@
           nulo(f.motivo), obs, k.S, k.T, k.U, k.V, k.W, noContar, k.Y, k.Z, k.AA, nota, k.AC, k.AD]);
         est.sap++;
       });
-      // 2) listas PEND del mes anterior, agregadas al final de los datos como hace el equipo (sin fórmulas; Fecha Solicitud =
-      // día 30 del mes; A/F del mes si la lista lo dice, si no ANTIGUO). PL1 ("Por hacer solicitud") es de Planta Ate y PL2
-      // ("solicitado", por ingresar) de Planta Lima. PL1 entra ahora a TOTAL DE RMD con su propio estado (en julio contaba
-      // como "solicitado"; en agosto quedó fuera del rango de la tabla dinámica).
+      // 2) PEND del mes anterior al final de los datos (sin fórmulas; Fecha Solicitud = día 30). PL1 = Planta Ate, PL2 = Planta Lima.
       const pl1 = previo ? previo.pl1 : [], pl2 = previo ? previo.pl2 : [];
       const fechaPend = new Date(Date.UTC(anio, mes - 1, Math.min(30, new Date(Date.UTC(anio, mes, 0)).getUTCDate())));
       const filaPend = (p, planta, estado) => {
@@ -4922,7 +4801,7 @@
       pl1.forEach((p) => registros.push(filaPend(p, 'PLANTA ATE', 'Por hacer solicitud')));
       est.pl1 = pl1.length; est.pl2 = pl2.length;
 
-      // 3) hoja de datos (una tabla de Excel: al agregar filas y "Actualizar todo", las tablas dinámicas las toman solas)
+      // 3) hoja de datos como tabla de Excel (las dinámicas toman filas nuevas al actualizar)
       const ultima = registros.length + 1, rango = `A1:AD${ultima}`;
       const hd = libro.hoja(HOJA_DATOS, { cols: ANCHOS_DATOS, congelar: 'H1', tabla: { nombre: TABLA_DATOS, ref: rango } });
       CAMPOS.forEach((n, c) => hd.poner({ c, r: 0 }, n, ESTILO_CAB[n] || 'cabecera'));
@@ -4936,7 +4815,7 @@
       });
       const cache = libro.cache(hd, CAMPOS, registros, rango, { tabla: TABLA_DATOS, extras: { 'No contar': NO_CONTAR_CONOCIDOS } });
 
-      // 4) RESUMEN: las 7 tablas dinámicas del archivo del equipo, en sus mismas celdas (las de abajo bajan si las de arriba crecen)
+      // 4) RESUMEN: 7 tablas dinámicas en sus celdas fijas
       const hr = libro.hoja('RESUMEN', { activa: true, cols: ANCHOS_RESUMEN });
       const nc = (v) => limpio(v).toUpperCase(), esMes = (v) => nc(v) === MES, esMesOAnt = (v) => esMes(v) || nc(v) === 'ANTIGUO';
       const autEnMes = (v) => typeof v === 'string' && v.slice(0, 7) === pref, ingEnMes = (v) => typeof v === 'string' && v.slice(0, 6) === prefS;
@@ -4956,7 +4835,7 @@
         valor: { campo: 'RMD APR', funcion: 'sum', nombre: 'Suma de RMD APR' } });
       const t3 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica4', celda: 'AD10', filas: ['Planta', 'Usuario'], columnas: ['FC'],
         paginas: [{ campo: 'Fec Ingreso Real', visible: ingEnMes }, { campo: 'A/F', visible: esMes }, { campo: 'No contar', visible: pendOVacio }], valor: cuenta });
-      const f4 = Math.max(36, t3.filaFin + 9);                                                    // (filas desde 0: AD37 en agosto)
+      const f4 = Math.max(36, t3.filaFin + 9);
       titulo(Xlsx.ref(29, f4 - 6), 'RMD INGRESADOS TOTAL', `AD${f4 - 5}:AF${f4 - 5}`);
       const t4 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica5', celda: Xlsx.ref(29, f4), filas: ['Planta', 'Usuario'],
         paginas: [{ campo: 'A/F', visible: esMes }, { campo: 'Fec Ingreso Real', visible: ingEnMes }, { campo: 'No contar', visible: pendOVacio }],
@@ -4964,14 +4843,13 @@
       const t5 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica6', celda: 'AZ8', filas: ['Planta', 'Estado'],
         paginas: [{ campo: 'A/F', visible: esMesOAnt }, { campo: 'No contar', visible: (v) => nc(v) !== 'NO CONTAR' && nc(v) !== 'POR INGRESAR' }],
         ocultar: { Estado: (v) => /^SOLICITUD (APROBADA|RECHAZADA)$/.test(nc(v)) }, valor: cuenta });
-      const f6 = Math.max(28, t5.filaFin + 10);                                                   // título en AZ29 en agosto
+      const f6 = Math.max(28, t5.filaFin + 10);
       titulo(Xlsx.ref(51, f6), 'ESTATUS DE TOTAL DE RMD  POR MOTIVO(NO CONTAR)', `AZ${f6 + 1}:BB${f6 + 1}`); hr.poner(Xlsx.ref(54, f6), 'INFORMATIVO', 'negrita');
       libro.dinamica(hr, cache, { nombre: 'Tabla dinámica7', celda: Xlsx.ref(51, f6 + 6), filas: ['Planta', 'A/F', 'No contar'],
         ocultar: { 'A/F': (v) => vacio(v) || nc(v) === 'SI' }, valor: cuenta });
       const t7 = libro.dinamica(hr, cache, { nombre: 'Tabla dinámica8', celda: 'BO8', filas: ['Planta', 'Prioridad'], columnas: ['Dias'],
         paginas: [{ campo: 'A/F', visible: esMesOAnt }, { campo: 'No contar', visible: vacio }, { campo: 'Estado', visible: (v) => /^(AUTORIZADO|SUSPENDIDO)$/.test(nc(v)) }], valor: cuenta });
-      // "% dentro de plazo" (el "% PRIO" del archivo de julio, que en agosto quedó con #REF!): con CONTAR.SI.CONJUNTO sobre la hoja
-      // de datos, así no depende de en qué columna de la tabla dinámica cae cada número de días.
+      // «% dentro de plazo» con CONTAR.SI.CONJUNTO sobre los datos
       const fP = t7.filaFin + 3, D = (campo) => `${REF_DATOS}!$${L[campo]}:$${L[campo]}`;
       titulo(Xlsx.ref(66, fP), '% DENTRO DE PLAZO (AUTORIZADOS Y SUSPENDIDOS DEL MES)', `BO${fP + 1}:BT${fP + 1}`);
       ['Planta', 'Prioridad', 'Plazo (días hábiles)', 'Dentro de plazo', 'Total', '%'].forEach((t, k) => hr.poner({ c: 66 + k, r: fP + 1 }, t, 'encabezado'));
@@ -4989,7 +4867,7 @@
       }));
       hr.poner({ c: 66, r: fila }, 'Plazo: días hábiles desde la fecha de ingreso (inicio de la Observación) hasta la autorización; puedes cambiarlo en la columna amarilla.', 'nota');
 
-      // 5) Hoja1: productividad por persona, tomada de las tablas "TOTAL" (RMD ING por iniciales, RMD APR por usuario de SAP)
+      // 5) Hoja1: productividad por persona
       const h1 = libro.hoja('Hoja1', { cols: [[2, 2, 11], [3, 3, 30], [4, 7, 12.5], [8, 8, 14]] });
       h1.poner('D3', `DLAB.: COMPLETAR LOS DÍAS LABORADOS EN ${MES}`, 'notaAmarilla'); h1.combinar('D3:H3');
       h1.poner('C5', new Date(Date.UTC(anio, mes - 1, 1)), 'mesAnio');
@@ -5019,8 +4897,7 @@
         'Autorizados = Suma de RMD APR (tabla "RMD AUTORIZADOS TOTAL") de su usuario de SAP.',
         'Promedio/Día = Total / DLAB. Meta: no menos de 3 RMD por día.'].forEach((t, k) => h1.poner({ c: 1, r: rT + 2 + k }, t, 'nota'));
 
-      // 6) PEND PL1 / PEND PL2 (mismas columnas; se agrega "Posible registro en SAP" para limpiar la lista: un RMD con la misma
-      // descripción y etapa que entró a SAP desde el mes anterior, que ya no debería seguir como pendiente)
+      // 6) PEND PL1 / PEND PL2 + «Posible registro en SAP» (misma descripción y etapa registrada desde el mes anterior)
       const desde = Date.UTC(anio, mes - 2, 1), porDescripcion = new Map();
       op.filas.forEach((f) => {
         const d = [fechaOk(f.fechaSolicitud), fechaOk(f.fechaRegistro)].filter(Boolean).map((x) => x.getTime()); if (!d.length || Math.max(...d) < desde) return;
@@ -5048,7 +4925,7 @@
       hp1.poner('C1', 'Total', 'negrita'); hp1.poner('D1', pl1.length, 'negrita', `COUNTA(C4:C${pl1.length + 503})`);
       listaPend('PEND PL2', 1, [['N', 'n'], ['Estado', 'estado'], ['Descripción', 'descripcion'], ['Etapa', 'etapa'], ['A/F', 'af'], ['Sección', 'seccion'], ['Observación', 'observacion'], ['No contar', 'noContar']], pl2,
         { anchos: [[1, 1, 5], [2, 2, 13], [3, 3, 50], [4, 4, 17], [5, 5, 11], [6, 6, 10], [7, 7, 30], [8, 8, 15], [9, 9, 44]] });
-      // mismo orden de hojas que el archivo del equipo
+      // orden de hojas del archivo manual
       const orden = [HOJA_DATOS, 'PEND PL1', 'PEND PL2', 'RESUMEN', 'Hoja1'];
       libro.hojas.sort((a, b) => orden.indexOf(a.nombre) - orden.indexOf(b.nombre));
 
@@ -5060,13 +4937,9 @@
   })();
   // ==INDICADORES-FIN==
 
-  // ==REGLAS-INICIO== (no quitar esta marca ni la de cierre: las pruebas extraen este bloque para correrlo fuera del portal)
-  // Reglas de revisión (v1.34): el motor, sin DOM ni SAP. Una regla busca en un texto (la descripción de un paso o de un proceso
-  // menor) palabras o frases, códigos de documento, códigos de equipo o un patrón, y dice qué hacer con lo que encuentra: marcarlo,
-  // avisar que no debe aparecer o avisar si falta en el RMD. La lista de documentos vigentes (la carga la persona) decide qué
-  // códigos citados están vigentes: los que están en la lista lo están; los que no están, no (SAP no lo compara por sí solo).
-  // v1.35: la lista de equipos calificados (hoja "Cronograma", columna "ESTADO GENERAL") decide qué equipos están calificados: las
-  // reglas de equipo pueden avisar los que no lo están, en los textos y en la estructura EQUIPOS / INSTRUMENTOS / MATERIALES del RMD.
+  // ==REGLAS-INICIO==
+  // Motor de reglas de revisión (sin DOM ni SAP): palabras, códigos de documento, equipos o patrones; marcar, prohibir o exigir presencia.
+  // Vigencia por lista del DMS; calificación por hoja «Cronograma» (ESTADO GENERAL).
   const Reglas = (() => {
     const TIPOS = { frase: 'Palabra o frase', documento: 'Código de documento', equipo: 'Código de equipo o utensilio', patron: 'Patrón avanzado (expresión regular)' };
     const VIGENCIAS = { todos: 'Cualquier documento', noVigentes: 'Solo los que NO están en la lista de vigentes', vigentes: 'Solo los que están en la lista de vigentes' };
@@ -5075,7 +4948,7 @@
     const COLORES = { amarillo: 'Amarillo', rojo: 'Rojo', azul: 'Azul', verde: 'Verde', morado: 'Morado' };
     const DONDE = { todo: 'Pasos y procesos menores', pasos: 'Solo pasos', menores: 'Solo procesos menores' };
     const CALIFICACIONES = { todos: 'Cualquier equipo', sinCalificar: 'Solo los que NO están calificados (lista de equipos calificados)', calificados: 'Solo los calificados' };
-    const ESTADOS_OK = ['CALIFICADO', 'NO REQUIERE'];                  // "ESTADO GENERAL" que cuentan como calificado (se puede cambiar)
+    const ESTADOS_OK = ['CALIFICADO', 'NO REQUIERE'];                  // valores de ESTADO GENERAL que cuentan como calificado
     const BASE = { nombre: '', activa: true, tipo: 'frase', buscar: '', palabraCompleta: true, mayusculas: false, vigencia: 'todos', calificacion: 'todos', estructura: false,
       noFigura: false, excepto: '', condicion: 'marcar', accion: 'resaltar', basta: false, color: 'amarillo', etiqueta: '', donde: 'todo', lista: '', mensaje: '' };
     const PREDETERMINADAS = [
@@ -5085,10 +4958,9 @@
       { id: 'pred-equipos', predeterminada: 'equipos', nombre: 'Códigos de equipo en el texto', activa: false, tipo: 'equipo', condicion: 'marcar', accion: 'resaltar', color: 'verde' },
       { id: 'pred-provisional', predeterminada: 'provisional', nombre: 'Textos provisionales (ejemplo)', activa: false, tipo: 'frase', buscar: 'XXX; POR DEFINIR; BORRADOR', condicion: 'noDebe', accion: 'advertencia', color: 'amarillo' },
     ];
-    // Códigos de documento: los de siempre (<I/P/F><Área>-<sufijo NNN>, como src/rmd_automation/referencias.py) y, como en la lista
-    // de vigentes, los manuales (MCAL-200) y las políticas (POL-CAL-001).
+    // Códigos de documento: <I/P/F><Área>-<NNN>, manuales (MCAL-200) y políticas (POL-CAL-001).
     const FUENTE_DOC = '\\b(?:POL-[A-Z]{3}-\\d{3}|M[A-Z]{3}-\\d{3}|[IPF][A-Z0-9]{3}-[A-Z]?\\d{3})\\b';
-    // Posibles códigos de equipo (PL1-GV1-E058, LIQ-E023, TAN-AAA-01…): se confirman contra el catálogo de equipos del portal.
+    // Posibles códigos de equipo; se confirman con el catálogo.
     const FUENTE_CANDIDATO = '(?<![A-Z0-9-])[A-Z0-9]{2,6}(?:-[A-Z0-9]{1,8}){1,3}(?![A-Z0-9])';
     const TIPO_DOC = { I: 'Instructivo', P: 'Procedimiento', F: 'Formato', M: 'Manual' };
     const GUIONES = /[‐-―−]/g;
@@ -5099,8 +4971,7 @@
     const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const nuevoId = () => 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-    // Texto sin tildes (y en mayúsculas, salvo que se distingan) y, por cada carácter del resultado, su posición en el original:
-    // así se busca sin importar tildes ni mayúsculas y se resalta exactamente lo que se ve.
+    // Texto normalizado (sin tildes, mayúsculas) con mapa de posiciones al original.
     const COMBINANTES = /[̀-ͯ]/g;
     function plegar(texto, distinguir) {
       const t = String(texto == null ? '' : texto), pos = []; let p = '';
@@ -5140,17 +5011,16 @@
     }
     const predeterminadas = () => PREDETERMINADAS.map(normalizar);
     const CLAVES_PREDETERMINADAS = PREDETERMINADAS.map((x) => x.predeterminada);
-    // Predeterminadas que salieron en una versión nueva (la persona no las conocía): se agregan en su lugar. Las que borró no vuelven.
+    // Nuevas predeterminadas se agregan; las borradas no vuelven.
     function completarPredeterminadas(reglas, conocidas) {
       const out = (reglas || []).slice(), ya = new Set(out.map((r) => r.predeterminada).filter(Boolean)), sabidas = new Set(conocidas || []);
       let nuevas = 0;
       PREDETERMINADAS.forEach((p, i) => { if (sabidas.has(p.predeterminada) || ya.has(p.predeterminada)) return; out.splice(Math.min(i, out.length), 0, normalizar(p)); nuevas++; });
       return { reglas: out, nuevas };
     }
-    // ids únicos (al importar o duplicar podrían repetirse)
     function sinIdsRepetidos(lista) { const vistos = new Set(); return lista.map((r) => { if (!vistos.has(r.id)) { vistos.add(r.id); return r; } const n = { ...r, id: nuevoId() }; vistos.add(n.id); return n; }); }
 
-    // ctx: { vigentes: Map(código -> info) | null, catalogo: Map(código -> descripción) | null }
+    // ctx: { vigentes: Map | null, catalogo: Map | null }
     function compilar(reglas, ctx = {}) {
       return (reglas || []).map((x, prioridad) => {
         const r = normalizar(x), c = { regla: r, prioridad, ok: false, error: '', necesita: '', valores: [], excepto: null };
@@ -5164,7 +5034,7 @@
             if (vals.length && !c.valores.length) throw new Error('los códigos escritos no son válidos');
             if (!vals.length && r.tipo === 'documento') c.valores = [{ etiqueta: 'un código de documento', rx: new RegExp(FUENTE_DOC, 'g'), plegado: false }];
             if (!vals.length && r.tipo === 'equipo') {
-              const porLista = r.calificacion !== 'todos';                 // (con filtro de calificación, los equipos salen de la lista cargada)
+              const porLista = r.calificacion !== 'todos';
               c.valores = [{ etiqueta: 'un código de equipo', rx: new RegExp(FUENTE_CANDIDATO, 'g'), plegado: true, catalogo: !porLista, enLista: porLista }];
               if (!porLista && !ctx.catalogo) c.necesita = 'catalogo';
             }
@@ -5188,15 +5058,14 @@
       if (r.lista) { if (ctx.lista == null) return true; if (!plegar(ctx.lista).p.includes(plegar(r.lista).p)) return false; }
       return true;
     }
-    // el catálogo (o la lista) puede tener el código sin el último tramo (texto "PL1-LIQ-E023-A", catálogo "PL1-LIQ-E023")
+    // coincidencia sin el último tramo (PL1-LIQ-E023-A ~ PL1-LIQ-E023)
     function enMapa(cand, mapa) {
       if (!mapa) return null;
       const tramos = cand.split('-');
       for (let k = tramos.length; k >= 2; k--) { const c = tramos.slice(0, k).join('-'); if (mapa.has(c)) return { codigo: c, valor: mapa.get(c), largo: c.length }; }
       return null;
     }
-    // Lista de equipos calificados -> { porCodigo, porSap }: por código (MIF / "Código de referencia") y por código SAP. Un código puede
-    // tener varias filas (una sala y su HVAC, un almacén por temporada): está calificado solo si lo están todas; si no, manda la que no.
+    // Equipos calificados -> { porCodigo, porSap }; con varias filas, calificado solo si todas lo están.
     function mapaCalificados(cal, estadosOk) {
       const ok = new Set((estadosOk && estadosOk.length ? estadosOk : ESTADOS_OK).map((e) => plegar(e).p.replace(/\s+/g, ' ').trim()));
       const porCodigo = new Map(), porSap = new Map();
@@ -5217,7 +5086,7 @@
     const etiquetaDe = (r, info) => (info ? String(r.etiqueta || '').replace(/\{estado\}/gi, info.estado).slice(0, 24) : String(r.etiqueta || '').replace(/\{estado\}/gi, '').trim());
     const textoAviso = (r, valor, motivo) => (r.mensaje ? `${r.mensaje} («${valor}»)` : motivo ? `${r.nombre}: ${motivo}` : r.condicion === 'noDebe' ? `${r.nombre}: «${valor}» no debe aparecer` : `${r.nombre}: «${valor}»`);
     const textoFalta = (r, vals) => r.mensaje || `${r.nombre}: no aparece ${vals.map((v) => `«${v}»`).join(r.basta ? ' ni ' : ', ')}${r.lista ? ` en ${r.lista}` : ''}${r.donde === 'pasos' ? ' (pasos)' : r.donde === 'menores' ? ' (procesos menores)' : ''}`;
-    // Marcas que se pisan: gana la regla de más prioridad (la de más arriba en la lista) y su título suma los motivos de las demás
+    // Solapes: gana la regla de mayor prioridad y acumula los motivos.
     function resolverSolapes(marcas) {
       const tomadas = [];
       marcas.slice().sort((a, b) => a.prioridad - b.prioridad || a.ini - b.ini || (b.fin - b.ini) - (a.fin - a.ini)).forEach((m) => {
@@ -5229,8 +5098,7 @@
       });
       return tomadas.sort((a, b) => a.ini - b.ini).map(({ titulos, ...m }) => ({ ...m, titulo: titulos.join('\n') }));
     }
-    // Aplica las reglas a un texto. ctx: { vigentes, catalogo, esPM, lista, probar }. Devuelve las marcas (sin solaparse, en orden),
-    // las advertencias y cuántas veces apareció cada valor de cada regla (hallados: "<id>#<n>" -> veces; para "Debe estar presente").
+    // Aplica las reglas a un texto. ctx: { vigentes, catalogo, esPM, lista, probar } -> { marcas, advertencias, hallados ("<id>#<n>" -> veces) }
     function buscar(texto, compiladas, ctx = {}) {
       const t = String(texto == null ? '' : texto), res = { marcas: [], avisos: [], hallados: {} };
       if (!t.trim()) return res;
@@ -5250,7 +5118,7 @@
               if (hit.largo < largo) { largo = hit.largo; v.rx.lastIndex = m.index + largo; }
               motivo = `equipo ${hit.codigo}${hit.valor ? ' — ' + hit.valor : ''}`;
             }
-            if (v.enLista) {                                                  // (el código tiene que estar en la lista de calificados)
+            if (v.enLista) {
               const hit = enMapa(m[0], ctx.calificados); if (!hit) continue;
               if (hit.largo < largo) { largo = hit.largo; v.rx.lastIndex = m.index + largo; }
               info = hit.valor;
@@ -5264,7 +5132,7 @@
             }
             if (r.tipo === 'equipo' && r.calificacion !== 'todos') {
               const cod = normalizarCodigo(valor);
-              if (!info) info = ctx.calificados ? ctx.calificados.get(cod) : null;   // (códigos escritos en la regla: se busca el código tal cual)
+              if (!info) info = ctx.calificados ? ctx.calificados.get(cod) : null;   // códigos explícitos: búsqueda literal
               if (!info || (r.calificacion === 'sinCalificar' && info.ok) || (r.calificacion === 'calificados' && !info.ok)) continue;
               motivo = textoCalif(cod, info);
             }
@@ -5279,8 +5147,7 @@
       res.marcas = resolverSolapes(res.marcas);
       return res;
     }
-    // Todo un RMD (o una lista): textos = [{ texto, esPM, lista }]. Además de lo de cada texto, las reglas "Debe estar presente"
-    // que no aparecieron en ninguna parte (según su alcance: pasos / procesos menores / lista).
+    // RMD completo: textos = [{ texto, esPM, lista }]; añade las reglas «Debe estar presente» no halladas según su alcance.
     function evaluarConjunto(textos, compiladas, ctx = {}) {
       const out = { items: [], faltan: [], avisos: 0, marcas: 0, hallados: {}, porRegla: {} };
       (textos || []).forEach((x, i) => {
@@ -5296,8 +5163,8 @@
       });
       return out;
     }
-    // Equipos de la estructura EQUIPOS / INSTRUMENTOS / MATERIALES: equipos = [{ codigo (Código de referencia / CodigoGaci), sap (equnr), desc,
-    // orden }]. Solo las reglas de equipo con "revisar también la estructura de equipos". ctx: { calificados, calificadosSap }.
+    // Estructura de equipos: equipos = [{ codigo, sap, desc, orden }]; solo reglas de equipo con revisión de estructura. ctx: { calificados, calificadosSap
+    // }.
     function evaluarEquipos(equipos, compiladas, ctx = {}) {
       const out = { items: [], avisos: 0 };
       (equipos || []).forEach((eq, i) => {
@@ -5311,7 +5178,7 @@
             info = (cod && ctx.calificados && ctx.calificados.get(cod)) || (sap && ctx.calificadosSap && ctx.calificadosSap.get(sap)) || null;
             if (!info) { if (!r.noFigura || r.calificacion !== 'sinCalificar') return; info = { ok: false, estado: 'NO FIGURA', detalle: 'no figura en la lista de equipos calificados', desc: '' }; }
             if ((r.calificacion === 'sinCalificar' && info.ok) || (r.calificacion === 'calificados' && !info.ok)) return;
-          } else if (!escritos.length) return;                                // (sin filtro ni códigos, la estructura no se revisa)
+          } else if (!escritos.length) return;
           const valor = eq.codigo || eq.sap, motivo = info ? textoCalif(valor, { ...info, desc: info.desc || eq.desc }) : `equipo ${valor}${eq.desc ? ' — ' + eq.desc : ''}`;
           const aviso = r.condicion !== 'debe' && r.accion === 'advertencia';
           marcas.push({ regla: r.id, valor, prioridad: c.prioridad, color: r.color, etiqueta: etiquetaDe(r, info), aviso, titulo: `Regla «${r.nombre}»: ${motivo}${r.mensaje ? ' — ' + r.mensaje : ''}` });
@@ -5321,7 +5188,7 @@
       });
       return out;
     }
-    // Fase de la nomenclatura de la 1ª línea de Observaciones ("…-FA1.0-F1", "-F1R", "-F2-R"): { corto: 'F2R', texto: 'Fase 2 R', linea }
+    // Fase de la 1.ª línea de Observaciones -> { corto, texto, linea }
     function faseDeObservacion(obs) {
       const linea = String(obs == null ? '' : obs).split(/\r?\n/)[0].trim(), tok = linea.split(/\s+/)[0] || '';
       const m = /(?:^|-)F(\d{1,2})(?:-?(R))?$/i.exec(tok);
@@ -5343,7 +5210,7 @@
       return p.join(' · ');
     }
 
-    // ---- lista de documentos vigentes: de las filas de una hoja (xls, xlsx o csv) ----
+    // ---- Lista de documentos vigentes (xls, xlsx o csv) ----
     const ENC = {
       codigo: [/^(identificador|c[oó]digo|c[oó]digo del documento|cod\.?|codigo documento)$/i, /^(documento|id|n[uú]mero|nro\.?)$/i],
       titulo: [/^(t[ií]tulo|nombre|nombre del documento|descripci[oó]n)$/i], revision: [/^(revisi[oó]n|rev\.?|versi[oó]n|ver\.?)$/i],
@@ -5357,7 +5224,7 @@
       const s = celdaTxt(v), m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/.exec(s); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : s;
     };
     function listaVigentesDeFilas(filas) {
-      filas = Array.from(filas || [], (f) => (Array.isArray(f) ? f : []));   // (las filas vacías llegan como huecos del arreglo)
+      filas = Array.from(filas || [], (f) => (Array.isArray(f) ? f : []));
       const parecidos = (col, desde) => { let n = 0; for (let i = desde; i < Math.min(filas.length, desde + 300); i++) if (PARECE_CODIGO.test(normalizarCodigo(celdaTxt(filas[i][col])))) n++; return n; };
       let mejor = null;
       for (let i = 0; i < Math.min(filas.length, 30); i++) {
@@ -5366,7 +5233,7 @@
           ENC.codigo.forEach((rx, fuerza) => { if (!rx.test(t)) return; const n = parecidos(j, i + 1), p = n * 10 - fuerza; if (n && (!mejor || p > mejor.p)) mejor = { fila: i, col: j, p, titulo: t }; });
         });
       }
-      if (!mejor) {                                                     // sin encabezado reconocible: la columna con más códigos
+      if (!mejor) {                                                     // sin encabezado: la columna con más códigos
         const anchos = Math.max(0, ...filas.slice(0, 300).map((f) => f.length));
         for (let j = 0; j < anchos; j++) { const n = parecidos(j, 0); if (n >= 3 && (!mejor || n > mejor.p)) mejor = { fila: -1, col: j, p: n, titulo: `columna ${j + 1}` }; }
         if (mejor) { const k = filas.findIndex((f) => PARECE_CODIGO.test(normalizarCodigo(celdaTxt(f[mejor.col])))); mejor.fila = k - 1; }
@@ -5378,7 +5245,7 @@
       Object.keys(ENC).forEach((k) => {
         if (k === 'codigo') return;
         const buscarEn = (fila, soloVacias) => fila.findIndex((v, j) => j !== mejor.col && (!soloVacias || !celdaTxt(cab[j])) && ENC[k].some((rx) => rx.test(celdaTxt(v))));
-        let j = buscarEn(cab, false); if (j < 0) j = buscarEn(sobre, true);   // (el encabezado "S" del estado está una fila más arriba en la lista del DMS)
+        let j = buscarEn(cab, false); if (j < 0) j = buscarEn(sobre, true);   // el encabezado del estado está una fila más arriba
         if (j >= 0) { col[k] = j; out.columnas[k] = celdaTxt(cab[j]) || celdaTxt(sobre[j]); }
       });
       const vistos = new Set();
@@ -5391,15 +5258,15 @@
       }
       return out;
     }
-    // ---- lista de equipos calificados: la hoja "Cronograma" (encabezados en la fila de "ESTADO GENERAL") ----
+    // ---- Equipos calificados: hoja «Cronograma» ----
     const ENC_CAL = {
       codigo: /^c[oó]digo(\s*(mif|gaci|de\s*referencia))?$/i, sap: /^c[oó]digo\s*sap$/i, desc: /^descripci[oó]n$/i, general: /^estado\s*general$/i,
       oq: /\(\s*oq\s*\).*estado\s*de\s*calificaci[oó]n/i, pq: /\(\s*pq\s*\).*estado\s*de\s*calificaci[oó]n/i, oqProx: /\(\s*oq\s*\).*pr[oó]xima/i, pqProx: /\(\s*pq\s*\).*pr[oó]xima/i,
       tipo: /^tipo\s*(de\s*)?equipo$/i, sucursal: /^(sucursal|planta)$/i, seccion: /^secci[oó]n$/i, estadoEquipo: /^estado$/i, obs: /^observaciones?$/i,
     };
-    const COL_AU = 46;                                                    // (si el encabezado "ESTADO GENERAL" no aparece: la columna AU)
+    const COL_AU = 46;                                                    // sin encabezado ESTADO GENERAL: columna AU
     function listaCalificadosDeFilas(filas) {
-      filas = Array.from(filas || [], (f) => (Array.isArray(f) ? f : []));   // (las filas vacías llegan como huecos del arreglo)
+      filas = Array.from(filas || [], (f) => (Array.isArray(f) ? f : []));
       const limpio = (v) => celdaTxt(v).replace(/[:*]+$/, '').trim();
       let fila = -1;
       for (let i = 0; i < Math.min(filas.length, 40) && fila < 0; i++) if (filas[i].some((v) => ENC_CAL.general.test(limpio(v)))) fila = i;
@@ -5435,7 +5302,7 @@
       return filas;
     }
 
-    // ---- exportar / importar ----
+    // ---- Exportar / importar ----
     const paraExportar = (reglas, vigentes, extra) => ({ app: 'rmd-ui-mejoras', tipo: 'reglas-revision', version: 1, ...(extra || {}), reglas: (reglas || []).map(normalizar), ...(vigentes ? { vigentes } : {}) });
     function leerExportado(obj) {
       const o = Array.isArray(obj) ? { reglas: obj } : obj;
@@ -5459,7 +5326,7 @@
       if (!reglas && !vigentes && !calificados) throw new Error('el archivo no trae reglas ni listas');
       return { reglas, vigentes, calificados, exportado: String(o.exportado || ''), script: String(o.script || '') };
     }
-    // Agregar: las de mismo id o mismo nombre se reemplazan (en su lugar); las demás se agregan al final. Reemplazar: solo las nuevas.
+    // Agregar: reemplaza por id o nombre y añade el resto. Reemplazar: solo las nuevas.
     function fusionar(actuales, nuevas, reemplazar) {
       if (reemplazar) return { reglas: sinIdsRepetidos(nuevas.map(normalizar)), agregadas: nuevas.length, reemplazadas: 0 };
       const out = (actuales || []).map(normalizar), clave = (r) => plegar(r.nombre).p;
@@ -5471,9 +5338,8 @@
       return { reglas: sinIdsRepetidos(out), agregadas, reemplazadas };
     }
 
-    // v1.37: línea de observación por un cambio de receta en SAP: «20260929CJ Actualización de Lista de Materiales» = AAAAMMDD + iniciales de la
-    // persona en SAP (1.ª letra de su primer nombre y de su primer apellido) + el mensaje.
-    const primeraLetra = (t) => { const m = /\p{L}/u.exec(String(t == null ? '' : t).trim().split(/\s+/)[0] || ''); return m ? m[0].normalize('NFD')[0].toUpperCase() : ''; };   // (sin tilde: «Ángela» → A, «Ñuñez» → N)
+    // Observación por cambio de receta: AAAAMMDD + iniciales (nombre y apellido) + mensaje.
+    const primeraLetra = (t) => { const m = /\p{L}/u.exec(String(t == null ? '' : t).trim().split(/\s+/)[0] || ''); return m ? m[0].normalize('NFD')[0].toUpperCase() : ''; };
     const inicialesDe = (nombre, apellido) => primeraLetra(nombre) + primeraLetra(apellido);
     function lineaActualizacion(fecha, iniciales, { lista, ruta } = {}) {
       const d = fecha instanceof Date ? fecha : new Date(fecha), p2 = (n) => String(n).padStart(2, '0');
@@ -5487,13 +5353,9 @@
   })();
   // ==REGLAS-FIN==
 
-  // ---- "Documentos citados" del RMD (v1.23: solo los documentos, como se pensó al inicio, y en segundos) ----
-  // Lee TODOS los pasos del RMD abierto (MD_ES_PASO, con su estructura), sus etiquetas (MD_ES_ETIQUETA) y todos sus procesos
-  // menores (MD_ES_PASO_INSUMO_PASO) con el modelo del portal —las mismas entidades que el portal usa al abrir cada lista—, en
-  // 3 lecturas y sin abrir ninguna ventana, y busca en las descripciones el patrón <Tipo I/P/F><Área>-<sufijo NNN> (mismo
-  // criterio que src/rmd_automation/referencias.py) y, desde la v1.34, también manuales (MCAL-200) y políticas (POL-CAL-001),
-  // como en la lista de vigentes del DMS (Reglas.FUENTE_DOC). Antes abría cada lista y tardaba de 20 s a varios minutos.
-  // v1.34: la lectura (leerTextosRmd) es la misma del aviso de reglas del RMD; con la lista de vigentes cargada sale "Vigente".
+  // ---- Documentos citados del RMD ----
+  // Lee MD_ES_PASO, MD_ES_ETIQUETA y MD_ES_PASO_INSUMO_PASO (3 lecturas) y busca códigos de documento (Reglas.FUENTE_DOC).
+  // Con lista de vigentes, columna «Vigente».
   const ICONO_DOCUMENTOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h6l2.5 2.5V14a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-12a.5.5 0 0 1 .5-.5Z"/><path d="M9.5 1.5V4h2.5M5.5 8h5M5.5 10.5h5"/></svg>';
   const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   function descargarArchivo(nombre, datos, tipo) {
@@ -5501,21 +5363,21 @@
     const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
-  // (diagnóstico) bytes de un .xlsx en base64, para que las pruebas lo revisen sin descargarlo en el navegador
+  // pruebas: .xlsx en base64
   const aBase64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
-  // Todas las filas de una entidad con esos filtros (páginas de 1000, como el portal: el servicio no devuelve más por lectura)
+  // Todas las filas de una entidad (páginas de 1000, límite del servicio)
   async function leerTodoDe(modelo, entidad, filtros, params) {
     const leer = (skip) => new Promise((ok, mal) => modelo.read('/' + entidad, { filters: filtros, urlParameters: { ...params, $top: '1000', $skip: String(skip) },
       success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
     const out = []; for (let skip = 0; skip < 50000; skip += 1000) { const p = await leer(skip); out.push(...p); if (p.length < 1000) break; }
     return out;
   }
-  // Vista del portal (controlador de la lista principal) a la que pertenece una tabla: de ella salen el RMD abierto y el modelo
+  // Vista (controlador de la lista principal) de una tabla
   function vistaDeTabla(t) { let c = t && sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); while (c && !c.getController) c = c.getParent && c.getParent(); return c || null; }
   async function citasDelRMD(dRaiz) {
     const vista = vistaDeTabla(tablaDe(dRaiz)), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
     if (!md || !md.mdId || !modelo) throw new Error('no se pudo identificar el RMD abierto');
-    const base = await textosDelRmd(modelo, md, 0);                         // (lectura nueva: también la usa el aviso de reglas del RMD)
+    const base = await textosDelRmd(modelo, md, 0);
     const r = { rmd: base.rmd, listas: base.listas.map((l) => ({ ...l, citas: 0 })), citas: [], pasos: base.pasos, pms: base.pms, segundos: base.segundos };
     base.textos.forEach((x) => Reglas.codigosDocumento(x.texto).forEach((codigo) => { r.citas.push({ ...x.lugar, codigo }); r.listas[x.il].citas++; }));
     return r;
@@ -5548,7 +5410,7 @@
   }
   function armarCitasExcel(dRaiz, r) {
     const rmd = r.rmd || (/\d{6,}/.exec(cabecera(dRaiz)) || ['rmd'])[0], hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), docs = agruparCitas(r.citas);
-    const vig = on('reglasrev') && RR.mapa, info = (c) => (vig ? RR.mapa.get(c) : null);   // con la lista de vigentes cargada: columna "Vigente"
+    const vig = on('reglasrev') && RR.mapa, info = (c) => (vig ? RR.mapa.get(c) : null);
     const libro = Xlsx.crearLibro();
     const hR = libro.hoja('Resumen', { activa: true, cols: [[1, 1, 52], [2, 4, 16]] });
     hR.poner('A1', 'Documentos citados en el RMD', 'titulo');
@@ -5592,25 +5454,19 @@
     const ref = hdr.querySelector('.sapMTBSpacer') || hdr.firstElementChild;
     if (ref) ref.insertAdjacentElement('afterend', b); else hdr.appendChild(b);
   }
-  // diagnóstico: las citas del RMD abierto sin ventana, y su Excel en base64 (sin descargarlo)
+  // pruebas: citas del RMD y Excel en base64
   window.__rmdStats.citasRMD = () => citasDelRMD(dialogos()[0]);
   window.__rmdStats.excelCitas = async (r) => aBase64(await armarCitasExcel(dialogos()[0], r).libro.generar());
 
-  // ---- Lectura del maestro de RMD con sus recetas, para "Enviar a Status RMD" (junto al icono nativo "Exportar"): ese
-  // botón del portal solo trae "Código por Defecto" (codDefectoReceta), un único código, pero un RMD puede tener VARIAS
-  // recetas asociadas (la tabla "Recetas Asociadas" de Asociar Fórmula). En vez de abrir esa ventana RMD por RMD, se usa
-  // el mismo modelo OData que ya usa el propio botón "Exportar" (mainModelv2, entidad "MD") pidiendo además
-  // "aReceta/recetaId" y "estadoIdRmd": la misma API que el portal ya usa para leer (no se inventa ninguna llamada).
+  // ---- Maestro de RMD con recetas («Enviar a Status RMD») ----
+  // Entidad MD de mainModelv2 con aReceta/recetaId y estadoIdRmd (el Exportar nativo solo trae codDefectoReceta).
   function modeloListaPrincipal() {
     const btnExportar = [...document.querySelectorAll('button')].find((b) => visible(b) && b.title === 'Exportar'); if (!btnExportar) return null;
     const ctl = ctlDe(btnExportar); const ctrl = ctl && ctl.mEventRegistry && ctl.mEventRegistry.press && ctl.mEventRegistry.press[0] && ctl.mEventRegistry.press[0].oListener;
     const vista = ctrl && ctrl.getView && ctrl.getView();
     return vista && vista.getModel('mainModelv2');
   }
-  // El servicio devuelve como MÁXIMO 1000 filas por lectura (probado: sin $top corta en 1000 y ni siquiera avisa con
-  // __next; con $top > 1000 también corta en 1000). Por eso se cuenta primero ($count, con el mismo filtro) y se piden
-  // todas las páginas de 1000 ($skip, orden estable por la clave mdId), 4 a la vez. Si al terminar la última página vino
-  // llena (entraron RMD nuevos mientras se leía), se sigue pidiendo hasta que llegue una incompleta.
+  // Máximo 1000 filas por lectura (sin __next): $count y páginas de 1000 por mdId, 4 en paralelo; se sigue si la última vino llena.
   const EXPAND_MD = 'estadoIdRmd,sucursalId,motivoId,aReceta/recetaId';
   const SELECT_MD = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'nivelTxt', 'codAgrupadorReceta', 'codDefectoReceta', 'codigoversionprincipal',
     'descripcion', 'observacion', 'fechaRegistro', 'usuarioRegistro', 'fechaAutorizacion', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'areaRmdTxt',
@@ -5635,7 +5491,7 @@
     return filas;
   }
   const fechaIso = (f) => (f instanceof Date && !isNaN(f) ? f.toISOString().slice(0, 10) : '');
-  // Los 18 datos del "Exportar" nativo del portal (mismos nombres y orden) más el linaje de versiones de un RMD.
+  // Las 18 columnas del Exportar nativo + linaje de versiones.
   function datosBaseDeMD(md) {
     return {
       codigo: md.codigo || '', codigoSolicitud: md.codigoSolicitud || '', version: md.version != null ? String(md.version) : '',
@@ -5647,17 +5503,11 @@
     };
   }
 
-  // ---- Enviar a Status RMD (status-rmd.vercel.app) sin archivo: el script ya corre dentro de la sesión del portal, así
-  // que lee aquí todo el maestro con sus recetas (lectura paginada de arriba, sin filtro) y se lo pasa a esa página abierta
-  // en otra pestaña con postMessage, restringido a su origen exacto. No se envía nada a ningún servidor nuevo ni se toca
-  // ninguna credencial: los datos van de una pestaña a otra dentro del mismo navegador, y Status RMD los procesa igual que
-  // si se hubiera subido el Excel. v1.19: el envío lleva también el usuario con el que se inició sesión en el portal
-  // (nombre y correo, del propio launchpad), y Status RMD registra la sincronización con él: un solo clic, sin DNI.
+  // ---- Enviar a Status RMD ----
+  // postMessage a la pestaña de status-rmd.vercel.app (origen exacto) con el maestro y el usuario de sesión (nombre y correo del launchpad).
   const URL_STATUS_RMD = 'https://status-rmd.vercel.app/';
   const ORIGEN_STATUS_RMD = 'https://status-rmd.vercel.app';
-  // Las dos últimas columnas (v1.18) traen Fecha Registro / Solicitud CON hora (ISO en UTC; Status RMD la pasa a hora
-  // local): con solo el día, dos RMD registrados el mismo día no se podrían ordenar. Van aparte, al final, para que una
-  // versión de Status RMD que aún no las conozca siga recibiendo las fechas de siempre (solo el día).
+  // Fecha Registro / Solicitud con hora (ISO UTC) en las dos últimas columnas, por compatibilidad.
   const COLUMNAS_PUENTE = ['codigo', 'codigoSolicitud', 'version', 'estado', 'codDefecto', 'codAgrupador', 'descripcion', 'etapa', 'fechaRegistro',
     'usuarioRegistro', 'fechaAut', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'planta', 'seccion', 'motivo', 'observacion', 'linaje', 'recetas',
     'fechaRegistroHora', 'fechaSolicitudHora'];
@@ -5669,8 +5519,7 @@
       fechaRegistroHora: fechaHoraIso(f.fechaRegistro), fechaSolicitudHora: fechaHoraIso(f.fechaSolicitud) };
     return COLUMNAS_PUENTE.map((c) => v[c]);
   }
-  // Usuario con el que se inició sesión en el portal: lo da el propio launchpad (sap.ushell.Container.getUser()), en este
-  // frame o en el de arriba (mismo origen). Solo nombre, correo e identificador: nunca se lee ninguna contraseña.
+  // Usuario del launchpad (sap.ushell.Container.getUser()): nombre, correo e id.
   function usuarioSapActual() {
     for (const w of [window, window.parent, window.top]) {
       try {
@@ -5678,15 +5527,14 @@
         if (!u) continue;
         const id = String((u.getId && u.getId()) || ''), nombre = String((u.getFullName && u.getFullName()) || ''), email = String((u.getEmail && u.getEmail()) || '');
         if (id || email) return { id, nombre, email };
-      } catch (e) { /* frame de otro origen o launchpad aún cargando */ }
+      } catch (e) { }
     }
     return null;
   }
   const ICONO_ENVIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h9.5M8.5 4.5 12 8l-3.5 3.5"/><path d="M14 2.5v11"/></svg>';
   async function enviarAStatusRmd(btn) {
     if (window.__rmdEnviandoStatus) return;
-    // La ventana se abre YA, dentro del clic: si se abriera después de leer los datos (tras un await), el navegador la
-    // bloquearía como ventana emergente. El parámetro único fuerza a recargarla si la pestaña ya estaba abierta.
+    // La ventana se abre dentro del clic (tras un await la bloquearía el navegador); parámetro único para recargar.
     const win = window.open(`${URL_STATUS_RMD}?desde=sap&t=${Date.now()}`, 'status-rmd');
     if (!win) { toast('El navegador bloqueó la ventana de Status RMD: permite ventanas emergentes para este portal y vuelve a intentarlo.', true); return; }
     window.__rmdEnviandoStatus = true; btn.disabled = true;
@@ -5699,7 +5547,7 @@
       if (d.type === 'STATUS_RMD_LISTO') listo = true; else if (d.type === 'STATUS_RMD_RECIBIDO') respuesta = d;
     };
     window.addEventListener('message', alMensaje);
-    const ping = setInterval(() => { try { if (!listo && !win.closed) win.postMessage({ type: 'STATUS_RMD_PING' }, ORIGEN_STATUS_RMD); } catch (e) { /* aún cargando */ } }, 800);
+    const ping = setInterval(() => { try { if (!listo && !win.closed) win.postMessage({ type: 'STATUS_RMD_PING' }, ORIGEN_STATUS_RMD); } catch (e) { } }, 800);
     try {
       const modelo = modeloListaPrincipal(); if (!modelo) throw new Error('abre la lista "Configuración Manufactura Digital" para poder leer el maestro');
       const datos = await leerMDPaginado(modelo, [], (h, t) => setTxt(span, `Leyendo SAP… ${h}/${t}`));
@@ -5710,7 +5558,7 @@
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
       if (!listo) throw new Error('Status RMD no respondió: ¿cargó la página y ya tiene la versión con enlace a SAP?');
       win.postMessage(payload, ORIGEN_STATUS_RMD);
-      // Con el usuario de SAP no hay nada que confirmar allá; sin él (launchpad sin usuario), Status RMD pide el DNI.
+      // Sin usuario de SAP, Status RMD pide el DNI.
       setTxt(span, usuarioSap ? 'Procesando en Status RMD…' : 'Confirma tu DNI en Status RMD…');
       await hasta(() => respuesta || win.closed, 300000, 300);
       if (!respuesta) throw new Error(usuarioSap ? 'no llegó la confirmación de Status RMD (¿se cerró la pestaña?)' : 'no llegó la confirmación de Status RMD (¿se canceló el DNI o se cerró la pestaña?)');
@@ -5721,7 +5569,7 @@
   }
   function gestionarBotonStatusRmd() {
     if (!on('statusrmd')) { document.querySelectorAll('.rmd-status-rmd').forEach((e) => e.remove()); return; }
-    document.querySelectorAll('.sapMDialog .rmd-status-rmd, .sapMDialog .rmd-suspension, .sapMDialog .rmd-buscar-equipo').forEach((e) => e.remove());   // nunca en ventanas (Configuración Maestra)
+    document.querySelectorAll('.sapMDialog .rmd-status-rmd, .sapMDialog .rmd-suspension, .sapMDialog .rmd-buscar-equipo').forEach((e) => e.remove());
     const btnExportar = botonExportar(); if (!btnExportar) return;
     const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra) return;
     if (!barra.querySelector('.rmd-status-rmd')) {
@@ -5731,17 +5579,13 @@
     }
   }
 
-  // ---- "Indicadores" (junto al icono nativo "Exportar"): lee aquí el maestro completo (la misma lectura de "Enviar a Status
-  // RMD") y arma "BD RMD <MES> <AÑO> - P1-P2.xlsx" con el bloque INDICADORES de arriba: las mismas hojas y tablas dinámicas del
-  // archivo que el equipo prepara a mano cada mes. Si se elige el archivo del mes anterior, trae sus listas PEND PL1 / PEND PL2
-  // y los "No contar" ya marcados. No envía nada a ningún lado: el archivo se arma en el navegador y se descarga.
+  // ---- Indicadores ----
+  // Lee el maestro y arma el libro con el bloque INDICADORES; opcionalmente toma el archivo del mes anterior. Se genera y descarga en el navegador.
   const ICONO_INDICADORES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 14.5h12"/><path d="M4 12V8.5M7 12V5M10 12V7M13 12V3"/></svg>';
-  // Filas para el libro, iguales a las del "Exportar" nativo: su "Fecha Autorización" es el texto de la fecha LOCAL
-  // (formatDateExcel del portal), mientras Fecha Registro y Fecha Solicitud van como fecha con hora UTC (sap.ui.export).
-  // (Los Cancelados, que el Exportar tampoco trae, los quita el propio bloque INDICADORES.)
+  // Filas como el Exportar nativo: Fecha Autorización como texto local (formatDateExcel); Registro y Solicitud con hora UTC.
   const fechaLocalTexto = (f) => (f instanceof Date && !isNaN(f) ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}` : '');
   const filaIndicadores = (md) => ({ ...datosBaseDeMD(md), fechaAut: fechaLocalTexto(md.fechaAutorizacion) });
-  // Mes por defecto: el anterior durante la primera quincena (se cierra el mes que acaba de terminar); si no, el actual.
+  // mes por defecto: el anterior en la primera quincena
   function mesPorDefecto(hoy = new Date()) { const d = new Date(hoy.getFullYear(), hoy.getMonth() - (hoy.getDate() <= 15 ? 1 : 0), 1); return { mes: d.getMonth() + 1, anio: d.getFullYear() }; }
   function abrirIndicadores() {
     if (window.__rmdIndicadores) return;
@@ -5790,14 +5634,11 @@
     });
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
   }
-  // ---- Orden de las estructuras del RMD (ventana raíz "Estructura de RMD") ----
-  // barra con el título de la lista ("Estructura de RMD (8)"): va dentro de la propia lista, no en la cabecera de la ventana
+  // ---- Orden de estructuras («Estructura de RMD») ----
+  // barra con el título de la lista, dentro de la lista
   const barraDeLista = (tabla) => { const l = tabla.closest('.sapMList'); return l && l.querySelector(':scope > .sapMTB, :scope > .sapMListHdr, .sapMListHdr'); };
-  // Hubo RMD autorizados con INSUMOS al final por error. El orden habitual se toma de los últimos autorizados de la misma
-  // planta, sección y etapa (si hay menos de 2, de la misma planta y etapa): la posición de cada estructura es la mediana de su
-  // posición relativa en esas referencias, y las que rompen la secuencia más larga coherente con ese orden son las que están
-  // fuera de lugar. Probado con todo el maestro (septiembre de 2026): ningún Ingresado sale marcado; con INSUMOS al final se
-  // marca solo INSUMOS en 252 de 252 casos simulados; en el historial marca 7 autorizados (6 por INSUMOS).
+  // Orden de referencia: últimos autorizados de la misma planta, sección y etapa (o planta y etapa si hay < 2); posición = mediana relativa.
+  // Fuera de lugar: las que rompen la subsecuencia coherente más larga.
   const N_REFS_ORDEN = 5, refsOrden = new Map();
   async function referenciasDeOrden(modelo, md) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
@@ -5814,7 +5655,7 @@
     const secuencias = refs.map((r) => es.filter((x) => x.mdId_mdId === r.mdId && x.activo !== false).sort((a, b) => a.orden - b.orden).map((x) => x.estructuraId_estructuraId)).filter((x) => x.length);
     return secuencias.length >= 2 ? { secuencias, alcance, codigos: refs.map((r) => `${r.codigo} v${r.version}`) } : null;
   }
-  // ids: estructuras del RMD en su orden; devuelve las que están fuera de lugar y el orden esperado (de las que tienen referencia)
+  // ids en orden -> { fueraDeLugar, esperado }
   function estructurasFueraDeOrden(ids, secuencias) {
     const mediana = (a) => { const x = [...a].sort((p, q) => p - q), m = x.length >> 1; return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; };
     const pos = new Map();
@@ -5825,7 +5666,7 @@
     const esperado = c.map((id, i) => ({ id, p: pos.get(id), i })).sort((a, b) => a.p - b.p || a.i - b.i).map((x) => x.id);
     return { fuera: [...new Set(c.filter((_, i) => !quedan.has(i)))], esperado };
   }
-  window.__rmdStats.estructurasFueraDeOrden = estructurasFueraDeOrden;   // (pruebas)
+  window.__rmdStats.estructurasFueraDeOrden = estructurasFueraDeOrden;   // pruebas
   async function revisarOrdenEstructuras(d, tabla) {
     const quitar = () => {
       tabla.querySelectorAll('td.rmd-orden-mal').forEach((td) => { td.classList.remove('rmd-orden-mal'); td.removeAttribute('title'); });
@@ -5862,12 +5703,11 @@
       aviso = document.createElement('div'); aviso.className = 'rmd-orden-aviso';
       const barra = barraDeLista(tabla); if (barra) barra.insertAdjacentElement('afterend', aviso); else tabla.insertAdjacentElement('beforebegin', aviso);
     }
-    if (aviso.dataset.html !== html) { aviso.dataset.html = html; aviso.innerHTML = html; }   // (reescribirlo sin cambios dispararía otro ajuste)
+    if (aviso.dataset.html !== html) { aviso.dataset.html = html; aviso.innerHTML = html; }
   }
 
-  // ---- Equipos por master (v1.22): todos los master con sus EQUIPOS / INSTRUMENTOS / MATERIALES en un Excel ----
-  // Se lee con el modelo del portal (las mismas entidades que usa al abrir esa estructura: MD_ES_EQUIPO y MD_ES_UTENSILIO) en
-  // páginas de 1000, 6 a la vez. Una fila por master y equipo, con los datos del equipo a la izquierda para filtrar por él.
+  // ---- Equipos por master ----
+  // MD_ES_EQUIPO y MD_ES_UTENSILIO en páginas de 1000 (6 en paralelo); una fila por master y equipo.
   const ICONO_EQUIPOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M6.5 6.2v7.3"/></svg>';
   async function leerEntidadCompleta(modelo, entidad, params, clave, avisar) {
     const leer = (ruta, u) => new Promise((ok, mal) => modelo.read(ruta, { urlParameters: u, success: ok, error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
@@ -5976,19 +5816,17 @@
       finally { window.__rmdEquipos = false; trabajando = false; bGen.disabled = false; }
     });
   }
-  // ---- Menú de exportados en el icono nativo "Exportar" (v1.23) ----
-  // El icono del portal ya no exporta directo: abre un menú con el exportado original (el mismo Excel del portal, con sus filtros,
-  // y la columna "Producción Estado" al final para no mover las demás), Equipos por master e Indicadores del mes.
-  // (el de la lista principal: Configuración Maestra y otras ventanas del portal también tienen un "Exportar" y ahí no va nada del script)
+  // ---- Menú del icono «Exportar» de la lista principal ----
+  // Exportado original (+ «Producción Estado» al final), Equipos por master e Indicadores.
   const botonExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
   const ctlExportar = () => { const b = botonExportar(); return b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); };
-  // Controlador de la lista principal (el mismo al que responde el botón Exportar)
+  // Controlador de la lista principal
   function controladorPrincipal() {
     const c = ctlExportar(), reg = c && ((c.mEventRegistry || {}).press || [])[0];
     return reg && reg.oListener && reg.oListener.getView ? reg.oListener : null;
   }
   function gestionarMenuExportar() {
-    document.querySelectorAll('.rmd-indicadores, .rmd-equipos-master').forEach((e) => e.remove());   // (botones sueltos de v1.20-1.22)
+    document.querySelectorAll('.rmd-indicadores, .rmd-equipos-master').forEach((e) => e.remove());
     const c = ctlExportar(); if (!c) return;
     const b = botonExportar();
     if (!on('exportar')) {
@@ -6033,8 +5871,7 @@
     setTimeout(() => { document.addEventListener('mousedown', fuera, true); document.addEventListener('keydown', teclas, true); }, 0);
     const primero = m.querySelector('.rmd-menu-item'); if (primero) primero.focus();
   }
-  // Texto de "Producción Estado" por id, como lo muestra la lista (su propio formateador) y, si se puede, de toda la maestra de
-  // esos estados (así también salen los que no aparecen en la lista cargada).
+  // Texto de «Producción Estado» por id (formateador de la lista y maestra de estados).
   let mapaProduccion = null;
   async function mapaProduccionEstado(ctrl) {
     if (mapaProduccion) return mapaProduccion;
@@ -6053,27 +5890,26 @@
         (await leerTodoDe(modelo, conjunto, [new Filtro({ filters: [...tipos].map((t) => new Filtro('oMaestraTipo_maestraTipoId', 'EQ', t)), and: false })], {}))
           .forEach((x) => { if (!(x.iMaestraId in mapa)) mapa[x.iMaestraId] = texto(x.iMaestraId, x.contenido); });
       }
-    } catch (e) { /* basta con los de la lista */ }
+    } catch (e) { }
     return (mapaProduccion = mapa);
   }
   async function exportadoOriginal(ctrl, fnOrig) {
-    let mapa = {}; try { mapa = await mapaProduccionEstado(ctrl); } catch (e) { /* la columna sale con el código */ }
+    let mapa = {}; try { mapa = await mapaProduccionEstado(ctrl); } catch (e) { }
     const lib = sap.ui.require('sap/ui/export/library'), EdmType = (lib && lib.EdmType) || {};
     const col = { label: 'Producción Estado', property: 'estadoIdProceso_iMaestraId', type: EdmType.Enumeration || 'Enumeration', valueMap: mapa };
     const propia = Object.prototype.hasOwnProperty.call(ctrl, 'createColumnMDExport'), orig = ctrl.createColumnMDExport;
     ctrl.createColumnMDExport = function () { const c = orig.apply(this, arguments); if (Array.isArray(c)) c.push(col); return c; };
-    try { fnOrig.call(ctrl); }   // onExportXLS pide las columnas al empezar (de forma síncrona): se restituye enseguida
+    try { fnOrig.call(ctrl); }   // onExportXLS lee las columnas de forma síncrona: se restauran enseguida
     finally { if (propia) ctrl.createColumnMDExport = orig; else delete ctrl.createColumnMDExport; }
   }
   window.__rmdStats.columnasExportadoOriginal = async () => { const ctrl = controladorPrincipal(), mapa = await mapaProduccionEstado(ctrl); return { columnas: ctrl.createColumnMDExport().map((c) => c.label).concat('Producción Estado'), mapa }; };
 
-  // ---- Buscar RMD por equipo (v1.23) ----
-  // Busca en los catálogos del portal (EQUIPO, UTENSILIO y UTENSILIO_CLASIFICACION, leídos una vez por sesión) por código o
-  // descripción, y trae los master que tienen esos equipos en su estructura EQUIPOS / INSTRUMENTOS / MATERIALES.
+  // ---- Buscar RMD por equipo ----
+  // Catálogos EQUIPO, UTENSILIO y UTENSILIO_CLASIFICACION (una vez por sesión) -> masters con esos equipos.
   const ICONO_BUSCAR_EQUIPO = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.3"/><path d="m10 10 4 4"/><path d="M5 6.8h3.6"/></svg>';
   let catalogoEquipos = null;
   function cargarCatalogoEquipos(modelo, avisar) {
-    if (catalogoEquipos && catalogoEquipos.__modelo !== modelo) catalogoEquipos = null;   // (otro modelo: el del arranque ya no responde)
+    if (catalogoEquipos && catalogoEquipos.__modelo !== modelo) catalogoEquipos = null;
     if (!catalogoEquipos) catalogoEquipos = Promise.all([
       leerEntidadCompleta(modelo, 'EQUIPO', { $select: 'equipoId,CodigoGaci,denom,eqktx,equnr,pltxt' }, 'equipoId', avisar),
       leerEntidadCompleta(modelo, 'UTENSILIO', { $select: 'utensilioId,codigo,descripcion' }, 'utensilioId'),
@@ -6086,7 +5922,7 @@
     if (catalogoEquipos) catalogoEquipos.__modelo = modelo;
     return catalogoEquipos;
   }
-  // un equipo del catálogo = todos los registros con el mismo tipo, código y descripción (EQUIPO trae varios por código GACI)
+  // equipo = mismo tipo, código y descripción (EQUIPO repite por código GACI)
   function agruparCatalogo(filas) {
     const m = new Map();
     filas.forEach((x) => { const k = x.tipo + '|' + x.codigo + '|' + x.desc; const g = m.get(k); if (g) { g.ids.push(x.id); if (!g.extra.includes(x.extra)) g.extra += ' ' + x.extra; } else m.set(k, { ...x, ids: [x.id] }); });
@@ -6112,7 +5948,7 @@
   }
   function filtrarListaPrincipal(codigo) {
     const ctrl = controladorPrincipal(); if (!ctrl) return;
-    if (filtroEquipo.input) filtroEquipo.input.setValue(''); filtroEquipo.ids = null; filtroEquipo.texto = '';   // se busca ese código, sin el filtro de equipo
+    if (filtroEquipo.input) filtroEquipo.input.setValue(''); filtroEquipo.ids = null; filtroEquipo.texto = '';
     ctrl.getView().getModel('oDataFilter').setProperty('/code', codigo); ctrl.onSearch();
   }
   function abrirBuscarPorEquipo() {
@@ -6172,11 +6008,6 @@
     return { catalogo: cat.length, items: items.map((x) => x.tipo + ' ' + x.codigo + ' ' + x.desc), filas: filas.map((x) => [x.equipo.codigo, x.md.codigo, x.md.version, x.md.estado, x.md.etapa]) };
   };
 
-  // ---- Modificaciones masivas de RMD (v1.23 "Suspensión masiva"; ver más abajo) ----
-  // La persona pega los códigos de los master y, si quiere, un motivo. Para CADA uno se hace exactamente lo que haría a mano: se
-  // filtra la lista, se abre su "Asociar fórmulas", se elige Estado "Suspendido", el motivo va como una línea nueva al final de
-  // Observaciones y se pulsa el Guardar del portal (con sus validaciones, la trazabilidad y la anulación del documento de cada
-  // receta en el DMS). Solo sirve para usuarios con permiso para cambiar el Estado ahí (rol Jefe DT, igual que en el portal).
   const ICONO_SUSPENDER = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M6.4 5.4v5.2M9.6 5.4v5.2"/></svg>';
   const SELECT_MD_SUSP = 'mdId,codigo,version,descripcion,nivelTxt,areaRmdTxt,observacion,fechaAutorizacion,codDefectoReceta,estadoIdRmd/contenido,sucursalId/contenido';
   async function leerMDPorCodigos(modelo, codigos) {
@@ -6214,20 +6045,15 @@
     await esperar(600); await hasta(() => !ocupadoGlobal(), 40000);
     return d;
   }
-  // ---- Modificaciones masivas (v1.23 "Suspensión masiva"; v1.28: también Ingresados y observaciones en cualquier master) ----
-  // Cada master se modifica igual que a mano, con la ventana "Asociar fórmulas" del portal y su botón Guardar (sus validaciones,
-  // la trazabilidad y, al suspender, la anulación del documento de cada receta en el DMS):
-  //  · Suspender: Estado "Suspendido" (el combo del portal lo ofrece a Autorizados e Ingresados) + el motivo, opcional, como una
-  //    línea nueva al final de Observaciones.
-  //  · Agregar observación: solo la línea nueva en Observaciones, sin cambiar el Estado. Sirve para cualquier estado salvo
-  //    Cancelado (el Guardar del portal no graba nada en un master cancelado). En un Autorizado de Fabricación / Envase el portal
-  //    compara antes las cantidades de insumos y, si difieren, abre el "Comparador de fórmula" en vez de guardar: se informa.
-  // Se abre desde el panel de mejoras o con Ctrl+K (no está en la barra de la lista: se usa poco y cambia muchos RMD a la vez).
+  // ---- Modificaciones masivas ----
+  // Por cada master, el flujo manual de «Asociar fórmulas» y su Guardar (validaciones, trazabilidad y anulación DMS).
+  // Suspender: Estado «Suspendido» + motivo en Observaciones. Agregar observación: solo la línea nueva (no en Cancelados).
+  // En Autorizados de Fabricación / Envase el portal puede abrir el «Comparador de fórmula»: se informa.
   const MODOS_MASIVOS = {
     suspender: { titulo: 'Suspender', estados: ['Autorizado', 'Ingresado'], verbo: 'Suspender', hecho: 'Suspendido' },
     observacion: { titulo: 'Agregar observación', estados: ['Autorizado', 'Ingresado', 'Suspendido', 'Solicitado', 'Solicitud Aprobada', 'Solicitud Rechazada'], verbo: 'Agregar la observación a', hecho: 'Observación agregada' },
   };
-  // Modifica UN master con el Guardar del portal. Devuelve { obs, mensajes }; lanza un error con el motivo si no se pudo.
+  // Modifica un master con el Guardar del portal -> { obs, mensajes }; lanza error si falla.
   async function modificarUno(ctrl, codigo, { suspender, linea }) {
     const d = await abrirAsociarFormulas(ctrl, codigo), vista = ctrl.getView(), asoc = vista.getModel('asociarDatos');
     const previos = new Set(dialogos());
@@ -6248,7 +6074,7 @@
       const antes = String(a.observacionBK != null ? a.observacionBK : a.observacion || '').replace(/\s+$/, '');
       const obs = linea ? (antes ? antes + '\n' : '') + linea : antes;
       asoc.setProperty('/observacionBK', obs);
-      // el mismo manejador que el botón Guardar de la ventana (se espera a que termine: guarda, trazabilidad y DMS)
+      // mismo manejador del botón Guardar (espera guardado, trazabilidad y DMS)
       const bGuardar = ctls.find((c) => c.getMetadata().getName() === 'sap.m.Button' && c.getText && c.getText() === 'Guardar' && c.getDomRef() && visible(c.getDomRef()));
       const reg = bGuardar && ((bGuardar.mEventRegistry || {}).press || [])[0]; if (!reg) throw new Error('no se encontró el botón Guardar');
       await reg.fFunction.call(reg.oListener, { getSource: () => bGuardar, getParameter: () => undefined, getParameters: () => ({}) });
@@ -6306,7 +6132,7 @@
       bRev.disabled = true; resultados = []; setTxt(prog, `Leyendo ${codigos.length} código(s) en SAP…`);
       try {
         const mds = await leerMDPorCodigos(modelo, codigos), porCod = new Map();
-        mds.forEach((m) => { const y = porCod.get(m.codigo); if (!y || m.version > y.version) porCod.set(m.codigo, m); });   // la versión más reciente
+        mds.forEach((m) => { const y = porCod.get(m.codigo); if (!y || m.version > y.version) porCod.set(m.codigo, m); });
         plan = codigos.map((c) => { const md = porCod.get(c), est = md && md.estadoIdRmd ? md.estadoIdRmd.contenido : '';
           return { codigo: c, md, estadoTxt: md ? est : '—', aplica: !!md && puede(est), motivoNo: !md ? 'No existe' : puede(est) ? '' : `No se modifica: está ${est}` }; });
         const n = plan.filter((x) => x.aplica).length;
@@ -6347,7 +6173,7 @@
         setTxt(prog, `${detenido ? 'Detenido. ' : ''}${sus ? 'Suspendidos' : 'Con la observación agregada'}: ${hechos} de ${lista.length}. Descarga el detalle con "Exportar Excel".`);
       } finally {
         trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; mot.readOnly = false; bX.disabled = !resultados.length;
-        try { ctrl.getView().getModel('oDataFilter').setProperty('/code', filtroAntes); await ctrl.onSearch(); } catch (e) { /* la lista se actualiza al próximo "Ir" */ }
+        try { ctrl.getView().getModel('oDataFilter').setProperty('/code', filtroAntes); await ctrl.onSearch(); } catch (e) { }
       }
     });
     const bX = botonModal('Exportar Excel', '', async () => {
@@ -6365,12 +6191,12 @@
     pintarModo(); setTimeout(() => ta.focus(), 40);
   }
   const abrirSuspensionMasiva = () => abrirModificacionesMasivas('suspender');
-  // diagnóstico (pruebas con el guardado SIMULADO): suspende uno con el mismo flujo, sin ventana
+  // pruebas (guardado simulado)
   window.__rmdStats.suspenderUno = (codigo, motivo) => suspenderUno(controladorPrincipal(), codigo, motivo);
   window.__rmdStats.observacionUno = (codigo, linea) => modificarUno(controladorPrincipal(), codigo, { suspender: false, linea });
   window.__rmdStats.leerMDPorCodigos = (codigos) => leerMDPorCodigos(controladorPrincipal().getView().getModel('mainModelv2'), codigos);
 
-  // Botones de la barra principal (v1.28: ya ninguno propio aquí; "Buscar por equipo" es un filtro y "Modificaciones masivas" está en el panel)
+  // Botones de la barra principal
   function gestionarBotonesLista() {
     const b = botonExportar(); if (!b) return;
     const barra = b.closest('.sapMBar, .sapMOTB, .sapMToolbar') || b.parentElement; if (!barra) return;
@@ -6381,12 +6207,11 @@
       const x = botonIcono(icono, texto, cls, fn); x.title = titulo;
       colocarEnBarra(barra, x);
     };
-    const viejoEq = barra.querySelector('.rmd-buscar-equipo'); if (viejoEq) viejoEq.remove();   // (v1.23-1.27: botón; ahora es el filtro "Equipo" de la barra de filtros)
-    const viejoSus = barra.querySelector('.rmd-suspension'); if (viejoSus) viejoSus.remove();   // (v1.23-1.27: botón; ahora "Modificaciones masivas" en el panel de mejoras y Ctrl+K)
+    const viejoEq = barra.querySelector('.rmd-buscar-equipo'); if (viejoEq) viejoEq.remove();
+    const viejoSus = barra.querySelector('.rmd-suspension'); if (viejoSus) viejoSus.remove();
     void poner;
   }
-  // ---- Botones del script en la barra de la lista principal (v1.24): a la IZQUIERDA de la barra vertical que separa los iconos
-  // del portal (Nuevo RMD, Configurar, Exportar), siempre en este orden.
+  // ---- Botones del script en la barra de la lista principal (a la izquierda del separador) ----
   const ORDEN_BARRA = ['rmd-status-rmd', 'rmd-buscar-equipo', 'rmd-suspension'];
   function colocarEnBarra(barra, x) {
     const nativo = [...barra.querySelectorAll('button')].find((y) => visible(y) && /^Nuevo RMD$/i.test(y.title || '')) || botonExportar(); if (!nativo) return;
@@ -6398,9 +6223,8 @@
     if (siguiente) siguiente.insertAdjacentElement('beforebegin', x); else ancla.insertAdjacentElement('beforebegin', x);
   }
 
-  // ---- Documentos citados en TODOS los master (v1.24, en el menú Exportar) ----
-  // Para no leer 1,1 millones de pasos: se lee el catálogo de pasos (PASO, ~91 mil) y se quedan los que citan un documento; luego se
-  // piden solo sus apariciones en los master (MD_ES_PASO y, como proceso menor, MD_ES_PASO_INSUMO_PASO) en bloques de 40.
+  // ---- Documentos citados en todos los master ----
+  // Catálogo PASO filtrado por citas; luego sus apariciones en MD_ES_PASO y MD_ES_PASO_INSUMO_PASO en bloques de 40.
   const ESTADOS_SIN_MARCAR_DOCS = ['Suspendido', 'Cancelado'];
   async function leerPorIds(modelo, entidad, campo, ids, params, extra, avisar) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, out = [], bloques = [];
@@ -6447,7 +6271,7 @@
   }
   function armarCitasTodosExcel(r, estados) {
     const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro(), nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
-    const vig = on('reglasrev') && RR.mapa, info = (c) => (vig ? RR.mapa.get(c) : null);   // con la lista de vigentes cargada: columna "Vigente"
+    const vig = on('reglasrev') && RR.mapa, info = (c) => (vig ? RR.mapa.get(c) : null);
     const cs = [...r.citas].sort((a, b) => nat(a.doc, b.doc) || nat(a.md.codigo, b.md.codigo) || (+a.orden || 0) - (+b.orden || 0));
     const porDoc = new Map(); cs.forEach((c) => { let x = porDoc.get(c.doc); if (!x) porDoc.set(c.doc, x = { masters: new Set(), aut: new Set(), citas: 0, etapas: new Set() }); x.masters.add(c.md.mdId); if (c.md.estado === 'Autorizado') x.aut.add(c.md.mdId); x.citas++; if (c.md.etapa) x.etapas.add(c.md.etapa); });
     const tabla = (nombre, nt, cab, anchos, datos, estilos = {}, op = {}) => {
@@ -6501,27 +6325,20 @@
     return { segundos: r.segundos, citas: r.citas.length, masters: r.masters, documentos: x.documentos, pasosCitados: r.pasosCitados, bytes: u8.length, nombre: x.nombre, muestra: r.citas.slice(0, 3).map((c) => [c.doc, c.md.codigo, c.lista, c.esPM, c.orden]) };
   };
 
-  // ---- Recetas frente a SAP: lista de materiales (v1.24) y hoja de ruta (v1.27, opcional) ----
-  // Al asociar una receta, el portal copia en el RMD su lista de materiales (MaterialSet del ERP: Matnr + Werks + Stlal → MD_ES_RE_INSUMO)
-  // y los datos de su versión de fabricación (ProduccionVSet → RECETA: puesto principal Mdv01, hoja de ruta Plnnr, contador Alnal,
-  // bloqueo Mksp, validez, lote). Esas copias ya no cambian: aquí se comparan con lo que devuelve hoy SAP (las mismas lecturas del
-  // portal). Solo AVISA: no impide autorizar.
-  // v1.27: la revisión va POR RECETA y sigue a la tabla de "Asociar fórmulas": al eliminar o agregar una receta el aviso se rehace
-  // solo (antes se guardaba por RMD y seguía mostrando la receta eliminada hasta cerrar la ventana). El detalle ya no va en una línea:
-  // un icono ⚠ junto al código abre una tabla (componente, descripción, en el RMD → en SAP hoy).
-  const revisionesReceta = new Map();                                     // mdRecetaId -> { t, clave, p: Promise<resultado> }
+  // ---- Recetas frente a SAP ----
+  // Al asociar, el portal copia MaterialSet (-> MD_ES_RE_INSUMO) y ProduccionVSet (-> RECETA: Mdv01, Plnnr, Alnal, Mksp, validez, lote).
+  // Se comparan con SAP actual; solo aviso. Revisión por receta; detalle en el ícono ⚠.
+  const revisionesReceta = new Map();                                     // mdRecetaId -> { t, clave, p }
   const contextosRmd = new Map();                                         // mdId -> { t, p: Promise<{ puestos, anterior }> }
   const cantidadNum = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
   const numTxt = (n) => (n == null ? '' : (Math.round(n * 1000) / 1000).toLocaleString('es-PE', { maximumFractionDigits: 3 }));
   function leerErp(erp, entidad, filtros) {
     return new Promise((ok, mal) => erp.read('/' + entidad, { filters: filtros, success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no respondió (${entidad}, ${(e && e.statusCode) || 'sin código'})`)) }));
   }
-  // Fechas de SAP (v1.36): cada componente de la lista trae "válido desde" (ValidFrom, "dd.mm.aaaa") y su número de cambio (ChangeNo):
-  // es la fecha en que se hizo ese cambio de la lista. La versión de fabricación trae "válida desde" (Adatu).
+  // ValidFrom / ChangeNo de la lista y Adatu de la versión de fabricación
   const fechaBom = (v) => { const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(norm(v)); if (!m) return null; const d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])); return isNaN(d) ? null : d; };
   const fechaCorta = (d) => (d ? `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}` : '');
-  // Al copiar la lista al asociar la receta, el portal a veces lee el separador de miles como decimal: 42094 queda como «42.094000» (1000 veces
-  // menos; 1 234 567 queda «1.234567»). No es un cambio en SAP: si la copia es la cantidad de SAP dividida entre 1000 o entre 1 000 000, es la misma.
+  // El portal a veces copia el separador de miles como decimal (÷1000 o ÷1 000 000): se considera igual.
   const cantidadIgual = (qSap, qRmd) => Math.abs(qSap - qRmd) <= 1e-6 || (qSap >= 1000 && [1e3, 1e6].some((f) => Math.abs(qSap - qRmd * f) <= 1e-6 * Math.max(1, qSap)));
   function diferenciasBom(sap, rmd) {
     const agrupar = (filas) => { const m = new Map(); filas.forEach((x) => { const k = norm(x.Component); if (!k) return; const g = m.get(k) || { comp: k, desc: norm(x.Maktx || x.ItemText1 || ''), q: 0, u: norm(x.CompUnit), n: 0, fecha: null, cambio: '' }; g.q += cantidadNum(x.CompQty) || 0; g.n++; if (!g.desc) g.desc = norm(x.Maktx || x.ItemText1 || '');
@@ -6533,7 +6350,7 @@
       else if (!cantidadIgual(x.q, y.q) || x.u.toUpperCase() !== y.u.toUpperCase()) dif.push({ tipo: 'cambia', comp: k, desc: x.desc || y.desc, antes: { q: y.q, u: y.u }, ahora: { q: x.q, u: x.u }, fecha: x.fecha, cambio: x.cambio, texto: `${k}: ${numTxt(y.q)} ${y.u} → ${numTxt(x.q)} ${x.u}` });
     });
     b.forEach((y, k) => { if (!a.has(k)) dif.push({ tipo: 'quitado', comp: k, desc: y.desc, antes: { q: y.q, u: y.u }, texto: `− ${k} (ya no está en la lista de SAP)` }); });
-    // un quitado y un nuevo con la misma descripción salvo la versión del material ("… x25" → "… x25 H v.1") = reemplazo
+    // quitado + nuevo con la misma descripción salvo versión del material = reemplazo
     const base = (t) => norm(t).toUpperCase().replace(/[\s.,;-]*\b(H\s*)?V\.\s*\d+\s*$/, '').replace(/\s+/g, ' ').trim();
     const nuevos = dif.filter((d) => d.tipo === 'nuevo');
     dif.filter((d) => d.tipo === 'quitado').forEach((q) => {
@@ -6547,14 +6364,13 @@
   }
   const TEXTO_MKSP = { '': 'No bloqueado', 1: 'Bloqueado para cada utilización', 2: 'Bloqueado para selección automática' };
   const fechaSap = (v) => { if (!v) return ''; const d = v instanceof Date ? v : new Date(v); if (isNaN(d)) return String(v); return d.getUTCFullYear() >= 9999 ? 'sin fin' : `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
-  // Lo más resaltante de la versión de fabricación. Solo avisan los datos de la ruta (puesto, hoja de ruta, contador, alternativa):
-  // el bloqueo (Mksp) cambia a menudo al usar la versión y el portal ya lo refresca con su botón; se muestra solo como información.
+  // Versión de fabricación: avisan puesto, hoja de ruta, contador y alternativa; Mksp solo informativo.
   const CAMPOS_RUTA = [
     ['Mdv01', 'Puesto de trabajo (línea)', (v) => norm(v), true], ['Plnnr', 'Hoja de ruta', (v) => norm(v), true], ['Alnal', 'Contador', (v) => String(parseInt(v, 10) || norm(v)), true],
     ['Stlal', 'Alternativa de la lista de materiales', (v) => String(parseInt(v, 10) || norm(v)), true],
     ['Mksp', 'Estado', (v) => TEXTO_MKSP[norm(v)] || norm(v), false], ['Adatu', 'Válida desde', fechaSap, false], ['Bdatu', 'Válida hasta', fechaSap, false], ['Bstma', 'Tamaño de lote máximo', (v) => numTxt(cantidadNum(v)), false],
   ];
-  // Datos del RMD que sirven a todas sus recetas: puestos de trabajo usados en sus pasos y la receta de la versión anterior
+  // Datos comunes del RMD: puestos usados y receta de la versión anterior
   function contextoRmd(ctrl, mdId) {
     const g = contextosRmd.get(mdId); if (g && Date.now() - g.t < 5 * 60000) return g.p;
     const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
@@ -6582,7 +6398,7 @@
       if (hoy && a !== s) cambios.push({ campo: nombre, asociada: a, sap: s, anterior: v, clave: k, avisa });
       else if (!hoy || (ant && v !== a && avisa)) cambios.push({ campo: nombre, asociada: a, sap: s, anterior: v, clave: k, avisa: avisa && !hoy, soloAnterior: !!hoy });
     });
-    // puestos de la hoja de ruta (la misma lectura del combo "Puesto Trabajo" del portal) frente a los que usan los pasos del RMD
+    // puestos de la hoja de ruta frente a los usados en los pasos
     const puestosDe = async (plnnr, alnal) => [...new Set((await leerErp(erp, 'PuestoTrabSet', [new F('Plnnr', 'EQ', norm(plnnr)), new F('Umrez', 'EQ', norm(alnal))]).catch(() => [])).map((x) => norm(x.Arbpl).toUpperCase()).filter(Boolean))];
     const rutaHoy = hoy ? await puestosDe(hoy.Plnnr, hoy.Alnal) : [];
     const rutaAsoc = hoy && (norm(hoy.Plnnr) !== norm(rc.Plnnr) || norm(hoy.Alnal) !== norm(rc.Alnal)) ? await puestosDe(rc.Plnnr, rc.Alnal) : rutaHoy;
@@ -6625,7 +6441,7 @@
     let a = contenedor.querySelector(':scope > .rmd-receta-aviso') || contenedor.querySelector('.rmd-receta-aviso');
     const hay = r && (r.desactualizadas.length || r.conRuta.length);
     if (!hay) { if (a) a.remove(); return; }
-    // solo el resumen: el detalle está en el ⚠ junto al código (y con clic en el código de la receta del aviso)
+    // resumen; el detalle va en el ⚠
     const cod = (x) => `<b class="rmd-receta-cod" data-id="${esc(x.mdRecetaId)}">${esc(x.receta)}</b>`, partes = [];
     if (r.desactualizadas.length) partes.push(`⚠ <b>Lista de materiales actualizada en SAP</b> en ${r.desactualizadas.length} receta(s): ${r.desactualizadas.map(cod).join(', ')}`);
     if (r.conRuta.length) partes.push(`⚠ <b>Hoja de ruta o puesto de trabajo distinto en SAP</b> en ${r.conRuta.length} receta(s): ${r.conRuta.map(cod).join(', ')}`);
@@ -6636,7 +6452,7 @@
     a.__rmdRes = r;
     if (!a.__rmdClic) { a.__rmdClic = true; a.addEventListener('click', (e) => { const b = e.target.closest('.rmd-receta-cod'); if (!b) return; e.stopPropagation(); const x = a.__rmdRes.recetas.find((y) => y.mdRecetaId === b.dataset.id); if (x) abrirDetalleRecetas(b, [x], true); }); }
   }
-  // Detalle: tarjeta flotante junto al icono (o al botón del aviso), con una tabla por receta
+  // Detalle flotante con una tabla por receta
   function detalleRecetaHtml(x) {
     let h = `<div class="rmd-rec-cab"><b>${esc(x.receta)}</b> <span>${esc(x.texto)}</span></div>`;
     if (x.dif.length) {
@@ -6677,7 +6493,7 @@
   }
   document.addEventListener('mousedown', (e) => { if (detalleAbierto && detalleAbierto.classList.contains('fijo') && !detalleAbierto.contains(e.target) && !(detalleAbierto.__ancla && detalleAbierto.__ancla.contains(e.target))) cerrarDetalleRecetas(); }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && detalleAbierto) { e.stopPropagation(); e.preventDefault(); cerrarDetalleRecetas(); } }, true);
-  // Icono junto al código de cada receta con algo distinto en SAP
+  // Ícono ⚠ junto al código de la receta
   function pintarIconosRecetas(lista, r) {
     const porId = new Map((r ? r.recetas : []).filter((x) => x.dif.length || x.rutaAvisa).map((x) => [x.mdRecetaId, x]));
     lista.getItems().forEach((it) => {
@@ -6696,7 +6512,7 @@
       ic.__rmdRes = x; const txt = `⚠ ${n}`; if (ic.textContent !== txt) ic.textContent = txt; ic.title = tit + '. Pasa el ratón para ver el detalle.';
     });
   }
-  // Ventana "Asociar Fórmula": botón "Revisar recetas" y revisión automática; se rehace cuando cambia la tabla de recetas
+  // «Asociar Fórmula»: botón «Revisar recetas» y revisión automática al cambiar la tabla
   function gestionarRecetasAsociar() {
     if (!on('recetas')) { document.querySelectorAll('.rmd-revisar-recetas, .rmd-receta-aviso, .rmd-rec-icono').forEach((e) => e.remove()); cerrarDetalleRecetas(); return; }
     const d = typeof sap !== 'undefined' && dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x))); const ctrl = d && controladorPrincipal();
@@ -6720,12 +6536,12 @@
       const ref = barra.querySelector('.sapMTBSpacer'); if (ref) ref.insertAdjacentElement('afterend', b); else barra.appendChild(b);
     }
     const firma = asoc.mdId + '|' + (on('recetaruta') ? 'r' : 'b') + '|' + filas.map((x) => x.mdRecetaId).sort().join(',');
-    if (d.__rmdRecetasFirma !== firma) {                                   // al abrir, o si se eliminó / agregó una receta
+    if (d.__rmdRecetasFirma !== firma) {
       d.__rmdRecetasFirma = firma;
       revisar(false).then((r) => { if (d.isConnected && d.__rmdRecetasFirma === firma) { d.__rmdRecetasRes = r; pintarAvisoRecetas(cont, tabla, r); pintarIconosRecetas(lista, r); } }, () => {});
-    } else if (d.__rmdRecetasRes) { pintarAvisoRecetas(cont, tabla, d.__rmdRecetasRes); pintarIconosRecetas(lista, d.__rmdRecetasRes); }   // UI5 volvió a dibujar la tabla
+    } else if (d.__rmdRecetasRes) { pintarAvisoRecetas(cont, tabla, d.__rmdRecetasRes); pintarIconosRecetas(lista, d.__rmdRecetasRes); }
   }
-  // También en la ventana raíz del RMD (aviso junto al del orden de estructuras)
+  // También en la ventana raíz del RMD
   function avisoRecetasRaiz(d, tabla) {
     if (!on('recetas') || typeof sap === 'undefined') return;
     const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), ctrl = controladorPrincipal();
@@ -6740,15 +6556,12 @@
     const antes = opc.recetaruta; if (conRuta != null) opc.recetaruta = !!conRuta;
     try { return await revisarRecetasDe(ctrl, { mdId: md.mdId, codigo, aReceta: { results: recs }, sucursalId: suc[0] && suc[0].sucursalId }, true); } finally { opc.recetaruta = antes; }
   };
-  window.__rmdStats.diferenciasBom = diferenciasBom; window.__rmdStats.detalleRecetaHtml = detalleRecetaHtml; window.__rmdStats.contextoRmd = (mdId) => contextoRmd(controladorPrincipal(), mdId).then((c) => ({ puestos: [...c.puestos.entries()], anterior: c.anterior }));   // (pruebas)
+  window.__rmdStats.diferenciasBom = diferenciasBom; window.__rmdStats.detalleRecetaHtml = detalleRecetaHtml; window.__rmdStats.contextoRmd = (mdId) => contextoRmd(controladorPrincipal(), mdId).then((c) => ({ puestos: [...c.puestos.entries()], anterior: c.anterior }));   // pruebas
 
-  // ---- "Adicionar Pasos": el mismo paso varias veces y en el orden que se quiera (v1.25; v1.29: panel "Pasos a agregar") ----
-  // El Agregar del portal agrega, EN ORDEN, un paso por cada elemento del modelo aSeleccionadoPaso (la barra de etiquetas de arriba
-  // de la tabla): basta con que un paso pueda estar varias veces. Tanto en el selector de pasos (frgAdicNewMdPasos) como en el de
-  // procesos menores (frgAddPasoPM). v1.29: en lugar del "+" dentro de cada etiqueta y de arrastrarlas (poco visibles y frágiles),
-  // un panel "Pasos a agregar" encima de la tabla, dibujado siempre desde ese modelo: una fila por paso con su cantidad (− n +),
-  // subir / bajar y quitar; lo que se ve ahí es exactamente lo que se agrega y en ese orden. Marcar una fila de la tabla lo agrega
-  // (cantidad 1); desmarcarla lo quita. El portal quitaba los repetidos al marcar otra fila: se conservan.
+  // ---- «Adicionar Pasos»: repetidos y orden (panel «Pasos a agregar») ----
+  // El Agregar del portal recorre aSeleccionadoPaso en orden (frgAdicNewMdPasos y frgAddPasoPM). El panel se dibuja desde ese modelo: cantidad, orden y
+  // quitar.
+  // El portal deduplica al marcar otra fila: aquí se conservan las copias.
   const RUTA_SEL = 'aSeleccionadoPaso', TABLAS_SELECTOR = ['frgAdicNewMdPasos--idTblPaso', 'frgAddPasoPM--idTblPaso'];
   function modeloSel(c) { return c && c.getModel && c.getModel(RUTA_SEL); }
   function fijarSel(m, arr) { arr.forEach((x, i) => { x.pos = i + 1; }); m.setData(arr); m.refresh(true); }
@@ -6811,13 +6624,13 @@
     const core = sap.ui.getCore();
     const tabla = TABLAS_SELECTOR.map((id) => core.byId(id)).find((t) => t && t.getDomRef() && visible(t.getDomRef())); if (!tabla) return;
     const d = tabla.getDomRef().closest('.sapMDialog'); if (!d) return;
-    d.classList.toggle('rmd-selector-ancho', on('ancho'));                // (v1.53: también el de procesos menores, igual que el de pasos mayores)
+    d.classList.toggle('rmd-selector-ancho', on('ancho'));                // también en el selector de PM
     d.querySelectorAll('.rmd-nota-repetir, .rmd-token-mas').forEach((n) => n.remove());
     d.querySelectorAll('.sapMToken[draggable]').forEach((t) => { t.removeAttribute('draggable'); t.classList.remove('rmd-token-rep'); });
     const m = modeloSel(tabla); if (!m) return;
     const modTabla = (tabla.getBindingInfo('items') || {}).model;
     const mi = [...d.querySelectorAll('.sapMMultiInput')].map((x) => core.byId(x.id)).find((c) => c && c.getBindingInfo && (c.getBindingInfo('tokens') || {}).model === RUTA_SEL);
-    // marcar / desmarcar filas: el portal deja un solo elemento por paso; aquí se conservan las copias y su orden
+    // marcar / desmarcar: se conservan copias y orden
     parchearEvento(tabla, 'selectionChange', function (orig, args) {
       const mm = modeloSel(tabla), antes = ((mm && mm.getData()) || []).slice(), e = args[0];
       const it = e && e.getParameter && e.getParameter('listItem'), sel = it && it.getSelected(), ctx = it && it.getBindingContext(modTabla), o = ctx && ctx.getObject();
@@ -6829,7 +6642,7 @@
       if (lista.length !== despues.length || lista.some((x, i) => x !== despues[i])) fijarSel(mm, lista);
       return r;
     });
-    // quitar una etiqueta (×) de la barra: se quita esa copia; la fila sigue marcada mientras quede otra
+    // quitar una etiqueta (×): solo esa copia
     if (mi) parchearEvento(mi, 'tokenUpdate', function (orig, args) {
       const e = args[0], quitados = ((e && e.getParameter && e.getParameter('removedTokens')) || []).map((t) => Number(t.getKey()));
       const r = orig.apply(this, args), mm = modeloSel(mi); if (!mm) return r;
@@ -6840,17 +6653,12 @@
     if (!on('repetirpaso')) { d.querySelectorAll('.rmd-sel-panel').forEach((x) => x.remove()); return; }
     pintarPanelPasos(d, tabla, m);
   }
-  window.__rmdStats.panelPasos = () => { const p = document.querySelector('.rmd-sel-panel'); return p && !p.hidden ? [...p.querySelectorAll('li')].map((li) => li.querySelector('.rmd-sel-cod').textContent + 'x' + li.querySelector('input').value) : []; };   // (pruebas)
+  window.__rmdStats.panelPasos = () => { const p = document.querySelector('.rmd-sel-panel'); return p && !p.hidden ? [...p.querySelectorAll('li')].map((li) => li.querySelector('.rmd-sel-cod').textContent + 'x' + li.querySelector('input').value) : []; };   // pruebas
 
-  // ---- RMD en vivo (v1.24, opción apagada por defecto; v1.25: salta a lo que cambió, lo resalta un momento y recarga sin parpadeo) ----
-  // Con la configuración de un RMD abierta, la mitad derecha de la pantalla muestra el PDF del RMD (el mismo que genera el portal
-  // con "Imprimir" / "Ver master", con pdfMake) y se vuelve a generar solo después de cada cambio guardado. Las ventanas de
-  // configuración pasan a la mitad izquierda.
-  // Qué cambió: se guarda una copia del documento de pdfMake (antes de que pdfMake lo procese) y se compara con el anterior por
-  // bloques de texto (celdas de tabla y textos, en orden): lo que difiere se pinta de amarillo en una segunda versión del PDF
-  // (pdfMake tarda <1 s) y, tras maquetarla, pdfMake deja en cada bloque su página y altura → el visor abre ahí (#page=&view=FitH,y).
-  // Unos segundos después se funde con la versión normal (el resaltado se desvanece). Cada versión nueva se carga detrás y aparece
-  // con un fundido cuando el visor ya la tiene, sin pantalla en blanco. Si el documento no cambió, no se recarga.
+  // ---- RMD en vivo (opcional) ----
+  // PDF del RMD (pdfMake, como «Ver master») en la mitad derecha, regenerado tras cada guardado.
+  // Diferencias por bloques de texto contra la copia anterior del documento; versión resaltada y salto a la posición (#page=&view=FitH,y), luego fundido a
+  // la normal.
   const vivo = { urls: [], panel: null, pendiente: null, generando: false, otraVez: false, mdId: null, t: 0, bloques: null, cab: '', cambio: null, fundido: null };
   const VIVO_COLOR = '#ffe066', VIVO_COLOR_BORRADO = '#ffb4a8', VIVO_RESALTE_MS = 2800;
   function clonarDoc(x) {
@@ -6867,7 +6675,7 @@
     return textoNodo(n.stack || n.columns || n.ul || n.ol || '');
   }
   const conTabla = (n) => !!n && typeof n === 'object' && (Array.isArray(n) ? n.some(conTabla) : !!(n.table || conTabla(n.stack) || conTabla(n.columns)));
-  // bloques del documento en orden de lectura: { s: texto, holder, key, celda } (holder[key] es el nodo, para poder resaltarlo)
+  // bloques en orden de lectura: { s, holder, key, celda }
   function bloquesDoc(content) {
     const out = [];
     const add = (holder, key, celda) => { const s = norm(textoNodo(holder[key])); if (s) out.push({ s, holder, key, celda }); };
@@ -6882,15 +6690,14 @@
     visitar({ c: content }, 'c');
     return out;
   }
-  // tramo de bloques nuevos que difiere del documento anterior (los números se ignoran al buscar el tramo, porque insertar un paso
-  // renumera todo lo que sigue; si solo cambiaron números, el primero que cambió — sin contar fechas y horas)
+  // tramo cambiado (los números se ignoran: insertar renumera; si solo cambian números, el primero distinto sin fechas/horas)
   function tramoCambiado(viejos, nuevos) {
     const a = viejos, b = nuevos, sn = (x) => x.replace(/\d+/g, '#');
     let p = 0; while (p < a.length && p < b.length && sn(a[p]) === sn(b[p])) p++;
     let s = 0; while (s < a.length - p && s < b.length - p && sn(a[a.length - 1 - s]) === sn(b[b.length - 1 - s])) s++;
     if (b.length - s > p) {
       if (a.length - s > p) return { desde: p, hasta: b.length - s, tipo: 'cambio' };
-      let d = p, h = b.length - s; while (d > 0 && sn(b[d - 1]) === sn(b[h - 1])) { d--; h--; }   // inserción: lo más arriba posible (la fila entera, con su número)
+      let d = p, h = b.length - s; while (d > 0 && sn(b[d - 1]) === sn(b[h - 1])) { d--; h--; }   // inserción: la fila completa
       return { desde: d, hasta: h, tipo: 'nuevo' };
     }
     if (a.length - s > p) { const i = Math.max(0, Math.min(p, b.length - 1)); return b.length ? { desde: i, hasta: i + 1, tipo: 'borrado' } : null; }
@@ -6913,7 +6720,7 @@
     p.querySelector('.rmd-vivo-ir').addEventListener('click', () => { if (vivo.cambio) mostrarCambio(vivo.cambio); });
     document.documentElement.appendChild(p); vivo.panel = p; return p;
   }
-  // carga el PDF en un visor nuevo detrás del actual y lo funde encima cuando ya está cargado
+  // carga el PDF en un visor oculto y lo funde al terminar
   function cargarPdf(url, frag) {
     const p = panelVivo(), marco = p.querySelector('.rmd-vivo-marco');
     return new Promise((ok) => {
@@ -6925,19 +6732,19 @@
           const viejos = [...marco.querySelectorAll('iframe.rmd-vivo-pdf')].filter((x) => x !== f);
           f.classList.add('activo'); viejos.forEach((x) => { x.classList.remove('activo'); setTimeout(() => x.remove(), 600); });
           ok(f);
-        }, 450);                                                                          // el visor pinta la página un instante después de "load"
+        }, 450);
       };
       f.addEventListener('load', listo); setTimeout(listo, 8000);
       f.src = url + frag; marco.appendChild(f);
     });
   }
-  // "view=FitH,y": y en puntos desde el borde superior de la página; el visor deja ese punto a ~1/4 de su alto (con contexto encima)
+  // view=FitH,y: y en puntos desde el borde superior
   const fragmento = (c) => (c && c.pagina ? `#page=${c.pagina}&view=FitH,${Math.max(0, Math.round(c.y - 10))}&navpanes=0` : '#view=FitH&navpanes=0');
   async function mostrarCambio(c) {
     clearTimeout(vivo.fundido);
     await cargarPdf(c.urlResaltado || c.url, fragmento(c));
     if (!c.urlResaltado) return;
-    vivo.fundido = setTimeout(() => {                                                // si la persona hizo clic en el PDF (pudo desplazarse), no se le mueve
+    vivo.fundido = setTimeout(() => {                                                // no se desplaza si hubo clic en el visor
       const f = vivo.panel && vivo.panel.querySelector('iframe.rmd-vivo-pdf.activo'); if (vivo.cambio === c && !(f && document.activeElement === f)) cargarPdf(c.url, fragmento(c));
     }, VIVO_RESALTE_MS);
   }
@@ -6958,7 +6765,7 @@
     } catch (e) { setTxt(est, 'No se pudo generar: ' + e.message); }
     finally {
       window.open = open0; URL.createObjectURL = cou0; if (cp0) pm.createPdf = cp0;
-      try { sap.ui.core.BusyIndicator.hide(); } catch (e) { /* sin UI5 */ }
+      try { sap.ui.core.BusyIndicator.hide(); } catch (e) { }
     }
     try {
       if (!blob) return;
@@ -6971,7 +6778,7 @@
       if (!primera && previos && bloques && !tramo && cab === cabPrev) { setTxt(est, `${md.codigo || ''} · sin cambios en el documento (${hora})`); return; }
       const url = cou0.call(URL, blob); guardarUrl(url);
       if (!tramo) { vivo.cambio = null; p.querySelector('.rmd-vivo-ir').hidden = true; await cargarPdf(url, fragmento(null)); setTxt(est, `${md.codigo || ''} · actualizado ${hora}`); return; }
-      // versión resaltada: mismo documento con los bloques cambiados en amarillo (o rojizo donde se quitó algo)
+      // versión resaltada (amarillo; rojizo donde se quitó)
       const dd2 = clonarDoc(limpio), marcados = bloquesDoc(dd2.content).slice(tramo.desde, Math.min(tramo.hasta, tramo.desde + 400)), color = tramo.tipo === 'borrado' ? VIVO_COLOR_BORRADO : VIVO_COLOR;
       const nodos = marcados.map((u) => { let n = u.holder[u.key]; if (!n || typeof n !== 'object') { n = { text: String(n) }; u.holder[u.key] = n; } if (u.celda) n.fillColor = color; else n.background = color; return n; });
       let urlResaltado = null;
@@ -6987,7 +6794,7 @@
       if (vivo.otraVez) { vivo.otraVez = false; programarVivo(); }
     }
   }
-  window.__rmdStats.vivo = { bloquesDoc, tramoCambiado, cambio: () => vivo.cambio && Object.assign({}, vivo.cambio, { fragmento: fragmento(vivo.cambio) }) };   // (pruebas)
+  window.__rmdStats.vivo = { bloquesDoc, tramoCambiado, cambio: () => vivo.cambio && Object.assign({}, vivo.cambio, { fragmento: fragmento(vivo.cambio) }) };   // pruebas
   function programarVivo() { clearTimeout(vivo.pendiente); vivo.pendiente = setTimeout(async () => { await hasta(() => !ocupadoGlobal(), 20000); generarVivo(false); }, 2500); }
   function gestionarVivo() {
     const raiz = dialogos().find((x) => /^\d{6,}\s*-/.test(cabecera(x)) && /^Estructura de RMD\b/i.test(norm((barraDeLista(tablaDe(x) || x) || {}).textContent)));
@@ -7003,14 +6810,13 @@
     panelVivo();
     if (md && md.mdId && vivo.mdId !== md.mdId && !vivo.generando) generarVivo(false);
   }
-  // ---- Fórmulas: reordenar los términos (v1.25) ----
-  // La lista de abajo de "Fórmulas" es localModel>/aListFormulaPasoDisponibleSeleccionados y el Guardar del portal (onTxFormulaPaso)
-  // graba el orden de cada término según su posición: basta con moverlos aquí (Subir / Bajar o Alt+↑ / Alt+↓) y pulsar Guardar.
+  // ---- Fórmulas: reordenar términos ----
+  // localModel>/aListFormulaPasoDisponibleSeleccionados; onTxFormulaPaso guarda el orden por posición.
   const RUTA_FORMULA = '/aListFormulaPasoDisponibleSeleccionados';
   function listaFormula(d) {
     return [...d.querySelectorAll('.sapMList')].map((x) => sap.ui.getCore().byId(x.id)).find((l) => { const bi = l && l.getBindingInfo && l.getBindingInfo('items'); return bi && bi.path === RUTA_FORMULA; });
   }
-  // Mueve el término de la posición `de` a la posición `a` (los dos índices de la lista) y rehace el texto de la fórmula
+  // Mueve el término de `de` a `a` y rehace el texto de la fórmula
   function reordenarFormula(d, de, a) {
     const lista = listaFormula(d); if (!lista) return;
     const bi = lista.getBindingInfo('items'), lm = lista.getModel(bi.model), arr = (lm.getProperty(RUTA_FORMULA) || []).slice();
@@ -7019,7 +6825,7 @@
     lm.setProperty(RUTA_FORMULA, arr); lm.refresh(true);
     const it = lista.getItems()[a]; if (it) lista.setSelectedItem(it, true);
     const reg = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).map((c) => c && ((c.mEventRegistry || {}).press || [])[0]).find((r) => r && r.oListener && r.oListener._mssgPrintFormula);
-    if (reg) reg.oListener._mssgPrintFormula(arr);   // el mismo texto de la fórmula que arma el portal
+    if (reg) reg.oListener._mssgPrintFormula(arr);   // mismo texto que arma el portal
     setTimeout(() => { const tr = it && it.getDomRef(); if (tr) { tr.classList.remove('rmd-recien-movida'); void tr.offsetWidth; tr.classList.add('rmd-recien-movida'); } }, 80);
   }
   function moverTermino(d, paso) {
@@ -7053,10 +6859,8 @@
     });
     t.addEventListener('dragend', () => { origen = -1; limpiar(); });
   }
-  // v1.53 — Al abrir una fórmula guardada, el portal empareja cada término con su paso SOLO por el paso mayor y el código: si la fórmula usa varios
-  // procesos menores del mismo paso con el mismo código (p. ej. «PESO (kg):» en los órdenes 1, 2 y 3), todos aparecen como el último, con el mismo
-  // orden, aunque en SAP cada término guarda su proceso menor (pasoFormulaIdPM). Aquí se vuelven a emparejar con su fila real y, debajo del texto de
-  // la fórmula (que el portal escribe con códigos), se muestra la fórmula por orden, que no se confunde cuando un código se repite.
+  // Al cargar una fórmula, el portal empareja términos solo por paso mayor + código (ignora pasoFormulaIdPM): PM repetidos salen iguales.
+  // Se reemparejan con MD_ES_FORMULA_PASO y se muestra la fórmula por orden.
   async function corregirFormulaCargada(d, lista) {
     const bi = lista.getBindingInfo('items'), lm = lista.getModel(bi.model), sel = lm.getProperty(RUTA_FORMULA) || [];
     const ids = sel.filter((x) => x.mdFormulaPaso && !x.__rmdOk).map((x) => x.mdFormulaPaso); if (!ids.length) return;
@@ -7064,8 +6868,7 @@
     const guardados = await leerPorIds(modelo, 'MD_ES_FORMULA_PASO', 'mdFormulaPaso', ids, { $select: 'mdFormulaPaso,pasoFormulaId_mdEstructuraPasoId,pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId,bFlagPM,valor,esPaso' });
     if (!d.isConnected) return;
     const disp = mDisp.getData() || [], porId = new Map(guardados.map((g) => [g.mdFormulaPaso, g])), tomadas = new Set(); let cambio = false;
-    // (en una versión copiada de otra, el término puede guardar el id del proceso menor de la versión anterior: entonces se empareja por paso mayor y código,
-    //  y cada término toma una fila distinta, en orden: dos términos «110742» del mismo paso van a sus dos filas, no a la misma)
+    // versión copiada: el id PM puede ser de la versión anterior -> por paso + código, una fila por término
     const candidata = (g) => {
       const pm = g.pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId && disp.find((a) => a.mdEstructuraPasoInsumoPasoId === g.pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId);
       if (pm) return pm;
@@ -7080,18 +6883,17 @@
       x.orden = o.orden; x.descrPaso = o.descrPaso; x.descrEstructura = o.descrEstructura; if (o.mdEstructuraPasoInsumoPasoId) x.mdEstructuraPasoInsumoPasoId = o.mdEstructuraPasoInsumoPasoId; cambio = true;
     });
     if (!cambio) return;
-    // (las filas disponibles marcadas como «ya en la fórmula» pasan a ser justo las de sus términos)
     const usados = new Set(sel.map((x) => (x.mdEstructuraPasoInsumoPasoId ? 'pm:' + x.mdEstructuraPasoInsumoPasoId : 'p:' + x.pasoPadreId + ':' + x.codigo)));
     disp.forEach((a) => { if (a.rank === 10 || a.rank === 0) a.rank = usados.has(a.mdEstructuraPasoInsumoPasoId ? 'pm:' + a.mdEstructuraPasoInsumoPasoId : 'p:' + a.pasoPadreId + ':' + a.codigo) ? 10 : 0; });
     lm.refresh(true); mDisp.refresh(true);
   }
-  window.__rmdStats.corregirFormula = () => { const d = dialogos().find((x) => /^F[oó]rmulas$/i.test(cabecera(x))); return d ? corregirFormulaCargada(d, listaFormula(d)) : null; };   // (pruebas)
+  window.__rmdStats.corregirFormula = () => { const d = dialogos().find((x) => /^F[oó]rmulas$/i.test(cabecera(x))); return d ? corregirFormulaCargada(d, listaFormula(d)) : null; };   // pruebas
   function formulaLegible(d, lista) {
     const bi = lista.getBindingInfo('items'), sel = lista.getModel(bi.model).getProperty(RUTA_FORMULA) || [];
     const corto = (t) => norm(String(t || '').replace(/^Proceso menor\s*/i, 'PM '));
     const txt = sel.map((x) => (x.descrPaso ? `orden ${x.orden} (${String(x.codigo).trim()})` : x.codigo === 'CT' ? 'cantidad teórica' : String(x.codigo || '').trim())).filter(Boolean).join(' ');
     const detalle = sel.filter((x) => x.descrPaso).map((x) => `orden ${x.orden} · ${x.codigo} · ${corto(x.descrPaso)}`).join('\n');
-    const ancla = [...d.querySelectorAll('.sapMMsgStrip, input, textarea')].find((el) => { const c = sap.ui.getCore().byId(el.id) || ctlDe(el); return c && ['text', 'value'].some((k) => /formulaText/.test(rutaDe(c, k) || '')); });   // (el portal la muestra en una franja informativa)
+    const ancla = [...d.querySelectorAll('.sapMMsgStrip, input, textarea')].find((el) => { const c = sap.ui.getCore().byId(el.id) || ctlDe(el); return c && ['text', 'value'].some((k) => /formulaText/.test(rutaDe(c, k) || '')); });
     if (!ancla) return;
     let p = d.querySelector('.rmd-formula-legible');
     if (!txt) { if (p) p.remove(); return; }
@@ -7112,7 +6914,7 @@
       const ref = barra.querySelector('.sapMTBSeparator') || barra.querySelector('.sapMInputBase'); if (ref) ref.insertAdjacentElement('beforebegin', g); else barra.appendChild(g);
     }
     if (!d.__rmdTeclasFormula) { d.__rmdTeclasFormula = true; d.addEventListener('keydown', (e) => { if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); moverTermino(d, e.key === 'ArrowUp' ? -1 : 1); } }, true); }
-    // asa para arrastrar cada término (como en las estructuras del máster)
+    // asa de arrastre
     lista.getItems().forEach((it) => {
       const tr = it.getDomRef(); if (!tr) return;
       const td = [...tr.children].find((x) => !/sapMListTblHighlightCell|sapMListTblSelCol|sapMListTblNavCol/.test(x.className)); if (!td || td.querySelector(':scope > .rmd-grip-f')) return;
@@ -7125,11 +6927,10 @@
     formulaLegible(d, lista);
   }
 
-  // ---- Producción Estatus: a quién se envió a revisión (v1.25) ----
-  // Cada RMD enviado trae sus destinatarios (destinatariosMD: DJEFPROD = jefe de producción, DGERPROD = gerente); el nombre sale de
-  // USUARIO. Se muestra junto al icono de la columna "Producción Estatus".
+  // ---- Producción Estatus: destinatarios de la revisión ----
+  // destinatariosMD (DJEFPROD, DGERPROD); nombre desde USUARIO.
   const nombresUsuario = new Map(); let pidiendoUsuarios = null;
-  function nombreDe(u) {                                                 // { completo, corto: primer nombre + apellido paterno }
+  function nombreDe(u) {                                                 // { completo, corto }
     const completo = norm([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' ')) || norm(u.nombreMostrar || u.usuario || '');
     return { completo, corto: norm([String(u.nombre || '').trim().split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
   }
@@ -7138,7 +6939,7 @@
     faltan.forEach((id) => nombresUsuario.set(id, null));
     pidiendoUsuarios = leerPorIds(modelo, 'USUARIO', 'usuarioId', faltan, { $select: 'usuarioId,usuario,nombre,apellidoPaterno,apellidoMaterno,nombreMostrar' })
       .then((us) => us.forEach((u) => nombresUsuario.set(u.usuarioId, nombreDe(u))), () => faltan.forEach((id) => nombresUsuario.delete(id)))
-      .finally(() => { pidiendoUsuarios = null; setTimeout(gestionarRevisores, 0); });   // (los nombres llegan después de pintar la lista)
+      .finally(() => { pidiendoUsuarios = null; setTimeout(gestionarRevisores, 0); });
   }
   function gestionarRevisores() {
     const tabla = [...document.querySelectorAll('table.sapMListTbl')].find((t) => visible(t) && !t.closest('.sapMDialog'));
@@ -7153,7 +6954,7 @@
       const td = celda(tr, i); if (!td) return;
       const ds = ((o.destinatariosMD && o.destinatariosMD.results) || []).filter((x) => x.activo !== false);
       const de = (tipo) => { const m = new Map(); ds.filter((x) => (x.tipo || '').startsWith(tipo)).forEach((x) => { const n = nombresUsuario.get(x.usuarioId_usuarioId); if (n && !m.has(n.completo)) m.set(n.completo, n); }); return [...m.values()]; };
-      const jefe = de('DJEFPROD'), gerente = de('DGERPROD'), corto = on('columnas');   // (con "Columnas ordenadas": compacto, uno por línea)
+      const jefe = de('DJEFPROD'), gerente = de('DGERPROD'), corto = on('columnas');
       const linea = (et, ns, k) => (ns.length ? `${et}: ${ns.map((n) => n[k]).join(', ')}` : '');
       const texto = [linea('Jefe', jefe, corto ? 'corto' : 'completo'), linea('Gerente', gerente, corto ? 'corto' : 'completo')].filter(Boolean).join(corto ? '\n' : ' · ');
       const titulo = 'Enviado a revisión a: ' + [linea('Jefe', jefe, 'completo'), linea('Gerente', gerente, 'completo')].filter(Boolean).join(' · ');
@@ -7165,7 +6966,7 @@
     });
   }
 
-  // ---- Recetas asociadas: eliminar varias a la vez (v1.25) y no asociar recetas de otro puesto de trabajo ----
+  // ---- Recetas asociadas: eliminación múltiple y mismo puesto de trabajo ----
   function gestionarRecetasMultiples() {
     const d = typeof sap !== 'undefined' && dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x))); const ctrl = d && controladorPrincipal(); if (!ctrl) return;
     const t = [...d.querySelectorAll('table.sapMListTbl')].pop(), lista = t && sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); if (!lista) return;
@@ -7198,7 +6999,7 @@
     } catch (e) { toast('No se pudieron eliminar todas: ' + ((e && (e.message || e.responseText)) || e), true); }
     finally { try { sap.ui.core.BusyIndicator.hide(); } catch (e) { /* sin UI5 */ } }
   }
-  // Al asociar recetas ("Agregar Producto"), todas deben tener el mismo puesto de trabajo (Mdv01) que las ya asociadas.
+  // Al asociar recetas todas deben tener el mismo Mdv01 que las ya asociadas.
   function gestionarPuestoRecetas() {
     const t = typeof sap !== 'undefined' && sap.ui.getCore().byId('frgAsocRecetas--idTblRecetas'), dom = t && t.getDomRef(); if (!dom || !visible(dom)) return;
     const d = enDialogo(dom), ctrl = controladorPrincipal(); if (!d || !ctrl) return;
@@ -7219,20 +7020,16 @@
             `Con otro puesto: ${distintas.map((x) => `${x.Matnr} / ${x.Verid} (${puesto(x)})`).join(', ')}.`, { title: 'Puesto de trabajo distinto' });
           return undefined;
         }
-      } catch (e) { /* si no se puede comprobar, el portal sigue como siempre */ }
+      } catch (e) { }
       return orig.apply(this, arguments);
     };
     w.__rmdPuesto = orig; reg.fFunction = w;
   }
 
-  // ---- Editar un paso que también está en otros RMD (v1.25) ----
-  // El "Grabar" de "Editar Paso" (onGrabarPasoPadre) sobrescribía en silencio el paso maestro cuando los otros RMD que lo usan están
-  // INGRESADOS (cambiándolos a todos), y cuando lo usan RMD Autorizados/Suspendidos creaba un paso nuevo aunque ya existiera otro con
-  // la misma descripción (pasos duplicados). Ahora, antes del Grabar del portal, se revisa dónde está el paso y, si aplica, se elige:
-  // "Generar un nuevo paso" (verde; si ya existe uno con la misma descripción, se usa ese en vez de duplicarlo) o "Sobrescribir el paso"
-  // (ámbar; el Grabar del portal de siempre). Luego una confirmación que se acepta sola a los 5 s si no se pulsa Cancelar u OK.
+  // ---- Editar Paso usado en otros RMD ----
+  // onGrabarPasoPadre sobrescribe el paso maestro (con RMD Ingresados) o crea uno nuevo aunque exista la misma descripción (con Autorizados/Suspendidos).
+  // Antes de grabar se elige: nuevo paso (reutiliza uno existente igual) o sobrescribir. Confirmación con autoaceptación a los 5 s.
   const ESTADOS_BLOQUEAN = ['465', '468'], ESTADOS_CERRADOS = ['465', '468', '466', '478'];
-  // v1.30: una sola ventana que explica qué cambió y qué pasa con cada opción; la cuenta de 5 s va dentro (sin otra ventana)
   const CAMPOS_PASO = [['descripcion', 'Descripción'], ['tipoDatoId_iMaestraId', 'Tipo de dato'], ['valorInicial', 'Valor inicial'], ['valorFinal', 'Valor final'], ['margen', 'Margen'],
     ['decimales', 'Decimales'], ['numeracion', 'Numeración'], ['tipoLapsoId_motivoLapsoId', 'Lapso'], ['tipoCondicionId_iMaestraId', 'Condición']];
   function elegirEdicionPaso(info) {
@@ -7283,14 +7080,14 @@
   }
   async function pasoDuplicado(modelo, d) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
-    // el mismo filtro que usa el portal para avisar "El Paso ya se encuentra registrado…"
+    // mismo filtro que el aviso «El Paso ya se encuentra registrado…»
     const f = [new Filtro('tolower(descripcion)', FO.EQ, "'" + String(d.descripcion || '').toLowerCase().replace("'", "''") + "'"), new Filtro('estructuraId_estructuraId', FO.EQ, d.estructuraId_estructuraId),
       new Filtro('etiquetaId_etiquetaId', FO.EQ, d.etiquetaId_etiquetaId), new Filtro('pasoId', FO.NE, d.pasoId)];
     const r = await leerTodoDe(modelo, 'PASO', f, { $select: 'pasoId,codigo,descripcion,activo' });
     const exacto = r.filter((x) => x.activo !== false).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0))[0];
     return exacto || pasoParecido(modelo, d);
   }
-  // v1.53: «la misma descripción» aunque cambien mayúsculas, tildes, espacios dobles o los signos del final («PESO (kg):» = «Peso (kg)»)
+  // comparación normalizada (mayúsculas, tildes, espacios, signos finales)
   const clavePaso = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9%°]+/g, ' ').trim();
   async function pasoParecido(modelo, d) {
     const clave = clavePaso(d.descripcion); if (clave.length < 4) return null;
@@ -7318,7 +7115,7 @@
     }
     if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId }); }
     else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId }); }
-    // los mismos refrescos que hace el portal al terminar
+    // mismos refrescos que el portal
     await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
     const etq = b.getView().getModel('headerAddEtiqueta');
     if (etq && comp !== 'pasoHijo') { if (etq.getData().length === 0) await M.onGetPasosToAssign(); else await M.onGetPasosToAssignProcess(); }
@@ -7327,7 +7124,7 @@
     if (comp === 'pasoHijo') M.oEditPasoHijoRM.close(); else M.oEditPasoRM.close();
     return codigo;
   }
-  // al abrir "Editar Paso": aviso arriba si el paso también está en otros RMD (así la pregunta al Grabar no sorprende)
+  // aviso al abrir si el paso está en otros RMD
   function avisoUsoAlAbrir(d, bG) {
     const b = controladorPrincipal(); if (!b) return;
     const comp = bG.data && bG.data('component'), lm = b.getView().getModel('localModel');
@@ -7372,20 +7169,20 @@
       const sec = d.querySelector('.sapMDialogSection'); if (sec) sec.prepend(a);
     };
     ta.addEventListener('input', () => { clearTimeout(reloj); reloj = setTimeout(revisar, 700); });
-    setTimeout(revisar, 300);                                           // (al abrir: ¿ya hay otro paso con la misma descripción?)
+    setTimeout(revisar, 300);
   }
   function gestionarEdicionPasos() {
     const d = dialogos().find((x) => /^Editar Paso/i.test(cabecera(x))); if (!d || typeof sap === 'undefined') return;
     const bG = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((x) => x && x.getText && x.getText() === 'Grabar');
     const reg = bG && ((bG.mEventRegistry || {}).press || [])[0], M = reg && reg.oListener;
-    if (!M || typeof M.onGrabarPasoPadre !== 'function' || (reg.fFunction !== M.onGrabarPasoPadre && !reg.fFunction.__rmdGrabar)) return;   // solo el Grabar del editor del RMD
+    if (!M || typeof M.onGrabarPasoPadre !== 'function' || (reg.fFunction !== M.onGrabarPasoPadre && !reg.fFunction.__rmdGrabar)) return;
     if (!on('editarpaso')) { if (reg.fFunction.__rmdGrabar) reg.fFunction = reg.fFunction.__rmdGrabar; return; }
     avisoUsoAlAbrir(d, bG);
     vigilarDuplicadoAlEditar(d, bG, M);
     if (reg.fFunction.__rmdGrabar) return;
     const orig = reg.fFunction;
     const w = async function (e) {
-      // UI5 recicla el objeto del evento al terminar el manejador: se guarda el botón ahora y el Grabar del portal recibe un evento equivalente
+      // UI5 recicla el evento tras el manejador: se guarda el botón y se pasa un evento equivalente
       const yo = this, fuente = e && e.getSource && e.getSource(), evento = { getSource: () => fuente, getParameter: () => undefined, getParameters: () => ({}) };
       const portal = () => orig.call(yo, evento);
       try {
@@ -7396,7 +7193,7 @@
         const modelo = b.getView().getModel('mainModelv2'), md = b.getView().getModel('asociarDatos').getData();
         const [uso, dup] = await Promise.all([usoDelPaso(modelo, dd.pasoId, md.mdId), pasoDuplicado(modelo, dd)]);
         const hayDup = dup && clavePaso(dd.descripcion) !== clavePaso((nn || {}).descripcion) ? dup : (uso.bloquean.length ? dup : null);
-        if (!uso.abiertos.length && !uso.bloquean.length && !hayDup) return portal();   // solo este RMD: el Grabar de siempre
+        if (!uso.abiertos.length && !uso.bloquean.length && !hayDup) return portal();
         const cambios = CAMPOS_PASO.filter(([k]) => String((nn || {})[k] == null ? '' : nn[k]) !== String(dd[k] == null ? '' : dd[k])).map(([clave, nombre]) => ({ clave, nombre }));
         const eleccion = await elegirEdicionPaso({ codigo: (nn && nn.codigo) || dd.codigo, antes: norm((nn || {}).descripcion), descripcion: norm(dd.descripcion), cambios, enEste: uso.enEste, abiertos: uso.abiertos, bloquean: uso.bloquean, dup: hayDup });
         if (!eleccion) return undefined;
@@ -7410,11 +7207,8 @@
     w.__rmdGrabar = orig; reg.fFunction = w;
   }
   window.__rmdStats.usoDelPaso = (pasoId, mdId) => usoDelPaso(controladorPrincipal().getView().getModel('mainModelv2'), pasoId, mdId);
-  // ---- Productividad (v1.26): saludo, "Ir a…" (Ctrl+K), RMD recientes y título de la pestaña ----
-  // Saludo: al cargar la lista principal, abajo a la izquierda (junto al botón de mejoras), "Buenos días, Carlos" con un resumen de
-  // los RMD de la persona en Ingresado y "Continuar con <el último RMD abierto>"; se desvanece solo (pasar el ratón lo detiene).
-  // El nombre sale del launchpad (sap.ushell.Container.getUser) y el código de usuario (el de usuarioRegistro de MD) del modelo del
-  // portal; del registro de usuario solo se lee ese campo. Recientes: los RMD abiertos en este navegador (localStorage, solo códigos).
+  // ---- Productividad: saludo, «Ir a…» (Ctrl+K), recientes y título de pestaña ----
+  // Nombre desde sap.ushell.Container.getUser; usuario desde usuarioRegistro de MD. Recientes en localStorage (solo códigos).
   const CLAVE_RECIENTES = 'rmdUiRecientes', CLAVE_SALUDO = 'rmdUiSaludo';
   const leerRecientes = () => { try { const a = JSON.parse(localStorage.getItem(CLAVE_RECIENTES)); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
   function anotarReciente(md) {
@@ -7423,13 +7217,13 @@
       const a = leerRecientes().filter((x) => x.codigo !== md.codigo);
       a.unshift({ codigo: String(md.codigo), version: md.version, descripcion: String(md.descripcion || '').slice(0, 120), etapa: md.nivelTxt || '', t: Date.now() });
       localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(a.slice(0, 12)));
-    } catch (e) { /* sin almacenamiento: sin recientes */ }
+    } catch (e) { }
   }
   const capitalizar = (t) => String(t || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
   function primerNombre() {
     for (const w of [window, window.parent, window.top]) {
       try { const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        const n = (u.getFirstName && u.getFirstName()) || (u.getFullName && u.getFullName()) || ''; if (n) return capitalizar(n.trim().split(/\s+/)[0]); } catch (e) { /* otro origen */ }
+        const n = (u.getFirstName && u.getFirstName()) || (u.getFullName && u.getFullName()) || ''; if (n) return capitalizar(n.trim().split(/\s+/)[0]); } catch (e) { }
     }
     return '';
   }
@@ -7438,7 +7232,7 @@
     const u = usuarioSapActual(); return u && u.email ? u.email.split('@')[0].toUpperCase() : '';
   }
   const saludoDelMomento = (h = new Date().getHours()) => (h >= 5 && h < 12 ? 'Buenos días' : h >= 12 && h < 19 ? 'Buenas tardes' : 'Buenas noches');
-  // RMD en Ingresado registrados o actualizados por la persona (una lectura de MD, solo los campos necesarios)
+  // RMD en Ingresado del usuario (una lectura de MD)
   let misRmdCache = null;
   async function misRmd(ctrl) {
     if (misRmdCache && Date.now() - misRmdCache.t < 60000) return misRmdCache.lista;
@@ -7460,9 +7254,9 @@
   let saludoHecho = false;
   function gestionarSaludo() {
     if (saludoHecho || !on('saludo')) return;
-    const ctrl = controladorPrincipal(); if (!ctrl || !botonExportar()) return;           // cuando ya se ve la lista principal
+    const ctrl = controladorPrincipal(); if (!ctrl || !botonExportar()) return;
     saludoHecho = true;
-    try { const u = +localStorage.getItem(CLAVE_SALUDO) || 0; if (Date.now() - u < 10 * 60000) return; localStorage.setItem(CLAVE_SALUDO, String(Date.now())); } catch (e) { /* sin almacenamiento: se saluda */ }
+    try { const u = +localStorage.getItem(CLAVE_SALUDO) || 0; if (Date.now() - u < 10 * 60000) return; localStorage.setItem(CLAVE_SALUDO, String(Date.now())); } catch (e) { }
     const nombre = primerNombre(), ult = leerRecientes()[0], reciente = ult && Date.now() - ult.t < 14 * 86400000 ? ult : null;
     const el = document.createElement('div'); el.className = 'rmd-saludo'; el.setAttribute('role', 'status');
     el.innerHTML = `<b>${esc(saludoDelMomento())}${nombre ? ', ' + esc(nombre) : ''}</b><span class="rmd-saludo-resumen"></span>` +
@@ -7478,7 +7272,7 @@
     const bc = el.querySelector('.rmd-saludo-continuar'); if (bc) bc.addEventListener('click', () => { ocultar(); abrirRmdPorCodigo(reciente.codigo, 'configurar', reciente.version); });
     resumenPersonal(ctrl).then((r) => { setTxt(el.querySelector('.rmd-saludo-resumen'), r); }, () => {});
   }
-  // Abrir un RMD como a mano: filtra la lista principal por su código y elige la acción en el menú de su fila (el mismo manejador del portal)
+  // Abre un RMD filtrando la lista y usando el menú de su fila
   const ACCIONES_FILA = { configurar: 'Configurar el RMD', asociar: 'Asociar fórmulas', master: 'Ver master', op: 'Ver OP', trazabilidad: 'Trazabilidad RMD' };
   async function abrirRmdPorCodigo(codigo, accion = 'configurar', version) {
     const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para ir a un RMD.', true); return false; }
@@ -7501,7 +7295,7 @@
     menu.fireItemSelected({ item });
     return true;
   }
-  // ---- "Ir a…" (Ctrl+K) ----
+  // ---- «Ir a…» (Ctrl+K) ----
   function herramientasPaleta() {
     const ctrl = controladorPrincipal(), lista = !!(ctrl && botonExportar());
     const clic = (sel) => () => { const b = document.querySelector(sel); if (b) b.click(); };
@@ -7523,12 +7317,11 @@
       ['Mejoras de interfaz', 'Activar o desactivar funciones del script', () => { const p = document.getElementById('rmd-ui-panel'); if (p) p.open = true; }],
     ].filter(Boolean);
   }
-  // Con una ventana de SAP abierta, UI5 (Popup modal) devuelve el foco a esa ventana si pasa a un elemento ajeno: la paleta, los
-  // avisos propios, el panel y el menú Exportar se declaran "contenido externo" de sus popups para poder escribir y usar el teclado ahí.
+  // Con un diálogo modal abierto UI5 recupera el foco: paleta, avisos, panel y menú se registran como contenido externo del popup.
   let externosUI5 = false;
   function registrarExternosUI5() {
     if (externosUI5 || typeof sap === 'undefined') return;
-    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { /* versión de UI5 sin esta función */ }
+    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { }
   }
   function abrirPaleta() {
     if (document.querySelector('.rmd-paleta-fondo')) return;
@@ -7579,7 +7372,7 @@
     q.addEventListener('input', () => { activo = 0; pintar(); });
     if (hayVentanas) setTxt(estado, 'Con ventanas abiertas solo se puede filtrar la lista.');
     pintar(); q.focus();
-    // UI5 devuelve el foco a su control un instante después (su gestor de foco): se recupera para que lo tecleado vaya a la paleta
+    // UI5 devuelve el foco un instante después: se recupera
     [0, 60, 200].forEach((ms) => setTimeout(() => { if (fondo.isConnected && document.activeElement !== q) q.focus(); }, ms));
     fondo.addEventListener('focusout', () => setTimeout(() => { if (fondo.isConnected && !fondo.contains(document.activeElement)) q.focus(); }, 0));
     if (ctrl && !hayVentanas) setTxt(estado, 'Leyendo tus RMD…');
@@ -7594,8 +7387,8 @@
     if (!on('paleta') || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'k') return;
     e.preventDefault(); e.stopPropagation(); abrirPaleta();
   }, true);
-  // RMD abierto: se anota en recientes y la pestaña del navegador lleva su código (útil con varias pestañas del portal)
-  const abrevEtapa = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);   // FABRICACION → FAB
+  // RMD abierto: recientes + título de pestaña
+  const abrevEtapa = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
   let rmdAbiertoId = null, tituloOriginal = null, tituloPuesto = null;
   function gestionarRmdAbierto() {
     const raiz = dialogos().find((x) => /^\d{6,}\s*-/.test(cabecera(x)) || /^Asociar F[oó]rmula/i.test(cabecera(x)));
@@ -7604,31 +7397,27 @@
     if (md && md.mdId && md.codigo) {
       if (rmdAbiertoId !== md.mdId) { rmdAbiertoId = md.mdId; if (on('paleta') || on('saludo')) anotarReciente(md); }
       if (on('titulo')) {
-        if (norm(doc.title) !== tituloPuesto) tituloOriginal = doc.title;                 // el título del portal (o el que puso el launchpad después)
-        const t = norm(`${abrevEtapa(md.nivelTxt) || md.codigo} - ${String(md.descripcion || '').slice(0, 45)} — ${tituloOriginal}`);   // FAB / ENV / ACO / INS / REC - descripción (el navegador junta los espacios)
+        if (norm(doc.title) !== tituloPuesto) tituloOriginal = doc.title;                 // título original
+        const t = norm(`${abrevEtapa(md.nivelTxt) || md.codigo} - ${String(md.descripcion || '').slice(0, 45)} — ${tituloOriginal}`);   // FAB / ENV / ACO / INS / REC - descripción
         if (norm(doc.title) !== t) doc.title = t;
         tituloPuesto = t; return;
       }
     } else rmdAbiertoId = null;
-    if (tituloPuesto && norm(doc.title) === tituloPuesto && tituloOriginal != null) doc.title = tituloOriginal;   // RMD cerrado u opción apagada: título del portal
+    if (tituloPuesto && norm(doc.title) === tituloPuesto && tituloOriginal != null) doc.title = tituloOriginal;   // RMD cerrado u opción desactivada: título original
     tituloPuesto = null;
   }
   window.__rmdStats.productividad = { leerRecientes, primerNombre, codigoUsuario: () => codigoUsuario(controladorPrincipal()), misRmd: () => misRmd(controladorPrincipal()), resumen: () => resumenPersonal(controladorPrincipal()), abrirPaleta, abrirRmdPorCodigo, saludoDelMomento,
-    saludar: () => { saludoHecho = false; try { localStorage.removeItem(CLAVE_SALUDO); } catch (e) { /* sin almacenamiento */ } document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove()); gestionarSaludo(); } };   // (pruebas)
-  // ---- Filtro "Equipo" en la barra de filtros de la lista principal (v1.28; reemplaza al botón "Buscar por equipo") ----
-  // Es una tarjeta más del FilterBar del portal (FilterGroupItem, como Código RMD o Planta): se escribe el código o el nombre de un
-  // equipo, instrumento, utensilio o agrupador (con sugerencias del catálogo) y "Ir" muestra solo los master que lo tienen, junto con
-  // los demás filtros. Cómo: la lista la lee el portal con onGetMd(filtros) de 100 en 100; con el filtro activo se hace la MISMA lectura
-  // (mismos filtros, mismo $expand y orden) añadiendo los mdId de los master con ese equipo, en bloques de 30 (la URL no debe crecer),
-  // y se devuelve todo de una vez. "Restablecer" lo vacía. También: "Código Agrupador" pasa a "Agrupador" y las tarjetas se estrechan
-  // para que entren todas en una fila.
+    saludar: () => { saludoHecho = false; try { localStorage.removeItem(CLAVE_SALUDO); } catch (e) { /* sin almacenamiento */ } document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove()); gestionarSaludo(); } };   // pruebas
+  // ---- Filtro «Equipo» en la barra de filtros de la lista principal ----
+  // FilterGroupItem adicional. Con valor, onGetMd repite la misma lectura (filtros, $expand, orden) añadiendo los mdId con el equipo en bloques de 30.
+  // También: «Código Agrupador» -> «Agrupador» y tarjetas más estrechas.
   const EXPAND_LISTA_MD = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,destinatariosMD/usuarioId,aStatusProceso/estadoIdProceso,aStatusProceso/mdId,aReceta/recetaId,aTrazabilidad/estadoTrazab';
   const filtroEquipo = { item: null, input: null, ids: null, texto: '', resumen: '' };
   function barraFiltrosPrincipal() {
     const lab = [...document.querySelectorAll('.sapUiCompFilterBar label, .sapUiCompFilterBar .sapMLabel')].find((l) => !l.closest('.sapMDialog') && /^Codigo RMD/i.test(norm(l.textContent)));
     const fbDom = lab && lab.closest('.sapUiCompFilterBar'); return fbDom ? sap.ui.getCore().byId(fbDom.id) : null;
   }
-  // lo escrito en la tarjeta (el valor del control de UI5 solo se actualiza al salir del campo o con Enter)
+  // valor escrito (el control solo actualiza al salir o con Enter)
   const valorEquipo = () => { const i = filtroEquipo.input; if (!i) return ''; const d = i.getDomRef('inner'), v = norm(d ? d.value : i.getValue()); if (v !== i.getValue()) i.setValue(v); return v; };
   async function prepararFiltroEquipo(modelo) {
     const texto = valorEquipo();
@@ -7646,7 +7435,7 @@
   }
   async function leerListaConEquipo(ctrl, filtros, ocupado_) {
     const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, ids = filtroEquipo.ids || [];
-    if (!filtros || !filtros.length) return { results: [] };            // "Growing" (más filas): ya se trajo todo de una vez
+    if (!filtros || !filtros.length) return { results: [] };            // growing: ya se trajo todo
     if (ocupado_) sap.ui.core.BusyIndicator.show(0);
     try {
       const partes = []; for (let i = 0; i < ids.length; i += 30) partes.push(ids.slice(i, i + 30));
@@ -7683,23 +7472,23 @@
       });
       inp.attachSuggestionItemSelected((e) => { const it = e.getParameter('selectedItem'); if (it) inp.setValue(it.getKey()); });
       const it = new FGI({ groupName: 'MANGROUP', name: 'RMDEQUIPO', label: 'Equipo', labelTooltip: 'Master que tienen este equipo, instrumento, material, utensilio o agrupador', visibleInFilterBar: true, control: inp });
-      fb.addFilterGroupItem(it);                                          // (insertFilterGroupItem no la dibuja: el FilterBar solo actualiza su barra con add)
+      fb.addFilterGroupItem(it);                                          // insertFilterGroupItem no redibuja la barra (solo add)
       filtroEquipo.item = it; filtroEquipo.input = inp;
     }
-    // "Ir": antes de la búsqueda del portal se calculan los master con el equipo; la lectura de la lista los incluye (onGetMd)
+    // «Ir»: se calculan los master con el equipo antes de onGetMd
     const regS = ((fb.mEventRegistry || {}).search || [])[0];
     if (regS && !regS.fFunction.__rmdEquipo) {
       const orig = regS.fFunction;
       const w = async function (e) {
-        const modelo = (controladorPrincipal() || ctrl).getView().getModel('mainModelv2');   // el modelo vigente (el portal lo reemplaza al arrancar)
+        const modelo = (controladorPrincipal() || ctrl).getView().getModel('mainModelv2');   // modelo vigente (el portal lo reemplaza al arrancar)
         const yo = this, fuente = e && e.getSource && e.getSource(), ev = { sId: 'search', getSource: () => fuente, getParameter: () => undefined, getParameters: () => ({}) };
-        window.__rmdStats.filtroEquipoInicio = Date.now();   // (pruebas)
+        window.__rmdStats.filtroEquipoInicio = Date.now();   // pruebas
         if (valorEquipo()) {
           sap.ui.core.BusyIndicator.show(0);
           try { await prepararFiltroEquipo(modelo); } catch (err) { filtroEquipo.ids = null; toast('No se pudo filtrar por equipo: ' + err.message, true); } finally { sap.ui.core.BusyIndicator.hide(); }
         } else await prepararFiltroEquipo(modelo);
         const r = await orig.call(yo, ev);
-        window.__rmdStats.filtroEquipo = { texto: filtroEquipo.texto, masters: filtroEquipo.ids ? filtroEquipo.ids.length : null, t: Date.now() };   // (pruebas)
+        window.__rmdStats.filtroEquipo = { texto: filtroEquipo.texto, masters: filtroEquipo.ids ? filtroEquipo.ids.length : null, t: Date.now() };   // pruebas
         if (filtroEquipo.ids) toast(filtroEquipo.resumen + ' La lista muestra los que cumplen también los demás filtros.', !filtroEquipo.ids.length);
         return r;
       };
@@ -7715,7 +7504,7 @@
       ctrl.onGetMd = function (filtros, formula, valor, ocupado_) { return filtroEquipo.ids ? leerListaConEquipo(ctrl, filtros, ocupado_) : orig.apply(this, arguments); };
     }
   }
-  // "Código Agrupador" → "Agrupador", "Restablecer" → ⟳ rojo (se usa poco) y tarjetas más estrechas para que entren todas en una fila
+  // «Código Agrupador» -> «Agrupador», «Restablecer» -> ⟳ y tarjetas más estrechas
   function compactarBarraFiltros(fb, items) {
     const agr = items.find((x) => x.getName() === 'D'), dom = fb.getDomRef(), layout = dom && sap.ui.getCore().byId((dom.querySelector('.sapUiAFLayout') || {}).id);
     const rest = dom && [...dom.querySelectorAll('button')].map((b) => sap.ui.getCore().byId(b.id.replace(/-(inner|img)$/, ''))).find((c) => c && c.getText && (c.getText() === 'Restablecer' || c.__rmdRestablecer));
@@ -7733,14 +7522,11 @@
     if (!filtroEquipo.input || !filtroEquipo.input.getDomRef()) { toast('Activa "Filtro Equipo" en el panel de mejoras y abre la lista principal.', true); return; }
     filtroEquipo.input.focus();
   }
-  // ---- Lista principal: columna "Fase" y columnas a medida (v1.35) ----
-  // "Fase" sale de la nomenclatura de la 1ª línea de Observaciones (…-F1, -F1R, -F2-R: Fase 1, Fase 1 R, Fase 2 R). Se agrega como última
-  // columna (y su celda como última celda de cada fila y de la plantilla), así las celdas del portal no cambian de posición, y se dibuja en
-  // su lugar con el orden de dibujo de UI5 (Column.setOrder). Con "Columnas ordenadas": un orden más claro (lo que es el RMD, su estado y
-  // fase, la producción, la autorización) y anchos según el ancho de la pantalla; la Descripción toma lo que sobra. Antes todas las
-  // columnas medían lo mismo (~150 px) y la Descripción, estrecha, ocupaba 3 líneas. "Etapa" sigue en una línea ("ACONDICIONADO" completo).
+  // ---- Lista principal: columna «Fase» y anchos ----
+  // Fase desde la 1.ª línea de Observaciones. Se agrega al final (celdas del portal sin mover) y se ordena con Column.setOrder.
+  // «Columnas ordenadas»: orden propio y anchos según pantalla; la Descripción toma el resto.
   const ORDEN_LISTA = ['Código', 'Versión', 'Descripción', 'Producción Estado', 'Producción Enviar', 'Producción Estatus', 'Etapa', 'Estado', 'Fase', 'Fecha Autorización', 'Usuario Autorización', 'A/F', 'Planta', 'Accion'];
-  // ancho preferido en px; el mínimo se mide (la palabra más larga del encabezado y de las celdas visibles, sin partirla, + el relleno)
+  // ancho preferido (px); el mínimo se mide
   const ANCHOS_LISTA = { 'Código': 110, 'Versión': 70, 'Etapa': 130, 'Estado': 100, 'Fase': 80, 'Producción Estado': 120, 'Producción Enviar': 96,
     'Producción Estatus': 200, 'Fecha Autorización': 150, 'Usuario Autorización': 124, 'A/F': 50, 'Planta': 110 };
   const CENTRADAS_LISTA = ['Versión', 'Fase', 'Producción Enviar', 'A/F'], MIN_DESCRIPCION = 240, ANCHO_COMPACTO = 1750;
@@ -7755,7 +7541,7 @@
     const ctrl = controladorPrincipal(), t = ctrl && ctrl.getView().byId('idTblConfigurationRmd'); if (!t || !t.getColumns || !t.getDomRef()) return;
     const texto = (c) => { const h = c.getHeader && c.getHeader(); return h && h.getText ? h.getText() : ''; };
     let reordenar = false;
-    // 1. columna Fase (al final de las columnas y de las celdas)
+    // 1. columna Fase
     let colFase = t.getColumns().find((c) => c.data && c.data('rmdFase'));
     if (on('fase')) {
       if (!colFase) {
@@ -7772,7 +7558,7 @@
       quitar((t.getBindingInfo('items') || {}).template); t.getItems().forEach(quitar);
     }
     const cols = t.getColumns(), iEstado = cols.findIndex((c) => texto(c) === 'Estado');
-    // 2. orden de dibujo (sin "Columnas ordenadas": el del portal, con Fase tras Estado)
+    // 2. orden de dibujo
     cols.forEach((c, i) => {
       const k = ORDEN_LISTA.indexOf(texto(c));
       const o = on('columnas') ? (k >= 0 ? k : 100 + i) : c === colFase ? iEstado + 0.5 : i;
@@ -7785,9 +7571,9 @@
       if (t.hasStyleClass('rmd-lista-compacta')) t.removeStyleClass('rmd-lista-compacta');
       delete t.__rmdAnchosFirma;
     } else {
-      const W = (dom.clientWidth || 0) - 50;                                  // (menos la selección y la flecha de cada fila)
+      const W = (dom.clientWidth || 0) - 50;
       if (W >= 600) {
-        const compacta = W < ANCHO_COMPACTO;                                  // pantallas estrechas: menos relleno y encabezados más pequeños
+        const compacta = W < ANCHO_COMPACTO;                                  // pantallas estrechas: menos relleno
         if (t.hasStyleClass('rmd-lista-compacta') !== compacta) t.toggleStyleClass('rmd-lista-compacta', compacta);
         const its = t.getItems(), o0 = its[0] && its[0].getBindingContext('listMD'), o1 = its.length && its[its.length - 1].getBindingContext('listMD');
         const firma = [W, compacta, its.length, o0 && o0.getObject().codigo, o1 && o1.getObject().codigo, dom.querySelectorAll('.rmd-revisor').length, on('fase')].join('|');
@@ -7796,12 +7582,8 @@
           const tabla = dom.querySelector('table'), ths = tabla ? [...tabla.querySelectorAll('thead th')] : [], filas = tabla ? [...tabla.querySelectorAll('tbody tr')].filter((tr) => !/SubRow|NoData/.test(tr.className)).slice(0, 60) : [];
           const caja = (el) => { if (!el) return { pad: 0, bb: false }; const cs = getComputedStyle(el), px = (v) => parseFloat(v) || 0;
             return { pad: px(cs.paddingLeft) + px(cs.paddingRight) + px(cs.borderLeftWidth) + px(cs.borderRightWidth), bb: cs.boxSizing === 'border-box' }; };
-          // El ancho de la columna se pone en su encabezado (th). Con content-box, el relleno del th va aparte; la celda (td) tiene su propio
-          // relleno, que no es el del th: sin modo compacto el th no tiene relleno y la celda 8 + 8 px (16 + 8 la primera columna), así que el
-          // texto de la celda tiene 16 px menos que el encabezado ("ACONDICIONADO" se partía a 1728 px). El texto del encabezado va además
-          // dentro de un contenedor (.sapMColumnHeader) con su propio relleno.
-          // Por columna: el mínimo (ninguna palabra partida), el de "una línea" (cada celda en una sola línea; el encabezado sí puede ocupar
-          // dos) y el preferido (ANCHOS_LISTA). Los botones de la celda (iconos) también cuentan.
+          // Ancho en el th (content-box): el relleno del td es distinto del th (16 px menos de texto).
+          // Por columna: mínimo (sin partir palabras), «una línea» y preferido (ANCHOS_LISTA); los iconos cuentan.
           const minimos = {}, unaLinea = {}, rellenos = {}; let descMaxLinea = 0;
           ths.forEach((th, i) => {
             const n = norm(th.textContent); if (!ANCHOS_LISTA[n] && n !== 'Descripción') return;
@@ -7813,29 +7595,27 @@
               const td = tr.children[i]; if (!td) return;
               td.querySelectorAll('.sapMText, .sapMObjStatusText, .sapMLabel, .rmd-revisor').forEach((el) => {
                 const txt = norm(el.textContent); if (!txt) return;
-                const palabras = n === 'Fase' ? [txt] : txt.split(' ');           // (Fase no se parte: "Fase 2 R" en una línea)
+                const palabras = n === 'Fase' ? [txt] : txt.split(' ');
                 palabras.forEach((w) => { mC = Math.max(mC, anchoTexto(el, w)); });
                 if (!el.classList.contains('rmd-revisor')) { const w = anchoTexto(el, txt); lineas.push(w); lC = Math.max(lC, w); return; }
-                const bt = td.querySelector('.sapMBtn'), antes = bt ? bt.getBoundingClientRect().width + 6 : 0;   // (revisores: uno por línea, junto al icono)
+                const bt = td.querySelector('.sapMBtn'), antes = bt ? bt.getBoundingClientRect().width + 6 : 0;
                 el.textContent.split('\n').forEach((l) => { lC = Math.max(lC, antes + anchoTexto(el, norm(l))); });
               });
               td.querySelectorAll('.sapMBtn').forEach((b) => { const w = b.getBoundingClientRect().width; mC = Math.max(mC, w); lC = Math.max(lC, w); });
               td.querySelectorAll('.sapMHBox').forEach((hb) => { const w = [...hb.children].reduce((s, x) => s + x.getBoundingClientRect().width, 0); mC = Math.max(mC, w); lC = Math.max(lC, w); });
             });
             if (n === 'Descripción' && lineas.length) descMaxLinea = Math.max(...lineas);
-            if (n === 'Descripción' && lineas.length) lC = lineas.sort((a, b) => a - b)[Math.floor((lineas.length - 1) * 0.9)];   // (9 de cada 10 en una línea: las más largas pueden ocupar dos)
+            if (n === 'Descripción' && lineas.length) lC = lineas.sort((a, b) => a - b)[Math.floor((lineas.length - 1) * 0.9)];   // percentil 90 en una línea
             minimos[n] = Math.ceil(Math.max(mH, mC ? mC + tdPad - fuera : 0) + 6);
             unaLinea[n] = Math.max(minimos[n], Math.ceil((lC ? lC + tdPad - fuera : 0) + 6)); rellenos[n] = Math.ceil(fuera);
           });
           const presentes = Object.keys(ANCHOS_LISTA).filter((k) => porNombre.has(k) && porNombre.get(k).getVisible() && minimos[k]);
           const thAccion = ths.find((th) => norm(th.textContent) === 'Accion'), aW = thAccion ? Math.ceil(thAccion.getBoundingClientRect().width) : 0;
           const mn = (k) => minimos[k], ul = (k) => unaLinea[k], id = (k) => Math.max(ANCHOS_LISTA[k] - rellenos[k], ul(k));
-          // la Descripción se guarda lo que ocupan en una línea 9 de cada 10 de sus textos, hasta la cuarta parte (y nunca menos de 240 px)
+          // Descripción: percentil 90 en una línea, hasta 1/4 del ancho (mín. 240 px)
           const reservaDesc = Math.max(MIN_DESCRIPCION, Math.min(Math.round(W * 0.25), (unaLinea['Descripción'] || Infinity) + (rellenos['Descripción'] || 0)));
           const libre = W - reservaDesc;
-          // Reparto: todas al mínimo; con lo que sobra, primero las celdas en una línea, porque una celda en varias líneas hace más alta toda
-          // la fila: antes Producción Estatus (el icono y los revisores, la celda más alta), luego las más baratas ("PLANTA ATE", la fecha
-          // con su hora…); después, hacia los anchos preferidos. La Descripción se queda con el resto.
+          // Reparto: todas al mínimo; luego celdas a una línea (primero las más altas); luego hacia el preferido. Descripción con el resto.
           const ancho = Object.fromEntries(presentes.map((k) => [k, mn(k)])), primero = (k) => (k === 'Producción Estatus' ? 0 : 1);
           let sobra = libre - aW - presentes.reduce((x, k) => x + mn(k) + rellenos[k], 0), f = 0;
           if (sobra > 0) {
@@ -7844,17 +7624,15 @@
             f = falta > 0 ? Math.min(1, sobra / falta) : 1;
             presentes.forEach((k) => { ancho[k] = Math.round(ancho[k] + (id(k) - ancho[k]) * f); });
           }
-          // Pantallas anchas (zoom del navegador al 70–90 %): la Descripción se queda con lo que ocupan sus textos (+15 %) y el resto del espacio
-          // se reparte entre las demás columnas, hasta 1,8 veces su ancho preferido, para que la tabla no se vea vacía.
-          const descIdeal = Math.min(Math.round(W * 0.45), Math.max(MIN_DESCRIPCION, Math.ceil((Math.max(descMaxLinea, unaLinea['Descripción'] || 0) + (rellenos['Descripción'] || 0) + 16) * 1.05)));   // (el texto más largo en una línea)
+          // Pantallas anchas: Descripción a su contenido (+15 %); el resto hasta 1,8× el preferido.
+          const descIdeal = Math.min(Math.round(W * 0.45), Math.max(MIN_DESCRIPCION, Math.ceil((Math.max(descMaxLinea, unaLinea['Descripción'] || 0) + (rellenos['Descripción'] || 0) + 16) * 1.05)));
           let extra = W - aW - presentes.reduce((x, k) => x + ancho[k] + rellenos[k], 0) - descIdeal;
           for (let vuelta = 0; vuelta < 4 && extra > 8; vuelta++) {
             const crecen = presentes.filter((k) => ancho[k] < Math.round(id(k) * 1.8)), peso = crecen.reduce((x, k) => x + ancho[k], 0); if (!peso) break;
             let usado = 0; crecen.forEach((k) => { const add = Math.min(Math.round(id(k) * 1.8) - ancho[k], Math.floor(extra * ancho[k] / peso)); ancho[k] += add; usado += add; });
             extra -= usado; if (!usado) break;
           }
-          // El ancho se cambia sin redibujar la tabla (propiedad sin invalidar + estilo del encabezado): redibujarla quitaba los revisores
-          // de Producción Estatus, se volvía a medir sin ellos y el ancho oscilaba sin parar (se redibujaba ~12 veces por segundo a 1366 px).
+          // Ancho sin invalidar la tabla (propiedad + estilo del th): redibujar causaba oscilación.
           const poner = (c, w, al) => {
             if (!c.__rmdOrig) c.__rmdOrig = { width: c.getWidth(), hAlign: c.getHAlign() };
             if (w && c.getWidth() !== w) { c.setProperty('width', w, true); const th = c.getDomRef(); if (th) th.style.width = w; }
@@ -7868,8 +7646,8 @@
     if (reordenar) t.invalidate();
   }
   let esperaAncho = 0;
-  window.addEventListener('resize', () => { clearTimeout(esperaAncho); esperaAncho = setTimeout(() => { try { if (opc.activo) gestionarColumnasLista(); } catch (e) { /* sin la lista */ } }, 250); });
-  // diagnóstico: el libro de equipos sin descargarlo (pruebas de solo lectura en el portal)
+  window.addEventListener('resize', () => { clearTimeout(esperaAncho); esperaAncho = setTimeout(() => { try { if (opc.activo) gestionarColumnasLista(); } catch (e) { } }, 250); });
+  // pruebas: libro de equipos sin descarga
   window.__rmdStats.equiposSinDescargar = async (estados = ['Autorizado', 'Ingresado']) => {
     const modelo = modeloListaPrincipal(), t0 = Date.now();
     const masters = (await leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId', $select: SELECT_MD_EQ }, 'mdId')).map(mdParaEquipos);
@@ -7877,10 +7655,10 @@
     const { libro, nombre, filas, equipos } = armarEquiposExcel(elegidos, items, estados), u8 = await libro.generar();
     return { nombre, masters: elegidos.length, items: items.length, filas, equipos, bytes: u8.length, segundos: Math.round((Date.now() - t0) / 1000), base64: aBase64(u8) };
   };
-  // diagnóstico: el maestro tal como lo recibe el libro de indicadores (datosBaseDeMD), para compararlo con un exportado
+  // pruebas: datos base del libro de indicadores
   window.__rmdStats.maestro = async () => (await leerMDPaginado(modeloListaPrincipal(), [])).map((md) => { const f = datosBaseDeMD(md);
     return { ...f, fechaAutLocal: fechaLocalTexto(md.fechaAutorizacion), fechaAutorizacion: md.fechaAutorizacion && md.fechaAutorizacion.toISOString(), fechaRegistro: f.fechaRegistro && f.fechaRegistro.toISOString(), fechaSolicitud: f.fechaSolicitud && f.fechaSolicitud.toISOString() }; });
-  // diagnóstico: arma el libro de un mes sin descargarlo (para las pruebas de solo lectura en el portal)
+  // pruebas: libro del mes sin descarga
   window.__rmdStats.indicadoresSinDescargar = async (mes, anio, op = {}) => {
     const datos = await leerMDPaginado(modeloListaPrincipal(), []);
     const { libro, nombre, resumen } = Indicadores.construir({ filas: datos.map(filaIndicadores), mes, anio, previo: null, generado: new Date() });
@@ -7889,22 +7667,18 @@
       muestra: op.muestra ? datos.filter((md) => op.muestra.includes(md.codigo)).map((md) => ({ codigo: md.codigo, reg: md.fechaRegistro && md.fechaRegistro.toISOString(), sol: md.fechaSolicitud && md.fechaSolicitud.toISOString(), aut: md.fechaAutorizacion && md.fechaAutorizacion.toISOString() })) : undefined };
   };
 
-  // ---- Experimental: aplicar "Aa" (minúsculas con redacción correcta) y el aviso de ortografía sobre los textarea editables
-  // ya existentes (Descripción Paso de "Nuevo Paso", Descripción/Especificaciones de Especificaciones). Nunca escriben solas.
+  // ---- «Aa» en textarea editables (Nuevo Paso, Especificaciones); solo a demanda ----
   const ICONO_AA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11 5 3l3 8M2.8 8.5h4.4"/><path d="M9.5 11c0-1.4 1.1-2.3 2.5-2.3s2.4.8 2.4 2c0 1-.7 1.3-1.8 1.6-1.2.3-2.7.6-2.7 2 0 .9.8 1.2 1.7 1.2 1.1 0 2-.5 2.4-1.3"/></svg>';
-  // "Casi todo en MAYÚSCULAS": no cuentan los símbolos y unidades que se escriben con minúsculas dentro de un texto en mayúsculas
-  // ("RESULTADO DE pH", "(100 mL)", "25 mg") y del resto se admite hasta un 10 % de minúsculas. Antes bastaba una sola minúscula
-  // para no ofrecer "Aa", y los pasos con "pH" o "mL" se quedaban sin el botón.
+  // «Casi todo en MAYÚSCULAS»: excluye unidades/símbolos en minúscula (pH, mL, mg) y tolera 10 % de minúsculas.
   const MINUSCULAS_DE_UNIDAD = /(?<!\p{L})(?:\p{Ll}+\p{Lu}\p{L}*|mg|mcg|kg|g|ml|nm|mm|cm|rpm|min|seg|h|s|mbar|psi|bar)(?!\p{L})/gu;
   const casiTodoMayus = (t) => {
     const letras = (t || '').replace(MINUSCULAS_DE_UNIDAD, ' ').replace(/[^\p{L}]/gu, ''), minus = (letras.match(/\p{Ll}/gu) || []).length;
     return letras.length > 4 && minus <= letras.length * 0.1 && /\p{Lu}/u.test(letras);
   };
-  window.__rmdStats.casiTodoMayus = casiTodoMayus;   // (diagnóstico y pruebas)
+  window.__rmdStats.casiTodoMayus = casiTodoMayus;   // pruebas
   function gestionarTextosMayusculas() {
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) textarea').forEach((ta) => {
-      // "Nuevo Paso" y "Editar Paso" (Configuración Maestra) no siempre se llaman igual: se detectan por el campo "Descripción Paso"
-      // en vez de por el título, para que también funcione si el portal lo abre con otro nombre.
+      // «Nuevo Paso» / «Editar Paso» se detectan por el campo «Descripción Paso», no por el título.
       const d = enDialogo(ta); const aplica = d && (gestionada(d) || !!campoDe(d, 'Descripción Paso'));
       if (!aplica) { ta.classList.remove('rmd-ortografia'); const b = ta.parentElement && ta.parentElement.querySelector(':scope > .rmd-aa'); if (b) b.remove(); return; }
       if (ta.readOnly || ta.disabled) return;
@@ -7915,7 +7689,7 @@
         b.title = 'Pasar a minúsculas con mayúscula al iniciar oración, tildes, unidades (pH, mL) y códigos tal cual (experimental: revisa el resultado antes de guardar).';
         b.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
-          // la Descripción de un paso se redacta como en "En minúsculas" (con punto final); los demás textos, sin tocar su puntuación
+          // Descripción de paso con punto final; otros textos sin cambiar puntuación
           ta.value = campoDe(d, 'Descripción Paso') ? pasoEnMinusculas(ta.value) : redactarEnMinusculas(ta.value);
           ta.dispatchEvent(new Event('input', { bubbles: true })); ta.dispatchEvent(new Event('change', { bubbles: true })); ta.focus();
           if (/^Editar Paso/i.test(cabecera(d))) toast('Si este paso ya está en RMD autorizados, el portal no deja grabarlo ("El paso se encuentra en RMDs Autorizados no se puede actualizar."). ' +
@@ -7923,13 +7697,12 @@
         });
         ta.parentElement.appendChild(b);
       }
-      ta.classList.remove('rmd-ortografia'); ta.removeAttribute('data-rmd-dudosas');   // (el aviso de ortografía, que era experimental, se retiró en v1.23)
+      ta.classList.remove('rmd-ortografia'); ta.removeAttribute('data-rmd-dudosas');
     });
   }
 
-  // ---- Botón "Nuevo Paso" dentro del selector "Adicionar Pasos": abre el mismo "Nuevo Paso" de Configuración Maestra, apilado
-  // encima (no navega fuera de la edición del RMD), y precarga Estructura/Etiqueta con el contexto de este selector si coinciden.
-  // No pulsa "Agregar" por el usuario: solo abre la ventana para que la complete y guarde ella misma.
+  // ---- Botón «Nuevo Paso» en «Adicionar Pasos» ----
+  // Abre «Nuevo Paso» de Configuración Maestra encima y precarga Estructura/Etiqueta. No pulsa «Agregar».
   const ICONO_NUEVO_PASO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h8M2 8h5M2 12.5h5"/><circle cx="12.5" cy="10.5" r="2.8"/><path d="M12.5 9v3M11 10.5h3"/></svg>';
   function instalarBotonNuevoPaso(d) {
     if (d.querySelector('.rmd-nuevo-paso-grupo')) return;
@@ -7941,8 +7714,7 @@
     ir.insertAdjacentElement('afterend', grupo);
   }
   function quitarBotonNuevoPaso(d) { d.querySelectorAll('.rmd-nuevo-paso-grupo').forEach((x) => x.remove()); }
-  // Abre Configuración Maestra (con el botón "Configurar" de la lista principal), cambia a la pestaña "Paso" y pulsa "Nuevo Paso":
-  // devuelve la ventana "Nuevo Paso", apilada encima de lo que esté abierto. No pulsa "Agregar".
+  // Configuración Maestra -> pestaña «Paso» -> «Nuevo Paso»; devuelve el diálogo. No pulsa «Agregar».
   async function abrirVentanaNuevoPaso() {
     const previos = new Set(dialogos());
     const btnConfigurar = botonPorTitulo(document, 'Configurar'); if (!btnConfigurar) throw new Error('No encuentro el botón "Configurar" de la lista principal');
@@ -7952,7 +7724,7 @@
     await hasta(() => !ocupado(), 15000); await esperar(500);
     const tab = [...maestra.querySelectorAll('[role=tab]')].find((x) => /(^|\s)Paso(\s|$)/.test(norm(x.textContent)));
     if (!tab) throw new Error('No encuentro la pestaña "Paso" de Configuración Maestra');
-    // Los filtros de esta barra (IconTabBar en modo filtro) no reaccionan a un .click() sintético: hace falta la secuencia real de eventos de puntero.
+    // IconTabBar en modo filtro: requiere eventos de puntero reales
     const opts = { bubbles: true, cancelable: true, view: window };
     ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((tipo) => { const Ctor = tipo.startsWith('pointer') ? PointerEvent : MouseEvent; tab.dispatchEvent(new Ctor(tipo, opts)); });
     await esperar(1200); await hasta(() => !ocupado(), 15000);
@@ -7963,7 +7735,7 @@
     const dlg = await hasta(() => dialogos().find((x) => !previos2.has(x) && /^Nuevo Paso/i.test(cabecera(x))), 15000);
     if (!dlg) throw new Error('No se abrió la ventana "Nuevo Paso"');
     await esperar(500);
-    dlg.__rmdMaestra = maestra;                                           // (al cerrar «Nuevo Paso» se cierra también, para volver al RMD sin una ventana encima)
+    dlg.__rmdMaestra = maestra;                                           // se cierra junto con «Nuevo Paso»
     return dlg;
   }
   async function abrirNuevoPasoMaestro(d) {
@@ -7974,7 +7746,7 @@
       const fijar = async (etiquetaCampo, texto) => {
         if (!texto) return false;
         const el = campoDe(dlg, etiquetaCampo), c = el && ctlDe(el); if (!c || !c.getItems) return false;
-        const it = await hasta(() => c.getItems().find((x) => norm(x.getText ? x.getText() : '') === norm(texto)), 4000, 250);   // Etiqueta depende de la Estructura elegida: su lista tarda en llenarse
+        const it = await hasta(() => c.getItems().find((x) => norm(x.getText ? x.getText() : '') === norm(texto)), 4000, 250);   // Etiqueta depende de la Estructura: carga diferida
         if (!it) return false;
         c.setSelectedItem(it); if (c.setValue) c.setValue(it.getText());
         if (c.fireSelectionChange) c.fireSelectionChange({ selectedItem: it }); if (c.fireChange) c.fireChange({ value: it.getText() });
@@ -7988,17 +7760,11 @@
     } finally { window.__rmdAbriendoNuevoPaso = false; }
   }
 
-  // ---- "En minúsculas": a partir de un paso existente en MAYÚSCULAS abre "Nuevo Paso" de Configuración Maestra con todo lo del paso
-  // copiado (estructura, etiqueta, numeración, tipo de dato, clave modelo, valores, decimales y lapso, del paso maestro que trae la
-  // propia fila) y la descripción ya redactada en minúsculas. La persona revisa y pulsa "Agregar": el script no guarda nada.
-  // Descripción en MAYÚSCULAS -> minúsculas con mayúscula al iniciar oración, tildes (diccionario), unidades (mL, mg, kg, g, L, °C,
-  // pH, rpm…), códigos con números (PV1-PHM-09, FPRO-201) y siglas conocidas tal cual, y punto final salvo que ya termine en un
-  // signo (":" en "FECHA / HORA INICIO:"). "ADICION DE CLOROCRESOL.-" -> "Adición de clorocresol."
+  // ---- «En minúsculas» ----
+  // Abre «Nuevo Paso» con los datos del paso (estructura, etiqueta, numeración, tipo, clave, valores, decimales, lapso) y la descripción en minúsculas. No
+  // guarda.
   const UNIDADES_MIN = { ML: 'mL', MG: 'mg', MCG: 'mcg', KG: 'kg', G: 'g', L: 'L', RPM: 'rpm', MM: 'mm', CM: 'cm', NM: 'nm', MBAR: 'mbar', BAR: 'bar', PSI: 'psi', KPA: 'kPa', HPA: 'hPa', HRS: 'h', HR: 'h', H: 'h', MIN: 'min', SEG: 's', S: 's', UI: 'UI' };
-  // Redacción en minúsculas de un texto en MAYÚSCULAS, sin tocar lo que debe quedar como está: símbolos que ya vienen con
-  // minúsculas ("pH", "mL"), unidades tras un número ("100ML" -> "100 mL"), °C, códigos con letras y números completos
-  // (PV1-PHM-09, IPRO-P202, PCMB-200), siglas conocidas (POE, RMD…) y las áreas de la empresa, que son nombres propios
-  // ("Calidad en Operaciones", "Control de Calidad", "Aseguramiento de la Calidad").
+  // MAYÚSCULAS -> minúsculas conservando pH/mL, unidades tras número, °C, códigos alfanuméricos, siglas y áreas de la empresa.
   function redactarEnMinusculas(texto) {
     const guardados = [], ini = String.fromCharCode(3), fin = String.fromCharCode(4);
     const guardar = (m) => { guardados.push(m); return ini + (guardados.length - 1) + fin; };
@@ -8008,24 +7774,24 @@
     t = t.replace(/°\s*C\b/g, () => guardar('°C')).replace(/\bPH\b/gi, () => guardar('pH'));
     t = t.replace(/\bCALIDAD EN OPERACIONES\b/gi, () => guardar('Calidad en Operaciones')).replace(/\bCONTROL DE CALIDAD\b/gi, () => guardar('Control de Calidad'))
       .replace(/\bASEGURAMIENTO DE (LA )?CALIDAD\b/gi, (m, la) => guardar('Aseguramiento de ' + (la ? 'la ' : '') + 'Calidad'));
-    // códigos: todo el código si en alguna parte lleva letras y números; los ordinales ("2DA", "1ER") van en minúsculas
+    // códigos alfanuméricos completos; ordinales en minúsculas
     t = t.replace(/\b[A-Z0-9]+(?:[-/.][A-Z0-9]+)*\b/g, (m) => (!/\d/.test(m) || !/[A-Z]/.test(m) ? m
       : /^\d+(ER|RA|DA|DO|TO|TA|MO|MA|VO|VA|NO|NA)$/.test(m) ? m.toLowerCase() : guardar(m)));
     t = mejorarTexto(t);
     return t.replace(new RegExp(ini + '(\\d+)' + fin, 'g'), (_, i) => guardados[+i]);
   }
-  // Descripción de un paso: además, punto final (salvo que ya termine en un signo: ":" en "FECHA / HORA INICIO:") y sin ".-".
+  // Descripción de paso: punto final (salvo signo final) y sin «.-».
   function pasoEnMinusculas(texto) {
     let t = redactarEnMinusculas(texto);
     t = t.replace(/\s*\.\s*-+\s*$/, '.').replace(/\s+-+\s*$/, '').trim();
     if (t && !/[.:;!?…]$/.test(t)) t += '.';
     return t;
   }
-  window.__rmdStats.pasoEnMinusculas = pasoEnMinusculas;   // (diagnóstico y pruebas)
+  window.__rmdStats.pasoEnMinusculas = pasoEnMinusculas;   // pruebas
   const objetoCargado = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null);
-  // Datos del paso maestro de una fila (paso mayor: pasoId; proceso menor: pasoHijoId), con los nombres que muestran los combos.
+  // Paso maestro de una fila (mayor: pasoId; PM: pasoHijoId) con los textos de los combos.
   function pasoMaestroDeFila(tr, tabla) {
-    const o = objetoDeFila(tr) || {}, esMenor = !!o.pasoHijoId_pasoId, m = esMenor ? objetoCargado(o.pasoHijoId) : objetoCargado(o.pasoId);   // (en un proceso menor, pasoId es la fila del paso mayor)
+    const o = objetoDeFila(tr) || {}, esMenor = !!o.pasoHijoId_pasoId, m = esMenor ? objetoCargado(o.pasoHijoId) : objetoCargado(o.pasoId);   // en un PM, pasoId es la fila del paso mayor
     if (!m || !m.descripcion) return { error: o.estructuraRecetaInsumoId || o.Maktx ? 'Esa fila es un insumo de la receta, no un paso.' : 'No encuentro los datos del paso maestro de esa fila.' };
     const est = objetoCargado(o.mdEstructuraId) && objetoCargado(o.mdEstructuraId.estructuraId);
     const nombres = {
@@ -8036,18 +7802,18 @@
     };
     const datos = { estructuraId_estructuraId: m.estructuraId_estructuraId, etiquetaId_etiquetaId: m.etiquetaId_etiquetaId, numeracion: !!m.numeracion, tipoDatoId_iMaestraId: m.tipoDatoId_iMaestraId,
       clvModelo: m.clvModelo, valorInicial: m.valorInicial, valorFinal: m.valorFinal, margen: m.margen, decimales: m.decimales, tipoLapsoId_motivoLapsoId: m.tipoLapsoId_motivoLapsoId };
-    // cómo está configurado en ESTE RMD (puede diferir del paso maestro: p. ej. maestro "Texto", aquí "Realizado por")
+    // configuración en este RMD (puede diferir del maestro)
     const enRmd = !esMenor ? { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, clvModelo: o.clvModelo, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales }
       : { tipoDatoId_iMaestraId: o.tipoDatoId_iMaestraId, valorInicial: o.valorInicial, valorFinal: o.valorFinal, margen: o.margen, decimales: o.decimales };
     const origen = esMenor ? { tipo: 'menor', id: o.mdEstructuraPasoInsumoPasoId, orden: o.orden } : { tipo: 'mayor', id: o.mdEstructuraPasoId, orden: o.orden };
     return { codigo: m.codigo, descripcion: m.descripcion, datos, nombres, enRmd, origen };
   }
-  // nombre de una etiqueta por su id, de lo que el portal ya tiene cargado (árbol de estructuras del RMD)
+  // nombre de etiqueta por id (árbol cargado del RMD)
   function nombreEstructura(id) {
     try { const md = controladorPrincipal().getView().getModel('asociarDatos').getData(); const e = ((md.aEstructura && md.aEstructura.results) || []).map((x) => objetoCargado(x.estructuraId)).find((x) => x && x.estructuraId === id); return e ? e.descripcion : ''; } catch (e) { return ''; }
   }
   function nombreEtiqueta(id) {
-    try { const md = controladorPrincipal().getView().getModel('asociarDatos').getData(); for (const e of (md.aEstructura && md.aEstructura.results) || []) for (const t of (e.aEtiqueta && e.aEtiqueta.results) || []) { const et = objetoCargado(t.etiquetaId); if (t.etiquetaId_etiquetaId === id && et) return et.descripcion; } } catch (e) { /* sin datos */ }
+    try { const md = controladorPrincipal().getView().getModel('asociarDatos').getData(); for (const e of (md.aEstructura && md.aEstructura.results) || []) for (const t of (e.aEtiqueta && e.aEtiqueta.results) || []) { const et = objetoCargado(t.etiquetaId); if (t.etiquetaId_etiquetaId === id && et) return et.descripcion; } } catch (e) { }
     return '';
   }
   const vacioM = (v) => v == null || v === '';
@@ -8072,7 +7838,7 @@
         ${difiere.length ? '<label><input type="checkbox" class="rmd-min-rmd"> Usar la configuración que tiene en este RMD (tipo de dato, clave, valores y decimales) en lugar de la del paso maestro</label>' : ''}
         <p class="rmd-nota">Se abrirá "Nuevo Paso" de Configuración Maestra con todo esto ya puesto: revísalo y pulsa <b>Agregar</b> (el script no guarda nada). Luego podrás añadir el paso nuevo al RMD.</p>`;
       const ta = v.cuerpo.querySelector('.rmd-min-texto'), igual = v.cuerpo.querySelector('.rmd-min-igual');
-      // el portal busca un paso con la misma descripción en minúsculas (tolower) en la misma Estructura y Etiqueta antes de crearlo
+      // el portal valida descripción duplicada (tolower) en la misma Estructura y Etiqueta
       const revisarIgual = () => { igual.hidden = norm(ta.value).toLowerCase() !== String(p.descripcion || '').toLowerCase(); };
       ta.value = p.nueva; revisarIgual(); ta.addEventListener('input', revisarIgual);
       v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal('Abrir "Nuevo Paso"', 'primario', () => {
@@ -8082,8 +7848,7 @@
       }));
     });
   }
-  // Pone un valor en el control de "Nuevo Paso" ligado a /newPaso/<campo> (con los mismos eventos que al elegirlo a mano, para que
-  // el portal habilite lo que depende de él: la Etiqueta según la Estructura, los valores según el Tipo de Dato).
+  // Asigna /newPaso/<campo> disparando los mismos eventos que la selección manual (dependencias del formulario).
   async function llenarNuevoPaso(dlg, datos) {
     const core = nucleo(), rutas = ['value', 'selectedKey', 'state', 'selected'];
     const controles = () => [...new Set([...dlg.querySelectorAll('[id]')].map((el) => core.byId(el.id)).filter((c) => c && c.getBinding))];
@@ -8125,7 +7890,7 @@
       const dlg = await abrirVentanaNuevoPaso();
       const fallidos = await llenarNuevoPaso(dlg, op.datos), x = op.datos;
       vigilarPasoCreado(dlg, x, p.origen, p.codigo);
-      // lo que el portal va a pedir al pulsar Agregar (validaciones de su propio botón)
+      // validaciones del botón Agregar
       const rangoIncompleto = String(x.tipoDatoId_iMaestraId) === '443' && [x.valorInicial, x.valorFinal, x.margen].some(vacioM);
       const soloMayus = x.descripcion.toLowerCase() === String(p.descripcion || '').toLowerCase();
       toast(`Se abrió "Nuevo Paso" con el paso en minúsculas y su configuración copiada${fallidos.length ? ` (no se pudo poner: ${fallidos.join(', ')}; complétalo a mano)` : ''}.` +
@@ -8134,14 +7899,14 @@
     } catch (e) { toast('No se pudo preparar "Nuevo Paso": ' + e.message, true); }
     finally { window.__rmdMinusculas = false; }
   }
-  // diagnóstico: el mismo flujo sin vista previa (para las pruebas de solo lectura: abre "Nuevo Paso" lleno, NO pulsa Agregar)
+  // pruebas: abre «Nuevo Paso» lleno sin pulsar Agregar
   window.__rmdStats.nuevoPasoEnMinusculas = async (tr, usarRmd) => {
     const tabla = tr.closest('table'), p = pasoMaestroDeFila(tr, tabla); if (p.error) throw new Error(p.error);
     const datos = { ...p.datos, ...(usarRmd ? p.enRmd : {}), descripcion: pasoEnMinusculas(p.descripcion) };
     const dlg = await abrirVentanaNuevoPaso(); const fallidos = await llenarNuevoPaso(dlg, datos);
     return { origen: p.descripcion, datos, fallidos, dialogo: dlg.id };
   };
-  window.__rmdStats.abrirVentanaNuevoPaso = abrirVentanaNuevoPaso;   // (diagnóstico: abre "Nuevo Paso" vacío; no pulsa Agregar)
+  window.__rmdStats.abrirVentanaNuevoPaso = abrirVentanaNuevoPaso;   // pruebas: «Nuevo Paso» vacío
 
   const ICONO_CAMBIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5h10M10 2.5 12.5 5 10 7.5"/><path d="M13.5 11h-10M6 8.5 3.5 11 6 13.5"/></svg>';
   const ICONO_COPIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3.5A1.5 1.5 0 0 0 2 3v5.5A1.5 1.5 0 0 0 3.5 10H4"/></svg>';
@@ -8149,7 +7914,7 @@
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/></svg>';
   const ICONO_LUPA = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/></svg>';
   const botonIcono = (icono, txt, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rmd-btn ' + (cls || ''); b.innerHTML = icono + '<span></span>'; b.querySelector('span').textContent = txt; b.addEventListener('click', fn); return b; };
-  // Los botones van en la barra de herramientas de la tabla ("Pasos (n)"), justo a la izquierda del separador y del icono de impresora.
+  // Botones en la barra de la tabla, a la izquierda del separador
   function instalarBotonesCopia(d) {
     const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-copia-grupo')) return;
     const grupo = document.createElement('span'); grupo.className = 'rmd-copia-grupo';
@@ -8162,7 +7927,7 @@
     if (ref) hdr.insertBefore(grupo, ref); else hdr.appendChild(grupo);
     pintarEstadoPortapapeles();
   }
-  // "En minúsculas" en la barra de la tabla de Pasos y de Procesos menores (a la izquierda del icono de impresora)
+  // «En minúsculas» en las barras de Pasos y Procesos menores
   function instalarBotonMinusculas(d, tabla) {
     const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-minusculas')) return;
     const b = botonIcono(ICONO_AA, 'En minúsculas', 'rmd-minusculas', () => crearEnMinusculas(tablaDe(d) || tabla));
@@ -8172,11 +7937,9 @@
     else { const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((x) => x.title === 'Imprimir'); b.style.marginRight = '10px'; if (ref) hdr.insertBefore(b, ref); else hdr.appendChild(b); }
   }
 
-  // ---- "Cambiar paso" (v1.31): cambiar el paso maestro de un paso mayor por otro código, sin tocar su configuración ----
-  // En el RMD, cada paso es una fila de MD_ES_PASO con SU configuración (tipo de dato, decimales, puesto, clave, casillas, depende,
-  // orden…) que apunta al paso maestro (pasoId_pasoId); sus procesos menores cuelgan de esa fila (pasoId_mdEstructuraPasoId), no del
-  // paso maestro. Cambiar el paso = actualizar solo pasoId_pasoId de esa fila: todo lo demás queda igual. Solo en RMD que no estén
-  // autorizados ni suspendidos (el portal tampoco deja cambiarlos). Luego se refresca la lista como hace el portal.
+  // ---- «Cambiar paso» ----
+  // Actualiza solo pasoId_pasoId de la fila MD_ES_PASO; la configuración y los PM (pasoId_mdEstructuraPasoId) se mantienen.
+  // No en Autorizados ni Suspendidos.
   function controladorPasos(d) {
     const b = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((c) => c && c.mEventRegistry && c.mEventRegistry.press && c.mEventRegistry.press[0].oListener && typeof c.mEventRegistry.press[0].oListener.onGetPasosToAssign === 'function');
     return b && b.mEventRegistry.press[0].oListener;
@@ -8185,7 +7948,7 @@
     if (window.__rmdCambiando) return;
     const sel = seleccionadas(tabla);
     if (sel.length !== 1) { toast('Marca la casilla de UN solo paso y pulsa "Cambiar paso".', true); return; }
-    const o = objetoDeFila(sel[0]) || {}, esMenor = !!o.pasoHijoId_pasoId, m = esMenor ? objetoCargado(o.pasoHijoId) : objetoCargado(o.pasoId);   // (en un proceso menor, pasoId es la fila del paso mayor)
+    const o = objetoDeFila(sel[0]) || {}, esMenor = !!o.pasoHijoId_pasoId, m = esMenor ? objetoCargado(o.pasoHijoId) : objetoCargado(o.pasoId);   // en un PM, pasoId es la fila del paso mayor
     if ((esMenor ? !o.mdEstructuraPasoInsumoPasoId : !o.mdEstructuraPasoId) || !m || !m.codigo) { toast('Esa fila no es un paso del RMD (¿un insumo de la receta?).', true); return; }
     const origen = esMenor ? { tipo: 'menor', id: o.mdEstructuraPasoInsumoPasoId, orden: o.orden } : { tipo: 'mayor', id: o.mdEstructuraPasoId, orden: o.orden };
     const b = controladorPrincipal(), md = b && b.getView().getModel('asociarDatos').getData();
@@ -8246,13 +8009,11 @@
   }
   window.__rmdStats.cambiarPasoMayor = (d, t) => cambiarPasoMayor(d, t);
 
-  // ---- Tras crear el paso en minúsculas (v1.32): código copiado al portapapeles y "Reemplazar en la fila" ----
-  // Mientras está abierta la ventana "Nuevo Paso" que llenó "En minúsculas" se guarda la descripción que tiene; al cerrarse, se busca
-  // en PASO el paso recién creado (misma descripción, estructura y etiqueta, registrado después de abrirla). Si existe: su código se
-  // copia al portapapeles y una tarjeta ofrece reemplazar el paso de la fila de origen (paso mayor o proceso menor) por el nuevo,
-  // cambiando solo el paso maestro al que apunta (se conserva su configuración y, en un paso mayor, sus procesos menores).
+  // ---- Tras crear el paso en minúsculas ----
+  // Al cerrar «Nuevo Paso» se busca el paso creado (descripción, estructura, etiqueta, fecha); se copia su código y se ofrece reemplazarlo en la fila de
+  // origen.
   async function copiarAlPortapapeles(t) {
-    try { await navigator.clipboard.writeText(t); return true; } catch (e) { /* sin permiso: se intenta a la antigua */ }
+    try { await navigator.clipboard.writeText(t); return true; } catch (e) { /* sin permiso de portapapeles: método alternativo */ }
     try { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; html.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
   }
   function vigilarPasoCreado(dlg, datos, origen, codigoAntes) {
@@ -8263,7 +8024,7 @@
       if (f && norm(f.value)) { desc = norm(f.value); return; }
       if (dlg.isConnected && visible(dlg) && Date.now() - t0 < 30 * 60000) return;
       clearInterval(reloj);
-      const ma = dlg.__rmdMaestra;                                        // (v1.53: la Configuración Maestra abierta por el script se cierra: quedaba encima del RMD)
+      const ma = dlg.__rmdMaestra;                                        // se cierra la Configuración Maestra abierta por el script
       if (ma && ma.isConnected && visible(ma)) { const bc = botonPorTitulo(ma, 'Cerrar') || [...ma.querySelectorAll('button')].find((x) => visible(x) && /^(Cerrar|Cancelar|Salir)$/.test(norm(x.textContent))); if (bc) pulsar(bc); }
       if (!desc) return;
       try {
@@ -8271,11 +8032,10 @@
         const r = await leerTodoDe(modelo, 'PASO', [new F('tolower(descripcion)', FO.EQ, "'" + desc.toLowerCase().replace(/'/g, "''") + "'")].concat(datos.estructuraId_estructuraId ? [new F('estructuraId_estructuraId', 'EQ', datos.estructuraId_estructuraId)] : []), { $select: 'pasoId,codigo,descripcion,fechaRegistro,etiquetaId_etiquetaId' });
         const nuevo = r.filter((x) => +new Date(x.fechaRegistro) >= t0 - 60000).sort((a, c) => +new Date(c.fechaRegistro) - +new Date(a.fechaRegistro))[0];
         if (nuevo) await ofrecerPasoCreado(nuevo, origen, codigoAntes);
-      } catch (e) { /* no se pudo comprobar: sin tarjeta */ }
+      } catch (e) { }
     }, 700);
   }
-  // v1.53: con el selector «Adicionar Pasos» abierto (pasos o procesos menores) el código del paso recién creado se escribe en su filtro «Código Paso»,
-  // se pulsa «Ir» (así aparece arriba, en vez de al final de una lista de decenas de miles) y el campo queda resaltado hasta que la persona lo cambie
+  // Con «Adicionar Pasos» abierto, el código nuevo se escribe en «Código Paso», se pulsa «Ir» y el campo queda resaltado.
   function pegarCodigoEnSelector(codigo) {
     try {
       const core = sap.ui.getCore(), t = TABLAS_SELECTOR.map((id) => core.byId(id)).find((x) => x && x.getDomRef() && visible(x.getDomRef())); if (!t) return false;
@@ -8287,7 +8047,7 @@
       return true;
     } catch (e) { return false; }
   }
-  window.__rmdStats.pegarCodigoEnSelector = (c) => pegarCodigoEnSelector(c);   // (pruebas)
+  window.__rmdStats.pegarCodigoEnSelector = (c) => pegarCodigoEnSelector(c);   // pruebas
   async function ofrecerPasoCreado(nuevo, origen, codigoAntes) {
     const pegado = pegarCodigoEnSelector(nuevo.codigo);
     const copiado = await copiarAlPortapapeles(String(nuevo.codigo));
@@ -8296,7 +8056,7 @@
     const donde = origen ? `el ${origen.tipo === 'menor' ? 'proceso menor' : 'paso'} de orden ${origen.orden} (${codigoAntes})` : '';
     c.innerHTML = `<b>✓ Paso ${esc(nuevo.codigo)} creado</b><span>${esc(nuevo.descripcion)}</span><span class="rmd-nota rmd-creado-copia">${pegado ? '✓ Código puesto en "Código Paso" del selector y buscado: márcalo y pulsa Agregar.' : copiado ? '✓ Código copiado al portapapeles: pégalo en "Código Paso" de Adicionar Pasos.' : `Código: ${esc(nuevo.codigo)} (no se pudo copiar solo: pulsa «Copiar código»).`}</span>
       <div class="rmd-creado-pie">${origen ? `<button type="button" class="rmd-btn primario rmd-creado-reemplazar" title="Cambia solo el paso maestro de esa fila: conserva su configuración${origen.tipo === 'mayor' ? ' y sus procesos menores' : ''}.">Reemplazar ${esc(donde)}</button>` : ''}<button type="button" class="rmd-btn rmd-creado-copiar">Copiar código</button><button type="button" class="rmd-btn rmd-creado-cerrar">Cerrar</button></div>`;
-    html.appendChild(c);                                                               // (se queda hasta que la persona la cierre; no tiene temporizador)
+    html.appendChild(c);
     c.querySelector('.rmd-creado-copiar').addEventListener('click', async (e) => { const ok = await copiarAlPortapapeles(String(nuevo.codigo)); const n = c.querySelector('.rmd-creado-copia'); if (ok) confirmarCopia(e.currentTarget); setTxt(n, ok ? `✓ Código ${nuevo.codigo} copiado al portapapeles.` : 'No se pudo copiar: selecciona el código a mano.'); e.currentTarget.blur(); });
     c.querySelector('.rmd-creado-cerrar').addEventListener('click', () => c.remove());
     const br = c.querySelector('.rmd-creado-reemplazar');
@@ -8321,20 +8081,13 @@
       }
     } finally { sap.ui.core.BusyIndicator.hide(); }
   }
-  window.__rmdStats.ofrecerPasoCreado = (nuevo, origen, codigoAntes) => ofrecerPasoCreado(nuevo, origen, codigoAntes);   // (pruebas)
+  window.__rmdStats.ofrecerPasoCreado = (nuevo, origen, codigoAntes) => ofrecerPasoCreado(nuevo, origen, codigoAntes);   // pruebas
 
-  // ---- 9 ter. Reglas de revisión y documentos vigentes (v1.34) ----------------------------------------------------------
-  // Reglas que define la persona para revisar los textos de los pasos y procesos menores (palabras o frases, códigos de
-  // documento o de equipo, patrones) y la lista de documentos vigentes que carga (la del DMS: los que están en la lista están
-  // vigentes; los que no, no). Se aplican solas: se resalta lo encontrado en la descripción de cada fila (al pasar el ratón se
-  // ve el motivo), sus advertencias se suman al aviso de la barra de la lista ("ir a la siguiente") y la ventana del RMD muestra
-  // un resumen de todo el RMD. Se guarda SOLO en este navegador: las reglas en localStorage (con copia en IndexedDB) y la lista
-  // en IndexedDB; nada sale a ningún servidor. "Exportar / Importar configuración" las llevan a otra PC en un archivo .json.
-  // v1.35: también la lista de equipos calificados (hoja "Cronograma" del registro OQ / PQ): la regla "Equipo sin calificación" avisa
-  // los equipos de la estructura EQUIPOS / INSTRUMENTOS / MATERIALES del RMD (y los citados en los pasos) cuyo ESTADO GENERAL no es
-  // de calificado. Cada apartado tiene su "Restablecer".
+  // ---- 9 ter. Reglas de revisión y documentos vigentes ----
+  // Reglas locales sobre los textos de pasos y PM, lista de vigentes del DMS y equipos calificados (OQ / PQ).
+  // Reglas en localStorage (+ IndexedDB), listas en IndexedDB; exportación/importación .json.
   const CLAVE_REGLAS = 'rmdUiReglas', CLAVE_VIGENTES_LS = 'rmdUiVigentes', SELLO_VIGENTES = 'rmdUiVigentesSello', CLAVE_CALIF_LS = 'rmdUiCalificados', SELLO_CALIF = 'rmdUiCalificadosSello';
-  const CONOCIDAS_V134 = ['novigente', 'documentos', 'equipos', 'provisional'];   // predeterminadas que ya traía la v1.34
+  const CONOCIDAS_V134 = ['novigente', 'documentos', 'equipos', 'provisional'];   // predeterminadas iniciales
   const Almacen = (() => {
     let base = null;
     const abrir = () => base || (base = new Promise((ok, mal) => {
@@ -8351,9 +8104,9 @@
     return { leer: (k) => tx('readonly', (s) => s.get(k)), guardar: (k, v) => tx('readwrite', (s) => s.put(v, k)), borrar: (k) => tx('readwrite', (s) => s.delete(k)) };
   })();
   const RR = { reglas: null, ver: 1, vigentes: null, mapa: null, calif: null, mapaCalif: null, catalogo: null, pidiendoCat: false, comp: null, compClave: '', errorGuardar: '', listo: null };
-  function leerDatoReglasLS() { try { const o = JSON.parse(localStorage.getItem(CLAVE_REGLAS) || 'null'); return o && Array.isArray(o.reglas) ? o : null; } catch (e) { return null; } }   // (dañado: se recupera de IndexedDB)
+  function leerDatoReglasLS() { try { const o = JSON.parse(localStorage.getItem(CLAVE_REGLAS) || 'null'); return o && Array.isArray(o.reglas) ? o : null; } catch (e) { return null; } }   // dañado: se recupera de IndexedDB
   function leerReglasLS() { const o = leerDatoReglasLS(); return o ? o.reglas.map(Reglas.normalizar) : null; }
-  // las reglas guardadas + las predeterminadas que salieron después (las que la persona borró no vuelven)
+  // guardadas + predeterminadas nuevas
   const conPredeterminadasNuevas = (dato) => Reglas.completarPredeterminadas(dato.reglas.map(Reglas.normalizar), Array.isArray(dato.conocidas) ? dato.conocidas : CONOCIDAS_V134);
   function reglasActuales() {
     if (!RR.reglas) { const d = leerDatoReglasLS(); RR.reglas = Reglas.sinIdsRepetidos(d ? conPredeterminadasNuevas(d).reglas : Reglas.predeterminadas()); }
@@ -8381,23 +8134,23 @@
     if (!v) { try { v = JSON.parse(localStorage.getItem(CLAVE_VIGENTES_LS) || 'null'); } catch (e) { v = null; } }
     ponerVigentes(v); if (opc.activo) ajustarTodo(); refrescarVentanaReglas();
   }
-  // v = null quita la lista. Si IndexedDB no está disponible se intenta en localStorage; si tampoco, queda solo mientras la página siga abierta.
+  // v = null quita la lista; IndexedDB, si no localStorage, si no memoria.
   async function guardarVigentes(v) {
     let ok = false, error = '';
     if (v) {
-      try { await Almacen.guardar('vigentes', v); ok = true; try { localStorage.removeItem(CLAVE_VIGENTES_LS); } catch (e) { /* nada */ } }
+      try { await Almacen.guardar('vigentes', v); ok = true; try { localStorage.removeItem(CLAVE_VIGENTES_LS); } catch (e) { } }
       catch (e) { error = e.message; try { localStorage.setItem(CLAVE_VIGENTES_LS, JSON.stringify(v)); ok = true; } catch (e2) { error = e2.message; } }
-      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* sin esa API */ }
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { }
     } else {
-      try { await Almacen.borrar('vigentes'); } catch (e) { /* no había */ }
-      try { localStorage.removeItem(CLAVE_VIGENTES_LS); } catch (e) { /* nada */ }
+      try { await Almacen.borrar('vigentes'); } catch (e) { }
+      try { localStorage.removeItem(CLAVE_VIGENTES_LS); } catch (e) { }
       ok = true;
     }
-    try { localStorage.setItem(SELLO_VIGENTES, String(Date.now())); } catch (e) { /* otra pestaña no se enterará */ }
+    try { localStorage.setItem(SELLO_VIGENTES, String(Date.now())); } catch (e) { }
     ponerVigentes(v); ajustarTodo(); refrescarVentanaReglas();
     return { ok, error };
   }
-  // ---- lista de equipos calificados: { archivo, cargado, hoja, n, estados, estadosOk, equipos: [[código, SAP, descripción, ESTADO GENERAL, OQ, PQ…]] } ----
+  // ---- Equipos calificados: { archivo, cargado, hoja, n, estados, estadosOk, equipos: [[código, SAP, descripción, ESTADO GENERAL, OQ, PQ…]] } ----
   function ponerCalificados(v) {
     RR.calif = v && Array.isArray(v.equipos) && v.equipos.length ? v : null;
     RR.mapaCalif = RR.calif ? Reglas.mapaCalificados(RR.calif, RR.calif.estadosOk) : null;
@@ -8412,34 +8165,33 @@
   async function guardarCalificados(v) {
     let ok = false, error = '';
     if (v) {
-      try { await Almacen.guardar('calificados', v); ok = true; try { localStorage.removeItem(CLAVE_CALIF_LS); } catch (e) { /* nada */ } }
+      try { await Almacen.guardar('calificados', v); ok = true; try { localStorage.removeItem(CLAVE_CALIF_LS); } catch (e) { } }
       catch (e) { error = e.message; try { localStorage.setItem(CLAVE_CALIF_LS, JSON.stringify(v)); ok = true; } catch (e2) { error = e2.message; } }
-      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* sin esa API */ }
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { }
     } else {
-      try { await Almacen.borrar('calificados'); } catch (e) { /* no había */ }
-      try { localStorage.removeItem(CLAVE_CALIF_LS); } catch (e) { /* nada */ }
+      try { await Almacen.borrar('calificados'); } catch (e) { }
+      try { localStorage.removeItem(CLAVE_CALIF_LS); } catch (e) { }
       ok = true;
     }
-    try { localStorage.setItem(SELLO_CALIF, String(Date.now())); } catch (e) { /* otra pestaña no se enterará */ }
+    try { localStorage.setItem(SELLO_CALIF, String(Date.now())); } catch (e) { }
     ponerCalificados(v); ajustarTodo(); refrescarVentanaReglas();
     return { ok, error };
   }
-  // Al arrancar: si el localStorage se perdió, las reglas se recuperan de IndexedDB (y si no, se copian a IndexedDB); luego las listas.
-  // Si salió una predeterminada nueva que la persona no conocía (p. ej. "Equipo sin calificación" en la v1.35), se agrega y se guarda.
+  // Arranque: sincroniza reglas entre localStorage e IndexedDB, carga listas y agrega predeterminadas nuevas.
   RR.listo = (async () => {
     try {
       const enLS = leerDatoReglasLS(), enDB = await Almacen.leer('reglas').catch(() => null);
       if (!enLS && enDB && Array.isArray(enDB.reglas)) {
         RR.reglas = Reglas.sinIdsRepetidos(conPredeterminadasNuevas(enDB).reglas); RR.ver++;
-        try { localStorage.setItem(CLAVE_REGLAS, JSON.stringify(enDB)); } catch (e) { /* solo en IndexedDB */ }
+        try { localStorage.setItem(CLAVE_REGLAS, JSON.stringify(enDB)); } catch (e) { }
       } else if (enLS && (!enDB || enDB.guardado !== enLS.guardado)) Almacen.guardar('reglas', enLS).catch(() => {});
       const dato = leerDatoReglasLS() || enDB;
       if (dato && conPredeterminadasNuevas(dato).nuevas) await guardarReglas(reglasActuales());
-    } catch (e) { /* sin IndexedDB: basta el localStorage */ }
+    } catch (e) { }
     await leerVigentesGuardados();
     await leerCalificadosGuardados();
   })();
-  // otra pestaña del portal cambió las reglas o una lista
+  // cambios desde otra pestaña
   window.addEventListener('storage', (e) => {
     if (e.key === CLAVE_REGLAS) { RR.reglas = null; RR.ver++; ajustarTodo(); refrescarVentanaReglas(); }
     else if (e.key === SELLO_VIGENTES) leerVigentesGuardados();
@@ -8453,7 +8205,7 @@
     return RR.comp;
   }
   const reglasVivas = () => on('reglasrev') && reglasCompiladas().some((c) => c.ok);
-  // Códigos de equipo, utensilio y agrupador del catálogo del portal (el mismo de "Buscar por equipo"): solo si una regla activa lo usa
+  // Códigos del catálogo (equipo, utensilio, agrupador), solo si una regla activa los usa
   function pedirCatalogo() {
     if (RR.pidiendoCat || typeof sap === 'undefined') return;
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
@@ -8461,10 +8213,10 @@
     cargarCatalogoEquipos(modelo).then((items) => {
       const m = new Map(); items.forEach((x) => { const c = Reglas.normalizarCodigo(x.codigo); if (c.length >= 5 && c.includes('-') && !m.has(c)) m.set(c, x.desc || ''); });
       RR.catalogo = m; RR.ver++; ajustarTodo(); refrescarVentanaReglas();
-    }, () => { setTimeout(() => { RR.pidiendoCat = false; }, 60000); });   // (se reintenta en un minuto)
+    }, () => { setTimeout(() => { RR.pidiendoCat = false; }, 60000); });   // reintento en un minuto
   }
 
-  // ---- resaltado dentro del texto de una celda (sin cambiar su texto: el filtro, copiar y demás siguen leyendo lo mismo) ----
+  // ---- Resaltado dentro de la celda (sin cambiar su texto) ----
   const textoDeCelda = (td) => td && (td.querySelector('.sapMText') || td.querySelector('.sapMLnk') || td.querySelector('.sapMObjectIdentifierTitle') || td.querySelector('.sapMLabel'));
   function quitarMarcasReglas(el) {
     el.querySelectorAll('mark.rmd-regla').forEach((m) => { const p = m.parentNode; if (!p) return; p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); });
@@ -8473,19 +8225,18 @@
     quitarMarcasReglas(el); if (!marcas.length) return;
     const nodos = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, off = 0;
     while ((n = w.nextNode())) { nodos.push({ n, ini: off, fin: off + n.data.length }); off += n.data.length; }
-    for (let k = marcas.length - 1; k >= 0; k--) {                       // de atrás hacia adelante: las posiciones pendientes no se mueven
+    for (let k = marcas.length - 1; k >= 0; k--) {                       // de atrás hacia adelante
       const m = marcas[k]; let ultimo = true;
       for (let j = nodos.length - 1; j >= 0; j--) {
         const x = nodos[j], a = Math.max(m.ini, x.ini), b = Math.min(m.fin, x.fin); if (a >= b) continue;
         const r = document.createRange(); r.setStart(x.n, a - x.ini); r.setEnd(x.n, b - x.ini);
         const mk = document.createElement('mark'); mk.className = `rmd-regla rmd-c-${m.color}${m.aviso ? ' aviso' : ''}`; mk.title = m.titulo;
         if (ultimo && m.etiqueta) mk.dataset.etq = m.etiqueta; ultimo = false;
-        try { r.surroundContents(mk); } catch (e) { /* (rango cortado por otro elemento: se deja sin marcar) */ }
+        try { r.surroundContents(mk); } catch (e) { /* rango cortado por otro elemento */ }
       }
     }
   }
-  // Una lista (pasos, procesos menores o el selector "Adicionar Pasos"): marca cada descripción y devuelve sus advertencias.
-  // Cada celda guarda la "firma" de lo que pintó (reglas + texto): si nada cambió no se vuelve a tocar el DOM.
+  // Marca las descripciones de una lista y devuelve advertencias; firma por celda para no tocar el DOM sin cambios.
   function aplicarReglasLista(tabla, filas, iDes, ctx) {
     const out = { n: 0, filas: [] };
     if (!reglasVivas()) {
@@ -8505,8 +8256,7 @@
     });
     return out;
   }
-  // Ventana de la estructura EQUIPOS / INSTRUMENTOS / MATERIALES (v1.35): cada equipo se revisa con las reglas de equipo que revisan
-  // también la estructura (p. ej. "Equipo sin calificación") y se marca su "Código de referencia" (o su código SAP) con el estado.
+  // Estructura de equipos: reglas de equipo con revisión de estructura; marca el código con su estado.
   const reglasDeEstructura = () => reglasVivas() && reglasCompiladas().some((c) => c.ok && c.regla.tipo === 'equipo' && c.regla.estructura);
   function aplicarReglasEquiposVentana(tabla, filas, nombres) {
     const out = { n: 0, filas: [] };
@@ -8518,7 +8268,7 @@
     const iRef = nombres.indexOf('CÓDIGO DE REFERENCIA'), iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), comp = reglasCompiladas(), ctx = ctxReglas(), clave = `${firmaReglas()}|eq|`;
     filas.forEach((tr) => {
       const o = objetoDeFila(tr) || {}, eq = (o.equipoId && typeof o.equipoId === 'object') ? o.equipoId : {};
-      const cod0 = String(o.codigo || eq.equnr || '').trim(), numerico = /^\d+$/.test(cod0);   // ("Código" es el SAP del equipo; en utensilios, su propio código)
+      const cod0 = String(o.codigo || eq.equnr || '').trim(), numerico = /^\d+$/.test(cod0);   // «Código» = SAP del equipo; en utensilios, su código
       const e = { codigo: norm(o.CodigoGaci || eq.CodigoGaci || (numerico ? '' : cod0)), sap: numerico ? sinCeros(cod0) : '', desc: norm(o.descripcion || eq.denom || ''), orden: o.orden };
       const el = textoDeCelda(celda(tr, e.codigo && iRef >= 0 ? iRef : iCod)); if (!el) return;
       const texto = el.textContent || '', firma = `${clave}${e.codigo}|${e.sap}|${texto}`;
@@ -8532,7 +8282,7 @@
     });
     return out;
   }
-  // nombre de la lista de pasos que está debajo (para los procesos menores y los selectores)
+  // nombre de la lista de pasos de debajo
   function listaPadre(d) { const ds = dialogos(); for (let i = ds.indexOf(d) - 1; i >= 0; i--) if (ds[i].__rmdListaEfectiva) return ds[i].__rmdListaEfectiva; return ''; }
   function gestionarReglasSelector() {
     if (typeof sap === 'undefined') return;
@@ -8544,12 +8294,10 @@
     });
   }
 
-  // ---- todo el RMD: textos de sus pasos y procesos menores (lo usan el aviso de la ventana del RMD y "Documentos citados") ----
-  // Lee TODOS los pasos del RMD (MD_ES_PASO, con su estructura), sus etiquetas (MD_ES_ETIQUETA) y todos sus procesos menores
-  // (MD_ES_PASO_INSUMO_PASO) con el modelo del portal —las mismas entidades que el portal usa al abrir cada lista—, en 3 lecturas.
-  // v1.35: y sus equipos (MD_ES_EQUIPO con su EQUIPO: "Código de referencia" = CodigoGaci y código SAP = equnr), para la calificación.
+  // ---- Textos de todo el RMD ----
+  // MD_ES_PASO, MD_ES_ETIQUETA, MD_ES_PASO_INSUMO_PASO y MD_ES_EQUIPO (CodigoGaci, equnr).
   const textosRmd = new Map();                                            // mdId -> { t, modelo, p }
-  let generacionRmd = 0, dialogosAntes = 0;                               // (sube cada vez que se cierra una ventana: pudo cambiar algo)
+  let generacionRmd = 0, dialogosAntes = 0;                               // se incrementa al cerrar una ventana
   const sinCeros = (s) => String(s == null ? '' : s).trim().replace(/^0+(?=\d)/, '');
   async function leerTextosRmd(modelo, md) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new Filtro('mdId_mdId', 'EQ', md.mdId)], t0 = Date.now();
@@ -8594,7 +8342,7 @@
     r.segundos = Math.max(1, Math.round((Date.now() - t0) / 1000));
     return r;
   }
-  // maxEdad: se reutiliza una lectura de hace menos de ese tiempo (ms); 0 = leer de nuevo
+  // maxEdad (ms): reutiliza lecturas recientes; 0 = releer
   function textosDelRmd(modelo, md, maxEdad) {
     const g = textosRmd.get(md.mdId);
     if (g && g.modelo === modelo && Date.now() - g.t < (maxEdad == null ? 60000 : maxEdad)) return g.p;
@@ -8602,9 +8350,8 @@
     p.catch(() => { const x = textosRmd.get(md.mdId); if (x && x.p === p) textosRmd.delete(md.mdId); });
     return p;
   }
-  // ---- Elementos dados de baja (BPD n.º 6): aviso al entrar a la configuración de un RMD Ingresado ----
-  // Paso, proceso menor o utensilio de baja = estado «De Baja» en su catálogo; equipo de baja = su estado en SAP (ERP, lectura del portal) es distinto de
-  // «MONT-Montado» (se exceptúa «AEQS-Asignado al equipo superior», que es un accesorio y no una baja). Es solo un aviso: no cambia el PDF ni impide autorizar. Se resalta en amarillo la fila en las listas del RMD.
+  // ---- Elementos de baja (RMD Ingresado) ----
+  // Paso / PM / utensilio: estado «De Baja»; equipo: estado SAP distinto de «MONT-Montado» (salvo «AEQS»). Solo aviso y resaltado.
   const BAJAS = { erp: new Map(), avisados: new Set(), t: 0 };
   function estadosEquiposErp(ctrl, swerk) {
     const g = BAJAS.erp.get(String(swerk)); if (g && Date.now() - g.t < 3600000) return g.p;
@@ -8613,7 +8360,7 @@
     reg.p = new Promise((ok) => erp.read('/EquipoSet', { filters: [new F('Swerk', 'EQ', String(swerk)), new F('Eqtyp', 'EQ', '')], success: (r) => { reg.mapa = new Map((r.results || []).map((x) => [sinCeros(x.Equipment), norm(x.Txt30)])); ok(reg.mapa); }, error: () => ok(null) }));
     BAJAS.erp.set(String(swerk), reg); reg.p.then((m) => { if (!m) BAJAS.erp.delete(String(swerk)); }); return reg.p;
   }
-  const equipoDeBaja = (estado) => !!estado && !/^(MONT|AEQS)-/i.test(estado.trim());      // (AEQS = asignado al equipo superior: un accesorio, no una baja)
+  const equipoDeBaja = (estado) => !!estado && !/^(MONT|AEQS)-/i.test(estado.trim());      // AEQS = accesorio, no baja
   function bajasDelRmd(base, mapaErp) {
     const items = base.bajas.slice();
     (base.equiposRaw || []).forEach((q) => { const estado = (mapaErp && mapaErp.get(q.equnr)) || q.estat; if (equipoDeBaja(estado)) items.push({ tipo: 'Equipo', donde: 'Equipos / instrumentos / materiales', codigo: q.codigo || q.equnr, desc: q.desc, motivo: estado }); });
@@ -8640,7 +8387,7 @@
     if (typeof sap === 'undefined' || !on('bajas')) { if (d.__rmdBajasFirma || d.querySelector('.rmd-bajas-aviso')) quitar(); return; }
     const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
     if (!md || !md.mdId || !modelo) return;
-    if (+md.estadoIdRmd_iMaestraId !== 467) { if (d.__rmdBajasFirma || d.querySelector('.rmd-bajas-aviso')) quitar(); return; }   // (solo en RMD Ingresados)
+    if (+md.estadoIdRmd_iMaestraId !== 467) { if (d.__rmdBajasFirma || d.querySelector('.rmd-bajas-aviso')) quitar(); return; }
     const firma = `${md.mdId}|${generacionRmd}`, prev = d.__rmdBajasFirma || '';
     if (prev !== firma && dialogos().pop() === d) {
       d.__rmdBajasFirma = firma;
@@ -8650,10 +8397,10 @@
         window.__rmdStats.bajasRaiz = { rmd: md.codigo, total: items.length, porTipo: items.reduce((o, x) => { o[x.tipo] = (o[x.tipo] || 0) + 1; return o; }, {}), erp: !!mapa, equipos: (base.equiposRaw || []).length };
         pintarAvisoBajas(d, tabla);
         if (items.length && !BAJAS.avisados.has(md.mdId)) { BAJAS.avisados.add(md.mdId); abrirAdvertenciaBajas(md, items); }
-      }, () => { /* sin conexión: queda sin aviso hasta el próximo cambio */ });
+      }, () => { /* sin conexión: sin aviso */ });
     } else if (d.__rmdBajas && !d.querySelector('.rmd-bajas-aviso')) pintarAvisoBajas(d, tabla);
   }
-  // filas de baja resaltadas en las listas del RMD (pasos, procesos menores, utensilios y equipos)
+  // filas de baja resaltadas
   function gestionarBajasFilas() {
     if (typeof sap === 'undefined') return;
     if (!on('bajas')) { document.querySelectorAll('.rmd-baja').forEach((tr) => { tr.classList.remove('rmd-baja'); if (/^De baja/.test(tr.title || '')) tr.removeAttribute('title'); }); return; }
@@ -8677,17 +8424,16 @@
     });
   }
   window.__rmdStats.bajas = { equipoDeBaja, bajasDelRmd, resumen: resumenBajas };
-  // Aviso en la ventana del RMD: advertencias de las reglas en todo el RMD (pasos y procesos menores de todas las listas) y las
-  // reglas "Debe estar presente" que no se cumplen. Se revisa al abrir el RMD, al volver a él (cerrada una lista: pudo cambiar
-  // algo) y al cambiar las reglas o la lista de vigentes.
+  // Aviso del RMD: advertencias de reglas en todo el RMD y «Debe estar presente» no cumplidas. Se recalcula al abrir, al volver y al cambiar reglas o
+  // listas.
   function avisoReglasRaiz(d, tabla) {
     const quitar = () => { d.querySelectorAll('.rmd-reglas-aviso').forEach((x) => x.remove()); d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; };
     if (typeof sap === 'undefined' || !reglasVivas()) { if (d.__rmdReglasFirma || d.querySelector('.rmd-reglas-aviso')) quitar(); return; }
     const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
     if (!md || !md.mdId || !modelo) return;
     const firma = `${md.mdId}|${firmaReglas()}|${generacionRmd}`, prev = d.__rmdReglasFirma || '';
-    if (prev !== firma && dialogos().pop() === d) {                      // (con otra ventana encima se espera a volver al RMD)
-      const soloReglas = prev.startsWith(md.mdId + '|') && prev.endsWith('|' + generacionRmd);   // cambiaron las reglas: basta con reevaluar
+    if (prev !== firma && dialogos().pop() === d) {                      // espera a que no haya otra ventana encima
+      const soloReglas = prev.startsWith(md.mdId + '|') && prev.endsWith('|' + generacionRmd);   // cambio de reglas: solo reevaluar
       d.__rmdReglasFirma = firma;
       textosDelRmd(modelo, md, !prev.startsWith(md.mdId + '|') ? 60000 : soloReglas ? 3600000 : 0).then((base) => {
         if (!d.isConnected || d.__rmdReglasFirma !== firma) return;
@@ -8698,8 +8444,8 @@
         window.__rmdStats.reglasRaiz = { rmd: base.rmd, avisos: res.avisos, faltan: res.faltan.map((f) => f.texto), marcas: res.marcas, documentos: docs.length, noVigentes: RR.mapa ? docs.filter((c) => !RR.mapa.has(c)) : null,
           equipos: (base.equipos || []).length, equiposConAviso: resEq.items.filter((it) => it.avisos.length).map((it) => [base.equipos[it.i].codigo || base.equipos[it.i].sap, it.marcas[0].etiqueta]) };
         pintarAvisoReglas(d, tabla);
-      }, () => { /* sin conexión: queda sin aviso hasta el próximo cambio */ });
-    } else if (d.__rmdReglasRes && !d.querySelector('.rmd-reglas-aviso')) pintarAvisoReglas(d, tabla);   // UI5 volvió a dibujar la tabla
+      }, () => { /* sin conexión: sin aviso */ });
+    } else if (d.__rmdReglasRes && !d.querySelector('.rmd-reglas-aviso')) pintarAvisoReglas(d, tabla);   // UI5 redibujó la tabla
   }
   function pintarAvisoReglas(d, tabla) {
     const x = d.__rmdReglasRes; if (!x) return;
@@ -8729,7 +8475,7 @@
     if (a.dataset.html !== h) { a.dataset.html = h; a.innerHTML = h; }
     a.title = 'Según tus reglas de revisión (botón de mejoras › Reglas de revisión). Es solo un aviso: no cambia nada ni impide autorizar.';
   }
-  // Detalle: cada texto con advertencias (resaltado), dónde está y, abajo, lo que solo se resalta
+  // Detalle: textos con advertencias y ubicación; abajo, solo resaltados
   function abrirDetalleReglas(d) {
     const x = d.__rmdReglasRes; if (!x) return;
     const { res, base } = x, resEq = x.resEq || { items: [], avisos: 0 }, v = ventana(`Reglas de revisión — ${cabecera(d)}`, { cancelar: () => v.cerrar() });
@@ -8743,7 +8489,7 @@
       const t = document.createElement('table'); t.className = 'rmd-tabla'; t.innerHTML = '<thead><tr><th>Regla</th><th>Dónde</th><th>Texto</th></tr></thead><tbody></tbody>';
       const tb = t.querySelector('tbody');
       res.faltan.forEach((f) => { const tr = document.createElement('tr'); tr.innerHTML = `<td><b>${esc(f.nombre)}</b></td><td class="rmd-nota">Todo el RMD</td><td class="rmd-vig-no">${esc(f.texto)}</td>`; tb.appendChild(tr); });
-      itemsEq.forEach((it) => {                                            // equipos de la estructura EQUIPOS / INSTRUMENTOS / MATERIALES
+      itemsEq.forEach((it) => {
         const e = base.equipos[it.i], tr = document.createElement('tr'), texto = `${e.codigo || e.sap} — ${e.desc}`;
         tr.innerHTML = `<td>${[...new Set(it.marcas.map((m) => nombreRegla.get(m.regla) || m.regla))].map((n) => `<div>${it.avisos.some((a) => a.nombre === n) ? '⚠ ' : ''}${esc(n)}</div>`).join('')}</td>
           <td class="rmd-nota">EQUIPOS / INSTRUMENTOS / MATERIALES › orden ${esc(e.orden)}<div>SAP ${esc(e.sap || '—')}</div></td><td></td>`;
@@ -8797,10 +8543,10 @@
   const fechaHoraCorta = (iso) => { const t = new Date(iso); if (isNaN(t)) return String(iso || ''); const dd = (n) => String(n).padStart(2, '0'); return `${dd(t.getDate())}/${dd(t.getMonth() + 1)}/${t.getFullYear()} ${dd(t.getHours())}:${dd(t.getMinutes())}`; };
   const diasDesde = (iso) => { const t = Date.parse(iso); return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 86400000); };
   const infoVigente = (codigo) => (RR.mapa ? RR.mapa.get(Reglas.normalizarCodigo(codigo)) || null : null);
-  // un equipo del RMD en la lista de calificados: por su "Código de referencia" (CodigoGaci) o, si no, por su código SAP
+  // equipo en la lista de calificados: por CodigoGaci o código SAP
   const infoCalif = (e) => (RR.mapaCalif ? (e.codigo && RR.mapaCalif.porCodigo.get(Reglas.normalizarCodigo(e.codigo))) || (e.sap && RR.mapaCalif.porSap.get(sinCeros(e.sap))) || null : null);
 
-  // ---- lista de documentos vigentes: leer el archivo (.xls del DMS, .xlsx, .csv o una tabla HTML/XML guardada como .xls) ----
+  // ---- Lectura de la lista de vigentes (.xls, .xlsx, .csv o HTML/XML como .xls) ----
   const textoDeBytes = (u8) => { try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) { return new TextDecoder('windows-1252').decode(u8); } };
   function filasDeMarcado(texto) {
     const xml = /<Workbook\b/i.test(texto) && /urn:schemas-microsoft-com:office:spreadsheet/i.test(texto), doc = new DOMParser().parseFromString(texto, xml ? 'text/xml' : 'text/html');
@@ -8823,7 +8569,7 @@
     if (!mejor) throw new Error('no se encontró una columna con códigos de documento (por ejemplo «Identificador» o «Código»)');
     return { archivo, hoja: mejor.hoja, columna: mejor.columnas.codigo || '', n: mejor.docs.length, estados: mejor.estados, duplicados: mejor.duplicados, docs: mejor.docs };
   }
-  // Lista de equipos calificados: la hoja "Cronograma" (o, si no está, la que tenga la columna "ESTADO GENERAL" y los códigos)
+  // Equipos calificados: hoja «Cronograma» o la que tenga «ESTADO GENERAL»
   async function leerListaCalificados(u8, archivo) {
     const hojas = (await filasDeArchivo(u8, archivo)).sort((a, b) => (/cronograma/i.test(b.hoja) ? 1 : 0) - (/cronograma/i.test(a.hoja) ? 1 : 0));
     for (const h of hojas) {
@@ -8835,7 +8581,7 @@
   function exportarConfiguracion() {
     const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), nombre = `Reglas de revisión RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.json`;
     const obj = Reglas.paraExportar(reglasActuales(), RR.vigentes, { exportado: hoy.toISOString(), script: VERSION, ...(RR.calif ? { calificados: RR.calif } : {}) });
-    // legible en un editor de texto: las reglas con sangría y cada documento o equipo de las listas en su propia línea
+    // JSON indentado, un elemento por línea
     const marca = '@@' + Math.random().toString(36).slice(2) + '_', filasDe = { docs: obj.vigentes && obj.vigentes.docs, equipos: obj.calificados && obj.calificados.equipos };
     const txt = JSON.stringify(obj, (k, v) => ((k === 'docs' || k === 'equipos') && Array.isArray(v) ? v.map((x, i) => `${marca}${k}_${i}`) : v), 2)
       .replace(new RegExp(`"${marca}(docs|equipos)_(\\d+)"`, 'g'), (_, k, i) => JSON.stringify(filasDe[k][+i]));
@@ -8845,7 +8591,7 @@
     return { nombre, texto: txt };
   }
 
-  // ---- ventana "Reglas de revisión" ----
+  // ---- Ventana «Reglas de revisión» ----
   let ventanaReglas = null;
   function refrescarVentanaReglas() { if (ventanaReglas && ventanaReglas.fondo.isConnected) ventanaReglas.refrescar(); }
   const AYUDA_BUSCAR = {
@@ -8879,12 +8625,12 @@
     }
     const ir = (p) => { if (vista === 'editor' && sucio) { confirmar('¿Descartar los cambios?', 'La regla que estás editando tiene cambios sin guardar.', '', { si: 'Descartar', no: 'Seguir editando', peligro: true }).then((s) => { if (s) { sucio = false; vista = p; pintar(); } }); return; } vista = p; pintar(); };
     tabs.addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) ir(b.dataset.p); });
-    // soltar un archivo en la ventana: .json = importar configuración; .xls / .xlsx / .csv = lista de vigentes
+    // arrastrar archivo: .json = configuración; .xls/.xlsx/.csv = vigentes
     ['dragenter', 'dragover'].forEach((ev) => v.fondo.addEventListener(ev, (e) => { if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); tarjeta.classList.add('rmd-rg-soltar'); }));
     v.fondo.addEventListener('dragleave', (e) => { if (!e.relatedTarget || !v.fondo.contains(e.relatedTarget)) tarjeta.classList.remove('rmd-rg-soltar'); });
     v.fondo.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; tarjeta.classList.remove('rmd-rg-soltar'); if (!f) return; e.preventDefault(); if (vista !== 'editor') abrirArchivo(f); });
 
-    // .json = configuración exportada; una hoja con "ESTADO GENERAL" = lista de equipos calificados; si no, lista de documentos vigentes
+    // .json = configuración; hoja con «ESTADO GENERAL» = calificados; si no, vigentes
     async function abrirArchivo(f) {
       try {
         const u8 = new Uint8Array(await f.arrayBuffer()), ini = textoDeBytes(u8.subarray(0, 200)).replace(/^﻿/, '').trimStart();
@@ -8911,7 +8657,7 @@
         : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : vista === 'cargarCalif' ? 'Cargar la lista de equipos calificados' : 'Reglas de revisión';
       v.pie.innerHTML = ''; v.fondo.__ctrlS = null; v.cuerpo.oninput = null; v.cuerpo.onchange = null;
       ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif })[vista]();
-      if (['reglas', 'vigentes', 'calificados'].includes(vista)) {             // "Restablecer todo" en el pie de las tres pestañas
+      if (['reglas', 'vigentes', 'calificados'].includes(vista)) {
         const bT = botonModal('Restablecer todo…', 'peligro', () => restablecerTodo()); bT.title = 'Vuelve todo a como venía: reglas predeterminadas y sin listas cargadas';
         v.pie.insertBefore(bT, v.pie.lastElementChild);
       }
@@ -8982,7 +8728,7 @@
     });
     const mismoNombre = (a, b) => Reglas.plegar(a).p === Reglas.plegar(b).p;
     function nombreLibre(nombre, reglas, id) { let n = nombre, k = 2; while (reglas.some((r) => r.id !== id && mismoNombre(r.nombre, n))) n = `${nombre} (${k++})`; return n; }
-    // Restablecer todo: reglas predeterminadas (sin las propias) y sin listas cargadas
+    // Restablecer todo: predeterminadas y sin listas
     function restablecerTodo() {
       const w = ventana('Restablecer todo', { cancelar: () => w.cerrar() });
       w.fondo.querySelector('.rmd-modal').classList.add('rmd-modal-aviso');
@@ -9077,7 +8823,7 @@
         sucio = false; await guardarReglas(reglas); v.cuerpo.oninput = null; v.cuerpo.onchange = null; vista = 'reglas'; pintar();
         toast(`Regla «${x.nombre}» guardada${x.activa ? '' : ' (inactiva)'}.`);
       };
-      // (predeterminada: vuelve a su configuración de fábrica en el formulario; se guarda con "Guardar regla")
+      // predeterminada: restaura valores de fábrica en el formulario
       const pred = editando.regla.predeterminada && Reglas.predeterminadas().find((p) => p.predeterminada === editando.regla.predeterminada);
       if (pred) {
         const bR = botonModal('Restablecer esta regla', '', () => { editando.regla = { ...pred, id: editando.regla.id }; editando.accionTocada = true; pintar(); sucio = true; toast('Restablecida en el formulario: pulsa «Guardar regla» para aplicarla.'); });
@@ -9124,7 +8870,7 @@
       v.pie.append(botonModal('Cancelar', '', () => { cargandoVig = null; vista = 'vigentes'; pintar(); }), botonModal('Usar esta lista', 'primario', usar));
       v.fondo.__ctrlS = usar;
     }
-    // -- equipos calificados (v1.35) --
+    // -- equipos calificados --
     const estadosTxt = (est) => Object.entries(est || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n.toLocaleString('es-PE')}`).join(' · ');
     const califOk = (g) => ((RR.calif && RR.calif.estadosOk) || Reglas.ESTADOS_OK).some((x) => Reglas.plegar(x).p.trim() === Reglas.plegar(g || '').p.trim());
     const filaCal = (e) => `<tr><td class="rmd-nowrap">${esc(e[0] || '—')}</td><td class="rmd-nowrap">${esc(e[1] || '—')}</td><td>${esc(e[2])}</td><td class="rmd-nowrap"><b class="${califOk(e[3]) ? 'rmd-vig-si' : 'rmd-vig-no'}">${esc(e[3] || '(sin estado)')}</b></td><td>${esc(e[4])}</td><td>${esc(e[5])}</td><td class="rmd-nowrap">${esc(e[6] || '')}${e[7] ? ' / ' + esc(e[7]) : ''}</td></tr>`;
@@ -9199,37 +8945,31 @@
   window.__rmdStats.reglas = {
     lista: () => JSON.parse(JSON.stringify(reglasActuales())), fijar: (lista) => guardarReglas(lista), listo: () => RR.listo,
     vigentes: () => (RR.vigentes ? { archivo: RR.vigentes.archivo, cargado: RR.vigentes.cargado, n: RR.vigentes.docs.length, hoja: RR.vigentes.hoja, columna: RR.vigentes.columna } : null),
-    // (pruebas) lista de vigentes desde los bytes de un archivo en base64, o desde una lista de códigos; null la quita
+    // pruebas: lista de vigentes desde base64 o códigos; null la quita
     cargarVigentes: async (b64, nombre) => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const lv = await leerListaVigentes(u8, nombre); const r = await guardarVigentes({ ...lv, cargado: new Date().toISOString() }); return { ...r, n: lv.n, hoja: lv.hoja, columna: lv.columna }; },
     ponerVigentes: (docs, archivo = 'prueba') => guardarVigentes(docs ? { archivo, cargado: new Date().toISOString(), n: docs.length, estados: {}, docs: docs.map((d) => (Array.isArray(d) ? d : [Reglas.normalizarCodigo(d)])) } : null),
     guardados: async () => ({ ls: localStorage.getItem(CLAVE_REGLAS), db: await Almacen.leer('reglas').catch((e) => 'error: ' + e.message), vigentesDB: await Almacen.leer('vigentes').then((x) => (x ? x.docs.length : null), (e) => 'error: ' + e.message) }),
     evaluar: (texto, ctx) => Reglas.buscar(texto, reglasCompiladas(), ctxReglas({ probar: true, ...(ctx || {}) })),
     exportar: () => exportarConfiguracion(), abrir: (p) => abrirReglas(p), compiladas: () => reglasCompiladas().map((c) => ({ id: c.regla.id, ok: c.ok, error: c.error, necesita: c.necesita })),
     motor: Reglas,
-    // (pruebas) respaldo completo de lo guardado y su restauración: las pruebas dejan el navegador como estaba
+    // pruebas: respaldo y restauración
     respaldo: async () => ({ ls: localStorage.getItem(CLAVE_REGLAS), db: await Almacen.leer('reglas').catch(() => null), vig: RR.vigentes, cal: RR.calif }),
     restaurar: async (r) => {
-      try { if (r.ls) localStorage.setItem(CLAVE_REGLAS, r.ls); else localStorage.removeItem(CLAVE_REGLAS); } catch (e) { /* nada */ }
-      try { if (r.db) await Almacen.guardar('reglas', r.db); else await Almacen.borrar('reglas'); } catch (e) { /* nada */ }
+      try { if (r.ls) localStorage.setItem(CLAVE_REGLAS, r.ls); else localStorage.removeItem(CLAVE_REGLAS); } catch (e) { }
+      try { if (r.db) await Almacen.guardar('reglas', r.db); else await Almacen.borrar('reglas'); } catch (e) { }
       RR.reglas = null; RR.ver++; await guardarVigentes(r.vig || null); await guardarCalificados(r.cal || null);
     },
-    // (pruebas) lista de equipos calificados: desde los bytes de un archivo en base64, o desde filas [código, SAP, descripción, estado general, OQ, PQ]
+    // pruebas: equipos calificados desde base64 o filas
     calificados: () => (RR.calif ? { archivo: RR.calif.archivo, cargado: RR.calif.cargado, n: RR.calif.equipos.length, hoja: RR.calif.hoja, columna: RR.calif.columna, estadosOk: RR.calif.estadosOk, codigos: RR.mapaCalif.porCodigo.size } : null),
     cargarCalificados: async (b64, nombre) => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const lc = await leerListaCalificados(u8, nombre); const r = await guardarCalificados({ ...lc, cargado: new Date().toISOString() }); return { ...r, n: lc.n, hoja: lc.hoja, columna: lc.columna, estados: lc.estados }; },
     ponerCalificados: (equipos, archivo = 'prueba') => guardarCalificados(equipos ? { archivo, cargado: new Date().toISOString(), n: equipos.length, estados: {}, estadosOk: Reglas.ESTADOS_OK.slice(), equipos: equipos.map((e) => [Reglas.normalizarCodigo(e[0]), sinCeros(e[1]), ...e.slice(2)]) } : null),
     infoEquipo: (codigo, sap) => { const i = infoCalif({ codigo, sap }); return i && { ok: i.ok, estado: i.estado, detalle: i.detalle }; },
   };
 
-  // ---- 9 quater. Cambios de recetas en SAP (v1.37) ----------------------------------------------------------------------
-  // Al asociar una receta, el portal copia en el RMD su lista de materiales y los datos de su versión de fabricación; esa copia ya no se
-  // actualiza sola. Aquí se revisan, en segundo plano, los RMD Ingresados y Autorizados (la última versión de cada uno) frente a lo que
-  // devuelve hoy SAP (las mismas lecturas que ya hace «Revisar recetas»). Los que tienen diferencias se avisan con un icono tenue junto a
-  // «Manufactura Digital»; al abrirlo se ve, por RMD, la receta, qué cambió y cuándo. SAP da la fecha «válido desde» de cada componente
-  // (no la hora): la hora que se muestra es la de la revisión que lo detectó. Desde ahí se puede agregar a las Observaciones del RMD una
-  // línea «AAAAMMDD<iniciales> Actualización de Lista de Materiales» (o «… de Hoja de Ruta»), con el mismo Guardar de «Asociar fórmulas»
-  // que usan las modificaciones masivas, y el detalle se exporta a Excel desde el menú Exportar. Lo leído se guarda solo en este navegador.
-  // Lo que se lee (todo con las lecturas del propio portal): MD (estados Autorizado / Ingresado), MD_RECETA, MD_ES_RE_INSUMO (la copia; una
-  // sola vez por receta asociada, queda guardada), MaterialSet (una lectura por receta: SAP no admite varias) y ProduccionVSet (por bloques).
+  // ---- 9 quater. Cambios de recetas en SAP ----
+  // Compara en segundo plano la copia del RMD (MD_ES_RE_INSUMO, RECETA) con MaterialSet y ProduccionVSet en Ingresados y Autorizados (última versión).
+  // Aviso junto a «Manufactura Digital», observación «AAAAMMDD<iniciales> Actualización de …» con el Guardar de «Asociar fórmulas», Excel en Exportar.
+  // Resultados guardados localmente. MaterialSet: una lectura por receta.
   const RS = { datos: null, copias: null, leyendo: false, cancelar: false, progreso: '', error: '', ver: 1, arrancado: false, ventana: null, resultados: new Map() };
   const RS_ESPERA = 45000, RS_PARALELO = 6, RS_BLOQUEO = 'rmdUiRecetasBloqueo', RS_ID = Math.random().toString(36).slice(2);
   const RS_VACIO = () => ({ v: 1, ultima: { ing: 0, aut: 0 }, hallazgos: [], detectado: {}, obs: {} });
@@ -9247,10 +8987,10 @@
     return RS.copias;
   }
   const rsGuardarCopias = () => Almacen.guardar('recetasSapCopias', RS.copias).catch(() => {});
-  // Solo una pestaña revisa sola a la vez (la revisión manual no espera)
+  // una sola pestaña revisa automáticamente
   const rsBloqueado = () => { try { return Date.now() - (+localStorage.getItem(RS_BLOQUEO) || 0) < 5 * 60000 && localStorage.getItem(RS_BLOQUEO + 'Id') !== RS_ID; } catch (e) { return false; } };
-  const rsTomarBloqueo = () => { try { localStorage.setItem(RS_BLOQUEO, String(Date.now())); localStorage.setItem(RS_BLOQUEO + 'Id', RS_ID); } catch (e) { /* sin almacenamiento */ } };
-  const rsSoltarBloqueo = () => { try { if (localStorage.getItem(RS_BLOQUEO + 'Id') === RS_ID) { localStorage.removeItem(RS_BLOQUEO); localStorage.removeItem(RS_BLOQUEO + 'Id'); } } catch (e) { /* nada */ } };
+  const rsTomarBloqueo = () => { try { localStorage.setItem(RS_BLOQUEO, String(Date.now())); localStorage.setItem(RS_BLOQUEO + 'Id', RS_ID); } catch (e) { } };
+  const rsSoltarBloqueo = () => { try { if (localStorage.getItem(RS_BLOQUEO + 'Id') === RS_ID) { localStorage.removeItem(RS_BLOQUEO); localStorage.removeItem(RS_BLOQUEO + 'Id'); } } catch (e) { } };
   async function rsPool(items, n, fn) {
     let i = 0;
     const trabajador = async () => { while (i < items.length && !RS.cancelar) { const k = i++; await fn(items[k], k); } };
@@ -9258,7 +8998,7 @@
   }
   const rsDeCompacta = (c) => c.map(([Component, CompQty, CompUnit, Maktx]) => ({ Component, CompQty, CompUnit, Maktx }));
   const rsClave3 = (rc) => [norm(rc.Matnr), norm(rc.Werks), String(parseInt(rc.Stlal, 10))].join('|');
-  // los RMD Ingresados y Autorizados, solo la última versión de cada uno (versiones = mismo «código de versión principal»)
+  // Ingresados y Autorizados, última versión por codigoversionprincipal
   async function rsCandidatos(modelo) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
     const mds = await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('estadoIdRmd_iMaestraId', 'EQ', 465), new F('estadoIdRmd_iMaestraId', 'EQ', 467)], and: false })],
@@ -9268,21 +9008,21 @@
     return [...ult.values()].map((m) => ({ mdId: m.mdId, codigo: m.codigo, version: m.version, linaje: m.codigoversionprincipal || m.codigo, descripcion: norm(m.descripcion), etapa: m.nivelTxt || '', area: m.areaRmdTxt || '',
       planta: (m.sucursalId && m.sucursalId.contenido) || '', estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' }));
   }
-  // hoja de ruta y puesto: solo lo que se puede comparar con lo copiado al asociar (puesto principal, hoja de ruta, contador y alternativa)
+  // ruta: puesto principal, hoja de ruta, contador y alternativa
   function rsRuta(rc, hoy) {
     const cambios = [];
     if (hoy) CAMPOS_RUTA.forEach(([k, nombre, f, avisa]) => { if (!avisa) return; const a = f(rc[k]), s = f(hoy[k]); if (a !== s) cambios.push({ campo: nombre, asociada: a, sap: s, anterior: null, clave: k, avisa: true }); });
     return { existe: !!hoy, cambios, anteriorVersion: null, puestosRuta: [], entran: [], salen: [], faltan: [] };
   }
   const rsResumenRuta = (ru) => (!ru ? '' : !ru.existe ? 'la versión de fabricación ya no existe en SAP' : ru.cambios.map((c) => `${c.campo}: ${c.asociada || '—'} → ${c.sap || '—'}`).join('; '));
-  // Revisa un conjunto de RMD ya leídos. Recibe las lecturas (para poder probarla con datos de mentira) y devuelve los hallazgos.
+  // Revisa RMD ya leídos (lecturas inyectables) -> hallazgos.
   function rsCompararRecetas(recs, porMd, copias, bom, versiones, verOk) {
     const out = [];
     recs.forEach((r) => {
       const md = porMd.get(r.mdId_mdId), rc = r.recetaId; if (!md || !rc) return;
       const sap = bom.get(rsClave3(rc)), copia = copias[r.mdRecetaId];
       let dif = [], ultima = null, nSap = 0;
-      if (sap && copia && copia.length) {                                    // (sin copia guardada o sin lectura de SAP: no se puede comparar → no se avisa)
+      if (sap && copia && copia.length) {                                    // sin copia o sin lectura de SAP: no se avisa
         dif = diferenciasBom(sap, rsDeCompacta(copia)); nSap = sap.length;
         sap.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
       }
@@ -9297,12 +9037,10 @@
     });
     return out;
   }
-  // La revisión, por tandas. Cada lista de materiales de SAP (una por receta distinta) se vuelve a leer solo cuando le toca: las de los RMD
-  // Ingresados cada 3 h y las de los Autorizados cada 24 h. Lo automático lee como máximo unos 100 s por tanda y sigue en la siguiente
-  // (SAP tarda distinto según la hora), así el primer barrido se completa poco a poco sin cargar el portal. alcance: 'auto' (solo lo que toca,
-  // con tope de tiempo), 'ingresados' o 'todos' (los botones: leen todo lo de ese alcance ahora).
+  // Revisión por tandas: relectura cada 3 h (Ingresados) / 24 h (Autorizados); automática con tope ~100 s.
+  // alcance: 'auto' | 'ingresados' | 'todos'.
   const RS_TTL_ING = 3 * 3600000, RS_TTL_AUT = 24 * 3600000, RS_TOPE_AUTO_MS = 100000, RS_MAX_AUTO = 500;
-  async function rsRevisar(alcance, auto, opciones = {}) {   // opciones.codigos: solo esos RMD (pruebas)
+  async function rsRevisar(alcance, auto, opciones = {}) {   // pruebas: solo esos códigos
     if (RS.leyendo) return;
     const ctrl = typeof sap !== 'undefined' && controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'), erp = ctrl && ctrl.oModelErpNec;
     if (!modelo || !erp) { RS.error = 'Abre la lista «Configuración Manufactura Digital» para revisar las recetas.'; rsPintar(); return; }
@@ -9317,7 +9055,7 @@
       const recs = (await leerPorIds(modelo, 'MD_RECETA', 'mdId_mdId', objetivo.map((m) => m.mdId), { $expand: 'recetaId',
         $select: 'mdRecetaId,mdId_mdId,activo,recetaId/Matnr,recetaId/Werks,recetaId/Verid,recetaId/Stlal,recetaId/Mdv01,recetaId/Plnnr,recetaId/Alnal,recetaId/Text1' }, null,
         (h, n) => avanza(`Leyendo las recetas de los RMD (${h} de ${n})…`))).filter((r) => r.activo !== false && r.recetaId && r.recetaId.Matnr && !isNaN(parseInt(r.recetaId.Stlal, 10)));
-      // qué listas de materiales toca leer: las que nunca se leyeron o ya pasó su plazo, las más atrasadas primero (y los Ingresados antes)
+      // listas pendientes o vencidas, las más atrasadas primero (Ingresados antes)
       const info = new Map();                                                 // triple -> { edad, ttl, ing }
       recs.forEach((r) => { const t = rsClave3(r.recetaId), ing = porMd.get(r.mdId_mdId).estado === 'Ingresado', x = info.get(t) || { t, ing: false, ttl: RS_TTL_AUT }; x.ing = x.ing || ing; x.ttl = x.ing ? RS_TTL_ING : RS_TTL_AUT; info.set(t, x); });
       const ahora0 = Date.now(); info.forEach((x) => { x.edad = ahora0 - (datos.leidas[x.t] || 0); });
@@ -9325,21 +9063,21 @@
       if (!forzar) debidas = debidas.slice(0, opciones.max || RS_MAX_AUTO);
       datos.universo = { rmd: todos.length, recetas: recs.length, listas: info.size, ing: todos.filter((m) => m.estado === 'Ingresado').length };
       const idsLeer = new Set(debidas.map((x) => x.t)), recsLeer = recs.filter((r) => idsLeer.has(rsClave3(r.recetaId)));
-      // la copia de cada receta asociada (una vez; queda guardada)
+      // copia de cada receta asociada (una vez)
       const faltan = [...new Set(recsLeer.map((r) => r.mdRecetaId))].filter((id) => !copias[id]);
       if (faltan.length) {
         const filas = await leerPorIds(modelo, 'MD_ES_RE_INSUMO', 'mdRecetaId_mdRecetaId', faltan, { $select: 'estructuraRecetaInsumoId,mdRecetaId_mdRecetaId,Component,CompQty,CompUnit,Maktx,activo', $orderby: 'estructuraRecetaInsumoId' }, null,
           (h, n) => avanza(`Leyendo lo copiado en los RMD (${h} de ${n})…`));
         const por = new Map(); filas.forEach((x) => { if (x.activo === false) return; const id = x.mdRecetaId_mdRecetaId; if (!por.has(id)) por.set(id, []); por.get(id).push([norm(x.Component), norm(x.CompQty), norm(x.CompUnit), norm(x.Maktx)]); });
-        por.forEach((a, id) => { copias[id] = a; });                          // (una receta sin ninguna fila copiada no se guarda: no se puede comparar)
+        por.forEach((a, id) => { copias[id] = a; });                          // sin filas copiadas: no se guarda
         await rsGuardarCopias();
       }
       if (RS.cancelar) throw new Error('Revisión detenida.');
-      // lo que hoy dice SAP: la lista de materiales de cada receta (una lectura por receta) y sus versiones de fabricación (por bloques)
+      // SAP actual: MaterialSet por receta y ProduccionVSet por bloques
       const bom = new Map(), triples = debidas.map((x) => x.t), limite = forzar ? Infinity : t0 + (opciones.topeMs != null ? opciones.topeMs : RS_TOPE_AUTO_MS);
       let hechas = 0, fallos = 0, salteadas = 0;
       await rsPool(triples, RS_PARALELO, async (t) => {
-        if (Date.now() > limite) { salteadas++; return; }                     // (tope de tiempo de la tanda automática: el resto queda para la siguiente)
+        if (Date.now() > limite) { salteadas++; return; }                     // tope de tiempo de la tanda automática
         const [matnr, werks, stlal] = t.split('|');
         try { bom.set(t, (await leerErp(erp, 'MaterialSet', [new F('Matnr', 'EQ', matnr), new F('Werks', 'EQ', werks), new F('Stlal', 'EQ', stlal)])).map((x) => ({ Component: x.Component, CompQty: x.CompQty, CompUnit: x.CompUnit, Maktx: x.Maktx, ItemText1: x.ItemText1, ValidFrom: x.ValidFrom, ChangeNo: x.ChangeNo }))); }
         catch (e) { fallos++; if (fallos > 30 && fallos > hechas / 4) throw new Error('SAP no está respondiendo las lecturas de las listas de materiales.'); }
@@ -9352,11 +9090,11 @@
       porWerks.forEach((set, w) => { const m = [...set]; for (let i = 0; i < m.length; i += 40) bloques.push([w, m.slice(i, i + 40)]); });
       await rsPool(bloques, RS_PARALELO, async ([w, mats]) => {
         try { (await leerErp(erp, 'ProduccionVSet', [...mats.map((m) => new F('Matnr', 'EQ', m)), new F('Werks', 'EQ', w)])).forEach((x) => versiones.set([norm(x.Matnr), norm(x.Werks), norm(x.Verid)].join('|'), x)); mats.forEach((m) => verOk.add(m + '|' + w)); }
-        catch (e) { /* sin lectura: no se avisa la hoja de ruta de estos materiales */ }
+        catch (e) { }
       });
       if (RS.cancelar) throw new Error('Revisión detenida.');
       const nuevos = rsCompararRecetas(leidasAhora, porMd, copias, bom, versiones, verOk), idsRec = new Set(leidasAhora.map((r) => r.mdRecetaId)), idsVivos = new Set(recs.map((r) => r.mdRecetaId)), idsObjetivo = new Set(objetivo.map((m) => m.mdId));
-      // se conserva lo anterior de lo que no se leyó ahora; se descartan los RMD que ya no son Ingresados / Autorizados y las recetas ya no asociadas
+      // se conserva lo no releído; se descartan RMD y recetas que ya no aplican
       datos.hallazgos = [...datos.hallazgos.filter((h) => universo.has(h.mdId) && !idsRec.has(h.mdRecetaId) && (!idsObjetivo.has(h.mdId) || idsVivos.has(h.mdRecetaId))), ...nuevos];
       bom.forEach((_, t) => { datos.leidas[t] = Date.now(); });
       const vivos = new Set(), ahora = Date.now();
@@ -9365,7 +9103,7 @@
       Object.keys(datos.obs).forEach((k) => { if (!universo.has(k.split('|')[0])) delete datos.obs[k]; });
       const aldia = (ing) => [...info.values()].filter((x) => x.ing === ing).every((x) => datos.leidas[x.t] && ahora - datos.leidas[x.t] < x.ttl);
       if (aldia(true)) datos.ultima.ing = ahora; if (alcance !== 'ingresados' && !opciones.codigos && aldia(false)) datos.ultima.aut = ahora;
-      datos.proximo = alcance === 'ingresados' || opciones.codigos ? 0 : Math.min(...[...info.values()].map((x) => (datos.leidas[x.t] || 0) + x.ttl), Infinity);   // (revisión parcial: la próxima tanda automática lo vuelve a evaluar)
+      datos.proximo = alcance === 'ingresados' || opciones.codigos ? 0 : Math.min(...[...info.values()].map((x) => (datos.leidas[x.t] || 0) + x.ttl), Infinity);   // revisión parcial
       datos.cobertura = { listas: info.size, alDia: [...info.values()].filter((x) => datos.leidas[x.t] && ahora - datos.leidas[x.t] < x.ttl).length };
       datos.segundos = Math.round((ahora - t0) / 1000); datos.lecturas = { rmd: objetivo.length, recetas: recs.length, listas: triples.length - salteadas, sinLectura: fallos, pendientes: salteadas };
       await rsGuardar();
@@ -9375,21 +9113,21 @@
   async function rsAuto() {
     if (!on('cambiosrecetas') || !on('recetasauto') || RS.leyendo || rsBloqueado() || !controladorPrincipal()) return;
     const d = await rsDatos(), ahora = Date.now();
-    if (d.proximo && ahora < d.proximo && ahora - (d.ultimaLista || 0) < 3600000) return;   // todo al día hasta el próximo vencimiento y el universo se leyó hace poco: nada que hacer
+    if (d.proximo && ahora < d.proximo && ahora - (d.ultimaLista || 0) < 3600000) return;   // todo al día: nada que hacer
     d.ultimaLista = ahora; await rsRevisar('auto', true);
   }
   async function rsArrancar() {
     await rsDatos(); rsPintar();
     setTimeout(rsAuto, RS_ESPERA); setInterval(rsAuto, 10 * 60000);
   }
-  // «Borrar lo guardado»: quita los resultados y las copias leídas (la próxima revisión lee todo de nuevo)
+  // «Borrar lo guardado»: resultados y copias
   async function rsBorrarTodo() {
     RS.datos = null; RS.copias = null; RS.error = '';
-    try { await Almacen.borrar('recetasSap'); } catch (e) { /* no había */ }
-    try { await Almacen.borrar('recetasSapCopias'); } catch (e) { /* no había */ }
+    try { await Almacen.borrar('recetasSap'); } catch (e) { }
+    try { await Almacen.borrar('recetasSapCopias'); } catch (e) { }
     await rsDatos(); rsPintar();
   }
-  // ---- los RMD con cambios, agrupados (un RMD puede tener varias recetas) ----
+  // ---- RMD con cambios, agrupados por RMD ----
   function rsGrupos() {
     const d = RS.datos; if (!d) return [];
     const por = new Map();
@@ -9416,7 +9154,7 @@
     }
     return '';
   }
-  // ---- el icono tenue junto a «Manufactura Digital» ----
+  // ---- Icono junto a «Manufactura Digital» ----
   function rsEstadoBoton(b) {
     const d = RS.datos, mds = d ? new Set(d.hallazgos.map((h) => h.mdId)) : new Set(), n = mds.size, ing = d ? new Set(d.hallazgos.filter((h) => h.estado === 'Ingresado').map((h) => h.mdId)).size : 0;
     b.classList.toggle('vacio', !n); b.classList.toggle('leyendo', RS.leyendo); setTxt(b.querySelector('.n'), n ? String(n) : '');
@@ -9440,7 +9178,7 @@
     if (!RS.arrancado) { RS.arrancado = true; rsArrancar(); }
   }
   function rsPintar(soloEstado) { RS.ver++; const b = document.querySelector('.rmd-alerta-rec'); if (b) rsEstadoBoton(b); if (RS.ventana && RS.ventana.fondo.isConnected) (soloEstado ? RS.ventana.pintarEstado : RS.ventana.pintar)(); }
-  // ---- la ventana ----
+  // ---- Ventana ----
   async function abrirCambiosRecetas() {
     if (RS.ventana && RS.ventana.fondo.isConnected) return;
     registrarExternosUI5(); await rsDatos();
@@ -9545,13 +9283,13 @@
         toast(`Observación agregada a ${hechos} de ${plan.length} RMD.${hechos < plan.length ? ' Los demás quedan marcados con el motivo.' : ''}`, hechos < plan.length);
       } finally {
         trabajando = false; RS.cancelar = false;
-        try { ctrl.getView().getModel('oDataFilter').setProperty('/code', filtroAntes); await ctrl.onSearch(); } catch (e) { /* la lista se actualiza al próximo «Ir» */ }
+        try { ctrl.getView().getModel('oDataFilter').setProperty('/code', filtroAntes); await ctrl.onSearch(); } catch (e) { }
         v.pintar();
       }
     }
     v.pintar(); setTimeout(() => buscar.focus(), 40);
   }
-  // ---- Excel: Resumen (una fila por RMD y receta) y Diferencias (una fila por componente o dato de la hoja de ruta) ----
+  // ---- Excel: Resumen (RMD y receta) y Diferencias (componente o dato de ruta) ----
   function rsArmarExcel() {
     const d = RS.datos || RS_VACIO(), hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
     const utc = (x) => (x instanceof Date && !isNaN(x) ? new Date(Date.UTC(x.getFullYear(), x.getMonth(), x.getDate(), x.getHours(), x.getMinutes())) : '');
@@ -9595,7 +9333,7 @@
     try { const { libro, nombre, rmd } = rsArmarExcel(); descargarArchivo(nombre, await libro.generar(), TIPO_XLSX); toast(`Excel de ${rmd} RMD con cambios de receta en SAP (revisión del ${fechaHoraCorta(Math.max(RS.datos.ultima.ing, RS.datos.ultima.aut))}).`); }
     catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); }
   }
-  // diagnóstico y pruebas
+  // pruebas
   window.__rmdStats.recetasSap = {
     estado: RS, datos: rsDatos, revisar: rsRevisar, borrar: rsBorrarTodo, copias: rsCopias, grupos: rsGrupos, abrir: abrirCambiosRecetas, comparar: rsCompararRecetas, hash: rsHash, iniciales: rsUsuarioIniciales,
     poner: async (hallazgos, ultima) => { const d = await rsDatos(); d.hallazgos = hallazgos; d.detectado = {}; hallazgos.forEach((h) => { d.detectado[h.mdRecetaId + '|' + h.huella] = h.detectado || Date.now(); }); d.ultima = ultima || { ing: Date.now(), aut: Date.now() }; RS.ver++; rsPintar(); },
@@ -9603,14 +9341,9 @@
     excel: async () => { const x = rsArmarExcel(); return { ...x, base64: aBase64(await x.libro.generar()) }; },
   };
 
-  // ---- 9 quinquies. Historial de cambios en «Trazabilidad RMD» (v1.38) ----
-  // Dos fuentes, ninguna con fotos propias del script:
-  //  · Entre versiones: cada versión de un RMD es un registro aparte (mismo «código de versión principal»); sus estructuras, etiquetas, pasos,
-  //    procesos menores, insumos, recetas y especificaciones se emparejan por su código de estructura, etiqueta y paso (los mismos en todas las
-  //    versiones) y se comparan.
-  //  · Por guardado: la tabla AUDITORIA del servicio guarda el contenido de cada guardado con el usuario (dentro del valor: usuarioActualiza),
-  //    desde enero de 2024. Solo se consulta por fila (≈ 1 s cada una: el servidor no filtra rápido por otra cosa). Como el portal reenvía la fila
-  //    (a veces solo algunos campos), el «antes» sale de acumular los guardados anteriores de esa misma fila.
+  // ---- 9 quinquies. Historial en «Trazabilidad RMD» ----
+  // Entre versiones: estructuras, etiquetas, pasos, PM, insumos, recetas y especificaciones emparejados por código y comparados.
+  // Por guardado: tabla AUDITORIA (usuarioActualiza en el valor, desde 2024), consulta por fila (~1 s); el «antes» se acumula de guardados previos.
   const TZ_ESTR_ORDEN = ['Cabecera', 'Etiquetas', 'Pasos', 'Procesos menores', 'Insumos', 'Recetas', 'Especificaciones'];
   const TZ_CAMPOS_PASO = [['orden', 'Orden', 'n'], ['valorInicial', 'Val. Inicial', 'n'], ['valorFinal', 'Val. Final', 'n'], ['margen', 'Margen', 'n'], ['decimales', 'Decimales', 'n'], ['tipoDato', 'Tipo Dato', 't'],
     ['depende', 'Depende del paso', 't'], ['estadoCC', 'Estado CC', 'b'], ['estadoMov', 'Estado Mov.', 'b'], ['pmop', 'PM OP', 'b'], ['genpp', 'Gen PP', 'b'], ['tab', 'Tab', 'b'], ['edit', 'Edit', 'b'], ['rpor', 'R. Por', 'b'],
@@ -9621,7 +9354,7 @@
   const TZ_CAMPOS_INS = [['CompQty', 'Cantidad', 'n'], ['CompUnit', 'UM', 't'], ['Maktx', 'Descripción', 't'], ['cantidadRm', 'Cantidad RM', 'n']];
   const TZ_CAMPOS_ESP = [['especificacion', 'Especificación', 't'], ['tipoDato', 'Tipo Dato', 't'], ['valorInicial', 'Val. Inicial', 'n'], ['valorFinal', 'Val. Final', 'n'], ['margen', 'Margen', 'n'], ['decimales', 'Decimales', 'n'], ['orden', 'Orden', 'n']];
   const TZ_CAMPOS_MD = [['descripcion', 'Descripción', 't'], ['nivelTxt', 'Etapa', 't'], ['areaRmdTxt', 'Área', 't'], ['sucursal', 'Planta', 't'], ['codAgrupadorReceta', 'Cód. agrupador de receta', 't'], ['codDefectoReceta', 'Cód. de receta por defecto', 't'], ['rptaValidacion', 'Validación', 't']];
-  // nombres de los campos tal como llegan en el guardado (AUDITORIA); los no listados salen con su nombre técnico
+  // nombres de campos de AUDITORIA; el resto con su nombre técnico
   const TZ_ETIQUETA_CAMPO = { orden: 'Orden', valorInicial: 'Val. Inicial', valorFinal: 'Val. Final', margen: 'Margen', decimales: 'Decimales', tipoDatoId_iMaestraId: 'Tipo Dato', depende: 'Depende del paso', estadoCC: 'Estado CC', estadoMov: 'Estado Mov.',
     pmop: 'PM OP', genpp: 'Gen PP', tab: 'Tab', edit: 'Edit', rpor: 'R. Por', vb: 'V.B.', formato: 'Formato', imagen: 'Imagen', colorHex: 'Color', colorRgb: 'Color', puestoTrabajo: 'Puesto de trabajo', clvModelo: 'Clave modelo', automatico: 'Automático',
     cantidadInsumo: 'Cantidad insumos', Component: 'Componente', CompUnit: 'UM', CompQty: 'Cantidad', Maktx: 'Descripción', activo: 'Activo', conforme: 'Conforme', procesoMenor: 'Proceso menor', observacion: 'Observaciones',
@@ -9634,7 +9367,7 @@
   const tzFilaAud = (r, md) => { const cuando = r.fechaActualiza || r.fechaRegistro || null, aut = md && md.fechaAutorizacion ? +new Date(md.fechaAutorizacion) : 0, t = cuando ? +new Date(cuando) : 0;
     return { quien: r.usuarioActualiza || r.usuarioRegistro || '', cuando, modificado: !!r.usuarioActualiza, alAutorizar: !!(aut && t && !r.usuarioActualiza && aut - t < 600000 && aut - t > -600000) }; };
   const tzTipo = (o, cat) => (o && (o.contenido || o.descripcion)) || '';
-  // Lo leído de UNA versión del RMD, ya con las claves de emparejamiento (estructura | etiqueta | paso # ocurrencia)
+  // Una versión normalizada con claves (estructura | etiqueta | paso # ocurrencia)
   function tzNormalizar(md, d, cat) {
     const lugar = (estr, etq) => `${cat.estructura.get(estr) || 'Estructura'} › ${cat.etiqueta.get(etq) || 'Etiqueta'}`;
     const ocurr = new Map(), sig = (k) => { const n = (ocurr.get(k) || 0) + 1; ocurr.set(k, n); return n; }, porOrden = (a, b) => (+a.orden || 0) - (+b.orden || 0);
@@ -9667,8 +9400,8 @@
     const mdr = { ...md, sucursal: (md.sucursalId && md.sucursalId.contenido) || '' };
     return { md: mdr, etiquetas, pasos, pm, recetas, insumos, espec };
   }
-  // Diferencias entre dos versiones ya normalizadas. Cada cambio: sección, elemento, campo, antes, después, tipo (Agregado / Quitado / Modificado /
-  // Reemplazado) y el último usuario y fecha de la fila (los que el portal guarda en ella). soloOrden: el único campo que cambió es el orden.
+  // Diferencias entre versiones: sección, elemento, campo, antes, después, tipo (Agregado / Quitado / Modificado / Reemplazado), usuario y fecha.
+  // soloOrden: solo cambió el orden.
   function tzCompararVersiones(A, B) {
     const out = [];
     const anota = (sec, elem, campo, antes, despues, tipo, fila, extra) => out.push({ seccion: sec, elemento: elem, campo, antes, despues, tipo, quien: fila ? fila.quien : '', cuando: fila ? fila.cuando : null, modificado: !!(fila && fila.modificado), alAutorizar: !!(fila && fila.alAutorizar), soloOrden: false, ...extra });
@@ -9679,12 +9412,11 @@
         dif.forEach(([k, n, t]) => anota(sec, elem(y), n, tzNorm(x[k], t), tzNorm(y[k], t), 'Modificado', y, { soloOrden: dif.length === 1 && k === 'orden', idFila: y.id, ...(ext || {}) })); });
       return { agregados, quitados };
     };
-    // (v1.53: sin la cabecera —descripción, observaciones…—, a pedido del usuario)
     // etiquetas
     const e = cruzar('Etiquetas', A.etiquetas, B.etiquetas, TZ_CAMPOS_ETQ, (y) => y.lugar);
     e.agregados.forEach((y) => anota('Etiquetas', y.lugar, 'Etiqueta', '', `Orden ${tzNum(y.orden)}`, 'Agregado', y, { idFila: y.id }));
     e.quitados.forEach((x) => anota('Etiquetas', x.lugar, 'Etiqueta', `Orden ${tzNum(x.orden)}`, '', 'Quitado', null));
-    // pasos (un paso quitado y otro agregado en el mismo lugar y orden = «Cambiar paso» → Reemplazado)
+    // pasos (quitado + agregado en la misma posición = Reemplazado)
     const nombrePaso = (y) => `${y.lugar} › Paso ${y.paso}${y.desc ? ' — ' + (y.desc.length > 70 ? y.desc.slice(0, 70) + '…' : y.desc) : ''}`;
     const p = cruzar('Pasos', A.pasos, B.pasos, TZ_CAMPOS_PASO, nombrePaso), cambiados = new Set([...p.agregados, ...p.quitados].map((x) => x.key)), hijos = (arr, k) => arr.filter((z) => z.padreKey === k).length;
     const libres = [...p.quitados];
@@ -9694,7 +9426,7 @@
       else anota('Pasos', nombrePaso(y), 'Paso', '', `Orden ${tzNum(y.orden)}${hijos(B.pm, y.key) ? ` (con ${hijos(B.pm, y.key)} procesos menores)` : ''}`, 'Agregado', y, { idFila: y.id });
     });
     libres.forEach((x) => anota('Pasos', nombrePaso(x), 'Paso', `Orden ${tzNum(x.orden)}${hijos(A.pm, x.key) ? ` (con ${hijos(A.pm, x.key)} procesos menores)` : ''}`, '', 'Quitado', null));
-    // procesos menores (los de un paso agregado, quitado o reemplazado ya van dentro de ese paso)
+    // PM (los de pasos agregados/quitados/reemplazados van con el paso)
     const nombrePm = (y) => `${y.lugar} › Paso ${y.paso} › Proceso menor ${y.hijo}${y.hijoDesc ? ' — ' + (y.hijoDesc.length > 60 ? y.hijoDesc.slice(0, 60) + '…' : y.hijoDesc) : ''}`;
     const m = cruzar('Procesos menores', A.pm.filter((z) => !cambiados.has(z.padreKey)), B.pm.filter((z) => !cambiados.has(z.padreKey)), TZ_CAMPOS_PM, nombrePm);
     m.agregados.forEach((y) => anota('Procesos menores', nombrePm(y), 'Proceso menor', '', `Orden ${tzNum(y.orden)}`, 'Agregado', y, { idFila: y.id }));
@@ -9715,9 +9447,8 @@
     const oS = (c) => TZ_ESTR_ORDEN.indexOf(c.seccion);
     return out.map((c, n) => ({ ...c, n })).sort((a, b) => (oS(a) - oS(b)) || (a.n - b.n));
   }
-  // ---- por guardado (AUDITORIA) ----
-  // eventos: [{ ts: Date, accion, p: contenido del guardado }] ya ordenados por fecha. Devuelve una entrada por guardado: el usuario y, campo por
-  // campo, lo que cambió respecto a lo acumulado de los guardados anteriores de la misma fila (sin «antes» registrado si es el primero que se ve).
+  // ---- Por guardado (AUDITORIA) ----
+  // eventos: [{ ts, accion, p }] ordenados -> una entrada por guardado con usuario y campos cambiados.
   function tzDifEventos(eventos, fmt = (k, v) => (v == null ? '' : String(v))) {
     let estado = null; const out = [];
     eventos.forEach((e) => {
@@ -9747,16 +9478,15 @@
     const filas = await leerTodoDe(modelo, 'AUDITORIA', [new F('serviceName', 'EQ', 'CatalogService.' + servicio), new F('eventStatus', 'EQ', 'Success'), new F('value', 'Contains', id)], { $select: 'timestamp,eventAction,value' });
     return tzParsear(filas, campoId, id);
   }
-  // ---- lectura de versiones ----
+  // ---- Lectura de versiones ----
   async function tzCatalogos(modelo) {
     const [es, et] = await Promise.all([leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion', $orderby: 'estructuraId' }), leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion', $orderby: 'etiquetaId' })]);
     return { estructura: new Map(es.map((x) => [x.estructuraId, norm(x.descripcion)])), etiqueta: new Map(et.map((x) => [x.etiquetaId, norm(x.descripcion)])), tipos: new Map(), estados: new Map() };
   }
-  // Versiones de un master. SAP las une de tres maneras y no siempre llena las tres (v1.53, caso 2202609204 IDELLE 0.1% CRM: su
-  // «codigoversionprincipal» está vacío y antes solo se veía la v7): 1) codigoversionprincipal = código de la primera versión; 2) mdIdVersionAnt = la
-  // versión de la que se creó (las versiones recientes); 3) en las antiguas, ninguna de las dos: se reconocen por la misma descripción, planta, área y etapa.
+  // Versiones de un master: 1) codigoversionprincipal; 2) mdIdVersionAnt (versiones recientes);
+  // 3) sin enlace: misma descripción, planta, área y etapa.
   const TZ_EXPAND_MD = 'estadoIdRmd,estadoIdProceso,sucursalId';
-  const tzComparable = (m) => /autoriz|ingres|suspend/i.test((m && m.estado) || '');     // (solo se comparan versiones Autorizadas, Ingresadas o Suspendidas)
+  const tzComparable = (m) => /autoriz|ingres|suspend/i.test((m && m.estado) || '');     // solo Autorizadas, Ingresadas o Suspendidas
   async function tzLinaje(modelo, codigo, cat) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, L = (f) => leerTodoDe(modelo, 'MD', f, { $expand: TZ_EXPAND_MD, $orderby: 'mdId' });
     const uno = (await L([new F('codigo', 'EQ', isNaN(+codigo) ? codigo : +codigo)]))[0];
@@ -9767,7 +9497,7 @@
       for (const p of ps) { principales.add(p); add(await L([new F({ filters: [new F('codigoversionprincipal', 'EQ', p), new F('codigo', 'EQ', isNaN(+p) ? p : +p)], and: false })])); }
       return ps.length;
     };
-    const porEnlace = async () => {                                     // mdIdVersionAnt hacia atrás y hacia adelante
+    const porEnlace = async () => {                                     // mdIdVersionAnt en ambos sentidos
       let n = 0;
       const antes = [...todos.values()].map((m) => m.mdIdVersionAnt).filter((id) => id && !todos.has(id));
       if (antes.length) n += add(await leerPorIds(modelo, 'MD', 'mdId', [...new Set(antes)], { $expand: TZ_EXPAND_MD }));
@@ -9776,7 +9506,7 @@
       return n;
     };
     for (let vuelta = 0; vuelta < 6; vuelta++) { const a = await porPrincipal(), b = await porEnlace(); if (!a && !b) break; }
-    // las versiones antiguas sin ningún enlace: misma descripción, planta, área y etapa
+    // versiones sin enlace
     const vers = [...todos.values()], minV = Math.min(...vers.map((m) => +m.version || 0));
     if (minV > 1) {
       const igual = (a, b) => norm(a) === norm(b);
@@ -9795,7 +9525,7 @@
       L('MD_ES_RE_INSUMO', '', 'estructuraRecetaInsumoId'), L('MD_RECETA', 'recetaId', 'mdRecetaId'), L('MD_ES_ESPECIFICACION', '', 'mdEstructuraEspecificacionId')]);
     return tzNormalizar(md, { etiquetas, pasos, pm, insumos, recetas, espec }, cat);
   }
-  // valores de un guardado, legibles (tipo de dato y estado por su nombre, sí/no, vacíos)
+  // valores de un guardado legibles
   const tzFormato = (cat) => (k, v) => {
     if (v == null || v === '') return '';
     if (typeof v === 'boolean') return v ? 'Sí' : 'No';
@@ -9836,12 +9566,12 @@
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Trazabilidad RMD ${e.codigo} ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, cambios: cambios.length, filas: hist.length };
   }
-  // ---- PDF de la diferencia entre versiones (v1.53): como la hoja de la plantilla, sección por sección, con lo agregado, quitado, modificado y reemplazado ----
-  // Se arma con el pdfMake del propio portal (el mismo del PDF del RMD) y se descarga; no lee nada más de SAP: usa la comparación que ya muestra la ventana.
+  // ---- PDF de la diferencia entre versiones ----
+  // pdfMake del portal; usa la comparación ya cargada.
   const TZ_PDF_COLOR = { Agregado: ['#1e7d32', '#e8f5e9'], Quitado: ['#c62828', '#fdecea'], Modificado: ['#b26a00', '#fff4e5'], Reemplazado: ['#1f5fa8', '#e8f0fb'] };
   function tzPdfDoc({ codigo, descripcion, comparacion, cambios, soloOrden }) {
     const lista = (cambios || []).filter((c) => soloOrden || !c.soloOrden), hoy = new Date(), dd = (n) => String(n).padStart(2, '0');
-    const [desde, hasta] = String(comparacion || '').split(/\s*→\s*/);   // (la letra del PDF del portal no trae la flecha: «Desde» / «Hasta»)
+    const [desde, hasta] = String(comparacion || '').split(/\s*→\s*/);   // Roboto no incluye «→»
     const sinFlecha = (t) => String(t == null ? '' : t).replace(/\s*→\s*/g, ' > ');
     const fecha = (t) => { const x = t ? new Date(t) : null; return x && !isNaN(x) ? `${dd(x.getDate())}/${dd(x.getMonth() + 1)}/${x.getFullYear()}` : ''; };
     const cuenta = (t) => lista.filter((c) => c.tipo === t).length;
@@ -9873,9 +9603,7 @@
       footer: (p, n) => ({ columns: [{ text: `Trazabilidad RMD ${codigo} · ${sinFlecha(comparacion)}`, fontSize: 6.5, color: '#666', margin: [24, 6, 0, 0] }, { text: `Página ${p} de ${n}`, fontSize: 6.5, alignment: 'right', color: '#666', margin: [0, 6, 24, 0] }] }),
       info: { title: `Trazabilidad RMD ${codigo}` } };
   }
-  // v1.53 (pedido del usuario): la hoja como la plantilla para Producción — la versión nueva completa, numerada y en sus recuadros, con lo quitado
-  // tachado en rojo en su sitio, lo nuevo en verde y lo modificado en ámbar con su valor anterior. Sin la cabecera. Las dos versiones se leen
-  // con ppLeerArbol (el mismo árbol que la plantilla) y cada lista se alinea por código de paso (subsecuencia común más larga).
+  // Hoja estilo plantilla: versión nueva completa con quitado (rojo tachado), nuevo (verde) y modificado (ámbar). Listas alineadas por código (LCS).
   function tzAlinear(a, b, clave) {
     const n = a.length, m = b.length, L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
     for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = clave(a[i]) === clave(b[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
@@ -9979,17 +9707,16 @@
     const hoy = new Date(), dd = (n) => String(n).padStart(2, '0');
     return tzHojaDoc(A, B, { ...info, fecha: `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()}` });
   }
-  window.__rmdStats.tzMaster = async (a, b, info) => { const m = controladorPrincipal().getView().getModel('mainModelv2'); return tzMarcarMaster(await tzDocMaster(m, a), await tzDocMaster(m, b), info || {}); };   // (pruebas)
-  window.__rmdStats.tzHoja = (a, b, info) => tzHoja(controladorPrincipal().getView().getModel('mainModelv2'), a, b, info || {});   // (pruebas)
-  // v1.53 (segundo pedido): el PDF debe ser EL MISMO documento que el PDF del master (encabezado, cuadros, casillas de Realizado por / V.B.…).
-  // Se pide al propio portal el documento de cada versión, como hace «Ver master» (asociarDatos = el RMD, onGetDataEstructuraMD, tratarInformacion),
-  // capturando la definición de pdfMake sin abrir el visor, y sobre el de la versión nueva se marcan los cambios fila por fila.
+  window.__rmdStats.tzMaster = async (a, b, info) => { const m = controladorPrincipal().getView().getModel('mainModelv2'); return tzMarcarMaster(await tzDocMaster(m, a), await tzDocMaster(m, b), info || {}); };   // pruebas
+  window.__rmdStats.tzHoja = (a, b, info) => tzHoja(controladorPrincipal().getView().getModel('mainModelv2'), a, b, info || {});   // pruebas
+  // PDF del master de cada versión: se repite «Ver master» (asociarDatos, onGetDataEstructuraMD, tratarInformacion) capturando la definición de pdfMake;
+  // los cambios se marcan fila por fila sobre la versión nueva.
   async function tzDocMaster(modelo, mdId) {
     const ctrl = controladorPrincipal(), V = ctrl.getView(), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JM = sap.ui.require('sap/ui/model/json/JSONModel');
     const md = (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', mdId)], { $expand: EXPAND_LISTA_MD }))[0]; if (!md) throw new Error('no se encontró la versión en SAP');
     const nombres = ['asociarDatos', 'listMdEstructura', 'listMdEsPaso', 'listMdEsEquipo', 'listMdEsUtensilio', 'listMdEsEtiqueta', 'listMdEsReInsumo', 'listMdEsEspecificacion', 'listEsPasoInsumoPasoGeneral'];
     const antes = nombres.map((n) => [n, V.getModel(n)]), pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open; let dd = null;
-    TZ_ESC.pausa++;                                                     // (el título de «Trazabilidad del RMD» sigue a asociarDatos: que no se rehaga el panel mientras tanto)
+    TZ_ESC.pausa++;                                                     // el título del diálogo de trazabilidad depende de asociarDatos
     try {
       V.setModel(new JM(md), 'asociarDatos'); await ctrl.onGetDataEstructuraMD();
       window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
@@ -10009,13 +9736,13 @@
     const textoDe = (n) => (n == null ? '' : typeof n === 'string' || typeof n === 'number' ? String(n) : Array.isArray(n) ? n.map(textoDe).join('') : typeof n === 'object' ? (n.text != null ? textoDe(n.text) : n.stack ? textoDe(n.stack) : n.columns ? textoDe(n.columns) : n.table ? n.table.body.map((r) => r.map(textoDe).join(' ')).join(' ') : '') : '');
     const clave = (t) => SIN_ACENTOS(String(t || '')).replace(/[^A-Z0-9%°]+/g, ' ').trim();
     const esNumero = (t) => /^\s*(\d+(\.\d+)*\.-|-)\s*$/.test(t);
-    // la tabla real de una entrada del contenido (el portal envuelve las de procedimiento en una tabla de una celda)
+    // tabla real (el portal envuelve el procedimiento en una tabla de una celda)
     const tablaDe = (it) => { if (!it || !it.table) return null; const b = it.table.body; if (b.length === 1 && b[0].length === 1 && b[0][0] && b[0][0].table) return b[0][0].table; return it.table; };
     const tituloDe = (it) => { if (!it) return null; if (it.style === 'subheader') return textoDe(it); const t = it.table && it.style === 'tableColocarCheckNoBorder' && it.table.body[0] && textoDe(it.table.body[0][0]); return t && !/^\(Colocar check/.test(t) ? t : null; };
     const claveTitulo = (t) => clave(String(t).replace(/^\s*\d+(\.\d+)*\.-\s*/, ''));
-    // secciones: título + las entradas que le siguen hasta el siguiente título
+    // secciones: título + entradas hasta el siguiente título
     const secciones = (dd) => { const out = []; let cur = { titulo: '', items: [] }; (dd.content || []).forEach((it, i) => { const t = tituloDe(it); if (t) { out.push(cur); cur = { titulo: t, items: [], idx: i } ; cur.items.push(it); } else cur.items.push(it); }); out.push(cur); return out; };
-    // filas de una tabla en «elementos»: la fila principal (número, «-» o una fila de tabla de equipos) y las filas que dependen de ella (procesos menores)
+    // elementos: fila principal (número, «-» o fila de equipos) + filas de PM
     const elementos = (tb) => {
       const out = []; const hr = tb.headerRows || 0;
       tb.body.forEach((fila, i) => {
@@ -10026,11 +9753,11 @@
       });
       return out;
     };
-    const conContenido = (c) => ['text', 'table', 'stack', 'columns', 'image', 'canvas', 'ul', 'ol', 'qr', 'svg'].some((k) => k in c);   // (las celdas vacías que rellenan un colSpan se dejan tal cual: pdfMake no las admite con color)
+    const conContenido = (c) => ['text', 'table', 'stack', 'columns', 'image', 'canvas', 'ul', 'ol', 'qr', 'svg'].some((k) => k in c);   // pdfMake no admite fillColor en celdas de relleno de colSpan
     const pintarCelda = (cel, color) => { if (cel && typeof cel === 'object' && !Array.isArray(cel) && conContenido(cel)) cel.fillColor = color; };
     const pintarFila = (fila, color) => fila.forEach((c, k) => { if (c && typeof c === 'object') pintarCelda(c, color); else if (c != null) fila[k] = { text: String(c), fillColor: color }; });
     const tachar = (n) => { if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach(tachar); return; } if (n.text != null && typeof n.text !== 'object') { n.decoration = 'lineThrough'; n.color = C.quitado; } if (Array.isArray(n.text)) n.text.forEach((x, k) => { if (typeof x === 'string') n.text[k] = { text: x, decoration: 'lineThrough', color: C.quitado }; else tachar(x); }); if (n.stack) tachar(n.stack); if (n.columns) tachar(n.columns); };
-    let colMarca = 1;                                                     // (columna del texto: la 2.ª en pasos y cuadros; la 1.ª en tablas con cabecera, como equipos)
+    let colMarca = 1;                                                     // columna de texto: 2.ª en pasos y cuadros; 1.ª en tablas con cabecera
     const marcaEn = (fila, etiqueta, color, notas) => {
       const k = fila.length > 1 ? colMarca : 0, cel = fila[k] && typeof fila[k] === 'object' ? fila[k] : (fila[k] = { text: String(fila[k] || '') });
       const base = Array.isArray(cel.text) ? cel.text : [{ text: cel.text == null ? '' : cel.text }];
@@ -10052,7 +9779,7 @@
             if (resto(fa[0]) !== resto(fb[0])) notas.push(`Casillas / campos antes: ${resto(fa[0])} — ahora: ${resto(fb[0])}`);
             marcaEn(fb[0], 'MODIFICADO', C.mod, notas.length ? notas : ['Cambió su configuración.']);
           }
-          // procesos menores del paso
+          // PM del paso
           const sa = o.a.filas.slice(1).map((i) => ({ i, clave: clave(textoDe(tA.body[i][1]) || textoDe(tA.body[i][0])) })), sb = o.b.filas.slice(1).map((i) => ({ i, clave: clave(textoDe(tB.body[i][1]) || textoDe(tB.body[i][0])) }));
           let ultSub = o.b.filas[0];
           tzAlinear(sa, sb, (x) => x.clave).forEach((q) => {
@@ -10070,7 +9797,7 @@
         }
       });
       inserciones.forEach((x, n) => { x.n = n; });
-      inserciones.sort((a, b) => b.despues - a.despues || b.n - a.n).forEach((x) => tB.body.splice(x.despues + 1, 0, ...x.filas));   // (varias seguidas en el mismo sitio: en su orden)
+      inserciones.sort((a, b) => b.despues - a.despues || b.n - a.n).forEach((x) => tB.body.splice(x.despues + 1, 0, ...x.filas));   // orden estable de inserciones en la misma posición
     };
     const SA = secciones(ddA), SB = secciones(ddB), salida = [];
     tzAlinear(SA, SB, (x) => claveTitulo(x.titulo)).forEach((o) => {
@@ -10104,8 +9831,8 @@
     descargarArchivo(nombre, new Uint8Array(await blob.arrayBuffer()), 'application/pdf');
     return { nombre, bytes: blob.size };
   }
-  window.__rmdStats.tzPdfDoc = tzPdfDoc;   // (pruebas)
-  // ---- el panel dentro de la ventana «Trazabilidad del RMD» del portal ----
+  window.__rmdStats.tzPdfDoc = tzPdfDoc;   // pruebas
+  // ---- Panel en «Trazabilidad del RMD» ----
   function montarHistorial(d, codigo) {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
     const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d;
@@ -10117,10 +9844,10 @@
     const cuerpo = raiz.querySelector('.rmd-tz-cuerpo'), tabs = raiz.querySelector('.rmd-cr-chips');
     const E = { tab: 'est', iniciado: false, cat: null, linaje: null, desde: '', hasta: '', cambios: null, comparacion: '', cargando: '', error: '', seccion: 'Todas', tipo: 'Todos', soloOrden: false, consulta: '',
       pasosMd: null, soloPost: null, pasoConsulta: '', incluirPm: false, hist: new Map(), abiertos: new Set(), lote: false, cancelar: false, versionCache: new Map() };
-    // los estados de la tabla nativa de la ventana (Estado · Registrado · Usuario Registro)
+    // estados de la tabla nativa (Estado · Registrado · Usuario Registro)
     const estadosNativos = () => [...d.querySelectorAll('table tbody tr')].filter((tr) => !raiz.contains(tr) && !/SubRow/.test(tr.className))
       .map((tr) => [...tr.children].map((td) => norm(td.textContent)).filter(Boolean)).filter((c) => c.length >= 3).map((c) => [c[0], c[1], c[2]]);
-    const origenDe = (m) => { const vs = (E.linaje ? E.linaje.versiones : []).filter((x) => +x.version < +m.version && tzComparable(x)); return vs.length ? vs[vs.length - 1] : null; };   // (la anterior que se puede comparar)
+    const origenDe = (m) => { const vs = (E.linaje ? E.linaje.versiones : []).filter((x) => +x.version < +m.version && tzComparable(x)); return vs.length ? vs[vs.length - 1] : null; };   // anterior comparable
     const ficha = (m) => { const o = origenDe(m), c = (t, v) => `<div><span>${t}</span><b>${esc(v == null || v === '' ? '—' : String(v))}</b></div>`;
       return `<div class="rmd-tz-ficha">${c('Código', m.codigo)}${c('Versión', m.version)}${c('Descripción', m.descripcion)}${c('Etapa', m.nivelTxt)}${c('Planta', m.sucursalId && m.sucursalId.contenido)}${c('Estado', m.estado)}${c('Versión origen', o ? `v${o.version} · ${o.codigo}` : 'Sin versión origen')}</div>`; };
     const filasVersiones = () => (E.linaje ? E.linaje.versiones : []).map((m) => { const o = origenDe(m); return { codigo: m.codigo, version: m.version, estado: m.estado, descripcion: m.descripcion, etapa: m.nivelTxt, planta: (m.sucursalId && m.sucursalId.contenido) || '', origen: o ? `v${o.version}` : '', fecha: m.fechaRegistro, usuario: m.usuarioRegistro, mdId: m.mdId }; });
@@ -10144,7 +9871,7 @@
         if (E.desde) await comparar(); else { E.cambios = []; E.comparacion = ''; E.cargando = ''; pintar(); }
       } catch (e) { E.error = 'No se pudo leer: ' + e.message; E.cargando = ''; pintar(); }
     }
-    // ---- historial por guardado ----
+    // ---- Historial por guardado ----
     async function pasosDeLaVersion() {
       if (E.pasosMd) return E.pasosMd;
       await asegurar(); const v = await leerV(E.linaje.actual); E.pasosMd = v; return v;
@@ -10184,7 +9911,7 @@
         ? x.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(x.ts))}</td><td class="rmd-nowrap">${esc(x.usuario || '—')}</td>`}<td>${esc(x.de ? x.de + ' · ' : '')}${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')
         : `<tr><td class="rmd-nowrap">${esc(tzCuando(x.ts))}</td><td class="rmd-nowrap">${esc(x.usuario || '—')}</td><td colspan="3" class="rmd-nota">${x.accion === 'CREATE' ? 'Alta de la fila' : 'Primer guardado registrado (sin guardados anteriores para comparar)'}</td></tr>`).join('')}</tbody></table>${sin ? `<p class="rmd-nota">${sin} guardado${sin > 1 ? 's' : ''} más sin cambios en esta fila.</p>` : ''}`;
     };
-    // ---- pintar ----
+    // ---- Render ----
     function pintar() {
       tabs.querySelectorAll('button').forEach((b) => { const a = b.dataset.t === E.tab; b.classList.toggle('activo', a); b.setAttribute('aria-selected', String(a)); });
       raiz.classList.toggle('est', E.tab === 'est'); d.classList.toggle('rmd-tz-on', E.tab !== 'est'); if (E.tab === 'est') return;
@@ -10230,7 +9957,7 @@
           return `<div class="rmd-tz-fila ${ab ? 'abierta' : ''}" data-id="${esc(f.id)}"><div class="rmd-tz-fila-cab"><span class="rmd-tz-rotulo">${esc(f.rotulo)}<span class="rmd-nota"> · ${esc(f.sub)}</span></span>
             <span class="rmd-nowrap">${h && h.cargando ? '<span class="rmd-nota rmd-espera-mini">consultando…</span>' : n != null ? `<span class="rmd-cr-tag ${n ? '' : 'dos'}">${n} cambio${n === 1 ? '' : 's'}</span> ` : ''}<button type="button" class="rmd-link" data-a="${h && !h.cargando && !h.error ? 'ver' : 'cargar'}">${h && !h.cargando && !h.error ? (ab ? 'Ocultar' : 'Ver historial') : 'Cargar historial'}</button></span></div>${ab && h ? `<div class="rmd-tz-detalle">${htmlEntradas(h)}</div>` : ''}</div>`; }).join('')}</div>`;
     }
-    // ---- eventos ----
+    // ---- Eventos ----
     tabs.addEventListener('click', async (e) => {
       const b = e.target.closest('button[data-t]'); if (!b) return; E.tab = b.dataset.t; pintar();
       if (E.tab === 'vers') { E.cargando = 'Leyendo las versiones del RMD…'; pintar(); try { await asegurar(); } catch (x) { E.error = 'No se pudo leer: ' + x.message; } E.cargando = ''; pintar(); }
@@ -10280,18 +10007,18 @@
       if (e.key !== 'Escape' || document.querySelector('.rmd-modal-fondo')) return;
       const top = dialogos().pop(), b = top && top.querySelector('.rmd-tz') && [...top.querySelectorAll('footer button')].find((x) => /^Cerrar$/.test(x.textContent.trim())); if (!b) return;
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }, true); }
-    if (TZ_ESC.pausa) {                                                 // armando el PDF: el portal cambia un momento el RMD asociado y vuelve a dibujar la ventana (título incluido)
+    if (TZ_ESC.pausa) {                                                 // PDF en curso: el portal cambia asociarDatos y redibuja el diálogo
       const g = d && d.__rmdTz; if (!g) return;
       if (!g.isConnected) { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d; cont.insertBefore(g, cont.firstChild); d.classList.add('rmd-tz-dlg'); }
       const t = d.querySelector('.sapMDialogTitle .sapMTitle, .sapMDialogTitle, header .sapMTitle'), titulo = 'Trazabilidad del RMD: ' + g.dataset.titulo;
-      if (t && g.dataset.titulo && t.textContent !== titulo && /^Trazabilidad del RMD:/.test(t.textContent)) t.textContent = titulo;   // (solo en pantalla; al devolver el modelo el portal pone el suyo, que es el mismo)
+      if (t && g.dataset.titulo && t.textContent !== titulo && /^Trazabilidad del RMD:/.test(t.textContent)) t.textContent = titulo;   // solo DOM; el binding restaura el mismo título
       return;
     }
     if (!d) { document.querySelectorAll('.rmd-tz').forEach((x) => { if (x.__tz) x.__tz.E.cancelar = true; x.remove(); }); document.querySelectorAll('.rmd-tz-dlg').forEach((x) => { x.classList.remove('rmd-tz-dlg'); x.__rmdTz = null; }); return; }
     const m = /^Trazabilidad del RMD:\s*(\S+)/i.exec(tzTituloDe(d)), codigo = m && m[1], viejo = d.querySelector('.rmd-tz');
     if (viejo && viejo.dataset.codigo === codigo) return;
     if (viejo) viejo.remove();
-    // si el portal volvió a dibujar el contenido de la ventana, se repone el mismo panel (con su pestaña y su comparación) en vez de uno nuevo
+    // si el portal redibujó el contenido, se reinserta el mismo panel
     const guardado = d.__rmdTz;
     if (!viejo && guardado && guardado.dataset.codigo === codigo) { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d; cont.insertBefore(guardado, cont.firstChild); d.classList.add('rmd-tz-dlg'); return; }
     if (codigo) montarHistorial(d, codigo);
@@ -10300,12 +10027,11 @@
     panel: () => { const r = document.querySelector('.rmd-tz'); return r && r.__tz; } };
 
   // ==== PLANTILLA-PRODUCCION:INICIO ====
-  // ---- 9 sexies. Plantilla para Producción (v1.40) ----
-  // Núcleo de la plantilla para Producción: funciones puras que usan igual el editor (archivo .html, sin SAP) y el portal (al importar).
-  // Se serializa con toString() dentro del archivo: no debe usar nada de fuera de esta función.
+  // ---- 9 sexies. Plantilla para Producción ----
+  // Núcleo puro compartido por el editor (.html sin SAP) y el portal. Se serializa con toString(): sin dependencias externas.
   function ppNucleo() {
     const TIPO = { COND: 483, CUADRO: 484, EQUIPOS: 485, ESPEC: 486, PROCESOS: 487, FORMULA: 488, FIRMAS: 489 };
-    const RANGO = 443;                                                        // tipo de dato «Rango»: lleva valor inicial, final y margen
+    const RANGO = 443;                                                        // tipo «Rango»: valor inicial, final y margen
     const VACIAS = new Set('DE LA EL Y EN LOS LAS DEL A AL CON POR PARA SEGUN LO O U SE QUE SU SUS UN UNA E N NO'.split(' '));
     const normalizar = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9%°]+/g, ' ').replace(/\s+/g, ' ').trim();
     const fichas = (n) => n.split(' ').filter((w) => w && !VACIAS.has(w));
@@ -10318,8 +10044,7 @@
     }
     function similitud(na, nb) { if (na === nb) return 1; return 0.55 * dice(contar(fichas(na)), contar(fichas(nb))) + 0.45 * dice(bigramas(na), bigramas(nb)); }
     const porOrden = (a, b) => (+a.orden || 0) - (+b.orden || 0);
-    // Coincidencia de una palabra escrita (q) con una palabra del catálogo (w): 1 igual, .9 empieza igual («limp» → «limpieza»),
-    // .8 la escrita es más larga («tabletas» → «tableta»), .65 la contiene, .6 con una letra de más, de menos o cambiada (≥ 4 letras).
+    // Coincidencia palabra escrita / catálogo: 1 igual, .9 prefijo, .8 más larga, .65 contiene, .6 una letra de diferencia (≥ 4).
     function pesoPalabra(q, w) {
       if (w === q) return 1;
       if (q.length >= 2 && w.startsWith(q)) return 0.9;
@@ -10333,9 +10058,8 @@
       return 0;
     }
     const palabrasConsulta = (n) => [...new Set(n.split(' ').filter((w) => w.length >= 2 || /^\d$/.test(w)))].filter((w, _, a) => a.length === 1 || !VACIAS.has(w));
-    // Buscador del catálogo de pasos: exacto (texto normalizado: sin tildes, mayúsculas, sin signos) y por palabras sueltas: basta una
-    // parte de la palabra («limp»), no importa el orden ni las tildes ni una letra mal puesta; se ordena por cuántas palabras coinciden
-    // (las poco comunes pesan más), por frases parecidas y por estar en la misma etiqueta. También busca por el código del paso.
+    // Buscador de pasos: exacto normalizado y por palabras (prefijos, sin orden ni tildes, tolerante a una letra); ranking por rareza, frase y etiqueta.
+    // También por código.
     function crearBuscador(filas) {
       const exacto = new Map(), indice = new Map(), porCod = new Map();
       filas.forEach((f, i) => {
@@ -10347,7 +10071,7 @@
         total: N,
         exactos: (texto) => exacto.get(normalizar(texto)) || [],
         porCodigo: (c) => porCod.get(String(c)),
-        // Parecidos por frase completa (palabras + pares de letras): para deducir datos de un paso nuevo a partir del más parecido
+        // Similitud de frase (palabras + bigramas)
         parecidos(texto, op = {}) {
           const { estr = null, etq = null, max = 5, minimo = 0.55, soloEstr = true } = op, n = normalizar(texto); if (n.length < 3) return [];
           const ts = [...new Set(fichas(n))].map((w) => indice.get(w) || []).filter((l) => l.length).sort((a, b) => a.length - b.length), cand = new Set();
@@ -10358,7 +10082,7 @@
         buscar(texto, op = {}) {
           const { estr = null, etq = null, max = 8, soloEstr = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
           const ts = palabrasConsulta(n); res.tokens = ts; if (!ts.length) return res;
-          const mejor = ts.map((q) => {                                           // por palabra escrita: documento → mejor peso
+          const mejor = ts.map((q) => {                                           // por palabra: documento -> mejor peso
             const m = new Map(), pesos = []; for (const w of vocab) { const p = pesoPalabra(q, w); if (p) pesos.push([w, p]); }
             pesos.sort((a, b) => b[1] - a[1]).slice(0, 600).forEach(([w, p]) => indice.get(w).forEach((i) => { if ((m.get(i) || 0) < p) m.set(i, p); }));
             return { q, m, w: idf(q) > 0 && indice.has(q) ? idf(q) : Math.max(0.6, ...pesos.slice(0, 3).map(([w]) => idf(w))) };
@@ -10377,20 +10101,19 @@
         },
       };
     }
-    // Trozos de un texto para resaltar lo que coincide con lo escrito (sin importar tildes ni mayúsculas): [[texto, coincide], …]
+    // Fragmentos [[texto, coincide], …] para resaltar
     function resaltar(texto, tokens) {
       tokens = (tokens || []).map(normalizar); const out = []; String(texto == null ? '' : texto).replace(/([A-Za-zÀ-ÿ0-9%°]+)|([^A-Za-zÀ-ÿ0-9%°]+)/g, (m, pal, otro) => { if (otro) { out.push([m, false]); return m; } const w = normalizar(pal); out.push([m, !!w && (tokens || []).some((q) => pesoPalabra(q, w) >= 0.65)]); return m; });
       return out;
     }
-    // Búsqueda sencilla en listas (equipos, utensilios): cada palabra escrita debe aparecer (parte de una palabra o del código); primero las que empiezan igual.
+    // Búsqueda simple en equipos/utensilios: todas las palabras; primero prefijos.
     function buscarEn(lista, texto, max = 40) {
       const ts = palabrasConsulta(normalizar(texto)); if (!ts.length) return [];
       const r = []; lista.forEach((x) => { const ws = x.n.split(' '); let s = 0; for (const q of ts) { let b = 0; for (const w of ws) { const p = pesoPalabra(q, w); if (p > b) b = p; } if (!b) return; s += b; } r.push({ x, s: s / ts.length + (x.codigo && normalizar(x.codigo) === normalizar(texto) ? 1 : 0) }); });
       return r.sort((a, b) => b.s - a.s).slice(0, max).map((y) => y.x);
     }
-    // Numeración como el PDF del RMD (generador del portal, controller/table.js): solo las estructuras con «numeración» llevan número
-    // (1, 2, 3…); en las de «Procesos», cada etiqueta n.m (m = su posición) y cada paso n.(orden de la etiqueta).(orden del paso).
-    // Con «base», las listas que se editaron (pasos agregados, quitados o movidos) se numeran de nuevo, correlativas.
+    // Numeración como el PDF (controller/table.js): estructuras con numeración 1, 2…; en Procesos, etiqueta n.m y paso n.m.k. Con «base», las listas
+    // editadas se renumeran.
     function numerar(estructuras, base) {
       const out = new Map(), listaBase = new Map(); let n = 0;
       if (base) base.forEach((e) => (e.etiquetas || []).forEach((t) => listaBase.set(t.id, (t.pasos || []).map((p) => p.id).join('|'))));
@@ -10405,7 +10128,7 @@
       });
       return out;
     }
-    // subsecuencia creciente más larga (para saber qué filas se movieron: las que no están en ella)
+    // LIS (filas no incluidas = movidas)
     function enOrden(seq) {
       const n = seq.length, prev = new Array(n).fill(-1), fin = []; let largo = 0;
       for (let i = 0; i < n; i++) {
@@ -10417,9 +10140,7 @@
     const num = (v) => { if (v == null || v === '') return null; const x = Number(String(v).replace(',', '.')); return isNaN(x) ? NaN : x; };
     const txtValor = (v) => (v == null || v === '' ? '' : String(v));
     const CAMPOS_RANGO = [['vi', 'Valor inicial'], ['vf', 'Valor final'], ['margen', 'Margen']];
-    // Lista de cambios entre el RMD de la plantilla (base) y lo editado (trabajo). Cada cambio: clase (paso, pm, equipo, utensilio,
-    // etiqueta, estructura, especificacion), accion (agregar, quitar, cambiar, valores, mover, comentario), lugar, numero, antes,
-    // despues, codigos, nuevo (pide crear un paso en SAP) e ids para ubicarlo.
+    // Cambios base -> trabajo: { clase, accion, lugar, numero, antes, despues, codigos, nuevo, ids }.
     function cambios(base, trabajo) {
       const out = [], nW = numerar(trabajo.estructuras, base.estructuras), nB = numerar(base.estructuras), bEst = new Map(base.estructuras.map((e) => [e.id, e]));
       const lista = (ctx, w, b, clase, padre) => {
@@ -10470,17 +10191,17 @@
       });
       return out;
     }
-    // Avisos de lo editado: id → [{ nivel: 'error' | 'aviso' | 'info', texto }]. ctx.buscador (opcional) y ctx.etiquetas (id → nombre).
+    // Avisos: id -> [{ nivel, texto }]. ctx.buscador, ctx.etiquetas.
     function avisos(trabajo, ctx = {}) {
       const out = new Map(), add = (id, nivel, texto) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto }); };
       const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base);
-      const enBase = new Map();                                                // id → código en el RMD de la plantilla (lo que ya estaba así en SAP)
+      const enBase = new Map();                                                // id -> código en la base
       (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => enBase.set(m.id, String(m.codigo || ''))); })));
       const igualQueSap = (x) => enBase.has(x.id) && enBase.get(x.id) === String(x.codigo || '');
       const revisar = (x, estr, etq, esPm) => {
         const t = String(x.texto || '').trim();
         if (!t) { add(x.id, 'error', 'Falta el texto.'); return; }
-        // mismas excepciones que el script en el portal: «… O CALIDAD EN OPERACIONES», la entrega del FPRO-250 y los pasos mayores de biocarga
+        // mismas excepciones de Calidad que en el portal
         const n = normalizar(t), cc = esPm || !/\bBIOCARGA\b/.test(n) ? n.replace(/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES O CONTROL DE CALIDAD/g, 'CALIDAD EN OPERACIONES')
           .replace(/FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION FPRO \d+(?: VIGENTE)? A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA/g, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION') : '';
         if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(cc)) {
@@ -10505,7 +10226,7 @@
         const vistos = new Map();
         vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) add(x.id, 'aviso', `El paso ${x.codigo} ya está en esta lista (${numeros.get(otro) || 'más arriba'}).`); else if (!otro) vistos.set(String(x.codigo), x.id); }
           vivos(x.pm).forEach((m) => revisar(m, estr, etq, true)); });
-        // quitar un paso del que depende otro
+        // paso quitado con dependientes
         (l || []).filter((x) => x.quitado && x.codigo).forEach((x) => { const dep = vivos(l).filter((y) => String(y.depende || '') === String(x.codigo)); if (dep.length) add(x.id, 'aviso', `${dep.map((y) => numeros.get(y.id) || y.texto.slice(0, 30)).join(', ')} depende${dep.length > 1 ? 'n' : ''} de este paso: el equipo RMD revisará los predecesores.`); });
       };
       trabajo.estructuras.forEach((e) => {
@@ -10515,9 +10236,8 @@
       });
       return out;
     }
-    // Rehace el borrador sobre el RMD tal como está hoy en SAP (cuando cambió desde que se generó la plantilla): lo que Producción hizo se
-    // vuelve a aplicar sobre `actual` fila por fila; si SAP y Producción tocaron lo mismo, no se pisa y se avisa. `mapa` (id de la base → id
-    // en actual) solo hace falta si `actual` es otra versión del master. Devuelve { trabajo, conflictos, aplicados }.
+    // Rehace el borrador sobre `actual`; conflictos si SAP y Producción tocaron lo mismo. mapa: id base -> id actual (otra versión).
+    // -> { trabajo, conflictos, aplicados }
     function rebase(base, trabajo, actual, mapa) {
       const clon = (x) => JSON.parse(JSON.stringify(x)), R = clon(actual), conflictos = [], M = (id) => (mapa ? mapa.get(id) : id) || null;
       let aplicados = 0;
@@ -10527,13 +10247,13 @@
       const mezclar = (b, w, r, donde) => {
         const bId = new Map(b.map((x) => [x.id, x])), mapR = new Map(r.map((x) => [x.id, x])), nuevoClon = new Map(), vivos = w.filter((x) => !x.quitado), posB = new Map(b.map((x, i) => [x.id, i]));
         const delActual = (x) => mapR.get(M(x.id)) || null;
-        w.forEach((x) => {                                                            // quitados y cambiados
+        w.forEach((x) => {
           const b0 = bId.get(x.id); if (!b0) return; const ra = delActual(x);
           if (x.quitado) { if (!ra) return; if (Object.keys(grupos).some((g) => grupos[g](ra) !== grupos[g](b0))) conflictos.push(`${donde}: Producción quitó «${nombre(b0)}» pero en SAP cambió; se deja como está en SAP.`); else { ra.quitado = true; aplicados++; } return; }
           if (!ra) { if (Object.keys(grupos).some((g) => grupos[g](x) !== grupos[g](b0))) conflictos.push(`${donde}: «${nombre(b0)}» ya no está en SAP; se omite el cambio de Producción.`); return; }
           Object.keys(grupos).forEach((g) => {
-            if (grupos[g](x) === grupos[g](b0)) return;                              // Producción no tocó este grupo
-            if (grupos[g](ra) === grupos[g](x)) return;                              // SAP ya quedó igual
+            if (grupos[g](x) === grupos[g](b0)) return;
+            if (grupos[g](ra) === grupos[g](x)) return;
             if (grupos[g](ra) !== grupos[g](b0)) { conflictos.push(`${donde}: «${nombre(b0)}» (${g === 'texto' ? 'texto' : g === 'rango' ? 'rango' : 'firmas'}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
             campos[g].forEach((k) => { if (x[k] === undefined) delete ra[k]; else ra[k] = x[k]; }); aplicados++;
           });
@@ -10542,7 +10262,7 @@
         });
         const orden = vivos.filter((x) => bId.has(x.id)), ok = enOrden(orden.map((x) => posB.get(x.id))), movidos = new Set(orden.filter((x, i) => !ok.has(i)).map((x) => x.id));
         const insertarDespues = (ancla, item) => { const i = ancla ? r.indexOf(ancla) : -1; if (ancla && i < 0) return false; r.splice(i + 1, 0, item); return true; };
-        vivos.forEach((x, i) => {                                                    // agregados y movidos, en el orden del borrador
+        vivos.forEach((x, i) => {                                                    // agregados y movidos, en orden del borrador
           const nuevo = !bId.has(x.id); if (!nuevo && !movidos.has(x.id)) return;
           let ancla = null; for (let j = i - 1; j >= 0 && !ancla; j--) { const y = vivos[j]; ancla = nuevoClon.get(y.id) || (bId.has(y.id) ? delActual(y) : null); }
           if (nuevo) { const c = clon(x); const ok2 = insertarDespues(ancla, c); if (!ok2) r.push(c); nuevoClon.set(x.id, c); aplicados++; return; }
@@ -10571,22 +10291,20 @@
       });
       return { trabajo: R, conflictos, aplicados };
     }
-    // Huella del RMD (lo que importa para saber si cambió desde que se generó la plantilla)
+    // Huella del RMD para detectar cambios
     function huella(arbol) {
       const p = (x) => [x.id, x.pasoId || '', x.orden, x.vi == null ? '' : x.vi, x.vf == null ? '' : x.vf, x.margen == null ? '' : x.margen, (x.pm || []).map((m) => [m.id, m.pasoId || '', m.orden, m.vi == null ? '' : m.vi, m.vf == null ? '' : m.vf].join(',')).join(';')].join('|');
       const s = arbol.estructuras.map((e) => [e.id, e.orden, (e.pasos || []).map(p).join('/'), (e.etiquetas || []).map((t) => t.id + ':' + t.orden + ':' + (t.pasos || []).map(p).join('/')).join('#'), (e.equipos || []).map((x) => x.id).join(','), (e.utensilios || []).map((x) => x.id).join(',')].join('§')).join('¶');
       let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '-' + s.length.toString(36);
     }
-    // Catálogo empacado (una línea por paso: código, estructura, etiqueta, tipo, texto) ↔ filas
+    // Catálogo empacado (código, estructura, etiqueta, tipo, texto) <-> filas
     function desempacarPasos(cat) {
       const E = cat.estr.map((x) => x[0]), T = cat.etq.map((x) => x[0]);
       return cat.pasos.split('\n').filter(Boolean).map((l) => { const [c, e, t, ti, ...tx] = l.split('\t'); return { codigo: c, estr: E[+e] || null, etq: t === '' ? null : (T[+t] || null), tipo: ti === '' ? null : +ti, texto: tx.join('\t') }; });
     }
     return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num };
   }
-  // Editor del borrador (corre en el archivo .html que abre Producción, sin SAP ni internet). Se serializa con toString():
-  // no debe usar nada de fuera de esta función (recibe el núcleo ya creado). La hoja copia el PDF del RMD que genera el portal
-  // (controller/table.js: encabezado de 8 columnas, cuadros, equipos, insumos, procedimiento con sus casillas, especificaciones, firmas).
+  // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
     'use strict';
     const ORIGINAL = '<!doctype html>\n' + document.documentElement.outerHTML;
@@ -10598,7 +10316,7 @@
     const fmtDec = (v) => { if (v == null || v === '') return ''; const n = parseFloat(String(v).replace(',', '.')); if (isNaN(n)) return String(v); const [e, d] = n.toFixed(3).split('.'); return e.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + '.' + d; };
     const cols = (ws) => { const t = ws.reduce((a, b) => a + b, 0); return `<colgroup>${ws.map((w) => `<col style="width:${(w / t * 100).toFixed(2)}%">`).join('')}</colgroup>`; };
     const { TIPO, RANGO } = PPN;
-    const CON_CAJA = new Set([433, 434, 435, 436, 437, 438, 443, 444, 445]), CON_CHECK = new Set([432, 442]);   // tipos de dato con casilla de dato / de check (como el PDF)
+    const CON_CAJA = new Set([433, 434, 435, 436, 437, 438, 443, 444, 445]), CON_CHECK = new Set([432, 442]);   // tipos con casilla de dato / de check
     const CAJA = '<span class="pp-caja"></span>', CHECK = '<span class="pp-check"></span>';
     const ICO_CHECK = '<svg class="pp-ico-check" viewBox="0 0 16 16" aria-label="check"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.2 8.3l2.6 2.6 5-5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const app = $('#app');
@@ -10646,12 +10364,12 @@
 
     // ---------- estado ----------
     function cambio(fn) { const rb = document.querySelector('.pp-recuperar'); if (rb && !cambio.recuperando) rb.remove(); deshacer.push(clon({ W, SOL })); if (deshacer.length > 60) deshacer.shift(); fn(); sucio = true; guardarLocal(); pintarTodo(); }
-    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { /* sin almacenamiento: solo se pierde la copia automática */ } }, 400); }
+    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } }, 400); }
     function ofrecerRecuperar(auto) {
       const b = document.createElement('div'); b.className = 'pp-recuperar';
       b.innerHTML = `Hay cambios de esta plantilla que no se guardaron en un archivo (${esc(fechaHora(auto.t))}). <button type="button" data-a="si">Recuperarlos</button> <button type="button" data-a="no">Descartar</button>`;
       document.body.appendChild(b);
-      b.addEventListener('click', (e) => { const a = e.target.dataset.a; if (!a) return; if (a === 'si') { cambio.recuperando = true; cambio(() => { W = auto.W; SOL = auto.SOL || {}; }); cambio.recuperando = false; } else { try { localStorage.removeItem(CLAVE()); } catch (x) { /* nada */ } } b.remove(); });
+      b.addEventListener('click', (e) => { const a = e.target.dataset.a; if (!a) return; if (a === 'si') { cambio.recuperando = true; cambio(() => { W = auto.W; SOL = auto.SOL || {}; }); cambio.recuperando = false; } else { try { localStorage.removeItem(CLAVE()); } catch (x) { } } b.remove(); });
     }
     function encontrar(id) {
       for (const e of W.estructuras) {
@@ -10683,7 +10401,7 @@
       const nuevos = CMB.filter((c) => (c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo).length + CMB.filter((c) => c.accion === 'agregar' && c.pm).reduce((s, c) => s + c.pm.filter((m) => m.nuevo).length, 0);
       return { errores, avisos: avisosN, nuevos, total: CMB.length };
     }
-    // Orientación para quien trabaja el archivo: estado del RMD, ayuda y avisos de apertura
+    // Cabecera de ayuda: estado del RMD y avisos
     function htmlAvisosGenerales() {
       const r = PQ.rmd, partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
@@ -10704,7 +10422,7 @@
         <button type="button" data-a="guardar" class="primario" title="Descarga el archivo con el borrador para enviarlo al equipo RMD">Guardar borrador</button></div>
         <div class="pp-resumen">${n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'Sin cambios todavía'}${n.nuevos ? ` · <b class="crea">${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'} a crear</b>` : ''}${n.errores ? ` · <b class="err">${n.errores} por corregir</b>` : ''}${n.avisos ? ` · <b class="avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</b>` : ''} · <span class="pp-ayuda-corta">Pasa el ratón por una fila: ✎ cambiar · + agregar · ↑ ↓ mover · ✕ quitar · 💬 comentar</span></div></header>`;
     }
-    // Encabezado de página del PDF (8 columnas: 60, 80, 68, 28, 45, 75, 53, 60)
+    // Encabezado del PDF (8 columnas: 60, 80, 68, 28, 45, 75, 53, 60)
     function htmlEncabezadoPdf() {
       const r = PQ.rmd, logo = r.logo ? `<img src="${r.logo}" alt="Medifarma">` : '<b class="pp-logo-tx">● Medifarma</b>';
       return `<table class="pp-enc">${cols([60, 80, 68, 28, 45, 75, 53, 60])}
@@ -10741,7 +10459,7 @@
       return ` <span class="pp-rango" title="Rango del tipo de dato «Rango»">[${esc(x.vi == null ? '—' : x.vi)} – ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ` ± ${esc(x.margen)}` : ''}]</span>`;
     }
     const colorDe = (x) => (x.formato && x.colorHex && /^#?[0-9a-f]{3,8}$/i.test(String(x.colorHex).trim()) ? ` style="color:${String(x.colorHex).trim().replace(/^(?!#)/, '#')}"` : '');
-    // contenido de la celda de texto (texto como el PDF + marcas del borrador)
+    // celda de texto + marcas del borrador
     const celdaTexto = (x, b, texto, conRango) => `<span class="pp-tx"${colorDe(x)}>${texto}</span>${conRango ? htmlRango(x) : ''}${marcasDe(x, b)}${htmlAntes(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}`;
     function tipoFila(x, esPm, conforme) {
       let r;
@@ -10756,7 +10474,7 @@
       return r;
     }
     const mini = (cabs, filas) => `<table class="pp-mini"><tr>${cabs.map((c) => `<th>${c}</th>`).join('')}</tr>${Array.from({ length: filas }, () => `<tr>${cabs.map(() => '<td></td>').join('')}</tr>`).join('')}</table>`;
-    // ---- procedimiento: una etiqueta como en el PDF ----
+    // ---- procedimiento: una etiqueta ----
     function filaPaso(p, numero, conforme, conPm) {
       const b = BI.get(p.id), r = tipoFila(p, false, conforme), num = p.quitado ? `<s>${esc(NUM_BASE.get(p.id) || '')}${NUM_BASE.get(p.id) ? '.-' : ''}</s>` : `${esc(numero || '')}${numero ? '.-' : ''}`;
       const tx = celdaTexto(p, b, esc(p.texto)), acc = acciones('paso', p.quitado, false, conPm);
@@ -10790,7 +10508,7 @@
         ${htmlAvisos(t.id)}${htmlComentario(t)}<table class="pp-t pp-proc${conf ? ' conf' : ''}">${cols(conf ? [40, 243, 35, 50, 35, 50, 25] : [40, 233, 55, 50, 50, 60])}${filas}${ver}</table>
         <button type="button" class="pp-mas" data-a="agregar-final" data-lista="etq:${esc(t.id)}">+ Agregar paso</button></div>`;
     }
-    // ---- cuadros (Precauciones, Notas, Condiciones): filas con guion ----
+    // ---- cuadros (Precauciones, Notas, Condiciones) ----
     function htmlCuadro(e, lista) {
       const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false);
         return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
@@ -10798,7 +10516,7 @@
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
       return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">+ Agregar paso</button>`;
     }
-    // contenido de un agrupador: los utensilios de su clasificación en SAP (el PDF del portal solo pone el nombre del agrupador)
+    // miembros de un agrupador
     function htmlMiembros(x) {
       const ms = x.agrupadorId && !x.nuevo ? (MIEMBROS.get(x.agrupadorId) || []) : []; if (!ms.length) return '';
       const vis = ms.slice(0, 14), resto = ms.length - vis.length;
@@ -10814,7 +10532,7 @@
         <button type="button" class="pp-mas" data-a="agregar-equipo" data-est="${esc(e.id)}">+ Agregar equipo o utensilio</button>`;
     }
     function htmlInsumos(e) {
-      const lista = (e.insumos || []).filter((x) => x.aiPrio === '00' || x.aiPrio === '01');          // como el PDF: solo prioridad 00 y 01
+      const lista = (e.insumos || []).filter((x) => x.aiPrio === '00' || x.aiPrio === '01');          // prioridad 00 y 01
       const filas = lista.map((x) => `<tr><td>${esc(x.desc)}${x.txtadic ? ' ' + esc(x.txtadic) : ''}</td><td class="c">${esc(x.comp)}</td><td class="d">${esc(fmtDec(x.cant))}</td><td class="c">${esc(x.um)}</td><td></td><td></td><td></td><td></td></tr>`).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="4">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
       return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid pp-ins">${cols([172, 55, 68, 28, 68, 34, 30, 22])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Cantidad</th><th>UM</th><th>Cant. Recib.</th><th>UM (CP)</th><th>Bulto</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
@@ -10867,7 +10585,7 @@
       if (alMontar) alMontar(f.firstElementChild, cerrar); return cerrar;
     }
     function editar(ref) {
-      // ref: { id } (editar) o { nuevo: true, lista, despuesDe, clase, e, t, padre }
+      // ref: { id } | { nuevo: true, lista, despuesDe, clase, e, t, padre }
       const f = ref.id ? encontrar(ref.id) : ref, x = ref.id ? f.item : { texto: '' }, b = ref.id ? BI.get(ref.id) : null, clase = ref.id ? f.clase : ref.clase;
       const estr = f.e.estructuraId, etq = f.t ? f.t.etiquetaId : null, num = PPN.numerar(W.estructuras, BASE.estructuras);
       const donde = `${f.e.nombre}${f.t ? ' › ' + f.t.nombre : ''}`;
@@ -11007,12 +10725,12 @@
       else if (a === 'agregar-pm') { const f = encontrar(b.dataset.padre || id); if (!f.item.pm) f.item.pm = []; editar({ nuevo: true, lista: f.item.pm, despuesDe: null, clase: 'pm', e: f.e, t: f.t, padre: f.item }); }
       else if (a === 'agregar-equipo') agregarEquipo(b.dataset.est);
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
-      else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { /* nada */ } pintarTodo(); }
+      else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
     function deshacerUno() { const s = deshacer.pop(); if (!s) return; W = s.W; SOL = s.SOL; sucio = true; guardarLocal(); pintarTodo(); }
     document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !document.querySelector('.pp-modal-fondo') && !/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); deshacerUno(); } });
     window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (PQ && !document.querySelector('.pp-modal-fondo')) guardar(); } });
-    const errorGlobal = (m) => { if (document.querySelector('.pp-toast.error')) return; const x = document.createElement('div'); x.className = 'pp-toast error'; x.textContent = 'Ocurrió un error inesperado. Tus cambios se guardaron solos en este navegador: recarga la página (F5) y elige «Recuperarlos».'; document.body.appendChild(x); setTimeout(() => x.remove(), 12000); try { console.error(m); } catch (e) { /* nada */ } };
+    const errorGlobal = (m) => { if (document.querySelector('.pp-toast.error')) return; const x = document.createElement('div'); x.className = 'pp-toast error'; x.textContent = 'Ocurrió un error inesperado. Tus cambios se guardaron solos en este navegador: recarga la página (F5) y elige «Recuperarlos».'; document.body.appendChild(x); setTimeout(() => x.remove(), 12000); try { console.error(m); } catch (e) { } };
     window.addEventListener('error', (e) => errorGlobal(e.message)); window.addEventListener('unhandledrejection', (e) => errorGlobal(e.reason));
     window.addEventListener('beforeunload', (e) => { if (sucio) { e.preventDefault(); e.returnValue = ''; } });
     let ULTIMO = null;
@@ -11030,9 +10748,9 @@
       const html = ORIGINAL.replace(/(<script id="rmd-(?:borrador|propuesta)" type="application\/json">)[\s\S]*?(<\/script>)/, (m0, a, b) => a + json + b);
       const nombreArchivo = `Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`.replace(/[\\/:*?"<>|]/g, '-'); ULTIMO = { html, nombre: nombreArchivo };
       descargar(html, nombreArchivo);
-      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { /* nada */ } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(nombreArchivo, n);                                                // (pruebas)
+      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(nombreArchivo, n);                                                // pruebas
     }
-    // Qué hacer con el archivo que se acaba de guardar (para quien no sabe cómo enviarlo)
+    // Instrucciones tras guardar
     function mostrarEnvio(nombre, n) {
       const asunto = `Borrador RMD ${PQ.rmd.codigo} v${PQ.rmd.version} - ${(SOL && SOL.nombre) || ''}`, cuerpo = `Adjunto el borrador de cambios del RMD ${PQ.rmd.codigo} v${PQ.rmd.version} (${PQ.rmd.descripcion}).\n${n.total} cambio(s). Solicitado por ${(SOL && SOL.nombre) || ''} (${(SOL && SOL.area) || ''}).`;
       modal(`<h3>Borrador guardado<span>${n.total} cambio${n.total === 1 ? '' : 's'} · listo para enviar al equipo RMD</span></h3>
@@ -11045,11 +10763,10 @@
     }
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
     window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion(); });
-    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar() }), editar, quitar, mover, comentar, guardar, encontrar, buscador: () => BUS, irA };   // (pruebas)
+    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar() }), editar, quitar, mover, comentar, guardar, encontrar, buscador: () => BUS, irA };   // pruebas
     iniciar();
   }
-  // Estilos del archivo de la plantilla. La hoja copia el PDF del RMD (pdfMake, Roboto 9 pt, bordes finos, encabezado de 8 columnas);
-  // en pantalla se agranda (1 pt ≈ 1,4 px) y los botones de edición quedan en el margen derecho, fuera de la hoja.
+  // Estilos de la plantilla (pdfMake, Roboto 9 pt; 1 pt ≈ 1,4 px en pantalla).
   const PP_EDITOR_CSS = `
 :root { --tx: #1f2328; --ap: #59636e; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
   --cam: #9a6700; --cam-f: #fff4d6; --mov: #2f5fb3; --mov-f: #e8effb; --crea: #7a3fbf; --crea-f: #f3ebfc; color-scheme: light; }
@@ -11097,7 +10814,7 @@ button { font: inherit; cursor: pointer; } button:disabled { cursor: default; op
 .pp-cuadro { border: 1px solid var(--linea); } .pp-cuadro td { border: 0; } .pp-c-guion { text-align: center; }
 .pp-ver td { border: 1px solid var(--linea) !important; font-weight: 700; font-size: 13px; padding: 10px 6px 6px !important; }
 .pp-etq-cab { width: 100%; border-collapse: collapse; margin: 12px 0 2px; } .pp-etq-tit { font-size: 15px; font-weight: 400; padding: 6px 0; } .pp-etq-cab .pp-nota-der { vertical-align: middle; }
-.pp-proc { border: 1px solid var(--linea); }   /* (v1.53: el recuadro de los pasos cerrado por los cuatro lados, como en el PDF del portal) */ .pp-proc tr.pp-paso > td { border-top: 1px solid var(--linea); } .pp-proc tr.pp-paso:first-child > td { border-top: 0; }
+.pp-proc { border: 1px solid var(--linea); }   /* recuadro cerrado por los cuatro lados */ .pp-proc tr.pp-paso > td { border-top: 1px solid var(--linea); } .pp-proc tr.pp-paso:first-child > td { border-top: 0; }
 .pp-c-num { white-space: nowrap; } .pp-c-pm { padding-left: 2px !important; color: #222; } .pp-c-pm.tab { padding-left: 22px !important; } .pp-c-cant { white-space: nowrap; }
 .pp-caja { display: block; height: 20px; border: 1px solid var(--linea); margin: 2px 0; } .pp-c-chk { text-align: right; } .pp-check { display: inline-block; width: 18px; height: 18px; border: 1px solid var(--linea); margin: 2px 0; vertical-align: top; }
 .pp-mini { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: 10.5px; } .pp-mini th, .pp-mini td { border: 1px solid var(--linea); text-align: center; padding: 1px 2px; height: 15px; font-weight: 700; }
@@ -11164,20 +10881,15 @@ td.ult { position: relative; }
   tr.agr > td, tr.cam > td, tr.qui > td, .pp-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 `;
-  // ---- Plantilla para Producción: del portal al archivo y de vuelta (v1.40; v1.41: «Borrador de Producción») ----
-  // 1) «Plantilla para Producción»: lee el RMD (las mismas 8 listas que usa el portal para su PDF, más la trazabilidad y el logo del
-  //    encabezado) y el catálogo de pasos, equipos y utensilios de SAP, y descarga un .html que se abre en cualquier Chrome / Edge, sin
-  //    SAP ni internet. Producción deja ahí su borrador de cambios (sobre una hoja igual al PDF) y devuelve el archivo.
-  // 2) «Importar borrador de Producción»: solo se importa en un RMD **Ingresado** (el mismo de la plantilla si sigue Ingresado, o la
-  //    versión Ingresada más nueva del mismo master; si no hay ninguna, no se importa). Revisa si el RMD cambió desde la plantilla,
-  //    vuelve a buscar en SAP los pasos nuevos (por si ya se crearon) y muestra el plan de cambios con sus avisos y su Excel. No escribe.
+  // ---- Plantilla para Producción: exportar e importar ----
+  // 1) Exporta un .html autónomo con el RMD (8 listas del PDF, trazabilidad, logo) y el catálogo de SAP.
+  // 2) Importa solo en un RMD Ingresado (el mismo o la versión Ingresada más nueva); revisa cambios, rebusca pasos nuevos y muestra el plan. No escribe.
   const PPN = ppNucleo();
   const PP = { cat: null, catT: 0 };
   const PP_TTL_CATALOGO = 12 * 3600000;
   const ppLimpio = (t) => String(t == null ? '' : t).replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
   const ppNulo = (v) => (v == null || v === '' ? null : v);
-  // Recién cargada la página, durante unos segundos el portal no responde las lecturas (se pierden sin respuesta). Antes de empezar se
-  // prueba una lectura corta (hasta 4 intentos de 8 s); si el portal sigue sin responder, se avisa en vez de quedarse esperando.
+  // Tras cargar, el portal pierde lecturas unos segundos: se sondea (4 × 8 s) antes de empezar.
   async function ppModeloListo(modelo) {
     for (let i = 0; i < 4; i++) {
       const ok = await Promise.race([new Promise((r) => modelo.read('/ESTRUCTURA', { urlParameters: { $top: '1', $select: 'estructuraId' }, success: () => r(true), error: () => r(true) })), new Promise((r) => setTimeout(() => r(false), 8000))]);
@@ -11217,7 +10929,7 @@ td.ult { position: relative; }
     out.estructuras.forEach((e) => e.etiquetas.sort(orden));
     return out;
   }
-  // Catálogo de SAP para buscar duplicados y agregar equipos (se guarda en este navegador 12 h; ~16 s leerlo)
+  // Catálogo de SAP (caché local 12 h)
   async function ppCatalogo(modelo, forzar, avisar) {
     if (!forzar && PP.cat && Date.now() - PP.catT < PP_TTL_CATALOGO) return PP.cat;
     if (!forzar) { try { const c = await Almacen.leer('ppCatalogo'); if (c && c.t && Date.now() - c.t < PP_TTL_CATALOGO && c.v === 2) { PP.cat = c; PP.catT = c.t; return c; } } catch (e) { /* se lee de SAP */ } }
@@ -11233,13 +10945,13 @@ td.ult { position: relative; }
       pasos: pasos.filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && norm(p.descripcion)).map((p) => [String(p.codigo), p.estructuraId_estructuraId || '', p.etiquetaId_etiquetaId || '', p.tipoDatoId_iMaestraId == null ? '' : p.tipoDatoId_iMaestraId, ppLimpio(p.descripcion)]),
       estructuras: estructuras.map((x) => [x.estructuraId, ppLimpio(x.descripcion)]), etiquetas: etiquetas.map((x) => [x.etiquetaId, ppLimpio(x.descripcion)]),
       equipos: equipos.filter((x) => x.activo !== false && (x.equnr || x.eqktx)).map((x) => [x.equipoId, ppLimpio(x.equnr), ppLimpio(x.CodigoGaci), ppLimpio(x.eqktx)]),
-      utensilios: utensilios.filter((x) => x.activo !== false && +x.estadoId_iMaestraId !== 1).map((x) => [x.utensilioId, ppLimpio(x.codigo), ppLimpio(x.descripcion), x.clasificacionId_clasificacionUtensilioId || '']),   // (4.º: el agrupador al que pertenece)
+      utensilios: utensilios.filter((x) => x.activo !== false && +x.estadoId_iMaestraId !== 1).map((x) => [x.utensilioId, ppLimpio(x.codigo), ppLimpio(x.descripcion), x.clasificacionId_clasificacionUtensilioId || '']),   // 4.º campo: agrupador
       agrupadores: agrupadores.filter((x) => x.activo !== false).map((x) => [x.clasificacionUtensilioId, ppLimpio(x.descripcion)]),
       tipos: Object.fromEntries(maestra.filter((x) => x.iMaestraId >= 430 && x.iMaestraId <= 460).map((x) => [x.iMaestraId, ppLimpio(x.contenido)])) };
-    PP.cat = c; PP.catT = c.t; try { await Almacen.guardar('ppCatalogo', c); } catch (e) { /* sin almacenamiento: se vuelve a leer la próxima vez */ }
+    PP.cat = c; PP.catT = c.t; try { await Almacen.guardar('ppCatalogo', c); } catch (e) { }
     return c;
   }
-  // El paquete que viaja en el archivo: el RMD, los nombres y el catálogo empacado (solo los pasos de las estructuras del RMD)
+  // Paquete del archivo: RMD, nombres y catálogo empacado
   function ppPaquete(md, arbol, cat, usuario, extra = {}) {
     const estrRmd = new Set(arbol.estructuras.map((e) => e.estructuraId)), pasos = cat.pasos.filter((p) => estrRmd.has(p[1]));
     const iE = new Map(), iT = new Map(), estr = [], etq = [];
@@ -11253,7 +10965,7 @@ td.ult { position: relative; }
       tipos: cat.tipos || {}, arbol, huella: PPN.huella(arbol),
       catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
   }
-  // «Estado / Fecha / Por» como el PDF: Autorizado → fecha y usuario de la autorización; los demás → la última trazabilidad
+  // «Estado / Fecha / Por» como el PDF
   async function ppEstadoFechaPor(modelo, md) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, f = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : ''; };
     let fecha = '', por = '';
@@ -11262,7 +10974,7 @@ td.ult { position: relative; }
       if (tr[0]) { fecha = f(tr[0].fechaRegistro); por = norm(tr[0].usuarioRegistro); } }
     return `${md.estado || ''}/ ${fecha} /${por}`;
   }
-  // el logo del encabezado del PDF: está en el código del generador del portal (controller/table.js, «var E»)
+  // logo del encabezado (controller/table.js, «var E»)
   async function ppLogo() {
     if (PP.logo !== undefined) return PP.logo;
     try {
@@ -11293,7 +11005,7 @@ td.ult { position: relative; }
     if (!md) throw new Error(`no se encontró el RMD ${codigo}`);
     md.estado = norm(md.estadoIdRmd && md.estadoIdRmd.contenido);
     const [arbol, cat, estadoFechaPor, logo] = await Promise.all([ppLeerArbol(modelo, md), ppCatalogo(modelo, !!op.forzar, avisar), ppEstadoFechaPor(modelo, md), ppLogo()]);
-    // insumos: como el PDF, los de la receta por defecto del RMD (si la tiene)
+    // insumos de la receta por defecto
     const def = norm(md.codDefectoReceta); if (def) arbol.estructuras.forEach((e) => { if (e.insumos.some((i) => i.matnr === def)) e.insumos = e.insumos.filter((i) => i.matnr === def); });
     avisar('Armando el archivo…');
     const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
@@ -11302,14 +11014,14 @@ td.ult { position: relative; }
     const cuenta = (f) => arbol.estructuras.reduce((s, e) => s + f(e), 0);
     return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length } };
   }
-  // ---- leer el archivo del borrador (el .html que devuelve Producción; también los de la v1.40, «propuesta») ----
-  // Contenido de un <script id="…"> sin depender del orden de sus atributos ni de las comillas
+  // ---- Lectura del archivo del borrador ----
+  // contenido de <script id="…"> independiente del orden de atributos
   function ppExtraerScript(texto, id) {
     const re = new RegExp(`<script\\b[^>]*\\bid\\s*=\\s*(["']?)${id}\\1[^>]*>([\\s\\S]*?)<\\/script>`, 'ig'); let m, mejor = null;
     while ((m = re.exec(texto))) { if (mejor == null || m[2].length > mejor.length) mejor = m[2]; }
     return mejor;
   }
-  // Lee el archivo que devuelve Producción: no importa cómo se llame ni de dónde venga; se reconoce por su contenido. Cada problema se explica.
+  // Lee el archivo devuelto; se reconoce por contenido.
   async function ppLeerBorrador(texto) {
     texto = String(texto == null ? '' : texto).replace(/^\uFEFF/, '');
     if (!/rmd-datos/i.test(texto)) throw new Error('el archivo no es un borrador de Producción (no contiene los datos de un RMD). Debe ser el .html que se guardó con «Guardar borrador»');
@@ -11326,7 +11038,7 @@ td.ult { position: relative; }
     if (!prop.base || prop.base.huella !== datos.huella) throw new Error('el borrador no corresponde a esta plantilla (¿se mezclaron archivos de distintas versiones?)');
     return { datos, prop };
   }
-  // ¿Este archivo es un borrador? Se decide por su contenido, no por su nombre ni extensión (se puede renombrar, quedar como .txt o sin extensión)
+  // Detección por contenido, no por nombre ni extensión
   async function ppArchivoValido(f) {
     if (!f) return { error: 'no se eligió ningún archivo' };
     if (f.size > 80 * 1048576) return { error: 'el archivo pesa demasiado para ser un borrador' };
@@ -11334,7 +11046,7 @@ td.ult { position: relative; }
     let texto; try { texto = await f.text(); } catch (e) { return { error: 'no se pudo leer el archivo: ' + e.message }; }
     return /rmd-datos/i.test(texto) ? { texto } : { error: 'no es un borrador de Producción (debe ser el .html que se guardó con «Guardar borrador»)' };
   }
-  // Une filas de dos versiones del mismo master por estructura, etiqueta y código de paso (las versiones tienen filas nuevas)
+  // Une filas de dos versiones por estructura, etiqueta y código de paso
   function ppMapear(base, otro) {
     const claves = (arbol) => {
       const m = new Map(), oc = new Map(), sig = (k) => { const n = (oc.get(k) || 0) + 1; oc.set(k, n); return `${k}#${n}`; };
@@ -11350,8 +11062,7 @@ td.ult { position: relative; }
     a.forEach((id, k) => { if (b.has(k)) out.set(id, b.get(k)); });
     return out;
   }
-  // Dónde se importa: solo en un RMD Ingresado (467): el de la plantilla si sigue Ingresado, o la versión Ingresada más nueva del mismo
-  // master posterior a la de la plantilla; si no hay ninguna, no se importa.
+  // Destino: RMD Ingresado (467): el de la plantilla o la versión Ingresada posterior más nueva.
   function ppDestino(versiones, base) {
     const ing = (m) => m && +m.estadoIdRmd_iMaestraId === 467;
     if (ing(base)) return base;
@@ -11372,7 +11083,7 @@ td.ult { position: relative; }
       if (destino.mdId === datos.rmd.mdId) { if (PPN.huella(actual) !== datos.huella) enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, actual)); }
       else { mapa = ppMapear(datos.arbol, actual); enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, ppTraducir(actual, mapa))); }
     }
-    // los pasos nuevos se vuelven a buscar en SAP como lo hace el portal (mismo texto, estructura y etiqueta), por si ya se crearon
+    // rebúsqueda de pasos nuevos (texto, estructura, etiqueta)
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     const estrDe = new Map(), etqDe = new Map(); prop.trabajo.estructuras.forEach((e) => { estrDe.set(e.id, e.estructuraId); (e.etiquetas || []).forEach((t) => etqDe.set(t.id, t.etiquetaId)); });
     const nuevos = [];
@@ -11387,7 +11098,7 @@ td.ult { position: relative; }
     const tocados = new Set(cambiosP.map((c) => c.id)), conflictos = enSap.filter((c) => tocados.has(c.id) || (c.padre && tocados.has(c.padre)));
     return { base, destino, actual, lin, cambios: cambiosP, avisos: avisosP, enSap, conflictos, nuevos, mapa, etqNom };
   }
-  // Lo que ya no está en SAP (se quitó desde la plantilla) no aparece en el árbol actual: se agrega marcado como quitado para que la comparación lo vea
+  // lo quitado en SAP se agrega marcado como quitado
   function ppConQuitados(base, actual) {
     const mezcla = (b, w) => { const ids = new Set(w.map((x) => x.id)); return [...w, ...b.filter((x) => !ids.has(x.id)).map((x) => ({ ...x, quitado: true }))].map((x) => ({ ...x })); };
     const pasos = (b, w) => mezcla(b || [], w || []).map((p) => { const bp = (b || []).find((y) => y.id === p.id); return { ...p, pm: p.quitado ? p.pm : mezcla(bp ? bp.pm || [] : [], p.pm || []) }; });
@@ -11395,7 +11106,7 @@ td.ult { position: relative; }
     return { estructuras: actual.estructuras.map((e) => { const be = baseE.get(e.id) || {}, baseT = new Map((be.etiquetas || []).map((t) => [t.id, t]));
       return { ...e, pasos: pasos(be.pasos, e.pasos), etiquetas: (e.etiquetas || []).map((t) => ({ ...t, pasos: pasos((baseT.get(t.id) || {}).pasos, t.pasos) })), equipos: mezcla(be.equipos || [], e.equipos || []), utensilios: mezcla(be.utensilios || [], e.utensilios || []) }; }) };
   }
-  // reemplaza los ids de la otra versión por los de la base (para comparar)
+  // ids de la otra versión -> ids de la base
   function ppTraducir(arbol, mapa) {
     const inv = new Map([...mapa.entries()].map(([a, b]) => [b, a])), t = (x) => ({ ...x, id: inv.get(x.id) || ('otra:' + x.id) });
     return { estructuras: arbol.estructuras.map((e) => ({ ...t(e), pasos: (e.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })), etiquetas: (e.etiquetas || []).map((x) => ({ ...t(x), pasos: (x.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })) })), equipos: (e.equipos || []).map(t), utensilios: (e.utensilios || []).map(t), espec: (e.espec || []).map(t) })) };
@@ -11423,7 +11134,7 @@ td.ult { position: relative; }
       ['Generado', `${dd2(hoy.getDate())}/${dd2(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd2(hoy.getHours())}:${dd2(hoy.getMinutes())}`]].forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Borrador RMD ${datos.rmd.codigo} - plan de ingreso ${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}.xlsx` };
   }
-  // ---- Crear la versión Ingresada con el propio botón «Nueva Versión» del portal (el portal copia toda la configuración) ----
+  // ---- Nueva versión Ingresada con «Nueva Versión» del portal ----
   async function ppVersiones(modelo, principal) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, p = isNaN(+principal) ? principal : +principal;
     return (await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', String(principal)), new F('codigo', 'EQ', p)], and: false })], { $expand: 'estadoIdRmd', $orderby: 'mdId' })).map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' }));
@@ -11431,7 +11142,7 @@ td.ult { position: relative; }
   function ppCerrarDialogosSap() {
     for (let i = 0; i < 8; i++) { const d = dialogos().pop(); if (!d) return; const b = [...d.querySelectorAll('button')].find((x) => x.getClientRects().length && /^(Cerrar|Cancelar)$/.test(norm(x.textContent))); if (!b) return; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }
   }
-  // origen: el MD (Autorizado) desde el que se crea; avance(segundos, texto). Devuelve el MD nuevo ya completo.
+  // origen: MD Autorizado; avance(segundos, texto) -> MD nuevo
   async function ppCrearVersionNueva(modelo, origen, avance) {
     if (dialogos().length) throw new Error('cierra primero las ventanas abiertas del portal');
     const principal = String(origen.codigoversionprincipal || origen.codigo), antes = await ppVersiones(modelo, principal), idsAntes = new Set(antes.map((m) => m.mdId)), t0 = Date.now(), seg = () => Math.round((Date.now() - t0) / 1000);
@@ -11447,9 +11158,9 @@ td.ult { position: relative; }
     sap.ui.getCore().byId(ok.id.replace(/-inner$/, '')).firePress();
     avance(seg(), 'El portal está copiando la configuración del RMD…');
     let nueva = null;
-    for (let i = 0; i < 225 && !nueva; i++) { await esperar(4000); avance(seg(), 'El portal está copiando la configuración del RMD…'); try { nueva = (await ppVersiones(modelo, principal)).find((m) => !idsAntes.has(m.mdId) && +m.version > +origen.version); } catch (e) { /* se reintenta */ } }
+    for (let i = 0; i < 225 && !nueva; i++) { await esperar(4000); avance(seg(), 'El portal está copiando la configuración del RMD…'); try { nueva = (await ppVersiones(modelo, principal)).find((m) => !idsAntes.has(m.mdId) && +m.version > +origen.version); } catch (e) { } }
     if (!nueva) throw new Error('el portal no creó la versión nueva en 15 minutos; revisa la lista y vuelve a importar');
-    // el portal sigue escribiendo las filas: se espera a que deje de estar ocupado y a que la copia tenga lo mismo que el origen
+    // espera a que la copia del portal termine
     const filas = (a) => a.estructuras.reduce((n, e) => n + (e.pasos || []).length + (e.etiquetas || []).reduce((m, t) => m + t.pasos.length + t.pasos.reduce((k, p) => k + (p.pm || []).length, 0), 0) + (e.pasos || []).reduce((k, p) => k + (p.pm || []).length, 0) + (e.equipos || []).length + (e.utensilios || []).length, 0);
     const total = filas(await ppLeerArbol(modelo, origen)); let ultimo = -1, estables = 0;
     for (let i = 0; i < 225; i++) {
@@ -11462,7 +11173,7 @@ td.ult { position: relative; }
     await esperar(1500); ppCerrarDialogosSap(); await esperar(800);
     return { ...nueva, estado: nueva.estado };
   }
-  // ---- ventanas ----
+  // ---- Ventanas ----
   function abrirPlantillaProduccion(codigo) {
     const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista «Configuración Manufactura Digital».', true); return; }
     const asoc = ctrl.getView().getModel('asociarDatos'), abierto = asoc && asoc.getData() && asoc.getData().codigo;
@@ -11490,11 +11201,11 @@ td.ult { position: relative; }
     cod.addEventListener('keydown', (e) => { if (e.key === 'Enter') bGen.click(); }); setTimeout(() => cod.focus(), 30);
   }
   function elegirBorrador() {
-    const i = document.createElement('input'); i.type = 'file'; i.multiple = true;                  // sin filtro de tipo: el archivo puede venir renombrado
+    const i = document.createElement('input'); i.type = 'file'; i.multiple = true;                  // sin filtro de tipo
     i.addEventListener('change', async () => { await abrirArchivos([...(i.files || [])]); });
     i.click();
   }
-  // Abre el primer archivo que sea un borrador (también varios soltados a la vez); si ninguno lo es, dice por qué
+  // Abre el primer archivo válido; si ninguno, informa el motivo
   async function abrirArchivos(lista) {
     if (!lista.length) return;
     const errores = []; for (const f of lista) { const r = await ppArchivoValido(f); if (r.texto) { abrirImportarBorrador(r.texto, f.name); return; } errores.push(`${f.name}: ${r.error}`); }
@@ -11512,13 +11223,13 @@ td.ult { position: relative; }
     } catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo abrir «${esc(nombreArchivo || 'el archivo')}»: ${esc(e.message)}</p>`; v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); return; }
     pintarImportacion(v, datos, prop, an, {});
   }
-  // La revisión del borrador (se vuelve a pintar cuando se rehace sobre el RMD actual)
+  // Revisión del borrador
   function pintarImportacion(v, datos, prop, an, extra) {
     v.pie.innerHTML = '';
     const s = prop.solicitud || {}, r = datos.rmd;
     const cab = `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}<br><span class="rmd-nota">Plantilla del ${esc(fechaHoraCorta(datos.generado))} · borrador guardado el ${esc(fechaHoraCorta(prop.guardado))}</span></div>
         <div><b>${esc(s.nombre || '—')}</b> · ${esc(s.area || '')}<br><span class="rmd-nota">${esc(s.motivo || '')}${s.cc ? ' · ' + esc(s.cc) : ''}</span></div></div>`;
-    if (!an.destino) {                                                          // solo se importa en un RMD Ingresado
+    if (!an.destino) {
       v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso error">Solo se puede importar en un RMD <b>Ingresado</b>. El RMD ${esc(r.codigo)} (v${esc(r.version)}) está ${esc(an.base.estado || r.estado)} y su master no tiene una versión Ingresada posterior.</p>
         <p class="rmd-nota">Puedes crear la versión Ingresada desde aquí con «Crear la versión Ingresada ahora» (usa el botón «Nueva Versión» del portal) o hacerlo en el portal y volver a importar este borrador.</p>`;
       const origen = [...an.lin.versiones].filter((m) => +m.estadoIdRmd_iMaestraId !== 466).sort((a, b) => +b.version - +a.version)[0];
@@ -11558,7 +11269,7 @@ td.ult { position: relative; }
       <p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>`;
     const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length ? 'El borrador no trae cambios.' : '';
     const bIngresar = botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an)); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
-    // el RMD cambió desde la plantilla: se puede rehacer el borrador sobre lo que hay hoy, sin que Producción repita nada
+    // RMD cambiado desde la plantilla: opción de rehacer el borrador
     const bRehacer = botonModal('Rehacer sobre el RMD actual', 'primario', async () => {
       bRehacer.disabled = true; const aviso = document.createElement('p'); aviso.className = 'rmd-progreso'; aviso.textContent = 'Rehaciendo el borrador sobre el RMD actual…'; v.cuerpo.prepend(aviso);
       try {
@@ -11574,7 +11285,7 @@ td.ult { position: relative; }
     v.__pp = { datos, prop, an };
     window.__rmdStats.plantilla.ultimo = { datos, prop, an };
   }
-  // soltar el archivo del borrador sobre la lista principal lo abre
+  // soltar el archivo sobre la lista principal
   document.addEventListener('dragover', (e) => { if (on('plantillaprod') && e.dataTransfer && [...(e.dataTransfer.items || [])].some((i) => i.kind === 'file') && controladorPrincipal() && !dialogos().length) e.preventDefault(); });
   document.addEventListener('drop', async (e) => {
     const fs = e.dataTransfer && e.dataTransfer.files && [...e.dataTransfer.files];
@@ -11582,20 +11293,16 @@ td.ult { position: relative; }
     e.preventDefault(); abrirArchivos(fs);
   });
   window.__rmdStats.plantilla = { versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
-  // ---- Ingreso automático del borrador (v1.42; v1.43: pasos nuevos, equipos, predecesores, marcas y «Deshacer») ----
-  // «Ingresar en SAP…» (en la ventana del borrador importado) deja el RMD Ingresado como el borrador, con las mismas escrituras que hace el
-  // portal (leídas de su código y comprobadas simulando): agregar pasos y procesos menores = actualización profunda de MD_ESTRUCTURA
-  // (aPaso / aPasoInsumoPaso); agregar equipos = copia en su catálogo (TABLAS_ARRAY_MD_SKIP) + aEquipo; utensilios = aUtensilio; quitar =
-  // activo:false (con sus procesos menores); cambiar el paso de una fila = pasoId_pasoId; rangos = valorInicial / valorFinal / margen; orden =
-  // `orden` renumerado; pasos que aún no existen = PASO nuevo (código correlativo del portal, como «Nuevo Paso»); predecesores = «Depende»
-  // de lo que quedó enlazado a un paso quitado o separado por un paso nuevo. Cada escritura guarda su inverso: «Deshacer ingreso» lo revierte.
-  // Las filas ingresadas quedan marcadas en las ventanas de pasos del portal para que el equipo RMD las revise y haga los últimos ajustes.
+  // ---- Ingreso automático del borrador ----
+  // Mismas escrituras que el portal: aPaso / aPasoInsumoPaso en MD_ESTRUCTURA, catálogo de equipos (TABLAS_ARRAY_MD_SKIP) + aEquipo, aUtensilio,
+  // activo:false, pasoId_pasoId, valorInicial / valorFinal / margen, orden, PASO nuevo, «Depende».
+  // Cada escritura guarda su inversa («Deshacer ingreso»). Filas ingresadas marcadas en el portal.
   const PP_PASO_SEL = 'pasoId,codigo,descripcion,estructuraId_estructuraId,etiquetaId_etiquetaId,tipoDatoId_iMaestraId,decimales,margen,valorInicial,valorFinal,clvModelo,automatico,activo,estadoId_iMaestraId,numeracion,tipoLapsoId_motivoLapsoId,tipoCondicionId_iMaestraId';
   const PP_FASES = ['Crear los pasos nuevos en SAP', 'Quitar', 'Cambiar pasos y rangos', 'Agregar', 'Ordenar', 'Enlazar predecesores'];
-  const PP_SIN_TIPO = 446;                                                                // tipo de dato «Sin tipo de dato»
+  const PP_SIN_TIPO = 446;                                                                // «Sin tipo de dato»
   const ppUuid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
   const ppNum = (v) => { if (v == null || v === '') return null; const x = Number(String(v).replace(',', '.')); return isNaN(x) ? null : x; };
-  // Casillas (Edit, R. Por, V.B., Estado CC) que corresponden a un paso nuevo según las reglas del script (tipo de dato y redacción)
+  // Casillas de un paso nuevo según reglas (tipo y redacción)
   const PP_CAMPO_CASILLA = { 'EDIT': 'edit', 'R. POR': 'rpor', 'V.B.': 'vb', 'ESTADO CC': 'estadoCC' };
   function ppCasillas(texto, nombreTipo, esPm) {
     if (!nombreTipo) return null;
@@ -11607,7 +11314,7 @@ td.ult { position: relative; }
   async function ppLeerUno(modelo, entidad, filtros, select) {
     return new Promise((ok) => modelo.read('/' + entidad, { filters: filtros, urlParameters: { $top: '1', ...(select ? { $select: select } : {}) }, success: (r) => ok((r.results || [])[0] || null), error: () => ok(null) }));
   }
-  // Arma TODAS las escrituras del ingreso sin escribir nada: { ops, bloqueos, avisos, manual, nuevos, finales, resumen, D, ... }
+  // Arma las escrituras sin ejecutarlas: { ops, bloqueos, avisos, manual, nuevos, finales, resumen, D, … }
   async function ppPlanEscritura(datos, prop, an, modelo, usuario) {
     const plan0 = {}, bloqueos = [], avisos = [], manual = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
@@ -11617,12 +11324,12 @@ td.ult { position: relative; }
     const errores = [...an.avisos.values()].flat().filter((a) => a.nivel === 'error').length; if (errores) bloqueos.push(`El borrador tiene ${errores} dato(s) por corregir marcados con ✕.`);
     if (!an.cambios.length) bloqueos.push('El borrador no trae cambios.');
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
-    // lo que hay hoy en el destino y el mapa de ids (base → destino)
+    // estado del destino y mapa de ids
     const idx = new Map(), estD = new Map();
     an.actual.estructuras.forEach((e) => { estD.set(e.id, e); const rec = (l) => (l || []).forEach((p) => { idx.set(p.id, p); (p.pm || []).forEach((m) => idx.set(m.id, m)); }); rec(e.pasos); (e.etiquetas || []).forEach((t) => rec(t.pasos)); (e.equipos || []).forEach((q) => idx.set(q.id, q)); (e.utensilios || []).forEach((q) => idx.set(q.id, q)); });
     const nuevosIds = new Map(), D = (id) => (String(id).startsWith('n:') ? (nuevosIds.get(id) || (nuevosIds.set(id, ppUuid()), nuevosIds.get(id))) : mismo ? id : (an.mapa && an.mapa.get(id)) || null);
     const bEst = new Map(datos.arbol.estructuras.map((e) => [e.id, e]));
-    // listas a procesar: pasos de cada estructura y etiqueta, y procesos menores de cada paso que ya existía
+    // listas a procesar
     const listas = [];
     prop.trabajo.estructuras.forEach((e) => {
       const be = bEst.get(e.id) || { pasos: [], etiquetas: [] };
@@ -11632,7 +11339,7 @@ td.ult { position: relative; }
     const conPm = [];
     listas.forEach((L) => L.w.forEach((x) => { const b0 = L.b.find((y) => y.id === x.id); if (b0 && !x.quitado && ((x.pm || []).length || (b0.pm || []).length)) conPm.push({ kind: 'pm', w: x.pm || [], b: b0.pm || [], e: L.e, t: L.t, padre: x }); }));
     listas.push(...conPm);
-    // pasos del catálogo que hacen falta: por código; los «nuevos» se buscan otra vez por su texto (por si ya existen) y, si no, se crean
+    // pasos del catálogo: por código; los nuevos se rebuscan por texto o se crean
     const pide = (x, b0) => !b0 || String(x.codigo || '') !== String(b0.codigo || '') || x.nuevo;
     const codigos = new Set(), buscarTexto = [];
     listas.forEach((L) => { const bId = new Map(L.b.map((y) => [y.id, y])); L.w.filter((x) => !x.quitado).forEach((x) => { if (!pide(x, bId.get(x.id))) return; if (x.codigo && !x.nuevo) codigos.add(String(x.codigo)); else buscarTexto.push({ x, L, tipoBase: (bId.get(x.id) || {}).tipo }); }); });
@@ -11641,13 +11348,13 @@ td.ult { position: relative; }
     const lista = [...codigos]; for (let i = 0; i < lista.length; i += 40) (await lee([new F({ filters: lista.slice(i, i + 40).map((c) => new F('codigo', 'EQ', c)), and: false })])).forEach((p) => { if (p.activo !== false) porCodigo.set(String(p.codigo), p); });
     const cfgCache = new Map(), configDe = async (pasoId) => { if (!cfgCache.has(pasoId)) { cfgCache.set(pasoId, (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('mdId_mdId', 'EQ', dest.mdId), new F('activo', 'EQ', true)], PP_CFG_SEL)) || (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('activo', 'EQ', true)], PP_CFG_SEL))); } return cfgCache.get(pasoId); };
     const muestras = new Map(), muestra = async (estr, etq) => { const k = estr + '|' + (etq || ''); if (!muestras.has(k)) { let m = etq ? await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('etiquetaId_etiquetaId', 'EQ', etq), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion') : null; if (!m) m = await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion'); muestras.set(k, m); } return muestras.get(k); };
-    const catNuevo = new Map();                                                           // id del paso del borrador → fila que tendrá en el catálogo
+    const catNuevo = new Map();                                                           // id del borrador -> fila del catálogo
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
       const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL && !pm) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
       const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
       if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); continue; }
-      // el texto del árbol viene limpio (sin espacios dobles): también se busca igual en el catálogo del archivo (sin tildes ni signos)
+      // búsqueda normalizada en el catálogo
       if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo));
       const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && (pm || !etqL || f.etq === etqL)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
       if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
@@ -11677,13 +11384,13 @@ td.ult { position: relative; }
     faltan.forEach((c) => bloqueos.push(`El paso ${c} no se encontró (¿está de baja?) en el catálogo de SAP.`));
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
     const cfgPorPaso = new Map(); { const ids = new Set(); listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id) && !catNuevo.has(x.id)).forEach((x) => { const p = catDe(x); if (p) ids.add(p.pasoId); }); }); for (const id of [...ids].slice(0, 60)) cfgPorPaso.set(id, await configDe(id)); }
-    // predecesores de los pasos de las listas que cambian: se leen una vez
+    // predecesores de las listas modificadas
     const rowsMd = new Map(), leerRowsMd = async () => { if (rowsMd.size) return; (await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', dest.mdId)], { $select: 'mdEstructuraPasoId,orden,depende,dependeMdEstructuraPasoId,mdEstructuraPasoIdDepende,tipoDatoId_iMaestraId,activo' })).filter((p) => p.activo !== false).forEach((p) => rowsMd.set(p.mdEstructuraPasoId, p)); };
-    // ---- operaciones ----
+    // ---- Operaciones ----
     let n = 0; const op = (fase, o) => { ops.push({ fase, ...o }); };
     const fechaUsuario = { usuarioActualiza: usuario, fechaActualiza: ahora }, baja = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: false }, alta = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: true };
     const lugar = (L) => `${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}${L.padre ? ' › paso ' + (L.padre.codigo || '') : ''}`;
-    const quitados = new Set(), seqPasos = [], locNuevo = new Map(), revisar = [], equiposRev = [];                                           // para los predecesores: [{L, seq: [{id, x, nuevo}]}]
+    const quitados = new Set(), seqPasos = [], locNuevo = new Map(), revisar = [], equiposRev = [];                                           // [{ L, seq: [{ id, x, nuevo }] }]
     for (const L of listas) {
       const esPm = L.kind === 'pm', tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO', campo = esPm ? 'pasoHijoId_pasoId' : 'pasoId_pasoId', clase = esPm ? 'pm' : 'paso', bId = new Map(L.b.map((y) => [y.id, y]));
       const quien = (x, b0) => `${esPm ? 'proceso menor' : 'paso'} ${cod(x) || (b0 && b0.codigo) || '(nuevo)'} — ${String(x.texto || (b0 && b0.texto) || '').slice(0, 60)}`;
@@ -11744,9 +11451,9 @@ td.ult { position: relative; }
         }
       });
     }
-    // pasos que se crean en el catálogo (antes que todo lo demás)
+    // pasos nuevos del catálogo primero
     nuevosPaso.forEach((np) => op(0, { lugar: `${np.estrNombre}${np.etqNombre ? ' › ' + np.etqNombre : ''}`, accion: 'Crear', clase: 'catalogo', desc: `crear en SAP el paso nuevo «${np.texto.slice(0, 80)}»`, ruta: '/PASO', tipo: 'create', crearPaso: np, datos: np.fila, inv: { ruta: `/PASO('${np.pasoId}')`, datos: { activo: false } } }));
-    // equipos y utensilios: quitar, agregar (copia en el catálogo de equipos como el portal) y renumerar
+    // equipos y utensilios: quitar, agregar y renumerar
     const catEq = new Map(); const ids = []; prop.trabajo.estructuras.forEach((e) => (e.equipos || []).forEach((x) => { if (!String(x.id).startsWith('n:') || x.quitado || !x.equipoId) return; ids.push(x.equipoId); }));
     for (let i = 0; i < ids.length; i += 40) (await leerTodoDe(modelo, 'EQUIPO', [new F({ filters: ids.slice(i, i + 40).map((c) => new F('equipoId', 'EQ', c)), and: false })], {})).forEach((q) => catEq.set(q.equipoId, q));
     for (const e of prop.trabajo.estructuras) {
@@ -11764,7 +11471,7 @@ td.ult { position: relative; }
         });
       });
       for (const { x, k, clase, nombre } of nuevosEq) {
-        if (x.nuevo) { manual.push(`Crear en SAP el ${(x.tipoNuevo || (k === 'equipos' ? 'equipo' : 'utensilio')).toLowerCase()} nuevo «${x.desc}»${x.codigo ? ` (código ${x.codigo})` : ''}${x.ref ? `, referencia ${x.ref}` : ''} y luego agregarlo en «${e.nombre}» (Adicionar Equipo del portal).`); continue; }   // (v1.53: no existe en el catálogo de SAP)
+        if (x.nuevo) { manual.push(`Crear en SAP el ${(x.tipoNuevo || (k === 'equipos' ? 'equipo' : 'utensilio')).toLowerCase()} nuevo «${x.desc}»${x.codigo ? ` (código ${x.codigo})` : ''}${x.ref ? `, referencia ${x.ref}` : ''} y luego agregarlo en «${e.nombre}» (Adicionar Equipo del portal).`); continue; }   // nuevo: no existe en SAP
         cambiaListas = true; const id = D(x.id); locNuevo.set(id, { estr: D(e.id), equipo: true }); if (k === 'equipos') equiposRev.push({ x, e, nombre });
         if (k === 'equipos') {
           const base = x.equipoId && catEq.get(x.equipoId); if (!base) { bloqueos.push(`No se encontró en el catálogo de SAP el equipo ${nombre}.`); continue; }
@@ -11778,17 +11485,17 @@ td.ult { position: relative; }
             ...(x.agrupadorId ? { agrupadorId_clasificacionUtensilioId: x.agrupadorId } : { utensilioId_utensilioId: x.utensilioId }), orden: ++nuevoOrden + 1000 }] }, inv: { ruta: `/MD_ES_UTENSILIO('${id}')`, datos: { ...baja } }, marca: { id, tipo: 'agregado' }, ordenDe: { estr: e.id, id, tabla: 'MD_ES_UTENSILIO' } });
         }
       }
-      if (cambiaListas) {                                                                 // equipos y utensilios comparten la numeración 1..n (como updateOrderEquipment)
+      if (cambiaListas) {                                                                 // numeración compartida 1..n (updateOrderEquipment)
         const quita = new Set((e.equipos || []).concat(e.utensilios || []).filter((x) => x.quitado).map((x) => D(x.id)));
         const finalL = [...(ed.equipos || []).concat(ed.utensilios || [])].filter((y) => !quita.has(y.id)).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).map((y) => ({ id: y.id, orden: y.orden, existente: true, tabla: (ed.equipos || []).includes(y) ? 'MD_ES_EQUIPO' : 'MD_ES_UTENSILIO' }));
         ops.filter((o) => o.ordenDe && o.ordenDe.estr === e.id).forEach((o) => finalL.push({ id: o.ordenDe.id, existente: false, tabla: o.ordenDe.tabla, op: o }));
         finalL.forEach((y, i) => { if (!y.existente) { const campoOrden = y.op.datos.aEquipo || y.op.datos.aUtensilio; campoOrden[0].orden = i + 1; return; } if (+y.orden !== i + 1) op(4, { lugar: e.nombre, accion: 'Orden', clase: y.tabla === 'MD_ES_EQUIPO' ? 'equipo' : 'utensilio', desc: `equipos y utensilios: orden ${y.orden} → ${i + 1}`, ruta: `/${y.tabla}('${y.id}')`, datos: { orden: i + 1 }, paralelo: true, inv: { ruta: `/${y.tabla}('${y.id}')`, datos: { orden: y.orden } } }); });
       }
     }
-    // predecesores («Depende»): lo enlazado a un paso quitado o separado por uno nuevo se vuelve a enlazar; los movidos se avisan
+    // predecesores: reenlazar lo afectado por quitados o insertados; movidos se avisan
     if (seqPasos.length && !bloqueos.length) {
       await leerRowsMd();
-      const cambia = new Map();                                                          // id → { pred: id | '' }
+      const cambia = new Map();                                                          // id -> { pred }
       const tipoDe = (v) => (v.nuevo ? +(catDe(v.x) || {}).tipoDatoId_iMaestraId || PP_SIN_TIPO : +((rowsMd.get(v.id) || {}).tipoDatoId_iMaestraId) || PP_SIN_TIPO);
       const quitadosTodos = new Set(seqPasos.flatMap((s) => s.quitados)); seqPasos.forEach((s) => s.quitados.forEach((id) => quitados.add(id)));
       const predDe = (id) => { const r = rowsMd.get(id); return r ? (r.dependeMdEstructuraPasoId || '') : ''; };
@@ -11796,7 +11503,7 @@ td.ult { position: relative; }
       const ordenBase = (L) => [...L.b].sort((a, b) => (+((rowsMd.get(D(a.id)) || {}).orden) || 0) - (+((rowsMd.get(D(b.id)) || {}).orden) || 0));
       for (const s of seqPasos) {
         const seq = s.vivos;
-        // ¿la lista se encadena paso a paso (cada uno depende del anterior con tipo de dato)? Entonces se vuelve a encadenar entera
+        // lista encadenada: se reencadena completa
         const orig = ordenBase(s.L).map((y) => D(y.id)).filter((id) => rowsMd.has(id) && +rowsMd.get(id).tipoDatoId_iMaestraId !== PP_SIN_TIPO);
         let enCadena = 0; orig.forEach((id, i) => { if (i > 0 && predDe(id) === orig[i - 1]) enCadena++; });
         const cadena = orig.length > 2 && enCadena >= Math.max(1, Math.round((orig.length - 1) * 0.6));
@@ -11808,9 +11515,9 @@ td.ult { position: relative; }
             if (tipoDe(v) === PP_SIN_TIPO) return;
             let deseado;
             if (prev) deseado = prev.id;
-            else if (v.nuevo) deseado = primeroExistente ? salta(predDe(primeroExistente.id)) : '';       // abre la lista: hereda lo que enlazaba al primero
+            else if (v.nuevo) deseado = primeroExistente ? salta(predDe(primeroExistente.id)) : '';
             else deseado = salta(predDe(v.id));
-            if (!v.nuevo && prev && !consistente.has(v.id)) deseado = salta(predDe(v.id));                    // una rama paralela que ya era así: no se toca
+            if (!v.nuevo && prev && !consistente.has(v.id)) deseado = salta(predDe(v.id));                    // rama paralela existente: sin cambios
             const actual = v.nuevo ? '' : predDe(v.id);
             if (v.nuevo ? !!deseado : deseado !== actual) cambia.set(v.id, deseado);
             prev = v;
@@ -11833,7 +11540,7 @@ td.ult { position: relative; }
           });
         }
       }
-      // pasos de otras listas que dependían de uno quitado: se enlazan al anterior de ese
+      // dependientes de otras listas -> al anterior del quitado
       rowsMd.forEach((r, id) => { if (!cambia.has(id) && !quitados.has(id) && r.dependeMdEstructuraPasoId && quitados.has(r.dependeMdEstructuraPasoId)) cambia.set(id, salta(r.dependeMdEstructuraPasoId)); });
       const nuevoPorId = new Map(seqPasos.flatMap((s) => s.vivos).filter((y) => y.nuevo).map((y) => [y.id, y.x]));
       const codigoDe = (id) => { const f = idx.get(id); if (f) return String(f.codigo || ''); const v = seqPasos.flatMap((s) => s.vivos).find((y) => y.id === id); return v ? String(cod(v.x) || '') : ''; };
@@ -11844,7 +11551,7 @@ td.ult { position: relative; }
           inv: r ? { ruta: `/MD_ES_PASO('${id}')`, datos: { depende: r.depende || '', dependeMdEstructuraPasoId: r.dependeMdEstructuraPasoId || '', ...fechaUsuario } } : null, marca: { id, tipo: 'predecesor' }, predItem: pred ? nuevoPorId.get(pred) : null });
       });
     }
-    // lo que queda a mano
+    // tareas manuales
     prop.trabajo.estructuras.forEach((e) => (e.espec || []).forEach((x) => { if (x.comentario) manual.push(`Comentario de Producción en la especificación «${String(x.ensayo || '').slice(0, 40)}» (${e.nombre}): ${x.comentario}`); }));
     an.cambios.filter((c) => c.accion === 'comentario' && c.comentario && c.clase !== 'especificacion').forEach((c) => manual.push(`Comentario de Producción en ${c.lugar}${c.texto ? ' › ' + String(c.texto).slice(0, 50) : ''}: ${c.comentario}`));
     const loc = new Map(); an.actual.estructuras.forEach((e) => { const reg = (l, t) => (l || []).forEach((p) => { loc.set(p.id, { estr: e.id, etq: t ? t.id : null }); (p.pm || []).forEach((m) => loc.set(m.id, { estr: e.id, etq: t ? t.id : null, padre: p.id })); }); reg(e.pasos, null); (e.etiquetas || []).forEach((t) => reg(t.pasos, t)); (e.equipos || []).concat(e.utensilios || []).forEach((q) => loc.set(q.id, { estr: e.id, equipo: true })); });
@@ -11856,8 +11563,7 @@ td.ult { position: relative; }
     const revision = ppRevisarReglas(datos, an, revisar, equiposRev, ops, seqPasos, lugar);
     return { ops, bloqueos, avisos, manual, revision, nuevos: [...nuevosPaso.values()], finales, resumen, D, nuevosIds, porCodigo, catNuevo };
   }
-  // Revisión de lo que se va a ingresar con las reglas del script: las de redacción y tipo de dato (reglasDeFila), las reglas propias de la
-  // persona (textos, documentos no vigentes, equipos sin calificación) y los avisos que dejó el borrador. Son alertas: no bloquean, se aceptan.
+  // Revisión previa: reglasDeFila, reglas locales y avisos del borrador (no bloquean).
   function ppRevisarReglas(datos, an, revisar, equiposRev, ops, seqPasos, lugar) {
     const alertas = [], add = (donde, texto, nivel) => alertas.push({ nivel: nivel || 'aviso', donde, texto });
     const tipos = datos.tipos || {};
@@ -11866,10 +11572,10 @@ td.ult { position: relative; }
       try { reglasDeFila({ esPM: !!esPm, tipo: t, desc: x.texto, chk: {}, dec: p && p.decimales == null ? '' : p && p.decimales, vi: p && p.valorInicial == null ? '' : p && p.valorInicial, vf: p && p.valorFinal == null ? '' : p && p.valorFinal })
         .filter((f) => f.col === 'DESCRIPCION' || f.col === 'DECIMAL' || f.col === 'VAL. INICIAL' || f.col === 'VAL. FINAL').forEach((f) => add(donde, f.msg)); } catch (e) { /* sin reglas de fila */ }
     });
-    // un paso nuevo con tipo de dato en una lista que usa predecesores debería quedar enlazado
+    // paso nuevo con tipo de dato sin predecesor
     const enlazados = new Set(ops.filter((o) => o.accion === 'Predecesor' && o.marca).map((o) => o.marca.id));
     seqPasos.forEach((s) => { const usa = s.vivos.some((v) => !v.nuevo); s.vivos.filter((v) => v.nuevo).forEach((v) => { const t = +(((revisar.find((r) => r.x === v.x) || {}).p) || {}).tipoDatoId_iMaestraId; if (usa && t && t !== PP_SIN_TIPO && !enlazados.has(v.id)) add(`${lugar(s.L)} › ${String(v.x.texto || '').slice(0, 50)}`, 'El paso nuevo no quedó enlazado a un predecesor: revisa su «Depende».'); }); });
-    // reglas de la persona
+    // reglas locales
     try {
       if (typeof reglasVivas === 'function' && reglasVivas()) {
         const comp = reglasCompiladas(), ctx = ctxReglas(), textos = revisar.map((r) => ({ texto: r.x.texto, esPM: !!r.esPm, lista: r.L.t ? r.L.t.nombre : r.L.e.nombre }));
@@ -11877,12 +11583,12 @@ td.ult { position: relative; }
         ev.items.forEach((it) => it.avisos.forEach((a) => { const r = revisar[it.i]; add(`${lugar(r.L)} › ${String(r.x.texto || '').slice(0, 50)}`, a.texto); }));
         if (equiposRev.length) { const eq = equiposRev.map((q) => ({ codigo: q.x.ref, sap: q.x.codigo, desc: q.x.desc, orden: 0 })), ee = Reglas.evaluarEquipos(eq, comp, ctx); ee.items.forEach((it) => it.avisos.forEach((a) => add(`${equiposRev[it.i].e.nombre} › ${equiposRev[it.i].nombre}`, a.texto))); }
       }
-    } catch (e) { /* las reglas de la persona no se pudieron evaluar */ }
-    // avisos que dejó el borrador (duplicados, etiqueta distinta, «Control de Calidad»…)
+    } catch (e) { /* reglas locales no evaluables */ }
+    // avisos del borrador
     an.avisos.forEach((lista, id) => { const c = an.cambios.find((y) => y.id === id); lista.filter((a) => a.nivel === 'aviso' && !/^Debe decir «CALIDAD/.test(a.texto)).forEach((a) => add(c ? `${c.lugar}${c.numero ? ' › ' + c.numero : ''}` : 'Borrador', a.texto)); });
     const vistos = new Set(); return alertas.filter((a) => { const k = a.donde + '|' + a.texto; if (vistos.has(k)) return false; vistos.add(k); return true; });
   }
-  // Comprueba, releyendo el RMD, que cada lista quedó con los pasos (y procesos menores) del borrador y en su orden.
+  // Verifica releyendo el RMD que cada lista tenga los pasos y el orden del borrador.
   async function ppVerificarIngreso(modelo, dest, prop, plan) {
     const nuevo = await ppLeerArbol(modelo, dest), dif = [], est = new Map(nuevo.estructuras.map((e) => [e.id, e])), D = plan.D, cod = (x) => String(plan.finales.get(x.id) || x.__codigo || x.codigo || x.comp || '');
     prop.trabajo.estructuras.forEach((e) => {
@@ -11899,7 +11605,7 @@ td.ult { position: relative; }
     });
     return dif;
   }
-  // Diario de ingresos (en este navegador): permite «Deshacer ingreso» y marcar en el portal lo que se ingresó
+  // Diario local de ingresos (deshacer y marcas)
   const PP_MARCAS = { mapa: new Map(), ingresos: [], cargado: false };
   async function ppDiarioCargar() {
     try { PP_MARCAS.ingresos = (await Almacen.leer('ppIngresos')) || []; } catch (e) { PP_MARCAS.ingresos = []; }
@@ -11911,7 +11617,7 @@ td.ult { position: relative; }
     try { await Almacen.guardar('ppIngresos', PP_MARCAS.ingresos); } catch (e) { /* sin almacenamiento: sin deshacer */ }
     await ppDiarioCargar();
   }
-  // Ejecuta las operaciones una por una (para al primer error). simular = no envía nada (para probar).
+  // Ejecuta las operaciones en orden; se detiene al primer error. simular = sin envío.
   async function ppEjecutarIngreso(modelo, plan, o = {}) {
     const diario = []; let hechas = 0;
     const correlativo = () => new Promise((ok, mal) => modelo.callFunction('/obtenerCodigoCorrelativo', { method: 'GET', urlParameters: { sTipo: 'PASO_CODIGO' }, async: true, success: (d) => ok(String(d && d.obtenerCodigoCorrelativo)), error: (e) => mal(new Error((e && (e.responseText || e.message)) || 'no se pudo obtener el código del paso')) }));
@@ -11925,14 +11631,14 @@ td.ult { position: relative; }
     const ops = plan.ops; let i = 0;
     while (i < ops.length) {
       if (o.detener && o.detener()) { diario.push({ ...ops[i], estado: 'detenido' }); break; }
-      const lote = ops[i].paralelo ? ops.slice(i, i + 8).filter((y, k) => y.paralelo && ops.slice(i, i + k + 1).every((z) => z.paralelo)) : [ops[i]];   // las de «orden» salen de a 8, como el portal
+      const lote = ops[i].paralelo ? ops.slice(i, i + 8).filter((y, k) => y.paralelo && ops.slice(i, i + k + 1).every((z) => z.paralelo)) : [ops[i]];   // orden en lotes de 8, como el portal
       const res = await Promise.allSettled(lote.map(hacer)); let falla = false;
       res.forEach((r, k) => { const x = lote[k]; if (r.status === 'fulfilled') { diario.push({ ...x, datos: undefined, codigo: r.value, estado: o.simular ? 'simulado' : 'hecho' }); hechas++; } else { falla = true; diario.push({ ...x, datos: undefined, estado: 'error', error: (r.reason && r.reason.message) || String(r.reason) }); } });
       i += lote.length; if (o.avance) o.avance(hechas, ops.length, lote[lote.length - 1]); if (falla) break;
     }
     return diario;
   }
-  // Deshace un ingreso: aplica en orden inverso lo opuesto de cada escritura hecha
+  // Deshacer: inversas en orden inverso
   async function ppDeshacerIngreso(modelo, entrada, avance) {
     const hechas = (entrada.ops || []).filter((o) => o.estado === 'hecho' && o.inv).reverse(), errores = [];
     let i = 0;
@@ -11957,7 +11663,7 @@ td.ult { position: relative; }
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Ingreso RMD ${dest.codigo} v${dest.version} ${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}.xlsx` };
   }
-  // ---- Ventana «Ingresar en SAP»: revisión → ingreso con avance → resultado (a revisar en SAP, deshacer, registro) ----
+  // ---- Ventana «Ingresar en SAP» ----
   async function abrirIngreso(datos, prop, an, opc = {}) {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'), usuario = codigoUsuario(ctrl);
     if (!modelo) { toast('Abre la lista «Configuración Manufactura Digital».', true); return null; }
@@ -12049,7 +11755,7 @@ td.ult { position: relative; }
     est.ejecutar = correr; est.deshacer = () => bDes.click();
     return est;
   }
-  // Abre el RMD en el portal y llega hasta la fila (paso, proceso menor, equipo) indicada
+  // Abre el RMD y navega hasta la fila indicada
   async function ppIrASap(destino, ver) {
     document.querySelectorAll('.rmd-modal-fondo').forEach((f) => f.remove());
     const filaDe = (d, f) => [...d.querySelectorAll('table.sapMListTbl tbody tr:not(.sapMListTblSubRow)')].find((tr) => { const o = objetoDeFila(tr); return o && f(o); });
@@ -12078,7 +11784,7 @@ td.ult { position: relative; }
       fila.scrollIntoView({ block: 'center' }); fila.classList.remove('rmd-ing-destello'); void fila.offsetWidth; fila.classList.add('rmd-ing-destello'); return true;
     } catch (e) { toast('No se pudo llegar al paso: ' + e.message, true); return false; }
   }
-  // Marcas en las ventanas de pasos del portal: lo que se ingresó desde un borrador queda resaltado, con un aviso para quitar las marcas o deshacer
+  // Marcas de filas ingresadas en las ventanas de pasos
   function gestionarMarcasIngreso() {
     if (typeof sap === 'undefined') return;
     if (!on('plantillaprod')) { document.querySelectorAll('.rmd-ing-aviso').forEach((e) => e.remove()); document.querySelectorAll('.rmd-ing-fila').forEach((e) => e.classList.remove('rmd-ing-fila', 'rmd-ing-agregado', 'rmd-ing-cambiado', 'rmd-ing-movido', 'rmd-ing-predecesor')); return; }
@@ -12100,7 +11806,7 @@ td.ult { position: relative; }
       const gi = vivos.find((y) => y.id === ingreso) || vivos[0];
       av = document.createElement('div'); av.className = 'rmd-ing-aviso';
       av.innerHTML = `<span><b>Ingresado desde el borrador de Producción</b>${gi && gi.solicitud ? ' de ' + esc(gi.solicitud) : ''} · <span class="n">${hay}</span> fila(s) marcada(s) en esta lista: revísalas y haz los últimos ajustes</span><span><button type="button" class="rmd-btn rmd-ing-quitar">Quitar marcas</button><button type="button" class="rmd-btn rmd-ing-deshacer">Deshacer ingreso</button></span>`;
-      av.querySelector('.rmd-ing-quitar').addEventListener('click', async () => { for (const y of PP_MARCAS.ingresos) y.sinMarcas = true; try { await Almacen.guardar('ppIngresos', PP_MARCAS.ingresos); } catch (e) { /* nada */ } PP_MARCAS.mapa = new Map(); document.querySelectorAll('.rmd-ing-aviso').forEach((e) => e.remove()); toast('Marcas quitadas.'); });
+      av.querySelector('.rmd-ing-quitar').addEventListener('click', async () => { for (const y of PP_MARCAS.ingresos) y.sinMarcas = true; try { await Almacen.guardar('ppIngresos', PP_MARCAS.ingresos); } catch (e) { } PP_MARCAS.mapa = new Map(); document.querySelectorAll('.rmd-ing-aviso').forEach((e) => e.remove()); toast('Marcas quitadas.'); });
       av.querySelector('.rmd-ing-deshacer').addEventListener('click', async () => {
         if (!gi) return;
         if (!(await confirmar('¿Deshacer el ingreso?', `Se revierten las escrituras del ingreso del ${new Date(gi.fecha).toLocaleString('es-PE')} en el RMD ${gi.codigo} v${gi.version}.`, 'Cierra y vuelve a abrir el RMD para ver el resultado.', { si: 'Deshacer', no: 'Cancelar' }))) return;
@@ -12112,8 +11818,8 @@ td.ult { position: relative; }
   window.__rmdStats.plantilla = Object.assign(window.__rmdStats.plantilla || {}, { marcas: PP_MARCAS, diario: ppDiarioCargar, deshacer: ppDeshacerIngreso });
   // ==== PLANTILLA-PRODUCCION:FIN ====
 
-  // ---- 10. Panel para activar/desactivar cada mejora -------------------------------------------
-  // Grupos del panel (las claves son las de OPC)
+  // ---- 10. Panel de mejoras ----
+  // Grupos del panel (claves de OPC)
   const GRUPOS_PANEL = [
     ['Productividad', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'exito', 'sesion', 'orbes']],
     ['Lista principal', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'cambiosrecetas', 'recetasauto', 'historialcambios', 'plantillaprod', 'exportar', 'equipos', 'indicadores', 'citastodos', 'statusrmd', 'suspension']],
@@ -12142,14 +11848,12 @@ td.ult { position: relative; }
     p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); delete opc.vistaMovil; guardar(opc); refrescar(); gestionarVistaMovil(); aplicarClases(); ajustarTodo(); });
     panelEl = p; montarPanel();
   }
-  // El botón cuelga de <html>, no de <body>: UI5 usa el <body> como zona de dibujo y, al montar la app (unos segundos después de cargar la página),
-  // aparta a su zona oculta de "preservados" cualquier nodo con id que cuelgue del <body>, y el botón desaparecía. Fuera del <body> no lo toca.
-  // Además se vigila (observador de <html> y revisión periódica) por si algo lo retira: se vuelve a colgar el mismo elemento, con su estado.
+  // El botón cuelga de <html>: UI5 mueve a su zona de preservados los nodos con id del <body>. Se vigila y se reinserta si se retira.
   let panelEl = null;
   function montarPanel() {
     if (panelEl && (panelEl.parentNode !== html || !panelEl.isConnected)) html.appendChild(panelEl);
     if (!estilo.isConnected) (document.head || html).appendChild(estilo);
-    if (!!on('ancho') !== html.classList.contains('rmd-ui')) aplicarClases();                 // (si algo reescribiera las clases de <html>)
+    if (!!on('ancho') !== html.classList.contains('rmd-ui')) aplicarClases();
   }
   new MutationObserver(montarPanel).observe(html, { childList: true });
   aplicarClases(); panel(); ajustarTodo();
