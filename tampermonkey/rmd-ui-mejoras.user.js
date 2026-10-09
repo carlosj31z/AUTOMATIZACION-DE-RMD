@@ -1,20 +1,29 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.55.0
+// @version      1.56.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
 // @grant        none
-// @updateURL    https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras.user.js
-// @downloadURL  https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras.user.js
 // ==/UserScript==
 
-(function () {
+(function rmdUi(arranque) {
   'use strict';
-  const VERSION = '1.55.0';                                                       // mantener igual a @version
+  // Con el cargador instalado (data-rmd-cargador), él inyecta la versión más reciente; una copia instalada directamente solo arranca si a los 10 s no
+  // arrancó ninguna.
+  if (!window.__rmdDesdeCargador && arranque !== 'directo' && document.documentElement.hasAttribute('data-rmd-cargador')) {
+    const t0 = Date.now(), espera = setInterval(() => {
+      if (window.__rmdUiMejoras || window.__rmdSesionShell) clearInterval(espera);
+      else if (Date.now() - t0 > 10000) { clearInterval(espera); rmdUi('directo'); }
+    }, 250);
+    return;
+  }
+  const VERSION = '1.56.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
-  const URL_ACTUALIZACION = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras.user.js';   // mantener igual a @downloadURL
+  const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
+  const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
+  const URL_CARGADOR = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras-cargador.user.js';   // igual a @downloadURL del cargador
   const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return {}; } };
   const guardar = (o) => { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   const OPC = [
@@ -36,6 +45,7 @@
     ['ocultar', 'Ocultar columnas poco usadas', 'Estado Mov., Imagen, Formato (salvo en procesos menores), PM OP y Gen PP.'],
     ['estado', 'Estado del RMD en la cabecera', 'Muestra si el RMD está Ingresado, Autorizado, Suspendido…'],
     ['pmtitulo', 'Título completo del proceso menor', 'Muestra la descripción completa del paso mayor.'],
+    ['pdfventana', 'Imprimir sin descargar', 'La impresora de «Configurar el RMD» abre el master en otra pestaña, como «Ver master».'],
     ['grupos', 'Ayuda en los títulos de columna', 'Al pasar el ratón sobre un título se explica qué contiene la columna.'],
     ['depende', 'Detalle de «Depende»', 'Al pasar el ratón muestra el paso predecesor.'],
     ['filtro', 'Filtro en las listas de pasos', 'Busca por texto, código u orden dentro de la lista abierta.'],
@@ -65,7 +75,7 @@
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
     ['citastodos', 'Documentos citados en todos los master', 'Qué master citan cada instructivo, procedimiento o formato.'],
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
-    ['verop', 'Ver OP completo', 'Al abrir, todas las OP asociadas ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
+    ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master o agrégales una observación.'],
@@ -509,62 +519,94 @@
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-asociar.ok, #rmd-aviso-nomenclatura.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
   .rmd-campo-aviso .sapMInputBaseContentWrapper, .rmd-campo-aviso .sapMInputBaseInner { box-shadow: 0 0 0 2px var(--rmd-ambar) !important; border-radius: 2px; }
-  /* ── Botón y panel de mejoras (estilo Popover de Fiori) ── */
+  /* ── Botón y panel de mejoras: vidrio translúcido; el desenfoque solo se calcula con el panel abierto o el botón activo ── */
+  html { --rmd-vidrio: rgba(38,44,52,.72); --rmd-vidrio-borde: rgba(255,255,255,.14); --rmd-vidrio-brillo: rgba(255,255,255,.2); --rmd-vidrio-tarjeta: rgba(255,255,255,.06);
+    --rmd-vidrio-linea: rgba(255,255,255,.09); --rmd-vidrio-relleno: rgba(118,118,128,.24); --rmd-vidrio-sw: rgba(120,120,128,.36); --rmd-vidrio-on: var(--rmd-acento); --rmd-vidrio-icono: rgba(27,141,236,.18);
+    --rmd-vidrio-sombra: 0 24px 60px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.3); }
+  html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-vidrio: rgba(250,251,253,.74); --rmd-vidrio-borde: rgba(255,255,255,.8); --rmd-vidrio-brillo: rgba(255,255,255,.95); --rmd-vidrio-tarjeta: rgba(255,255,255,.66);
+    --rmd-vidrio-linea: rgba(60,60,67,.12); --rmd-vidrio-relleno: rgba(118,118,128,.12); --rmd-vidrio-sw: rgba(120,120,128,.2); --rmd-vidrio-on: var(--rmd-acento); --rmd-vidrio-icono: rgba(10,110,209,.1);
+    --rmd-vidrio-sombra: 0 24px 60px rgba(20,35,60,.24), 0 2px 8px rgba(20,35,60,.1); }
   #rmd-ui-panel { position: fixed; left: 12px; bottom: 12px; z-index: 99999; font: 14px var(--rmd-fuente); color: var(--rmd-texto); }
   #rmd-ui-panel summary { position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; list-style: none; cursor: pointer; border-radius: 50%;
-    background: var(--rmd-superficie); color: var(--rmd-acento-texto); border: 1px solid var(--rmd-borde); box-shadow: 0 1px 4px rgba(0,0,0,.3); transition: transform .16s ease-out, opacity .16s ease-out; }
+    background: var(--rmd-vidrio); color: var(--rmd-acento-texto); border: 1px solid var(--rmd-vidrio-borde); box-shadow: 0 4px 14px rgba(0,0,0,.2), inset 0 1px 0 var(--rmd-vidrio-brillo);
+    transition: transform .2s cubic-bezier(.22,1,.36,1), opacity .2s ease-out; }
   #rmd-ui-panel summary::-webkit-details-marker { display: none; }
   #rmd-ui-panel summary::before { content: ''; position: absolute; inset: -10px -14px -10px -10px; }
+  #rmd-ui-panel.rmd-pn-visible summary, #rmd-ui-panel summary:hover { -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); }
   #rmd-ui-panel:not([open]):not(.rmd-pn-visible) summary { transform: translateX(-24px); opacity: .45; box-shadow: none; }   /* latente: asoma el borde del ícono */
   #rmd-ui-panel:not([open]) summary:hover, #rmd-ui-panel summary:focus-visible { transform: none; opacity: 1; }
-  #rmd-ui-panel summary:hover, #rmd-ui-panel[open] summary { border-color: var(--rmd-acento); }
-  #rmd-ui-panel[open] summary { background: var(--rmd-acento); color: #fff; }
+  #rmd-ui-panel[open] summary { background: var(--rmd-acento); border-color: transparent; color: #fff; }
   #rmd-ui-panel summary:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
+  #rmd-ui-panel.rmd-pn-nueva summary::after { content: ''; position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%; background: var(--rmd-acento); box-shadow: 0 0 0 2px var(--rmd-superficie); }   /* versión nueva lista */
   #rmd-ui-panel svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
-  #rmd-ui-panel .rmd-panel-cuerpo { position: absolute; left: 0; bottom: 46px; display: flex; flex-direction: column; width: 404px; max-width: calc(100vw - 24px); max-height: calc(100vh - 80px); overflow: hidden;
-    background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
-  #rmd-ui-panel[open] .rmd-panel-cuerpo { animation: rmd-pn-entra .12s ease-out; }
-  @keyframes rmd-pn-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: reduce) { #rmd-ui-panel summary { transition: none; } #rmd-ui-panel[open] .rmd-panel-cuerpo { animation: none; } }
-  #rmd-ui-panel .rmd-pn-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 4px 8px 4px 16px; border-bottom: 1px solid var(--rmd-borde); background: var(--rmd-barra); }
-  #rmd-ui-panel .rmd-pn-titulo { font-size: 16px; font-weight: 600; } #rmd-ui-panel .rmd-pn-sub { color: var(--rmd-apagado); font-size: 12px; }
-  #rmd-ui-panel .rmd-pn-x { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--rmd-acento-texto); cursor: pointer; }
-  #rmd-ui-panel .rmd-pn-x:hover { background: rgba(128,140,155,.16); }
+  #rmd-ui-panel .rmd-panel-cuerpo { position: absolute; left: 0; bottom: 48px; display: flex; flex-direction: column; width: 404px; max-width: calc(100vw - 24px); max-height: calc(100vh - 80px); overflow: hidden;
+    background: var(--rmd-vidrio); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); border: 1px solid var(--rmd-vidrio-borde); border-radius: 22px;
+    box-shadow: var(--rmd-vidrio-sombra), inset 0 1px 0 var(--rmd-vidrio-brillo); transform-origin: 19px calc(100% + 29px); }
+  #rmd-ui-panel .rmd-panel-cuerpo::before { content: ''; position: absolute; inset: 0; z-index: 1; padding: 1px; border-radius: inherit; pointer-events: none;   /* reflejo del borde */
+    background: linear-gradient(155deg, var(--rmd-vidrio-brillo), transparent 30%, transparent 70%, var(--rmd-vidrio-borde));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  #rmd-ui-panel .rmd-panel-cuerpo > :not(.rmd-pn-lista) { flex-shrink: 0; }   /* solo la lista se encoge y desplaza */
+  #rmd-ui-panel[open] .rmd-panel-cuerpo { animation: rmd-pn-entra .22s cubic-bezier(.22,1,.36,1); }
+  @keyframes rmd-pn-entra { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #rmd-ui-panel .rmd-panel-cuerpo, #rmd-ui-panel summary, .rmd-pn-aviso { background: var(--rmd-superficie); } }
+  @media (prefers-reduced-transparency: reduce) { #rmd-ui-panel .rmd-panel-cuerpo, #rmd-ui-panel summary, .rmd-pn-aviso { background: var(--rmd-superficie); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+  @media (prefers-reduced-motion: reduce) { #rmd-ui-panel summary { transition: none; } #rmd-ui-panel[open] .rmd-panel-cuerpo, #rmd-ui-panel .rmd-pn-ver.girando svg, .rmd-pn-aviso { animation: none; } }
+  #rmd-ui-panel .rmd-pn-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 16px 12px 6px 20px; }
+  #rmd-ui-panel .rmd-pn-titulo { font-size: 19px; font-weight: 700; letter-spacing: -.2px; }
+  #rmd-ui-panel .rmd-pn-ver { display: inline-flex; align-items: center; gap: 5px; max-width: 300px; min-height: 24px; margin: 3px 0 0 -8px; padding: 2px 8px; border: 0; border-radius: 12px;
+    background: none; color: var(--rmd-apagado); font: 12.5px var(--rmd-fuente); text-align: left; cursor: pointer; }
+  #rmd-ui-panel .rmd-pn-ver:hover { background: var(--rmd-vidrio-relleno); color: var(--rmd-texto); } #rmd-ui-panel .rmd-pn-ver:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 1px; }
+  #rmd-ui-panel .rmd-pn-ver svg { width: 12px; height: 12px; } #rmd-ui-panel .rmd-pn-ver.girando svg { animation: rmd-pn-gira .9s linear infinite; }
+  @keyframes rmd-pn-gira { to { transform: rotate(360deg); } }
+  #rmd-ui-panel .rmd-pn-ver.nueva { color: var(--rmd-acento-texto); font-weight: 600; } #rmd-ui-panel .rmd-pn-ver.error .rmd-pn-est { color: var(--rmd-ambar); }
+  #rmd-ui-panel .rmd-pn-x { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--rmd-vidrio-relleno); color: var(--rmd-apagado); cursor: pointer; }
+  #rmd-ui-panel .rmd-pn-x:hover { color: var(--rmd-texto); } #rmd-ui-panel .rmd-pn-x svg { width: 12px; height: 12px; stroke-width: 2; }
   #rmd-ui-panel .rmd-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; cursor: pointer; line-height: 1.3; }
   #rmd-ui-panel .rmd-pn-txt { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; text-align: left; }
   #rmd-ui-panel .rmd-pn-t { font-size: 14px; } #rmd-ui-panel .rmd-pn-d { margin-top: 2px; color: var(--rmd-apagado); font-size: 12px; line-height: 1.35; }
-  #rmd-ui-panel .rmd-pn-maestro { padding: 12px 16px; border-bottom: 1px solid var(--rmd-borde); } #rmd-ui-panel .rmd-pn-maestro .rmd-pn-t { font-weight: 600; }
-  #rmd-ui-panel .rmd-pn-buscar { display: flex; align-items: center; gap: 6px; margin: 10px 16px 6px; padding: 0 8px; height: 32px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-cabecera); color: var(--rmd-apagado); }
-  #rmd-ui-panel .rmd-pn-buscar:focus-within { border-color: var(--rmd-acento); }
+  #rmd-ui-panel .rmd-pn-maestro { margin: 6px 12px 0; padding: 11px 14px; border-radius: 14px; background: var(--rmd-vidrio-tarjeta); } #rmd-ui-panel .rmd-pn-maestro .rmd-pn-t { font-weight: 600; }
+  #rmd-ui-panel .rmd-pn-buscar { display: flex; align-items: center; gap: 6px; margin: 10px 12px 8px; padding: 0 10px; height: 34px; border-radius: 10px; background: var(--rmd-vidrio-relleno); color: var(--rmd-apagado); }
+  #rmd-ui-panel .rmd-pn-buscar:focus-within { box-shadow: 0 0 0 2px var(--rmd-acento); }
   #rmd-ui-panel .rmd-pn-buscar input { flex: 1 1 auto; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
-  #rmd-ui-panel .rmd-pn-lista { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-bottom: 4px; }
+  #rmd-ui-panel .rmd-pn-lista { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 12px 4px; }
   #rmd-ui-panel.rmd-pn-inactivo .rmd-pn-lista { opacity: .5; }
-  #rmd-ui-panel .rmd-pn-gcab { display: flex; align-items: center; gap: 8px; padding: 0 16px 0 6px; min-height: 52px; border-top: 1px solid var(--rmd-borde); }
-  #rmd-ui-panel .rmd-pn-grupo:first-child .rmd-pn-gcab { border-top: 0; }
-  #rmd-ui-panel .rmd-pn-abrir { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 4px 6px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: pointer; }
-  #rmd-ui-panel .rmd-pn-abrir:hover { background: rgba(128,140,155,.12); } #rmd-ui-panel .rmd-pn-abrir:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
+  #rmd-ui-panel .rmd-pn-grupo { margin-bottom: 8px; border-radius: 14px; background: var(--rmd-vidrio-tarjeta); overflow: hidden; }
+  #rmd-ui-panel .rmd-pn-gcab { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 4px; min-height: 52px; }
+  #rmd-ui-panel .rmd-pn-abrir { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 4px 6px; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; cursor: pointer; }
+  #rmd-ui-panel .rmd-pn-abrir:hover { background: var(--rmd-vidrio-relleno); } #rmd-ui-panel .rmd-pn-abrir:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
   #rmd-ui-panel .rmd-pn-abrir .rmd-pn-t { font-weight: 600; }
-  #rmd-ui-panel .rmd-pn-flecha { display: flex; color: var(--rmd-apagado); transition: transform .12s; } #rmd-ui-panel .rmd-pn-flecha svg { width: 12px; height: 12px; }
+  #rmd-ui-panel .rmd-pn-flecha { display: flex; color: var(--rmd-apagado); transition: transform .15s; } #rmd-ui-panel .rmd-pn-flecha svg { width: 11px; height: 11px; }
   #rmd-ui-panel .rmd-pn-grupo.abierto .rmd-pn-flecha { transform: rotate(90deg); }
-  #rmd-ui-panel .rmd-pn-gico { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(27,141,236,.14); color: var(--rmd-acento-texto); }
-  #rmd-ui-panel .rmd-pn-grupo.apagado .rmd-pn-gico { background: rgba(128,140,155,.14); color: var(--rmd-apagado); }
-  #rmd-ui-panel .rmd-pn-items { display: none; margin: 0 0 6px 50px; border-left: 1px solid var(--rmd-borde); }
+  #rmd-ui-panel .rmd-pn-gico { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 29px; height: 29px; border-radius: 8px; background: var(--rmd-vidrio-icono); color: var(--rmd-acento-texto); }
+  #rmd-ui-panel .rmd-pn-grupo.apagado .rmd-pn-gico { background: var(--rmd-vidrio-relleno); color: var(--rmd-apagado); }
+  #rmd-ui-panel .rmd-pn-items { display: none; margin-left: 52px; border-top: 1px solid var(--rmd-vidrio-linea); }
   #rmd-ui-panel .rmd-pn-grupo.abierto .rmd-pn-items, #rmd-ui-panel.rmd-pn-buscando .rmd-pn-items { display: block; }
-  #rmd-ui-panel .rmd-pn-item { padding: 8px 16px 8px 12px; } #rmd-ui-panel .rmd-pn-item:hover { background: rgba(128,140,155,.08); }
+  #rmd-ui-panel .rmd-pn-item { padding: 9px 14px 9px 0; } #rmd-ui-panel .rmd-pn-item + .rmd-pn-item { border-top: 1px solid var(--rmd-vidrio-linea); }
   #rmd-ui-panel [hidden] { display: none !important; }
   #rmd-ui-panel .rmd-pn-vacio { margin: 16px; color: var(--rmd-apagado); font-size: 13px; text-align: center; }
   #rmd-ui-panel mark { background: rgba(242,176,30,.35); color: inherit; border-radius: 2px; }
-  #rmd-ui-panel input.rmd-pn-sw { flex: 0 0 auto; appearance: none; -webkit-appearance: none; position: relative; width: 36px; height: 20px; margin: 0; border: 1px solid var(--rmd-borde-campo); border-radius: 10px; background: transparent; cursor: pointer; transition: background .12s, border-color .12s; }
-  #rmd-ui-panel input.rmd-pn-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--rmd-borde-campo); transition: transform .12s, background .12s; }
-  #rmd-ui-panel input.rmd-pn-sw:checked { background: var(--rmd-acento); border-color: var(--rmd-acento); } #rmd-ui-panel input.rmd-pn-sw:checked::after { transform: translateX(16px); background: #fff; }
-  #rmd-ui-panel input.rmd-pn-sw:indeterminate { background: rgba(27,141,236,.35); border-color: var(--rmd-acento); } #rmd-ui-panel input.rmd-pn-sw:indeterminate::after { transform: translateX(8px); background: #fff; }
+  #rmd-ui-panel input.rmd-pn-sw { flex: 0 0 auto; appearance: none; -webkit-appearance: none; position: relative; width: 42px; height: 26px; margin: 0; border: 0; border-radius: 13px; background: var(--rmd-vidrio-sw); cursor: pointer; transition: background-color .2s; }
+  #rmd-ui-panel input.rmd-pn-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.2), 0 0 0 .5px rgba(0,0,0,.05); transition: transform .22s cubic-bezier(.3,1.35,.5,1); }
+  #rmd-ui-panel input.rmd-pn-sw:checked { background: var(--rmd-vidrio-on); } #rmd-ui-panel input.rmd-pn-sw:checked::after { transform: translateX(16px); }
+  #rmd-ui-panel input.rmd-pn-sw:indeterminate { background: color-mix(in srgb, var(--rmd-vidrio-on) 55%, transparent); } #rmd-ui-panel input.rmd-pn-sw:indeterminate::after { transform: translateX(8px); }
   #rmd-ui-panel input.rmd-pn-sw:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
-  #rmd-ui-panel .rmd-pn-pie { flex: 0 0 auto; padding: 8px 16px 10px; border-top: 1px solid var(--rmd-borde); background: var(--rmd-barra); }
-  #rmd-ui-panel .rmd-pn-acciones { display: flex; gap: 8px; } #rmd-ui-panel .rmd-pn-acciones .rmd-btn { flex: 1 1 auto; justify-content: center; padding: 0 10px; white-space: nowrap; }
-  #rmd-ui-panel .rmd-pn-pie2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--rmd-apagado); font-size: 12px; }
-  #rmd-ui-panel kbd { padding: 0 4px; border: 1px solid var(--rmd-borde); border-radius: 3px; font: 11px var(--rmd-fuente); }
-  #rmd-ui-panel .rmd-restablecer, #rmd-ui-panel .rmd-pn-actualizar { border-color: transparent; background: none; white-space: nowrap; }
-  #rmd-ui-panel .rmd-pn-version { margin-top: 4px; align-items: flex-start; } #rmd-ui-panel .rmd-pn-version > span { line-height: 1.35; }
+  #rmd-ui-panel .rmd-pn-pie { flex: 0 0 auto; padding: 10px 12px 12px; border-top: 1px solid var(--rmd-vidrio-linea); }
+  #rmd-ui-panel .rmd-pn-acciones { display: flex; gap: 8px; }
+  #rmd-ui-panel .rmd-pn-acciones .rmd-btn { flex: 1 1 0; justify-content: center; height: 34px; padding: 0 10px; border: 0; border-radius: 11px; background: var(--rmd-vidrio-relleno); font-weight: 600; white-space: nowrap; }
+  #rmd-ui-panel .rmd-pn-acciones .rmd-btn:hover:not(:disabled) { background: rgba(10,132,255,.16); }
+  #rmd-ui-panel .rmd-pn-pie2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 0 2px 0 6px; color: var(--rmd-apagado); font-size: 12px; }
+  #rmd-ui-panel kbd { padding: 0 4px; border: 1px solid var(--rmd-vidrio-linea); border-radius: 4px; background: var(--rmd-vidrio-tarjeta); font: 11px var(--rmd-fuente); }
+  #rmd-ui-panel .rmd-restablecer { height: 26px; padding: 0 8px; border: 0; border-radius: 8px; background: none; font-size: 12.5px; white-space: nowrap; }
+  #rmd-ui-panel .rmd-restablecer:hover:not(:disabled) { background: var(--rmd-vidrio-relleno); }
+  /* aviso discreto de versión nueva junto al botón (una vez por versión) */
+  .rmd-pn-aviso { position: fixed; left: 60px; bottom: 15px; z-index: 99999; display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 13px; border: 1px solid var(--rmd-vidrio-borde); border-radius: 15px;
+    background: var(--rmd-vidrio); -webkit-backdrop-filter: blur(14px) saturate(180%); backdrop-filter: blur(14px) saturate(180%); box-shadow: 0 6px 18px rgba(0,0,0,.16), inset 0 1px 0 var(--rmd-vidrio-brillo);
+    color: var(--rmd-texto); font: 12.5px var(--rmd-fuente); cursor: pointer; animation: rmd-aviso-entra .3s cubic-bezier(.22,1,.36,1); transition: opacity .35s, transform .35s; }
+  .rmd-pn-aviso b { color: var(--rmd-acento-texto); font-weight: 600; } .rmd-pn-aviso:hover b { text-decoration: underline; } .rmd-pn-aviso.sale { opacity: 0; transform: translateX(-8px); }
+  .rmd-pn-punto { width: 7px; height: 7px; border-radius: 50%; background: var(--rmd-acento); }
+  @keyframes rmd-aviso-entra { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  /* Ver OP con todas las OP: sin paginación del portal */
+  .rmd-verop-todas button[title^="navigation-"] { display: none !important; }
   /* ── Reglas de revisión ── */
   .rmd-c-amarillo { --rmd-c: #e0a100; --rmd-cf: rgba(242,176,30,.36); } .rmd-c-rojo { --rmd-c: #e53935; --rmd-cf: rgba(229,57,53,.24); } .rmd-c-azul { --rmd-c: #1e88e5; --rmd-cf: rgba(30,136,229,.24); }
   .rmd-c-verde { --rmd-c: #2e9d4a; --rmd-cf: rgba(67,160,71,.26); } .rmd-c-morado { --rmd-c: #8e24aa; --rmd-cf: rgba(142,36,170,.24); }
@@ -757,8 +799,9 @@
   html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo { position: fixed; left: 8px; right: 8px; bottom: 62px; width: auto; max-width: none; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); }
   html.rmd-movil #rmd-ui-panel .rmd-panel-cuerpo, html.rmd-movil .rmd-modal-cuerpo, html.rmd-movil .rmd-paleta-res { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   html.rmd-movil #rmd-ui-panel summary, html.rmd-movil #rmd-ui-buscar, html.rmd-movil .rmd-filtros-mas, html.rmd-movil .rmd-paleta-it { -webkit-tap-highlight-color: transparent; }
-  html.rmd-movil #rmd-ui-panel .rmd-pn-item { padding: 10px 14px 10px 12px; } html.rmd-movil #rmd-ui-panel .rmd-btn { height: 40px; }
-  html.rmd-movil #rmd-ui-panel input.rmd-pn-sw { width: 44px; height: 26px; border-radius: 13px; } html.rmd-movil #rmd-ui-panel input.rmd-pn-sw::after { top: 3px; left: 3px; width: 18px; height: 18px; } html.rmd-movil #rmd-ui-panel input.rmd-pn-sw:checked::after { transform: translateX(18px); } html.rmd-movil #rmd-ui-panel input.rmd-pn-sw:indeterminate::after { transform: translateX(9px); }
+  html.rmd-movil #rmd-ui-panel .rmd-pn-item { padding: 11px 14px 11px 0; } html.rmd-movil #rmd-ui-panel .rmd-btn { height: 40px; }
+  html.rmd-movil #rmd-ui-panel input.rmd-pn-sw { width: 51px; height: 31px; border-radius: 16px; } html.rmd-movil #rmd-ui-panel input.rmd-pn-sw::after { width: 27px; height: 27px; } html.rmd-movil #rmd-ui-panel input.rmd-pn-sw:checked::after { transform: translateX(20px); } html.rmd-movil #rmd-ui-panel input.rmd-pn-sw:indeterminate::after { transform: translateX(10px); }
+  html.rmd-movil .rmd-pn-aviso { left: 116px; bottom: 17px; }
   html.rmd-movil #rmd-ui-panel .rmd-pn-atajos { display: none; } html.rmd-movil #rmd-ui-panel .rmd-pn-pie2 { justify-content: flex-end; }
   /* saludo, avisos y mensajes */
   html.rmd-movil .rmd-saludo { left: 10px; right: 10px; bottom: 62px; max-width: none; } html.rmd-movil .rmd-saludo-tip { display: none; }
@@ -2218,7 +2261,7 @@
     if (on('sesion')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -4025,7 +4068,6 @@
   // se asigna la unión al modelo.
   const RX_VER_OP = /^Visualizar las Ordenes de Producci[oó]n/i;
   const ICONO_EXPORTAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8.2M4.8 6.9 8 10.1l3.2-3.2"/><path d="M2.5 11.5v1.8A1.2 1.2 0 0 0 3.7 14.5h8.6a1.2 1.2 0 0 0 1.2-1.2v-1.8"/></svg>';
-  const ICONO_VER_TODAS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/></svg>';
   const csvCelda = (t) => '"' + String(t == null ? '' : t).replace(/"/g, '""').replace(/\s+/g, ' ').trim() + '"';
   function csvVerOP(t) {
     // solo columnas con encabezado de texto
@@ -4077,15 +4119,15 @@
   const EXPANDS_VER_OP = ['mdId/estadoIdRmd,estadoIdRmd', 'aReceta/recetaId', 'aEstructura/estructuraId', 'aEstructura/aEquipo/equipoId', 'aEstructura/aPaso/pasoId',
     'aEstructura/aPasoInsumoPaso/pasoHijoId,aEstructura/aPasoInsumoPaso/rmdEstructuraRecetaInsumoId', 'aEstructura/aUtensilio/utensilioId,aEstructura/aUtensilio/agrupadorId',
     'aEstructura/aEspecificacion', 'aEstructura/aInsumo', 'aEstructura/aEtiqueta/etiquetaId'];
-  async function cargarTodasOPRapido(d, t, avisar, detenido) {
-    const ctl = ctlDe(t); let c = ctl; while (c && !c.getController) c = c.getParent && c.getParent();
-    const ctrl = c && c.getController(), vista = ctrl && ctrl.getView && ctrl.getView();
+  const ctrlDeTabla = (t) => { let c = ctlDe(t); while (c && !c.getController) c = c.getParent && c.getParent(); return c && c.getController(); };
+  async function cargarTodasOPRapido(ctrl, avisar, detenido, fOP, fLote) {
+    const vista = ctrl && ctrl.getView && ctrl.getView();
     const modelo = vista && vista.getModel('mainModelv2'), asociar = vista && vista.getModel('asociarDatos'), local = vista && vista.getModel('localModel');
     const mdId = asociar && asociar.getData() && asociar.getData().mdId;
     if (!modelo || !local || !mdId) throw new Error('No encuentro los datos de esta ventana');
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
     const filtros = [new Filtro('mdId_mdId', 'EQ', mdId), new Filtro('estadoIdRmd_iMaestraId', 'NE', null)];
-    const fOP = local.getProperty('/filterOP'), fLote = local.getProperty('/filterLote');
+    if (fOP === undefined) fOP = local.getProperty('/filterOP'); if (fLote === undefined) fLote = local.getProperty('/filterLote');
     if (fOP) filtros.push(new Filtro('ordenSAP', 'EQ', fOP)); if (fLote) filtros.push(new Filtro('lote', 'EQ', fLote));
     const leer = (ruta, params) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read(ruta, { filters: filtros, urlParameters: params, success: ok, error: (e) => mal(new Error(`el servidor no respondió (${(e && e.statusCode) || 'sin código'})`)) })));
     const total = Number(await leer('/RMD/$count', {})) || 0, TAM = 5, paginas = Math.ceil(total / TAM), resultado = new Array(paginas);
@@ -4118,7 +4160,7 @@
   async function obtenerTodasOP(d, t) {
     let detenido = false; const av = avanceVerOP(d, () => { detenido = true; });
     try {
-      try { return { ...(await cargarTodasOPRapido(d, t, (n, total) => av.poner(n, total), () => detenido)), detenido }; }
+      try { return { ...(await cargarTodasOPRapido(ctrlDeTabla(t), (n, total) => av.poner(n, total), () => detenido)), detenido }; }
       catch (e) {
         try { console.info('[RMD] Ver todas: carga rápida no disponible (' + e.message + '); se usa la paginación del portal.'); } catch (e2) { /* sin consola */ }
         av.texto('Cargando página por página…');
@@ -4152,14 +4194,48 @@
     } catch (e) { toast('No se pudieron cargar todas las OP: ' + e.message, true); }
     finally { if (boton) boton.disabled = false; }
   }
-  // Al abrir Ver OP: cuando el portal termina su primera página, se cargan todas (si hay más de una página) y se ordenan por fecha de inicio.
-  const botonTodasVerOP = (d) => [...d.querySelectorAll('.rmd-exportar-op')].find((b) => /Ver todas/.test(b.textContent));
+  // onVerOP espera a onGetRMDVerOP (5 OP, 10 lecturas) para abrir la ventana. Con «verop» se sustituye: la ventana abre enseguida con la barra de avance y
+  // se leen todas las páginas en paralelo; la paginación del portal se oculta. Si la carga falla, se vuelve a la página 1 del portal.
+  function parchearVerOP(ctrl) {
+    if (ctrl.__rmdVerOP || typeof ctrl.onGetRMDVerOP !== 'function' || !ctrl.localModel) return;
+    const orig = ctrl.onGetRMDVerOP; ctrl.__rmdVerOP = orig;
+    ctrl.onGetRMDVerOP = function (fOP, fLote) {
+      if (!on('verop')) { this.__rmdCargaOP = null; return orig.apply(this, arguments); }
+      const previa = this.__rmdCargaOP; if (previa && !previa.fin) previa.detenido = true;
+      const carga = { fOP, fLote, n: 0, total: 0, detenido: false, fin: false, atendida: false, r: null, error: null, avance: null };
+      carga.promesa = cargarTodasOPRapido(this, (n, total) => { carga.n = n; carga.total = total; if (carga.avance) carga.avance.poner(n, total); }, () => carga.detenido, fOP || '', fLote || '')
+        .then((r) => { carga.r = r; }, (e) => { carga.error = e; }).then(() => { carga.fin = true; });
+      this.__rmdCargaOP = carga;
+      this.localModel.setProperty('/Estructura', []);
+      const dlg = this.oVerOP, d = dlg && dlg.isOpen && dlg.isOpen() && dlg.getDomRef(), t = d && d.querySelector('table.sapMListTbl');
+      if (t) seguirCargaVerOP(d, t, carga);                             // búsqueda o recarga con la ventana ya abierta
+      return Promise.resolve();
+    };
+  }
+  async function seguirCargaVerOP(d, t, carga) {
+    if (carga.atendida) return; carga.atendida = true; d.__rmdCarga = carga; d.__rmdPaginacion = false; VEROP_ABIERTAS.add(d); delete d.__rmdOpCompletas;
+    d.classList.add('rmd-verop-todas');
+    const av = avanceVerOP(d, () => { carga.detenido = true; }); carga.avance = av; if (carga.n) av.poner(carga.n, carga.total);
+    try { await carga.promesa; } finally { av.quitar(); carga.avance = null; }
+    const ctrl = ctrlDeTabla(t);
+    if (!ctrl || ctrl.__rmdCargaOP !== carga || !d.isConnected || !dialogos().includes(d)) return;   // cerrada o sustituida por otra búsqueda
+    if (carga.error) {
+      d.__rmdPaginacion = true; d.classList.remove('rmd-verop-todas');
+      toast(`No se pudieron cargar todas las OP (${carga.error.message}); se muestran por páginas, como en el portal.`, true);
+      try { await ctrl.__rmdVerOP.call(ctrl, carga.fOP, carga.fLote); } catch (e) { /* el portal ya avisa */ }
+      return;
+    }
+    const r = carga.r; r.detenido = carga.detenido; r.filas = ordenarOP(r.filas);
+    await pintarTodasEnTabla(t, r.modelo, r.ruta, r.filas); rotuloTodas(r); indicarOrdenVerOP(t, true); d.__rmdOpCompletas = r.detenido ? 0 : r.filas.length;
+    if (r.detenido) toast(`Detenido: se muestran ${r.filas.length} de ${r.total || '?'} OP.`);
+  }
+  // Sin el parche (controlador aún no localizado): tras la primera página del portal se cargan todas y se ordenan.
   async function autoVerOP(d, t) {
     await esperar(400);
     const listo = await hasta(() => !d.isConnected || !dialogos().includes(d) || (!ocupadoGlobal() && filasPrincipales(t).length > 0), 45000, 250);
     if (!listo || !d.isConnected || !dialogos().includes(d) || !on('verop')) return;
     const der = [...d.querySelectorAll('button')].find((b) => b.title === 'navigation-right-arrow'), cDer = der && ctlDe(der);
-    if (cDer && cDer.getEnabled && cDer.getEnabled()) await verTodasOP(d, t, botonTodasVerOP(d), true);
+    if (cDer && cDer.getEnabled && cDer.getEnabled()) await verTodasOP(d, t, null, true);
     else ordenarVerOPEnSitio(d, t);
   }
   window.__rmdStats.verOP = { ordenarOP, inicioOP };   // pruebas
@@ -4258,32 +4334,67 @@
     }
     aplicarFiltrosColumnaVerOP(t); actualizarIconosFiltroVerOP(t);
   }
-  const VEROP_ABIERTAS = new Set();                                    // ventanas Ver OP ya cargadas en esta apertura
+  const VEROP_ABIERTAS = new Set();                                    // ventanas Ver OP ya atendidas en esta apertura
   function gestionarVerOP() {
     if (!on('verop')) { quitarBotonesVerOP(); return; }
     const abiertas = dialogos().filter((d) => RX_VER_OP.test(cabecera(d)));
-    VEROP_ABIERTAS.forEach((d) => { if (!abiertas.includes(d)) { VEROP_ABIERTAS.delete(d); delete d.__rmdOpCompletas; } });
+    VEROP_ABIERTAS.forEach((d) => {
+      if (abiertas.includes(d)) return;
+      VEROP_ABIERTAS.delete(d); if (d.__rmdCarga && !d.__rmdCarga.fin) d.__rmdCarga.detenido = true;   // cerrada a media carga: se dejan de leer páginas
+      delete d.__rmdCarga; delete d.__rmdOpCompletas;
+    });
     abiertas.forEach((d) => {
       const t = d.querySelector('table.sapMListTbl'); if (!t) return;
+      d.classList.toggle('rmd-verop-todas', !d.__rmdPaginacion);
       instalarFiltrosVerOP(d, t);
-      if (!VEROP_ABIERTAS.has(d)) { VEROP_ABIERTAS.add(d); autoVerOP(d, t); }
+      const ctrl = ctrlDeTabla(t), carga = ctrl && ctrl.__rmdCargaOP;
+      if (carga && !carga.atendida) seguirCargaVerOP(d, t, carga);
+      else if (!VEROP_ABIERTAS.has(d)) { VEROP_ABIERTAS.add(d); if (!carga) autoVerOP(d, t); }
       const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-exportar-op')) return;
-      const bT = botonIcono(ICONO_VER_TODAS, 'Ver todas', 'rmd-exportar-op', () => verTodasOP(d, t, bT));
-      bT.title = 'Vuelve a cargar todas las OP asociadas (al abrir la ventana ya se cargan solas) y las ordena por fecha de inicio.';
       const bE = botonIcono(ICONO_EXPORTAR, 'Exportar a CSV', 'rmd-exportar-op', () => exportarVerOP(d, t, bE));
-      bE.title = 'Exporta a CSV todas las OP asociadas (primero las carga todas, como "Ver todas").';
+      bE.title = 'Exporta a CSV todas las OP asociadas de la ventana.';
       const cuenta = document.createElement('span'); cuenta.className = 'rmd-cuenta-verop';
       const ref = hdr.querySelector('.sapMTBSpacer') || hdr.firstElementChild;
-      if (ref) { ref.insertAdjacentElement('afterend', cuenta); ref.insertAdjacentElement('afterend', bE); ref.insertAdjacentElement('afterend', bT); } else { hdr.appendChild(bT); hdr.appendChild(bE); hdr.appendChild(cuenta); }
+      if (ref) { ref.insertAdjacentElement('afterend', cuenta); ref.insertAdjacentElement('afterend', bE); } else { hdr.appendChild(bE); hdr.appendChild(cuenta); }
     });
   }
   function quitarBotonesVerOP() {
     try { dialogos().filter((d) => RX_VER_OP.test(cabecera(d))).forEach((d) => { const t = d.querySelector('table.sapMListTbl'); if (t) indicarOrdenVerOP(t, false); }); } catch (e) { /* sin UI5 */ }
     VEROP_ABIERTAS.clear();
+    document.querySelectorAll('.rmd-verop-todas').forEach((d) => d.classList.remove('rmd-verop-todas'));
     document.querySelectorAll('.rmd-exportar-op, .rmd-cuenta-verop').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-filtro-col]').forEach((e) => delete e.dataset.rmdFiltroCol);
   }
+
+  // ---- Impresora de «Configurar el RMD» ----
+  // Llama tratarInformacion() sin argumentos -> onGeneratePdf -> pdfMake download(). «Ver master» usa tratarInformacion(false, true) -> open(). Con
+  // «pdfventana» se toma esa ruta sobre una pestaña abierta en el mismo clic, para que el bloqueador de ventanas emergentes no la frene si el PDF tarda.
+  function parchearImpresora(ctrl) {
+    if (ctrl.__rmdImprimir || typeof ctrl.tratarInformacion !== 'function') return;
+    const orig = ctrl.tratarInformacion; ctrl.__rmdImprimir = orig;
+    ctrl.tratarInformacion = function () {
+      const P = window.pdfMake;
+      if (arguments.length || !on('pdfventana') || !P || typeof P.createPdf !== 'function') return orig.apply(this, arguments);
+      const w = window.open('', '_blank');
+      if (!w) { toast('El navegador bloqueó la pestaña nueva y el PDF se descarga. Permite las ventanas emergentes de este sitio para verlo sin descargarlo.', true); return orig.apply(this, arguments); }
+      try { w.document.title = 'RMD master'; w.document.body.style.cssText = 'margin:0;display:grid;place-items:center;height:100vh;background:#f5f6f7;color:#556;font:15px Arial,sans-serif'; w.document.body.textContent = 'Generando el PDF del master…'; } catch (e) { /* sin acceso */ }
+      const crear = P.createPdf, est = window.__rmdStats.impresora = { creados: 0, abiertos: 0, firma: null }; let usada = false;
+      P.createPdf = function () {                                        // una sola vez: el documento de esta impresión se abre en la pestaña ya creada
+        P.createPdf = crear;
+        const doc = crear.apply(this, arguments), abrir = doc.open; est.creados++; est.firma = abrir && abrir.length;
+        doc.open = function (opciones) { usada = true; est.abiertos++; return abrir.length > 1 ? abrir.call(doc, opciones || {}, w) : abrir.call(doc, w); };   // 0.1: open(opciones, ventana); 0.2: open(ventana)
+        return doc;
+      };
+      // tratarInformacion termina antes que onGeneratePdf (asíncrono, sin await): el gancho se retira al usarse, si el portal falla o a los 3 min
+      const fin = () => { clearTimeout(limite); if (!est.creados && P.createPdf !== crear) P.createPdf = crear; if (!usada) try { w.close(); } catch (e) { /* ya cerrada */ } };
+      const limite = setTimeout(fin, 180000);
+      let r; try { r = orig.call(this, false, true); } catch (e) { fin(); throw e; }
+      Promise.resolve(r).catch(fin);
+      return r;
+    };
+  }
+  function parchearControlador() { const c = controladorPrincipal(); if (c) { parchearVerOP(c); parchearImpresora(c); } }
 
   // ==XLSX-INICIO==
   // Escritor/lector .xlsx sin dependencias: estilos, fórmulas con valor en caché, autofiltro, paneles fijos y tablas dinámicas con caché. Comprime con
@@ -7504,7 +7615,7 @@
   let externosUI5 = false;
   function registrarExternosUI5() {
     if (externosUI5 || typeof sap === 'undefined') return;
-    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { }
+    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-pn-aviso', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { }
   }
   function abrirPaleta() {
     if (document.querySelector('.rmd-paleta-fondo')) return;
@@ -12010,7 +12121,7 @@ td.ult { position: relative; }
   const GRUPOS_PANEL = [
     ['Uso diario', 'inicio', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
     ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios']],
-    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'grupos', 'depende', 'filtro', 'vivo']],
+    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
@@ -12021,8 +12132,25 @@ td.ult { position: relative; }
     inicio: '<path d="M2.5 7.5 8 3l5.5 4.5"/><path d="M4 6.5V13h3v-3.5h2V13h3V6.5"/>', lista: '<path d="M6 4h7.5M6 8h7.5M6 12h7.5M2.5 4h.5M2.5 8h.5M2.5 12h.5"/>',
     tabla: '<rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6.5h12M6.5 6.5V13"/>', lapiz: '<path d="M10.5 2.5l3 3L6 13H3v-3z"/><path d="M9 4l3 3"/>',
     matraz: '<path d="M6 2h4M6.5 2v4.2L3 13.5h10L9.5 6.2V2"/><path d="M4.6 10.5h6.8"/>', alerta: '<path d="M8 2.5 14 13.5H2z"/><path d="M8 6.5v3.3M8 11.8v.1"/>',
-    reporte: '<path d="M4 2h5.5L12 4.5V14H4z"/><path d="M6.5 11.5V10M8 11.5V8M9.5 11.5V9"/>',
+    reporte: '<path d="M4 2h5.5L12 4.5V14H4z"/><path d="M6.5 11.5V10M8 11.5V8M9.5 11.5V9"/>', actualizar: '<path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M12.4 1.8v2.6H9.8"/>',
   };
+  // Estado del cargador (rmd-ui-mejoras-cargador.user.js): atributo data-rmd-cargador-estado en <html>
+  const cmpVersion = (a, b) => { const A = String(a || '').split('.').map((x) => parseInt(x, 10) || 0), B = String(b || '').split('.').map((x) => parseInt(x, 10) || 0); for (let i = 0; i < 3; i++) if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) - (B[i] || 0); return 0; };
+  const estadoCargador = () => { try { return JSON.parse(html.getAttribute('data-rmd-cargador-estado') || 'null'); } catch (e) { return null; } };
+  const versionNueva = (e) => (e && e.ultima && cmpVersion(e.ultima, VERSION) !== 0 ? e.ultima : null);
+  const recargarPortal = () => { try { window.top.location.reload(); } catch (e) { location.reload(); } };
+  // aviso discreto junto al botón, una vez por versión (el punto en el botón y el texto del panel siguen hasta recargar)
+  function avisoVersionNueva() {
+    const v = versionNueva(estadoCargador());
+    if (!v || cmpVersion(v, VERSION) < 0 || opc.versionAvisada === v || document.querySelector('.rmd-pn-aviso')) return;
+    opc.versionAvisada = v; guardar(opc);
+    const a = document.createElement('button'); a.type = 'button'; a.className = 'rmd-pn-aviso'; a.title = 'Las mejoras se actualizan al recargar la página';
+    a.innerHTML = `<span class="rmd-pn-punto"></span>Versión ${esc(v)} lista · <b>Recargar</b>`;
+    a.addEventListener('click', recargarPortal);
+    html.appendChild(a);
+    setTimeout(() => { a.classList.add('sale'); setTimeout(() => a.remove(), 400); }, 9000);
+  }
+  window.__rmdStats.cargador = { estado: estadoCargador, versionNueva, aviso: avisoVersionNueva, desde: window.__rmdDesdeCargador || null };   // pruebas
   const iconoPanel = (n) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICONOS_PANEL[n] || ''}</svg>`;
   const clavePanel = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   function panel() {
@@ -12032,7 +12160,7 @@ td.ult { position: relative; }
     const p = document.createElement('details'); p.id = 'rmd-ui-panel'; p.className = 'rmd-pn-visible';
     p.innerHTML = '<summary title="Mejoras de interfaz" aria-label="Mejoras de interfaz">' + ICONO_AJUSTES + '</summary>' +
       '<div class="rmd-panel-cuerpo" role="group" aria-label="Mejoras de interfaz">' +
-        `<div class="rmd-pn-cab"><div><div class="rmd-pn-titulo">Mejoras de interfaz</div><div class="rmd-pn-sub">Versión ${VERSION}</div></div><button type="button" class="rmd-pn-x" title="Cerrar (Esc)" aria-label="Cerrar">${iconoPanel('cerrar')}</button></div>` +
+        `<div class="rmd-pn-cab"><div><div class="rmd-pn-titulo">Mejoras de interfaz</div><button type="button" class="rmd-pn-sub rmd-pn-ver">${iconoPanel('actualizar')}<span>Versión ${VERSION}</span><span class="rmd-pn-est"></span></button></div><button type="button" class="rmd-pn-x" title="Cerrar (Esc)" aria-label="Cerrar">${iconoPanel('cerrar')}</button></div>` +
         `<label class="rmd-fila rmd-pn-maestro maestro"><span class="rmd-pn-txt"><span class="rmd-pn-t">${esc(T.activo.t)}</span><span class="rmd-pn-d">${esc(T.activo.d)}</span></span>${sw('data-k="activo"', opc.activo)}</label>` +
         `<div class="rmd-pn-buscar">${iconoPanel('buscar')}<input type="search" placeholder="Buscar una mejora" aria-label="Buscar una mejora"></div>` +
         '<div class="rmd-pn-lista">' + GRUPOS_PANEL.map(([nombre, icono, ks], g) =>
@@ -12041,7 +12169,7 @@ td.ult { position: relative; }
         '<p class="rmd-pn-vacio" hidden>Ninguna mejora coincide con la búsqueda.</p></div>' +
         '<div class="rmd-pn-pie"><div class="rmd-pn-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear o activar tus reglas de revisión y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión…</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
         '<div class="rmd-pn-pie2"><span class="rmd-pn-atajos"><kbd>Ctrl</kbd>+<kbd>K</kbd> Ir a… · <kbd>Ctrl</kbd>+<kbd>S</kbd> Guardar</span><button type="button" class="rmd-btn rmd-restablecer" title="Deja todas las mejoras como vienen de inicio">Restablecer</button></div>' +
-        '<div class="rmd-pn-pie2 rmd-pn-version"><span>Se actualiza sola una vez al día desde la carpeta MEJORAS DE INTERFAZ de SharePoint.</span><button type="button" class="rmd-btn rmd-pn-actualizar" title="Abre el archivo publicado: Tampermonkey muestra su versión y permite instalarla ahora">Instalar la última versión</button></div></div>' +
+        '</div>' +
       '</div>';
     const grupos = [...p.querySelectorAll('.rmd-pn-grupo')], buscar = p.querySelector('.rmd-pn-buscar input');
     const pintar = () => {
@@ -12056,7 +12184,7 @@ td.ult { position: relative; }
     };
     const aplicar = () => {
       guardar(opc); aplicarClases(); pintar();
-      document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => { if (c.style.display === 'none') c.style.display = ''; });
+      document.querySelectorAll('.sapMDialog th[style*="display: none"], .sapMDialog td[style*="display: none"]').forEach((c) => { c.style.display = ''; });
       ajustarTodo();
     };
     p.addEventListener('change', (e) => {
@@ -12083,17 +12211,40 @@ td.ult { position: relative; }
     buscar.addEventListener('keydown', (e) => { if (e.key === 'Escape' && buscar.value) { e.stopPropagation(); e.preventDefault(); buscar.value = ''; buscar.dispatchEvent(new Event('input')); } });
     const cerrar = () => { if (p.open) p.open = false; };
     p.querySelector('.rmd-pn-x').addEventListener('click', () => { cerrar(); p.querySelector('summary').focus(); });
-    p.addEventListener('toggle', () => { if (p.open) { pintar(); p.classList.remove('rmd-pn-visible'); if (!html.classList.contains('rmd-movil')) setTimeout(() => buscar.focus({ preventScroll: true }), 30); } });
+    p.addEventListener('toggle', () => { if (p.open) { pintar(); pintarVersion(); p.classList.remove('rmd-pn-visible'); if (!html.classList.contains('rmd-movil')) setTimeout(() => buscar.focus({ preventScroll: true }), 30); } });
     // se cierra al hacer clic fuera o con Esc
     document.addEventListener('pointerdown', (e) => { if (p.open && !p.contains(e.target)) cerrar(); }, true);
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && p.open && !document.querySelector('.rmd-modal-fondo')) { e.stopPropagation(); e.preventDefault(); cerrar(); p.querySelector('summary').focus(); } }, true);
     p.querySelector('.rmd-mod-masivas').addEventListener('click', () => { cerrar(); abrirModificacionesMasivas('suspender'); });
     p.querySelector('.rmd-abrir-reglas').addEventListener('click', () => { cerrar(); abrirReglas(); });
-    p.querySelector('.rmd-pn-actualizar').addEventListener('click', () => { cerrar(); window.open(URL_ACTUALIZACION, '_blank', 'noopener'); });
+    // versión: con el cargador, el clic revisa SharePoint (o recarga si ya hay otra lista); sin él, abre la instalación del cargador
+    const ver = p.querySelector('.rmd-pn-ver'), verEst = ver.querySelector('.rmd-pn-est'); let buscando = 0;
+    const pintarVersion = () => {
+      const e = estadoCargador(), con = html.hasAttribute('data-rmd-cargador'), nueva = versionNueva(e);
+      ver.classList.toggle('girando', !!buscando); ver.classList.toggle('nueva', !!nueva); ver.classList.toggle('error', !!(con && e && e.error && !buscando && !nueva));
+      p.classList.toggle('rmd-pn-nueva', !!nueva);
+      let est = '', tip;
+      if (!con) tip = 'Instalar el cargador: usa siempre la versión más reciente de la carpeta MEJORAS DE INTERFAZ de SharePoint, con cualquier nombre de archivo';
+      else if (buscando) { est = ' · buscando…'; tip = 'Revisando la carpeta MEJORAS DE INTERFAZ'; }
+      else if (nueva) { est = ` · ${nueva} lista, recargar`; tip = `La versión ${nueva} ya está descargada: clic para recargar la página y usarla`; }
+      else if (e && e.error) { est = ' · sin revisar'; tip = `No se pudo revisar SharePoint (${e.error}). Clic para reintentar; si sigue, abre SharePoint en este navegador e inicia sesión.`; }
+      else { est = e && e.revisado ? ' · al día' : ''; tip = 'Buscar una versión más reciente en la carpeta MEJORAS DE INTERFAZ' + (e && e.revisado ? ` (última revisión ${new Date(e.revisado).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })})` : ''); }
+      if (verEst.textContent !== est) verEst.textContent = est;
+      ver.title = tip;
+    };
+    ver.addEventListener('click', () => {
+      if (!html.hasAttribute('data-rmd-cargador')) { window.open(URL_CARGADOR, '_blank', 'noopener'); return; }
+      if (versionNueva(estadoCargador())) { recargarPortal(); return; }
+      if (buscando) return;
+      const e = estadoCargador(); if (e && /sesión/.test(e.error || '')) window.open(URL_CARPETA, '_blank', 'noopener');
+      buscando = setTimeout(() => { buscando = 0; pintarVersion(); }, 90000); pintarVersion();
+      document.dispatchEvent(new Event('rmd-cargador-revisar'));
+    });
+    document.addEventListener('rmd-cargador-estado', () => { if (buscando) { clearTimeout(buscando); buscando = 0; } pintarVersion(); avisoVersionNueva(); });
     p.querySelector('.rmd-restablecer').addEventListener('click', () => { OPC.forEach(([k]) => { opc[k] = !APAGADAS_POR_DEFECTO.includes(k); }); delete opc.vistaMovil; gestionarVistaMovil(); aplicar(); });
     setTimeout(() => p.classList.remove('rmd-pn-visible'), 4000);     // al cargar se ve completo unos segundos; luego queda latente
     window.__rmdStats.panel = { abrir: (todo) => { p.open = true; if (todo) grupos.forEach((sec) => sec.classList.add('abierto')); }, cerrar, grupos: GRUPOS_PANEL };
-    pintar(); panelEl = p; montarPanel();
+    pintar(); pintarVersion(); panelEl = p; montarPanel(); avisoVersionNueva();
   }
   // El botón cuelga de <html>: UI5 mueve a su zona de preservados los nodos con id del <body>. Se vigila y se reinserta si se retira.
   let panelEl = null;

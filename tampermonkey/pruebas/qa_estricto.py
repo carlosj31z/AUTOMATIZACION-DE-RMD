@@ -1,6 +1,6 @@
 """Pruebas estrictas del userscript rmd-ui-mejoras.user.js contra el portal real.
 
-Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 1 3 4; por defecto todos)
+Uso:  python tampermonkey/pruebas/qa_estricto.py [bloques]      (bloques: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 1 3 4 5; por defecto todos)
   A diseño y estructura · B portapapeles · C otros RMD y estados · E interruptores del panel · F otras listas/Escape/avisos
   G pantalla pequeña · H ventana "Asociar Fórmula" y aviso de códigos · I diseño de las listas de Pasos en varios tamaños
   J Especificaciones (reordenar y editar textos; el guardado se comprueba con la petición SIMULADA y un cortafuegos: no escribe)
@@ -42,7 +42,7 @@ RMD_AUTORIZADO = os.environ.get("RMD_AUTORIZADO", "2202609061")
 RMD_ASOCIAR = os.environ.get("RMD_ASOCIAR", "2202609081"); ASOCIAR_DESC = os.environ.get("ASOCIAR_DESC", "clorfenamina 4")
 ETQS_LISTAS = os.environ.get("ETQS_LISTAS", "DOCUMENTACION|PREPARACION DE LAS MAQUINAS|PREPARACION DEL MATERIAL|FABRICACION|RENDIMIENTO").split("|")
 
-SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ1234D"
+SOLO = sys.argv[1] if len(sys.argv) > 1 else "ABCEFGHIJKLMNOPQRSTUVWXYZ12345D"
 if "D" in SOLO and not RMD_PRUEBA:
     raise SystemExit("El bloque D ESCRIBE: define RMD_PRUEBA con el código de un RMD de PRUEBA (nunca uno real) o ejecuta solo los bloques sin escritura (ABCEFGHIJKLMNOQRSTVWXYZ).")
 RMD_PRUEBA = RMD_PRUEBA or "2202609081"            # bloques sin escritura: por defecto un RMD Ingresado real (solo se cambian datos en memoria)
@@ -1120,19 +1120,22 @@ with sync_playwright() as p:
             visible = fr.evaluate("[...document.querySelectorAll('.sapMMessageDialog')].some(x=>x.getClientRects().length && /PRUEBA RMD: error normal/.test(x.textContent))")
             fr.evaluate("(() => { const m=[...document.querySelectorAll('.sapMMessageDialog')].filter(x=>x.getClientRects().length).pop(); if(m){ const b=m.querySelector('footer button'); if(b) sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); } })()"); pg.wait_for_timeout(600)
             return (oculto and visible), f"omitido={oculto} normal visible={visible}"
-        @prueba("Q7 Ver OP (v1.55): al abrir se cargan solas todas las OP asociadas (carga rápida, sin pulsar «Ver todas») y quedan ordenadas por Fecha Inicio de menor a mayor, con Item 1..n, la flecha de orden en la columna y los datos de cada fila completos")
+        @prueba("Q7 Ver OP (v1.56): la ventana abre directamente con todas las OP asociadas (nunca muestra la página de 5 del portal; sin «Ver todas» ni flechas de paginación), ordenadas por Fecha Inicio de menor a mayor, con Item 1..n, la flecha de orden en la columna y los datos de cada fila completos")
         def _():
             ra = RmdAutomation(pg); ra.configuracion.filtrar(ConfiguracionFiltro(codigo_rmd=RMD_VER_OP)); pg.wait_for_timeout(2500); t0 = time.time(); ra.configuracion.elegir_accion("Ver OP")
             leer = """() => { const d=""" + TOPQ + """; if (!d || !/Ordenes de Producci/.test((d.querySelector('h2')||{}).textContent||'')) return null; const t=d.querySelector('table.sapMListTbl'); const c=sap.ui.getCore().byId(t.id.replace(/-listUl$/,''));
               const os=c.getItems().map(it=>it.getBindingContext('localModel')).filter(Boolean).map(x=>x.getObject()); const col=c.getColumns().find(k=>k.getHeader&&/Fecha Inicio/.test(k.getHeader().getText?k.getHeader().getText():''));
-              return { n: os.length, avance: !!d.querySelector('.rmd-op-avance'), orden: col && col.getSortIndicator(), fechas: os.map(o=>o.fechaInicio?new Date(o.fechaInicio).getTime():null), items: os.map(o=>o.item), completas: os.every(o=>o.aEstructura&&o.aEstructura.results), rotulo: (d.textContent.match(/1 - \d+/)||[])[0] }; }"""
-            e = None
-            for _i in range(90):
-                pg.wait_for_timeout(1000); e = fr.evaluate(leer)
+              return { n: os.length, avance: !!d.querySelector('.rmd-op-avance'), orden: col && col.getSortIndicator(), fechas: os.map(o=>o.fechaInicio?new Date(o.fechaInicio).getTime():null), items: os.map(o=>o.item), completas: os.every(o=>o.aEstructura&&o.aEstructura.results), rotulo: (d.textContent.match(/1 - \d+/)||[])[0],
+                flechas: [...d.querySelectorAll('button')].filter(b=>/^navigation-/.test(b.title)&&b.getClientRects().length).length, botones: [...d.querySelectorAll('.rmd-exportar-op')].map(b=>b.textContent.trim()) }; }"""
+            e = None; durante = set()
+            for _i in range(180):
+                pg.wait_for_timeout(500); e = fr.evaluate(leer)
+                if e and e["avance"]: durante.add(e["n"])
                 if e and not e["avance"] and e["n"] > 5 and e["orden"] == "Ascending": break
             s_ = round(time.time() - t0, 1); f = [x for x in e["fechas"] if x is not None]
-            ok = (e["n"] > 5 and f == sorted(f) and all(x is None for x in e["fechas"][len(f):]) and e["items"] == list(range(1, e["n"] + 1)) and e["completas"] and e["orden"] == "Ascending" and e["rotulo"] == f"1 - {e['n']}" and s_ < 90)
-            return ok, f"{e['n']} OP en {s_} s desde abrir; ordenadas={f == sorted(f)} item 1..n={e['items'] == list(range(1, e['n'] + 1))} flecha={e['orden']} rótulo={e['rotulo']}"
+            ok = (e["n"] > 5 and f == sorted(f) and all(x is None for x in e["fechas"][len(f):]) and e["items"] == list(range(1, e["n"] + 1)) and e["completas"] and e["orden"] == "Ascending" and e["rotulo"] == f"1 - {e['n']}" and s_ < 90
+                  and durante <= {0} and e["flechas"] == 0 and e["botones"] == ["Exportar a CSV"])
+            return ok, f"{e['n']} OP en {s_} s desde abrir; filas durante la carga={sorted(durante)} ordenadas={f == sorted(f)} item 1..n={e['items'] == list(range(1, e['n'] + 1))} flecha={e['orden']} rótulo={e['rotulo']} flechas visibles={e['flechas']} botones={e['botones']}"
         cerrar_seguro()
         RMD_PH = os.environ.get("RMD_PH", "2202609126")   # RMD con algún paso de Fabricación en MAYÚSCULAS que lleve "pH" o "mL"
         @prueba("Q8 'Aa' sale en 'Editar Paso' de un paso en MAYÚSCULAS con 'pH'/'mL' (v1.21.1) y redacta sin tocarlos (se cancela: nunca Grabar)")
@@ -2671,6 +2674,82 @@ with sync_playwright() as p:
                 return (not bq4 and not e and not errores4), f"bloqueadas={bq4[:5]} errores_script={e[:3]} errores_pagina={errores4[:3]}"
         finally:
             pg4.close()
+
+    # ───────────────────────── 5. v1.56: impresora en pestaña nueva, versión y aviso del cargador, copia directa frente al cargador — solo lectura (cortafuegos) ─────────────────────────
+    if "5" in SOLO:
+        bq5 = []; errores5 = []
+        COD_5 = os.environ.get("COD_5", "2202609224")
+        def guardia5(route):
+            if route.request.method not in ("GET", "HEAD"): bq5.append(route.request.method + " " + route.request.url[:90]); route.abort()
+            else: route.continue_()
+        pg5, fr5, _ = abrir_con_inyeccion_temprana(b, src, ancho=1415, alto=886)
+        pg5.route("**/*", guardia5); pg5.on("pageerror", lambda e: errores5.append(str(e)[:200]))
+        try:
+            pg5.wait_for_timeout(2500); fr5.evaluate("() => document.querySelectorAll('.rmd-saludo').forEach((x) => x.remove())")
+
+            @prueba("5-1 La impresora de «Configurar el RMD» abre el master en UNA pestaña nueva (visor de PDF), sin descargarlo")
+            def _():
+                RmdAutomation(pg5).editor_de_rmd(COD_5); pg5.wait_for_timeout(4000)
+                fr5.evaluate("() => document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")
+                q = fr5.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).pop(); const b = d && [...d.querySelectorAll('button')].find(x => { const c = sap.ui.getCore().byId(x.id); return c && c.getIcon && /print/.test(c.getIcon()) && x.getClientRects().length; });
+                  if (!b) return null; const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }""")
+                if not q: return False, "no se encontró la impresora"
+                ifr = pg5.query_selector("iframe[src*='ui5appruntime']").bounding_box(); nuevas, descargas = [], []
+                oyente = lambda p_: nuevas.append(p_)
+                pg5.context.on("page", oyente); pg5.on("download", lambda d_: descargas.append(d_.suggested_filename))
+                try:
+                    pg5.mouse.click(ifr["x"] + q[0], ifr["y"] + q[1])
+                    for _i in range(90):
+                        pg5.wait_for_timeout(500)
+                        if any(x.url.startswith("blob:") for x in nuevas if not x.is_closed()): break
+                    pg5.wait_for_timeout(1500)
+                finally:
+                    pg5.context.remove_listener("page", oyente)
+                abiertas = [x for x in nuevas if not x.is_closed()]; urls = [x.url[:40] for x in abiertas]; est = fr5.evaluate("(window.__rmdStats || {}).impresora || null")
+                for x in abiertas: x.close()
+                ok = (len(abiertas) == 1 and urls[0].startswith("blob:") and not descargas and est and est["abiertos"] == 1)
+                fr5.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).pop(); const b = d && [...d.querySelectorAll('button')].filter(x => x.getClientRects().length && /^(Cancelar|Cerrar|Salir)$/.test(x.textContent.trim())).pop(); if (b) sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }""")
+                pg5.wait_for_timeout(1500)
+                return ok, f"pestañas abiertas={urls} descargas={descargas} pdfMake={est}"
+
+            @prueba("5-2 Versión del panel: sin cargador abre su instalación; con cargador busca en SharePoint y muestra «al día», «sin revisar» o «X lista, recargar»; la versión nueva pone un punto en el botón y un aviso discreto una sola vez")
+            def _():
+                r = fr5.evaluate("""async () => { const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms)), h = document.documentElement, P = window.__rmdStats.panel, abiertas = [], wo = window.open, o = {};
+                  const ver = () => document.querySelector('#rmd-ui-panel .rmd-pn-ver');
+                  const estado = (x) => { h.setAttribute('data-rmd-cargador-estado', JSON.stringify(Object.assign({ cargador: '1.0.0', actual: '1.56.0', ultima: '1.56.0', revisado: Date.now(), error: '' }, x))); document.dispatchEvent(new Event('rmd-cargador-estado')); };
+                  const cfg = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete cfg.versionAvisada; localStorage.setItem('rmdUiMejoras', JSON.stringify(cfg));
+                  window.open = (u) => { abiertas.push(u); return null; };
+                  try {
+                    P.abrir(); await esperar(300); ver().click(); o.sinCargador = abiertas.slice(); o.fila = !!document.querySelector('.rmd-pn-version, .rmd-pn-actualizar');
+                    h.setAttribute('data-rmd-cargador', '1.0.0'); let pedidos = 0; const oye = () => { pedidos++; setTimeout(() => estado({}), 300); }; document.addEventListener('rmd-cargador-revisar', oye);
+                    estado({ revisado: Date.now() - 60000 }); ver().click(); await esperar(50); o.buscando = ver().textContent; await esperar(500); o.alDia = ver().textContent; o.pedidos = pedidos; document.removeEventListener('rmd-cargador-revisar', oye);
+                    estado({ error: 'sin sesión de SharePoint en este navegador' }); o.error = ver().textContent; P.cerrar(); await esperar(200);
+                    estado({ ultima: '1.57.0', archivo: '1.57.0.js' }); await esperar(400); o.nueva = ver().textContent; o.punto = document.getElementById('rmd-ui-panel').classList.contains('rmd-pn-nueva');
+                    const a = document.querySelector('.rmd-pn-aviso'); o.aviso = a && a.textContent; estado({ ultima: '1.57.0' }); o.avisos = document.querySelectorAll('.rmd-pn-aviso').length;
+                    o.guardada = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}').versionAvisada;
+                  } finally { window.open = wo; const c2 = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete c2.versionAvisada; localStorage.setItem('rmdUiMejoras', JSON.stringify(c2)); document.querySelectorAll('.rmd-pn-aviso').forEach((x) => x.remove()); h.removeAttribute('data-rmd-cargador'); h.removeAttribute('data-rmd-cargador-estado'); document.getElementById('rmd-ui-panel').classList.remove('rmd-pn-nueva'); P.cerrar(); }
+                  return o; }""")
+                ok = (len(r["sinCargador"]) == 1 and r["sinCargador"][0].endswith("/rmd-ui-mejoras-cargador.user.js") and not r["fila"] and "buscando" in r["buscando"] and r["alDia"].endswith("al día") and r["pedidos"] == 1
+                      and r["error"].endswith("sin revisar") and r["nueva"].endswith("1.57.0 lista, recargar") and r["punto"] and r["aviso"] == "Versión 1.57.0 lista · Recargar" and r["avisos"] == 1 and r["guardada"] == "1.57.0")
+                return ok, json.dumps(r, ensure_ascii=False)
+
+            @prueba("5-3 Ninguna petición de escritura salió del navegador durante el bloque 5 y el script no registró errores")
+            def _():
+                e = fr5.evaluate("window.__rmdStats.errores || []")
+                return (not bq5 and not e and not errores5), f"bloqueadas={bq5[:5]} errores_script={e[:3]} errores_pagina={errores5[:3]}"
+        finally:
+            pg5.close()
+
+        MARCA = "document.documentElement.setAttribute('data-rmd-cargador', '1.0.0');\n"
+        for nombre, texto, esperado in (("solo la copia instalada directamente", MARCA + src, (0, 1)), ("la copia directa y la del cargador", MARCA + src + "\n;window.__rmdDesdeCargador = '1.56.0';\n" + src, (1, 1))):
+            @prueba(f"5-4 Con el cargador instalado y {nombre}: arranca una sola copia (la del cargador al momento; la directa solo si a los 10 s no arrancó ninguna)")
+            def _():
+                pgx, frx, _ = abrir_con_inyeccion_temprana(b, texto)
+                try:
+                    a = frx.evaluate("document.querySelectorAll('#rmd-ui-panel').length"); pgx.wait_for_timeout(11000); z = frx.evaluate("document.querySelectorAll('#rmd-ui-panel').length")
+                finally:
+                    pgx.close()
+                return (a, z) == esperado, f"paneles al montar la app={a}, a los 11 s={z} (esperado {esperado})"
 
     print("\n══ RESUMEN ══")
     fallas = [r for r in RES if not r[1]]
