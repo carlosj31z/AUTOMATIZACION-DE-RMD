@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.57.0
+// @version      1.57.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.57.0';                                                       // mantener igual a @version
+  const VERSION = '1.57.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1638,7 +1638,14 @@
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
       if (t !== 'SIN TIPO DE DATO' && iDep >= 0) {
         const v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
+        // «CÓDIGO (ORDEN)» solo se compara si ese orden y código están en esta misma lista (el primero de una etiqueta puede depender de otra)
+        const mismaLista = !!(mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1]);
+        const ob = objetoDeFila(tr) || {}, ordenFila = Number(norm(iOrd >= 0 ? (inputDe(celda(tr, iOrd)) || {}).value : '') || k + 1);
         if (v && !mm) marcarFalta(iDep, 'Predecesor colgante (sin orden): reasignar Depende');
+        // un paso que depende de sí mismo (o de uno posterior) nunca se habilita en Producción
+        else if ((ob.mdEstructuraPasoId && ob.dependeMdEstructuraPasoId === ob.mdEstructuraPasoId) || (mismaLista && Number(mm[2]) === ordenFila))
+          marcarFalta(iDep, 'El paso depende de sí mismo: en Producción nunca se habilita. Asigna como predecesor el paso anterior.');
+        else if (mismaLista && Number(mm[2]) > ordenFila) marcarFalta(iDep, `El predecesor (orden ${mm[2]}) está después de este paso: en Producción no se habilita hasta terminar uno posterior. Revisa Depende.`);
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
         else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
           // el portal vacía el predecesor al marcar Estado CC
