@@ -2678,7 +2678,7 @@ with sync_playwright() as p:
     # ───────────────────────── 5. v1.56: impresora en pestaña nueva, versión y aviso del cargador, copia directa frente al cargador — solo lectura (cortafuegos) ─────────────────────────
     if "5" in SOLO:
         bq5 = []; errores5 = []
-        COD_5 = os.environ.get("COD_5", "2202609224")
+        COD_5 = os.environ.get("COD_5", "2202609225")                       # Ingresado real, solo lectura (el de prueba 2202609224 se borró)
         def guardia5(route):
             if route.request.method not in ("GET", "HEAD"): bq5.append(route.request.method + " " + route.request.url[:90]); route.abort()
             else: route.continue_()
@@ -2716,7 +2716,8 @@ with sync_playwright() as p:
             def _():
                 r = fr5.evaluate("""async () => { const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms)), h = document.documentElement, P = window.__rmdStats.panel, abiertas = [], wo = window.open, o = {};
                   const ver = () => document.querySelector('#rmd-ui-panel .rmd-pn-ver');
-                  const estado = (x) => { h.setAttribute('data-rmd-cargador-estado', JSON.stringify(Object.assign({ cargador: '1.0.0', actual: '1.56.0', ultima: '1.56.0', revisado: Date.now(), error: '' }, x))); document.dispatchEvent(new Event('rmd-cargador-estado')); };
+                  const V = ver().querySelector('span').textContent.replace('Versión ', '').trim();
+                  const estado = (x) => { h.setAttribute('data-rmd-cargador-estado', JSON.stringify(Object.assign({ cargador: '1.0.0', actual: V, ultima: V, revisado: Date.now(), error: '' }, x))); document.dispatchEvent(new Event('rmd-cargador-estado')); };
                   const cfg = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete cfg.versionAvisada; localStorage.setItem('rmdUiMejoras', JSON.stringify(cfg));
                   window.open = (u) => { abiertas.push(u); return null; };
                   try {
@@ -2724,13 +2725,13 @@ with sync_playwright() as p:
                     h.setAttribute('data-rmd-cargador', '1.0.0'); let pedidos = 0; const oye = () => { pedidos++; setTimeout(() => estado({}), 300); }; document.addEventListener('rmd-cargador-revisar', oye);
                     estado({ revisado: Date.now() - 60000 }); ver().click(); await esperar(50); o.buscando = ver().textContent; await esperar(500); o.alDia = ver().textContent; o.pedidos = pedidos; document.removeEventListener('rmd-cargador-revisar', oye);
                     estado({ error: 'sin sesión de SharePoint en este navegador' }); o.error = ver().textContent; P.cerrar(); await esperar(200);
-                    estado({ ultima: '1.57.0', archivo: '1.57.0.js' }); await esperar(400); o.nueva = ver().textContent; o.punto = document.getElementById('rmd-ui-panel').classList.contains('rmd-pn-nueva');
-                    const a = document.querySelector('.rmd-pn-aviso'); o.aviso = a && a.textContent; estado({ ultima: '1.57.0' }); o.avisos = document.querySelectorAll('.rmd-pn-aviso').length;
+                    estado({ ultima: '9.9.9', archivo: '9.9.9.js' }); await esperar(400); o.nueva = ver().textContent; o.punto = document.getElementById('rmd-ui-panel').classList.contains('rmd-pn-nueva');
+                    const a = document.querySelector('.rmd-pn-aviso'); o.aviso = a && a.textContent; estado({ ultima: '9.9.9' }); o.avisos = document.querySelectorAll('.rmd-pn-aviso').length;
                     o.guardada = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}').versionAvisada;
                   } finally { window.open = wo; const c2 = JSON.parse(localStorage.getItem('rmdUiMejoras') || '{}'); delete c2.versionAvisada; localStorage.setItem('rmdUiMejoras', JSON.stringify(c2)); document.querySelectorAll('.rmd-pn-aviso').forEach((x) => x.remove()); h.removeAttribute('data-rmd-cargador'); h.removeAttribute('data-rmd-cargador-estado'); document.getElementById('rmd-ui-panel').classList.remove('rmd-pn-nueva'); P.cerrar(); }
                   return o; }""")
                 ok = (len(r["sinCargador"]) == 1 and r["sinCargador"][0].endswith("/rmd-ui-mejoras-cargador.user.js") and not r["fila"] and "buscando" in r["buscando"] and r["alDia"].endswith("al día") and r["pedidos"] == 1
-                      and r["error"].endswith("sin revisar") and r["nueva"].endswith("1.57.0 lista, recargar") and r["punto"] and r["aviso"] == "Versión 1.57.0 lista · Recargar" and r["avisos"] == 1 and r["guardada"] == "1.57.0")
+                      and r["error"].endswith("sin revisar") and r["nueva"].endswith("9.9.9 lista, recargar") and r["punto"] and r["aviso"] == "Versión 9.9.9 lista · Recargar" and r["avisos"] == 1 and r["guardada"] == "9.9.9")
                 return ok, json.dumps(r, ensure_ascii=False)
 
             @prueba("5-3 Ninguna petición de escritura salió del navegador durante el bloque 5 y el script no registró errores")

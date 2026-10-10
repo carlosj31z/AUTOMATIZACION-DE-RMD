@@ -174,10 +174,11 @@ with sync_playwright() as p:
             if espera: pg.wait_for_timeout(espera)
             antes = sucia(pg); cancelar(pg); av = aviso(pg); res.append((antes, av is None, n_dialogos(pg) == 0)); cerrar_todo(pg)
         return all(x == (False, True, True) for x in res), str(res)
-    @prueba("LM5 Lo mismo con Ctrl+S")
+    @prueba("LM5 Ctrl+S no hace nada (se retiró en la v1.57): no guarda y el aviso de cambios sin guardar sigue")
     def _():
-        abrir(pg, PRECAUCIONES, respuesta="exito"); tocar_casilla(pg, 1); pg.keyboard.press("Control+s"); pg.wait_for_timeout(1500); cancelar(pg)
-        ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg); return ok, ""
+        abrir(pg, PRECAUCIONES, respuesta="exito"); tocar_casilla(pg, 1); g0 = pg.evaluate("window.__opc.guardados || 0")
+        pg.keyboard.press("Control+s"); pg.wait_for_timeout(1500); g1 = pg.evaluate("window.__opc.guardados || 0"); cancelar(pg)
+        ok = g1 == g0 and aviso(pg) is not None; cerrar_todo(pg); return ok, f"guardados {g0}->{g1}"
     @prueba("LM6 Si el portal responde con una Advertencia al guardar (no se guardó), la ventana vuelve a contar como sin guardar")
     def _():
         abrir(pg, PRECAUCIONES, respuesta="fallo"); tocar_casilla(pg, 1); guardar(pg); pg.wait_for_timeout(1200)
@@ -341,20 +342,14 @@ with sync_playwright() as p:
               and r["numero"] and r["numero"]["tipo"] == "cambio" and r["quitado"] and r["quitado"]["tipo"] == "borrado"
               and r["soloFecha"] is None and r["igual"] is None and r["minusculas"] and r["minusculas"]["tipo"] == "cambio")
         return ok, json.dumps(r, ensure_ascii=False)[:600]
-    @prueba("LN13 Ctrl+K abre 'Ir a…' con el foco en su buscador (también sobre una ventana abierta), escribir filtra, Esc cierra solo la paleta; saludo según la hora")
+    @prueba("LN13 Ctrl+K no abre nada (se retiró en la v1.57); saludo según la hora")
     def _():
         abrir(pg, PRECAUCIONES)
         pg.keyboard.press("Control+k"); pg.wait_for_timeout(500)
-        a = pg.evaluate("() => ({ abierta: !!document.querySelector('.rmd-paleta-fondo'), foco: document.activeElement.className, items: [...document.querySelectorAll('.rmd-paleta-it')].map(x => x.innerText.split('\\n')[0]) })")
-        pg.keyboard.type("mejoras"); pg.wait_for_timeout(300)
-        b_ = pg.evaluate("[...document.querySelectorAll('.rmd-paleta-it')].map(x => x.innerText.split('\\n')[0].trim())")
-        pg.keyboard.press("Escape"); pg.wait_for_timeout(400)
-        c = pg.evaluate("({ paleta: !!document.querySelector('.rmd-paleta-fondo'), dialogos: [...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length })")
+        a = pg.evaluate("!!document.querySelector('.rmd-paleta-fondo')")
         h = pg.evaluate("[5, 11, 12, 18, 19, 23, 2].map(x => window.__rmdStats.productividad.saludoDelMomento(x))")
         cerrar_todo(pg)
-        ok = (a["abierta"] and a["foco"] == "rmd-paleta-q" and any("Mejoras de interfaz" in x for x in a["items"]) and b_ and all("Mejoras" in x for x in b_)
-              and not c["paleta"] and c["dialogos"] == 1 and h == ["Buenos días", "Buenos días", "Buenas tardes", "Buenas tardes", "Buenas noches", "Buenas noches", "Buenas noches"])
-        return ok, f"{a} filtrado={b_} tras Esc={c} saludos={h}"
+        return (not a and h == ["Buenos días", "Buenos días", "Buenas tardes", "Buenas tardes", "Buenas noches", "Buenas noches", "Buenas noches"]), f"paleta={a} saludos={h}"
     @prueba("LN14 Recetas: la comparación con SAP separa cantidad cambiada, material reemplazado por otra versión ('… x25' → '… x25 H v.1'), nuevo y quitado, y el detalle lo muestra en tabla")
     def _():
         r = pg.evaluate("""() => { const S = window.__rmdStats;
@@ -401,7 +396,7 @@ with sync_playwright() as p:
         ok = (all(not f["marcas"] for f in apagada["filas"]) and "aviso de reglas" not in apagada["barra"] and apagada["filas"][0]["texto"] == FILAS_REGLAS[0]["desc"]
               and len(encendida["filas"][0]["marcas"]) == 1 and "1 aviso de reglas" in encendida["barra"])
         return ok, f"apagada={apagada['barra']!r} {[len(f['marcas']) for f in apagada['filas']]} encendida={encendida['barra']!r}"
-    @prueba("LN17 Ventana 'Reglas de revisión' (botón del panel): crear una regla con prueba en vivo (la acción pasa sola a 'advertencia' con 'No debe aparecer'), desactivarla, duplicarla, subirla y eliminarla; Ctrl+S guarda la regla sin pulsar el Guardar de SAP")
+    @prueba("LN17 Ventana 'Reglas de revisión' (botón del panel): crear una regla con prueba en vivo (la acción pasa sola a 'advertencia' con 'No debe aparecer'), desactivarla, duplicarla, subirla y eliminarla; «Guardar regla» la guarda sin pulsar el Guardar de SAP")
     def _():
         pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(200)
         pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(500)
@@ -415,7 +410,7 @@ with sync_playwright() as p:
         prueba_ = pg.evaluate("[...document.querySelectorAll('.rmd-reglas .rmd-rg-res mark')].map(m => m.textContent)")
         aviso_prueba = pg.evaluate("(document.querySelector('.rmd-reglas .rmd-rg-res .rmd-rg-ayuda') || {}).textContent")
         guardados_sap = pg.evaluate("window.__opc.guardados || 0")
-        pg.keyboard.press("Control+s"); pg.wait_for_timeout(600)
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Guardar regla").click(); pg.wait_for_timeout(600)
         tras_ctrl_s = pg.evaluate("({ vista: document.querySelector('.rmd-reglas h3').textContent, sap: window.__opc.guardados || 0, nombres: window.__rmdStats.reglas.lista().map(r => r.nombre) })")
         fila = lambda nombre: pg.locator(".rmd-rg-fila").filter(has=pg.locator("b", has_text=re.compile("^" + re.escape(nombre) + "$")))
         fila("Prueba borrador").locator(".rmd-switch").click(); pg.wait_for_timeout(400)
@@ -878,11 +873,11 @@ with sync_playwright() as p:
 
     # ── Vista móvil (v1.51): se prueba con el tamaño de pantalla (390 px) sobre la maqueta ──
     def movil_estado():
-        return pg.evaluate("() => { const b = document.getElementById('rmd-ui-buscar'); return { clase: document.documentElement.classList.contains('rmd-movil'), buscar: !!b && b.isConnected && !b.hidden, activo: window.__rmdStats.movil.activo() }; }")
+        return pg.evaluate("() => { const b = document.getElementById('rmd-ui-buscar'); return { clase: document.documentElement.classList.contains('rmd-movil'), buscar: document.documentElement.classList.contains('rmd-movil') && !(b && b.isConnected && !b.hidden), activo: window.__rmdStats.movil.activo() }; }")
 
     def tamano(w, h=844): pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(600)
 
-    @prueba("LN38 Vista móvil (v1.51): con 390 y 700 px la página pasa sola a la vista móvil (clase rmd-movil y botón flotante de búsqueda) y con 760 o 1415 px no; el panel NO tiene control de vista móvil; un modo guardado «si» / «no» se respeta y «auto» vuelve a decidir por el ancho; «Restablecer» lo devuelve a automático; apagar las mejoras la retira por completo")
+    @prueba("LN38 Vista móvil (v1.51): con 390 y 700 px la página pasa sola a la vista móvil (clase rmd-movil, sin botón de búsqueda desde la v1.57) y con 760 o 1415 px no; el panel NO tiene control de vista móvil; un modo guardado «si» / «no» se respeta y «auto» vuelve a decidir por el ancho; «Restablecer» lo devuelve a automático; apagar las mejoras la retira por completo")
     def _():
         r = {"escritorio": movil_estado()}
         tamano(760); r["760"] = movil_estado()
@@ -946,12 +941,10 @@ with sync_playwright() as p:
               and r["plegado2"]["visibles"] == [True, True, False, False, False, True] and r["vuelta"]["estado"] is None and r["vuelta"]["boton"] is None and not any(r["vuelta"]["extra"]) and all(r["vuelta"]["visibles"]))
         return ok, json.dumps(r, ensure_ascii=False)[:1600]
 
-    @prueba("LN41 Vista móvil, lo del script: en 390 px la paleta (botón de búsqueda) ocupa toda la pantalla, tiene su «×» y no habla de teclas; el panel de ajustes es una hoja inferior; las ventanas del script (Reglas) ocupan la pantalla sin desbordar y los avisos pequeños siguen centrados; en escritorio la paleta no tiene «×» y la ventana no es de pantalla completa")
+    @prueba("LN41 Vista móvil, lo del script: en 390 px no hay botón de búsqueda (la paleta se retiró en la v1.57); el panel de ajustes es una hoja inferior; las ventanas del script (Reglas) ocupan la pantalla sin desbordar y los avisos pequeños siguen centrados; en escritorio la paleta no tiene «×» y la ventana no es de pantalla completa")
     def _():
         tamano(390); r = {}
-        pg.evaluate("document.getElementById('rmd-ui-buscar').click()"); pg.wait_for_timeout(500)
-        r["paleta"] = pg.evaluate("() => { const p = document.querySelector('.rmd-paleta'), b = p.getBoundingClientRect(), x = document.querySelector('.rmd-paleta-x'); return { tam: [Math.round(b.width), Math.round(b.height)], x: getComputedStyle(x).display, pie: document.querySelector('.rmd-paleta-pie span').textContent.slice(0, 30), q: getComputedStyle(document.querySelector('.rmd-paleta-q')).fontSize }; }")
-        pg.locator(".rmd-paleta-x").click(); pg.wait_for_timeout(300); r["paletaCerrada"] = not pg.evaluate("!!document.querySelector('.rmd-paleta-fondo')")
+        r["sinBuscar"] = pg.evaluate("!document.getElementById('rmd-ui-buscar') || document.getElementById('rmd-ui-buscar').hidden")
         pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(300)
         r["panel"] = pg.evaluate("() => { const c = document.querySelector('#rmd-ui-panel .rmd-panel-cuerpo'), b = c.getBoundingClientRect(); return { pos: getComputedStyle(c).position, ancho: Math.round(b.width), dentro: b.left >= 0 && b.right <= innerWidth, tam: getComputedStyle(document.querySelector('#rmd-ui-panel summary')).width }; }")
         pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(700)
@@ -962,17 +955,14 @@ with sync_playwright() as p:
         r["aviso"] = pg.evaluate("() => { const b = document.querySelector('.rmd-modal-aviso').getBoundingClientRect(); return { ancho: Math.round(b.width), alto: Math.round(b.height), cx: Math.round(b.left + b.width / 2), cy: Math.round(b.top + b.height / 2) }; }")
         pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())"); pg.evaluate("document.getElementById('rmd-ui-panel').open = false")
         tamano(1415, 886)
-        pg.keyboard.press("Control+k"); pg.wait_for_timeout(400)
-        r["paletaEscritorio"] = pg.evaluate("() => ({ x: getComputedStyle(document.querySelector('.rmd-paleta-x')).display, pie: document.querySelector('.rmd-paleta-pie span').textContent.slice(0, 12) })")
-        pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
         pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(500)
         r["ventanaEscritorio"] = pg.evaluate("() => { const b = document.querySelector('.rmd-modal').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }")
         pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")
-        ok = (r["paleta"]["tam"] == [390, 844] and r["paleta"]["x"] == "block" and r["paleta"]["pie"].startswith("Toca un RMD") and r["paleta"]["q"] == "16px" and r["paletaCerrada"]
+        ok = (r["sinBuscar"]
               and r["panel"]["pos"] == "fixed" and r["panel"]["dentro"] and r["panel"]["ancho"] >= 370 and r["panel"]["tam"] == "44px"
               and r["ventana"]["tam"] == [390, 844] and r["ventana"]["desbordeCuerpo"] <= 0 and r["ventana"]["pagina"] <= 0
               and r["aviso"]["ancho"] <= 366 and abs(r["aviso"]["cx"] - 195) <= 2 and 150 < r["aviso"]["cy"] < 700
-              and r["paletaEscritorio"]["x"] == "none" and r["paletaEscritorio"]["pie"].startswith("↑↓") and r["ventanaEscritorio"][0] < 1300 and r["ventanaEscritorio"][1] < 886)
+              and r["ventanaEscritorio"][0] < 1300 and r["ventanaEscritorio"][1] < 886)
         return ok, json.dumps(r, ensure_ascii=False)[:1500]
 
     @prueba("LN42 Pasadas del script (v1.52): marcar o desmarcar la casilla de una fila de la lista de pasos lanza UNA sola pasada (antes tres: la del observador, la del clic y, 600 ms después, la de la firma de las tablas, que contaba la selección); un clic fuera de la selección y escribir en un campo siguen provocando su pasada; buscar el botón «Exportar» no mide el diseño de cada botón de la página")

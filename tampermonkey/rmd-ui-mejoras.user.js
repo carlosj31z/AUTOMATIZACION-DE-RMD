@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.56.0
+// @version      1.57.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.56.0';                                                       // mantener igual a @version
+  const VERSION = '1.57.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -29,10 +29,9 @@
   const OPC = [
     ['activo', 'Mejoras activas', 'Apágalo para usar el portal tal como es, sin ninguna mejora.'],
     ['saludo', 'Saludo de bienvenida', 'Tus RMD en Ingresado y acceso directo al último que abriste.'],
-    ['paleta', 'Ir a… (Ctrl+K)', 'Abre un RMD o una herramienta escribiendo su nombre o código.'],
     ['titulo', 'Nombre de la pestaña', 'La pestaña del navegador muestra la etapa y la descripción del RMD abierto.'],
     ['enter', 'Enter para buscar', 'En un filtro, Enter pulsa «Ir».'],
-    ['singuardar', 'Avisar cambios sin guardar', 'Avisa antes de cerrar una ventana con cambios. Ctrl+S guarda.'],
+    ['singuardar', 'Avisar cambios sin guardar', 'Avisa antes de cerrar una ventana con cambios.'],
     ['sesion', 'Mantener la sesión abierta', 'Pulsa «Continuar trabajando» por ti y evita el error del refresco automático al volver.'],
     ['orbes', 'Animaciones de espera', 'Solo al cargar todas las OP y al preparar reportes en Excel.'],
     ['barrafiltros', 'Barra de filtros compacta', 'Todos los filtros en una sola fila; «Restablecer» como el ícono de quitar filtros de SAP.'],
@@ -156,17 +155,8 @@
     return [...raiz.querySelectorAll('button')].find((b) => visible(b) && (b.title === titulo || norm(b.textContent) === titulo));
   }
 
-  // ---- 1. Enter en un filtro = pulsar "Ir"; Ctrl+S = Guardar -----------------------------------
+  // ---- 1. Enter en un filtro = pulsar "Ir" -----------------------------------
   document.addEventListener('keydown', (e) => {
-    if (e.key === 's' && (e.ctrlKey || e.metaKey) && opc.activo && document.querySelector('.rmd-modal-fondo')) {
-      const propia = [...document.querySelectorAll('.rmd-modal-fondo')].pop(); e.preventDefault(); e.stopPropagation(); if (propia.__ctrlS) propia.__ctrlS(); return;
-    }
-    if (e.key === 's' && (e.ctrlKey || e.metaKey) && on('singuardar')) {
-      const d = dialogos().pop();
-      const g = d && botonPorTitulo(d, 'Guardar');
-      if (g) { e.preventDefault(); e.stopPropagation(); alGuardar(d); pulsar(g); }
-      return;
-    }
     if (!on('enter') || e.key !== 'Enter' || e.isComposing) return;
     const t = e.target;
     if (!(t instanceof HTMLInputElement) || t.type === 'checkbox' || t.type === 'radio' || t.readOnly) return;
@@ -330,6 +320,20 @@
   .rmd-restablecer-ui5 .sapMBtnIcon, .rmd-restablecer-ui5 .sapUiIcon { color: var(--rmd-acento-texto) !important; } .rmd-restablecer-ui5 .sapMBtnInner { border-color: transparent !important; background: transparent !important; border-radius: 0.25rem; }
   .rmd-restablecer-ui5:hover .sapMBtnInner { background: rgba(27,141,236,.14) !important; } .rmd-restablecer-ui5:active .sapMBtnInner { background: var(--rmd-acento) !important; } .rmd-restablecer-ui5:active .sapUiIcon { color: #fff !important; }
   .rmd-mm-modos { display: flex; gap: 0; margin: 0 0 10px; border-bottom: 1px solid var(--rmd-borde); }
+  /* ventanas para pegar o escribir códigos de master */
+  .rmd-v-pegar { width: min(760px, 94vw); border-radius: 16px; }
+  .rmd-v-pegar .rmd-mm-modos { display: inline-flex; gap: 2px; padding: 3px; border: 0; border-radius: 10px; background: rgba(118,118,128,.18); }
+  .rmd-v-pegar .rmd-mm-modo { padding: 6px 16px; border: 0; border-radius: 8px; } .rmd-v-pegar .rmd-mm-modo.activo { background: var(--rmd-superficie); color: var(--rmd-texto); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .rmd-pegar { border: 1.5px dashed var(--rmd-borde-campo); border-radius: 12px; background: rgba(27,141,236,.04); transition: border-color .15s, background .15s; }
+  .rmd-pegar:focus-within { border-color: var(--rmd-acento); background: rgba(27,141,236,.08); }
+  .rmd-pegar .rmd-susp-codigos { min-height: 96px; border: 0; background: transparent; padding: 12px 14px; font: 14px/1.6 var(--rmd-fuente); outline: 0; }
+  .rmd-pegar-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; } .rmd-pegar-chips:empty { display: none; }
+  .rmd-pegar-chip { padding: 2px 9px; border-radius: 10px; background: rgba(27,141,236,.14); color: var(--rmd-acento-texto); font: 12px var(--rmd-fuente); }
+  .rmd-pegar-n { padding: 2px 9px; border-radius: 10px; background: var(--rmd-acento); color: #fff; font: 600 12px var(--rmd-fuente); }
+  .rmd-v-pegar .rmd-susp-motivo, .rmd-v-pegar .rmd-pp-campo input { height: 36px; border-radius: 10px; padding: 0 12px; }
+  .rmd-v-pegar .rmd-pp-campo input { width: 100%; max-width: 320px; font-size: 16px; letter-spacing: .5px; }
+  .rmd-v-pegar .rmd-pp-campo input { height: 46px; border: 1.5px dashed var(--rmd-borde-campo); background: rgba(27,141,236,.04); outline: 0; } .rmd-v-pegar .rmd-pp-campo input:focus { border-color: var(--rmd-acento); background: rgba(27,141,236,.08); }
+  .rmd-v-pegar .rmd-mm-ayuda { margin: 12px 0 8px; } .rmd-v-pegar .rmd-mm-nota { padding: 8px 12px; border-radius: 10px; background: rgba(118,118,128,.1); }
   .rmd-mm-modo { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-mm-modo.activo { color: var(--rmd-texto); border-bottom-color: var(--rmd-acento); }
   .rmd-sel-panel { margin: 6px 16px 8px; padding: 8px 10px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: rgba(27,141,236,.07); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-sel-cab { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; } .rmd-sel-cab span { color: var(--rmd-apagado); font-size: 12px; }
@@ -455,10 +459,12 @@
   .rmd-codigo-pegado .sapMInputBaseContentWrapper { box-shadow: 0 0 0 2px rgba(240,180,90,.6); background: rgba(240,180,90,.12) !important; }   /* código pegado en el selector */
   .rmd-exportar-op, .rmd-documentos-citados { margin: 0 4px; height: 32px; }
   .rmd-cuenta-verop { align-self: center; margin: 0 4px; color: var(--rmd-apagado); font-size: 12.5px; white-space: nowrap; }
-  .rmd-op-avance { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0,0,0,.38); }
+  .rmd-op-avance { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0,0,0,.38); } .rmd-op-avance { border-radius: inherit; }
   .rmd-op-caja { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 300px; padding: 18px 22px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.4); font: 14px/1.4 var(--rmd-fuente); }
   .rmd-op-barra { width: 260px; height: 6px; border-radius: 3px; background: rgba(128,140,155,.25); overflow: hidden; } .rmd-op-barra > div { width: 0; height: 100%; background: var(--rmd-acento); transition: width .25s ease; }
   .rmd-op-txt { color: var(--rmd-apagado); font-size: 13px; }
+  .rmd-op-caja { flex-direction: row !important; gap: 16px !important; padding: 14px 18px !important; } .rmd-op-info { display: flex; flex-direction: column; gap: 8px; }
+  .rmd-op-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .rmd-op-fila .rmd-btn { height: 26px; padding: 0 10px; font-size: 12.5px; }
   /* ── Filtro por columna de Ver OP ── */
   .rmd-th-filtro { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 4px; padding: 0; border: 0; background: transparent; color: var(--rmd-apagado); cursor: pointer; border-radius: 3px; vertical-align: middle; }
   .rmd-th-filtro:hover { background: rgba(27,141,236,.16); color: var(--rmd-acento-texto); }
@@ -2403,7 +2409,7 @@
     if ((t === 'Cancelar' || t === 'Cerrar') && sucia(d)) {
       e.preventDefault(); e.stopPropagation();
       confirmar('Tienes cambios sin guardar', 'Si cierras esta ventana ahora, los cambios que hiciste en ella se perderán.',
-        'Para conservarlos, vuelve y pulsa Guardar (o Ctrl+S).', { si: 'Descartar y cerrar', no: 'Seguir editando', peligro: true })
+        'Para conservarlos, vuelve y pulsa Guardar.', { si: 'Descartar y cerrar', no: 'Seguir editando', peligro: true })
         .then((descartar) => { if (descartar) { rebase(d); pulsar(b); } });
     }
   }, true);
@@ -4111,6 +4117,7 @@
   // Con growing desactivado la tabla pinta todo el array; se espera a que el DOM tenga las filas (el CSV se lee de la tabla).
   async function pintarTodasEnTabla(t, modelo, ruta, filas) {
     const ctl = ctlDe(t); if (ctl && ctl.setGrowing) ctl.setGrowing(false);
+    if (modelo.setSizeLimit && (modelo.iSizeLimit || 100) < filas.length) modelo.setSizeLimit(filas.length + 50);   // JSONModel enlaza 100 filas por defecto
     modelo.setProperty(ruta, filas);
     await hasta(() => filasPrincipales(t).length >= filas.length, 8000);
   }
@@ -4146,10 +4153,10 @@
   }
   // Barra de avance sobre la tabla
   function avanceVerOP(d, alDetener) {
-    const cont = d.querySelector('.sapMDialogSection') || d, o = document.createElement('div'); o.className = 'rmd-op-avance';
-    o.innerHTML = '<div class="rmd-op-caja"><b>Cargando todas las OP…</b><div class="rmd-op-barra"><div></div></div><span class="rmd-op-txt">Contando las OP…</span></div>';
-    const b = botonModal('Detener', '', () => { b.disabled = true; setTxt(b, 'Deteniendo…'); alDetener(); }); o.querySelector('.rmd-op-caja').appendChild(b);
-    if (on('orbes')) o.querySelector('.rmd-op-caja').prepend(orbe('searching', 64, 'Cargando las OP…'));
+    const cont = d, o = document.createElement('div'); o.className = 'rmd-op-avance';   // sobre toda la ventana: con la tabla vacía la sección mide ~100 px
+    o.innerHTML = '<div class="rmd-op-caja"><div class="rmd-op-info"><b>Cargando todas las OP…</b><div class="rmd-op-barra"><div></div></div><div class="rmd-op-fila"><span class="rmd-op-txt">Contando las OP…</span></div></div></div>';
+    const b = botonModal('Detener', '', () => { b.disabled = true; setTxt(b, 'Deteniendo…'); alDetener(); }); o.querySelector('.rmd-op-fila').appendChild(b);
+    if (on('orbes')) o.querySelector('.rmd-op-caja').prepend(orbe('searching', 48, 'Cargando las OP…'));
     if (getComputedStyle(cont).position === 'static') cont.style.position = 'relative';
     cont.appendChild(o);
     return {
@@ -6379,12 +6386,19 @@
     const v = ventana('Modificaciones masivas de RMD', { cancelar: () => { if (!trabajando) v.cerrar(); } });
     v.cuerpo.innerHTML = `<div class="rmd-mm-modos" role="tablist">${Object.entries(MODOS_MASIVOS).map(([k, m]) => `<button type="button" role="tab" class="rmd-mm-modo" data-modo="${k}">${esc(m.titulo)}</button>`).join('')}</div>
       <p class="rmd-mm-ayuda"></p>
-      <textarea class="rmd-min-texto rmd-susp-codigos" placeholder="2202608939&#10;2202607784"></textarea>
+      <div class="rmd-pegar"><textarea class="rmd-min-texto rmd-susp-codigos" placeholder="Pega aquí los códigos&#10;2202608939&#10;2202607784"></textarea><div class="rmd-pegar-chips" aria-live="polite"></div></div>
       <p class="rmd-mm-rotulo"></p>
       <input type="text" class="rmd-susp-motivo" maxlength="400">
       <p class="rmd-nota rmd-mm-nota"></p>
       <p class="rmd-progreso"></p><div class="rmd-susp-res"></div>`;
     const ta = v.cuerpo.querySelector('.rmd-susp-codigos'), mot = v.cuerpo.querySelector('.rmd-susp-motivo'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-susp-res');
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-v-pegar');
+    const chips = v.cuerpo.querySelector('.rmd-pegar-chips');
+    const pintarChips = () => {                                          // códigos detectados mientras se pega o escribe
+      const cs = [...new Set(ta.value.match(/\d{6,}/g) || [])];
+      chips.innerHTML = cs.length ? `<span class="rmd-pegar-n">${cs.length} código${cs.length === 1 ? '' : 's'}</span>` + cs.slice(0, 40).map((c) => `<span class="rmd-pegar-chip">${esc(c)}</span>`).join('') + (cs.length > 40 ? `<span class="rmd-pegar-chip">+${cs.length - 40}</span>` : '') : '';
+    };
+    ta.addEventListener('input', pintarChips);
     const puede = (est) => MODOS_MASIVOS[modo].estados.includes(est);
     const pintarModo = () => {
       v.cuerpo.querySelectorAll('.rmd-mm-modo').forEach((b) => { const s = b.dataset.modo === modo; b.classList.toggle('activo', s); b.setAttribute('aria-selected', String(s)); });
@@ -7554,8 +7568,7 @@
     const nombre = primerNombre(), ult = leerRecientes()[0], reciente = ult && Date.now() - ult.t < 14 * 86400000 ? ult : null;
     const el = document.createElement('div'); el.className = 'rmd-saludo'; el.setAttribute('role', 'status');
     el.innerHTML = `<b>${esc(saludoDelMomento())}${nombre ? ', ' + esc(nombre) : ''}</b><span class="rmd-saludo-resumen"></span>` +
-      (reciente ? `<button type="button" class="rmd-saludo-continuar" title="Abrir la configuración de este RMD">Continuar con ${esc(reciente.codigo)} · ${esc(reciente.descripcion.slice(0, 38))}</button>` : '') +
-      `<span class="rmd-saludo-tip">Ctrl+K: ir a un RMD o a una herramienta</span>`;
+      (reciente ? `<button type="button" class="rmd-saludo-continuar" title="Abrir la configuración de este RMD">Continuar con ${esc(reciente.codigo)} · ${esc(reciente.descripcion.slice(0, 38))}</button>` : '');
     html.appendChild(el);
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
     let t = null;
@@ -7678,7 +7691,7 @@
     return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
   }
   document.addEventListener('keydown', (e) => {
-    if (!on('paleta') || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'k') return;
+    if (!on('paleta') || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'k') return;   // «paleta» ya no está en el panel: inactivo
     e.preventDefault(); e.stopPropagation(); abrirPaleta();
   }, true);
   // RMD abierto: recientes + título de pestaña
@@ -11477,7 +11490,7 @@ td.ult { position: relative; }
     const asoc = ctrl.getView().getModel('asociarDatos'), abierto = asoc && asoc.getData() && asoc.getData().codigo;
     const filtro = (ctrl.getView().getModel('oDataFilter') || { getProperty: () => '' }).getProperty('/code');
     const v = ventana('Plantilla para Producción', { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false;
-    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp');
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-v-pegar');
     v.cuerpo.innerHTML = `<p class="rmd-nota">Un archivo .html que Producción abre en Chrome o Edge, sin SAP: ve el RMD como en el PDF, deja su borrador de cambios (buscando los pasos que ya existen) y devuelve el archivo para importarlo aquí, en un RMD Ingresado.</p>
       <label class="rmd-pp-campo">Código del RMD <input class="rmd-pp-cod" value="${esc(codigo || abierto || filtro || '')}" placeholder="p. ej. 2202609157" inputmode="numeric"></label>
       <label class="rmd-nota"><input type="checkbox" class="rmd-pp-forzar"> Volver a leer el catálogo de SAP (si se crearon pasos hoy)</label>
@@ -11590,7 +11603,7 @@ td.ult { position: relative; }
     if (!on('plantillaprod') || !fs || !fs.length || dialogos().length || !controladorPrincipal() || document.querySelector('.rmd-modal-fondo')) return;
     e.preventDefault(); abrirArchivos(fs);
   });
-  window.__rmdStats.plantilla = { versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
+  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
   // ---- Ingreso automático del borrador ----
   // Mismas escrituras que el portal: aPaso / aPasoInsumoPaso en MD_ESTRUCTURA, catálogo de equipos (TABLAS_ARRAY_MD_SKIP) + aEquipo, aUtensilio,
   // activo:false, pasoId_pasoId, valorInicial / valorFinal / margen, orden, PASO nuevo, «Depende».
@@ -12119,7 +12132,7 @@ td.ult { position: relative; }
   // ---- 10. Panel de mejoras ----
   // [nombre, ícono, claves de OPC]
   const GRUPOS_PANEL = [
-    ['Uso diario', 'inicio', ['saludo', 'paleta', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
+    ['Uso diario', 'inicio', ['saludo', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
     ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios']],
     ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
@@ -12167,8 +12180,8 @@ td.ult { position: relative; }
           `<section class="rmd-pn-grupo" data-g="${g}"><div class="rmd-pn-gcab"><button type="button" class="rmd-pn-abrir" aria-expanded="false" title="Ver una por una las mejoras de «${esc(nombre)}»"><span class="rmd-pn-flecha">${iconoPanel('flecha')}</span><span class="rmd-pn-gico">${iconoPanel(icono)}</span><span class="rmd-pn-txt"><span class="rmd-pn-t">${esc(nombre)}</span><span class="rmd-pn-d rmd-pn-cuenta"></span></span></button>` +
           `${sw(`data-g="${g}" aria-label="Activar o desactivar todo el grupo ${esc(nombre)}" title="Activar o desactivar todo el grupo"`, false)}</div><div class="rmd-pn-items">${ks.map(fila).join('')}</div></section>`).join('') +
         '<p class="rmd-pn-vacio" hidden>Ninguna mejora coincide con la búsqueda.</p></div>' +
-        '<div class="rmd-pn-pie"><div class="rmd-pn-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear o activar tus reglas de revisión y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión…</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas…</button></div>' +
-        '<div class="rmd-pn-pie2"><span class="rmd-pn-atajos"><kbd>Ctrl</kbd>+<kbd>K</kbd> Ir a… · <kbd>Ctrl</kbd>+<kbd>S</kbd> Guardar</span><button type="button" class="rmd-btn rmd-restablecer" title="Deja todas las mejoras como vienen de inicio">Restablecer</button></div>' +
+        '<div class="rmd-pn-pie"><div class="rmd-pn-acciones"><button type="button" class="rmd-btn rmd-abrir-reglas" title="Crear o activar tus reglas de revisión y cargar la lista de documentos vigentes (se guardan solo en este navegador)">Reglas de revisión</button><button type="button" class="rmd-btn rmd-mod-masivas" title="Suspender varios master o agregarles una observación (con el Guardar de Asociar fórmulas de cada uno)">Modificaciones masivas</button></div>' +
+        '<div class="rmd-pn-pie2"><span></span><button type="button" class="rmd-btn rmd-restablecer" title="Deja todas las mejoras como vienen de inicio">Restablecer</button></div>' +
         '</div>' +
       '</div>';
     const grupos = [...p.querySelectorAll('.rmd-pn-grupo')], buscar = p.querySelector('.rmd-pn-buscar input');
