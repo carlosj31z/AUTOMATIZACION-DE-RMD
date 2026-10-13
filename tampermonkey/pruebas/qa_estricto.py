@@ -1201,7 +1201,7 @@ with sync_playwright() as p:
             e = fr.evaluate("window.__exp.pop()")
             fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
             vm = (e["ultima"] or {}).get("valueMap") or {}
-            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados en todos los master", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
                   and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
             return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
         @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
@@ -1302,16 +1302,16 @@ with sync_playwright() as p:
         def _():
             orden = fr.evaluate("() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar'); const barra = b.closest('.sapMBar, .sapMOTB, .sapMToolbar'); return [...barra.querySelectorAll('button, .sapMTBSeparator')].filter(x => x.getClientRects().length && !x.classList.contains('rmd-alerta-rec')).map(x => x.classList.contains('sapMTBSeparator') ? '|' : (x.textContent.trim() || x.title)); }")
             i = orden.index("|") if "|" in orden else -1
-            return (orden[:i] == ["Enviar a Status RMD"] and orden[i + 1] == "Nuevo RMD"), str(orden)
+            return (len(orden[:i]) == 1 and orden[:i][0].endswith("Status RMD") and orden[i + 1] == "Nuevo RMD"), str(orden)   # v1.59: botón de icono (texto oculto «Status RMD»)
         RmdAutomation(pg).editor_de_rmd(RMD_SEL); pg.wait_for_timeout(4000)
         abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(4000)
         fr.evaluate("() => { const d=" + TOPV + "; const b=[...d.querySelectorAll('button')].find(x=>/Agregar Estructura/.test(x.title)); sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).firePress(); }"); pg.wait_for_timeout(6000)
-        @prueba("V2 'Adicionar Pasos' más ancho (1480 px a 1920) con 'Ir' y 'Nuevo Paso' en la misma fila que los filtros")
+        @prueba("V2 'Adicionar Pasos' al menos 1480 px a 1920 (o el ancho del portal, si es mayor) con 'Ir' y 'Nuevo Paso' en la misma fila que los filtros")
         def _():
             l = fr.evaluate("""() => { const d=""" + TOPV + """; const r=(el)=>{ const q=el.getBoundingClientRect(); return [Math.round(q.left), Math.round(q.top), Math.round(q.width)]; };
               const ir=[...d.querySelectorAll('button')].find(x=>x.textContent.trim()==='Ir'); const inp=d.querySelector('.sapUiAFLayoutItem input'); const nuevo=d.querySelector('.rmd-nuevo-paso');
               return { dialogo: r(d), ir: ir && r(ir), campo: inp && r(inp.closest('.sapMInputBase') || inp), nuevo: nuevo && r(nuevo) }; }""")
-            return (l["dialogo"][2] == 1480 and l["ir"] and l["campo"] and abs(l["ir"][1] - l["campo"][1]) <= 8 and (not l["nuevo"] or abs(l["nuevo"][1] - l["ir"][1]) <= 2)), str(l)
+            return (l["dialogo"][2] >= 1480 and l["ir"] and l["campo"] and abs(l["ir"][1] - l["campo"][1]) <= 8 and (not l["nuevo"] or abs(l["nuevo"][1] - l["ir"][1]) <= 2)), str(l)
         def agregar_simulado_v(campo):
             fr.evaluate("""(campo) => { const b=[...document.querySelectorAll('button')].find(x=>x.title==='Exportar' && !x.closest('.sapMDialog')); const ctrl=sap.ui.getCore().byId(b.id.replace(/-inner$/,'')).mEventRegistry.press[0].oListener;
               const cods = Object.fromEntries(ctrl.getView().getModel('aSeleccionadoPaso').getData().map(x => [x.pasoId, x.codigo]));
@@ -1377,7 +1377,7 @@ with sync_playwright() as p:
         @prueba("V6 Documentos citados en todos los master (Autorizados + Ingresados): en el menú Exportar y armado leyendo SAP (sin descargar) en menos de 5 minutos")
         def _():
             fr.locator("button[title='Exportar']").first.click(); pg.wait_for_timeout(500)
-            item = fr.evaluate("[...document.querySelectorAll('.rmd-menu .rmd-menu-item b')].some(x => x.textContent === 'Documentos citados en todos los master')"); pg.keyboard.press("Escape")
+            item = fr.evaluate("[...document.querySelectorAll('.rmd-menu .rmd-menu-item b')].some(x => x.textContent === 'Documentos citados')"); pg.keyboard.press("Escape")
             t0 = time.time(); r = fr.evaluate("window.__rmdStats.citasDeTodos(['Autorizado', 'Ingresado'])"); s_ = round(time.time() - t0)
             return (item and r["citas"] > 10000 and r["documentos"] > 100 and s_ < 300), f"{s_} s: {r['documentos']} documentos, {r['citas']} citas en {r['masters']} master"
         cerrar_seguro()
@@ -2039,21 +2039,20 @@ with sync_playwright() as p:
                       and a["cambios"] is None and bool(e) and e["agrandada"] and not e["nativaVisible"] and e["pieVisible"] and e["top"] >= 0 and e["bottom"] <= e["vh"] and e["ancho"] >= 1000
                       and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
                 return ok, f"original={a} comparando={e}"
-            @prueba("P2 La comparación entre versiones cuadra con lo leído: (pasos de la versión nueva − pasos de la anterior) = agregados − quitados (un paso reemplazado no suma ni resta), cada cambio trae su usuario y fecha, y los filtros y la búsqueda reducen la lista")
+            @prueba("P2 La comparación entre versiones cuadra con lo leído: (pasos de la versión nueva − pasos de la anterior) = agregados − quitados (un paso reemplazado no suma ni resta), cada cambio trae su usuario y fecha; el documento muestra un paso o proceso menor marcado por cada cambio, «Todo el RMD» muestra más filas y la búsqueda las reduce")
             def _():
                 r = fr.evaluate("""() => { const t = window.__rmdStats.trazabilidad.panel(), E = t.E, A = E.versionCache.get(E.desde), B = E.versionCache.get(E.hasta), c = E.cambios;
                   const n = (s, tp) => c.filter(x => x.seccion === s && x.tipo === tp).length;
-                  const antes = document.querySelectorAll('.rmd-tz .rmd-tz-t tbody tr').length;
-                  const chip = [...document.querySelectorAll('.rmd-tz .rmd-cr-chips button[data-a=seccion]')].find(b => /^Pasos/.test(b.textContent.trim())); if (chip) chip.click();
-                  const soloPasos = document.querySelectorAll('.rmd-tz .rmd-tz-t tbody tr').length, todosPasos = c.filter(x => x.seccion === 'Pasos' && !x.soloOrden).length;
-                  const buscar = document.querySelector('.rmd-tz [data-f=consulta]'); buscar.value = 'zzzz-no-existe'; buscar.dispatchEvent(new Event('input', { bubbles: true }));
-                  const vacio = document.querySelectorAll('.rmd-tz .rmd-tz-t tbody tr').length; buscar.value = ''; buscar.dispatchEvent(new Event('input', { bubbles: true }));
-                  const todos = [...document.querySelectorAll('.rmd-tz .rmd-cr-chips button[data-a=seccion]')].find(b => /^Todas/.test(b.textContent.trim())); if (todos) todos.click();
+                  const sel = (q) => document.querySelectorAll('.rmd-tz ' + q).length, antes = sel('.rmd-pa-item.cambio');
+                  const k = E.dif.cuenta, soloPasos = sel('.rmd-pa-item.paso.cambio, .rmd-pa-item.pm.cambio'), todosPasos = E.dif.items.filter(x => (x.ent === 'paso' || x.ent === 'pm') && window.__rmdStats.tzPost.clase(x) !== 'orden').length;
+                  const buscar = document.querySelector('.rmd-tz [data-f=paQ]'); buscar.value = 'zzzz-no-existe'; buscar.dispatchEvent(new Event('input', { bubbles: true }));
+                  const vacio = sel('.rmd-pa-item.cambio') + (sel('.rmd-pa-vacio') ? 0 : 1000); const b2 = document.querySelector('.rmd-tz [data-f=paQ]'); b2.value = ''; b2.dispatchEvent(new Event('input', { bubbles: true }));
+                  document.querySelector('.rmd-tz .rmd-pa-todo').click(); const todo = sel('.rmd-pa-item'); document.querySelector('.rmd-tz .rmd-pa-seg button[data-v=cambios]').click();
                   const sinUsuario = c.filter(x => x.tipo !== 'Quitado' && x.seccion !== 'Cabecera' && (!x.quien || !x.cuando)).length;
-                  return { nA: A.pasos.length, nB: B.pasos.length, ag: n('Pasos', 'Agregado'), qu: n('Pasos', 'Quitado'), re: n('Pasos', 'Reemplazado'), pmA: A.pm.length, pmB: B.pm.length, filas: antes, soloPasos, todosPasos, vacio, sinUsuario, total: c.length,
+                  return { nA: A.pasos.length, nB: B.pasos.length, ag: n('Pasos', 'Agregado'), qu: n('Pasos', 'Quitado'), re: n('Pasos', 'Reemplazado'), pmA: A.pm.length, pmB: B.pm.length, filas: antes, soloPasos, todosPasos, vacio, todo, cuenta: k, sinUsuario, total: c.length,
                     tiposValidos: c.every(x => ['Agregado', 'Quitado', 'Modificado', 'Reemplazado'].includes(x.tipo)) }; }""")
-                ok = (r["nB"] - r["nA"] == r["ag"] - r["qu"] and r["tiposValidos"] and r["sinUsuario"] == 0 and r["soloPasos"] == min(1500, r["todosPasos"]) and r["vacio"] == 0 and r["total"] > 0
-                      and r["filas"] == min(1500, r["filas"]))
+                ok = (r["nB"] - r["nA"] == r["ag"] - r["qu"] and r["tiposValidos"] and r["sinUsuario"] == 0 and r["soloPasos"] >= r["todosPasos"] > 0 and r["vacio"] == 0 and r["total"] > 0
+                      and r["filas"] > 0 and r["todo"] > r["filas"])
                 return ok, str(r)
             @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Historial de versiones / Diferencia entre versiones / Historial post autorización / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
             def _():
@@ -2062,18 +2061,18 @@ with sync_playwright() as p:
                 z, hojas = xlsx_p(x.pop("b64")); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
                 ok = hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
                 return ok, f"{x}; hojas={hojas}"
-            @prueba("P4 Historial de guardados (auditoría): lista la cabecera y todos los pasos de la versión; al cargar la cabecera el último guardado es de quien figura en el RMD (mismo usuario, misma hora), y los pasos cargados salen en orden, con usuario, sin errores")
+            @prueba("P4 Historial post autorización: en segundos marca las filas cambiadas después de autorizar (o desde que se creó la versión si no está autorizada) con la forma del RMD, cada cambio con usuario, fecha, campo y antes / después, y el clic abre el detalle")
             def _():
-                abrir_traz(COD_PH, tab="his")
-                r = fr.evaluate("""async () => { const t = window.__rmdStats.trazabilidad.panel();
-                  for (let i = 0; i < 60 && !t.E.pasosMd; i++) await new Promise(r => setTimeout(r, 500));
-                  const fs = t.filas(), md = t.E.linaje.actual; await t.cargarFila(fs[0]); const h0 = t.E.hist.get(fs[0].id);
-                  let con = null, visitados = 0; for (const f of fs.slice(1)) { visitados++; await t.cargarFila(f); const h = t.E.hist.get(f.id); if (h.eventos > 0 && h.entradas.some(x => x.cambios.length)) { con = { rotulo: f.rotulo.slice(-50), eventos: h.eventos, ordenados: h.entradas.every((x, i, a) => !i || a[i - 1].ts <= x.ts), usuarios: [...new Set(h.entradas.map(x => x.usuario))], error: h.error || '' }; break; } if (visitados >= 40) break; }
-                  const ult = h0.entradas.length ? h0.entradas[h0.entradas.length - 1] : null, dif = ult && md.fechaActualiza ? Math.abs(+ult.ts - +new Date(md.fechaActualiza)) / 1000 : null;
-                  t.E.abiertos.add(fs[0].id); t.pintar();
-                  return { filas: fs.length, pasosDe: t.E.pasosMd.pasos.length, cab: { eventos: h0.eventos, error: h0.error || '', entradas: h0.entradas.length, ultimoUsuario: ult && ult.usuario, mdUsuario: md.usuarioActualiza, dif }, con, filasHtml: document.querySelectorAll('.rmd-tz-fila').length, detalle: document.querySelectorAll('.rmd-tz-detalle table').length }; }""")
-                ok = (r["filas"] == r["pasosDe"] + 1 and not r["cab"]["error"] and r["cab"]["eventos"] > 0 and r["cab"]["ultimoUsuario"] == r["cab"]["mdUsuario"] and r["cab"]["dif"] is not None and r["cab"]["dif"] < 120
-                      and bool(r["con"]) and r["con"]["ordenados"] and not r["con"]["error"] and all(r["con"]["usuarios"]) and r["filasHtml"] == r["filas"] and r["detalle"] >= 1)
+                COD_PA = os.environ.get("COD_PA", "2202608890")   # Autorizado con pasos y procesos menores modificados después de autorizar
+                abrir_traz(COD_PA, tab="his"); t0 = time.time()
+                r = fr.evaluate("""async () => { for (let i = 0; i < 240; i++) { const s = window.__rmdStats.postAut || {}; if (s.fase === 'listo' || s.fase === 'error') break; await new Promise(r => setTimeout(r, 250)); }
+                  const t = window.__rmdStats.trazabilidad.panel(), P = t.E.post, cl = window.__rmdStats.tzPost.clase;
+                  const conDetalle = P.items.filter(x => cl(x) === 'modificado'), sinUsuario = conDetalle.filter(x => !x.entradas.length || x.entradas.some(y => !y.ts || !y.cambios.every(c => c.campo && 'antes' in c && 'despues' in c))).length;
+                  const cab = document.querySelector('.rmd-tz .rmd-pa-item.cambio > .rmd-pa-cab'); if (cab) cab.click();
+                  const det = document.querySelector('.rmd-tz .rmd-pa-item.abierto .rmd-pa-det tbody tr');
+                  return { fase: P.fase, error: P.error || '', autorizada: P.autorizada, items: P.items.length, cuenta: P.cuenta, modificados: conDetalle.length, sinUsuario, marcadas: document.querySelectorAll('.rmd-tz .rmd-pa-item.cambio').length, detalle: !!det, secciones: document.querySelectorAll('.rmd-tz .rmd-pa-sec').length }; }""")
+                r["segundos"] = round(time.time() - t0, 1)
+                ok = r["fase"] == "listo" and not r["error"] and r["autorizada"] and r["modificados"] > 0 and r["sinUsuario"] == 0 and r["marcadas"] > 0 and r["detalle"] and r["secciones"] > 0 and r["segundos"] < 60
                 return ok, str(r)
             @prueba("P5 Al cerrar la ventana el panel desaparece y al volver a abrir otra trazabilidad se arma de nuevo (sin quedar restos)")
             def _():
