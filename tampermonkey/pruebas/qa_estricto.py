@@ -2100,7 +2100,7 @@ with sync_playwright() as p:
 
     # ───────────────────────── 1. Plantilla para Producción (v1.40; lectura real, sin escribir) ─────────────────────────
     if "1" in SOLO:
-        COD_PP = os.environ.get("COD_PP", "2202609157")      # RMD (Ingresado) para la plantilla y la importación
+        COD_PP = os.environ.get("COD_PP", "2202609241")      # RMD (Ingresado) para la plantilla y la importación (master de prueba indicado por el usuario)
         bloq_1 = []
         def guardia_1(route):
             if route.request.method not in ("GET", "HEAD"): bloq_1.append(route.request.method + " " + route.request.url[:80]); route.abort()
@@ -2193,7 +2193,7 @@ with sync_playwright() as p:
                 cerrar_seguro()
                 ok = (r["estado"] == "Autorizado" and r["cambia"] and r["bloqueado"] and r["destino"] is None and r["ventanas"] == 1 and "Solo se puede importar en un RMD Ingresado" in r["txt"] and "Exportar Excel" not in r["botones"] and "Crear la versión Ingresada ahora" in r["botones"] and r["filas"] == 0)
                 return ok, f"RMD {cod} · {r}"
-            @prueba("1-5 Ingreso automático SIMULADO en el RMD de prueba 2202609209 (cortafuegos): cambiar, agregar, paso NUEVO (se crearía con su tipo de dato deducido), quitar con sus procesos menores, equipos (copia + alta), renumerar y enlazar predecesores se convierten en las escrituras del portal, sin bloqueos y sin enviar nada")
+            @prueba("1-5 Ingreso automático SIMULADO en el RMD de prueba (COD_ING, 2202609241) (cortafuegos): cambiar, agregar, paso NUEVO (se crearía con su tipo de dato deducido), quitar con sus procesos menores, equipos (copia + alta), renumerar y enlazar predecesores se convierten en las escrituras del portal, sin bloqueos y sin enviar nada")
             def _():
                 MODELO_JS = "sap.ui.getCore().byId([...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')).id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener.getView().getModel('mainModelv2')"
                 JS = """async ([cod, modo, deshacer]) => { const P = window.__rmdStats.plantilla, mm = @@MODELO@@, F = sap.ui.model.Filter;
@@ -2218,7 +2218,7 @@ with sync_playwright() as p:
   if (deshacer && est.entrada) { const er = await P.deshacer(mm, est.entrada); out.deshacer = er; const an2 = await P.analizar(datos, prop); out.trasDeshacer = { enSap: an2.enSap.length, cambios: an2.enSap.map((c) => c.accion + ' ' + (c.antes || c.despues || '').slice(0, 50)) }; }
   return out; }""".replace("@@MODELO@@", MODELO_JS)
                 cerrar_seguro()
-                r = fr.evaluate(JS, [os.environ.get("COD_ING", "2202609209"), "sim", False]); cerrar_seguro()
+                r = fr.evaluate(JS, [os.environ.get("COD_ING", "2202609241"), "sim", False]); cerrar_seguro()
                 tipos = {o[2] + ":" + o[3] for o in r["ops"]}; res = r["resumen"]
                 ok = (not r["bloqueos"] and {"Crear:catalogo", "Agregar:paso", "Quitar:paso", "Cambiar:paso", "Orden:paso", "Agregar:equipo", "Quitar:equipo", "Predecesor:paso"} <= tipos and res["crear"] == 1
                       and any("Fecha y Hora" in a for a in r["avisos"]) and all(x[1] == "simulado" for x in r["diario"]) and len(r["diario"]) == len(r["ops"]) and not r["marcas"])
@@ -2235,15 +2235,15 @@ with sync_playwright() as p:
     # ───────────────────────── 2. v1.44: escenarios del ingreso automático (RMD de prueba 2202609209) ─────────────────────────
     if "2" in SOLO:
         import subprocess
-        REAL = os.environ.get("QA_ESCRIBIR_PRUEBA") == "1"          # solo con esta variable se escribe de verdad (y se deshace) en el RMD de prueba 2202609209
-        @prueba("2-1 Escenarios del ingreso automático (" + ("REALES con deshacer" if REAL else "SIMULADOS") + ") en el RMD de prueba 2202609209: quitar seguidos, agregar al inicio y al final, Sin tipo de dato, mover, procesos menores, firmas, paso nuevo con rango, equipos / utensilios / agrupador, texto ya existente y pasos nuevos parecidos; sin bloqueos ni errores" + (", comprobación sin diferencias y el RMD vuelve exacto" if REAL else ""))
+        REAL = os.environ.get("QA_ESCRIBIR_PRUEBA") == "1"          # solo con esta variable se escribe de verdad (y se deshace) en el RMD de prueba (COD_ING, 2202609241)
+        @prueba("2-1 Escenarios del ingreso automático (" + ("REALES con deshacer" if REAL else "SIMULADOS") + ") en el RMD de prueba (COD_ING, 2202609241): quitar seguidos, agregar al inicio y al final, Sin tipo de dato, mover, procesos menores, firmas, paso nuevo con rango, equipos / utensilios / agrupador, texto ya existente y pasos nuevos parecidos; sin bloqueos ni errores" + (", comprobación sin diferencias y el RMD vuelve exacto" if REAL else ""))
         def _():
             env = dict(os.environ, MODO="real" if REAL else "sim", PYTHONIOENCODING="utf-8")
             r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "_indicadores", "pruebas", "diag_escenarios.py")], capture_output=True, text=True, env=env, timeout=3000, encoding="utf-8")
             lineas = [l for l in r.stdout.splitlines() if l.startswith(("OK ", "FALLA"))]
             return (len(lineas) == 12 and all(l.startswith("OK") for l in lineas)), f"{len(lineas)} escenarios · " + " | ".join(l[:70] for l in lineas if not l.startswith("OK")) + (r.stderr[-300:] if not lineas else "")
         if REAL:
-            @prueba("2-2 «Nueva Versión» del portal desde el script (REAL) en el RMD de prueba 2202609209: se crea la versión siguiente (Ingresada), su contenido es igual al original y la prueba la cancela al terminar")
+            @prueba("2-2 «Nueva Versión» del portal desde el script (REAL) en el RMD de prueba (COD_ING, 2202609241): se crea la versión siguiente (Ingresada), su contenido es igual al original y la prueba la cancela al terminar")
             def _():
                 env = dict(os.environ, PYTHONIOENCODING="utf-8")
                 for _intento in range(2):                                    # (la conexión al navegador a veces falla al arrancar: se reintenta una vez, sin riesgo de crear dos versiones porque la falla ocurre antes de pulsar nada)
@@ -2487,7 +2487,7 @@ with sync_playwright() as p:
     # ───────────────────────── 4. Ventanas de pasos, fórmulas y selector (v1.53) · solo lectura + cortafuegos ─────────────────────────
     if "4" in SOLO:
         bq4 = []; errores4 = []
-        COD_4 = os.environ.get("COD_4", "2202609224")                       # RMD de prueba: Fabricación con más de 100 pasos y procesos menores, Rendimiento con la fracción del cálculo
+        COD_4 = os.environ.get("COD_4", "2202609241")                       # RMD de prueba: Fabricación con más de 100 pasos y procesos menores, Rendimiento con la fracción del cálculo
         pg4, fr4, _ = abrir_con_inyeccion_temprana(b, src, ancho=1415, alto=886)
         def guardia4(route):
             if route.request.method not in ("GET", "HEAD"): bq4.append(route.request.method + " " + route.request.url[:90]); route.abort()

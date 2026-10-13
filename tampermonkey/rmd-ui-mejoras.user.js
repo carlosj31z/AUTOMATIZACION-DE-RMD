@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.59.0
+// @version      1.60.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.59.0';                                                       // mantener igual a @version
+  const VERSION = '1.60.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -10877,12 +10877,12 @@
           if (!x.quitado) iv++;
           if (!b0) {
             const prev = anterior(i);
-            out.push({ ...base0, accion: 'agregar', despues: x.texto, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo, tipo: x.tipo || null, valores: CAMPOS_RANGO.filter(([k]) => txtValor(x[k])).map(([k, n]) => ({ campo: n, despues: txtValor(x[k]) })),
+            out.push({ ...base0, accion: 'agregar', despues: x.texto, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo, tipo: x.tipo || null, registro: x.registro || null, valores: CAMPOS_RANGO.filter(([k]) => txtValor(x[k])).map(([k, n]) => ({ campo: n, despues: txtValor(x[k]) })),
               casillas: clase === 'paso' && (x.rpor || x.vb) ? { rpor: !!x.rpor, vb: !!x.vb } : null, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
             return;
           }
           if (x.quitado) { out.push({ ...base0, accion: 'quitar', antes: b0.texto, codigoAntes: b0.codigo || null }); return; }
-          if (String(x.codigo || '') !== String(b0.codigo || '') || normalizar(x.texto) !== normalizar(b0.texto)) out.push({ ...base0, comentario: '', accion: 'cambiar', antes: b0.texto, despues: x.texto, codigoAntes: b0.codigo || null, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo });
+          if (String(x.codigo || '') !== String(b0.codigo || '') || normalizar(x.texto) !== normalizar(b0.texto)) out.push({ ...base0, comentario: '', accion: 'cambiar', registro: x.registro || null, antes: b0.texto, despues: x.texto, codigoAntes: b0.codigo || null, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo });
           const vals = CAMPOS_RANGO.filter(([k]) => txtValor(x[k]) !== txtValor(b0[k])).map(([k, n]) => ({ campo: n, antes: txtValor(b0[k]), despues: txtValor(x[k]) }));
           if (vals.length) out.push({ ...base0, comentario: '', accion: 'valores', texto: x.texto, campos: vals });
           if (!ok.has(vivos.indexOf(x)) && vivos.includes(x)) { const prev = anterior(i); out.push({ ...base0, comentario: '', accion: 'mover', texto: x.texto, numeroAntes: clase === 'pm' ? `proceso menor ${posB.get(x.id) + 1}` : (nB.get(x.id) || ''), trasDe: prev ? { id: prev.id, texto: prev.texto } : null }); }
@@ -11044,7 +11044,9 @@
     const app = $('#app');
     let PQ, BASE, W, SOL, BUS, EQ = [], MIEMBROS = new Map(), ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), NUM_BASE = new Map(), sucio = false, seq = 1, filtro = 'todos';
     const deshacer = [];
-    let avisoInicial = '';
+    let avisoInicial = '', pdfHecho = false, guardadoUna = false, imprimiendo = false, SELECCION = null, panelAbierto = false;
+    const CLAVE_PERSONA = 'rmdPlantillaPersona';                       // nombre y área de la última solicitud (este navegador)
+    const REGISTRO = { leer: 'Solo leerlo (instrucción)', dato: 'Anotar un dato (número o texto)', check: 'Marcar un check de conformidad', rango: 'Anotar un rango (valor inicial y final)', fecha: 'Anotar fecha y hora' };
     const CLAVE = () => `rmdPlantilla:${PQ.rmd.codigo}:${PQ.huella}`;
     const scriptBorrador = () => $('#rmd-borrador') || $('#rmd-propuesta');
 
@@ -11085,7 +11087,7 @@
     }
 
     // ---------- estado ----------
-    function cambio(fn) { const rb = document.querySelector('.pp-recuperar'); if (rb && !cambio.recuperando) rb.remove(); deshacer.push(clon({ W, SOL })); if (deshacer.length > 60) deshacer.shift(); fn(); sucio = true; guardarLocal(); pintarTodo(); }
+    function cambio(fn) { const rb = document.querySelector('.pp-recuperar'); if (rb && !cambio.recuperando) rb.remove(); deshacer.push(clon({ W, SOL })); if (deshacer.length > 60) deshacer.shift(); fn(); sucio = true; pdfHecho = false; guardarLocal(); pintarTodo(); }
     function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } }, 400); }
     function ofrecerRecuperar(auto) {
       const b = document.createElement('div'); b.className = 'pp-recuperar';
@@ -11114,8 +11116,10 @@
     function pintarTodo() {
       CMB = PPN.cambios(BASE, W); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras }); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
       const y = window.scrollY;
-      app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>`;
+      app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc${SELECCION ? ' con-sel' : ''}" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel${panelAbierto ? ' abierto' : ''}" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>
+        <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${CMB.length}</b>`}</button>`;
       window.scrollTo(0, y);
+      if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
       document.title = `${sucio ? '● ' : ''}Borrador RMD ${PQ.rmd.codigo} v${PQ.rmd.version}`;
     }
     function contar() {
@@ -11128,20 +11132,31 @@
       const partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
-      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Pasa el ratón por una fila</b>: a su derecha aparecen los botones <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Al final de cada lista está <b>+ Agregar paso al final</b>.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b>.</li><li>Pulsa <b>Solicitud</b> y completa quién pide el cambio y por qué.</li><li>Pulsa <b>Generar PDF</b> e ingrésalo por solicitud o envíalo por correo al área de <b>Documentación Técnica</b>.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué), <b>Guardar borrador</b> (archivo para el equipo RMD) y <b>Generar PDF</b> (para ingresarlo por solicitud o enviarlo por correo a <b>Documentación Técnica</b>).</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
     let ayudaAbierta = false;
     function htmlBarra() {
-      const r = PQ.rmd, n = contar(), falta = !solicitudCompleta();
+      const r = PQ.rmd, n = contar();
       return `<header class="pp-barra"><div class="pp-titulo"><b>Borrador de Producción · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)}</span></div>
-        <div class="pp-botones"><span class="pp-sucio" title="Hay cambios que aún no se guardaron en un archivo">${sucio ? '● Sin guardar' : ''}</span>
+        <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador, pero el archivo para enviar aún no se descargó">${sucio ? '● Sin guardar en archivo' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
-        <button type="button" data-a="solicitud" class="${falta ? 'falta' : ''}" title="Quién pide el cambio y por qué">Solicitud${falta ? ' ⚠' : ' ✓'}</button>
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="pdf" title="Genera el PDF del borrador con los cambios marcados">Generar PDF</button>
         <button type="button" data-a="guardar" class="primario" title="Descarga el archivo con el borrador para enviarlo al equipo RMD">Guardar borrador</button></div>
-        <div class="pp-resumen">${n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'Sin cambios todavía'}${n.nuevos ? ` · <b class="crea">${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'} a crear</b>` : ''}${n.errores ? ` · <b class="err">${n.errores} por corregir</b>` : ''}${n.avisos ? ` · <b class="avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</b>` : ''} · <span class="pp-ayuda-corta">Pasa el ratón por una fila para editarla, agregar debajo, moverla o quitarla</span></div></header>`;
+        <div class="pp-resumen">${htmlFlujo(n)}${n.errores ? `<button type="button" class="pp-pend-btn err" data-a="pendientes">✕ ${n.errores} por corregir</button>` : ''}${n.avisos ? `<span class="pp-pend-btn avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</span>` : ''}${n.nuevos ? `<span class="pp-pend-btn crea">★ ${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'}</span>` : ''}</div></header>`;
+    }
+    // Los cuatro pasos del trabajo, con su estado
+    function htmlFlujo(n) {
+      const sol = solicitudCompleta(), guardado = guardadoUna && !sucio;
+      const pasos = [['1', 'Cambios', n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'ninguno todavía', n.total > 0, ''], ['2', 'Solicitud', sol ? SOL.nombre : 'quién y por qué', sol, 'solicitud'],
+        ['3', 'Guardar borrador', guardado ? 'archivo descargado' : 'para el equipo RMD', guardado, 'guardar'], ['4', 'Generar PDF', pdfHecho ? 'abierto para guardar' : 'para Documentación Técnica', pdfHecho, 'pdf']];
+      return `<ol class="pp-flujo" aria-label="Pasos para terminar">${pasos.map(([k, t, sub, ok, a]) => `<li class="${ok ? 'ok' : ''}">${a ? `<button type="button" data-a="${a}">` : '<span>'}<i aria-hidden="true">${ok ? '✓' : k}</i><b>${t}</b><small>${esc(sub)}</small>${a ? '</button>' : '</span>'}</li>`).join('')}</ol>`;
+    }
+    function htmlIrA() {
+      const num = PPN.numerar(W.estructuras, BASE.estructuras), et = (x) => (num.get(x.id) ? num.get(x.id) + '.- ' : '') + (x.nombre || '');
+      const ops = [...W.estructuras].sort(PPN.porOrden).flatMap((e) => [`<option value="${esc(e.id)}">${esc(et(e))}</option>`, ...[...(e.etiquetas || [])].sort(PPN.porOrden).map((t) => `<option value="${esc(t.id)}">\u2003${esc(et(t))}</option>`)]);
+      return `<select class="pp-ir" data-k="ir" aria-label="Ir a una sección del RMD"><option value="">Ir a sección…</option>${ops.join('')}</select>`;
     }
     // Encabezado del PDF (8 columnas: 60, 80, 68, 28, 45, 75, 53, 60)
     function htmlEncabezadoPdf() {
@@ -11164,13 +11179,13 @@
     const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
     const acciones = (clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
       bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w')
-        + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') : '') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
+        + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') : '') + bt('mover-a', '⇅ Mover a…', 'Elegir en qué posición de la lista va', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
       + bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
     function marcasDe(x, b) {
       const out = [];
       if (!b) out.push('<span class="pp-tag agr">Nuevo</span>'); else if (x.quitado) out.push('<span class="pp-tag qui">Quitado</span>');
       else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (casillasCambiadas(x, b)) out.push('<span class="pp-tag cam">Casillas</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
-      if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}</span>`);
+      if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}</span>${x.registro && REGISTRO[x.registro] ? `<span class="pp-tag reg" title="Qué anota Producción en este paso (lo indica quien pide el cambio)">${esc(REGISTRO[x.registro])}</span>` : ''}`);
       else if (!x.quitado && x.codigo && x.texto != null && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
       return out.length ? `<span class="pp-tags">${out.join('')}</span>` : '';
     }
@@ -11211,7 +11226,7 @@
       else celdas = [`<td colspan="3" class="pp-c-tx">${tx}</td>`, `<td colspan="2" class="pp-c-mini">${mini(['Realizado Por', 'VB'], 2)}</td>`];
       if (conforme) celdas.push(`<td class="pp-c-chk">${CHECK}</td>`);
       celdas[celdas.length - 1] = celdas[celdas.length - 1].replace(/^<td([^>]*)>/, (m0, a) => `<td${a.includes('class="') ? a.replace('class="', 'class="ult ') : a + ' class="ult"'}>`).replace(/<\/td>$/, `${acc}</td>`);
-      return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}"><td class="pp-c-num">${num}</td>${celdas.join('')}</tr>`;
+      return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}" tabindex="0"><td class="pp-c-num">${num}</td>${celdas.join('')}</tr>`;
     }
     function filaPm(m, conforme) {
       const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo);
@@ -11222,7 +11237,7 @@
       celdas.push(r === 'I' ? `<td class="pp-c-caja">${CAJA}</td>` : r === 'C' ? `<td class="pp-c-chk">${CHECK}</td>` : '<td></td>', '<td></td>', '<td></td>');
       if (conforme) celdas.push('<td></td>');
       celdas[celdas.length - 1] = celdas[celdas.length - 1].replace(/^<td([^>]*)>/, (m0, a) => `<td${a.includes('class="') ? a.replace('class="', 'class="ult ') : a + ' class="ult"'}>`).replace(/<\/td>$/, `${acc}</td>`);
-      return `<tr class="pp-pm ${estadoCl(m, b)}" data-id="${esc(m.id)}">${celdas.join('')}</tr>`;
+      return `<tr class="pp-pm ${estadoCl(m, b)}" data-id="${esc(m.id)}" tabindex="0">${celdas.join('')}</tr>`;
     }
     function htmlEtiqueta(e, t, num) {
       const conf = !!t.conforme, nt = num.get(t.id), pasos = t.pasos || [];
@@ -11235,8 +11250,8 @@
     // ---- cuadros (Precauciones, Notas, Condiciones) ----
     function htmlCuadro(e, lista) {
       const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false);
-        return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
-          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo)}</td></tr>`; }).join('')); }).join('');
+        return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}" tabindex="0"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
+          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
       return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>`;
     }
@@ -11296,7 +11311,7 @@
     function htmlImpresion() {
       const r = PQ.rmd, s = SOL || {};
       return `<h2>Resumen del borrador · RMD ${esc(r.codigo)} v${esc(r.version)}</h2><table class="pp-tabla"><tbody><tr><td>Solicitado por</td><td>${esc(s.nombre || '')}</td><td>Área</td><td>${esc(s.area || '')}</td></tr><tr><td>Motivo</td><td colspan="3">${esc(s.motivo || '')}</td></tr><tr><td>Control de cambio</td><td>${esc(s.cc || '')}</td><td>Fecha</td><td>${esc(fechaHora(Date.now()))}</td></tr>${s.observacion ? `<tr><td>Observación</td><td colspan="3">${esc(s.observacion)}</td></tr>` : ''}</tbody></table>
-        <table class="pp-tabla"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${CMB.map((c) => `<tr><td>${esc(c.numero || '')}</td><td>${ETQ_ACCION[c.accion]}${c.nuevo ? ' ★' : ''}<br><span class="pp-nota">${esc(c.lugar)}</span></td><td>${esc(c.antes || '')}</td><td>${esc(c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? 'después de: ' + ((c.trasDe && c.trasDe.texto) || 'al inicio') : c.texto || ''))}</td><td>${esc(c.comentario || '')}</td></tr>`).join('')}</tbody></table>
+        <table class="pp-tabla"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${CMB.map((c) => `<tr><td>${esc(c.numero || '')}</td><td>${ETQ_ACCION[c.accion]}${c.nuevo ? ' ★' : ''}<br><span class="pp-nota">${esc(c.lugar)}</span></td><td>${esc(c.antes || '')}</td><td>${esc(c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? 'después de: ' + ((c.trasDe && c.trasDe.texto) || 'al inicio') : c.texto || ''))}</td><td>${esc([c.comentario, c.registro && REGISTRO[c.registro] ? 'Anota: ' + REGISTRO[c.registro] : ''].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table>
         <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p>`;
     }
 
@@ -11310,11 +11325,12 @@
     }
     // PDF: diálogo de impresión del navegador con destino «Guardar como PDF»
     function generarPdf() {
+      if (!solicitudCompleta()) { abrirSolicitud('pdf'); return; }
       modal(`<h3>Generar PDF<span>Borrador del RMD ${esc(PQ.rmd.codigo)} v${esc(PQ.rmd.version)}</span></h3>
         <ol class="pp-envio"><li>En la ventana que se abre, elige <b>Guardar como PDF</b> como destino y pulsa <b>Guardar</b>.</li>
         <li>El PDF generado debe <b>ingresarse por solicitud</b> o <b>enviarse por correo al área de Documentación Técnica</b>.</li></ol>
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Generar PDF</button></div>`, (m, cerrar) => {
-        m.addEventListener('click', (ev) => { const b = ev.target.closest('button[data-a]'); if (!b) return; cerrar(); if (b.dataset.a === 'aceptar') { pintarTodo(); setTimeout(() => window.print(), 60); } });
+        m.addEventListener('click', (ev) => { const b = ev.target.closest('button[data-a]'); if (!b) return; cerrar(); if (b.dataset.a === 'aceptar') { seleccionar(null); pintarTodo(); imprimiendo = true; setTimeout(() => window.print(), 60); } });
         const ok = m.querySelector('[data-a="aceptar"]'); if (ok) ok.focus();
       });
     }
@@ -11329,7 +11345,8 @@
       modal(`<h3>${titulo}<span>${esc(donde)}${ref.padre ? ' › ' + esc(ref.padre.texto).slice(0, 60) : ''}</span></h3>
         <label class="pp-campo">Texto<textarea id="m-texto" rows="3" spellcheck="true">${esc(x.texto)}</textarea></label>
         <div id="m-estado" class="pp-estado"></div><div id="m-sug" class="pp-sug"></div>
-        <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" value="${esc(x.margen == null ? '' : x.margen)}"></label></div>
+        <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label><span id="m-rango-av" class="pp-rango-av"></span></div>
+        <label id="m-reg-l" class="pp-campo" hidden>¿Qué anota Producción en este paso nuevo? (opcional)<select id="m-reg"><option value="">Sin indicar: lo decide el equipo RMD</option>${Object.entries(REGISTRO).map(([k, t]) => `<option value="${k}"${x.registro === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
         ${clase === 'paso' ? `<fieldset class="pp-cas"><legend>Quién firma este paso</legend><label><input type="checkbox" id="m-rpor"${x.rpor ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Realizado por»</label><label><input type="checkbox" id="m-vb"${x.vb ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Visto bueno»</label>${x.edit ? '<span class="pp-nota">Este paso pide un dato: lleva su caja de dato.</span>' : '<span class="pp-nota">Márcalo solo cuando el paso lo amerite.</span>'}</fieldset>` : ''}
         <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
@@ -11343,7 +11360,14 @@
           else if (elegido) est.innerHTML = `<span class="ok">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${etq && elegido.etq && elegido.etq !== etq && clase !== 'pm' ? `<br><span class="avi">⚠ En el catálogo es de ${esc(ETQ.get(elegido.etq) || 'otra etiqueta')}: en producción podría no aparecer en su lugar.</span>` : ''}`;
           else est.innerHTML = '<span class="crea">★ Paso nuevo: no existe en SAP con este texto. El equipo RMD lo creará.</span>';
           rango.hidden = !conRango();
+          $('#m-reg-l', m).hidden = !(t && !elegido && !(igualBase && b && b.codigo));
+          validarRango();
         };
+        const numero = (v) => { v = String(v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
+        const validarRango = () => { const av = $('#m-rango-av', m); if (rango.hidden) { av.textContent = ''; return true; }
+          const [a, b2, g] = ['#m-vi', '#m-vf', '#m-mg'].map((k) => numero($(k, m).value)), malo = [a, b2, g].some((v) => Number.isNaN(v)), alreves = !malo && a != null && b2 != null && a > b2;
+          av.textContent = malo ? 'Usa solo números (con punto o coma para los decimales).' : alreves ? 'El valor inicial es mayor que el final.' : ''; return !malo && !alreves; };
+        ['#m-vi', '#m-vf', '#m-mg'].forEach((k) => $(k, m).addEventListener('input', validarRango));
         let lim = 12;
         const marcado = (t, tk) => PPN.resaltar(t, tk).map(([x, m]) => (m ? `<mark>${esc(x)}</mark>` : esc(x))).join('');
         const pintarSug = (mas) => {
@@ -11356,7 +11380,8 @@
         sug.addEventListener('click', (e) => { if (e.target.closest('[data-mas]')) { pintarSug(true); return; } const s = e.target.closest('[data-codigo]'); if (!s) return; elegido = BUS.porCodigo(s.dataset.codigo); ta.value = elegido.texto; pintarEstado(); pintarSug(); ta.focus(); });
         const aceptar = () => {
           const t = ta.value.trim(); if (!t) { ta.focus(); return; }
-          const vi = $('#m-vi', m).value.trim(), vf = $('#m-vf', m).value.trim(), mg = $('#m-mg', m).value.trim(), com = $('#m-com', m).value.trim();
+          if (!validarRango()) { $('#m-vi', m).focus(); return; }
+          const vi = $('#m-vi', m).value.trim(), vf = $('#m-vf', m).value.trim(), mg = $('#m-mg', m).value.trim(), com = $('#m-com', m).value.trim(), reg = $('#m-reg-l', m).hidden ? '' : $('#m-reg', m).value;
           cambio(() => {
             let it = x;
             if (!ref.id) { it = { id: `n:${seq++}`, texto: '', pm: clase === 'paso' ? [] : undefined }; const lista = ref.lista, i = ref.despuesDe ? lista.findIndex((y) => y.id === ref.despuesDe) + 1 : lista.length; lista.splice(i, 0, it); }
@@ -11368,6 +11393,7 @@
             else { viva.codigo = null; viva.pasoId = null; viva.nuevo = true; viva.etqCat = null; viva.tipo = b ? b.tipo : (viva.tipo || null); }
             if (clase === 'paso' && $('#m-rpor', m) && !$('#m-rpor', m).disabled) { viva.rpor = $('#m-rpor', m).checked; viva.vb = $('#m-vb', m).checked; }
             if (!rango.hidden) { viva.vi = vi === '' ? null : vi; viva.vf = vf === '' ? null : vf; viva.margen = mg === '' ? null : mg; }
+            if (viva.nuevo && reg) viva.registro = reg; else delete viva.registro;
           });
           cerrar(); setTimeout(() => irA(ref.id || `n:${seq - 1}`), 30);
         };
@@ -11384,16 +11410,21 @@
       });
     }
     function solicitudCompleta() { const s = SOL || {}; return !!(String(s.nombre || '').trim() && String(s.area || '').trim() && String(s.motivo || '').trim()); }
-    function abrirSolicitud(paraGuardar) {
-      const s = SOL || {}, areas = (PQ.rmd.areas || []), campoArea = () => (areas.length ? `<label class="pp-campo">Área o sección *<select data-k="area"><option value="">Elige el área…</option>${areas.map((a) => `<option value="${esc(a)}"${(s.area || PQ.rmd.area) === a ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select></label>` : campo('area', 'Área o sección', true)), campo = (k, t, req, filas) => `<label class="pp-campo">${t}${req ? ' *' : ''}${filas ? `<textarea data-k="${k}" rows="${filas}">${esc(s[k] || '')}</textarea>` : `<input data-k="${k}" value="${esc(s[k] || '')}">`}</label>`;
-      modal(`<h3>Solicitud de cambio<span>${paraGuardar ? 'Completa estos datos para guardar el borrador' : 'Quién pide el cambio y por qué'}</span></h3>${campo('nombre', 'Nombre y apellido', true)}${campoArea()}${campo('motivo', 'Motivo del cambio', true, 2)}${campo('cc', 'Control de cambio (si lo hay)', false)}${campo('observacion', 'Observación', false, 2)}
-        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">${paraGuardar ? 'Guardar borrador' : 'Aceptar'}</button></div>`, (m, cerrar) => {
+    function abrirSolicitud(despues) {
+      const paraGuardar = !!despues;
+      let previa = {}; try { previa = JSON.parse(localStorage.getItem(CLAVE_PERSONA) || '{}') || {}; } catch (e) { previa = {}; }
+      const s = { ...SOL }; if (!s.nombre && previa.nombre) s.nombre = previa.nombre; if (!s.area && previa.area) s.area = previa.area;
+      const areas = (PQ.rmd.areas || []), campoArea = () => (areas.length ? `<label class="pp-campo">Área o sección *<select data-k="area"><option value="">Elige el área…</option>${areas.map((a) => `<option value="${esc(a)}"${(s.area || PQ.rmd.area) === a ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select></label>` : campo('area', 'Área o sección', true)), campo = (k, t, req, filas) => `<label class="pp-campo">${t}${req ? ' *' : ''}${filas ? `<textarea data-k="${k}" rows="${filas}">${esc(s[k] || '')}</textarea>` : `<input data-k="${k}" value="${esc(s[k] || '')}">`}</label>`;
+      modal(`<h3>Solicitud de cambio<span>${despues === 'guardar' ? 'Completa estos datos para guardar el borrador' : despues === 'pdf' ? 'Completa estos datos para el resumen del PDF' : 'Quién pide el cambio y por qué'}</span></h3>${campo('nombre', 'Nombre y apellido', true)}${campoArea()}${campo('motivo', 'Motivo del cambio', true, 2)}${campo('cc', 'Control de cambio (si lo hay)', false)}${campo('observacion', 'Observación', false, 2)}
+        <p class="pp-nota">* Obligatorio. Tu nombre y área se recuerdan en este navegador para la próxima vez.</p>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">${despues === 'guardar' ? 'Guardar borrador' : despues === 'pdf' ? 'Continuar al PDF' : 'Aceptar'}</button></div>`, (m, cerrar) => {
         setTimeout(() => { const i = $$('[data-k]', m).find((x) => !x.value.trim()) || $('[data-k]', m); i.focus(); }, 20);
         m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') {
           const nuevo = {}; $$('[data-k]', m).forEach((i) => { nuevo[i.dataset.k] = i.value.trim(); });
           const faltan = ['nombre', 'area', 'motivo'].filter((k) => !nuevo[k]); $$('[data-k]', m).forEach((i) => i.classList.toggle('falta', faltan.includes(i.dataset.k)));
-          if (faltan.length && paraGuardar) return;
-          cambio(() => { SOL = nuevo; }); cerrar(); if (paraGuardar) guardar(); } });
+          if (faltan.length && paraGuardar) { const f = $(`[data-k="${faltan[0]}"]`, m); if (f) f.focus(); return; }
+          try { localStorage.setItem(CLAVE_PERSONA, JSON.stringify({ nombre: nuevo.nombre, area: nuevo.area })); } catch (x) { }
+          cambio(() => { SOL = nuevo; }); cerrar(); if (despues === 'guardar') guardar(); else if (despues === 'pdf') generarPdf(); } });
       });
     }
     function agregarEquipo(estId) {
@@ -11434,6 +11465,36 @@
       cambio(() => { const f = encontrar(id), l = f.lista, i = l.findIndex((y) => y.id === id); let j = i + dir; while (j >= 0 && j < l.length && l[j].quitado) j += dir; if (j < 0 || j >= l.length) return; const [x] = l.splice(i, 1); l.splice(j, 0, x); });
       setTimeout(() => irA(id), 30);
     }
+    function moverA(id) {
+      const f = encontrar(id); if (!f || !f.lista) return; const x = f.item, num = PPN.numerar(W.estructuras, BASE.estructuras), vivos = f.lista.filter((y) => !y.quitado);
+      const previo = (() => { const i = vivos.findIndex((y) => y.id === id); return i > 0 ? vivos[i - 1].id : ''; })();
+      const ops = vivos.filter((y) => y.id !== id).map((y, k) => `<option value="${esc(y.id)}"${y.id === previo ? ' selected' : ''}>${esc(`${f.clase === 'pm' ? `${k + 1}.` : num.get(y.id) ? num.get(y.id) + '.-' : '-'} ${String(y.texto || '').slice(0, 100)}`)}</option>`).join('');
+      modal(`<h3>Mover ${f.clase === 'pm' ? 'proceso menor' : 'paso'}<span>${esc(String(x.texto || '').slice(0, 100))}</span></h3>
+        <label class="pp-campo">Colocarlo después de<select id="m-pos"><option value="">— Al inicio de la lista —</option>${ops}</select></label>
+        <p class="pp-nota">Se mueve dentro de la misma lista${f.t ? ` (${esc(f.t.nombre)})` : ''}. Para llevarlo a otra etiqueta, quítalo aquí y agrégalo allá.</p>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Mover</button></div>`, (m, cerrar) => {
+        const sel = $('#m-pos', m); setTimeout(() => sel.focus(), 20);
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') {
+          const dest = sel.value; if (dest === previo) { cerrar(); return; }
+          cambio(() => { const l = encontrar(id).lista, i = l.findIndex((y) => y.id === id), [it] = l.splice(i, 1), j = dest ? l.findIndex((y) => y.id === dest) + 1 : 0; l.splice(j, 0, it); });
+          cerrar(); setTimeout(() => { irA(id); seleccionar(id); }, 30); } });
+      });
+    }
+    // Antes de guardar: lo que falta corregir, con enlace a cada fila
+    function pendientes(n, seguir) {
+      const errs = [...AV.entries()].filter(([, l]) => l.some((a) => a.nivel === 'error'));
+      modal(`<h3>${n.total ? 'Hay cosas por corregir' : 'Todavía no hay cambios'}<span>${n.total ? 'Están marcadas con ✕ en la hoja' : 'Revisa antes de guardar el borrador'}</span></h3>
+        ${n.total ? `<div class="pp-pend">${errs.slice(0, 15).map(([id, l]) => { const f = encontrar(id), t = f ? (f.item.texto || f.item.nombre || f.item.desc || '') : ''; return `<button type="button" class="pp-cmb" data-ir2="${esc(id)}"><b>${esc(String(t || '(sin texto)').slice(0, 90))}</b>${l.filter((a) => a.nivel === 'error').map((a) => `<span class="pp-cmb-av error">${esc(a.texto)}</span>`).join('')}</button>`; }).join('')}${errs.length > 15 ? `<p class="pp-nota">… y ${errs.length - 15} más.</p>` : ''}</div>` : '<p>El borrador no tiene cambios. Puedes guardarlo igual, por ejemplo para enviar solo comentarios.</p>'}
+        <div class="pp-pie">${seguir ? '<button type="button" data-a="seguir">Guardar igual</button>' : ''}<button type="button" class="primario" data-a="cancelar">${n.total ? 'Corregir' : 'Volver'}</button></div>`, (m, cerrar) => {
+        m.addEventListener('click', (e) => { const ir = e.target.closest('[data-ir2]'); if (ir) { cerrar(); irA(ir.dataset.ir2); seleccionar(ir.dataset.ir2); return; }
+          const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'seguir') { cerrar(); seguir(); } });
+      });
+    }
+    function seleccionar(id) {
+      SELECCION = id || null; $$('.pp-doc tr.sel').forEach((x) => x.classList.remove('sel'));
+      const doc = $('#pp-doc'); if (doc) doc.classList.toggle('con-sel', !!SELECCION);
+      if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
+    }
     function quitar(id) {
       cambio(() => { const f = encontrar(id); if (!BI.has(id)) { f.lista.splice(f.lista.findIndex((y) => y.id === id), 1); return; } f.item.quitado = true; });
     }
@@ -11443,11 +11504,16 @@
     }
     app.addEventListener('click', (ev) => {
       const fb = ev.target.closest('[data-filtro]'); if (fb) { filtro = fb.dataset.filtro; $('#pp-panel').innerHTML = htmlPanel(); return; }
-      const ir = ev.target.closest('[data-ir]'); if (ir) { irA(ir.dataset.ir); return; }
-      const b = ev.target.closest('button[data-a]'); if (!b) return;
+      const ir = ev.target.closest('[data-ir]'); if (ir) { if (panelAbierto && window.matchMedia('(max-width: 1340px)').matches) { panelAbierto = false; pintarTodo(); } irA(ir.dataset.ir); seleccionar(ir.dataset.ir); return; }
+      const b = ev.target.closest('button[data-a]');
+      if (!b) { if (ev.target.closest('select, input, textarea, a')) return; const tr = ev.target.closest('.pp-doc tr[data-id]'); seleccionar(tr ? tr.dataset.id : null); return; }
       const a = b.dataset.a, fila = b.closest('[data-id]'), id = b.dataset.id || (fila && fila.dataset.id);
+      if (fila && fila.matches('.pp-doc tr[data-id]')) seleccionar(fila.dataset.id);
       if (a === 'guardar') guardar(); else if (a === 'pdf') generarPdf();
-      else if (a === 'solicitud') abrirSolicitud(false);
+      else if (a === 'panel') { panelAbierto = !panelAbierto; pintarTodo(); }
+      else if (a === 'pendientes') pendientes(contar(), null);
+      else if (a === 'mover-a') moverA(id);
+      else if (a === 'solicitud') abrirSolicitud('');
       else if (a === 'deshacer') deshacerUno();
       else if (a === 'editar') editar({ id });
       else if (a === 'comentar') comentar(id);
@@ -11461,6 +11527,13 @@
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
+    app.addEventListener('change', (ev) => { const sel = ev.target.closest('select.pp-ir'); if (!sel || !sel.value) return; const id = sel.value; sel.value = ''; irA(id); });
+    app.addEventListener('dblclick', (ev) => { const tr = ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target.closest('button')) return; const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { const s2 = window.getSelection && window.getSelection(); if (s2) s2.removeAllRanges(); editar({ id: tr.dataset.id }); } });
+    app.addEventListener('focusin', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (tr && ev.target === tr) seleccionar(tr.dataset.id); });
+    app.addEventListener('keydown', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target !== tr) return;
+      if (ev.key === 'Enter') { const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { ev.preventDefault(); editar({ id: tr.dataset.id }); } } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.defaultPrevented && SELECCION && !document.querySelector('.pp-modal-fondo')) seleccionar(null); });
+    window.addEventListener('afterprint', () => { if (imprimiendo) { imprimiendo = false; pdfHecho = true; pintarTodo(); } });
     function deshacerUno() { const s = deshacer.pop(); if (!s) return; W = s.W; SOL = s.SOL; sucio = true; guardarLocal(); pintarTodo(); }
     document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !document.querySelector('.pp-modal-fondo') && !/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); deshacerUno(); } });
     window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (PQ && !document.querySelector('.pp-modal-fondo')) guardar(); } });
@@ -11471,18 +11544,17 @@
     function descargar(texto, nombre) {
       const u = URL.createObjectURL(new Blob([texto], { type: 'text/html;charset=utf-8' })), a = document.createElement('a'); a.href = u; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 15000);
     }
-    function guardar() {
-      if (!solicitudCompleta()) { abrirSolicitud(true); return; }
+    function guardar(forzar) {
+      if (!solicitudCompleta()) { abrirSolicitud('guardar'); return; }
       const n = contar();
-      if (!n.total && !confirm('Todavía no hay cambios en el borrador. ¿Guardar el archivo igual?')) return;
-      if (n.errores && !confirm(`Hay ${n.errores} cosa(s) por corregir (marcadas con ✕). ¿Guardar el borrador igual?`)) return;
+      if (!forzar && (!n.total || n.errores)) { pendientes(n, () => guardar(true)); return; }
       const d = new Date(), r = PQ.rmd, prop = { formato: 1, tipo: 'borrador-rmd', base: { mdId: r.mdId, codigo: r.codigo, version: r.version, huella: PQ.huella }, guardado: d.toISOString(), solicitud: SOL, trabajo: W,
         resumen: { cambios: n.total, nuevos: n.nuevos, errores: n.errores, avisos: n.avisos } };
       const json = JSON.stringify(prop).replace(/</g, '\\u003c');
       const html = ORIGINAL.replace(/(<script id="rmd-(?:borrador|propuesta)" type="application\/json">)[\s\S]*?(<\/script>)/, (m0, a, b) => a + json + b);
       const nombreArchivo = `Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`.replace(/[\\/:*?"<>|]/g, '-'); ULTIMO = { html, nombre: nombreArchivo };
       descargar(html, nombreArchivo);
-      sucio = false; try { localStorage.removeItem(CLAVE()); } catch (e) { } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(nombreArchivo, n);                                                // pruebas
+      sucio = false; guardadoUna = true; try { localStorage.removeItem(CLAVE()); } catch (e) { } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(nombreArchivo, n);                                                // pruebas
     }
     // Instrucciones tras guardar
     function mostrarEnvio(nombre, n) {
@@ -11490,14 +11562,15 @@
       modal(`<h3>Borrador guardado<span>${n.total} cambio${n.total === 1 ? '' : 's'} · listo para enviar al equipo RMD</span></h3>
         <ol class="pp-envio"><li><b>Busca el archivo</b> en la carpeta <b>Descargas</b> de tu computadora (o abre las descargas del navegador con Ctrl+J):<code>${esc(nombre)}</code></li>
         <li><b>Envíalo al equipo RMD</b> como archivo adjunto, por correo o Teams. Es un solo archivo; no lo copies a otro formato ni lo imprimas en su lugar.</li>
-        <li><b>No lo abras con otro programa ni lo renombres.</b> Si te falta algo, ábrelo de nuevo con Chrome o Edge, sigue editando y vuelve a guardar: se descarga una versión nueva con el mismo nombre.</li></ol>
-        <p class="pp-nota">¿No se descargó? Tu navegador pudo bloquear la descarga: pulsa «Descargar otra vez».</p><div class="pp-pie"><button type="button" data-a="otra">Descargar otra vez</button><button type="button" data-a="copiar">Copiar nombre del archivo</button><a class="pp-btn-enlace" href="mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}">Abrir un correo con el asunto listo</a><button type="button" class="primario" data-a="cancelar">Entendido</button></div>`, (m, cerrar) => {
-        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'otra' && ULTIMO) descargar(ULTIMO.html, ULTIMO.nombre); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
+        <li><b>No lo abras con otro programa ni lo renombres.</b> Si te falta algo, ábrelo de nuevo con Chrome o Edge, sigue editando y vuelve a guardar: se descarga una versión nueva con el mismo nombre.</li>
+        <li><b>Genera también el PDF</b> e ingrésalo por solicitud o envíalo por correo al área de <b>Documentación Técnica</b>.${pdfHecho ? ' <span class="pp-ok-chip">✓ ya lo abriste</span>' : ''}</li></ol>
+        <p class="pp-nota">¿No se descargó? Tu navegador pudo bloquear la descarga: pulsa «Descargar otra vez».</p><div class="pp-pie"><button type="button" data-a="otra">Descargar otra vez</button><button type="button" data-a="copiar">Copiar nombre del archivo</button><a class="pp-btn-enlace" href="mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}">Abrir un correo con el asunto listo</a><button type="button" data-a="pdf-ahora">Generar PDF ahora</button><button type="button" class="primario" data-a="cancelar">Entendido</button></div>`, (m, cerrar) => {
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'pdf-ahora') { cerrar(); generarPdf(); } else if (a === 'otra' && ULTIMO) descargar(ULTIMO.html, ULTIMO.nombre); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
       });
     }
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
     window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion(); });
-    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar() }), editar, quitar, mover, comentar, guardar, encontrar, buscador: () => BUS, irA };   // pruebas
+    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar(), seleccion: SELECCION, pdfHecho, guardadoUna }), editar, quitar, mover, moverA, comentar, guardar, encontrar, buscador: () => BUS, irA, seleccionar };   // pruebas
     iniciar();
   }
   // Estilos de la plantilla (pdfMake, Roboto 9 pt; 1 pt ≈ 1,4 px en pantalla).
@@ -11608,10 +11681,38 @@ td.ult { position: relative; }
 .pp-recuperar button { margin-left: 8px; padding: 3px 10px; border: 1px solid var(--cam); border-radius: 5px; background: #fff; }
 .pp-tabla { width: 100%; border-collapse: collapse; margin: 6px 0; } .pp-tabla th, .pp-tabla td { border: 1px solid var(--bd); padding: 4px 8px; text-align: left; vertical-align: top; } .pp-tabla th { background: #f6f8fa; }
 .pp-solo-impresion { display: none; } .pp-firmas { width: 100%; margin-top: 28px; border-collapse: collapse; } .pp-firmas td { width: 33%; height: 70px; border: 1px solid #000; vertical-align: bottom; padding: 6px; font-size: 12px; }
-@media (max-width: 1340px) { .pp-cuerpo { grid-template-columns: 1fr; } .pp-panel { position: static; max-height: none; } .pp-doc { justify-self: center; } }
+/* pasos para terminar */
+.pp-resumen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.pp-flujo { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pp-flujo li > button, .pp-flujo li > span { display: grid; grid-template-columns: 22px auto; grid-template-rows: auto auto; column-gap: 7px; align-items: center; min-width: 150px; padding: 4px 12px 4px 6px; border: 1px solid var(--bd2); border-radius: 999px; background: #fff; color: var(--tx); text-align: left; font: inherit; }
+.pp-flujo li > button:hover { border-color: var(--acento); }
+.pp-flujo i { grid-row: 1 / span 2; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #eef1f4; color: var(--ap); font: 700 12px/1 "Segoe UI", Arial, sans-serif; font-style: normal; }
+.pp-flujo b { font-size: 12.5px; line-height: 1.2; } .pp-flujo small { font-size: 11px; line-height: 1.2; color: var(--ap); max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-flujo li.ok i { background: var(--agr); color: #fff; } .pp-flujo li.ok > button, .pp-flujo li.ok > span { border-color: rgba(26,127,55,.35); background: var(--agr-f); }
+.pp-pend-btn { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; background: none; }
+.pp-pend-btn.err { color: var(--qui); border-color: rgba(180,35,24,.35); background: var(--qui-f); cursor: pointer; } .pp-pend-btn.avi { color: var(--cam); background: var(--cam-f); } .pp-pend-btn.crea { color: var(--crea); background: var(--crea-f); }
+.pp-ir { height: 32px; max-width: 240px; padding: 0 8px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; color: var(--tx); font: inherit; }
+.pp-pend { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow: auto; margin: 4px 0 8px; }
+.pp-tag.reg { background: #eef1f4; color: #3a4048; font-weight: 500; } .pp-ok-chip { margin-left: 6px; padding: 0 8px; border-radius: 999px; background: var(--agr-f); color: var(--agr); font-size: 12px; font-weight: 600; }
+.pp-rango-av { flex-basis: 100%; color: var(--qui); font-weight: 600; font-size: 12px; min-height: 0; } .pp-rango-av:empty { display: none; }
+/* fila elegida: sus botones quedan a la vista (sirve en pantallas táctiles) */
+.pp-t tr.sel > td > .pp-acc { opacity: 1; pointer-events: auto; }
+.pp-t tr.sel { outline: 2px solid var(--acento) !important; outline-offset: -1px; }
+.pp-doc.con-sel .pp-t tr:not(.sel):hover > td > .pp-acc { opacity: 0; pointer-events: none; }
+.pp-t tr[data-id]:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
+.pp-t tr[data-id] { cursor: pointer; }
+.pp-cajon { display: none; }
+@media (max-width: 1340px) {
+  .pp-cuerpo { grid-template-columns: 1fr; } .pp-doc { justify-self: center; }
+  .pp-panel { display: none; } .pp-panel.abierto { display: flex; position: fixed; top: 12px; right: 12px; bottom: 70px; width: min(400px, calc(100vw - 24px)); max-height: none; z-index: 35; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .pp-cajon { display: inline-flex; align-items: center; gap: 6px; position: fixed; right: 16px; bottom: 16px; z-index: 36; height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--acento); color: #fff; font-weight: 600; box-shadow: 0 6px 18px rgba(10,102,194,.35); }
+  .pp-cajon b { padding: 0 7px; border-radius: 999px; background: rgba(255,255,255,.25); }
+}
+@media (pointer: coarse) { .pp-acc { width: 168px; } .pp-acc button { height: 34px; font-size: 13px; } .pp-flujo li > button { min-height: 40px; } }
 @media print {
   @page { size: A4; margin: 10mm 9mm 12mm; }
-  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo { display: none !important; }
+  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon { display: none !important; }
+  .pp-t tr.sel { outline: 0 !important; } .pp-t tr[data-id] { cursor: default; }
   .pp-t tr[data-id] { outline: 0 !important; }
   .pp-cuerpo { display: block; margin: 0; padding: 0; } .pp-doc { border: 0; box-shadow: none; padding: 0; } .pp-pagina { width: 100%; }
   .pp-enc { font-size: 9pt; } .pp-enc .g { font-size: 11pt; } .pp-hoja, .pp-t { font-size: 9pt; } .pp-sub { font-size: 10pt; } .pp-etq-tit { font-size: 11pt; } .pp-th th, .pp-ver td { font-size: 10pt; }
@@ -11849,6 +11950,8 @@ td.ult { position: relative; }
     const inv = new Map([...mapa.entries()].map(([a, b]) => [b, a])), t = (x) => ({ ...x, id: inv.get(x.id) || ('otra:' + x.id) });
     return { estructuras: arbol.estructuras.map((e) => ({ ...t(e), pasos: (e.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })), etiquetas: (e.etiquetas || []).map((x) => ({ ...t(x), pasos: (x.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })) })), equipos: (e.equipos || []).map(t), utensilios: (e.utensilios || []).map(t), espec: (e.espec || []).map(t) })) };
   }
+  const PP_REGISTRO = { leer: 'Solo leerlo (instrucción)', dato: 'Anotar un dato (número o texto)', check: 'Marcar un check de conformidad', rango: 'Anotar un rango (valor inicial y final)', fecha: 'Anotar fecha y hora' };   // igual que REGISTRO del editor
+  const ppComentario = (c) => [c.comentario, c.registro ? 'Anota: ' + (PP_REGISTRO[c.registro] || c.registro) : ''].filter(Boolean).join(' · ');
   const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario' };
   const ppQue = (c) => `${PP_ACCION[c.accion]}${c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ` (${c.clase})` : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}`;
   const ppDespues = (c) => c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? `después de: ${(c.trasDe && c.trasDe.texto) || '(al inicio)'}` : c.texto || '');
@@ -11860,7 +11963,7 @@ td.ult { position: relative; }
     };
     const avisoDe = (id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info').map((a) => a.texto).join(' · ');
     tabla('Cambios', 'CambiosBorrador', ['N.°', 'Lugar', 'Cambio', 'Antes', 'Después', 'Código antes', 'Código después', 'Paso nuevo a crear', 'Avisos', 'Comentario de Producción'], [10, 36, 22, 50, 50, 12, 12, 10, 40, 40],
-      an.cambios.map((c) => [c.numero || '', c.lugar || '', ppQue(c), c.antes || '', ppDespues(c), c.codigoAntes || '', c.codigo || '', c.nuevo ? 'Sí' : '', avisoDe(c.id), c.comentario || '']), { 1: 'envuelto', 3: 'envuelto', 4: 'envuelto', 8: 'envuelto', 9: 'envuelto' }, true);
+      an.cambios.map((c) => [c.numero || '', c.lugar || '', ppQue(c), c.antes || '', ppDespues(c), c.codigoAntes || '', c.codigo || '', c.nuevo ? 'Sí' : '', avisoDe(c.id), ppComentario(c)]), { 1: 'envuelto', 3: 'envuelto', 4: 'envuelto', 8: 'envuelto', 9: 'envuelto' }, true);
     tabla('Pasos nuevos', 'PasosNuevos', ['N.°', 'Lugar', 'Texto del paso nuevo', 'Ya existe en SAP (mismo texto, estructura y etiqueta)'], [10, 36, 70, 30],
       an.nuevos.map((n) => [n.c.numero || '', n.c.lugar || '', n.texto, n.error ? 'no se pudo comprobar' : (n.existe || []).join(', ')]), { 1: 'envuelto', 2: 'envuelto' });
     tabla('Cambiado en SAP', 'CambiadoEnSap', ['N.°', 'Lugar', 'Cambio en SAP desde la plantilla', 'Antes', 'Después', 'Toca un cambio del borrador'], [10, 36, 26, 50, 50, 12],
@@ -11996,7 +12099,7 @@ td.ult { position: relative; }
     const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
       return `<tr class="rmd-pp-${c.accion}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
         <td>${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => esc(m.texto) + (m.nuevo ? ' ★' : '')).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
-        <td>${esc(c.comentario || '')}</td></tr>`; }).join('');
+        <td>${esc(ppComentario(c))}</td></tr>`; }).join('');
     const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
     v.cuerpo.innerHTML = `${cab}${creada}${rehecho}
