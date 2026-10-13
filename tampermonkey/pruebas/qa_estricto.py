@@ -2228,6 +2228,28 @@ with sync_playwright() as p:
             try:
                 if PP1.get("pagina") and not PP1["pagina"].is_closed(): PP1["pagina"].close()
             except Exception: pass
+        @prueba("1-7 Importar con solo el PDF (v1.61): en la plantilla se cambia un paso, se agrega uno nuevo («qué se anota»: check) y se llena la solicitud; el PDF de Chrome (motor de «Guardar como PDF») trae el borrador en enlaces invisibles y el portal lo importa igual que el .html (mismo borrador, solicitud, destino Ingresado), sin escribir")
+        def _():
+            import base64 as b64m
+            if not PP1.get("ruta"): return False, "1-2 no dejó la plantilla"
+            ctx = pg.context; e = ctx.new_page(); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+            e.goto("file:///" + PP1["ruta"].replace("\\", "/")); e.wait_for_selector(".pp-doc", timeout=120000); e.wait_for_timeout(500)
+            e.evaluate("""async () => { const P = window.__pp, W = P.estado().W, pasos = W.estructuras.flatMap(x => (x.etiquetas || []).flatMap(t => t.pasos)).filter(q => q.codigo && !q.edit);
+              const pon = async (t) => { const ta = document.querySelector('#m-texto'); ta.value = t; ta.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 350)); };
+              P.editar({ id: pasos[5].id }); await pon(pasos[5].texto + ' (AJUSTE QA)'); document.querySelector('.pp-modal [data-a=aceptar]').click(); await new Promise(r => setTimeout(r, 250));
+              document.querySelector('tr[data-id="' + pasos[9].id + '"] .pp-acc [data-a=agregar]').click(); await pon('PASO NUEVO DE PRUEBA PDF QZX QUE NO EXISTE.');
+              document.querySelector('#m-reg').value = 'check'; document.querySelector('.pp-modal [data-a=aceptar]').click(); await new Promise(r => setTimeout(r, 250)); }""")
+            e.click(".pp-flujo [data-a=solicitud]"); e.wait_for_selector(".pp-modal [data-k=nombre]"); e.fill("[data-k=nombre]", "Ana Prueba QA"); e.select_option("[data-k=area]", index=1); e.fill("[data-k=motivo]", "Importar con solo el PDF"); e.click(".pp-modal [data-a=aceptar]")
+            e.wait_for_timeout(1500)
+            pdf = b64m.b64decode(ctx.new_cdp_session(e).send("Page.printToPDF", {"printBackground": True, "preferCSSPageSize": True})["data"])
+            trabajo = e.evaluate("() => JSON.stringify(window.__pp.estado().W)"); e.close()
+            r = fr.evaluate("""async ([b64, trabajo]) => { const u8 = Uint8Array.from(atob(b64), c => c.charCodeAt(0)), t0 = performance.now(); const { datos, prop } = await window.__rmdStats.plantillaPdf.leer(u8); const ms = Math.round(performance.now() - t0);
+              window.__rmdStats.plantilla.ultimo = null; await window.__rmdStats.plantilla.abrirArchivos([new File([u8], 'Borrador.pdf', { type: 'application/pdf' })]);
+              for (let k = 0; k < 120 && !window.__rmdStats.plantilla.ultimo; k++) await new Promise(r => setTimeout(r, 500)); const u = window.__rmdStats.plantilla.ultimo;
+              document.querySelectorAll('.rmd-modal-fondo').forEach(x => x.remove());
+              return { ms, igual: JSON.stringify(prop.trabajo) === trabajo, nombre: prop.solicitud && prop.solicitud.nombre, destino: u && u.an.destino ? u.an.destino.codigo : null, cambios: u ? u.an.cambios.map(c => [c.accion, !!c.nuevo, c.registro || '']) : null, desdePdf: !!(u && u.datos.desdePdf) }; }""", [b64m.b64encode(pdf).decode(), trabajo])
+            ok = (not errs and r["igual"] and r["nombre"] == "Ana Prueba QA" and str(r["destino"]) == str(COD_PP) and r["desdePdf"] and len(r["cambios"] or []) == 2 and ["agregar", True, "check"] in r["cambios"])
+            return ok, f"PDF {round(len(pdf) / 1048576, 2)} MB · {r} · errores={errs[:2]}"
         @prueba("1-6 Ninguna petición de escritura salió del navegador durante el bloque 1 (todo es lectura: RMD, catálogo, PDF en memoria y la nueva búsqueda de pasos)")
         def _():
             return (not bloq_1), f"bloqueadas={bloq_1[:5]}"

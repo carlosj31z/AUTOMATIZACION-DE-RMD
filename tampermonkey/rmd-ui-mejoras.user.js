@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.60.0
+// @version      1.61.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.60.0';                                                       // mantener igual a @version
+  const VERSION = '1.61.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -11078,7 +11078,7 @@
         else { W = clon(BASE); SOL = {}; if (prop && prop.trabajo) avisoInicial = 'El borrador guardado en este archivo no corresponde a esta plantilla; se abrió la plantilla sin cambios.'; }
         W.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { [p, ...(p.pm || [])].forEach((x) => { const s = /^n:(\d+)/.exec(x.id); if (s) seq = Math.max(seq, +s[1] + 1); }); })));
         ['equipos', 'utensilios'].forEach((k) => W.estructuras.forEach((e) => (e[k] || []).forEach((x) => { const s = /^n:(\d+)/.exec(x.id); if (s) seq = Math.max(seq, +s[1] + 1); })));
-        pintarTodo();
+        pintarTodo(); armarDatosPdf().catch(() => {});
         let auto = null; try { auto = JSON.parse(localStorage.getItem(CLAVE()) || 'null'); } catch (e) { auto = null; }
         if (auto && auto.W && (!prop || (auto.t > Date.parse(prop.guardado || 0)))) ofrecerRecuperar(auto);
       } catch (e) {
@@ -11088,7 +11088,23 @@
 
     // ---------- estado ----------
     function cambio(fn) { const rb = document.querySelector('.pp-recuperar'); if (rb && !cambio.recuperando) rb.remove(); deshacer.push(clon({ W, SOL })); if (deshacer.length > 60) deshacer.shift(); fn(); sucio = true; pdfHecho = false; guardarLocal(); pintarTodo(); }
-    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } }, 400); }
+    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } armarDatosPdf().catch(() => {}); }, 400); }
+    // Datos del borrador dentro del PDF: enlaces invisibles al final del resumen. «Guardar como PDF» de Chrome y Edge guarda cada dirección tal cual,
+    // y el portal la lee al importar el PDF (no hace falta el .html). Se arman tras cada cambio para que también sirva Ctrl+P.
+    let DATOS_PDF = '';
+    async function armarDatosPdf() {
+      const r = PQ.rmd, rmd = { ...r }, n = contar(); delete rmd.logo;
+      const datos = { tipo: 'plantilla-rmd', formato: PQ.formato, generado: PQ.generado, por: PQ.por, script: PQ.script, rmd, tipos: PQ.tipos, arbol: BASE, huella: PQ.huella };
+      const prop = { formato: 1, tipo: 'borrador-rmd', base: { mdId: r.mdId, codigo: r.codigo, version: r.version, huella: PQ.huella }, guardado: new Date().toISOString(), solicitud: SOL, trabajo: W,
+        resumen: { cambios: n.total, nuevos: n.nuevos, errores: n.errores, avisos: n.avisos } };
+      const gz = new Uint8Array(await new Response(new Blob([JSON.stringify({ v: 1, datos, prop })]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+      let bin = ''; for (let i = 0; i < gz.length; i += 0x8000) bin += String.fromCharCode.apply(null, gz.subarray(i, i + 0x8000));
+      DATOS_PDF = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return DATOS_PDF;
+    }
+    const htmlDatosPdf = () => { if (!DATOS_PDF) return ''; const T = 30000, n = Math.ceil(DATOS_PDF.length / T); let h = '';
+      for (let i = 0; i < n; i++) h += `<a href="https://borrador-rmd.invalid/#RMDPDF1.${i}.${n}.${DATOS_PDF.slice(i * T, (i + 1) * T)}">.</a>`;
+      return `<div class="pp-datos-pdf" aria-hidden="true">${h}</div>`; };
     function ofrecerRecuperar(auto) {
       const b = document.createElement('div'); b.className = 'pp-recuperar';
       b.innerHTML = `Hay cambios de esta plantilla que no se guardaron en un archivo (${esc(fechaHora(auto.t))}). <button type="button" data-a="si">Recuperarlos</button> <button type="button" data-a="no">Descartar</button>`;
@@ -11132,7 +11148,7 @@
       const partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
-      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué), <b>Guardar borrador</b> (archivo para el equipo RMD) y <b>Generar PDF</b> (para ingresarlo por solicitud o enviarlo por correo a <b>Documentación Técnica</b>).</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>: ingrésalo por solicitud o envíalo por correo a <b>Documentación Técnica</b>; lleva los datos para importar tus cambios, así que es el único archivo que hay que enviar. <b>Guardar borrador</b> es opcional: descarga un archivo para seguir editando otro día.</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
     let ayudaAbierta = false;
@@ -11142,15 +11158,15 @@
         <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador, pero el archivo para enviar aún no se descargó">${sucio ? '● Sin guardar en archivo' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
-        <button type="button" data-a="pdf" title="Genera el PDF del borrador con los cambios marcados">Generar PDF</button>
-        <button type="button" data-a="guardar" class="primario" title="Descarga el archivo con el borrador para enviarlo al equipo RMD">Guardar borrador</button></div>
+        <button type="button" data-a="guardar" title="Descarga un archivo con tu borrador para seguir editándolo otro día">Guardar borrador</button>
+        <button type="button" data-a="pdf" class="primario" title="Genera el PDF con los cambios marcados: es lo que se envía a Documentación Técnica (lleva los datos para importarlo)">Generar PDF</button></div>
         <div class="pp-resumen">${htmlFlujo(n)}${n.errores ? `<button type="button" class="pp-pend-btn err" data-a="pendientes">✕ ${n.errores} por corregir</button>` : ''}${n.avisos ? `<span class="pp-pend-btn avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</span>` : ''}${n.nuevos ? `<span class="pp-pend-btn crea">★ ${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'}</span>` : ''}</div></header>`;
     }
     // Los cuatro pasos del trabajo, con su estado
     function htmlFlujo(n) {
       const sol = solicitudCompleta(), guardado = guardadoUna && !sucio;
       const pasos = [['1', 'Cambios', n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'ninguno todavía', n.total > 0, ''], ['2', 'Solicitud', sol ? SOL.nombre : 'quién y por qué', sol, 'solicitud'],
-        ['3', 'Guardar borrador', guardado ? 'archivo descargado' : 'para el equipo RMD', guardado, 'guardar'], ['4', 'Generar PDF', pdfHecho ? 'abierto para guardar' : 'para Documentación Técnica', pdfHecho, 'pdf']];
+        ['3', 'Generar PDF', pdfHecho ? 'abierto para guardar' : 'para Documentación Técnica', pdfHecho, 'pdf'], ['4', 'Guardar borrador', guardado ? 'archivo descargado' : 'opcional: seguir otro día', guardado, 'guardar']];
       return `<ol class="pp-flujo" aria-label="Pasos para terminar">${pasos.map(([k, t, sub, ok, a]) => `<li class="${ok ? 'ok' : ''}">${a ? `<button type="button" data-a="${a}">` : '<span>'}<i aria-hidden="true">${ok ? '✓' : k}</i><b>${t}</b><small>${esc(sub)}</small>${a ? '</button>' : '</span>'}</li>`).join('')}</ol>`;
     }
     function htmlIrA() {
@@ -11312,7 +11328,8 @@
       const r = PQ.rmd, s = SOL || {};
       return `<h2>Resumen del borrador · RMD ${esc(r.codigo)} v${esc(r.version)}</h2><table class="pp-tabla"><tbody><tr><td>Solicitado por</td><td>${esc(s.nombre || '')}</td><td>Área</td><td>${esc(s.area || '')}</td></tr><tr><td>Motivo</td><td colspan="3">${esc(s.motivo || '')}</td></tr><tr><td>Control de cambio</td><td>${esc(s.cc || '')}</td><td>Fecha</td><td>${esc(fechaHora(Date.now()))}</td></tr>${s.observacion ? `<tr><td>Observación</td><td colspan="3">${esc(s.observacion)}</td></tr>` : ''}</tbody></table>
         <table class="pp-tabla"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${CMB.map((c) => `<tr><td>${esc(c.numero || '')}</td><td>${ETQ_ACCION[c.accion]}${c.nuevo ? ' ★' : ''}<br><span class="pp-nota">${esc(c.lugar)}</span></td><td>${esc(c.antes || '')}</td><td>${esc(c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? 'después de: ' + ((c.trasDe && c.trasDe.texto) || 'al inicio') : c.texto || ''))}</td><td>${esc([c.comentario, c.registro && REGISTRO[c.registro] ? 'Anota: ' + REGISTRO[c.registro] : ''].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table>
-        <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p>`;
+        <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p>
+        <p class="pp-nota">Este PDF lleva los datos del borrador: en el portal se importa directamente (Exportar › Plantilla para Producción › Importar un borrador).</p>`;
     }
 
     // ---------- modales ----------
@@ -11328,9 +11345,10 @@
       if (!solicitudCompleta()) { abrirSolicitud('pdf'); return; }
       modal(`<h3>Generar PDF<span>Borrador del RMD ${esc(PQ.rmd.codigo)} v${esc(PQ.rmd.version)}</span></h3>
         <ol class="pp-envio"><li>En la ventana que se abre, elige <b>Guardar como PDF</b> como destino y pulsa <b>Guardar</b>.</li>
-        <li>El PDF generado debe <b>ingresarse por solicitud</b> o <b>enviarse por correo al área de Documentación Técnica</b>.</li></ol>
+        <li>El PDF generado debe <b>ingresarse por solicitud</b> o <b>enviarse por correo al área de Documentación Técnica</b>. Lleva los datos de tus cambios: no hace falta enviar otro archivo.</li>
+        <li>Usa <b>Guardar como PDF</b> (no «Microsoft Print to PDF» ni una impresión escaneada): solo así el PDF conserva los datos para importarlo.</li></ol>
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Generar PDF</button></div>`, (m, cerrar) => {
-        m.addEventListener('click', (ev) => { const b = ev.target.closest('button[data-a]'); if (!b) return; cerrar(); if (b.dataset.a === 'aceptar') { seleccionar(null); pintarTodo(); imprimiendo = true; setTimeout(() => window.print(), 60); } });
+        m.addEventListener('click', (ev) => { const b = ev.target.closest('button[data-a]'); if (!b) return; cerrar(); if (b.dataset.a === 'aceptar') { seleccionar(null); pintarTodo(); armarDatosPdf().catch(() => {}).then(() => { imprimiendo = true; setTimeout(() => window.print(), 60); }); } });
         const ok = m.querySelector('[data-a="aceptar"]'); if (ok) ok.focus();
       });
     }
@@ -11559,17 +11577,17 @@
     // Instrucciones tras guardar
     function mostrarEnvio(nombre, n) {
       const asunto = `Borrador RMD ${PQ.rmd.codigo} v${PQ.rmd.version} - ${(SOL && SOL.nombre) || ''}`, cuerpo = `Adjunto el borrador de cambios del RMD ${PQ.rmd.codigo} v${PQ.rmd.version} (${PQ.rmd.descripcion}).\n${n.total} cambio(s). Solicitado por ${(SOL && SOL.nombre) || ''} (${(SOL && SOL.area) || ''}).`;
-      modal(`<h3>Borrador guardado<span>${n.total} cambio${n.total === 1 ? '' : 's'} · listo para enviar al equipo RMD</span></h3>
+      modal(`<h3>Borrador guardado<span>${n.total} cambio${n.total === 1 ? '' : 's'} · ábrelo otra vez para seguir editando</span></h3>
         <ol class="pp-envio"><li><b>Busca el archivo</b> en la carpeta <b>Descargas</b> de tu computadora (o abre las descargas del navegador con Ctrl+J):<code>${esc(nombre)}</code></li>
-        <li><b>Envíalo al equipo RMD</b> como archivo adjunto, por correo o Teams. Es un solo archivo; no lo copies a otro formato ni lo imprimas en su lugar.</li>
+        <li><b>Para seguir editando</b>, ábrelo con Chrome o Edge: trae tus cambios. Si el equipo RMD te lo pide, envíalo como adjunto.</li>
         <li><b>No lo abras con otro programa ni lo renombres.</b> Si te falta algo, ábrelo de nuevo con Chrome o Edge, sigue editando y vuelve a guardar: se descarga una versión nueva con el mismo nombre.</li>
-        <li><b>Genera también el PDF</b> e ingrésalo por solicitud o envíalo por correo al área de <b>Documentación Técnica</b>.${pdfHecho ? ' <span class="pp-ok-chip">✓ ya lo abriste</span>' : ''}</li></ol>
+        <li><b>Para enviar el cambio, genera el PDF</b> e ingrésalo por solicitud o envíalo por correo al área de <b>Documentación Técnica</b>: lleva los datos para importarlo.${pdfHecho ? ' <span class="pp-ok-chip">✓ ya lo abriste</span>' : ''}</li></ol>
         <p class="pp-nota">¿No se descargó? Tu navegador pudo bloquear la descarga: pulsa «Descargar otra vez».</p><div class="pp-pie"><button type="button" data-a="otra">Descargar otra vez</button><button type="button" data-a="copiar">Copiar nombre del archivo</button><a class="pp-btn-enlace" href="mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}">Abrir un correo con el asunto listo</a><button type="button" data-a="pdf-ahora">Generar PDF ahora</button><button type="button" class="primario" data-a="cancelar">Entendido</button></div>`, (m, cerrar) => {
         m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'pdf-ahora') { cerrar(); generarPdf(); } else if (a === 'otra' && ULTIMO) descargar(ULTIMO.html, ULTIMO.nombre); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
       });
     }
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
-    window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion(); });
+    window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion() + htmlDatosPdf(); });
     window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar(), seleccion: SELECCION, pdfHecho, guardadoUna }), editar, quitar, mover, moverA, comentar, guardar, encontrar, buscador: () => BUS, irA, seleccionar };   // pruebas
     iniciar();
   }
@@ -11713,6 +11731,7 @@ td.ult { position: relative; }
   @page { size: A4; margin: 10mm 9mm 12mm; }
   html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon { display: none !important; }
   .pp-t tr.sel { outline: 0 !important; } .pp-t tr[data-id] { cursor: default; }
+  .pp-datos-pdf { display: block; line-height: 1px; }   /* sin recortar: Chrome no guarda los enlaces de un contenedor con overflow: hidden */ .pp-datos-pdf a { display: inline-block; width: 2px; height: 2px; overflow: hidden; color: #fff; font-size: 1px; line-height: 1px; text-decoration: none; }
   .pp-t tr[data-id] { outline: 0 !important; }
   .pp-cuerpo { display: block; margin: 0; padding: 0; } .pp-doc { border: 0; box-shadow: none; padding: 0; } .pp-pagina { width: 100%; }
   .pp-enc { font-size: 9pt; } .pp-enc .g { font-size: 11pt; } .pp-hoja, .pp-t { font-size: 9pt; } .pp-sub { font-size: 10pt; } .pp-etq-tit { font-size: 11pt; } .pp-th th, .pp-ver td { font-size: 10pt; }
@@ -11877,13 +11896,54 @@ td.ult { position: relative; }
     if (!prop.base || prop.base.huella !== datos.huella) throw new Error('el borrador no corresponde a esta plantilla (¿se mezclaron archivos de distintas versiones?)');
     return { datos, prop };
   }
-  // Detección por contenido, no por nombre ni extensión
+  // Detección por contenido, no por nombre ni extensión: .html del borrador o PDF generado con «Generar PDF»
   async function ppArchivoValido(f) {
     if (!f) return { error: 'no se eligió ningún archivo' };
     if (f.size > 80 * 1048576) return { error: 'el archivo pesa demasiado para ser un borrador' };
     if (f.size < 1000) return { error: 'el archivo está vacío o es muy pequeño' };
-    let texto; try { texto = await f.text(); } catch (e) { return { error: 'no se pudo leer el archivo: ' + e.message }; }
-    return /rmd-datos/i.test(texto) ? { texto } : { error: 'no es un borrador de Producción (debe ser el .html que se guardó con «Guardar borrador»)' };
+    let bytes; try { bytes = new Uint8Array(await f.arrayBuffer()); } catch (e) { return { error: 'no se pudo leer el archivo: ' + e.message }; }
+    if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return { pdf: bytes };                      // %PDF
+    const texto = new TextDecoder('utf-8').decode(bytes);
+    return /rmd-datos/i.test(texto) ? { texto } : { error: 'no es un borrador de Producción (debe ser el PDF de «Generar PDF» o el .html de «Guardar borrador»)' };
+  }
+  // PDF de la plantilla: los datos van en direcciones de enlaces «…#RMDPDF1.i.n.<base64url>»; si el PDF se volvió a guardar comprimido, se buscan en sus flujos
+  const PP_MARCA_PDF = /RMDPDF1\.(\d+)\.(\d+)\.([A-Za-z0-9_-]+)/g;
+  async function ppTrozosPdf(bytes) {
+    const latin = (u8) => { let t = ''; for (let i = 0; i < u8.length; i += 0x8000) t += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return t; };
+    const buscar = (t, m) => { let x; PP_MARCA_PDF.lastIndex = 0; while ((x = PP_MARCA_PDF.exec(t))) { const i = +x[1], n = +x[2]; if (!m.n) m.n = n; if (n === m.n && !(m.t[i] && m.t[i].length >= x[3].length)) m.t[i] = x[3]; } };
+    const m = { n: 0, t: [] }, crudo = latin(bytes); buscar(crudo, m);
+    if (!m.n) {
+      const re = /\/FlateDecode[\s\S]{0,400}?stream\r?\n/g; let x;
+      while ((x = re.exec(crudo))) {
+        const ini = x.index + x[0].length, fin = crudo.indexOf('endstream', ini); if (fin < 0) break;
+        try { const u = new Uint8Array(await new Response(new Blob([bytes.subarray(ini, fin)]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer()); buscar(latin(u), m); } catch (e) { /* flujo que no es zlib */ }
+        if (m.n && m.t.filter(Boolean).length === m.n) break;
+      }
+    }
+    return m;
+  }
+  async function ppLeerPdf(bytes, avisar = () => {}) {
+    const m = await ppTrozosPdf(bytes);
+    if (!m.n) throw new Error('este PDF no trae los datos del borrador. Debe ser el PDF de «Generar PDF» de la plantilla (v1.61 o posterior), guardado con «Guardar como PDF» de Chrome o Edge; un PDF de «Microsoft Print to PDF», escaneado o firmado con otro programa puede perderlos. Pide a Producción el PDF de nuevo o el .html del borrador');
+    const faltan = []; for (let i = 0; i < m.n; i++) if (!m.t[i]) faltan.push(i + 1);
+    if (faltan.length) throw new Error(`al PDF le faltan ${faltan.length} de ${m.n} partes de los datos del borrador (¿se recortó o se volvió a guardar con otro programa?). Pide a Producción que lo genere otra vez`);
+    let datos, prop;
+    try {
+      const b64 = m.t.join('').replace(/-/g, '+').replace(/_/g, '/'), bin = atob(b64 + '==='.slice((b64.length + 3) % 4)), u8 = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      ({ datos, prop } = JSON.parse(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'))).text()));
+    } catch (e) { throw new Error('los datos del borrador dentro del PDF están dañados. Pide a Producción que lo genere otra vez'); }
+    if (!datos || datos.tipo !== 'plantilla-rmd' || !datos.arbol || !datos.rmd) throw new Error('el PDF no trae una plantilla de RMD válida');
+    if (!prop || !['borrador-rmd', 'propuesta-rmd'].includes(prop.tipo) || !prop.trabajo || !Array.isArray(prop.trabajo.estructuras)) throw new Error('el borrador del PDF no tiene el formato esperado');
+    if (+prop.formato > 1) throw new Error('el PDF lo generó una versión más nueva de las mejoras: actualízalas e inténtalo de nuevo');
+    if (!prop.base || prop.base.huella !== datos.huella) throw new Error('el borrador del PDF no corresponde a su plantilla');
+    // catálogo de pasos: el de SAP de ahora (en el PDF no viaja)
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital»');
+    avisar('Leyendo el catálogo de pasos de SAP…');
+    const cat = await ppCatalogo(modelo, false, avisar);
+    const md = { mdId: datos.rmd.mdId, codigo: datos.rmd.codigo, version: datos.rmd.version, descripcion: datos.rmd.descripcion, estado: datos.rmd.estado };
+    datos.catalogo = ppPaquete(md, datos.arbol, cat, '').catalogo; if (!datos.tipos) datos.tipos = cat.tipos || {};
+    datos.desdePdf = true;
+    return { datos, prop };
   }
   // Une filas de dos versiones por estructura, etiqueta y código de paso
   function ppMapear(base, otro) {
@@ -12021,7 +12081,7 @@ td.ult { position: relative; }
     const filtro = (ctrl.getView().getModel('oDataFilter') || { getProperty: () => '' }).getProperty('/code');
     const v = ventana('Plantilla para Producción', { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false;
     v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-v-pegar');
-    v.cuerpo.innerHTML = `<p class="rmd-nota">Un archivo .html que Producción abre en Chrome o Edge, sin SAP: ve el RMD como en el PDF, deja su borrador de cambios (buscando los pasos que ya existen) y devuelve el archivo para importarlo aquí, en un RMD Ingresado.</p>
+    v.cuerpo.innerHTML = `<p class="rmd-nota">Un archivo .html que Producción abre en Chrome o Edge, sin SAP: ve el RMD como en el PDF, deja su borrador de cambios (buscando los pasos que ya existen) y genera un PDF que lleva esos cambios. Ese PDF (o el .html del borrador) se importa aquí, en un RMD Ingresado.</p>
       <label class="rmd-pp-campo">Código del RMD <input class="rmd-pp-cod" value="${esc(codigo || abierto || filtro || '')}" placeholder="p. ej. 2202609157" inputmode="numeric"></label>
       <label class="rmd-nota"><input type="checkbox" class="rmd-pp-forzar"> Volver a leer el catálogo de SAP (si se crearon pasos hoy)</label>
       <p class="rmd-progreso rmd-pp-estado"></p>`;
@@ -12048,16 +12108,17 @@ td.ult { position: relative; }
   // Abre el primer archivo válido; si ninguno, informa el motivo
   async function abrirArchivos(lista) {
     if (!lista.length) return;
-    const errores = []; for (const f of lista) { const r = await ppArchivoValido(f); if (r.texto) { abrirImportarBorrador(r.texto, f.name); return; } errores.push(`${f.name}: ${r.error}`); }
+    const errores = []; for (const f of lista) { const r = await ppArchivoValido(f); if (r.texto || r.pdf) { abrirImportarBorrador(r.texto, f.name, r.pdf); return; } errores.push(`${f.name}: ${r.error}`); }
     toast(`No se abrió ningún borrador. ${errores.slice(0, 2).join(' · ')}`, true);
   }
-  async function abrirImportarBorrador(texto, nombreArchivo) {
+  async function abrirImportarBorrador(texto, nombreArchivo, pdf) {
     const v = ventana('Borrador de Producción', { cancelar: () => v.cerrar() });
     v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-pp-imp');
     v.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">Leyendo el borrador…</p>';
     let datos, prop, an;
     try {
-      ({ datos, prop } = await ppLeerBorrador(texto));
+      if (pdf) { const p0 = v.cuerpo.querySelector('.rmd-progreso'); ({ datos, prop } = await ppLeerPdf(pdf, (t) => { if (p0) setTxt(p0, t); })); }
+      else ({ datos, prop } = await ppLeerBorrador(texto));
       v.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">Revisando el RMD en SAP…</p>';
       an = await ppAnalizar(datos, prop);
     } catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo abrir «${esc(nombreArchivo || 'el archivo')}»: ${esc(e.message)}</p>`; v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); return; }
@@ -12067,7 +12128,7 @@ td.ult { position: relative; }
   function pintarImportacion(v, datos, prop, an, extra) {
     v.pie.innerHTML = '';
     const s = prop.solicitud || {}, r = datos.rmd;
-    const cab = `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}<br><span class="rmd-nota">Plantilla del ${esc(fechaHoraCorta(datos.generado))} · borrador guardado el ${esc(fechaHoraCorta(prop.guardado))}</span></div>
+    const cab = `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}<br><span class="rmd-nota">Plantilla del ${esc(fechaHoraCorta(datos.generado))} · ${datos.desdePdf ? 'PDF generado' : 'borrador guardado'} el ${esc(fechaHoraCorta(prop.guardado))}</span></div>
         <div><b>${esc(s.nombre || '—')}</b> · ${esc(s.area || '')}<br><span class="rmd-nota">${esc(s.motivo || '')}${s.cc ? ' · ' + esc(s.cc) : ''}</span></div></div>`;
     if (!an.destino) {
       v.cuerpo.innerHTML = `${cab}<p class="rmd-progreso error">Solo se puede importar en un RMD <b>Ingresado</b>. El RMD ${esc(r.codigo)} (v${esc(r.version)}) está ${esc(an.base.estado || r.estado)} y su master no tiene una versión Ingresada posterior.</p>
@@ -12132,6 +12193,7 @@ td.ult { position: relative; }
     if (!on('plantillaprod') || !fs || !fs.length || dialogos().length || !controladorPrincipal() || document.querySelector('.rmd-modal-fondo')) return;
     e.preventDefault(); abrirArchivos(fs);
   });
+  window.__rmdStats.plantillaPdf = { leer: ppLeerPdf, trozos: ppTrozosPdf };   // pruebas
   window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
   // ---- Ingreso automático del borrador ----
   // Mismas escrituras que el portal: aPaso / aPasoInsumoPaso en MD_ESTRUCTURA, catálogo de equipos (TABLAS_ARRAY_MD_SKIP) + aEquipo, aUtensilio,
