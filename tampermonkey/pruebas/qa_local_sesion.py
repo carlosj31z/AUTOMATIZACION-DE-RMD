@@ -51,6 +51,7 @@ def contexto(p, headless=True):
     pg = br.new_page(viewport={"width": 1000, "height": 700})
     errores = []; pg.on("pageerror", lambda e: errores.append(str(e)[:200]))
     pg.route("**/*", lambda r: r.fulfill(status=200, content_type="text/html; charset=utf-8", body=MAQUETA) if r.request.url.startswith(URL) and "?" not in r.request.url.split(URL)[-1][:1] else r.continue_())
+    pg.add_init_script("window.__rmdSinInicio = true")
     pg.goto(URL); pg.evaluate(src); pg.wait_for_timeout(500)
     return br, pg, errores
 

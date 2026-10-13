@@ -95,6 +95,7 @@ def contexto(p):
     pg = br.new_page(viewport={"width": 1415, "height": 886})
     errores = []; pg.on("pageerror", lambda e: errores.append(str(e)[:200]))
     pg.route("**/ui5appruntime.html", lambda r: r.fulfill(status=200, content_type="text/html; charset=utf-8", body=MAQUETA))
+    pg.add_init_script("window.__rmdSinInicio = true")   # (la maqueta no es un arranque del portal: sin la espera de inicio; LN37 la enciende a propósito)
     pg.goto(URL); pg.evaluate(src); pg.wait_for_timeout(800)
     return br, pg, errores
 
@@ -173,21 +174,24 @@ with sync_playwright() as p:
             if espera: pg.wait_for_timeout(espera)
             antes = sucia(pg); cancelar(pg); av = aviso(pg); res.append((antes, av is None, n_dialogos(pg) == 0)); cerrar_todo(pg)
         return all(x == (False, True, True) for x in res), str(res)
-    @prueba("LM5 Lo mismo con Ctrl+S")
+    @prueba("LM5 Ctrl+S no hace nada (se retiró en la v1.57): no guarda y el aviso de cambios sin guardar sigue")
     def _():
-        abrir(pg, PRECAUCIONES, respuesta="exito"); tocar_casilla(pg, 1); pg.keyboard.press("Control+s"); pg.wait_for_timeout(1500); cancelar(pg)
-        ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg); return ok, ""
+        abrir(pg, PRECAUCIONES, respuesta="exito"); tocar_casilla(pg, 1); g0 = pg.evaluate("window.__opc.guardados || 0")
+        pg.keyboard.press("Control+s"); pg.wait_for_timeout(1500); g1 = pg.evaluate("window.__opc.guardados || 0"); cancelar(pg)
+        ok = g1 == g0 and aviso(pg) is not None; cerrar_todo(pg); return ok, f"guardados {g0}->{g1}"
     @prueba("LM6 Si el portal responde con una Advertencia al guardar (no se guardó), la ventana vuelve a contar como sin guardar")
     def _():
         abrir(pg, PRECAUCIONES, respuesta="fallo"); tocar_casilla(pg, 1); guardar(pg); pg.wait_for_timeout(1200)
         pg.locator(".sapMMessageDialog button").click(); pg.wait_for_timeout(400)
         s_ = sucia(pg); cancelar(pg); av = aviso(pg); cerrar_todo(pg)
         return (s_ is True and av is not None), f"sucia={s_} aviso={av and av['titulo']}"
-    @prueba("LM7 Éxito al guardar: el mensaje se cierra solo y la ventana queda limpia")
+    @prueba("LM7 Éxito al guardar: el mensaje NO se cierra solo (se cierra con OK) y la ventana queda limpia")
     def _():
         abrir(pg, PRECAUCIONES, respuesta="exito"); tocar_casilla(pg, 1); guardar(pg); pg.wait_for_timeout(2600)
-        cerrado_solo = pg.evaluate("!document.querySelector('.sapMMessageDialog')"); cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
-        return (cerrado_solo and ok), f"mensaje cerrado solo={cerrado_solo}"
+        sigue = pg.evaluate("!!document.querySelector('.sapMMessageDialog')")
+        pg.evaluate("() => { const b = [...document.querySelectorAll('.sapMMessageDialog button')].find((x) => /^OK$/.test(x.textContent.trim())); if (b) b.click(); }"); pg.wait_for_timeout(400)
+        cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
+        return (sigue and ok), f"mensaje abierto tras 2,6 s={sigue}"
     @prueba("LM8 Cambios del portal sin que la persona toque nada (cargar, refrescar) no cuentan; marcar filas y escribir en el filtro local tampoco")
     def _():
         abrir(pg, PRECAUCIONES)
@@ -206,10 +210,10 @@ with sync_playwright() as p:
     @prueba("LM10 Con 'Avisar cambios sin guardar' apagado, Cancelar cierra sin avisar")
     def _():
         abrir(pg, PRECAUCIONES); tocar_casilla(pg, 1)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(500)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false"); cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(300)
-        pg.evaluate("document.querySelector('#rmd-ui-panel').open = false"); return ok, ""
+        pg.evaluate("window.__rmdStats.panel.abrir(true)"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(500)
+        pg.evaluate("window.__rmdStats.panel.cerrar()"); cancelar(pg); ok = aviso(pg) is None and n_dialogos(pg) == 0; cerrar_todo(pg)
+        pg.evaluate("window.__rmdStats.panel.abrir(true)"); pg.locator("#rmd-ui-panel label:has-text('Avisar cambios sin guardar') input").click(); pg.wait_for_timeout(300)
+        pg.evaluate("window.__rmdStats.panel.cerrar()"); return ok, ""
 
     # ───────── N. Predecesor obligatorio y textos ─────────
     @prueba("LN1 Precauciones: el primer paso (cabeza de la cadena) no necesita predecesor; los demás con tipo de dato sí (se marca la celda Depende y cuenta en el aviso)")
@@ -338,20 +342,14 @@ with sync_playwright() as p:
               and r["numero"] and r["numero"]["tipo"] == "cambio" and r["quitado"] and r["quitado"]["tipo"] == "borrado"
               and r["soloFecha"] is None and r["igual"] is None and r["minusculas"] and r["minusculas"]["tipo"] == "cambio")
         return ok, json.dumps(r, ensure_ascii=False)[:600]
-    @prueba("LN13 Ctrl+K abre 'Ir a…' con el foco en su buscador (también sobre una ventana abierta), escribir filtra, Esc cierra solo la paleta; saludo según la hora")
+    @prueba("LN13 Ctrl+K no abre nada (se retiró en la v1.57); saludo según la hora")
     def _():
         abrir(pg, PRECAUCIONES)
         pg.keyboard.press("Control+k"); pg.wait_for_timeout(500)
-        a = pg.evaluate("() => ({ abierta: !!document.querySelector('.rmd-paleta-fondo'), foco: document.activeElement.className, items: [...document.querySelectorAll('.rmd-paleta-it')].map(x => x.innerText.split('\\n')[0]) })")
-        pg.keyboard.type("mejoras"); pg.wait_for_timeout(300)
-        b_ = pg.evaluate("[...document.querySelectorAll('.rmd-paleta-it')].map(x => x.innerText.split('\\n')[0].trim())")
-        pg.keyboard.press("Escape"); pg.wait_for_timeout(400)
-        c = pg.evaluate("({ paleta: !!document.querySelector('.rmd-paleta-fondo'), dialogos: [...document.querySelectorAll('.sapMDialog')].filter(d => d.getClientRects().length).length })")
+        a = pg.evaluate("!!document.querySelector('.rmd-paleta-fondo')")
         h = pg.evaluate("[5, 11, 12, 18, 19, 23, 2].map(x => window.__rmdStats.productividad.saludoDelMomento(x))")
         cerrar_todo(pg)
-        ok = (a["abierta"] and a["foco"] == "rmd-paleta-q" and any("Mejoras de interfaz" in x for x in a["items"]) and b_ and all("Mejoras" in x for x in b_)
-              and not c["paleta"] and c["dialogos"] == 1 and h == ["Buenos días", "Buenos días", "Buenas tardes", "Buenas tardes", "Buenas noches", "Buenas noches", "Buenas noches"])
-        return ok, f"{a} filtrado={b_} tras Esc={c} saludos={h}"
+        return (not a and h == ["Buenos días", "Buenos días", "Buenas tardes", "Buenas tardes", "Buenas noches", "Buenas noches", "Buenas noches"]), f"paleta={a} saludos={h}"
     @prueba("LN14 Recetas: la comparación con SAP separa cantidad cambiada, material reemplazado por otra versión ('… x25' → '… x25 H v.1'), nuevo y quitado, y el detalle lo muestra en tabla")
     def _():
         r = pg.evaluate("""() => { const S = window.__rmdStats;
@@ -389,7 +387,7 @@ with sync_playwright() as p:
         return ok, json.dumps(r, ensure_ascii=False)[:900]
     @prueba("LN16 Reglas: al apagar 'Reglas de revisión' en el panel desaparecen los resaltados (y la advertencia de la barra); al encenderla vuelven")
     def _():
-        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(200)
+        pg.evaluate("window.__rmdStats.panel.abrir(true)"); pg.wait_for_timeout(200)
         pg.locator("#rmd-ui-panel input[data-k=reglasrev]").click(); pg.wait_for_timeout(700)
         apagada = pg.evaluate(MARCAS_JS)
         pg.locator("#rmd-ui-panel input[data-k=reglasrev]").click(); pg.wait_for_timeout(700)
@@ -398,7 +396,7 @@ with sync_playwright() as p:
         ok = (all(not f["marcas"] for f in apagada["filas"]) and "aviso de reglas" not in apagada["barra"] and apagada["filas"][0]["texto"] == FILAS_REGLAS[0]["desc"]
               and len(encendida["filas"][0]["marcas"]) == 1 and "1 aviso de reglas" in encendida["barra"])
         return ok, f"apagada={apagada['barra']!r} {[len(f['marcas']) for f in apagada['filas']]} encendida={encendida['barra']!r}"
-    @prueba("LN17 Ventana 'Reglas de revisión' (botón del panel): crear una regla con prueba en vivo (la acción pasa sola a 'advertencia' con 'No debe aparecer'), desactivarla, duplicarla, subirla y eliminarla; Ctrl+S guarda la regla sin pulsar el Guardar de SAP")
+    @prueba("LN17 Ventana 'Reglas de revisión' (botón del panel): crear una regla con prueba en vivo (la acción pasa sola a 'advertencia' con 'No debe aparecer'), desactivarla, duplicarla, subirla y eliminarla; «Guardar regla» la guarda sin pulsar el Guardar de SAP")
     def _():
         pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(200)
         pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(500)
@@ -412,7 +410,7 @@ with sync_playwright() as p:
         prueba_ = pg.evaluate("[...document.querySelectorAll('.rmd-reglas .rmd-rg-res mark')].map(m => m.textContent)")
         aviso_prueba = pg.evaluate("(document.querySelector('.rmd-reglas .rmd-rg-res .rmd-rg-ayuda') || {}).textContent")
         guardados_sap = pg.evaluate("window.__opc.guardados || 0")
-        pg.keyboard.press("Control+s"); pg.wait_for_timeout(600)
+        pg.locator(".rmd-reglas .rmd-modal-pie button", has_text="Guardar regla").click(); pg.wait_for_timeout(600)
         tras_ctrl_s = pg.evaluate("({ vista: document.querySelector('.rmd-reglas h3').textContent, sap: window.__opc.guardados || 0, nombres: window.__rmdStats.reglas.lista().map(r => r.nombre) })")
         fila = lambda nombre: pg.locator(".rmd-rg-fila").filter(has=pg.locator("b", has_text=re.compile("^" + re.escape(nombre) + "$")))
         fila("Prueba borrador").locator(".rmd-switch").click(); pg.wait_for_timeout(400)
@@ -621,8 +619,7 @@ with sync_playwright() as p:
           igual: T.comparar(A, A).length, orden: A.pasos.map(p => p.key).slice(0, 2) }; }"""))
         c = {(x[0], x[1], x[2]): x for x in r["c"]}
         def hay(*k): return k in c
-        ok = (hay("Cabecera", "Modificado", "Descripción") and c[("Cabecera", "Modificado", "Descripción")][3:5] == ["PRODUCTO", "PRODUCTO NUEVO"]
-              and hay("Cabecera", "Agregado", "Línea agregada") and c[("Cabecera", "Agregado", "Línea agregada")][4] == "linea tres" and c[("Cabecera", "Quitado", "Línea quitada")][3] == "linea dos"
+        ok = (not any(x[0] == "Cabecera" for x in r["c"])            # (v1.53: la cabecera ya no se compara)
               and c[("Pasos", "Modificado", "Val. Inicial")][3:5] == ["1", "2"] and c[("Pasos", "Modificado", "Tab")][3:5] == ["No", "Sí"]
               and hay("Pasos", "Reemplazado", "Paso") and "300" in c[("Pasos", "Reemplazado", "Paso")][3] and "350" in c[("Pasos", "Reemplazado", "Paso")][4]
               and hay("Pasos", "Agregado", "Paso") and "Paso 400" in c[("Pasos", "Agregado", "Paso")][8])
@@ -650,7 +647,7 @@ with sync_playwright() as p:
         ok = (r["paso"] == [["AA", True, []], ["BB", False, ["Orden:1>2"]], ["BB", False, []], ["CC", False, ["Tab:No>Sí", "Depende del paso:(no registrado)>123", "Tipo Dato:Números>Texto", "Val. Inicial:1>(vacío)"]]]
               and r["cab"] == [["AA", []], ["AA", ["Observaciones (línea agregada):>c", "Estado del proceso:Sin iniciar>En proceso"]], ["DD", ["Observaciones (línea quitada):b>"]]] and r["parseados"] == [2, 3])
         return ok, json.dumps(r, ensure_ascii=False)
-    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Cambios entre versiones, Historial de guardados, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
+    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Historial de versiones, Diferencia entre versiones, Historial post autorización, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
     def _():
         r = pg.evaluate(TZ_DATOS_JS.replace("return { T, A, B, cat }; }", """const c = T.comparar(A, B), h = [{ rotulo: 'PROCEDIMIENTO › FABRICACION › Paso 100', entradas: [{ ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [{ campo: 'Tab', antes: 'No', despues: 'Sí' }, { campo: 'Orden', antes: '1', despues: '2' }] }, { ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [] }] }];
           const x = T.excel({ codigo: '2202600002', descripcion: 'PRODUCTO NUEVO', cambios: c, comparacion: 'v2 → v3', historial: h, estados: [['Ingresado', '28/09/2026 03:26:22', 'JQUISPEP']] });
@@ -659,7 +656,7 @@ with sync_playwright() as p:
         z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64"))))
         hojas = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
         compartidas = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
-        ok = (hojas == ["Cambios entre versiones", "Historial de guardados", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
+        ok = (hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
               and "el registro al autorizar" in compartidas and "Guardado sin cambios" in compartidas and "JQUISPEP" in compartidas)
         return ok, f"{r}; hojas={hojas}"
     @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
@@ -692,12 +689,13 @@ with sync_playwright() as p:
         equipos: [['EQ1', '10000675', 'PL1-SEL-E013', 'REACTOR DE 400 L'], ['EQ2', '40100796', 'SEL-BAL-08', 'BALANZA-OHAUS-R31P30']], utensilios: [['U1', 'SEL-U005', 'BALDE DE ACERO INOXIDABLE DE 10 L']], agrupadores: [], tipos: { 443: 'Rango' } };
       const md = { mdId: 'MD1', codigo: '2202600001', version: 3, descripcion: 'PRODUCTO DE PRUEBA 10 mg', nivelTxt: 'FABRICACION', areaRmdTxt: 'SOLUCIONES', sucursalId: { contenido: 'PLANTA ATE' }, estado: 'Autorizado', observacion: '', rptaValidacion: 'RVP-19-13-00', codigoversionprincipal: '2202600001' };
       return { arbol, cat, md }; }"""
-    @prueba("LN27 Plantilla para Producción · núcleo (v1.40, datos de mentira): numeración como el PDF (solo estructuras con «numeración»; pasos con su orden y renumerados si la lista cambia), buscador (igual y parecidos, primero la misma etiqueta), lista de cambios (agregar, quitar, cambiar a un paso existente, rango, mover, proceso menor, equipos, comentario) y avisos (duplicado nuevo, «Control de Calidad» con las excepciones del FPRO-250 y la biocarga, rango invertido, predecesor, etiqueta distinta ya en SAP)")
+    @prueba("LN27 Plantilla para Producción · núcleo (v1.40, datos de mentira): numeración como el PDF (solo estructuras con «numeración»; pasos con su orden y renumerados si la lista cambia), buscador (igual y parecidos, primero la misma etiqueta), buscador por parte de palabra, letra mal puesta y código, resaltado y parecidos, lista de cambios (agregar, quitar, cambiar a un paso existente, rango, mover, proceso menor, equipos, comentario) y avisos (duplicado nuevo, «Control de Calidad» con las excepciones del FPRO-250 y la biocarga, rango invertido, predecesor, etiqueta distinta ya en SAP)")
     def _():
         r = pg.evaluate("((d) => { const N = window.__rmdStats.plantilla.nucleo, base = d.arbol, W = JSON.parse(JSON.stringify(base));" + """
           const n0 = N.numerar(base.estructuras), numBase = ['E1', 'E2', 'E3', 'T1', 'P10', 'P13', 'T2', 'P21'].map((k) => k + '=' + (n0.get(k) || ''));
           const filas = N.desempacarPasos(window.__rmdStats.plantilla.paquete(d.md, base, d.cat, 'PRUEBA').catalogo), B = N.crearBuscador(filas);
           const exacto = B.exactos('agitar durante 15 minutos').map((f) => f.codigo), parecidos = B.buscar('VERIFICAR LIMPIEZA EQUIPOS', { estr: 'S-PROC', etq: 'G-FAB' }).map((x) => x.f.codigo);
+          const parte = B.buscar('limp', { max: 5 }).map((x) => x.f.codigo), tipo = B.buscar('limpeza equipos', { max: 5 }).map((x) => x.f.codigo), codigoB = B.buscar('2010', { max: 3 }).map((x) => x.f.codigo), res = N.resaltar('Verificar la LIMPIEZA de equipos', ['limp']).filter((x) => x[1]).map((x) => x[0]), sim = B.parecidos('VERIFICAR LA LIMPIEZA DE LOS EQUIPOS Y ACCESORIOS', { max: 2 }).map((x) => x.f.codigo);
           const T1 = W.estructuras[2].etiquetas[0], T2 = W.estructuras[2].etiquetas[1];
           Object.assign(T1.pasos[1], { texto: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', codigo: '2012', pasoId: null, nuevo: false, etqCat: 'G-DOC' });   // P11 → paso existente 2012
           T1.pasos[2].quitado = true;                                                                                                                         // P12 (P13 depende de él)
@@ -711,14 +709,14 @@ with sync_playwright() as p:
           T2.pasos.push({ id: 'n:8', texto: 'EL PERSONAL DE CONTROL DE CALIDAD MUESTREA (100 mL) PARA ANALISIS DE BIOCARGA.', codigo: null, nuevo: true,
             pm: [{ id: 'n:9', texto: 'MUESTRA DE BIOCARGA PARA CONTROL DE CALIDAD (mL):', codigo: null, nuevo: true }] });                                  // excepciones de «Control de Calidad»
           W.estructuras[1].equipos[0].quitado = true; W.estructuras[1].equipos.push({ id: 'n:6', equipoId: 'EQ2', codigo: '40100796', ref: 'SEL-BAL-08', desc: 'BALANZA-OHAUS-R31P30' });
-          T2.comentario = 'Revisar con el jefe de sección.';
+          T2.comentario = 'Revisar con el jefe de sección.'; T2.pasos[0].vb = true; T1.pasos.find((y) => y.id === 'P10').rpor = true;                  // quién firma
           const c = N.cambios(base, W), n1 = N.numerar(W.estructuras, base.estructuras), av = N.avisos(W, { buscador: B, etiquetas: new Map(d.cat.etiquetas), base: base.estructuras });
           const avs = (id) => (av.get(id) || []).map((a) => a.nivel + ':' + a.texto.slice(0, 40));
-          return { numBase, exacto, parecidos: parecidos.slice(0, 2), cambios: c.map((x) => [x.clase, x.accion, x.id, x.numero, !!x.nuevo].join('|')), numNuevo: ['P10', 'n:1', 'P13', 'P11', 'P20', 'n:5'].map((k) => k + '=' + (n1.get(k) || '')),
+          return { numBase, exacto, parte, tipo, codigoB, res, sim, parecidos: parecidos.slice(0, 2), cambios: c.map((x) => [x.clase, x.accion, x.id, x.numero, !!x.nuevo].join('|')), numNuevo: ['P10', 'n:1', 'P13', 'P11', 'P20', 'n:5'].map((k) => k + '=' + (n1.get(k) || '')),
             av: { n1: avs('n:1'), n2: avs('n:2'), n3: avs('n:3'), n4: avs('n:4'), n5: avs('n:5'), n7: avs('n:7'), n8: avs('n:8'), n9: avs('n:9'), P12: avs('P12'), P21: avs('P21'), P20: avs('P20') } }; })""" + "((" + PP_DATOS_JS + ")())")
         c = set(r["cambios"])
-        ok = (r["numBase"] == ["E1=", "E2=1", "E3=2", "T1=2.1", "P10=2.1.1", "P13=2.1.4", "T2=2.2", "P21=2.2.2"] and r["exacto"] == ["2010"] and r["parecidos"][0] == "2011"
-              and {"paso|cambiar|P11|2.1.4|false", "paso|quitar|P12|2.1.3|false", "paso|agregar|n:1|2.1.2|true", "pm|agregar|n:2|2.1.4 › proceso menor 2|true", "equipo|quitar|Q1|1|false", "equipo|agregar|n:6|1|false", "etiqueta|comentario|T2|2.2|false"} <= c
+        ok = (r["numBase"] == ["E1=", "E2=1", "E3=2", "T1=2.1", "P10=2.1.1", "P13=2.1.4", "T2=2.2", "P21=2.2.2"] and r["exacto"] == ["2010"] and r["parecidos"][0] == "2011" and "2012" in r["parte"] and "2012" in r["tipo"] and r["codigoB"][0] == "2010" and r["res"] == ["LIMPIEZA"] and "2012" in r["sim"]
+              and {"paso|cambiar|P11|2.1.4|false", "paso|quitar|P12|2.1.3|false", "paso|agregar|n:1|2.1.2|true", "pm|agregar|n:2|2.1.4 › proceso menor 2|true", "equipo|quitar|Q1|1|false", "equipo|agregar|n:6|1|false", "etiqueta|comentario|T2|2.2|false", "paso|casillas|P20|2.2.1|false", "paso|casillas|P10|2.1.1|false"} <= c
               and any(x.startswith("paso|mover|") for x in c) and r["numNuevo"] == ["P10=2.1.1", "n:1=2.1.2", "P13=2.1.3", "P11=2.1.4", "P20=2.2.1", "n:5=2.2.5"]
               and any(a.startswith("info:Paso nuevo") for a in r["av"]["n1"]) and any("CANTIDAD MUESTREADA" in a for a in r["av"]["n2"]) and any(a.startswith("aviso:En el catálogo este paso es de DOC") for a in r["av"]["n3"])
               and not any("Debe decir" in a for a in r["av"]["n7"] + r["av"]["n8"]) and any(a.startswith("aviso:Debe decir «CALIDAD EN OPERACIONES»") for a in r["av"]["n9"])
@@ -746,7 +744,7 @@ with sync_playwright() as p:
         with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
         ruta = dl.value.path(); guardado = open(ruta, encoding="utf-8").read(); nombre = dl.value.suggested_filename
         e2 = PP_CTX.new_page(); e2.set_content(guardado); e2.wait_for_selector(".pp-doc", timeout=15000); otra = e2.evaluate("() => ({ contar: window.__pp.estado().contar, sol: window.__pp.estado().SOL.nombre })"); e2.close(); e.close()
-        ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and "★ Se creará" in estado["tags"] and "Paso 2010" in estado["tags"]
+        ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and any(t.startswith("★ Se creará") for t in estado["tags"]) and "Paso 2010" in estado["tags"]
               and estado["contar"]["total"] >= 5 and estado["contar"]["nuevos"] == 1 and "Solicitud" in pide and nombre.startswith("Borrador RMD 2202600001 v3 ") and otra["contar"] == estado["contar"] and otra["sol"] == "Ana Prueba")
         PP_GUARDADO.append(guardado)
         return ok, json.dumps({ "nums": nums[:8], "est1": est1, "est2": est2, "quitados": [quitados1, quitados2], "estado": estado, "nombre": nombre, "reabierta": otra, "errores": errs[:3] }, ensure_ascii=False)[:1800]
@@ -788,6 +786,244 @@ with sync_playwright() as p:
               and r["esp"] == ["ENSAYO", "ESPECIFICACIONES", "RESULTADOS"] and r["grupos"] == ["PRUEBAS ESPECIFICAS", "CARACTERISTICAS FISICAS"] and r["firmas"] == 2
               and d == {"ingresado": "B", "autorizadoConIngresada": "B", "autorizadoSinIngresada": None, "suspendido": None})
         return ok, json.dumps({"hoja": r, "destino": d}, ensure_ascii=False)[:1800]
+    @prueba("LN31 Borrador de Producción · el archivo (v1.44): los pasos mayores no piden valor inicial / final / margen, se elige si llevan «Realizado por» y / o «Visto bueno» (y queda como cambio «Casillas»), el área solo ofrece las de SAP, «Realizado Por» y «VB» miden lo mismo y al guardar se explica cómo enviar el archivo")
+    def _():
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { estadoFechaPor: 'Autorizado/ 2026-09-24 /NCUELLARL', areas: ['SOLIDOS', 'LIQUIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", pg.evaluate("(" + PP_DATOS_JS + ")()"))
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200])); e.on("dialog", lambda dlg: dlg.accept())
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        pid = e.evaluate("() => { const f = window.__pp.estado().W.estructuras.flatMap((x) => (x.etiquetas || []).filter((t) => !t.conforme).flatMap((t) => t.pasos)).find((q) => !q.edit && !q.rpor && !q.vb); return f.id; }")
+        e.evaluate("(id) => window.__pp.editar({ id })", pid); e.wait_for_selector("#m-texto")
+        rango = e.evaluate("() => !document.querySelector('#m-rango').hidden"); cas = e.evaluate("() => [...document.querySelectorAll('.pp-cas input')].map((i) => i.id)")
+        e.check("#m-rpor"); e.check("#m-vb"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        cambios = e.evaluate("() => window.__pp.estado().CMB.filter((c) => c.accion === 'casillas').map((c) => c.campos.map((x) => x.campo + ':' + x.despues).join(','))")
+        anchos = e.evaluate("(id) => { const t = document.querySelector('tr[data-id=' + JSON.stringify(id) + '] .pp-mini'); return t ? [...t.querySelectorAll('th')].map((x) => Math.round(x.getBoundingClientRect().width)) : null; }", pid)
+        e.click("[data-a=guardar]"); e.wait_for_selector(".pp-modal [data-k=area]")
+        area = e.evaluate("() => ({ tag: document.querySelector('.pp-modal [data-k=area]').tagName, ops: [...document.querySelectorAll('.pp-modal [data-k=area] option')].map((o) => o.textContent) })")
+        e.fill("[data-k=nombre]", "Ana Prueba"); e.select_option("[data-k=area]", label="LIQUIDOS"); e.fill("[data-k=motivo]", "Ajuste")
+        with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
+        e.wait_for_selector(".pp-envio"); envio = e.evaluate("() => ({ nombre: document.querySelector('.pp-envio code').textContent, correo: document.querySelector('.pp-btn-enlace').href.startsWith('mailto:?subject=') })"); e.close()
+        ok = (not errs and not rango and cas == ["m-rpor", "m-vb"] and cambios == ["Realizado por:Sí,Visto bueno:Sí"] and anchos and anchos[0] == anchos[1] and area["tag"] == "SELECT" and area["ops"][1:] == ["SOLIDOS", "LIQUIDOS"]
+              and envio["nombre"].startswith("Borrador RMD 2202600001 v3 ") and envio["correo"])
+        return ok, json.dumps({ "rango": rango, "cas": cas, "cambios": cambios, "anchos": anchos, "area": area, "envio": envio, "errores": errs[:3] }, ensure_ascii=False)
+    @prueba("LN32 Importar el borrador a prueba de errores (v1.45): se reconoce por su contenido (da igual el nombre o la extensión del archivo), aguanta BOM, saltos de línea y atributos distintos, y cada daño (cortado, dañado, sin borrador, de otra plantilla, no es un borrador) se explica con su mensaje")
+    def _():
+        if not PP_GUARDADO: return False, "LN28 no dejó archivo"
+        r = pg.evaluate("""async ([h, d0]) => { const P = window.__rmdStats.plantilla, ok = async (t) => { try { const x = await P.leer(t); return x.prop.solicitud.nombre; } catch (e) { return 'ERR ' + e.message; } }, out = {};
+          const gt = (t, id) => t.indexOf('>', t.indexOf('id="' + id + '"')) + 1, fin = (t, desde) => t.indexOf('</script>', desde);
+          out.original = await ok(h); out.bomcrlf = await ok(String.fromCharCode(65279) + h.split(String.fromCharCode(10)).join(String.fromCharCode(13, 10)));
+          out.atributos = await ok(h.replace('<script id="rmd-datos"', "<script type='application/octet-stream' id='rmd-datos'").replace('<script id="rmd-borrador" type="application/json">', '<script   type="application/json"   id=rmd-borrador >'));
+          out.cortado = await ok(h.slice(0, h.indexOf('<script id="rmd-datos"') + 120));
+          const g1 = gt(h, 'rmd-datos'); out.base64 = await ok(h.slice(0, g1) + 'AAAA'.repeat(100) + h.slice(g1 + 400));
+          out.sinBorrador = await ok(P.html(await P.empacar(P.paquete(d0.md, d0.arbol, d0.cat, 'X')), null, 'x'));
+          const k = h.indexOf('"huella":"', h.indexOf('id="rmd-borrador"')) + 10; out.otra = await ok(h.slice(0, k) + 'zzzzzz' + h.slice(k + 6));
+          const g2 = gt(h, 'rmd-borrador'); out.json = await ok(h.slice(0, g2) + '{"tipo": nope' + h.slice(fin(h, g2)));
+          out.noEs = await ok('hola mundo, esto no es un borrador');
+          const f1 = new File([h], 'Documento sin titulo (3)', { type: '' }), f2 = new File([h], 'foto.png.txt', { type: 'text/plain' }), f3 = new File(['x'.repeat(2000)], 'borrador.html'), f4 = new File(['x'], 'borrador.html');
+          out.archivos = [!!(await P.archivo(f1)).texto, !!(await P.archivo(f2)).texto, (await P.archivo(f3)).error, (await P.archivo(f4)).error];
+          return out; }""", [PP_GUARDADO[0], pg.evaluate("(" + PP_DATOS_JS + ")()")])
+        ok = (r["original"] == "Ana Prueba" and r["bomcrlf"] == "Ana Prueba" and r["atributos"] == "Ana Prueba" and "incompleto" in r["cortado"] and "dañados" in r["base64"] and "todavía no tiene un borrador" in r["sinBorrador"]
+              and "no corresponde" in r["otra"] and "dañada" in r["json"] and "no es un borrador" in r["noEs"] and r["archivos"][:2] == [True, True] and "no es un borrador" in r["archivos"][2] and "vacío" in r["archivos"][3])
+        return ok, json.dumps(r, ensure_ascii=False)[:1800]
+    @prueba("LN33 Rehacer el borrador sobre el RMD actual (v1.46, datos de mentira): lo de Producción se vuelve a aplicar sobre lo que hay hoy en SAP (quitar, cambiar, agregar tras su paso anterior, mover, equipos, comentarios), lo que SAP cambió se conserva y lo que tocaron los dos se avisa sin pisar")
+    def _():
+        r = pg.evaluate("((d) => { const N = window.__rmdStats.plantilla.nucleo, base = d.arbol, W = JSON.parse(JSON.stringify(base)), A = JSON.parse(JSON.stringify(base));" + """
+          const T1 = W.estructuras[2].etiquetas[0], T2 = W.estructuras[2].etiquetas[1], a1 = A.estructuras[2].etiquetas[0], a2 = A.estructuras[2].etiquetas[1];
+          // Producción: cambia P11 a otro paso, quita P12, agrega uno nuevo tras P10, sube P13, quita un equipo, agrega otro, comenta T2
+          Object.assign(T1.pasos[1], { texto: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', codigo: '2012', pasoId: null, nuevo: false });
+          T1.pasos[2].quitado = true; T1.pasos.splice(1, 0, { id: 'n:1', texto: 'ENJUAGAR CON AGUA PURIFICADA.', codigo: null, nuevo: true, pm: [] });
+          const p13 = T1.pasos.splice(4, 1)[0]; T1.pasos.splice(2, 0, p13);
+          W.estructuras[1].equipos[0].quitado = true; W.estructuras[1].equipos.push({ id: 'n:6', equipoId: 'EQ2', codigo: '40100796', ref: 'SEL-BAL-08', desc: 'BALANZA-OHAUS-R31P30' }); T2.comentario = 'Revisar con el jefe.';
+          // SAP: cambió el texto de P11 (choca), quitó P21, agregó S1 al final de T1 y cambió el texto de P20
+          a1.pasos[1].texto = 'OTRO TEXTO QUE PUSO SAP.'; a1.pasos.push({ id: 'S1', texto: 'NUEVO EN SAP', codigo: '9001', pm: [] }); a2.pasos = a2.pasos.filter((x) => x.id !== 'P21'); a2.pasos[0].texto = 'P20 CAMBIADO EN SAP';
+          const rb = N.rebase(base, W, A), R = rb.trabajo, t1 = R.estructuras[2].etiquetas[0].pasos, t2 = R.estructuras[2].etiquetas[1].pasos;
+          const c = N.cambios(A, R).map((x) => x.clase + '|' + x.accion + '|' + x.id + '|' + (x.nuevo ? 'nuevo' : ''));
+          return { orden: t1.map((x) => x.id + (x.quitado ? '(q)' : '')), p11: t1.find((x) => x.id === 'P11').texto, s1: t1.some((x) => x.id === 'S1'), t2: t2.map((x) => x.id + ':' + x.texto.slice(0, 9)), com: R.estructuras[2].etiquetas[1].comentario, aplicados: rb.aplicados, conflictos: rb.conflictos.map((x) => x.slice(0, 220)), cambios: c, eq: R.estructuras[1].equipos.map((x) => x.id + (x.quitado ? '(q)' : '')) }; })""" + "((" + PP_DATOS_JS + ")())")
+        ok = (r["orden"][0] == "P10" and r["orden"][1] == "n:1" and "P12(q)" in r["orden"] and r["orden"].index("P13") < r["orden"].index("P11") and r["s1"] and r["p11"] == "OTRO TEXTO QUE PUSO SAP."
+              and len(r["conflictos"]) == 1 and "P11" not in r["conflictos"][0] and "cambió en SAP y en el borrador" in r["conflictos"][0] and r["t2"] == ["P20:P20 CAMBI"] and r["com"] == "Revisar con el jefe."
+              and r["eq"][0] == "Q1(q)" and r["eq"][-1] == "n:6" and any(x.startswith("paso|agregar|n:1|") for x in r["cambios"]) and any(x.startswith("paso|quitar|P12") for x in r["cambios"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:1700]
+    @prueba("LN34 Elementos de baja (v1.47): solo MONT y AEQS (accesorio) no son baja; PTBO, NOAC y similares sí; sin estado no se marca")
+    def _():
+        r = pg.evaluate("() => { const f = window.__rmdStats.bajas.equipoDeBaja; return ['MONT-Montado', 'AEQS-Asignado al equipo superior', 'PTBO-Petición de borrado', 'NOAC-Objeto no activo', '', undefined].map((x) => f(x)); }")
+        return r == [False, False, True, True, False, False], json.dumps(r)
+    @prueba("LN35 Animaciones (v1.53): el orbe y el brillo del borde solo acompañan «Ver todas las OP» y las esperas de los Excel de reporte (ventanas marcadas como reporte); en cualquier otra ventana del script el mensaje de espera queda en texto, los tres puntos de SAP y su capa de espera se dejan como los dibuja el portal (sin capa propia ni esfera), y copiar no anima el icono")
+    def _():
+        r = pg.evaluate("""async () => {
+          const O = window.__rmdStats.orbes, esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+          const pinta = ['searching', 'composing'].every((e) => { const c = O.orbe(e, 64); document.body.appendChild(c); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i] > 0 ? 1 : 0; c.remove(); return n > 10; });
+          const ventana = (reporte, texto) => { const f = document.createElement('div'); f.className = 'rmd-modal-fondo'; f.innerHTML = '<div class="rmd-modal' + (reporte ? ' rmd-v-reporte' : '') + '"><h3>Prueba</h3><div class="rmd-modal-cuerpo"><p class="rmd-progreso rmd-espera">' + texto + '</p></div><div class="rmd-modal-pie"></div></div>'; document.body.appendChild(f); return f; };
+          const normal = ventana(false, 'Leyendo los pasos…'), rep = ventana(true, 'Armando el Excel con 10 master…');
+          await esperar(1700);
+          const a = { normal: normal.querySelectorAll('canvas.rmd-orbe').length, brilloNormal: !!normal.querySelector('.rmd-beam'), reporte: !!rep.querySelector('canvas.rmd-orbe-64'), brilloReporte: !!rep.querySelector('.rmd-modal > .rmd-beam') };
+          normal.remove(); rep.remove();
+          const bi = document.createElement('div'); bi.className = 'sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig'; bi.style.cssText = 'position: fixed; left: 100px; top: 100px; width: 300px; height: 200px'; bi.innerHTML = '<div class="sapUiLocalBusyIndicatorAnimation"><div></div><div></div><div></div></div>';
+          document.body.appendChild(bi);
+          const capa = document.createElement('div'); capa.id = 'sapUiBusyIndicator'; capa.style.cssText = 'position: fixed; inset: 0; display: block'; capa.innerHTML = '<div class="sapUiLocalBusyIndicator"><div class="sapUiLocalBusyIndicatorAnimation"></div></div>'; document.body.appendChild(capa);
+          await esperar(900);
+          const b = { orbeEnPuntos: !!bi.querySelector('canvas.rmd-orbe'), puntos: getComputedStyle(bi.querySelector('.sapUiLocalBusyIndicatorAnimation')).display, capaPropia: !!document.querySelector('.rmd-eg'), puntosCapa: getComputedStyle(capa.querySelector('.sapUiLocalBusyIndicatorAnimation')).opacity };
+          bi.remove(); capa.remove();
+          const btn = document.createElement('button'); btn.innerHTML = '<svg viewBox="0 0 16 16"></svg>'; document.body.appendChild(btn); O.confirmarCopia(btn); await esperar(50);
+          const c = { swap: !!btn.querySelector('.rmd-ico-swap'), clase: btn.className }; btn.remove();
+          await esperar(300);
+          return { pinta, a, b, c, esperaGlobal: 'esperaGlobal' in O, vivos: O.vivos() };
+        }""")
+        ok = (r["pinta"] and r["a"] == {"normal": 0, "brilloNormal": False, "reporte": True, "brilloReporte": True} and not r["b"]["orbeEnPuntos"] and r["b"]["puntos"] != "none" and not r["b"]["capaPropia"]
+              and r["b"]["puntosCapa"] == "1" and not r["c"]["swap"] and "rmd-copiado" not in r["c"]["clase"] and not r["esperaGlobal"])
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
+    # ── Vista móvil (v1.51): se prueba con el tamaño de pantalla (390 px) sobre la maqueta ──
+    def movil_estado():
+        return pg.evaluate("() => { const b = document.getElementById('rmd-ui-buscar'); return { clase: document.documentElement.classList.contains('rmd-movil'), buscar: document.documentElement.classList.contains('rmd-movil') && !(b && b.isConnected && !b.hidden), activo: window.__rmdStats.movil.activo() }; }")
+
+    def tamano(w, h=844): pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(600)
+
+    @prueba("LN38 Vista móvil (v1.51): con 390 y 700 px la página pasa sola a la vista móvil (clase rmd-movil, sin botón de búsqueda desde la v1.57) y con 760 o 1415 px no; el panel NO tiene control de vista móvil; un modo guardado «si» / «no» se respeta y «auto» vuelve a decidir por el ancho; «Restablecer» lo devuelve a automático; apagar las mejoras la retira por completo")
+    def _():
+        r = {"escritorio": movil_estado()}
+        tamano(760); r["760"] = movil_estado()
+        tamano(700); r["700"] = movil_estado()
+        tamano(390); r["telefono"] = movil_estado()
+        r["controles"] = pg.evaluate("document.querySelectorAll('#rmd-ui-panel .rmd-movil-sel, #rmd-ui-panel [data-vm]').length")
+        pg.evaluate("window.__rmdStats.movil.modo('no')"); pg.wait_for_timeout(500); r["nunca"] = movil_estado()
+        tamano(1415); pg.evaluate("window.__rmdStats.movil.modo('si')"); pg.wait_for_timeout(500); r["siempre"] = {**movil_estado(), "guardado": pg.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')).vistaMovil")}
+        pg.evaluate("window.__rmdStats.movil.modo('auto')"); pg.wait_for_timeout(500); r["auto"] = {**movil_estado(), "guardado": pg.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')).vistaMovil || null")}
+        pg.evaluate("window.__rmdStats.movil.modo('si')"); pg.wait_for_timeout(300)
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(150); pg.locator("#rmd-ui-panel .rmd-restablecer").click(); pg.wait_for_timeout(500)
+        r["restablecido"] = {**movil_estado(), "guardado": pg.evaluate("JSON.parse(localStorage.getItem('rmdUiMejoras')).vistaMovil || null")}
+        tamano(390); pg.locator("#rmd-ui-panel input[data-k=activo]").click(); pg.wait_for_timeout(600); r["apagado"] = movil_estado()
+        pg.locator("#rmd-ui-panel input[data-k=activo]").click(); pg.wait_for_timeout(600); r["encendido"] = movil_estado()
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = false"); tamano(1415, 886)
+        ok = (r["escritorio"] == {"clase": False, "buscar": False, "activo": False} and r["760"]["clase"] is False and r["700"] == {"clase": True, "buscar": True, "activo": True}
+              and r["telefono"] == {"clase": True, "buscar": True, "activo": True} and r["controles"] == 0
+              and r["nunca"] == {"clase": False, "buscar": False, "activo": False} and r["siempre"] == {"clase": True, "buscar": True, "activo": True, "guardado": "si"}
+              and r["auto"] == {"clase": False, "buscar": False, "activo": False, "guardado": None} and r["restablecido"] == {"clase": False, "buscar": False, "activo": False, "guardado": None}
+              and r["apagado"]["clase"] is False and not r["apagado"]["buscar"] and r["encendido"]["clase"] is True and r["encendido"]["buscar"])
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
+    @prueba("LN39 Vista móvil, tablas como tarjetas: en 390 px la ventana de pasos ocupa toda la pantalla, su tabla se reconoce (pasos, con selección), cada celda lleva su nombre y las filas son tarjetas (sin cabecera ni desborde); un campo vacío y deshabilitado no ocupa sitio y uno editable sí; al volver a escritorio se quitan todas las marcas")
+    def _():
+        tamano(390); abrir(pg, PRECAUCIONES); pg.wait_for_timeout(600)
+        pg.evaluate("() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(); const tr = d.querySelector('tbody tr'); const i = tr.querySelectorAll('input')[1]; i.id = 'dep-prueba'; i.disabled = true; }"); pg.wait_for_timeout(700)
+        medir = """() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), t = d.querySelector('table.sapMListTbl'), tr = t.querySelector('tbody tr.sapMListTblRow'), r = d.getBoundingClientRect();
+          const td = (c) => tr.querySelector('td[data-rmd-col=' + c + ']'), lab = (c) => td(c) ? getComputedStyle(td(c), '::before').content : null, de = document.documentElement;
+          return { tipo: t.dataset.rmdMov, sel: t.dataset.rmdSel, dlg: [Math.round(r.width), Math.round(r.height)], thead: getComputedStyle(t.querySelector('thead')).display, fila: getComputedStyle(tr).display, tabla: getComputedStyle(t).display, anchoTabla: Math.round(t.getBoundingClientRect().width),
+            etq: td('descripcion') && td('descripcion').dataset.rmdEtq, labOrden: lab('orden'), labDesc: lab('descripcion'), vacio: td('depende') && td('depende').dataset.rmdVacio, vacioVisible: td('depende') && getComputedStyle(td('depende')).display, tipoVisible: td('tipo-dato') && getComputedStyle(td('tipo-dato')).display,
+            desborde: de.scrollWidth - innerWidth, marcas: document.querySelectorAll('[data-rmd-mov], td[data-rmd-col], td[data-rmd-etq], td[data-rmd-vacio]').length }; }"""
+        a = pg.evaluate(medir)
+        pg.evaluate("document.getElementById('dep-prueba').disabled = false"); pg.wait_for_timeout(700)
+        b = pg.evaluate("() => { const td = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop().querySelector('tbody tr td[data-rmd-col=depende]'); return { vacio: td.dataset.rmdVacio || null, display: getComputedStyle(td).display }; }")
+        tamano(1415, 886); pg.wait_for_timeout(300)
+        c = pg.evaluate("() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), t = d.querySelector('table.sapMListTbl'), r = d.getBoundingClientRect(); return { dlg: Math.round(r.width), thead: getComputedStyle(t.querySelector('thead')).display, tabla: getComputedStyle(t).display, marcas: document.querySelectorAll('[data-rmd-mov], td[data-rmd-col], td[data-rmd-etq], td[data-rmd-vacio]').length }; }")
+        cerrar_todo(pg)
+        ok = (a["tipo"] == "pasos" and a["sel"] == "1" and a["dlg"] == [390, 844] and a["thead"] == "none" and a["fila"] == "flex" and a["tabla"] == "block" and a["anchoTabla"] <= 390 and a["etq"] == "Descripción" and a["labOrden"] == '"Orden"' and a["labDesc"] == "none"
+              and a["vacio"] == "1" and a["vacioVisible"] == "none" and a["tipoVisible"] != "none" and a["desborde"] <= 0 and a["marcas"] > 10
+              and b == {"vacio": None, "display": "block"} and c["dlg"] > 1000 and c["thead"] != "none" and c["tabla"] != "block" and c["marcas"] == 0)
+        return ok, json.dumps({"movil": a, "habilitado": b, "escritorio": c}, ensure_ascii=False)[:1500]
+
+    @prueba("LN40 Vista móvil, filtros plegables: en 390 px la barra de filtros deja a la vista los dos primeros campos y el último, esconde los del medio tras «Más filtros» (que cuenta los que están en uso), el botón no cuelga del layout de SAP (su reflow() escribe en el último hijo) y «Menos filtros» los vuelve a mostrar; en escritorio no hay nada")
+    def _():
+        tamano(1415, 886)
+        pg.evaluate("""() => { const l = document.createElement('div'); l.className = 'sapUiAFLayout'; l.id = '__layoutPrueba'; l.style.cssText = 'position:relative;display:flex;flex-wrap:wrap';
+          l.innerHTML = [1, 2, 3, 4, 5, 6].map((i) => '<div class="sapUiAFLayoutItem" style="flex:1 1 160px"><input placeholder="campo ' + i + '"></div>').join('') + '<div class="sapUiAFLayoutEnd" style="position:absolute;right:0;bottom:0"><button id="prueba--btnGo">Ir</button></div><div class="sapUiAFLayoutItem sapUiAFLayoutSpacer"></div>';
+          const c = document.createElement('div'); c.id = 'celda-filtros'; c.appendChild(l); document.body.appendChild(c); }"""); pg.wait_for_timeout(500)
+        est = """() => { const l = document.getElementById('__layoutPrueba'), it = [...l.querySelectorAll(':scope > .sapUiAFLayoutItem:not(.sapUiAFLayoutSpacer)')], b = l.nextElementSibling;
+          return { estado: l.dataset.rmdFiltros || null, visibles: it.map((x) => getComputedStyle(x).display !== 'none'), extra: it.map((x) => x.dataset.rmdExtra === '1'), boton: b && b.classList.contains('rmd-filtros-mas') ? b.textContent : null, hijoDelLayout: !!l.querySelector(':scope > .rmd-filtros-mas'), expandido: b && b.getAttribute('aria-expanded') }; }"""
+        r = {"escritorio": pg.evaluate(est)}
+        tamano(390); r["plegado"] = pg.evaluate(est)
+        pg.evaluate("document.querySelectorAll('#__layoutPrueba input')[3].value = 'ING'"); pg.evaluate("window.__rmdStats.movil.gestionar()"); pg.wait_for_timeout(200); r["enUso"] = pg.evaluate(est)
+        pg.evaluate("document.querySelector('.rmd-filtros-mas').click()"); pg.wait_for_timeout(300); r["abierto"] = pg.evaluate(est)
+        pg.evaluate("document.querySelector('.rmd-filtros-mas').click()"); pg.wait_for_timeout(300); r["plegado2"] = pg.evaluate(est)
+        tamano(1415, 886); pg.wait_for_timeout(300); r["vuelta"] = pg.evaluate(est)
+        pg.evaluate("document.getElementById('celda-filtros').remove()")
+        ok = (r["escritorio"]["estado"] is None and r["escritorio"]["boton"] is None and all(r["escritorio"]["visibles"])
+              and r["plegado"]["estado"] == "plegado" and r["plegado"]["visibles"] == [True, True, False, False, False, True] and r["plegado"]["boton"] == "Más filtros" and not r["plegado"]["hijoDelLayout"] and r["plegado"]["expandido"] == "false"
+              and r["enUso"]["boton"] == "Más filtros · 1 en uso" and r["abierto"]["estado"] == "abierto" and all(r["abierto"]["visibles"]) and r["abierto"]["boton"] == "Menos filtros" and r["abierto"]["expandido"] == "true"
+              and r["plegado2"]["visibles"] == [True, True, False, False, False, True] and r["vuelta"]["estado"] is None and r["vuelta"]["boton"] is None and not any(r["vuelta"]["extra"]) and all(r["vuelta"]["visibles"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:1600]
+
+    @prueba("LN41 Vista móvil, lo del script: en 390 px no hay botón de búsqueda (la paleta se retiró en la v1.57); el panel de ajustes es una hoja inferior; las ventanas del script (Reglas) ocupan la pantalla sin desbordar y los avisos pequeños siguen centrados; en escritorio la paleta no tiene «×» y la ventana no es de pantalla completa")
+    def _():
+        tamano(390); r = {}
+        r["sinBuscar"] = pg.evaluate("!document.getElementById('rmd-ui-buscar') || document.getElementById('rmd-ui-buscar').hidden")
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.wait_for_timeout(300)
+        r["panel"] = pg.evaluate("() => { const c = document.querySelector('#rmd-ui-panel .rmd-panel-cuerpo'), b = c.getBoundingClientRect(); return { pos: getComputedStyle(c).position, ancho: Math.round(b.width), dentro: b.left >= 0 && b.right <= innerWidth, tam: getComputedStyle(document.querySelector('#rmd-ui-panel summary')).width }; }")
+        pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(700)
+        r["ventana"] = pg.evaluate("() => { const m = document.querySelector('.rmd-modal'), b = m.getBoundingClientRect(), c = m.querySelector('.rmd-modal-cuerpo'); return { tam: [Math.round(b.width), Math.round(b.height)], desbordeCuerpo: c.scrollWidth - c.clientWidth, pagina: document.documentElement.scrollWidth - innerWidth }; }")
+        pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")
+        pg.evaluate("window.__maq.mensaje('Aviso', 'Prueba de mensaje del portal')"); pg.wait_for_timeout(300); pg.evaluate("document.querySelectorAll('.sapMMessageDialog').forEach((x) => x.remove())")
+        pg.evaluate("() => { const f = document.createElement('div'); f.className = 'rmd-modal-fondo'; f.innerHTML = '<div class=\"rmd-modal rmd-modal-aviso\"><div class=\"rmd-aviso-cab\"><h3>Aviso</h3></div><div class=\"rmd-modal-cuerpo\"><p>Texto de prueba</p></div><div class=\"rmd-modal-pie\"><button class=\"rmd-btn\">Entendido</button></div></div>'; document.body.appendChild(f); }"); pg.wait_for_timeout(300)
+        r["aviso"] = pg.evaluate("() => { const b = document.querySelector('.rmd-modal-aviso').getBoundingClientRect(); return { ancho: Math.round(b.width), alto: Math.round(b.height), cx: Math.round(b.left + b.width / 2), cy: Math.round(b.top + b.height / 2) }; }")
+        pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())"); pg.evaluate("document.getElementById('rmd-ui-panel').open = false")
+        tamano(1415, 886)
+        pg.evaluate("document.getElementById('rmd-ui-panel').open = true"); pg.locator("#rmd-ui-panel .rmd-abrir-reglas").click(); pg.wait_for_timeout(500)
+        r["ventanaEscritorio"] = pg.evaluate("() => { const b = document.querySelector('.rmd-modal').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }")
+        pg.evaluate("document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove())")
+        ok = (r["sinBuscar"]
+              and r["panel"]["pos"] == "fixed" and r["panel"]["dentro"] and r["panel"]["ancho"] >= 370 and r["panel"]["tam"] == "44px"
+              and r["ventana"]["tam"] == [390, 844] and r["ventana"]["desbordeCuerpo"] <= 0 and r["ventana"]["pagina"] <= 0
+              and r["aviso"]["ancho"] <= 366 and abs(r["aviso"]["cx"] - 195) <= 2 and 150 < r["aviso"]["cy"] < 700
+              and r["ventanaEscritorio"][0] < 1300 and r["ventanaEscritorio"][1] < 886)
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
+    @prueba("LN42 Pasadas del script (v1.52): marcar o desmarcar la casilla de una fila de la lista de pasos lanza UNA sola pasada (antes tres: la del observador, la del clic y, 600 ms después, la de la firma de las tablas, que contaba la selección); un clic fuera de la selección y escribir en un campo siguen provocando su pasada; buscar el botón «Exportar» no mide el diseño de cada botón de la página")
+    def _():
+        tamano(1415, 886); abrir(pg, PRECAUCIONES); pg.wait_for_timeout(1500)
+        def pasadas(accion, espera=1700):
+            n0 = pg.evaluate("window.__rmdStats.ajustes"); accion(); pg.wait_for_timeout(espera); return pg.evaluate("window.__rmdStats.ajustes") - n0
+        fila = pg.locator(".sapMDialog:not(.sapMMessageDialog) tbody tr").nth(3)
+        r = {"marcar": pasadas(lambda: fila.locator("td.sapMListTblSelCol [role=checkbox]").click())}
+        r["marcada"] = pg.evaluate("[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) tbody tr')][3].querySelector('td.sapMListTblSelCol [role=checkbox]').getAttribute('aria-checked')")
+        r["desmarcar"] = pasadas(lambda: fila.locator("td.sapMListTblSelCol [role=checkbox]").click())
+        r["clic_fuera"] = pasadas(lambda: pg.locator(".sapMDialog:not(.sapMMessageDialog) h2").first.click())
+        r["escribir"] = pasadas(lambda: (pg.locator(".sapMDialog:not(.sapMMessageDialog) tbody tr").nth(2).locator("input").first.click(), pg.keyboard.type("x"), pg.keyboard.press("Tab")))
+        # botón «Exportar»: con 600 botones en la página, buscarlo no debe medir el diseño de cada uno
+        r["botones_medidos"] = pg.evaluate("""() => { document.body.insertAdjacentHTML('beforeend', '<div id="relleno-botones">' + '<button title="otro">x</button>'.repeat(600) + '</div>'); let n = 0; const orig = Element.prototype.getClientRects;
+          Element.prototype.getClientRects = function () { if (this.tagName === 'BUTTON') n++; return orig.apply(this, arguments); };
+          const t0 = performance.now(); window.__rmdStats.ajustes; document.dispatchEvent(new Event('change', { bubbles: true, cancelable: true })); return new Promise((res) => setTimeout(() => { Element.prototype.getClientRects = orig; document.getElementById('relleno-botones').remove(); res(n); }, 400)); }""")
+        cerrar_todo(pg)
+        ok = r["marcada"] == "true" and r["marcar"] == 1 and r["desmarcar"] == 1 and r["clic_fuera"] >= 1 and r["escribir"] >= 1 and r["botones_medidos"] < 200
+        return ok, json.dumps(r, ensure_ascii=False)
+
+    @prueba("LN43 Descripción con saltos de línea (v1.52): el texto que el portal marca para respetar espacios y saltos (sapMTextRenderWhitespaceWrap) se dibuja con white-space pre-wrap en las ventanas del script, en escritorio y en el teléfono — la fracción del cálculo de Rendimiento queda en sus líneas, con el numerador y el denominador a cada lado de la barra —, y el resto de los textos de las celdas siguen ajustándose (normal)")
+    def _():
+        formula = "CALCULO DE RENDIMIENTO (%):\n\n" + " " * 37 + "CANT. OBTENIDA \nRENDIMIENTO (%) =  " + "-" * 30 + " x 100\n" + " " * 38 + "CANT. TEORICA"
+        geometria = """() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), trs = d.querySelectorAll('tbody tr'), normal = trs[0].querySelector('.sapMText'), sp = trs[1].querySelector('.sapMText');
+          const nodo = sp.firstChild, palabras = []; const re = /\\S+/g; let m; while ((m = re.exec(nodo.nodeValue))) { const r = document.createRange(); r.setStart(nodo, m.index); r.setEnd(nodo, m.index + m[0].length); const b = r.getBoundingClientRect(); palabras.push([m[0], Math.round(b.left), Math.round(b.top), Math.round(b.right)]); }
+          const por = (t) => palabras.filter((p) => p[0] === t); const barra = palabras.find((p) => /^-{10,}$/.test(p[0])), cants = por('CANT.');
+          return { normal: getComputedStyle(normal).whiteSpace, formula: getComputedStyle(sp).whiteSpace, lineas: [...new Set(palabras.map((p) => p[2]))].length,
+                   orden: !!barra && cants.length === 2 && palabras[0][2] < cants[0][2] && cants[0][2] < barra[2] && barra[2] < cants[1][2],
+                   numeradorSobreBarra: !!barra && cants.length === 2 && cants[0][1] >= barra[1] - 20 && cants[0][1] < barra[3], denominadorBajoBarra: !!barra && cants.length === 2 && cants[1][1] >= barra[1] - 20 && cants[1][1] < barra[3] }; }"""
+        r = {}
+        for nombre, ancho in (("escritorio", 1415), ("telefono", 390)):
+            tamano(ancho, 886 if ancho > 700 else 844)
+            abrir(pg, [{"desc": "CANTIDAD OBTENIDA (kg):", "tipo": "Fórmula"}, {"desc": "x", "tipo": "Fórmula"}])
+            pg.evaluate("""(f) => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), sp = d.querySelectorAll('tbody tr')[1].querySelector('.sapMText'); sp.classList.add('sapMTextRenderWhitespaceWrap'); sp.textContent = f; }""", formula)
+            pg.wait_for_timeout(900); r[nombre] = pg.evaluate(geometria)
+            cerrar_todo(pg)
+        tamano(1415, 886)
+        ok = all(v["normal"] == "normal" and v["formula"] == "pre-wrap" and v["orden"] for v in r.values()) and r["escritorio"]["lineas"] == 4 and r["escritorio"]["numeradorSobreBarra"] and r["escritorio"]["denominadorBajoBarra"]
+        return ok, json.dumps(r, ensure_ascii=False)
+
+    @prueba("LN44 Fracción dibujada con guiones (v1.52): la columna Descripción de una lista con un paso así (cálculo de Rendimiento) no cede por debajo de su línea más larga aunque la ventana sea estrecha (aparece desplazamiento horizontal en vez de partir la barra), y la tabla lleva su marca; sin ese paso se reparte como siempre y no hay marca")
+    def _():
+        formula = "CALCULO DE RENDIMIENTO (%):\n\n" + " " * 37 + "CANT. OBTENIDA \nRENDIMIENTO (%) =  " + "-" * 30 + " x 100\n" + " " * 38 + "CANT. TEORICA"
+        medir = """() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), t = d.querySelector('table.sapMListTbl'), cont = t.closest('.sapMDialogScrollCont'), th = [...t.querySelectorAll('thead th')].find((x) => /^Descrip/.test(x.textContent.trim()));
+          const sp = [...t.querySelectorAll('tbody .sapMText')].find((e) => e.textContent.includes('CALCULO')) || t.querySelector('tbody .sapMText'), lienzo = document.createElement('canvas').getContext('2d'), cs = getComputedStyle(sp);
+          lienzo.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+          const mayor = Math.max(...sp.textContent.split('\\n').map((l) => lienzo.measureText(l.replace(/\\u00a0/g, ' ').replace(/\\s+$/, '')).width));
+          return { marca: t.dataset.rmdFormula || null, th: Math.round(th.getBoundingClientRect().width), mayor: Math.round(mayor), desborda: cont.scrollWidth > cont.clientWidth + 1 }; }"""
+        r = {}
+        tamano(900, 700)
+        abrir(pg, [{"desc": "CANTIDAD OBTENIDA (kg):", "tipo": "Fórmula"}, {"desc": "CANTIDAD TEORICA (kg):", "tipo": "Fórmula"}]); pg.wait_for_timeout(500)
+        r["sin"] = pg.evaluate(medir); cerrar_todo(pg)
+        abrir(pg, [{"desc": "CANTIDAD OBTENIDA (kg):", "tipo": "Fórmula"}, {"desc": "x", "tipo": "Fórmula"}])
+        pg.evaluate("""(f) => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), sp = d.querySelectorAll('tbody tr')[1].querySelector('.sapMText'); sp.classList.add('sapMTextRenderWhitespaceWrap'); sp.textContent = f; }""", formula)
+        pg.wait_for_timeout(1200); r["con"] = pg.evaluate(medir)
+        tamano(1415, 886); pg.wait_for_timeout(800); r["ancha"] = pg.evaluate(medir); cerrar_todo(pg)
+        ok = (r["sin"]["marca"] is None and r["con"]["marca"] is not None and r["con"]["th"] >= r["con"]["mayor"] + 8 and r["con"]["desborda"] and r["con"]["th"] > r["sin"]["th"]
+              and r["ancha"]["marca"] is not None and r["ancha"]["th"] >= r["ancha"]["mayor"] + 8)
+        return ok, json.dumps(r, ensure_ascii=False)
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
