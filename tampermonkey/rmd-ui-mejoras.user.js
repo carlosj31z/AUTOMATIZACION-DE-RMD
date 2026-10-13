@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.57.1
+// @version      1.58.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.57.1';                                                       // mantener igual a @version
+  const VERSION = '1.58.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -183,12 +183,12 @@
   html.rmd-ui .sapMDialog.rmd-g > section { flex: 1 1 auto !important; min-height: 0 !important; overflow: auto !important; scrollbar-gutter: stable; }   /* ancho útil estable con barra vertical */
   html.rmd-ui .sapMDialog.rmd-g > footer, html.rmd-ui .sapMDialog.rmd-g > header { flex: 0 0 auto !important; }
   html.rmd-ui .sapMDialog.rmd-pasos {
-    width: 98vw !important; max-width: 98vw !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
+    width: max(98vw, var(--rmd-ancho-orig, 0px)) !important; max-width: max(98vw, var(--rmd-ancho-orig, 0px)) !important; height: calc(100vh - 16px) !important; max-height: calc(100vh - 16px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
   html.rmd-ui .sapMDialog.rmd-medio {
-    width: min(1120px, 96vw) !important; max-width: 96vw !important; height: auto !important; max-height: calc(100vh - 24px) !important;
+    width: max(min(1120px, 96vw), var(--rmd-ancho-orig, 0px)) !important; max-width: max(96vw, var(--rmd-ancho-orig, 0px)) !important; height: auto !important; max-height: calc(100vh - 24px) !important;
     left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
-  html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: 90vw !important; max-width: 97vw !important; }   /* sin altura mínima */
+  html.rmd-ui .sapMDialog.rmd-medio.rmd-ancho { width: max(90vw, var(--rmd-ancho-orig, 0px)) !important; max-width: max(97vw, var(--rmd-ancho-orig, 0px)) !important; }   /* sin altura mínima */
   html.rmd-ui .sapMDialog.sapMMessageDialog { position: fixed !important; margin: 0 !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; max-height: calc(100vh - 24px) !important; }
 
   /* ── Tablas: cabecera fija ── */
@@ -290,6 +290,7 @@
   .rmd-bajas-aviso button { margin-left: auto; padding: 2px 10px; border: 1px solid rgba(240,180,0,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; } .rmd-bajas-aviso button:hover { background: rgba(240,180,0,.25); }
   @keyframes rmd-baja-pulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(240,180,0,.6); } 50% { box-shadow: 0 0 0 7px rgba(240,180,0,0); } }
   tr.rmd-baja > td { background-image: linear-gradient(rgba(255,214,0,.2), rgba(255,214,0,.2)); } tr.rmd-baja > td:first-child { border-left: 4px solid #f0b400 !important; }
+  .rmd-dup-chip { display: inline-block; margin: 2px 0 0 6px; padding: 0 7px; border: 1px solid rgba(240,180,0,.7); border-radius: 9px; background: rgba(240,180,0,.14); color: var(--rmd-texto); font: 600 11px/16px var(--rmd-fuente); white-space: nowrap; }
   .rmd-modal.rmd-adv { width: min(640px, 94vw); border-top: 3px solid #f0b400; } .rmd-modal.rmd-adv h3 { display: flex; align-items: center; gap: 10px; } .rmd-modal.rmd-adv h3::before { content: '!'; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; background: #f0b400; color: #1d2733; font: 700 16px/26px var(--rmd-fuente); text-align: center; }
   .rmd-adv-lista { margin: 8px 0; padding-left: 20px; max-height: 45vh; overflow: auto; } .rmd-adv-lista li { margin: 6px 0; } .rmd-adv-donde { display: block; font-size: 11.5px; opacity: .65; } .rmd-adv-motivo { display: inline-block; margin-top: 2px; padding: 0 8px; border-radius: 9px; background: rgba(240,180,0,.25); font: 700 11px/18px var(--rmd-fuente); }
   .rmd-pp-conf { display: block; margin: 10px 0 4px; }
@@ -315,7 +316,7 @@
   tr.rmd-tz-quitado .rmd-tz-antes { text-decoration: line-through; } .rmd-tz-lista { margin-top: 4px; }
   .rmd-tz-fila { border-bottom: 1px solid rgba(128,140,155,.16); } .rmd-tz-fila-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 4px; } .rmd-tz-rotulo { min-width: 0; overflow-wrap: anywhere; }
   .rmd-tz-detalle { padding: 2px 8px 12px 20px; background: rgba(128,140,155,.07); } .rmd-tz [hidden] { display: none !important; } .rmd-tz-aut { margin-left: 4px; font-size: 11px; color: var(--rmd-apagado); cursor: help; }
-  html.rmd-ui .sapMDialog.rmd-medio.rmd-selector-ancho { width: min(1480px, 96vw) !important; }
+  html.rmd-ui .sapMDialog.rmd-medio.rmd-selector-ancho { width: max(min(1480px, 96vw), var(--rmd-ancho-orig, 0px)) !important; }
   .sapMToken.rmd-token-rep { display: inline-flex !important; align-items: center; }
   .rmd-restablecer-ui5 .sapMBtnIcon, .rmd-restablecer-ui5 .sapUiIcon { color: var(--rmd-acento-texto) !important; } .rmd-restablecer-ui5 .sapMBtnInner { border-color: transparent !important; background: transparent !important; border-radius: 0.25rem; }
   .rmd-restablecer-ui5:hover .sapMBtnInner { background: rgba(27,141,236,.14) !important; } .rmd-restablecer-ui5:active .sapMBtnInner { background: var(--rmd-acento) !important; } .rmd-restablecer-ui5:active .sapUiIcon { color: #fff !important; }
@@ -405,7 +406,10 @@
   html.rmd-reglas td.rmd-pm-mal::after { content: attr(data-rmd-pm); position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #ff4d4d; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; pointer-events: none; }
 
   /* ── Estado del RMD ── */
-  .rmd-estado { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 2; margin: 0; padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font: 600 11px/18px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; background: transparent; }
+  .rmd-estado { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 2; display: inline-flex; align-items: center; gap: 7px; margin: 0; padding: 3px 11px 3px 9px; border: 1px solid color-mix(in srgb, currentColor 26%, transparent); border-radius: 999px;
+    background: color-mix(in srgb, currentColor 9%, transparent); font: 600 12px/16px var(--rmd-fuente); letter-spacing: .1px; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .rmd-estado-punto { position: relative; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
+  .rmd-estado-sub { padding-left: 7px; border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent); font-weight: 400; font-size: 11.5px; opacity: .85; }
   .rmd-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-estado.autorizado { color: var(--rmd-verde); } .rmd-estado.suspendido { color: var(--rmd-ambar); } .rmd-estado.otro { color: var(--rmd-apagado); }
 
   /* ── Título del PM: máx. 2 líneas ── */
@@ -455,6 +459,8 @@
   .rmd-nuevo-paso-grupo { display: inline-flex; flex: 0 0 auto; align-items: center; margin-left: 10px; vertical-align: middle; }
   .rmd-nuevo-paso-grupo .rmd-btn { height: 32px; }
   details.rmd-agr { margin: 3px 0 0; font-size: 12px; color: var(--rmd-apagado); } details.rmd-agr summary { cursor: pointer; color: var(--rmd-acento-texto); } details.rmd-agr ul { margin: 3px 0 0; padding-left: 16px; } details.rmd-agr li { margin: 1px 0; color: var(--rmd-texto); }
+  .rmd-formula-desfase { display: flex; align-items: center; gap: 12px; margin: 8px 16px 4px; padding: 8px 12px; border-left: 4px solid var(--rmd-acento, #0a6ed1); border-radius: 4px; background: rgba(10,110,209,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-formula-desfase .rmd-btn { margin-left: auto; flex: 0 0 auto; } .rmd-formula-desfase.ok { border-left-color: var(--rmd-verde); background: rgba(46,160,67,.1); }
   .rmd-formula-legible { margin: 4px 16px 0; color: var(--rmd-apagado); font: 12.5px/1.45 var(--rmd-fuente); } .rmd-formula-legible.rmd-formula-rep { color: var(--rmd-texto); }
   .rmd-codigo-pegado .sapMInputBaseContentWrapper { box-shadow: 0 0 0 2px rgba(240,180,90,.6); background: rgba(240,180,90,.12) !important; }   /* código pegado en el selector */
   .rmd-exportar-op, .rmd-documentos-citados { margin: 0 4px; height: 32px; }
@@ -1533,6 +1539,11 @@
     const d0 = filas[0] && iDes >= 0 ? SIN_ACENTOS(celda(filas[0], iDes) && celda(filas[0], iDes).textContent) : '';
     return /^EVITAR EL INGRESO AL AREA DE TRABAJO/.test(d0) ? 'PRECAUCIONES' : '';
   }
+  // Ancho del portal medido antes de aplicar las clases: las ventanas nunca quedan más angostas (--rmd-ancho-orig en vw).
+  function anchoOriginal(d) {
+    if (d.__rmdAnchoOrig == null && !d.classList.contains('rmd-g')) { const w = d.getBoundingClientRect().width; if (w > 0) d.__rmdAnchoOrig = Math.min(100, (w / window.innerWidth) * 100); }
+    if (d.__rmdAnchoOrig && !d.style.getPropertyValue('--rmd-ancho-orig')) d.style.setProperty('--rmd-ancho-orig', d.__rmdAnchoOrig.toFixed(2) + 'vw');
+  }
   function ajustarTabla(tabla) {
     const d = enDialogo(tabla); if (!d || !gestionada(d)) return;
     // Ventana raíz («Estructura de RMD»): ancho del portal; solo se revisa el orden de estructuras.
@@ -1542,6 +1553,7 @@
       try { avisoReglasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoReglasRaiz: ' + e.message); }
       return;
     }
+    anchoOriginal(d);
     d.classList.add('rmd-g');
     const ths = [...tabla.querySelectorAll('thead th')];
     if (ths.length < 5) return;
@@ -1804,7 +1816,10 @@
         if (!b) { b = document.createElement('span'); b.className = 'rmd-estado'; barra.appendChild(b); }
         barra.classList.add('rmd-con-estado');
         const cls = /ingres/i.test(estado) ? 'ingresado' : /autoriz/i.test(estado) ? 'autorizado' : /suspend/i.test(estado) ? 'suspendido' : 'otro';
-        b.className = 'rmd-estado ' + cls; setTxt(b, estado.toUpperCase());
+        b.className = 'rmd-estado ' + cls;
+        const nombre = estado.charAt(0).toUpperCase() + estado.slice(1).toLowerCase(), sub = cls === 'ingresado' ? 'editable' : cls === 'otro' ? '' : 'solo lectura';
+        const h = `<span class="rmd-estado-punto" aria-hidden="true"></span><span>${esc(nombre)}</span>${sub ? `<span class="rmd-estado-sub">${sub}</span>` : ''}`;
+        if (b.innerHTML !== h) b.innerHTML = h;
         b.title = cls === 'ingresado' ? 'RMD en estado Ingresado: se puede modificar' : `RMD ${estado}: revisar antes de modificar`;
       } else if (b) { b.remove(); barra.classList.remove('rmd-con-estado'); }
       if (on('pmtitulo') && /^Procesos Menores para el Paso/i.test(norm(h2.textContent))) {
@@ -7236,6 +7251,7 @@
       td.classList.add('rmd-grip-td'); td.appendChild(asa);
     });
     arrastreFormula(d, lista);
+    avisoFormulaDesfasada(d).catch((e) => { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('fórmula desfasada: ' + e.message); });
     if (!d.__rmdCorrigiendo) { d.__rmdCorrigiendo = true; corregirFormulaCargada(d, lista).catch((e) => { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('fórmula: ' + e.message); }).finally(() => { d.__rmdCorrigiendo = false; }); }
     formulaLegible(d, lista);
   }
@@ -7418,6 +7434,45 @@
     const cb = { success: (r) => ok(r), error: (e) => mal(new Error((e && (e.responseText || e.message)) || 'error del servidor')) };
     if (metodo === 'create') modelo.create(ruta, datos, cb); else modelo.update(ruta, datos, cb);
   });
+  // El portal empareja cada término de fórmula por fila + código (valor): al cambiar el paso de una fila, su valor debe pasar al código nuevo.
+  async function actualizarTerminosFormula(modelo, menor, idFila, codigo) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const fp = await leerTodoDe(modelo, 'MD_ES_FORMULA_PASO', [new F(menor ? 'pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId' : 'pasoFormulaId_mdEstructuraPasoId', 'EQ', idFila), new F('esPaso', 'EQ', true)], { $select: 'mdFormulaPaso,bFlagPM,valor' });
+    const malos = fp.filter((g) => !!g.bFlagPM === !!menor && String(g.valor) !== String(codigo));
+    for (const g of malos) await modeloEscribir(modelo, 'update', `/MD_ES_FORMULA_PASO('${g.mdFormulaPaso}')`, { valor: String(codigo) });
+    return malos.length;
+  }
+  const terminosConCodigo = (modelo, menor, idFila, codigo) => (codigo == null ? Promise.resolve(0) : actualizarTerminosFormula(modelo, menor, idFila, codigo)
+    .catch((e) => { toast('El paso se cambió, pero no se pudo actualizar su código en las fórmulas: ' + e.message, true); return 0; }));
+  // Términos con el código anterior en todo el RMD (cambios de paso hechos antes de esta corrección)
+  async function terminosDesfasados(modelo, mdId) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new F('mdId_mdId', 'EQ', mdId)];
+    const fp = await leerTodoDe(modelo, 'MD_ES_FORMULA_PASO', porMd.concat(new F('esPaso', 'EQ', true)), { $select: 'mdFormulaPaso,pasoFormulaId_mdEstructuraPasoId,pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId,bFlagPM,valor' });
+    if (!fp.length) return [];
+    const pasos = await leerTodoDe(modelo, 'MD_ES_PASO', porMd, { $expand: 'pasoId', $select: 'mdEstructuraPasoId,orden,pasoId/codigo' });
+    const cod = new Map(pasos.map((x) => [x.mdEstructuraPasoId, x])), pms = fp.some((g) => g.bFlagPM)
+      ? await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', porMd, { $expand: 'pasoHijoId', $select: 'mdEstructuraPasoInsumoPasoId,orden,pasoHijoId/codigo' }).catch(() => []) : [];
+    const codPm = new Map(pms.map((x) => [x.mdEstructuraPasoInsumoPasoId, x]));
+    return fp.map((g) => { const f = g.bFlagPM ? codPm.get(g.pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId) : cod.get(g.pasoFormulaId_mdEstructuraPasoId), c = f && (g.bFlagPM ? f.pasoHijoId : f.pasoId);
+      return c && c.codigo != null && String(c.codigo) !== String(g.valor) ? { id: g.mdFormulaPaso, antes: String(g.valor), ahora: String(c.codigo), orden: f.orden, pm: !!g.bFlagPM } : null; }).filter(Boolean);
+  }
+  window.__rmdStats.terminosDesfasados = (mdId) => terminosDesfasados(controladorPrincipal().getView().getModel('mainModelv2'), mdId);   // pruebas
+  async function avisoFormulaDesfasada(d) {
+    const b = controladorPrincipal(), md = b && b.getView().getModel('asociarDatos').getData(), modelo = b && b.getView().getModel('mainModelv2');
+    if (!md || !md.mdId || !modelo || d.__rmdDesfase === md.mdId) return; d.__rmdDesfase = md.mdId;
+    const malos = await terminosDesfasados(modelo, md.mdId); window.__rmdStats.formulaDesfasada = { rmd: md.codigo, terminos: malos.map((x) => [x.orden, x.antes, x.ahora]) };
+    if (!malos.length || !d.isConnected) return;
+    const ing = +md.estadoIdRmd_iMaestraId === 467, sec = d.querySelector('section'); if (!sec) return;
+    const a = document.createElement('div'); a.className = 'rmd-formula-desfase'; a.setAttribute('role', 'status');
+    a.innerHTML = `<span><b>${malos.length} término${malos.length > 1 ? 's' : ''} de fórmula con el código anterior</b> (${malos.slice(0, 4).map((x) => `orden ${esc(x.orden)}: ${esc(x.antes)} → ${esc(x.ahora)}`).join(' · ')}): el paso se cambió y la fórmula dejó de mostrarse.${ing ? '' : ' Corrígelo en una versión Ingresada.'}</span>${ing ? '<button type="button" class="rmd-btn">Corregir</button>' : ''}`;
+    sec.insertAdjacentElement('afterbegin', a);
+    const bt = a.querySelector('button');
+    if (bt) bt.addEventListener('click', async () => {
+      bt.disabled = true;
+      try { for (const x of malos) await modeloEscribir(modelo, 'update', `/MD_ES_FORMULA_PASO('${x.id}')`, { valor: x.ahora }); a.classList.add('ok'); a.innerHTML = '<span>Fórmulas corregidas. Cierra y vuelve a abrir esta ventana para verlas.</span>'; }
+      catch (e) { bt.disabled = false; toast('No se pudo corregir: ' + e.message, true); }
+    });
+  }
   async function nuevoPasoSoloEste(M, b, comp, d, dup) {
     const lm = b.getView().getModel('localModel'), modelo = b.getView().getModel('mainModelv2'), usuario = ((lm.getProperty('/oInfoUsuario') || {}).data || {}).usuario;
     let pasoId = dup && dup.pasoId, codigo = dup && dup.codigo;
@@ -7428,8 +7483,8 @@
         decimales: d.decimales, tipoLapsoId_motivoLapsoId: d.tipoLapsoId_motivoLapsoId, tipoCondicionId_iMaestraId: d.tipoCondicionId_iMaestraId };
       await modeloEscribir(modelo, 'create', '/PASO', nuevo); pasoId = nuevo.pasoId;
     }
-    if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId }); }
-    else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId }); }
+    if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId }); await terminosConCodigo(modelo, true, c.mdEstructuraPasoInsumoPasoId, codigo); }
+    else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId }); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
     // mismos refrescos que el portal
     await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
     const etq = b.getView().getModel('headerAddEtiqueta');
@@ -8387,6 +8442,7 @@
     try {
       if (origen.tipo === 'menor') await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${origen.id}')`, { pasoHijoId_pasoId: nuevo.pasoId });
       else await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId });
+      await terminosConCodigo(modelo, origen.tipo === 'menor', origen.id, nuevo.codigo);
       await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
       const d = dialogos().filter((x) => controladorPasos(x)).pop(), M = d && controladorPasos(d);
       if (M) {
@@ -8671,13 +8727,22 @@
     const g = BAJAS.erp.get(String(swerk)); if (g && Date.now() - g.t < 3600000) return g.p;
     const erp = ctrl && ctrl.oModelErpNec; if (!erp || !swerk) return Promise.resolve(null);
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, reg = { t: Date.now(), mapa: null };
-    reg.p = conLectura(erp, (e) => new Promise((ok) => e.read('/EquipoSet', { filters: [new F('Swerk', 'EQ', String(swerk)), new F('Eqtyp', 'EQ', '')], success: (r) => { reg.mapa = new Map((r.results || []).map((x) => [sinCeros(x.Equipment), norm(x.Txt30)])); ok(reg.mapa); }, error: () => ok(null) })));
+    reg.p = conLectura(erp, (e) => new Promise((ok) => e.read('/EquipoSet', { filters: [new F('Swerk', 'EQ', String(swerk)), new F('Eqtyp', 'EQ', '')], success: (r) => { reg.mapa = mapaEstadosErp(r.results || []); ok(reg.mapa); }, error: () => ok(null) })));
     BAJAS.erp.set(String(swerk), reg); reg.p.then((m) => { if (!m) BAJAS.erp.delete(String(swerk)); }); return reg.p;
   }
   const equipoDeBaja = (estado) => !!estado && !/^(MONT|AEQS)-/i.test(estado.trim());      // AEQS = accesorio, no baja
+  // EquipoSet trae a veces 2 filas por equipo (p. ej. MONT y NOAC): manda el estado de baja; .rep guarda los códigos con estados distintos
+  function mapaEstadosErp(filas) {
+    const g = new Map();
+    filas.forEach((x) => { const k = sinCeros(x.Equipment), e = norm(x.Txt30); if (!k) return; const l = g.get(k) || []; if (e && !l.includes(e)) l.push(e); g.set(k, l); });
+    const mapa = new Map(); mapa.rep = new Map();
+    g.forEach((l, k) => { mapa.set(k, l.find(equipoDeBaja) || l[0] || ''); if (l.length > 1) mapa.rep.set(k, l); });
+    return mapa;
+  }
+  const motivoEquipo = (mapa, cod, estado) => { const l = mapa && mapa.rep && mapa.rep.get(sinCeros(cod)); return l ? `${estado} (figura ${l.length} veces en SAP: ${l.join(' / ')})` : estado; };
   function bajasDelRmd(base, mapaErp) {
     const items = base.bajas.slice();
-    (base.equiposRaw || []).forEach((q) => { const estado = (mapaErp && mapaErp.get(q.equnr)) || q.estat; if (equipoDeBaja(estado)) items.push({ tipo: 'Equipo', donde: 'Equipos / instrumentos / materiales', codigo: q.codigo || q.equnr, desc: q.desc, motivo: estado }); });
+    (base.equiposRaw || []).forEach((q) => { const estado = (mapaErp && mapaErp.get(sinCeros(q.equnr))) || q.estat; if (equipoDeBaja(estado)) items.push({ tipo: 'Equipo', donde: 'Equipos / instrumentos / materiales', codigo: q.codigo || q.equnr, desc: q.desc, motivo: motivoEquipo(mapaErp, q.equnr, estado) }); });
     return items;
   }
   function resumenBajas(items) { const n = (t) => items.filter((x) => x.tipo === t).length, p = (c, s, pl) => (c ? `${c} ${c > 1 ? pl : s}` : ''); return [p(n('Paso'), 'paso', 'pasos'), p(n('Proceso menor'), 'proceso menor', 'procesos menores'), p(n('Utensilio'), 'utensilio', 'utensilios'), p(n('Equipo'), 'equipo', 'equipos')].filter(Boolean).join(', '); }
@@ -8720,7 +8785,8 @@
     if (!on('bajas')) { document.querySelectorAll('.rmd-baja').forEach((tr) => { tr.classList.remove('rmd-baja'); if (/^De baja/.test(tr.title || '')) tr.removeAttribute('title'); }); return; }
     if (Date.now() - BAJAS.t < 500) return; BAJAS.t = Date.now();
     const ctrl = controladorPrincipal(), md = ctrl && ctrl.getView().getModel('asociarDatos') && ctrl.getView().getModel('asociarDatos').getData(); if (!md) return;
-    const ing = +md.estadoIdRmd_iMaestraId === 467, reg = BAJAS.erp.get(String(md.sucursalId && md.sucursalId.codigo)), mapa = reg && reg.mapa;
+    const swerk = md.sucursalId && md.sucursalId.codigo, ing = +md.estadoIdRmd_iMaestraId === 467, reg = BAJAS.erp.get(String(swerk)), mapa = reg && reg.mapa;
+    if (!reg && swerk && ing) estadosEquiposErp(ctrl, swerk);                    // se pinta en la pasada siguiente
     const objCargado = (v) => (v && typeof v === 'object' && !v.__deferred ? v : null);
     dialogos().forEach((dlg) => {
       const tabla = dlg.querySelector('table.sapMListTbl'); if (!tabla || !/^\d+\s/.test(cabecera(dlg))) return;
@@ -8730,14 +8796,37 @@
           const m = objCargado(o.pasoHijoId) || objCargado(o.pasoId), u = objCargado(o.utensilioId), q = objCargado(o.equipoId);
           if (m && m.codigo !== undefined && +m.estadoId_iMaestraId === 1) motivo = 'DE BAJA';
           else if (u && +u.estadoId_iMaestraId === 1) motivo = 'DE BAJA';
-          else if (q) { const e = (mapa && mapa.get(sinCeros(q.equnr))) || norm(q.estat || ''); if (equipoDeBaja(e)) motivo = e; }
-          else if (o.equipoId_equipoId) { const e = (mapa && mapa.get(sinCeros(o.codigo))) || norm(o.estado || ''); if (equipoDeBaja(e)) motivo = e; }
+          else if (q) { const e = (mapa && mapa.get(sinCeros(q.equnr))) || norm(q.estat || ''); if (equipoDeBaja(e)) motivo = motivoEquipo(mapa, q.equnr, e); }
+          else if (o.equipoId_equipoId) { const e = (mapa && mapa.get(sinCeros(o.codigo))) || norm(o.estado || ''); if (equipoDeBaja(e)) motivo = motivoEquipo(mapa, o.codigo, e); }
         } }
         tr.classList.toggle('rmd-baja', !!motivo); if (motivo) tr.title = `De baja en SAP: ${motivo}`; else if (/^De baja/.test(tr.title || '')) tr.removeAttribute('title');
       });
     });
+    dialogos().forEach((dlg) => { if (/^Adicionar Equipos/i.test(cabecera(dlg))) marcarSelectorEquipos(dlg, mapa); });
   }
-  window.__rmdStats.bajas = { equipoDeBaja, bajasDelRmd, resumen: resumenBajas };
+  // Selector «Adicionar Equipos»: un código con 2 filas (MONT y NOAC…) se marca en ambas como de baja, con el aviso de que está repetido
+  const GRUPOS_SEL = new WeakMap();
+  function marcarSelectorEquipos(dlg, mapa) {
+    const tabla = dlg.querySelector('table.sapMListTbl'); if (!tabla) return;
+    const ths = [...tabla.querySelectorAll('thead th')].map((th) => NORM(th.textContent)), iCod = ths.indexOf('CÓDIGO') >= 0 ? ths.indexOf('CÓDIGO') : ths.indexOf('CODIGO');
+    tabla.querySelectorAll('tbody tr:not(.sapMListTblSubRow)').forEach((tr) => {
+      const it = sap.ui.getCore().byId(tr.id), n = it && it.oBindingContexts ? Object.keys(it.oBindingContexts)[0] : null, ctx = n && it.getBindingContext(n === 'undefined' ? undefined : n), o = ctx && ctx.getObject();
+      if (!o || o.equnr == null) return;
+      const lista = ctx.getModel().getProperty(ctx.getPath().replace(/\/\d+$/, '') || '/'); let g = Array.isArray(lista) && GRUPOS_SEL.get(lista);
+      if (Array.isArray(lista) && !g) {
+        g = new Map(); lista.forEach((x) => { if (!x || x.equnr == null) return; const k = sinCeros(x.equnr), e = norm(x.estat || ''), l = g.get(k) || []; if (e && !l.includes(e)) l.push(e); g.set(k, l); });
+        GRUPOS_SEL.set(lista, g);
+      }
+      const k = sinCeros(o.equnr), propios = (g && g.get(k)) || [norm(o.estat || '')], erp = (mapa && mapa.rep && mapa.rep.get(k)) || [];
+      const estados = [...new Set(propios.concat(erp, mapa && mapa.get(k) ? [mapa.get(k)] : []))].filter(Boolean), baja = estados.find(equipoDeBaja), rep = estados.length > 1;
+      tr.classList.toggle('rmd-baja', !!baja);
+      if (baja) tr.title = `De baja en SAP: ${baja}${rep ? ` · el código figura ${estados.length} veces en SAP (${estados.join(' / ')}): no lo uses` : ''}`; else if (/^De baja/.test(tr.title || '')) tr.removeAttribute('title');
+      const td = iCod >= 0 ? celda(tr, iCod) : null; let chip = tr.querySelector('.rmd-dup-chip');
+      if (rep && baja && td) { if (!chip) { chip = document.createElement('span'); chip.className = 'rmd-dup-chip'; td.appendChild(chip); } setTxt(chip, 'Repetido en SAP · de baja'); }
+      else if (chip) chip.remove();
+    });
+  }
+  window.__rmdStats.bajas = { equipoDeBaja, bajasDelRmd, resumen: resumenBajas, mapaEstadosErp };
   // Aviso del RMD: advertencias de reglas en todo el RMD y «Debe estar presente» no cumplidas. Se recalcula al abrir, al volver y al cambiar reglas o
   // listas.
   function avisoReglasRaiz(d, tabla) {
@@ -10721,11 +10810,10 @@
     }
     // Cabecera de ayuda: estado del RMD y avisos
     function htmlAvisosGenerales() {
-      const r = PQ.rmd, partes = [];
+      const partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
-      if (r.estado && r.estado !== 'Ingresado') partes.push(`<div class="pp-aviso-gen">ℹ Este RMD está <b>${esc(r.estado)}</b>. Puedes preparar tu borrador igual: el equipo RMD lo ingresará cuando exista una versión nueva en estado Ingresado.</div>`);
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
-      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Pasa el ratón por una fila</b> (a la derecha de la hoja) y usa ✎ para cambiar el texto, <b>+</b> para agregar debajo, ↑ ↓ para mover y ✕ para quitar. Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar.</li><li>Si el paso no existe, queda marcado <b>★ Se creará</b>; el equipo RMD lo creará.</li><li>Pulsa <b>Solicitud</b> y completa quién pide el cambio y por qué.</li><li>Pulsa <b>Guardar borrador</b> (Ctrl+S) y envía el archivo descargado al equipo RMD, como adjunto.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Pasa el ratón por una fila</b>: a su derecha aparecen los botones <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Al final de cada lista está <b>+ Agregar paso al final</b>.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b>.</li><li>Pulsa <b>Solicitud</b> y completa quién pide el cambio y por qué.</li><li>Pulsa <b>Generar PDF</b> e ingrésalo por solicitud o envíalo por correo al área de <b>Documentación Técnica</b>.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
     let ayudaAbierta = false;
@@ -10736,9 +10824,9 @@
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <button type="button" data-a="solicitud" class="${falta ? 'falta' : ''}" title="Quién pide el cambio y por qué">Solicitud${falta ? ' ⚠' : ' ✓'}</button>
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
-        <button type="button" data-a="imprimir" title="Imprimir o guardar en PDF el borrador con los cambios marcados">Imprimir</button>
+        <button type="button" data-a="pdf" title="Genera el PDF del borrador con los cambios marcados">Generar PDF</button>
         <button type="button" data-a="guardar" class="primario" title="Descarga el archivo con el borrador para enviarlo al equipo RMD">Guardar borrador</button></div>
-        <div class="pp-resumen">${n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'Sin cambios todavía'}${n.nuevos ? ` · <b class="crea">${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'} a crear</b>` : ''}${n.errores ? ` · <b class="err">${n.errores} por corregir</b>` : ''}${n.avisos ? ` · <b class="avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</b>` : ''} · <span class="pp-ayuda-corta">Pasa el ratón por una fila: ✎ cambiar · + agregar · ↑ ↓ mover · ✕ quitar · 💬 comentar</span></div></header>`;
+        <div class="pp-resumen">${n.total ? `${n.total} cambio${n.total === 1 ? '' : 's'}` : 'Sin cambios todavía'}${n.nuevos ? ` · <b class="crea">${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'} a crear</b>` : ''}${n.errores ? ` · <b class="err">${n.errores} por corregir</b>` : ''}${n.avisos ? ` · <b class="avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</b>` : ''} · <span class="pp-ayuda-corta">Pasa el ratón por una fila para editarla, agregar debajo, moverla o quitarla</span></div></header>`;
     }
     // Encabezado del PDF (8 columnas: 60, 80, 68, 28, 45, 75, 53, 60)
     function htmlEncabezadoPdf() {
@@ -10758,8 +10846,11 @@
       const cuerpo = validacion + [...W.estructuras].sort(PPN.porOrden).map((e) => htmlEstructura(e, num)).join('');
       return `<table class="pp-pagina"><thead><tr><td>${htmlEncabezadoPdf()}</td></tr></thead><tbody><tr><td class="pp-hoja">${cuerpo}</td></tr></tbody></table>`;
     }
-    const acciones = (clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? `<button type="button" data-a="restaurar" title="Volver a poner">↺</button>` : soloComentario ? `<button type="button" data-a="comentar" title="Comentario">💬</button>` :
-      `<button type="button" data-a="editar" title="Cambiar el texto">✎</button>${clase === 'paso' || clase === 'pm' ? `<button type="button" data-a="agregar" title="Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo">+</button>${conPm ? '<button type="button" data-a="agregar-pm" class="ancho" title="Agregar un proceso menor a este paso">+PM</button>' : ''}<button type="button" data-a="subir" title="Subir">↑</button><button type="button" data-a="bajar" title="Bajar">↓</button>` : ''}<button type="button" data-a="quitar" title="Quitar">✕</button><button type="button" data-a="comentar" title="Comentario">💬</button>`}</span>`;
+    const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
+    const acciones = (clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
+      bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w')
+        + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') : '') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
+      + bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
     function marcasDe(x, b) {
       const out = [];
       if (!b) out.push('<span class="pp-tag agr">Nuevo</span>'); else if (x.quitado) out.push('<span class="pp-tag qui">Quitado</span>');
@@ -10824,7 +10915,7 @@
       const ver = conf && pasos.length ? '<tr class="pp-ver"><td colspan="3">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
       return `<div class="pp-etq" data-id="${esc(t.id)}"><table class="pp-etq-cab"><tr><td class="pp-etq-tit">${nt ? esc(nt) + '.-' : ''}${esc(t.nombre)} <button type="button" class="pp-com-tit" data-a="comentar" data-id="${esc(t.id)}" title="Comentario sobre esta etiqueta">💬</button></td>${conf ? '<td class="pp-nota-der">(Colocar check en caso de conformidad)</td>' : ''}</tr></table>
         ${htmlAvisos(t.id)}${htmlComentario(t)}<table class="pp-t pp-proc${conf ? ' conf' : ''}">${cols(conf ? [40, 243, 35, 50, 35, 50, 25] : [40, 233, 55, 50, 50, 60])}${filas}${ver}</table>
-        <button type="button" class="pp-mas" data-a="agregar-final" data-lista="etq:${esc(t.id)}">+ Agregar paso</button></div>`;
+        <button type="button" class="pp-mas" data-a="agregar-final" data-lista="etq:${esc(t.id)}">＋ Agregar paso al final de «${esc(t.nombre)}»</button></div>`;
     }
     // ---- cuadros (Precauciones, Notas, Condiciones) ----
     function htmlCuadro(e, lista) {
@@ -10832,7 +10923,7 @@
         return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
           + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
-      return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">+ Agregar paso</button>`;
+      return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>`;
     }
     // miembros de un agrupador
     function htmlMiembros(x) {
@@ -10841,13 +10932,13 @@
       return `<div class="pp-miembros" title="${esc(ms.map(([c, d]) => `${c} · ${d}`).join('\n'))}"><b>Contiene ${ms.length} utensilio${ms.length === 1 ? '' : 's'}:</b> ${vis.map(([c, d]) => `<span>${esc(c)}${d ? ' · ' + esc(d) : ''}</span>`).join('')}${resto ? `<span>y ${resto} más</span>` : ''}</div>`;
     }
     function htmlEquipos(e) {
-      const fila = (k, x) => { const b = BI.get(x.id), acc = x.quitado ? '<span class="pp-acc"><button type="button" data-a="restaurar" title="Volver a poner">↺</button></span>' : '<span class="pp-acc"><button type="button" data-a="quitar" title="Quitar">✕</button><button type="button" data-a="comentar" title="Comentario">💬</button></span>';
+      const fila = (k, x) => { const b = BI.get(x.id), acc = x.quitado ? `<span class="pp-acc">${bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w')}</span>` : `<span class="pp-acc">${bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui')}${bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
         const codigo = x.nuevo ? (x.codigo || '—') : k === 'utensilios' && !x.utensilioId ? 'AGRUPADOR' : x.codigo;
         return `<tr class="${estadoCl(x, b)}" data-id="${esc(x.id)}"><td class="pp-c-tx"><span class="pp-tx">${esc(x.desc)}</span>${htmlMiembros(x)}${marcasDe(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}</td><td class="c">${esc(codigo)}</td><td class="c">${esc(k === 'equipos' ? (x.ref || '-') : '-')}</td><td class="ult">${acc}</td></tr>`; };
       const filas = [...(e.equipos || []).map((x) => fila('equipos', x)), ...(e.utensilios || []).map((x) => fila('utensilios', x))].join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td>VERIFICADO POR:</td><td colspan="3">FECHA:</td></tr>' : '';
       return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid">${cols([300, 80, 105, 25])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Código de referencia</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
-        <button type="button" class="pp-mas" data-a="agregar-equipo" data-est="${esc(e.id)}">+ Agregar equipo o utensilio</button>`;
+        <button type="button" class="pp-mas" data-a="agregar-equipo" data-est="${esc(e.id)}">＋ Agregar equipo o utensilio</button>`;
     }
     function htmlInsumos(e) {
       const lista = (e.insumos || []).filter((x) => x.aiPrio === '00' || x.aiPrio === '01');          // prioridad 00 y 01
@@ -10901,6 +10992,16 @@
       const tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); cerrar(); } };
       document.addEventListener('keydown', tecla, true); f.addEventListener('mousedown', (e) => { if (e.target === f) cerrar(); });
       if (alMontar) alMontar(f.firstElementChild, cerrar); return cerrar;
+    }
+    // PDF: diálogo de impresión del navegador con destino «Guardar como PDF»
+    function generarPdf() {
+      modal(`<h3>Generar PDF<span>Borrador del RMD ${esc(PQ.rmd.codigo)} v${esc(PQ.rmd.version)}</span></h3>
+        <ol class="pp-envio"><li>En la ventana que se abre, elige <b>Guardar como PDF</b> como destino y pulsa <b>Guardar</b>.</li>
+        <li>El PDF generado debe <b>ingresarse por solicitud</b> o <b>enviarse por correo al área de Documentación Técnica</b>.</li></ol>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Generar PDF</button></div>`, (m, cerrar) => {
+        m.addEventListener('click', (ev) => { const b = ev.target.closest('button[data-a]'); if (!b) return; cerrar(); if (b.dataset.a === 'aceptar') { pintarTodo(); setTimeout(() => window.print(), 60); } });
+        const ok = m.querySelector('[data-a="aceptar"]'); if (ok) ok.focus();
+      });
     }
     function editar(ref) {
       // ref: { id } | { nuevo: true, lista, despuesDe, clase, e, t, padre }
@@ -11030,7 +11131,7 @@
       const ir = ev.target.closest('[data-ir]'); if (ir) { irA(ir.dataset.ir); return; }
       const b = ev.target.closest('button[data-a]'); if (!b) return;
       const a = b.dataset.a, fila = b.closest('[data-id]'), id = b.dataset.id || (fila && fila.dataset.id);
-      if (a === 'guardar') guardar(); else if (a === 'imprimir') { pintarTodo(); window.print(); }
+      if (a === 'guardar') guardar(); else if (a === 'pdf') generarPdf();
       else if (a === 'solicitud') abrirSolicitud(false);
       else if (a === 'deshacer') deshacerUno();
       else if (a === 'editar') editar({ id });
@@ -11153,11 +11254,14 @@ tr.mov > td:first-child { box-shadow: inset 3px 0 0 var(--mov); }
 .pp-sub > .pp-coment, .pp-est > .pp-coment, .pp-etq > .pp-coment { margin: 0 0 6px; }
 /* botones de edición: en el margen, a la derecha de la hoja */
 td.ult { position: relative; }
-.pp-acc { position: absolute; left: calc(100% + 10px); top: 1px; display: inline-flex; gap: 2px; opacity: 0; transition: opacity .12s; white-space: nowrap; }
-.pp-t tr:hover > td > .pp-acc, .pp-acc:focus-within, .pp-t tr.qui > td > .pp-acc { opacity: 1; }
-.pp-acc button { min-width: 24px; height: 23px; padding: 0 4px; border: 1px solid var(--bd); border-radius: 4px; background: #fff; color: var(--tx); font: 12px/1 "Segoe UI", Arial, sans-serif; }
-.pp-acc button:hover { border-color: var(--acento); color: var(--acento); } .pp-acc button.ancho { font-size: 10.5px; font-weight: 600; }
-.pp-mas { margin: -6px 0 10px; padding: 2px 9px; border: 1px dashed var(--bd); border-radius: 4px; background: none; color: var(--acento); font: 12px "Segoe UI", Arial, sans-serif; }
+.pp-acc { position: absolute; left: calc(100% + 8px); top: -4px; z-index: 5; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; width: 146px; padding: 5px; background: #fff; border: 1px solid var(--bd2); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); opacity: 0; pointer-events: none; transition: opacity .12s; }
+.pp-acc::before { content: ''; position: absolute; right: 100%; top: 0; width: 10px; height: 34px; }
+.pp-t tr:hover > td > .pp-acc, .pp-acc:focus-within { opacity: 1; pointer-events: auto; }
+.pp-t tr[data-id]:hover { outline: 2px solid rgba(10,102,194,.45); outline-offset: -1px; }
+.pp-acc button { height: 24px; padding: 0 6px; border: 1px solid var(--bd2); border-radius: 5px; background: #f7f9fb; color: var(--tx); font: 11.5px/1 "Segoe UI", Arial, sans-serif; text-align: left; white-space: nowrap; cursor: pointer; }
+.pp-acc button.w { grid-column: 1 / -1; } .pp-acc button:hover { border-color: var(--acento); color: var(--acento); background: #eef5fc; } .pp-acc button.qui:hover { border-color: var(--qui); color: var(--qui); background: var(--qui-f); }
+.pp-mas { display: block; margin: -4px 0 12px; padding: 4px 12px; border: 1px dashed rgba(10,102,194,.5); border-radius: 6px; background: rgba(10,102,194,.04); color: var(--acento); font: 600 12px "Segoe UI", Arial, sans-serif; cursor: pointer; }
+.pp-mas:hover { border-style: solid; background: rgba(10,102,194,.09); }
 .pp-nota { color: var(--ap); font: 12px "Segoe UI", Arial, sans-serif; margin: 4px 0; }
 .pp-destello { animation: pp-destello 1.6s ease-out; } @keyframes pp-destello { 0% { outline: 3px solid var(--acento); outline-offset: 1px; } 100% { outline: 3px solid transparent; outline-offset: 1px; } }
 /* modales */
@@ -11192,7 +11296,8 @@ td.ult { position: relative; }
 @media (max-width: 1340px) { .pp-cuerpo { grid-template-columns: 1fr; } .pp-panel { position: static; max-height: none; } .pp-doc { justify-self: center; } }
 @media print {
   @page { size: A4; margin: 10mm 9mm 12mm; }
-  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla { display: none !important; }
+  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo { display: none !important; }
+  .pp-t tr[data-id] { outline: 0 !important; }
   .pp-cuerpo { display: block; margin: 0; padding: 0; } .pp-doc { border: 0; box-shadow: none; padding: 0; } .pp-pagina { width: 100%; }
   .pp-enc { font-size: 9pt; } .pp-enc .g { font-size: 11pt; } .pp-hoja, .pp-t { font-size: 9pt; } .pp-sub { font-size: 10pt; } .pp-etq-tit { font-size: 11pt; } .pp-th th, .pp-ver td { font-size: 10pt; }
   .pp-solo-impresion { display: block; break-before: page; } tr { break-inside: avoid; }
@@ -11510,7 +11615,6 @@ td.ult { position: relative; }
         const r = await ppGenerar(c, { forzar: v.cuerpo.querySelector('.rmd-pp-forzar').checked, avisar: (t) => setTxt(est, t) });
         descargarArchivo(r.nombre, r.html, 'text/html;charset=utf-8');
         setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos. Envíalo a Producción.`);
-        if (r.paquete.rmd.estado !== 'Ingresado') est.textContent += ` El RMD está ${r.paquete.rmd.estado}: el borrador solo se podrá importar en una versión Ingresada (créala en el portal antes de importar).`;
       } catch (e) { setTxt(est, 'No se pudo generar: ' + e.message); est.classList.add('error'); }
       finally { ocupado = false; bGen.disabled = bImp.disabled = false; }
     });

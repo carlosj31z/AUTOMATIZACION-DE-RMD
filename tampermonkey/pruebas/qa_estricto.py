@@ -148,7 +148,7 @@ with sync_playwright() as p:
         @prueba("A1 Estructura: chip de estado pegado a la derecha de la cabecera")
         def _():
             r = fr.evaluate("""() => { const d=window.__q.top(); const bar=d.querySelector('.sapMBar'); const c=d.querySelector('.rmd-estado'); if(!c) return null; return {chip:window.__q.r(c), bar:window.__q.r(bar), txt:c.textContent}; }""")
-            return (r and abs(r["bar"]["r"] - r["chip"]["r"] - 16) <= 4 and r["txt"] == "INGRESADO", str(r))
+            return (r and abs(r["bar"]["r"] - r["chip"]["r"] - 16) <= 4 and r["txt"].upper().startswith("INGRESADO"), str(r))
         abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta")
         abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(3000)
 
@@ -318,7 +318,7 @@ with sync_playwright() as p:
                 marcar_fila(fr, pg, 2); fr.evaluate("document.querySelectorAll('.rmd-toast').forEach(t=>t.remove())"); fr.get_by_role("button", name="Pegar").click()
                 t = toast_texto(fr, pg, "solo se puede pegar en versiones Ingresadas", 8000)
                 modal = fr.evaluate("!!document.querySelector('.rmd-modal')"); limpiar_seleccion(fr)
-                return (bool(t) and not modal) if estado and 'INGRESADO' not in estado else (True, f"el RMD está {estado}; no aplica")
+                return (bool(t) and not modal) if estado and 'INGRESADO' not in estado.upper() else (True, f"el RMD está {estado}; no aplica")
             cerrar_seguro()
         except Exception as e:
             registrar("C3 RMD autorizado", False, "EXCEPCIÓN " + str(e)[:160]); cerrar_seguro()
@@ -730,7 +730,7 @@ with sync_playwright() as p:
                 if not ab: return False, f"no se pudo abrir Especificaciones de {RMD_AUTORIZADO}: {ultimo_error[0]}"
                 e = fr.evaluate(ESTADO_ESPEC) if fr.evaluate("!!(" + TOP + ").querySelector('table')") else {"tas": 0, "grips": 0, "grupo": False}
                 chip = fr.evaluate("((" + TOP + ").querySelector('.rmd-estado')||{}).textContent")
-                return (chip == "AUTORIZADO" and e["tas"] == 0 and e["grips"] == 0 and not e["grupo"]), f"estado={chip} textareas={e.get('tas')} asas={e.get('grips')} botones={e.get('grupo')}"
+                return ((chip or "").upper().startswith("AUTORIZADO") and e["tas"] == 0 and e["grips"] == 0 and not e["grupo"]), f"estado={chip} textareas={e.get('tas')} asas={e.get('grips')} botones={e.get('grupo')}"
             cerrar_seguro()
 
     # ───────────────────────── K. Botón de mejoras (esquina inferior izquierda) y su panel ─────────────────────────

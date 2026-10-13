@@ -1020,7 +1020,7 @@ with sync_playwright() as p:
         pg.evaluate("""(f) => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), sp = d.querySelectorAll('tbody tr')[1].querySelector('.sapMText'); sp.classList.add('sapMTextRenderWhitespaceWrap'); sp.textContent = f; }""", formula)
         pg.wait_for_timeout(1200); r["con"] = pg.evaluate(medir)
         tamano(1415, 886); pg.wait_for_timeout(800); r["ancha"] = pg.evaluate(medir); cerrar_todo(pg)
-        ok = (r["sin"]["marca"] is None and r["con"]["marca"] is not None and r["con"]["th"] >= r["con"]["mayor"] + 8 and r["con"]["desborda"] and r["con"]["th"] > r["sin"]["th"]
+        ok = (r["sin"]["marca"] is None and r["con"]["marca"] is not None and r["con"]["th"] >= r["con"]["mayor"] + 8 and r["con"]["desborda"] and r["con"]["th"] >= r["sin"]["th"]   # v1.58: la ventana conserva su ancho original
               and r["ancha"]["marca"] is not None and r["ancha"]["th"] >= r["ancha"]["mayor"] + 8)
         return ok, json.dumps(r, ensure_ascii=False)
 
