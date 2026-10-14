@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.61.0
+// @version      1.62.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.61.0';                                                       // mantener igual a @version
+  const VERSION = '1.62.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -296,6 +296,9 @@
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   /* elementos de baja */
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-dep-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-dep-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
+  .rmd-dep-aviso button { margin-left: auto; flex: 0 0 auto; padding: 2px 10px; border: 1px solid rgba(229,57,53,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; }
   .rmd-bajas-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #f0b400; color: #1d2733; font: 700 14px/22px var(--rmd-fuente); text-align: center; animation: rmd-baja-pulso 2.4s ease-in-out 2; }
   .rmd-bajas-aviso button { margin-left: auto; padding: 2px 10px; border: 1px solid rgba(240,180,0,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; } .rmd-bajas-aviso button:hover { background: rgba(240,180,0,.25); }
   @keyframes rmd-baja-pulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(240,180,0,.6); } 50% { box-shadow: 0 0 0 7px rgba(240,180,0,0); } }
@@ -323,7 +326,11 @@
   .rmd-tz-sel { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; } .rmd-tz-sel label { display: inline-flex; align-items: center; gap: 6px; }
   .rmd-tz-sel select { height: 30px; max-width: 380px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-tz-acc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .rmd-tz-t { font-size: 12.5px; } .rmd-tz-antes { color: var(--rmd-apagado); } .rmd-tz-desp { font-weight: 600; }
-  tr.rmd-tz-quitado .rmd-tz-antes { text-decoration: line-through; } .rmd-tz-lista { margin-top: 4px; }
+  tr.rmd-tz-quitado .rmd-tz-antes { text-decoration: line-through; }
+  .rmd-tz-vers tr.rmd-tz-obs > td { padding-top: 0; border-top: 0; } .rmd-tz-vers tbody tr:not(.rmd-tz-obs) > td { border-bottom: 0; }
+  .rmd-tz-obs-cab { font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--rmd-apagado); margin: 0 0 3px; }
+  .rmd-tz-obs-l { margin: 0 0 4px; padding: 0; list-style: none; font-size: 12.5px; } .rmd-tz-obs-l li { padding: 2px 0; white-space: pre-wrap; }
+  .rmd-tz-obs-f { display: inline-block; margin-right: 8px; padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--rmd-acento) 14%, transparent); color: var(--rmd-acento-texto); font-size: 11.5px; font-weight: 600; white-space: nowrap; } .rmd-tz-lista { margin-top: 4px; }
   /* Historial post autorización: forma del RMD con estilo Fiori */
   .rmd-pa { --pa-mod: var(--rmd-ambar); --pa-agr: var(--rmd-verde); --pa-qui: var(--rmd-rojo); --pa-ord: var(--rmd-apagado); font: 13px/1.45 var(--rmd-fuente); color: var(--rmd-texto); }
   .rmd-pa-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 12px 16px; border: 1px solid var(--rmd-borde); border-radius: 12px; background: var(--rmd-cabecera); }
@@ -1603,6 +1610,7 @@
     if (/^Estructura de RMD\b/i.test(norm((barraDeLista(tabla) || {}).textContent))) {
       d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla);
       try { avisoBajasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoBajasRaiz: ' + e.message); }
+      try { avisoDependenciasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoDependenciasRaiz: ' + e.message); }
       try { avisoReglasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoReglasRaiz: ' + e.message); }
       return;
     }
@@ -1701,16 +1709,17 @@
         avisos.push(msg);
       });
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
-      if (t !== 'SIN TIPO DE DATO' && iDep >= 0) {
-        const v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
+      if (iDep >= 0) {
+        const sinTipo = t === 'SIN TIPO DE DATO', v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
         // «CÓDIGO (ORDEN)» solo se compara si ese orden y código están en esta misma lista (el primero de una etiqueta puede depender de otra)
         const mismaLista = !!(mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1]);
         const ob = objetoDeFila(tr) || {}, ordenFila = Number(norm(iOrd >= 0 ? (inputDe(celda(tr, iOrd)) || {}).value : '') || k + 1);
-        if (v && !mm) marcarFalta(iDep, 'Predecesor colgante (sin orden): reasignar Depende');
+        if (v && !mm && !sinTipo) marcarFalta(iDep, 'Predecesor colgante (sin orden): reasignar Depende');
         // un paso que depende de sí mismo (o de uno posterior) nunca se habilita en Producción
         else if ((ob.mdEstructuraPasoId && ob.dependeMdEstructuraPasoId === ob.mdEstructuraPasoId) || (mismaLista && Number(mm[2]) === ordenFila))
           marcarFalta(iDep, 'El paso depende de sí mismo: en Producción nunca se habilita. Asigna como predecesor el paso anterior.');
         else if (mismaLista && Number(mm[2]) > ordenFila) marcarFalta(iDep, `El predecesor (orden ${mm[2]}) está después de este paso: en Producción no se habilita hasta terminar uno posterior. Revisa Depende.`);
+        else if (sinTipo) { /* sin tipo de dato: solo el propio o el posterior */ }
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
         else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
           // el portal vacía el predecesor al marcar Estado CC
@@ -2266,7 +2275,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -2342,7 +2351,7 @@
     if (on('sesion')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -8786,6 +8795,16 @@
       .map((x) => { const e = obj(x.equipoId); return { orden: x.orden, codigo: norm(e.CodigoGaci || ''), sap: sinCeros(e.equnr), desc: norm(e.denom || e.eqktx || '') }; });
     utensilios.filter(activo).forEach((u) => { const x = obj(u.utensilioId); if (+x.estadoId_iMaestraId === 1) r.bajas.push({ tipo: 'Utensilio', donde: 'Equipos / instrumentos / materiales', codigo: norm(x.codigo), desc: norm(x.descripcion), motivo: 'DE BAJA' }); });
     r.equiposRaw = equipos.filter(activo).map((x) => { const e = obj(x.equipoId); return { equnr: sinCeros(e.equnr), codigo: norm(e.CodigoGaci || ''), desc: norm(e.denom || e.eqktx || ''), estat: norm(e.estat || '') }; });
+    // Predecesores imposibles (en Producción el paso nunca se habilita): el propio paso, uno posterior de su lista o uno que ya no está en el RMD
+    const vivoId = new Map(pasos.filter(activo).map((x) => [x.mdEstructuraPasoId, x])), claveDe = (x) => (x.mdEstructuraId_mdEstructuraId || '') + '|' + (x.mdEsEtiquetaId_mdEsEtiquetaId || '');
+    r.dependencias = [];
+    [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2).forEach((l) => l.pasos.forEach((x) => {
+      const dep = x.dependeMdEstructuraPasoId; if (!dep) return;
+      const pr = vivoId.get(dep), tipo = dep === x.mdEstructuraPasoId ? 'propio' : !pr ? 'colgante' : claveDe(pr) === claveDe(x) && +pr.orden > +x.orden ? 'posterior' : '';
+      if (!tipo) return; const pp = obj(x.pasoId), q = pr ? obj(pr.pasoId) : {};
+      r.dependencias.push({ tipo, lista: l.lista, orden: x.orden, codigo: String(pp.codigo || ''), desc: norm(pp.descripcion), predOrden: pr ? pr.orden : null, predCodigo: String(q.codigo || x.depende || ''),
+        estr: x.mdEstructuraId_mdEstructuraId, etq: x.mdEsEtiquetaId_mdEsEtiquetaId || null, id: x.mdEstructuraPasoId });
+    }));
     r.segundos = Math.max(1, Math.round((Date.now() - t0) / 1000));
     return r;
   }
@@ -8796,6 +8815,56 @@
     const p = leerTextosRmd(modelo, md); textosRmd.set(md.mdId, { t: Date.now(), modelo, p });
     p.catch(() => { const x = textosRmd.get(md.mdId); if (x && x.p === p) textosRmd.delete(md.mdId); });
     return p;
+  }
+  // ---- Predecesores imposibles: aviso en la ventana raíz del RMD y al autorizar en «Asociar fórmulas» ----
+  const DEP_TXT = { propio: 'depende de sí mismo', posterior: 'depende de un paso posterior', colgante: 'depende de un paso que ya no está en el RMD' };
+  const depLinea = (y) => `${y.lista} › orden ${y.orden} (${y.codigo}) ${DEP_TXT[y.tipo]}${y.tipo === 'posterior' ? ` (orden ${y.predOrden})` : ''}`;
+  function abrirDetalleDependencias(x, sinIr) {
+    const v = ventana('Predecesores imposibles', { cancelar: () => v.cerrar() });
+    v.cuerpo.innerHTML = `<p>En Producción un paso se habilita cuando termina el paso de su «Depende». Estos <b>nunca se habilitan</b>:</p>
+      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Problema</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${x.items.map((y, i) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 90))}</td><td class="rmd-dif">${esc(DEP_TXT[y.tipo])}${y.tipo === 'posterior' ? ` (orden ${esc(y.predOrden)})` : ''}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${i}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>
+      <p class="rmd-nota">Corrige «Depende» con el paso anterior de la lista, o déjalo vacío si el paso no depende de otro.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</p>`;
+    v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const y = x.items[+b.dataset.i]; v.cerrar(); ppIrASap({ codigo: x.md.codigo, version: x.md.version }, { estr: y.estr, etq: y.etq, id: y.id }); });
+    v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar()));
+  }
+  function pintarAvisoDependencias(d, ancla, x, antes) {
+    let a = d.querySelector('.rmd-dep-aviso');
+    if (!x || !x.items || !x.items.length) { if (a) a.remove(); return; }
+    if (!a) { a = document.createElement('div'); a.className = 'rmd-dep-aviso'; a.setAttribute('role', 'alert'); ancla.insertAdjacentElement(antes ? 'beforebegin' : 'afterbegin', a);
+      a.addEventListener('click', (e) => { if (e.target.closest('button')) { e.stopPropagation(); const y = a.__x; abrirDetalleDependencias(y, y.sinIr); } }); }
+    a.__x = x; const n = x.items.length, ej = x.items.slice(0, 2).map(depLinea).join(' · ');
+    const t = `<span class="rmd-dep-ico" aria-hidden="true">✕</span><span><b>${x.autorizar ? 'No autorices todavía: ' : ''}${n} paso${n > 1 ? 's' : ''} con un predecesor imposible</b>: en Producción nunca se habilita${n > 1 ? 'n' : ''}. ${esc(ej)}${n > 2 ? ` y ${n - 2} más` : ''}.</span><button type="button">${x.sinIr ? 'Ver' : 'Ver y corregir'}</button>`;
+    if (a.innerHTML !== t) a.innerHTML = t;
+  }
+  function avisoDependenciasRaiz(d, tabla) {
+    const quitar = () => { d.querySelectorAll('.rmd-dep-aviso').forEach((x) => x.remove()); d.__rmdDepFirma = ''; d.__rmdDep = null; };
+    if (typeof sap === 'undefined' || !on('reglas')) { if (d.__rmdDepFirma || d.querySelector('.rmd-dep-aviso')) quitar(); return; }
+    const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
+    if (!md || !md.mdId || !modelo) return;
+    const firma = `${md.mdId}|${generacionRmd}`, prev = d.__rmdDepFirma || '';
+    if (prev !== firma && dialogos().pop() === d) {
+      d.__rmdDepFirma = firma;
+      textosDelRmd(modelo, md, prev.startsWith(md.mdId + '|') ? 5000 : 60000).then((base) => {
+        if (!d.isConnected || d.__rmdDepFirma !== firma) return;
+        d.__rmdDep = { items: base.dependencias || [], md };
+        window.__rmdStats.dependenciasRaiz = { rmd: md.codigo, items: d.__rmdDep.items.map((y) => [y.lista, y.orden, y.codigo, y.tipo]) };
+        pintarAvisoDependencias(d, tabla, d.__rmdDep, true);
+      }, () => { /* sin conexión: sin aviso */ });
+    } else if (d.__rmdDep && !d.querySelector('.rmd-dep-aviso')) pintarAvisoDependencias(d, tabla, d.__rmdDep, true);
+  }
+  // «Asociar fórmulas» con Estado Autorizado elegido (y el RMD aún no autorizado)
+  function gestionarDependenciasAsociar() {
+    const d = typeof sap !== 'undefined' && on('reglas') && dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x))); if (!d) return;
+    const ctrl = controladorPrincipal(); if (!ctrl) return;
+    const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2'); if (!asoc || !asoc.mdId || !modelo) return;
+    const autorizar = +asoc.estadoIdRmd_iMaestraIdBK === 465 && +asoc.estadoIdRmd_iMaestraId !== 465, sec = d.querySelector('section');
+    if (!autorizar || !sec) { const a = d.querySelector('.rmd-dep-aviso'); if (a) a.remove(); return; }
+    if (d.__rmdDepMd !== asoc.mdId) {
+      d.__rmdDepMd = asoc.mdId; d.__rmdDepItems = null;
+      textosDelRmd(modelo, asoc, 30000).then((b) => { if (d.isConnected && d.__rmdDepMd === asoc.mdId) { d.__rmdDepItems = b.dependencias || []; window.__rmdStats.dependenciasAsociar = { rmd: asoc.codigo, n: d.__rmdDepItems.length }; gestionarDependenciasAsociar(); } }, () => {});
+      return;
+    }
+    if (d.__rmdDepItems) pintarAvisoDependencias(d, sec, { items: d.__rmdDepItems, md: asoc, autorizar: true, sinIr: true }, false);
   }
   // ---- Elementos de baja (RMD Ingresado) ----
   // Paso / PM / utensilio: estado «De Baja»; equipo: estado SAP distinto de «MONT-Montado» (salvo «AEQS»). Solo aviso y resaltado.
@@ -8904,6 +8973,7 @@
     });
   }
   window.__rmdStats.bajas = { equipoDeBaja, bajasDelRmd, resumen: resumenBajas, mapaEstadosErp };
+  window.__rmdStats.dependencias = { leer: (md) => textosDelRmd(controladorPrincipal().getView().getModel('mainModelv2'), md, 0).then((b) => b.dependencias) };   // pruebas
   // Aviso del RMD: advertencias de reglas en todo el RMD y «Debe estar presente» no cumplidas. Se recalcula al abrir, al volver y al cambiar reglas o
   // listas.
   function avisoReglasRaiz(d, tabla) {
@@ -10033,7 +10103,7 @@
       if (x.cambios.length) x.cambios.forEach((c) => hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : 'Guardado', utc(x.ts), x.usuario, c.campo, c.antes, c.despues]));
       else hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : x.primero ? 'Primer guardado registrado' : 'Guardado sin cambios', utc(x.ts), x.usuario, '', '', '']);
     }));
-    tabla('Historial de versiones', 'HistorialVersiones', ['Código', 'Versión', 'Estado', 'Descripción', 'Etapa', 'Planta', 'Versión origen', 'Registrada', 'Usuario'], [14, 9, 16, 60, 18, 18, 14, 17, 18], (e.versiones || []).map((v) => [v.codigo, v.version, v.estado, v.descripcion, v.etapa, v.planta, v.origen, utc(v.fecha), v.usuario]), { 7: 'fechaHora' });
+    tabla('Historial de versiones', 'HistorialVersiones', ['Código', 'Versión', 'Estado', 'Descripción', 'Etapa', 'Planta', 'Versión origen', 'Registrada', 'Usuario', 'Observaciones'], [14, 9, 16, 60, 18, 18, 14, 17, 18, 80], (e.versiones || []).map((v) => [v.codigo, v.version, v.estado, v.descripcion, v.etapa, v.planta, v.origen, utc(v.fecha), v.usuario, v.obs || '']), { 7: 'fechaHora', 9: 'envuelto' });
     tabla('Diferencia entre versiones', 'CambiosEntreVersiones', ['Sección', 'Elemento', 'Cambio', 'Campo', 'Antes', 'Después', 'Solo cambia el orden', 'Usuario de la fila', 'Fecha de la fila', 'Usuario de la fila es de'],
       [16, 70, 13, 22, 34, 34, 12, 16, 17, 22], cambios.map((c) => [c.seccion, c.elemento, c.tipo, c.campo, c.antes, c.despues, c.soloOrden ? 'Sí' : '', c.quien, utc(c.cuando), c.tipo === 'Quitado' ? '' : c.alAutorizar ? 'el registro al autorizar (no necesariamente quien editó)' : c.modificado ? 'la última modificación' : 'el registro']), { 1: 'envuelto', 4: 'envuelto', 5: 'envuelto', 8: 'fechaHora' }, { activa: true });
     tabla('Historial post autorización', 'HistorialGuardados', ['Fila', 'Evento', 'Fecha y hora', 'Usuario', 'Campo', 'Antes', 'Después'], [70, 24, 17, 16, 30, 40, 40], hist, { 0: 'envuelto', 2: 'fechaHora', 5: 'envuelto', 6: 'envuelto' });
@@ -10529,7 +10599,7 @@
     const origenDe = (m) => { const vs = (E.linaje ? E.linaje.versiones : []).filter((x) => +x.version < +m.version && tzComparable(x)); return vs.length ? vs[vs.length - 1] : null; };   // anterior comparable
     const ficha = (m) => { const o = origenDe(m), c = (t, v) => `<div><span>${t}</span><b>${esc(v == null || v === '' ? '—' : String(v))}</b></div>`;
       return `<div class="rmd-tz-ficha">${c('Código', m.codigo)}${c('Versión', m.version)}${c('Descripción', m.descripcion)}${c('Etapa', m.nivelTxt)}${c('Planta', m.sucursalId && m.sucursalId.contenido)}${c('Estado', m.estado)}${c('Versión origen', o ? `v${o.version} · ${o.codigo}` : 'Sin versión origen')}</div>`; };
-    const filasVersiones = () => (E.linaje ? E.linaje.versiones : []).map((m) => { const o = origenDe(m); return { codigo: m.codigo, version: m.version, estado: m.estado, descripcion: m.descripcion, etapa: m.nivelTxt, planta: (m.sucursalId && m.sucursalId.contenido) || '', origen: o ? `v${o.version}` : '', fecha: m.fechaRegistro, usuario: m.usuarioRegistro, mdId: m.mdId }; });
+    const filasVersiones = () => (E.linaje ? E.linaje.versiones : []).map((m) => { const o = origenDe(m); return { codigo: m.codigo, version: m.version, estado: m.estado, descripcion: m.descripcion, etapa: m.nivelTxt, planta: (m.sucursalId && m.sucursalId.contenido) || '', origen: o ? `v${o.version}` : '', fecha: m.fechaRegistro, usuario: m.usuarioRegistro, mdId: m.mdId, obs: String(m.observacion || '').replace(/\r/g, '').trim() }; });
     const nomVersion = (m) => `v${m.version} · ${m.codigo} · ${m.estado}`;
     const asegurar = async () => { if (!E.cat) E.cat = await tzCatalogos(modelo); if (!E.linaje) E.linaje = await tzLinaje(modelo, codigo, E.cat); return E; };
     const leerV = async (m) => { if (!E.versionCache.has(m.mdId)) E.versionCache.set(m.mdId, await tzLeerVersion(modelo, m, E.cat)); return E.versionCache.get(m.mdId); };
@@ -10656,11 +10726,16 @@
       if (foco) { const el = [...cuerpo.querySelectorAll('input[type=search]')].find((x) => (x.dataset.f || x.className) === foco.n); if (el) { el.focus(); try { el.setSelectionRange(foco.pos, foco.pos); } catch (e) { /* sin selección */ } } }
     }
     const opcionesVersion = (sel) => E.linaje.versiones.filter((m) => tzComparable(m) || m.mdId === sel).map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
+    // Observaciones de «Asociar fórmulas»: una línea por anotación; «AAAAMMDD<iniciales>» al inicio se muestra como fecha
+    const htmlObs = (t) => { const ls = String(t || '').split('\n').map((x) => x.trim()).filter(Boolean); if (!ls.length) return '<span class="rmd-nota">Sin observaciones.</span>';
+      return `<ul class="rmd-tz-obs-l">${ls.map((l) => { const m = /^(\d{4})(\d{2})(\d{2})([A-ZÑ]{1,5})?[\s\-–:]*(.*)$/.exec(l);
+        return m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31 ? `<li><span class="rmd-tz-obs-f">${m[3]}/${m[2]}/${m[1]}${m[4] ? ' · ' + esc(m[4]) : ''}</span>${esc(m[5] || '')}</li>` : `<li>${esc(l)}</li>`; }).join('')}</ul>`; };
     function htmlVersionesLista() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
       if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="searching">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
       const f = filasVersiones(), act = E.linaje.actual;
-      return `${ficha(act)}<p class="rmd-tz-resumen">Todas las versiones relacionadas del RMD. «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Descripción</th><th>Versión origen</th><th>Registrada</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(x.version)}</td><td class="rmd-nowrap">${esc(x.estado)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? ' · ' + esc(x.usuario) : ''}</td><td>${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
+      return `${ficha(act)}<p class="rmd-tz-resumen">Todas las versiones relacionadas del RMD, cada una con sus observaciones de «Asociar fórmulas». «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Descripción</th><th>Versión origen</th><th>Registrada</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(x.version)}</td><td class="rmd-nowrap">${esc(x.estado)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? ' · ' + esc(x.usuario) : ''}</td><td>${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>
+        <tr class="rmd-tz-obs${x.mdId === act.mdId ? ' rmd-tz-actual' : ''}"><td></td><td colspan="6"><div class="rmd-tz-obs-cab">Observaciones · v${esc(x.version)}</div>${htmlObs(x.obs)}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
     }
     function htmlVersiones() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
