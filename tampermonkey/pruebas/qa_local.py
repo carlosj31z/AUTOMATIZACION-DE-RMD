@@ -594,6 +594,40 @@ with sync_playwright() as p:
               and r["r1fecha"] == "2026-09-02" and r["r1cambio"] == ["500000002071", "500000002150"] and r["r2"] == [["ruta"], ["Puesto de trabajo (línea) AAPVAC01→AAPVAC09"]] and r["r3"] == [["ruta"], False]
               and not r["r4"] and not r["r5"] and r["huellaIgual"] and r["huellaDistinta"])
         return ok, json.dumps(r, ensure_ascii=False, default=str)
+    @prueba("LN22b Texto de la lista de materiales (v1.67, lecturas de mentira): si el texto que el PDF imprime bajo los insumos (TextoCab) cambió en SAP, avisa dentro de «Lista de materiales» con el texto del RMD y el de SAP (detalle, resumen y Excel); no avisa por espacios ni por signos de puntuación sueltos (sí por números: 8.0 → 80) ni si no se leyó el texto; Acondicionado y Envase no se consideran")
+    def _():
+        r = pg.evaluate("""async () => { const S = window.__rmdStats.recetasSap;
+          const md = (id, cod) => [id, { mdId: id, codigo: cod, version: 5, estado: 'Ingresado', linaje: cod, descripcion: 'PRODUCTO ' + cod, etapa: 'FABRICACION', area: 'OFT', planta: 'PLANTA ATE' }];
+          const porMd = new Map([md('m6', '2202600016'), md('m7', '2202600017'), md('m8', '2202600018'), md('m9', '2202600019')]);
+          const rc = (matnr, o = {}) => ({ Matnr: matnr, Werks: '1020', Verid: '1001', Stlal: '1', Mdv01: 'FSOFFA01', Plnnr: '842', Alnal: '1', Text1: 'RECETA ' + matnr, ...o });
+          const recs = [{ mdRecetaId: 'r6', mdId_mdId: 'm6', recetaId: rc('700006', { TextoCab: 'CLORURO DE ZINC: Higroscópico.' }) }, { mdRecetaId: 'r7', mdId_mdId: 'm7', recetaId: rc('700007', { TextoCab: 'Proteger  de la humedad. ' }) },
+            { mdRecetaId: 'r8', mdId_mdId: 'm8', recetaId: rc('700008') }, { mdRecetaId: 'r9', mdId_mdId: 'm9', recetaId: rc('700009', { TextoCab: null }) }];
+          const copia = [['C1', '2', 'KG', 'UNO']], copias = { r6: copia, r7: copia, r8: copia, r9: copia }, sap1 = [{ Component: 'C1', CompQty: '2', CompUnit: 'KG', Maktx: 'UNO', ValidFrom: '30.01.2023', ChangeNo: '' }];
+          const bom = new Map(['700006', '700007', '700008', '700009'].map((m) => [m + '|1020|1', sap1]));
+          const v = (matnr, t) => [matnr + '|1020|1001', { Matnr: matnr, Werks: '1020', Verid: '1001', Mdv01: 'FSOFFA01', Plnnr: '842', Alnal: '1', Stlal: '1', TextoCab: t }];
+          const nuevo = ' CLORURO DE ZINC: Higroscópico.  Proteger de la humedad. Dispensar el mismo día de la fabricación.';
+          const versiones = new Map([v('700006', nuevo), v('700007', ' Proteger de la humedad'), v('700008', 'OTRO TEXTO'), v('700009', 'Nota nueva')]);
+          const verOk = new Set(['700006|1020', '700007|1020', '700008|1020', '700009|1020']);
+          const dec = (a, b) => !!S.comparar([{ mdRecetaId: 'rx', mdId_mdId: 'm6', recetaId: rc('700006', { TextoCab: a }) }], porMd, { rx: copia }, bom, new Map([v('700006', b)]), verOk).length;
+          const conEtapa = (et) => S.comparar([{ mdRecetaId: 'ry', mdId_mdId: 'm6', recetaId: rc('700006', { TextoCab: 'A' }) }], new Map([['m6', { ...porMd.get('m6'), etapa: et }]]), { ry: copia }, bom, new Map([v('700006', 'B')]), verOk).length;
+          const etapas = ['FABRICACION', 'RECUBRIMIENTO', 'ACONDICIONADO', 'ENVASE'].map(conEtapa);
+          const signos = [dec('Peso de envasado: 8.0 g', 'Peso de envasado: 8.0 g.'), dec('"ESTADO PERUANO" Peso', '"ESTADO PERUANO" . Peso'), dec('Lote, Fecha', 'Lote Fecha'), dec('Peso 8.0 g', 'Peso 80 g'), dec('1,5 kg', '15 kg'), dec('EAN 13 N° 775', 'EAN 13 N° 776')];
+          const h = S.comparar(recs, porMd, copias, bom, versiones, verOk), por = Object.fromEntries(h.map(x => [x.mdRecetaId, x]));
+          const otra = S.comparar(recs, porMd, copias, bom, new Map([...versiones, v('700006', nuevo + ' Más.')]), verOk).find(x => x.mdRecetaId === 'r6');
+          const det = window.__rmdStats.detalleRecetaHtml(por.r6), caja = document.createElement('div'); caja.innerHTML = det;
+          window.__resp = await S.respaldo(); await S.poner(h, { ing: Date.now(), aut: Date.now() });
+          const g = S.grupos().find(x => x.codigo === '2202600016');
+          const x = await S.excel(); await S.restaurar(window.__resp);
+          return { cuantos: h.map(x => x.mdRecetaId), r6: por.r6 && { tipos: por.r6.tipos, dif: por.r6.dif.length, texto: por.r6.textoCab, fecha: por.r6.fechaSap }, r9: por.r9 && por.r9.textoCab,
+            huellaDistinta: otra && otra.huella !== por.r6.huella, detalle: caja.innerText.replace(/\\s+/g, ' ').trim(), sinTablaComp: !caja.querySelector('th[title]'), tipoGrupo: g && [...g.tipos], signos, etapas, b64: x.base64 }; }""")
+        import base64, io, zipfile
+        z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64")))); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
+        r["excel"] = ["Texto de la lista cambiado en SAP" in todo, "Dispensar el mismo día" in todo, "Lista de materiales: cambió el texto de la lista" in todo]
+        ok = (r["cuantos"] == ["r6", "r9"] and r["r6"] and r["r6"]["tipos"] == ["lista"] and r["r6"]["dif"] == 0 and r["r6"]["fecha"] is None
+              and r["r6"]["texto"] == {"antes": "CLORURO DE ZINC: Higroscópico.", "ahora": "CLORURO DE ZINC: Higroscópico. Proteger de la humedad. Dispensar el mismo día de la fabricación."}
+              and r["r9"] == {"antes": "", "ahora": "Nota nueva"} and r["huellaDistinta"] and "Texto de la lista de materiales · cambió en SAP" in r["detalle"] and "Dispensar el mismo día" in r["detalle"]
+              and r["sinTablaComp"] and r["tipoGrupo"] == ["lista"] and all(r["excel"]) and r["signos"] == [False, False, False, True, True, True] and r["etapas"] == [1, 1, 0, 0])
+        return ok, json.dumps(r, ensure_ascii=False, default=str)[:1500]
     # datos de mentira de dos versiones de un RMD (lo que devuelven las lecturas del servicio) — los usan LN23 y LN25
     TZ_DATOS_JS = """() => { const T = window.__rmdStats.trazabilidad;
       const cat = { estructura: new Map([['E1', 'PROCEDIMIENTO']]), etiqueta: new Map([['T1', 'FABRICACION']]), tipos: new Map(), estados: new Map() };

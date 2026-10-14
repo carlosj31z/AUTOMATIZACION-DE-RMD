@@ -1893,7 +1893,7 @@ with sync_playwright() as p:
     # ───────────────────────── U. v1.37: cambios de recetas en SAP (lectura real; el guardado de la observación se SIMULA + cortafuegos) ─────────────────────────
     if "U" in SOLO:
         CODS_U = os.environ.get("CODS_U", "2202609107,2202609132,2202609067,2202609113").split(",")   # RMD Ingresados con la lista de materiales cambiada en SAP (y uno sin cambios)
-        RMD_OBS_U = os.environ.get("RMD_OBS_U", "2202609178")                                        # RMD Ingresado para probar la observación (guardado simulado)
+        RMD_OBS_U = os.environ.get("RMD_OBS_U", "2202609241")                                        # RMD Ingresado para probar la observación (guardado simulado)
         TOP_U = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x => x.getClientRects().length).pop()"
         def xlsx_u(b64):
             import base64 as b64m, io as iom, zipfile as zipm

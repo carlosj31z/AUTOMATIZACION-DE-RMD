@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.66.0
+// @version      1.67.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.66.0';                                                       // mantener igual a @version
+  const VERSION = '1.67.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -242,6 +242,7 @@
   .rmd-rec-detalle hr { border: 0; border-top: 1px solid var(--rmd-borde); margin: 10px 0; }
   .rmd-rec-cab b { font-size: 14px; } .rmd-rec-cab span { color: var(--rmd-apagado); }
   .rmd-rec-sub { margin: 8px 0 4px; font-weight: 600; color: var(--rmd-ambar); }
+  .rmd-rec-tabla.rmd-rec-txt td { width: 50%; white-space: pre-wrap; } .rmd-rec-txt .rmd-rec-antes { text-decoration: none; }
   /* Cambios de recetas en SAP */
   .rmd-alerta-rec { display: inline-flex; align-items: center; gap: 3px; margin: 0 0 0 6px; padding: 2px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--rmd-ambar); font: 600 11px var(--rmd-fuente); cursor: pointer; opacity: .5; vertical-align: middle; }
   .rmd-alerta-rec svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -6771,6 +6772,13 @@
     const orden = { cambia: 0, reemplazo: 1, nuevo: 2, quitado: 3 };
     return dif.filter((d) => !d.__usado).sort((p, q) => orden[p.tipo] - orden[q.tipo] || p.comp.localeCompare(q.comp));
   }
+  // Texto de cabecera de la lista (RECETA.TextoCab = ProduccionVSet.TextoCab): el PDF lo imprime bajo los insumos en Fabricación y Recubrimiento.
+  // RECETA es compartida por material y versión: volver a asociar la receta en cualquier RMD la actualiza («Actualizar» no la cambia).
+  const textoCabDe = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  const textoCabClave = (t) => t.replace(/(?<!\d)[.,;:]|[.,;:](?!\d)/g, ' ').replace(/\s+/g, ' ').trim();   // sin espacios ni signos sueltos (8.0 y 1,5 se conservan)
+  const difTextoCab = (rc, hoy) => { if (!rc || !hoy || rc.TextoCab === undefined || hoy.TextoCab === undefined) return null; const a = textoCabDe(rc.TextoCab), b = textoCabDe(hoy.TextoCab); return textoCabClave(a) === textoCabClave(b) ? null : { antes: a, ahora: b }; };
+  const textoCabEtapa = (etapa) => !/acondicion|envas/i.test(String(etapa || ''));   // Acondicionado y Envase no se consideran
+  const resumenLista = (x) => [x.dif.length && resumenDif(x.dif), x.textoCab && 'cambió el texto de la lista'].filter(Boolean).join(', ');
   const TEXTO_MKSP = { '': 'No bloqueado', 1: 'Bloqueado para cada utilización', 2: 'Bloqueado para selección automática' };
   const fechaSap = (v) => { if (!v) return ''; const d = v instanceof Date ? v : new Date(v); if (isNaN(d)) return String(v); return d.getUTCFullYear() >= 9999 ? 'sin fin' : `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
   // Versión de fabricación: avisan puesto, hoja de ruta, contador y alternativa; Mksp solo informativo.
@@ -6796,9 +6804,9 @@
     })();
     p.catch(() => contextosRmd.delete(mdId)); contextosRmd.set(mdId, { t: Date.now(), p }); return p;
   }
-  async function revisarRuta(ctrl, rc, werks, ctx) {
+  async function revisarRuta(ctrl, rc, werks, ctx, versionesP) {
     const erp = ctrl.oModelErpNec, F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
-    const versiones = await leerErp(erp, 'ProduccionVSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks)]);
+    const versiones = await (versionesP || leerErp(erp, 'ProduccionVSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks)]));
     const hoy = versiones.find((v) => norm(v.Verid) === norm(rc.Verid));
     const ant = ctx.anterior && ctx.anterior.recetas.find((x) => norm(x.Matnr) === norm(rc.Matnr)) || null;
     const cambios = [];
@@ -6818,22 +6826,24 @@
       faltan: hoy ? usados.filter((x) => rutaHoy.length && !rutaHoy.includes(x)).map((x) => ({ puesto: x, pasos: ctx.puestos.get(x) })) : [],
     };
   }
-  function revisarReceta(ctrl, r, werksRmd, mdId, forzar) {
+  function revisarReceta(ctrl, r, werksRmd, mdId, forzar, etapa) {
     const conRuta = !!on('recetaruta'), clave = (conRuta ? 'r' : 'b') + (r.recetaId && r.recetaId.Verid), g = revisionesReceta.get(r.mdRecetaId);
     if (!forzar && g && g.clave === clave && Date.now() - g.t < 30 * 60000) return g.p;
     const p = (async () => {
       const erp = ctrl.oModelErpNec, modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
       if (!erp || !modelo) throw new Error('no se encontró la conexión a SAP del portal');
       const rc = r.recetaId, werks = norm(rc.Werks) || werksRmd, stlal = String(parseInt(rc.Stlal, 10));
-      const [bom, copia, ruta] = await Promise.all([
+      const versionesP = leerErp(erp, 'ProduccionVSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks)]); versionesP.catch(() => {});
+      const [bom, copia, ruta, versiones] = await Promise.all([
         leerErp(erp, 'MaterialSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks), new F('Stlal', 'EQ', stlal)]),
         leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('mdRecetaId_mdRecetaId', 'EQ', r.mdRecetaId)], {}),
-        conRuta ? contextoRmd(ctrl, mdId).then((ctx) => revisarRuta(ctrl, rc, werks, ctx)).catch((e) => ({ error: e.message })) : Promise.resolve(null),
+        conRuta ? contextoRmd(ctrl, mdId).then((ctx) => revisarRuta(ctrl, rc, werks, ctx, versionesP)).catch((e) => ({ error: e.message })) : Promise.resolve(null),
+        versionesP.catch(() => null),
       ]);
-      const dif = diferenciasBom(bom, copia.filter((x) => x.activo !== false));
+      const dif = diferenciasBom(bom, copia.filter((x) => x.activo !== false)), textoCab = textoCabEtapa(etapa) ? difTextoCab(rc, versiones && versiones.find((v) => norm(v.Verid) === norm(rc.Verid))) : null;
       const rutaAvisa = !!(ruta && !ruta.error && (!ruta.existe || ruta.cambios.some((c) => c.avisa && !c.soloAnterior) || ruta.faltan.length || ruta.entran.length || ruta.salen.length));
       let ultima = null; bom.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
-      return { receta: `${rc.Matnr} / ${rc.Verid}`, codigo: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif, ruta, rutaAvisa, ultima };
+      return { receta: `${rc.Matnr} / ${rc.Verid}`, codigo: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif, textoCab, ruta, rutaAvisa, ultima };
     })();
     p.catch(() => revisionesReceta.delete(r.mdRecetaId)); revisionesReceta.set(r.mdRecetaId, { t: Date.now(), clave, p }); return p;
   }
@@ -6848,8 +6858,8 @@
   async function revisarRecetasDe(ctrl, asoc, forzar, filas, avance) {
     const recetas = recetasActivas(filas || (asoc.aReceta && asoc.aReceta.results));
     const werks = asoc.sucursalId && asoc.sucursalId.codigo; if (forzar) contextosRmd.delete(asoc.mdId);
-    const out = await enParalelo(recetas, RECETAS_PARALELO, (r) => revisarReceta(ctrl, r, werks, asoc.mdId, forzar), avance);
-    return { codigo: asoc.codigo, recetas: out, desactualizadas: out.filter((x) => x.dif.length), conRuta: out.filter((x) => x.rutaAvisa) };
+    const out = await enParalelo(recetas, RECETAS_PARALELO, (r) => revisarReceta(ctrl, r, werks, asoc.mdId, forzar, asoc.nivelTxt), avance);
+    return { codigo: asoc.codigo, recetas: out, desactualizadas: out.filter((x) => x.dif.length || x.textoCab), conRuta: out.filter((x) => x.rutaAvisa) };
   }
   const recetasDelRmd = (ctrl, asoc, forzar, filas, avance) => revisarRecetasDe(ctrl, asoc, forzar, filas, avance);
   const resumenDif = (dif) => { const c = (t) => dif.filter((d) => d.tipo === t).length, n = c('nuevo'), m = c('cambia'), q = c('quitado'), r = c('reemplazo');
@@ -6882,6 +6892,12 @@
           const qa = d.tipo === 'reemplazo' && d.antes && d.ahora && Math.abs(d.antes.q - d.ahora.q) < 1e-6 && d.antes.u === d.ahora.u ? `${q(d.ahora)} <span class="rmd-nota">(igual)</span>` : q(d.ahora);
           return `<tr class="rmd-rec-${d.tipo}"><td><span class="rmd-rec-marca" title="${{ nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Ya no está en SAP', reemplazo: 'Reemplazado por otra versión del material' }[d.tipo]}">${{ nuevo: '+', cambia: '≠', quitado: '−', reemplazo: '⇄' }[d.tipo]}</span></td><td>${comp}</td><td>${desc}</td><td>${q(d.antes)}</td><td>${qa}${delta ? ` <span class="rmd-rec-delta">(${delta > 0 ? '+' : ''}${numTxt(delta)})</span>` : ''}</td><td class="rmd-rec-cuando">${d.fecha ? `${esc(fechaCorta(d.fecha))}${d.cambio ? `<br><span class="rmd-nota">n.º ${esc(d.cambio)}</span>` : ''}` : `<span class="rmd-nota" title="${d.tipo === 'quitado' ? 'Ya no está en la lista de SAP: SAP no devuelve la fecha en que se quitó (mira el último cambio de la lista, arriba)' : 'Sin fecha en SAP'}">—</span>`}</td></tr>`; }).join('')}</tbody></table>`;
     }
+    if (x.textoCab) {
+      const tx = (t) => (t ? esc(t) : '<span class="rmd-nota">(sin texto)</span>');
+      h += `<div class="rmd-rec-sub">Texto de la lista de materiales · cambió en SAP</div>
+        <table class="rmd-rec-tabla rmd-rec-txt"><thead><tr><th>En el RMD</th><th>En SAP hoy</th></tr></thead><tbody><tr class="rmd-rec-cambia"><td>${tx(x.textoCab.antes)}</td><td>${tx(x.textoCab.ahora)}</td></tr></tbody></table>
+        <p class="rmd-rec-linea rmd-nota">Es la nota que el PDF del RMD imprime bajo los insumos (Fabricación y Recubrimiento; en Acondicionado y Envase no se revisa). SAP no informa la fecha de este cambio. Se trae al volver a asociar la receta («Actualizar» no lo cambia).</p>`;
+    }
     const ru = x.ruta;
     if (ru && ru.error) h += `<div class="rmd-rec-sub">Hoja de ruta: no se pudo leer (${esc(ru.error)})</div>`;
     else if (ru && x.rutaAvisa) {
@@ -6912,13 +6928,13 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && detalleAbierto) { e.stopPropagation(); e.preventDefault(); cerrarDetalleRecetas(); } }, true);
   // Ícono ⚠ junto al código de la receta
   function pintarIconosRecetas(lista, r) {
-    const porId = new Map((r ? r.recetas : []).filter((x) => x.dif.length || x.rutaAvisa).map((x) => [x.mdRecetaId, x]));
+    const porId = new Map((r ? r.recetas : []).filter((x) => x.dif.length || x.textoCab || x.rutaAvisa).map((x) => [x.mdRecetaId, x]));
     lista.getItems().forEach((it) => {
       const c = it.getBindingContext('listMdReceta'), o = c && c.getObject(), x = o && porId.get(o.mdRecetaId);
       const celda = it.getCells()[0], dom = celda && celda.getDomRef(); if (!dom) return;
       let ic = dom.parentElement.querySelector('.rmd-rec-icono');
       if (!x) { if (ic) ic.remove(); return; }
-      const n = x.dif.length + (x.rutaAvisa ? 1 : 0), tit = [x.dif.length && `Lista de materiales: ${resumenDif(x.dif)}`, x.rutaAvisa && 'Hoja de ruta / puesto de trabajo distinto en SAP'].filter(Boolean).join(' · ');
+      const n = x.dif.length + (x.textoCab ? 1 : 0) + (x.rutaAvisa ? 1 : 0), tit = [(x.dif.length || x.textoCab) && `Lista de materiales: ${resumenLista(x)}`, x.rutaAvisa && 'Hoja de ruta / puesto de trabajo distinto en SAP'].filter(Boolean).join(' · ');
       if (!ic) {
         ic = document.createElement('button'); ic.type = 'button'; ic.className = 'rmd-rec-icono'; dom.insertAdjacentElement('afterend', ic);
         ['pointerdown', 'mousedown', 'touchstart'].forEach((ev) => ic.addEventListener(ev, (e) => e.stopPropagation()));
@@ -6949,7 +6965,7 @@
           toast(hay ? `${r.desactualizadas.length} receta(s) con la lista de materiales cambiada${on('recetaruta') ? ` y ${r.conRuta.length} con la hoja de ruta distinta` : ''} en SAP: mira el ⚠ junto al código.` : `✓ Las ${r.recetas.length} receta(s) asociadas coinciden con SAP${on('recetaruta') ? ' (lista de materiales y hoja de ruta)' : ''}.`, hay > 0);
         } catch (e) { toast('No se pudieron revisar las recetas: ' + e.message, true); } finally { b.disabled = false; if (rotulo) rotulo.textContent = 'Revisar recetas'; }
       });
-      b.title = 'Compara con SAP la lista de materiales copiada al asociar cada receta' + (on('recetaruta') ? ' y su hoja de ruta / puesto de trabajo' : '') + ' (solo avisa; no cambia nada ni impide autorizar).';
+      b.title = 'Compara con SAP la lista de materiales copiada al asociar cada receta (componentes y su texto)' + (on('recetaruta') ? ' y su hoja de ruta / puesto de trabajo' : '') + ' (solo avisa; no cambia nada ni impide autorizar).';
       const ref = barra.querySelector('.sapMTBSpacer'); if (ref) ref.insertAdjacentElement('afterend', b); else barra.appendChild(b);
     }
     const firma = asoc.mdId + '|' + (on('recetaruta') ? 'r' : 'b') + '|' + filas.map((x) => x.mdRecetaId).sort().join(',');
@@ -6977,7 +6993,7 @@
     const recs = await leerTodoDe(ctrl.getView().getModel('mainModelv2'), 'MD_RECETA', [new Filtro('mdId_mdId', 'EQ', md.mdId)], { $expand: 'recetaId' });
     const suc = await leerTodoDe(ctrl.getView().getModel('mainModelv2'), 'MD', [new Filtro('mdId', 'EQ', md.mdId)], { $expand: 'sucursalId', $select: 'mdId,sucursalId/codigo' });
     const antes = opc.recetaruta; if (conRuta != null) opc.recetaruta = !!conRuta;
-    try { return await revisarRecetasDe(ctrl, { mdId: md.mdId, codigo, aReceta: { results: recs }, sucursalId: suc[0] && suc[0].sucursalId }, true); } finally { opc.recetaruta = antes; }
+    try { return await revisarRecetasDe(ctrl, { mdId: md.mdId, codigo, nivelTxt: md.nivelTxt, aReceta: { results: recs }, sucursalId: suc[0] && suc[0].sucursalId }, true); } finally { opc.recetaruta = antes; }
   };
   window.__rmdStats.diferenciasBom = diferenciasBom; window.__rmdStats.detalleRecetaHtml = detalleRecetaHtml; window.__rmdStats.contextoRmd = (mdId) => contextoRmd(controladorPrincipal(), mdId).then((c) => ({ puestos: [...c.puestos.entries()], anterior: c.anterior }));   // pruebas
 
@@ -9655,14 +9671,14 @@
         dif = diferenciasBom(sap, rsDeCompacta(copia)); nSap = sap.length;
         sap.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
       }
-      let ruta = null, rutaAvisa = false;
-      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { ruta = rsRuta(rc, versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; }
-      if (!dif.length && !rutaAvisa) return;
+      let ruta = null, rutaAvisa = false, textoCab = null;
+      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { const hoyV = versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null; ruta = rsRuta(rc, hoyV); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; textoCab = textoCabEtapa(md.etapa) ? difTextoCab(rc, hoyV) : null; }
+      if (!dif.length && !textoCab && !rutaAvisa) return;
       const fechas = dif.map((d) => d.fecha).filter(Boolean), fechaSap = fechas.length ? new Date(Math.max(...fechas.map((f) => +f))) : dif.length && ultima ? ultima.fecha : null;
-      const huella = rsHash(dif.map((d) => [d.tipo, d.comp, d.compAntes || '', d.antes ? d.antes.q + d.antes.u : '', d.ahora ? d.ahora.q + d.ahora.u : ''].join(':')).join(';') + '#' + (ruta ? (ruta.existe ? '' : 'X') + ruta.cambios.map((c) => c.clave + c.sap).join(',') : ''));
+      const huella = rsHash(dif.map((d) => [d.tipo, d.comp, d.compAntes || '', d.antes ? d.antes.q + d.antes.u : '', d.ahora ? d.ahora.q + d.ahora.u : ''].join(':')).join(';') + '#' + (ruta ? (ruta.existe ? '' : 'X') + ruta.cambios.map((c) => c.clave + c.sap).join(',') : '') + (textoCab ? '#t' + rsHash(textoCab.ahora) : ''));
       out.push({ mdRecetaId: r.mdRecetaId, mdId: md.mdId, codigo: md.codigo, version: md.version, estado: md.estado, linaje: md.linaje, descripcion: md.descripcion, etapa: md.etapa, area: md.area, planta: md.planta,
-        receta: `${norm(rc.Matnr)} / ${norm(rc.Verid)}`, matnr: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), sap: nSap, rmd: copia ? copia.length : 0, dif, ruta, rutaAvisa, ultima,
-        tipos: [dif.length && 'lista', rutaAvisa && 'ruta'].filter(Boolean), fechaSap, huella });
+        receta: `${norm(rc.Matnr)} / ${norm(rc.Verid)}`, matnr: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), sap: nSap, rmd: copia ? copia.length : 0, dif, textoCab, ruta, rutaAvisa, ultima,
+        tipos: [(dif.length || textoCab) && 'lista', rutaAvisa && 'ruta'].filter(Boolean), fechaSap, huella });
     });
     return out;
   }
@@ -9682,7 +9698,7 @@
       const objetivo = todos.filter((m) => (opciones.codigos ? opciones.codigos.includes(m.codigo) : alcance !== 'ingresados' || m.estado === 'Ingresado')), porMd = new Map(objetivo.map((m) => [m.mdId, m]));
       avanza(`Leyendo las recetas de ${objetivo.length} RMD…`);
       const recs = (await leerPorIds(modelo, 'MD_RECETA', 'mdId_mdId', objetivo.map((m) => m.mdId), { $expand: 'recetaId',
-        $select: 'mdRecetaId,mdId_mdId,activo,recetaId/Matnr,recetaId/Werks,recetaId/Verid,recetaId/Stlal,recetaId/Mdv01,recetaId/Plnnr,recetaId/Alnal,recetaId/Text1' }, null,
+        $select: 'mdRecetaId,mdId_mdId,activo,recetaId/Matnr,recetaId/Werks,recetaId/Verid,recetaId/Stlal,recetaId/Mdv01,recetaId/Plnnr,recetaId/Alnal,recetaId/Text1,recetaId/TextoCab' }, null,
         (h, n) => avanza(`Leyendo las recetas de los RMD (${h} de ${n})…`))).filter((r) => r.activo !== false && r.recetaId && r.recetaId.Matnr && !isNaN(parseInt(r.recetaId.Stlal, 10)));
       // listas pendientes o vencidas, las más atrasadas primero (Ingresados antes)
       const info = new Map();                                                 // triple -> { edad, ttl, ing }
@@ -9771,7 +9787,7 @@
       .sort((a, b) => (+(b.fechaSap || 0) - +(a.fechaSap || 0)) || b.detectado - a.detectado || String(b.codigo).localeCompare(String(a.codigo)));
   }
   const rsTipoTxt = (tipos) => [...tipos].map((t) => (t === 'lista' ? 'Lista de materiales' : 'Hoja de ruta')).join(' + ');
-  const rsResumenReceta = (h) => [h.dif.length && `Lista de materiales: ${resumenDif(h.dif)}`, h.rutaAvisa && `Hoja de ruta: ${rsResumenRuta(h.ruta)}`].filter(Boolean).join(' · ');
+  const rsResumenReceta = (h) => [(h.dif.length || h.textoCab) && `Lista de materiales: ${resumenLista(h)}`, h.rutaAvisa && `Hoja de ruta: ${rsResumenRuta(h.ruta)}`].filter(Boolean).join(' · ');
   const rsFechaSap = (d) => (d instanceof Date && !isNaN(d) ? fechaCorta(d) : '');
   const rsCuando = (ms) => (ms ? fechaHoraCorta(ms) : '');
   const rsMarca = { nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Quitado en SAP', reemplazo: 'Reemplazado por otra versión del material' };
@@ -9822,7 +9838,7 @@
     tarjeta.classList.add('rmd-cr'); RS.ventana = v;
     const cerrarOrig = v.cerrar; v.cerrar = () => { RS.ventana = null; cerrarOrig(); };
     v.cuerpo.innerHTML = `<p class="rmd-cr-intro">RMD <b>Ingresados y Autorizados</b> cuya receta cambió en SAP después de asociarla: hay que retirarla y volver a asociarla para traer lo nuevo. Es solo un aviso: no impide autorizar.
-      SAP informa la <b>fecha</b> de cada cambio de la lista de materiales; la <b>hora</b> es la de la revisión que lo detectó.</p>
+      SAP informa la <b>fecha</b> de cada cambio de componentes de la lista de materiales (no la del texto de la lista ni la de la hoja de ruta); la <b>hora</b> es la de la revisión que lo detectó.</p>
       <div class="rmd-cr-barra"><div class="rmd-cr-chips" role="tablist"></div><input type="search" class="rmd-cr-buscar" placeholder="Buscar por código, descripción, receta o componente"></div>
       <p class="rmd-progreso rmd-cr-estado"></p><div class="rmd-cr-tabla"></div>`;
     const q = (s) => v.cuerpo.querySelector(s), chips = q('.rmd-cr-chips'), buscar = q('.rmd-cr-buscar'), estado = q('.rmd-cr-estado'), tabla = q('.rmd-cr-tabla');
@@ -9830,7 +9846,7 @@
     const filtrados = () => rsGrupos().filter((g) => {
       if (filtro === 'Ingresado' || filtro === 'Autorizado') { if (g.estado !== filtro) return false; } else if (filtro === 'lista' || filtro === 'ruta') { if (!g.tipos.has(filtro)) return false; }
       if (!consulta) return true;
-      const t = norma([g.codigo, g.descripcion, g.etapa, g.planta, ...g.recetas.flatMap((h) => [h.receta, h.texto, ...h.dif.flatMap((d) => [d.comp, d.desc, d.compAntes, d.descAntes])])].join(' '));
+      const t = norma([g.codigo, g.descripcion, g.etapa, g.planta, ...g.recetas.flatMap((h) => [h.receta, h.texto, h.textoCab && h.textoCab.ahora, h.textoCab && h.textoCab.antes, ...h.dif.flatMap((d) => [d.comp, d.desc, d.compAntes, d.descAntes])])].join(' '));
       return consulta.split(/\s+/).every((p) => t.includes(p));
     });
     const bObs = botonModal('Agregar observación', 'peligro', () => agregarObservacion()), bX = botonModal('Exportar Excel', '', () => exportarCambiosRecetas()),
@@ -9865,7 +9881,7 @@
           <td class="rmd-nowrap">${esc(g.estado)}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-nowrap">${esc(h.receta)}</span>`).join('<br>')}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-cr-tag ${h.tipos.length > 1 ? 'dos' : h.tipos[0]}">${esc(rsTipoTxt(h.tipos))}</span> ${esc(rsResumenReceta(h))}`).join('<br>')}</td>
-          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio de la hoja de ruta">—</span>'}</td>
+          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio del texto de la lista ni de la hoja de ruta">—</span>'}</td>
           <td class="rmd-nowrap">${esc(rsCuando(g.detectado))}</td>
           <td class="rmd-cr-obs">${r ? esc(r) : g.obs ? `<span title="${esc(g.obs.linea)}">✓ ${esc(fechaHoraCorta(g.obs.t).slice(0, 10))}</span>` : ini ? `<input type="text" class="rmd-cr-obs-in" data-a="obs" value="${esc(editadas.has(g.mdId) ? editadas.get(g.mdId) : linea)}" title="Puedes editar el texto antes de agregarlo" aria-label="Observación de ${esc(g.codigo)}">` : ''}</td>
           <td class="rmd-nowrap"><button type="button" class="rmd-link" data-a="ver">${abierto ? 'Ocultar' : 'Ver detalle'}</button> · <button type="button" class="rmd-link" data-a="abrir" title="Abrir «Asociar fórmulas» de este RMD">Abrir</button></td></tr>
@@ -9941,20 +9957,21 @@
     hs.forEach((h) => {
       h.dif.forEach((x) => dif.push([h.codigo, h.version, h.estado, h.receta, 'Lista de materiales', rsMarca[x.tipo], x.tipo === 'reemplazo' ? `${x.compAntes} → ${x.comp}` : x.comp, x.desc + (x.tipo === 'reemplazo' && x.descAntes ? ` (antes: ${x.descAntes})` : ''),
         x.antes ? `${numTxt(x.antes.q)} ${x.antes.u}`.trim() : '', x.ahora ? `${numTxt(x.ahora.q)} ${x.ahora.u}`.trim() : '', x.fecha instanceof Date ? new Date(Date.UTC(x.fecha.getUTCFullYear(), x.fecha.getUTCMonth(), x.fecha.getUTCDate())) : '', x.cambio || '']));
+      if (h.textoCab) dif.push([h.codigo, h.version, h.estado, h.receta, 'Lista de materiales', 'Texto de la lista cambiado en SAP', 'Texto de la lista', 'Nota que el PDF imprime bajo los insumos (Fabricación y Recubrimiento)', h.textoCab.antes || '(sin texto)', h.textoCab.ahora || '(sin texto)', '', '']);
       if (h.rutaAvisa) {
         if (!h.ruta.existe) dif.push([h.codigo, h.version, h.estado, h.receta, 'Hoja de ruta', 'La versión de fabricación ya no existe en SAP', '', '', '', '', '', '']);
         h.ruta.cambios.forEach((c) => dif.push([h.codigo, h.version, h.estado, h.receta, 'Hoja de ruta', c.campo, '', '', c.asociada || '', c.sap || '', '', '']));
       }
     });
     tabla('Diferencias', 'DiferenciasRecetas', ['Código RMD', 'Versión', 'Estado', 'Receta', 'Tipo', 'Diferencia', 'Componente / dato', 'Descripción', 'En el RMD', 'En SAP hoy', 'Fecha en SAP', 'N.º de cambio'],
-      [13, 9, 12, 18, 18, 34, 24, 52, 16, 16, 13, 16], dif, { 10: 'fecha', 7: 'envuelto' });
+      [13, 9, 12, 18, 18, 34, 24, 52, 30, 30, 13, 16], dif, { 10: 'fecha', 7: 'envuelto', 8: 'envuelto', 9: 'envuelto' });
     const hI = libro.hoja('Información', { cols: [[1, 1, 34], [2, 2, 100]]});
     hI.poner('A1', 'Recetas con cambios en SAP (RMD Ingresados y Autorizados)', 'titulo');
     [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())}`],
       ['Última revisión de SAP', `Ingresados ${d.ultima.ing ? fechaHoraCorta(d.ultima.ing) : 'sin revisar'} · Autorizados ${d.ultima.aut ? fechaHoraCorta(d.ultima.aut) : 'sin revisar'}`],
       ['Listas de materiales revisadas', d.cobertura ? `${d.cobertura.alDia} de ${d.cobertura.listas} al día${d.cobertura.alDia < d.cobertura.listas ? ' (el resto se revisa solo, en segundo plano: este Excel puede estar incompleto)' : ''}` : 'sin revisar'],
       ['RMD con cambios', new Set(hs.map((h) => h.mdId)).size], ['Recetas con cambios', hs.length],
-      ['Qué compara', 'La lista de materiales y los datos de la versión de fabricación (puesto de trabajo, hoja de ruta, contador y alternativa) copiados en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
+      ['Qué compara', 'La lista de materiales (componentes, cantidades y, salvo en Acondicionado y Envase, el texto de la lista que el PDF imprime bajo los insumos) y los datos de la versión de fabricación (puesto de trabajo, hoja de ruta, contador y alternativa) copiados en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
       ['Fecha y hora', 'SAP informa la fecha «válido desde» de cada componente, no la hora ni la fecha de la hoja de ruta. «Detectado el» es la fecha y hora de la revisión que vio la diferencia por primera vez.'],
       ['Cómo se corrige', 'En «Asociar fórmulas» del RMD: Eliminar Receta → Agregar Producto → asociarla de nuevo.']]
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
