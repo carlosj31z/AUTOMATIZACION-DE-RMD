@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.63.0
+// @version      1.64.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.63.0';                                                       // mantener igual a @version
+  const VERSION = '1.64.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -328,7 +328,11 @@
   .rmd-tz-sel select { height: 30px; max-width: 380px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-tz-acc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .rmd-tz-t { font-size: 12.5px; } .rmd-tz-antes { color: var(--rmd-apagado); } .rmd-tz-desp { font-weight: 600; }
   tr.rmd-tz-quitado .rmd-tz-antes { text-decoration: line-through; }
-  .rmd-tz-vers tr.rmd-tz-obs > td { padding-top: 0; border-top: 0; } .rmd-tz-vers tbody tr:not(.rmd-tz-obs) > td { border-bottom: 0; }
+  .rmd-tz-vers th.rmd-tz-ord { cursor: pointer; user-select: none; white-space: nowrap; } .rmd-tz-vers th.rmd-tz-ord:hover, .rmd-tz-vers th.rmd-tz-ord.activa { color: var(--rmd-acento-texto); }
+  .rmd-tz-vers th.rmd-tz-ord span { opacity: .55; font-size: 10px; } .rmd-tz-vers th.rmd-tz-ord.activa span { opacity: 1; }
+  .rmd-tz-vers td { vertical-align: top; } .rmd-tz-vers .rmd-tz-obs-col { min-width: 420px; width: 55%; } .rmd-tz-vers .rmd-tz-num { font-weight: 700; white-space: nowrap; }
+  .rmd-tz-est { padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, currentColor 12%, transparent); }
+  .rmd-tz-est.autorizado { color: var(--rmd-verde); } .rmd-tz-est.ingresado { color: var(--rmd-acento-texto); } .rmd-tz-est.suspendido { color: var(--rmd-ambar); } .rmd-tz-est.cancelado { color: var(--rmd-apagado); }
   .rmd-tz-obs-cab { font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--rmd-apagado); margin: 0 0 3px; }
   .rmd-tz-obs-l { margin: 0 0 4px; padding: 0; list-style: none; font-size: 12.5px; } .rmd-tz-obs-l li { padding: 2px 0; white-space: pre-wrap; }
   .rmd-tz-obs-f { display: inline-block; margin-right: 8px; padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--rmd-acento) 14%, transparent); color: var(--rmd-acento-texto); font-size: 11.5px; font-weight: 600; white-space: nowrap; } .rmd-tz-lista { margin-top: 4px; }
@@ -10799,14 +10803,18 @@
     const opcionesVersion = (sel) => E.linaje.versiones.filter((m) => tzComparable(m) || m.mdId === sel).map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
     // Observaciones de «Asociar fórmulas»: una línea por anotación; «AAAAMMDD<iniciales>» al inicio se muestra como fecha
     const htmlObs = (t) => { const ls = String(t || '').split('\n').map((x) => x.trim()).filter(Boolean); if (!ls.length) return '<span class="rmd-nota">Sin observaciones.</span>';
-      return `<ul class="rmd-tz-obs-l">${ls.map((l) => { const m = /^(\d{4})(\d{2})(\d{2})([A-ZÑ]{1,5})?[\s\-–:]*(.*)$/.exec(l);
-        return m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31 ? `<li><span class="rmd-tz-obs-f">${m[3]}/${m[2]}/${m[1]}${m[4] ? ' · ' + esc(m[4]) : ''}</span>${esc(m[5] || '')}</li>` : `<li>${esc(l)}</li>`; }).join('')}</ul>`; };
+      return `<ul class="rmd-tz-obs-l">${ls.map((l) => { const m = /^(\d{4})(-?)(\d{2})(\d{2})([A-ZÑ]{1,5})?[\s\-–:]*(.*)$/.exec(l);   // AAAAMMDD o AAAA-MM-DD; iniciales pegadas a la fecha
+        return m && +m[3] >= 1 && +m[3] <= 12 && +m[4] >= 1 && +m[4] <= 31 ? `<li><span class="rmd-tz-obs-f">${m[4]}/${m[3]}/${m[1]}${m[5] ? ' · ' + esc(m[5]) : ''}</span>${esc(m[6] || '')}</li>` : `<li>${esc(l)}</li>`; }).join('')}</ul>`; };
+    // Orden de la tabla de versiones: por defecto la más reciente arriba; clic en Código, Versión, Estado o Registrada
+    const VERS_COL = { codigo: (x) => +x.codigo || 0, version: (x) => +x.version || 0, estado: (x) => SIN_ACENTOS(x.estado || ''), fecha: (x) => (x.fecha ? +new Date(x.fecha) : 0) };
+    const versionesOrdenadas = () => { const o = E.versOrden || { k: 'version', dir: -1 }, f = VERS_COL[o.k];
+      return filasVersiones().map((x, i) => [x, i]).sort(([a, ia], [b, ib]) => { const va = f(a), vb = f(b); return (va < vb ? -1 : va > vb ? 1 : (+a.version || 0) - (+b.version || 0) || ia - ib) * o.dir; }).map(([x]) => x); };
     function htmlVersionesLista() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
       if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="searching">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
-      const f = filasVersiones(), act = E.linaje.actual;
-      return `${ficha(act)}<p class="rmd-tz-resumen">Todas las versiones relacionadas del RMD, cada una con sus observaciones de «Asociar fórmulas». «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Descripción</th><th>Versión origen</th><th>Registrada</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(x.version)}</td><td class="rmd-nowrap">${esc(x.estado)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? ' · ' + esc(x.usuario) : ''}</td><td>${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>
-        <tr class="rmd-tz-obs${x.mdId === act.mdId ? ' rmd-tz-actual' : ''}"><td></td><td colspan="6"><div class="rmd-tz-obs-cab">Observaciones · v${esc(x.version)}</div>${htmlObs(x.obs)}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
+      const f = versionesOrdenadas(), act = E.linaje.actual, o = E.versOrden || { k: 'version', dir: -1 };
+      const th = (k, t) => `<th class="rmd-tz-ord${o.k === k ? ' activa' : ''}" data-a="vord" data-k="${k}" title="Ordenar por ${t.toLowerCase()}" aria-sort="${o.k === k ? (o.dir < 0 ? 'descending' : 'ascending') : 'none'}">${t}<span aria-hidden="true">${o.k === k ? (o.dir < 0 ? ' ▼' : ' ▲') : ' ↕'}</span></th>`;
+      return `${ficha(act)}<p class="rmd-tz-resumen">Todas las versiones relacionadas del RMD con sus observaciones de «Asociar fórmulas». Pulsa un encabezado para ordenar; «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr>${th('codigo', 'Código')}${th('version', 'Versión')}${th('estado', 'Estado')}<th>Versión origen</th>${th('fecha', 'Registrada')}<th class="rmd-tz-obs-col">Observaciones</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td><span class="rmd-nowrap">${esc(x.codigo)}</span>${norm(x.descripcion) !== norm(act.descripcion) ? `<br><span class="rmd-nota">${esc(x.descripcion)}</span>` : ''}</td><td class="rmd-tz-num">v${esc(x.version)}</td><td class="rmd-nowrap"><span class="rmd-tz-est ${SIN_ACENTOS(x.estado || '').toLowerCase()}">${esc(x.estado)}</span></td><td class="rmd-nowrap">${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? `<br><span class="rmd-nota">${esc(x.usuario)}</span>` : ''}</td><td class="rmd-tz-obs-col">${htmlObs(x.obs)}</td><td class="rmd-nowrap">${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
     }
     function htmlVersiones() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
@@ -10836,6 +10844,7 @@
     cuerpo.addEventListener('input', (e) => { const f = e.target.dataset.f; if (f === 'consulta') { E.consulta = SIN_ACENTOS(e.target.value).trim(); pintar(); } else if (f === 'paQ') { E.paQRaw = e.target.value; E.paQ = SIN_ACENTOS(e.target.value).trim(); pintar(); } });
     cuerpo.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
+      if (a === 'vord') { const k = b.dataset.k, o = E.versOrden || { k: 'version', dir: -1 }; E.versOrden = { k, dir: o.k === k ? -o.dir : (k === 'estado' || k === 'codigo' ? 1 : -1) }; pintar(); return; }
       if (a === 'difver') { const m = E.linaje.versiones.find((x) => x.mdId === b.dataset.id), o = m && origenDe(m); if (!o) return; E.hasta = m.mdId; E.desde = o.mdId; E.iniciado = true; E.tab = 'ver'; comparar(); }
       else if (a === 'comparar') comparar(); else if (a === 'seccion' || a === 'tipo') { E[a] = b.dataset.v; pintar(); }
       else if (a === 'pa-filtro') { E.paFiltro = b.dataset.v; pintar(); }
@@ -10860,12 +10869,12 @@
       const btn = e.currentTarget; btn.disabled = true;
       try {
         const est = estadosNativos();
-        const x = tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: est, versiones: filasVersiones() });
+        const x = tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: est, versiones: versionesOrdenadas() });
         descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); toast(`Excel de la trazabilidad del RMD ${codigo}: ${x.cambios} cambios entre versiones y ${x.filas} líneas de historial.`);
       } catch (err) { toast('No se pudo armar el Excel: ' + err.message, true); } finally { btn.disabled = false; }
     });
     cuerpo.addEventListener('change', (e) => { if (e.target.dataset.f === 'desde' || e.target.dataset.f === 'hasta') comparar(); });
-    raiz.__tz = { E, filasVersiones, comparar, pintar, iniciar, iniciarPost, pdfPost, filasPostExcel, excel: () => tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: estadosNativos(), versiones: filasVersiones() }) };
+    raiz.__tz = { E, filasVersiones, comparar, pintar, iniciar, iniciarPost, pdfPost, filasPostExcel, excel: () => tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: estadosNativos(), versiones: versionesOrdenadas() }) };
   }
   const TZ_ESC = { puesto: false, pausa: 0 };
   function gestionarTrazabilidad() {
