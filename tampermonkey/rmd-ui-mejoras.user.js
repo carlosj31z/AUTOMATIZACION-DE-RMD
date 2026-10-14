@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.64.0
+// @version      1.65.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.64.0';                                                       // mantener igual a @version
+  const VERSION = '1.65.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1513,7 +1513,7 @@
     const valores = (idx) => (idx < 0 ? '' : filas.map((tr) => (inputDe(celda(tr, idx)) || {}).value || '').join('\u0001'));
     const textosDesc = tipoTabla === 'pasos' && iDesc >= 0 ? filas.map((tr) => { const el = celda(tr, iDesc) && celda(tr, iDesc).querySelector('.sapMText'); return el ? el.textContent : ''; }) : [];
     const firma = [C, tipoTabla, filas.length, nombres.join('|'), valores(iDep), valores(iTipo), iCod >= 0 ? filas.slice(0, 60).map((tr) => celda(tr, iCod) ? celda(tr, iCod).textContent : '').join('|') : '',
-      textosDesc.filter((t) => t.indexOf('\n') > -1).join('\u0001'), iEst >= 0 ? filas.map((tr) => (celda(tr, iEst) ? celda(tr, iEst).textContent : '')).join('|') : '', tabla.dataset.rmdPmop || '', on('ocultar') ? 1 : 0].join('\u0002');
+      textosDesc.filter((t) => t.indexOf('\n') > -1).join('\u0001'), iEst >= 0 ? filas.map((tr) => (celda(tr, iEst) ? celda(tr, iEst).textContent : '')).join('|') : '', tabla.dataset.rmdPmop || '', on('ocultar') ? 1 : 0, tabla.__rmdDepExtra || 0].join('\u0002');
     // (UI5 puede volver a escribir sus anchos en las mismas cabeceras: se comprueban todas)
     const previa = tabla.__rmdAnchos;
     if (previa && previa.firma === firma && previa.tw === tabla.style.getPropertyValue('width') && previa.anchos.length === ths.length && ths.every((th, i) => th.style.getPropertyValue('width') === previa.anchos[i])) return;
@@ -1526,7 +1526,8 @@
     if (iDep >= 0) {                                                                       // Depende: ancho para ver siempre el valor completo
       let max = anchoTexto(ths[iDep], 'Depende'), f = null;
       filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) { f = f || fuenteDe(i); max = Math.max(max, anchoFuente(f, i.value)); } });
-      depW = Math.min(Math.max(max + 62, compacto ? 116 : 130), 300);
+      // holgura: con zoom del navegador el texto se dibuja algo más ancho que su medida; __rmdDepExtra lo agrega la comprobación tras pintar
+      depW = Math.min(Math.max(Math.ceil(max * 1.08) + 70 + (tabla.__rmdDepExtra || 0), compacto ? 124 : 140), 360);
     }
     let tipoW = null;
     if (iTipo >= 0) {                                                                      // Tipo Dato: sin cortar los valores habituales
@@ -1583,6 +1584,11 @@
     });
     tabla.style.setProperty('width', (sumaF + W) + 'px', 'important');
     tabla.__rmdAnchos = { firma, tw: tabla.style.getPropertyValue('width'), anchos: ths.map((th) => th.style.getPropertyValue('width')) };
+    if (iDep >= 0) requestAnimationFrame(() => {                                           // tras pintar: si algún «Depende» aún no cabe, se ensancha lo que falte
+      if (!tabla.isConnected) return;
+      let falta = 0; filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value && i.clientWidth) falta = Math.max(falta, i.scrollWidth - i.clientWidth); });
+      if (falta > 0 && (tabla.__rmdDepExtra || 0) < 160) { tabla.__rmdDepExtra = (tabla.__rmdDepExtra || 0) + falta + 8; tabla.__rmdAnchos = null; programarAjuste(); }
+    });
   }
 
   // Nombre de la lista (PRECAUCIONES, NOTAS…, etiqueta del PROCEDIMIENTO). Del modelo: mdEsEtiquetaId + listMdEsEtiqueta, o
