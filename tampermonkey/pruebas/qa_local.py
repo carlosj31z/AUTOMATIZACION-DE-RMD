@@ -693,7 +693,18 @@ with sync_playwright() as p:
         ok = (hojas == ["Historia del producto", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
               and "el registro al autorizar" in compartidas and "Guardado sin cambios" in compartidas and "JQUISPEP" in compartidas)
         return ok, f"{r}; hojas={hojas}"
-    @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
+    @prueba("LN25b «Cambió y volvió» (v1.68, guardados de mentira): una fila igual a la versión anterior que se cambió y se devolvió muestra cada cambio con su usuario; una fila vuelta a agregar marca su paso inicial como no registrado; volver a guardar lo mismo no es un cambio; un guardado sin usuario toma el del guardado vecino")
+    def _():
+        r = pg.evaluate("""() => { const R = window.__rmdStats.tzPost.revEntradas, campos = ['pasoHijoId_pasoId', 'valorInicial', 'valorFinal', 'edit'];
+          const base = { pasoHijoId_pasoId: 'P87680', valorInicial: '2', valorFinal: '4', edit: true }, ev = (min, p) => ({ ts: new Date(Date.UTC(2026, 8, 4, 13, min)), p });
+          const copia = R([ev(0, { usuarioActualiza: 'ANA', orden: 3 }), ev(1, { usuarioActualiza: 'ANA', valorInicial: '2', valorFinal: '3', edit: true }), ev(9, { usuarioActualiza: 'BETO', valorFinal: '4', edit: true })], base, campos, false);
+          const otra = R([ev(1, { usuarioActualiza: 'ANA', valorInicial: '2', valorFinal: '3' }), ev(30, { pasoHijoId_pasoId: 'P87680' }), ev(30, { usuarioActualiza: 'BETO', valorFinal: '4' })], base, campos, true);
+          const igual = R([ev(2, { usuarioActualiza: 'ANA', valorInicial: '2.0', valorFinal: '4', edit: true })], base, campos, false);
+          const txt = (es) => es.map((y) => y.usuario + ': ' + y.cambios.map((c) => `${c.k} ${c.desconocido ? '?' : c.antes}→${c.despues}`).join(', '));
+          return { copia: txt(copia), otra: txt(otra), igual: igual.length }; }""")
+        ok = (r["copia"] == ["ANA: valorFinal 4→3", "BETO: valorFinal 3→4"] and r["otra"] == ["ANA: valorFinal 4→3", "BETO: pasoHijoId_pasoId ?→P87680", "BETO: valorFinal 3→4"] and r["igual"] == 0)
+        return ok, json.dumps(r, ensure_ascii=False)
+    @prueba("LN26Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
     def _():
         r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });
           const sap = [c('C4', '42094.000'), c('C5', '2.000'), c('C6', '5000.000'), c('C7', '1500.000'), c('C8', '900.000'), c('C9', '3000.000', 'KG'), c('C10', '1234567.000')];

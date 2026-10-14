@@ -1514,7 +1514,7 @@ with sync_playwright() as p:
             cerrar_seguro()
         finally:
             pg.unroute("**/*", guardia_w)
-        @prueba("W8 'Cambiar paso' (SIMULADO + cortafuegos): cambia un paso mayor por otro código enviando SOLO pasoId_pasoId de su MD_ES_PASO (se conservan configuración y procesos menores)")
+        @prueba("W8 'Cambiar paso' (SIMULADO + cortafuegos): cambia un paso mayor por otro código enviando SOLO pasoId_pasoId de su MD_ES_PASO, con quién y cuándo (v1.68: la auditoría lo muestra; se conservan configuración y procesos menores)")
         def _():
             pg.route("**/*", guardia_w)
             try:
@@ -1536,7 +1536,7 @@ with sync_playwright() as p:
                 cerrar_seguro()
             finally:
                 pg.unroute("**/*", guardia_w)
-            ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
+            ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId", "usuarioActualiza", "fechaActualiza"] and capt[0]["datos"]["usuarioActualiza"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
             return ok, f"enviado={capt} nota={nota[:120]!r}"
         @prueba("W7 Ninguna petición de escritura salió del navegador durante el bloque W")
         def _():
@@ -2104,6 +2104,20 @@ with sync_playwright() as p:
                     r.append([pestana, pie["pieVisible"], pie["bottom"] <= pie["vh"], fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).length]")])
                 pg.set_viewport_size({"width": 1920, "height": 945})
                 return all(x[1] and x[2] and x[3] == [0, 0] for x in r), str(r)
+            @prueba("P8 «Cambió y volvió» y quién quitó (v1.68, 2202608974 v3 → v4): el proceso menor 87680 del 4.4.10 que pasó a «NIVEL 2 - 3» y volvió sale marcado con su historia (Val. Final 4 → 3 y 3 → 4, vuelto a agregar) y los procesos menores quitados traen quién los quitó y cuándo")
+            def _():
+                COD_R = os.environ.get("COD_R", "2202608974")
+                abrir_traz(COD_R, tab="ver")
+                r = fr.evaluate("""async () => { for (let i = 0; i < 240; i++) { const E = window.__rmdStats.trazabilidad.panel().E; if (E.rev && E.rev.fase !== 'leyendo') break; await new Promise((ok) => setTimeout(ok, 500)); }
+                  const E = window.__rmdStats.trazabilidad.panel().E, nodos = window.__rmdStats.tzPost ? E.dif.arbol.estructuras.flatMap((e) => [e, ...e.etiquetas, ...[...e.pasos, ...e.etiquetas.flatMap((x) => x.pasos)].flatMap((p) => [p, ...p.pm]), ...e.espec]) : [];
+                  const v = nodos.find((x) => x.marca === 'revertido' && x.codigo === '87680' && x.entradas.some((y) => y.cambios.some((c) => c.campo === 'Val. Final' && c.antes === '4' && c.despues === '3')));
+                  const q = nodos.filter((x) => x.marca === 'quitado' && !x.heredado);
+                  document.querySelector('.rmd-tz .rmd-pa-item.revertido .rmd-pa-cab').click(); await new Promise((ok) => setTimeout(ok, 300));
+                  return { fase: E.rev.fase, rev: E.rev.revertidos, kpi: !!document.querySelector('.rmd-tz .rmd-pa-kpi.revertido'), v: v && { recreado: v.recreado, baja: !!v.bajaAnterior, cambios: v.entradas.flatMap((y) => y.cambios.map((c) => `${c.campo}: ${c.antes} → ${c.despues}`)) },
+                    quitados: q.length, conFecha: q.filter((x) => x.cuando).length, conUsuario: q.filter((x) => x.quien).length, detalle: !!document.querySelector('.rmd-tz .rmd-pa-item.revertido.abierto table') }; }""")
+                ok = (r["fase"] == "listo" and r["rev"] >= 1 and r["kpi"] and r["v"] and r["v"]["recreado"] and r["v"]["baja"] and "Val. Final: 3 → 4" in r["v"]["cambios"]
+                      and r["quitados"] >= 10 and r["conFecha"] == r["quitados"] and r["conUsuario"] >= r["quitados"] - 5 and r["detalle"])
+                return ok, str(r)
         finally:
             cerrar_seguro(); pg.unroute("**/*", guardia_p)
         @prueba("P6 Ninguna petición de escritura salió del navegador durante el bloque P (todo es lectura: versiones, pasos y auditoría)")
