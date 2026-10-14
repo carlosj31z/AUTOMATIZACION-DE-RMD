@@ -2035,7 +2035,7 @@ with sync_playwright() as p:
                 a = fr.evaluate(ESTADO_P, TOP_P)
                 fr.evaluate("(t) => document.querySelector('.rmd-tz [data-t=' + t + ']').click()", "ver"); fr.evaluate(ESPERA_P)
                 e = fr.evaluate(ESTADO_P, TOP_P)
-                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Historial de versiones", "Diferencia entre versiones", "Historial post autorización"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
+                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Historia del producto", "Diferencia entre versiones", "Historial post autorización"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
                       and a["cambios"] is None and bool(e) and e["agrandada"] and not e["nativaVisible"] and e["pieVisible"] and e["top"] >= 0 and e["bottom"] <= e["vh"] and e["ancho"] >= 1000
                       and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
                 return ok, f"original={a} comparando={e}"
@@ -2054,13 +2054,25 @@ with sync_playwright() as p:
                 ok = (r["nB"] - r["nA"] == r["ag"] - r["qu"] and r["tiposValidos"] and r["sinUsuario"] == 0 and r["soloPasos"] >= r["todosPasos"] > 0 and r["vacio"] == 0 and r["total"] > 0
                       and r["filas"] > 0 and r["todo"] > r["filas"])
                 return ok, str(r)
-            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Historial de versiones / Diferencia entre versiones / Historial post autorización / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
+            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Historia del producto / Diferencia entre versiones / Historial post autorización / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
             def _():
                 x = fr.evaluate("""async () => { const r = window.__rmdStats.trazabilidad.panel().excel(), b = await r.libro.generar(); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
                   return { nombre: r.nombre, cambios: r.cambios, filas: r.filas, n: window.__rmdStats.trazabilidad.panel().E.cambios.length, b64: btoa(s) }; }""")
                 z, hojas = xlsx_p(x.pop("b64")); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
-                ok = hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
+                ok = hojas == ["Historia del producto", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
                 return ok, f"{x}; hojas={hojas}"
+            @prueba("P3b «Historia del producto» (v1.66): sin las versiones Canceladas del linaje, de la última versión a la primera, y los encabezados no ordenan al pulsarlos; la fecha de cada observación («AAAAMMDD…») sale resaltada")
+            def _():
+                r = fr.evaluate("""async () => { document.querySelector('.rmd-tz [data-t=vers]').click();
+                  for (let i = 0; i < 120 && !document.querySelector('.rmd-tz-vers'); i++) await new Promise(r => setTimeout(r, 250));
+                  const E = window.__rmdStats.trazabilidad.panel().E, filas = () => [...document.querySelectorAll('.rmd-tz-vers tbody tr')].map(tr => [...tr.children].slice(0, 3).map(td => td.innerText.replace(/\\s+/g, ' ').trim()));
+                  const f = filas(), th = [...document.querySelectorAll('.rmd-tz-vers thead th')]; th.forEach(x => x.click()); await new Promise(r => setTimeout(r, 200));
+                  return { pestana: document.querySelector('.rmd-tz [data-t=vers]').textContent, filas: f, canceladas: E.linaje.versiones.filter(m => /cancel/i.test(m.estado)).length, total: E.linaje.versiones.length,
+                    ordenables: th.filter(x => x.dataset.a || x.getAttribute('aria-sort')).length, fechas: document.querySelectorAll('.rmd-tz-vers .rmd-tz-obs-f').length, igual: JSON.stringify(filas()) === JSON.stringify(f) }; }""")
+                vs = [int(x[1].lstrip("v") or 0) for x in r["filas"]]
+                ok = (r["pestana"] == "Historia del producto" and r["canceladas"] >= 1 and len(r["filas"]) == r["total"] - r["canceladas"] and not any("Cancel" in x[2] for x in r["filas"])
+                      and vs == sorted(vs, reverse=True) and r["ordenables"] == 0 and r["igual"] and r["fechas"] >= 1)
+                return ok, str(r)
             @prueba("P4 Historial post autorización: en segundos marca las filas cambiadas después de autorizar (o desde que se creó la versión si no está autorizada) con la forma del RMD, cada cambio con usuario, fecha, campo y antes / después, y el clic abre el detalle")
             def _():
                 COD_PA = os.environ.get("COD_PA", "2202608890")   # Autorizado con pasos y procesos menores modificados después de autorizar
