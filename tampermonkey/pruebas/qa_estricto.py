@@ -1514,7 +1514,7 @@ with sync_playwright() as p:
             cerrar_seguro()
         finally:
             pg.unroute("**/*", guardia_w)
-        @prueba("W8 'Cambiar paso' (SIMULADO + cortafuegos): cambia un paso mayor por otro código enviando SOLO pasoId_pasoId de su MD_ES_PASO (se conservan configuración y procesos menores)")
+        @prueba("W8 'Cambiar paso' (SIMULADO + cortafuegos): cambia un paso mayor por otro código enviando SOLO pasoId_pasoId de su MD_ES_PASO, con quién y cuándo (v1.68: la auditoría lo muestra; se conservan configuración y procesos menores)")
         def _():
             pg.route("**/*", guardia_w)
             try:
@@ -1536,7 +1536,7 @@ with sync_playwright() as p:
                 cerrar_seguro()
             finally:
                 pg.unroute("**/*", guardia_w)
-            ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
+            ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId", "usuarioActualiza", "fechaActualiza"] and capt[0]["datos"]["usuarioActualiza"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
             return ok, f"enviado={capt} nota={nota[:120]!r}"
         @prueba("W7 Ninguna petición de escritura salió del navegador durante el bloque W")
         def _():
@@ -1893,7 +1893,7 @@ with sync_playwright() as p:
     # ───────────────────────── U. v1.37: cambios de recetas en SAP (lectura real; el guardado de la observación se SIMULA + cortafuegos) ─────────────────────────
     if "U" in SOLO:
         CODS_U = os.environ.get("CODS_U", "2202609107,2202609132,2202609067,2202609113").split(",")   # RMD Ingresados con la lista de materiales cambiada en SAP (y uno sin cambios)
-        RMD_OBS_U = os.environ.get("RMD_OBS_U", "2202609178")                                        # RMD Ingresado para probar la observación (guardado simulado)
+        RMD_OBS_U = os.environ.get("RMD_OBS_U", "2202609241")                                        # RMD Ingresado para probar la observación (guardado simulado)
         TOP_U = "[...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(x => x.getClientRects().length).pop()"
         def xlsx_u(b64):
             import base64 as b64m, io as iom, zipfile as zipm
@@ -2035,7 +2035,7 @@ with sync_playwright() as p:
                 a = fr.evaluate(ESTADO_P, TOP_P)
                 fr.evaluate("(t) => document.querySelector('.rmd-tz [data-t=' + t + ']').click()", "ver"); fr.evaluate(ESPERA_P)
                 e = fr.evaluate(ESTADO_P, TOP_P)
-                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Historial de versiones", "Diferencia entre versiones", "Historial post autorización"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
+                ok = (bool(a) and a["titulo"].startswith(f"Trazabilidad del RMD: {COD_P}") and a["panel"] and a["pestanas"] == ["Trazabilidad", "Historia del producto", "Diferencia entre versiones", "Historial post autorización"] and not a["agrandada"] and a["nativaVisible"] and a["estados"] >= 1 and a["pieVisible"]
                       and a["cambios"] is None and bool(e) and e["agrandada"] and not e["nativaVisible"] and e["pieVisible"] and e["top"] >= 0 and e["bottom"] <= e["vh"] and e["ancho"] >= 1000
                       and e["hasta"] == COD_P and e["desde"] and e["desde"] != COD_P and len(e["versiones"]) >= 2 and (e["cambios"] or 0) > 0 and not e["error"] and e["selects"] == 2)
                 return ok, f"original={a} comparando={e}"
@@ -2054,13 +2054,25 @@ with sync_playwright() as p:
                 ok = (r["nB"] - r["nA"] == r["ag"] - r["qu"] and r["tiposValidos"] and r["sinUsuario"] == 0 and r["soloPasos"] >= r["todosPasos"] > 0 and r["vacio"] == 0 and r["total"] > 0
                       and r["filas"] > 0 and r["todo"] > r["filas"])
                 return ok, str(r)
-            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Historial de versiones / Diferencia entre versiones / Historial post autorización / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
+            @prueba("P3 Excel de la trazabilidad con lo que se ve: hojas Historia del producto / Diferencia entre versiones / Historial post autorización / Estados / Información, una fila por cambio (también los que solo cambian el orden) y los estados de la ventana")
             def _():
                 x = fr.evaluate("""async () => { const r = window.__rmdStats.trazabilidad.panel().excel(), b = await r.libro.generar(); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
                   return { nombre: r.nombre, cambios: r.cambios, filas: r.filas, n: window.__rmdStats.trazabilidad.panel().E.cambios.length, b64: btoa(s) }; }""")
                 z, hojas = xlsx_p(x.pop("b64")); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
-                ok = hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
+                ok = hojas == ["Historia del producto", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and x["cambios"] == x["n"] > 0 and x["nombre"].startswith(f"Trazabilidad RMD {COD_P} ") and "Autorizado" in todo
                 return ok, f"{x}; hojas={hojas}"
+            @prueba("P3b «Historia del producto» (v1.66): sin las versiones Canceladas del linaje, de la última versión a la primera, y los encabezados no ordenan al pulsarlos; la fecha de cada observación («AAAAMMDD…») sale resaltada")
+            def _():
+                r = fr.evaluate("""async () => { document.querySelector('.rmd-tz [data-t=vers]').click();
+                  for (let i = 0; i < 120 && !document.querySelector('.rmd-tz-vers'); i++) await new Promise(r => setTimeout(r, 250));
+                  const E = window.__rmdStats.trazabilidad.panel().E, filas = () => [...document.querySelectorAll('.rmd-tz-vers tbody tr')].map(tr => [...tr.children].slice(0, 3).map(td => td.innerText.replace(/\\s+/g, ' ').trim()));
+                  const f = filas(), th = [...document.querySelectorAll('.rmd-tz-vers thead th')]; th.forEach(x => x.click()); await new Promise(r => setTimeout(r, 200));
+                  return { pestana: document.querySelector('.rmd-tz [data-t=vers]').textContent, filas: f, canceladas: E.linaje.versiones.filter(m => /cancel/i.test(m.estado)).length, total: E.linaje.versiones.length,
+                    ordenables: th.filter(x => x.dataset.a || x.getAttribute('aria-sort')).length, fechas: document.querySelectorAll('.rmd-tz-vers .rmd-tz-obs-f').length, igual: JSON.stringify(filas()) === JSON.stringify(f) }; }""")
+                vs = [int(x[1].lstrip("v") or 0) for x in r["filas"]]
+                ok = (r["pestana"] == "Historia del producto" and r["canceladas"] >= 1 and len(r["filas"]) == r["total"] - r["canceladas"] and not any("Cancel" in x[2] for x in r["filas"])
+                      and vs == sorted(vs, reverse=True) and r["ordenables"] == 0 and r["igual"] and r["fechas"] >= 1)
+                return ok, str(r)
             @prueba("P4 Historial post autorización: en segundos marca las filas cambiadas después de autorizar (o desde que se creó la versión si no está autorizada) con la forma del RMD, cada cambio con usuario, fecha, campo y antes / después, y el clic abre el detalle")
             def _():
                 COD_PA = os.environ.get("COD_PA", "2202608890")   # Autorizado con pasos y procesos menores modificados después de autorizar
@@ -2092,6 +2104,20 @@ with sync_playwright() as p:
                     r.append([pestana, pie["pieVisible"], pie["bottom"] <= pie["vh"], fr.evaluate("() => [document.querySelectorAll('.rmd-tz').length, [...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).length]")])
                 pg.set_viewport_size({"width": 1920, "height": 945})
                 return all(x[1] and x[2] and x[3] == [0, 0] for x in r), str(r)
+            @prueba("P8 «Cambió y volvió» y quién quitó (v1.68, 2202608974 v3 → v4): el proceso menor 87680 del 4.4.10 que pasó a «NIVEL 2 - 3» y volvió sale marcado con su historia (Val. Final 4 → 3 y 3 → 4, vuelto a agregar) y los procesos menores quitados traen quién los quitó y cuándo")
+            def _():
+                COD_R = os.environ.get("COD_R", "2202608974")
+                abrir_traz(COD_R, tab="ver")
+                r = fr.evaluate("""async () => { for (let i = 0; i < 240; i++) { const E = window.__rmdStats.trazabilidad.panel().E; if (E.rev && E.rev.fase !== 'leyendo') break; await new Promise((ok) => setTimeout(ok, 500)); }
+                  const E = window.__rmdStats.trazabilidad.panel().E, nodos = window.__rmdStats.tzPost ? E.dif.arbol.estructuras.flatMap((e) => [e, ...e.etiquetas, ...[...e.pasos, ...e.etiquetas.flatMap((x) => x.pasos)].flatMap((p) => [p, ...p.pm]), ...e.espec]) : [];
+                  const v = nodos.find((x) => x.marca === 'revertido' && x.codigo === '87680' && x.entradas.some((y) => y.cambios.some((c) => c.campo === 'Val. Final' && c.antes === '4' && c.despues === '3')));
+                  const q = nodos.filter((x) => x.marca === 'quitado' && !x.heredado);
+                  document.querySelector('.rmd-tz .rmd-pa-item.revertido .rmd-pa-cab').click(); await new Promise((ok) => setTimeout(ok, 300));
+                  return { fase: E.rev.fase, rev: E.rev.revertidos, kpi: !!document.querySelector('.rmd-tz .rmd-pa-kpi.revertido'), v: v && { recreado: v.recreado, baja: !!v.bajaAnterior, cambios: v.entradas.flatMap((y) => y.cambios.map((c) => `${c.campo}: ${c.antes} → ${c.despues}`)) },
+                    quitados: q.length, conFecha: q.filter((x) => x.cuando).length, conUsuario: q.filter((x) => x.quien).length, detalle: !!document.querySelector('.rmd-tz .rmd-pa-item.revertido.abierto table') }; }""")
+                ok = (r["fase"] == "listo" and r["rev"] >= 1 and r["kpi"] and r["v"] and r["v"]["recreado"] and r["v"]["baja"] and "Val. Final: 3 → 4" in r["v"]["cambios"]
+                      and r["quitados"] >= 10 and r["conFecha"] == r["quitados"] and r["conUsuario"] >= r["quitados"] - 5 and r["detalle"])
+                return ok, str(r)
         finally:
             cerrar_seguro(); pg.unroute("**/*", guardia_p)
         @prueba("P6 Ninguna petición de escritura salió del navegador durante el bloque P (todo es lectura: versiones, pasos y auditoría)")

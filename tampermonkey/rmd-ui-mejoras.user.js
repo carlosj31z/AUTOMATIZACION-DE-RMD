@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.63.0
+// @version      1.68.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.63.0';                                                       // mantener igual a @version
+  const VERSION = '1.68.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -242,6 +242,7 @@
   .rmd-rec-detalle hr { border: 0; border-top: 1px solid var(--rmd-borde); margin: 10px 0; }
   .rmd-rec-cab b { font-size: 14px; } .rmd-rec-cab span { color: var(--rmd-apagado); }
   .rmd-rec-sub { margin: 8px 0 4px; font-weight: 600; color: var(--rmd-ambar); }
+  .rmd-rec-tabla.rmd-rec-txt td { width: 50%; white-space: pre-wrap; } .rmd-rec-txt .rmd-rec-antes { text-decoration: none; }
   /* Cambios de recetas en SAP */
   .rmd-alerta-rec { display: inline-flex; align-items: center; gap: 3px; margin: 0 0 0 6px; padding: 2px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--rmd-ambar); font: 600 11px var(--rmd-fuente); cursor: pointer; opacity: .5; vertical-align: middle; }
   .rmd-alerta-rec svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -328,12 +329,14 @@
   .rmd-tz-sel select { height: 30px; max-width: 380px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-tz-acc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .rmd-tz-t { font-size: 12.5px; } .rmd-tz-antes { color: var(--rmd-apagado); } .rmd-tz-desp { font-weight: 600; }
   tr.rmd-tz-quitado .rmd-tz-antes { text-decoration: line-through; }
-  .rmd-tz-vers tr.rmd-tz-obs > td { padding-top: 0; border-top: 0; } .rmd-tz-vers tbody tr:not(.rmd-tz-obs) > td { border-bottom: 0; }
+  .rmd-tz-vers td { vertical-align: top; } .rmd-tz-vers .rmd-tz-obs-col { min-width: 420px; width: 55%; } .rmd-tz-vers .rmd-tz-num { font-weight: 700; white-space: nowrap; }
+  .rmd-tz-est { padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, currentColor 12%, transparent); }
+  .rmd-tz-est.autorizado { color: var(--rmd-verde); } .rmd-tz-est.ingresado { color: var(--rmd-acento-texto); } .rmd-tz-est.suspendido { color: var(--rmd-ambar); } .rmd-tz-est.cancelado { color: var(--rmd-apagado); }
   .rmd-tz-obs-cab { font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--rmd-apagado); margin: 0 0 3px; }
   .rmd-tz-obs-l { margin: 0 0 4px; padding: 0; list-style: none; font-size: 12.5px; } .rmd-tz-obs-l li { padding: 2px 0; white-space: pre-wrap; }
   .rmd-tz-obs-f { display: inline-block; margin-right: 8px; padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--rmd-acento) 14%, transparent); color: var(--rmd-acento-texto); font-size: 11.5px; font-weight: 600; white-space: nowrap; } .rmd-tz-lista { margin-top: 4px; }
   /* Historial post autorización: forma del RMD con estilo Fiori */
-  .rmd-pa { --pa-mod: var(--rmd-ambar); --pa-agr: var(--rmd-verde); --pa-qui: var(--rmd-rojo); --pa-ord: var(--rmd-apagado); font: 13px/1.45 var(--rmd-fuente); color: var(--rmd-texto); }
+  .rmd-pa { --pa-mod: var(--rmd-ambar); --pa-agr: var(--rmd-verde); --pa-qui: var(--rmd-rojo); --pa-ord: var(--rmd-apagado); --pa-rev: #7a5bbf; font: 13px/1.45 var(--rmd-fuente); color: var(--rmd-texto); }
   .rmd-pa-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 12px 16px; border: 1px solid var(--rmd-borde); border-radius: 12px; background: var(--rmd-cabecera); }
   .rmd-pa-tit b { display: block; font-size: 15px; font-weight: 700; } .rmd-pa-tit span { color: var(--rmd-apagado); font-size: 12.5px; }
   .rmd-pa-kpis { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -341,7 +344,7 @@
   .rmd-pa-kpi b { display: block; font-size: 20px; line-height: 1.2; color: var(--k); } .rmd-pa-kpi span { font-size: 11.5px; color: var(--rmd-apagado); }
   .rmd-pa-kpi.reemplazado { --k: var(--rmd-acento-texto); } .rmd-pa-item.reemplazado, .rmd-pa-tag.reemplazado { --t: var(--rmd-acento-texto); }
   .rmd-pa-tit .rmd-tz-sel { margin-top: 8px; }
-  .rmd-pa-kpi.modificado { --k: var(--pa-mod); } .rmd-pa-kpi.agregado { --k: var(--pa-agr); } .rmd-pa-kpi.quitado { --k: var(--pa-qui); } .rmd-pa-kpi.orden { --k: var(--pa-ord); }
+  .rmd-pa-kpi.modificado { --k: var(--pa-mod); } .rmd-pa-kpi.agregado { --k: var(--pa-agr); } .rmd-pa-kpi.quitado { --k: var(--pa-qui); } .rmd-pa-kpi.orden { --k: var(--pa-ord); } .rmd-pa-kpi.revertido { --k: var(--pa-rev); }
   .rmd-pa-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 12px 0 6px; }
   .rmd-pa-seg { display: inline-flex; padding: 2px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; }
   .rmd-pa-seg button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 600 12.5px var(--rmd-fuente); cursor: pointer; }
@@ -369,6 +372,7 @@
   .rmd-pa-item.cambio > .rmd-pa-cab:hover, .rmd-pa-item.cambio > .rmd-pa-cab:focus-visible { background: color-mix(in srgb, var(--t) 14%, transparent); outline: none; }
   .rmd-pa-item.modificado { --t: var(--pa-mod); } .rmd-pa-item.agregado { --t: var(--pa-agr); } .rmd-pa-item.quitado { --t: var(--pa-qui); } .rmd-pa-item.orden, .rmd-pa-item.igual { --t: var(--pa-ord); }
   .rmd-pa-tag.modificado { --t: var(--pa-mod); } .rmd-pa-tag.agregado { --t: var(--pa-agr); } .rmd-pa-tag.quitado { --t: var(--pa-qui); } .rmd-pa-tag.orden, .rmd-pa-tag.igual { --t: var(--pa-ord); }
+  .rmd-pa-item.revertido, .rmd-pa-tag.revertido { --t: var(--pa-rev); }
   .rmd-pa-item.quitado > .rmd-pa-cab .rmd-pa-tx { text-decoration: line-through; color: var(--pa-qui); }
   .rmd-pa-grupo.contexto > .rmd-pa-item.paso > .rmd-pa-cab { opacity: .62; }
   .rmd-pa-det { padding: 4px 14px 12px 102px; background: color-mix(in srgb, var(--t) 4%, transparent); box-shadow: inset 4px 0 0 var(--t); }
@@ -1509,7 +1513,7 @@
     const valores = (idx) => (idx < 0 ? '' : filas.map((tr) => (inputDe(celda(tr, idx)) || {}).value || '').join('\u0001'));
     const textosDesc = tipoTabla === 'pasos' && iDesc >= 0 ? filas.map((tr) => { const el = celda(tr, iDesc) && celda(tr, iDesc).querySelector('.sapMText'); return el ? el.textContent : ''; }) : [];
     const firma = [C, tipoTabla, filas.length, nombres.join('|'), valores(iDep), valores(iTipo), iCod >= 0 ? filas.slice(0, 60).map((tr) => celda(tr, iCod) ? celda(tr, iCod).textContent : '').join('|') : '',
-      textosDesc.filter((t) => t.indexOf('\n') > -1).join('\u0001'), iEst >= 0 ? filas.map((tr) => (celda(tr, iEst) ? celda(tr, iEst).textContent : '')).join('|') : '', tabla.dataset.rmdPmop || '', on('ocultar') ? 1 : 0].join('\u0002');
+      textosDesc.filter((t) => t.indexOf('\n') > -1).join('\u0001'), iEst >= 0 ? filas.map((tr) => (celda(tr, iEst) ? celda(tr, iEst).textContent : '')).join('|') : '', tabla.dataset.rmdPmop || '', on('ocultar') ? 1 : 0, tabla.__rmdDepExtra || 0].join('\u0002');
     // (UI5 puede volver a escribir sus anchos en las mismas cabeceras: se comprueban todas)
     const previa = tabla.__rmdAnchos;
     if (previa && previa.firma === firma && previa.tw === tabla.style.getPropertyValue('width') && previa.anchos.length === ths.length && ths.every((th, i) => th.style.getPropertyValue('width') === previa.anchos[i])) return;
@@ -1522,7 +1526,8 @@
     if (iDep >= 0) {                                                                       // Depende: ancho para ver siempre el valor completo
       let max = anchoTexto(ths[iDep], 'Depende'), f = null;
       filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value) { f = f || fuenteDe(i); max = Math.max(max, anchoFuente(f, i.value)); } });
-      depW = Math.min(Math.max(max + 62, compacto ? 116 : 130), 300);
+      // holgura: con zoom del navegador el texto se dibuja algo más ancho que su medida; __rmdDepExtra lo agrega la comprobación tras pintar
+      depW = Math.min(Math.max(Math.ceil(max * 1.08) + 70 + (tabla.__rmdDepExtra || 0), compacto ? 124 : 140), 360);
     }
     let tipoW = null;
     if (iTipo >= 0) {                                                                      // Tipo Dato: sin cortar los valores habituales
@@ -1579,6 +1584,11 @@
     });
     tabla.style.setProperty('width', (sumaF + W) + 'px', 'important');
     tabla.__rmdAnchos = { firma, tw: tabla.style.getPropertyValue('width'), anchos: ths.map((th) => th.style.getPropertyValue('width')) };
+    if (iDep >= 0) requestAnimationFrame(() => {                                           // tras pintar: si algún «Depende» aún no cabe, se ensancha lo que falte
+      if (!tabla.isConnected) return;
+      let falta = 0; filas.forEach((tr) => { const i = inputDe(celda(tr, iDep)); if (i && i.value && i.clientWidth) falta = Math.max(falta, i.scrollWidth - i.clientWidth); });
+      if (falta > 0 && (tabla.__rmdDepExtra || 0) < 160) { tabla.__rmdDepExtra = (tabla.__rmdDepExtra || 0) + falta + 8; tabla.__rmdAnchos = null; programarAjuste(); }
+    });
   }
 
   // Nombre de la lista (PRECAUCIONES, NOTAS…, etiqueta del PROCEDIMIENTO). Del modelo: mdEsEtiquetaId + listMdEsEtiqueta, o
@@ -6763,6 +6773,13 @@
     const orden = { cambia: 0, reemplazo: 1, nuevo: 2, quitado: 3 };
     return dif.filter((d) => !d.__usado).sort((p, q) => orden[p.tipo] - orden[q.tipo] || p.comp.localeCompare(q.comp));
   }
+  // Texto de cabecera de la lista (RECETA.TextoCab = ProduccionVSet.TextoCab): el PDF lo imprime bajo los insumos en Fabricación y Recubrimiento.
+  // RECETA es compartida por material y versión: volver a asociar la receta en cualquier RMD la actualiza («Actualizar» no la cambia).
+  const textoCabDe = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  const textoCabClave = (t) => t.replace(/(?<!\d)[.,;:]|[.,;:](?!\d)/g, ' ').replace(/\s+/g, ' ').trim();   // sin espacios ni signos sueltos (8.0 y 1,5 se conservan)
+  const difTextoCab = (rc, hoy) => { if (!rc || !hoy || rc.TextoCab === undefined || hoy.TextoCab === undefined) return null; const a = textoCabDe(rc.TextoCab), b = textoCabDe(hoy.TextoCab); return textoCabClave(a) === textoCabClave(b) ? null : { antes: a, ahora: b }; };
+  const textoCabEtapa = (etapa) => !/acondicion|envas/i.test(String(etapa || ''));   // Acondicionado y Envase no se consideran
+  const resumenLista = (x) => [x.dif.length && resumenDif(x.dif), x.textoCab && 'cambió el texto de la lista'].filter(Boolean).join(', ');
   const TEXTO_MKSP = { '': 'No bloqueado', 1: 'Bloqueado para cada utilización', 2: 'Bloqueado para selección automática' };
   const fechaSap = (v) => { if (!v) return ''; const d = v instanceof Date ? v : new Date(v); if (isNaN(d)) return String(v); return d.getUTCFullYear() >= 9999 ? 'sin fin' : `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
   // Versión de fabricación: avisan puesto, hoja de ruta, contador y alternativa; Mksp solo informativo.
@@ -6788,9 +6805,9 @@
     })();
     p.catch(() => contextosRmd.delete(mdId)); contextosRmd.set(mdId, { t: Date.now(), p }); return p;
   }
-  async function revisarRuta(ctrl, rc, werks, ctx) {
+  async function revisarRuta(ctrl, rc, werks, ctx, versionesP) {
     const erp = ctrl.oModelErpNec, F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
-    const versiones = await leerErp(erp, 'ProduccionVSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks)]);
+    const versiones = await (versionesP || leerErp(erp, 'ProduccionVSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks)]));
     const hoy = versiones.find((v) => norm(v.Verid) === norm(rc.Verid));
     const ant = ctx.anterior && ctx.anterior.recetas.find((x) => norm(x.Matnr) === norm(rc.Matnr)) || null;
     const cambios = [];
@@ -6810,22 +6827,24 @@
       faltan: hoy ? usados.filter((x) => rutaHoy.length && !rutaHoy.includes(x)).map((x) => ({ puesto: x, pasos: ctx.puestos.get(x) })) : [],
     };
   }
-  function revisarReceta(ctrl, r, werksRmd, mdId, forzar) {
+  function revisarReceta(ctrl, r, werksRmd, mdId, forzar, etapa) {
     const conRuta = !!on('recetaruta'), clave = (conRuta ? 'r' : 'b') + (r.recetaId && r.recetaId.Verid), g = revisionesReceta.get(r.mdRecetaId);
     if (!forzar && g && g.clave === clave && Date.now() - g.t < 30 * 60000) return g.p;
     const p = (async () => {
       const erp = ctrl.oModelErpNec, modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
       if (!erp || !modelo) throw new Error('no se encontró la conexión a SAP del portal');
       const rc = r.recetaId, werks = norm(rc.Werks) || werksRmd, stlal = String(parseInt(rc.Stlal, 10));
-      const [bom, copia, ruta] = await Promise.all([
+      const versionesP = leerErp(erp, 'ProduccionVSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks)]); versionesP.catch(() => {});
+      const [bom, copia, ruta, versiones] = await Promise.all([
         leerErp(erp, 'MaterialSet', [new F('Matnr', 'EQ', rc.Matnr), new F('Werks', 'EQ', werks), new F('Stlal', 'EQ', stlal)]),
         leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('mdRecetaId_mdRecetaId', 'EQ', r.mdRecetaId)], {}),
-        conRuta ? contextoRmd(ctrl, mdId).then((ctx) => revisarRuta(ctrl, rc, werks, ctx)).catch((e) => ({ error: e.message })) : Promise.resolve(null),
+        conRuta ? contextoRmd(ctrl, mdId).then((ctx) => revisarRuta(ctrl, rc, werks, ctx, versionesP)).catch((e) => ({ error: e.message })) : Promise.resolve(null),
+        versionesP.catch(() => null),
       ]);
-      const dif = diferenciasBom(bom, copia.filter((x) => x.activo !== false));
+      const dif = diferenciasBom(bom, copia.filter((x) => x.activo !== false)), textoCab = textoCabEtapa(etapa) ? difTextoCab(rc, versiones && versiones.find((v) => norm(v.Verid) === norm(rc.Verid))) : null;
       const rutaAvisa = !!(ruta && !ruta.error && (!ruta.existe || ruta.cambios.some((c) => c.avisa && !c.soloAnterior) || ruta.faltan.length || ruta.entran.length || ruta.salen.length));
       let ultima = null; bom.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
-      return { receta: `${rc.Matnr} / ${rc.Verid}`, codigo: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif, ruta, rutaAvisa, ultima };
+      return { receta: `${rc.Matnr} / ${rc.Verid}`, codigo: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), mdRecetaId: r.mdRecetaId, sap: bom.length, rmd: copia.length, dif, textoCab, ruta, rutaAvisa, ultima };
     })();
     p.catch(() => revisionesReceta.delete(r.mdRecetaId)); revisionesReceta.set(r.mdRecetaId, { t: Date.now(), clave, p }); return p;
   }
@@ -6840,8 +6859,8 @@
   async function revisarRecetasDe(ctrl, asoc, forzar, filas, avance) {
     const recetas = recetasActivas(filas || (asoc.aReceta && asoc.aReceta.results));
     const werks = asoc.sucursalId && asoc.sucursalId.codigo; if (forzar) contextosRmd.delete(asoc.mdId);
-    const out = await enParalelo(recetas, RECETAS_PARALELO, (r) => revisarReceta(ctrl, r, werks, asoc.mdId, forzar), avance);
-    return { codigo: asoc.codigo, recetas: out, desactualizadas: out.filter((x) => x.dif.length), conRuta: out.filter((x) => x.rutaAvisa) };
+    const out = await enParalelo(recetas, RECETAS_PARALELO, (r) => revisarReceta(ctrl, r, werks, asoc.mdId, forzar, asoc.nivelTxt), avance);
+    return { codigo: asoc.codigo, recetas: out, desactualizadas: out.filter((x) => x.dif.length || x.textoCab), conRuta: out.filter((x) => x.rutaAvisa) };
   }
   const recetasDelRmd = (ctrl, asoc, forzar, filas, avance) => revisarRecetasDe(ctrl, asoc, forzar, filas, avance);
   const resumenDif = (dif) => { const c = (t) => dif.filter((d) => d.tipo === t).length, n = c('nuevo'), m = c('cambia'), q = c('quitado'), r = c('reemplazo');
@@ -6874,6 +6893,12 @@
           const qa = d.tipo === 'reemplazo' && d.antes && d.ahora && Math.abs(d.antes.q - d.ahora.q) < 1e-6 && d.antes.u === d.ahora.u ? `${q(d.ahora)} <span class="rmd-nota">(igual)</span>` : q(d.ahora);
           return `<tr class="rmd-rec-${d.tipo}"><td><span class="rmd-rec-marca" title="${{ nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Ya no está en SAP', reemplazo: 'Reemplazado por otra versión del material' }[d.tipo]}">${{ nuevo: '+', cambia: '≠', quitado: '−', reemplazo: '⇄' }[d.tipo]}</span></td><td>${comp}</td><td>${desc}</td><td>${q(d.antes)}</td><td>${qa}${delta ? ` <span class="rmd-rec-delta">(${delta > 0 ? '+' : ''}${numTxt(delta)})</span>` : ''}</td><td class="rmd-rec-cuando">${d.fecha ? `${esc(fechaCorta(d.fecha))}${d.cambio ? `<br><span class="rmd-nota">n.º ${esc(d.cambio)}</span>` : ''}` : `<span class="rmd-nota" title="${d.tipo === 'quitado' ? 'Ya no está en la lista de SAP: SAP no devuelve la fecha en que se quitó (mira el último cambio de la lista, arriba)' : 'Sin fecha en SAP'}">—</span>`}</td></tr>`; }).join('')}</tbody></table>`;
     }
+    if (x.textoCab) {
+      const tx = (t) => (t ? esc(t) : '<span class="rmd-nota">(sin texto)</span>');
+      h += `<div class="rmd-rec-sub">Texto de la lista de materiales · cambió en SAP</div>
+        <table class="rmd-rec-tabla rmd-rec-txt"><thead><tr><th>En el RMD</th><th>En SAP hoy</th></tr></thead><tbody><tr class="rmd-rec-cambia"><td>${tx(x.textoCab.antes)}</td><td>${tx(x.textoCab.ahora)}</td></tr></tbody></table>
+        <p class="rmd-rec-linea rmd-nota">Es la nota que el PDF del RMD imprime bajo los insumos (Fabricación y Recubrimiento; en Acondicionado y Envase no se revisa). SAP no informa la fecha de este cambio. Se trae al volver a asociar la receta («Actualizar» no lo cambia).</p>`;
+    }
     const ru = x.ruta;
     if (ru && ru.error) h += `<div class="rmd-rec-sub">Hoja de ruta: no se pudo leer (${esc(ru.error)})</div>`;
     else if (ru && x.rutaAvisa) {
@@ -6904,13 +6929,13 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && detalleAbierto) { e.stopPropagation(); e.preventDefault(); cerrarDetalleRecetas(); } }, true);
   // Ícono ⚠ junto al código de la receta
   function pintarIconosRecetas(lista, r) {
-    const porId = new Map((r ? r.recetas : []).filter((x) => x.dif.length || x.rutaAvisa).map((x) => [x.mdRecetaId, x]));
+    const porId = new Map((r ? r.recetas : []).filter((x) => x.dif.length || x.textoCab || x.rutaAvisa).map((x) => [x.mdRecetaId, x]));
     lista.getItems().forEach((it) => {
       const c = it.getBindingContext('listMdReceta'), o = c && c.getObject(), x = o && porId.get(o.mdRecetaId);
       const celda = it.getCells()[0], dom = celda && celda.getDomRef(); if (!dom) return;
       let ic = dom.parentElement.querySelector('.rmd-rec-icono');
       if (!x) { if (ic) ic.remove(); return; }
-      const n = x.dif.length + (x.rutaAvisa ? 1 : 0), tit = [x.dif.length && `Lista de materiales: ${resumenDif(x.dif)}`, x.rutaAvisa && 'Hoja de ruta / puesto de trabajo distinto en SAP'].filter(Boolean).join(' · ');
+      const n = x.dif.length + (x.textoCab ? 1 : 0) + (x.rutaAvisa ? 1 : 0), tit = [(x.dif.length || x.textoCab) && `Lista de materiales: ${resumenLista(x)}`, x.rutaAvisa && 'Hoja de ruta / puesto de trabajo distinto en SAP'].filter(Boolean).join(' · ');
       if (!ic) {
         ic = document.createElement('button'); ic.type = 'button'; ic.className = 'rmd-rec-icono'; dom.insertAdjacentElement('afterend', ic);
         ['pointerdown', 'mousedown', 'touchstart'].forEach((ev) => ic.addEventListener(ev, (e) => e.stopPropagation()));
@@ -6941,7 +6966,7 @@
           toast(hay ? `${r.desactualizadas.length} receta(s) con la lista de materiales cambiada${on('recetaruta') ? ` y ${r.conRuta.length} con la hoja de ruta distinta` : ''} en SAP: mira el ⚠ junto al código.` : `✓ Las ${r.recetas.length} receta(s) asociadas coinciden con SAP${on('recetaruta') ? ' (lista de materiales y hoja de ruta)' : ''}.`, hay > 0);
         } catch (e) { toast('No se pudieron revisar las recetas: ' + e.message, true); } finally { b.disabled = false; if (rotulo) rotulo.textContent = 'Revisar recetas'; }
       });
-      b.title = 'Compara con SAP la lista de materiales copiada al asociar cada receta' + (on('recetaruta') ? ' y su hoja de ruta / puesto de trabajo' : '') + ' (solo avisa; no cambia nada ni impide autorizar).';
+      b.title = 'Compara con SAP la lista de materiales copiada al asociar cada receta (componentes y su texto)' + (on('recetaruta') ? ' y su hoja de ruta / puesto de trabajo' : '') + ' (solo avisa; no cambia nada ni impide autorizar).';
       const ref = barra.querySelector('.sapMTBSpacer'); if (ref) ref.insertAdjacentElement('afterend', b); else barra.appendChild(b);
     }
     const firma = asoc.mdId + '|' + (on('recetaruta') ? 'r' : 'b') + '|' + filas.map((x) => x.mdRecetaId).sort().join(',');
@@ -6969,7 +6994,7 @@
     const recs = await leerTodoDe(ctrl.getView().getModel('mainModelv2'), 'MD_RECETA', [new Filtro('mdId_mdId', 'EQ', md.mdId)], { $expand: 'recetaId' });
     const suc = await leerTodoDe(ctrl.getView().getModel('mainModelv2'), 'MD', [new Filtro('mdId', 'EQ', md.mdId)], { $expand: 'sucursalId', $select: 'mdId,sucursalId/codigo' });
     const antes = opc.recetaruta; if (conRuta != null) opc.recetaruta = !!conRuta;
-    try { return await revisarRecetasDe(ctrl, { mdId: md.mdId, codigo, aReceta: { results: recs }, sucursalId: suc[0] && suc[0].sucursalId }, true); } finally { opc.recetaruta = antes; }
+    try { return await revisarRecetasDe(ctrl, { mdId: md.mdId, codigo, nivelTxt: md.nivelTxt, aReceta: { results: recs }, sucursalId: suc[0] && suc[0].sucursalId }, true); } finally { opc.recetaruta = antes; }
   };
   window.__rmdStats.diferenciasBom = diferenciasBom; window.__rmdStats.detalleRecetaHtml = detalleRecetaHtml; window.__rmdStats.contextoRmd = (mdId) => contextoRmd(controladorPrincipal(), mdId).then((c) => ({ puestos: [...c.puestos.entries()], anterior: c.anterior }));   // pruebas
 
@@ -7570,8 +7595,8 @@
         decimales: d.decimales, tipoLapsoId_motivoLapsoId: d.tipoLapsoId_motivoLapsoId, tipoCondicionId_iMaestraId: d.tipoCondicionId_iMaestraId };
       await modeloEscribir(modelo, 'create', '/PASO', nuevo); pasoId = nuevo.pasoId;
     }
-    if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId }); await terminosConCodigo(modelo, true, c.mdEstructuraPasoInsumoPasoId, codigo); }
-    else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId }); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
+    if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() }); await terminosConCodigo(modelo, true, c.mdEstructuraPasoInsumoPasoId, codigo); }
+    else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() }); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
     // mismos refrescos que el portal
     await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
     const etq = b.getView().getModel('headerAddEtiqueta');
@@ -8527,8 +8552,9 @@
     if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) throw new Error('el RMD está autorizado o suspendido');
     sap.ui.core.BusyIndicator.show(0);
     try {
-      if (origen.tipo === 'menor') await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${origen.id}')`, { pasoHijoId_pasoId: nuevo.pasoId });
-      else await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId });
+      const firma = { usuarioActualiza: codigoUsuario(b), fechaActualiza: new Date() };
+      if (origen.tipo === 'menor') await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${origen.id}')`, { pasoHijoId_pasoId: nuevo.pasoId, ...firma });
+      else await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId, ...firma });
       await terminosConCodigo(modelo, origen.tipo === 'menor', origen.id, nuevo.codigo);
       await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
       const d = dialogos().filter((x) => controladorPasos(x)).pop(), M = d && controladorPasos(d);
@@ -9647,14 +9673,14 @@
         dif = diferenciasBom(sap, rsDeCompacta(copia)); nSap = sap.length;
         sap.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
       }
-      let ruta = null, rutaAvisa = false;
-      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { ruta = rsRuta(rc, versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; }
-      if (!dif.length && !rutaAvisa) return;
+      let ruta = null, rutaAvisa = false, textoCab = null;
+      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { const hoyV = versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null; ruta = rsRuta(rc, hoyV); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; textoCab = textoCabEtapa(md.etapa) ? difTextoCab(rc, hoyV) : null; }
+      if (!dif.length && !textoCab && !rutaAvisa) return;
       const fechas = dif.map((d) => d.fecha).filter(Boolean), fechaSap = fechas.length ? new Date(Math.max(...fechas.map((f) => +f))) : dif.length && ultima ? ultima.fecha : null;
-      const huella = rsHash(dif.map((d) => [d.tipo, d.comp, d.compAntes || '', d.antes ? d.antes.q + d.antes.u : '', d.ahora ? d.ahora.q + d.ahora.u : ''].join(':')).join(';') + '#' + (ruta ? (ruta.existe ? '' : 'X') + ruta.cambios.map((c) => c.clave + c.sap).join(',') : ''));
+      const huella = rsHash(dif.map((d) => [d.tipo, d.comp, d.compAntes || '', d.antes ? d.antes.q + d.antes.u : '', d.ahora ? d.ahora.q + d.ahora.u : ''].join(':')).join(';') + '#' + (ruta ? (ruta.existe ? '' : 'X') + ruta.cambios.map((c) => c.clave + c.sap).join(',') : '') + (textoCab ? '#t' + rsHash(textoCab.ahora) : ''));
       out.push({ mdRecetaId: r.mdRecetaId, mdId: md.mdId, codigo: md.codigo, version: md.version, estado: md.estado, linaje: md.linaje, descripcion: md.descripcion, etapa: md.etapa, area: md.area, planta: md.planta,
-        receta: `${norm(rc.Matnr)} / ${norm(rc.Verid)}`, matnr: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), sap: nSap, rmd: copia ? copia.length : 0, dif, ruta, rutaAvisa, ultima,
-        tipos: [dif.length && 'lista', rutaAvisa && 'ruta'].filter(Boolean), fechaSap, huella });
+        receta: `${norm(rc.Matnr)} / ${norm(rc.Verid)}`, matnr: norm(rc.Matnr), verid: norm(rc.Verid), texto: norm(rc.Text1 || ''), sap: nSap, rmd: copia ? copia.length : 0, dif, textoCab, ruta, rutaAvisa, ultima,
+        tipos: [(dif.length || textoCab) && 'lista', rutaAvisa && 'ruta'].filter(Boolean), fechaSap, huella });
     });
     return out;
   }
@@ -9674,7 +9700,7 @@
       const objetivo = todos.filter((m) => (opciones.codigos ? opciones.codigos.includes(m.codigo) : alcance !== 'ingresados' || m.estado === 'Ingresado')), porMd = new Map(objetivo.map((m) => [m.mdId, m]));
       avanza(`Leyendo las recetas de ${objetivo.length} RMD…`);
       const recs = (await leerPorIds(modelo, 'MD_RECETA', 'mdId_mdId', objetivo.map((m) => m.mdId), { $expand: 'recetaId',
-        $select: 'mdRecetaId,mdId_mdId,activo,recetaId/Matnr,recetaId/Werks,recetaId/Verid,recetaId/Stlal,recetaId/Mdv01,recetaId/Plnnr,recetaId/Alnal,recetaId/Text1' }, null,
+        $select: 'mdRecetaId,mdId_mdId,activo,recetaId/Matnr,recetaId/Werks,recetaId/Verid,recetaId/Stlal,recetaId/Mdv01,recetaId/Plnnr,recetaId/Alnal,recetaId/Text1,recetaId/TextoCab' }, null,
         (h, n) => avanza(`Leyendo las recetas de los RMD (${h} de ${n})…`))).filter((r) => r.activo !== false && r.recetaId && r.recetaId.Matnr && !isNaN(parseInt(r.recetaId.Stlal, 10)));
       // listas pendientes o vencidas, las más atrasadas primero (Ingresados antes)
       const info = new Map();                                                 // triple -> { edad, ttl, ing }
@@ -9763,7 +9789,7 @@
       .sort((a, b) => (+(b.fechaSap || 0) - +(a.fechaSap || 0)) || b.detectado - a.detectado || String(b.codigo).localeCompare(String(a.codigo)));
   }
   const rsTipoTxt = (tipos) => [...tipos].map((t) => (t === 'lista' ? 'Lista de materiales' : 'Hoja de ruta')).join(' + ');
-  const rsResumenReceta = (h) => [h.dif.length && `Lista de materiales: ${resumenDif(h.dif)}`, h.rutaAvisa && `Hoja de ruta: ${rsResumenRuta(h.ruta)}`].filter(Boolean).join(' · ');
+  const rsResumenReceta = (h) => [(h.dif.length || h.textoCab) && `Lista de materiales: ${resumenLista(h)}`, h.rutaAvisa && `Hoja de ruta: ${rsResumenRuta(h.ruta)}`].filter(Boolean).join(' · ');
   const rsFechaSap = (d) => (d instanceof Date && !isNaN(d) ? fechaCorta(d) : '');
   const rsCuando = (ms) => (ms ? fechaHoraCorta(ms) : '');
   const rsMarca = { nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Quitado en SAP', reemplazo: 'Reemplazado por otra versión del material' };
@@ -9814,7 +9840,7 @@
     tarjeta.classList.add('rmd-cr'); RS.ventana = v;
     const cerrarOrig = v.cerrar; v.cerrar = () => { RS.ventana = null; cerrarOrig(); };
     v.cuerpo.innerHTML = `<p class="rmd-cr-intro">RMD <b>Ingresados y Autorizados</b> cuya receta cambió en SAP después de asociarla: hay que retirarla y volver a asociarla para traer lo nuevo. Es solo un aviso: no impide autorizar.
-      SAP informa la <b>fecha</b> de cada cambio de la lista de materiales; la <b>hora</b> es la de la revisión que lo detectó.</p>
+      SAP informa la <b>fecha</b> de cada cambio de componentes de la lista de materiales (no la del texto de la lista ni la de la hoja de ruta); la <b>hora</b> es la de la revisión que lo detectó.</p>
       <div class="rmd-cr-barra"><div class="rmd-cr-chips" role="tablist"></div><input type="search" class="rmd-cr-buscar" placeholder="Buscar por código, descripción, receta o componente"></div>
       <p class="rmd-progreso rmd-cr-estado"></p><div class="rmd-cr-tabla"></div>`;
     const q = (s) => v.cuerpo.querySelector(s), chips = q('.rmd-cr-chips'), buscar = q('.rmd-cr-buscar'), estado = q('.rmd-cr-estado'), tabla = q('.rmd-cr-tabla');
@@ -9822,7 +9848,7 @@
     const filtrados = () => rsGrupos().filter((g) => {
       if (filtro === 'Ingresado' || filtro === 'Autorizado') { if (g.estado !== filtro) return false; } else if (filtro === 'lista' || filtro === 'ruta') { if (!g.tipos.has(filtro)) return false; }
       if (!consulta) return true;
-      const t = norma([g.codigo, g.descripcion, g.etapa, g.planta, ...g.recetas.flatMap((h) => [h.receta, h.texto, ...h.dif.flatMap((d) => [d.comp, d.desc, d.compAntes, d.descAntes])])].join(' '));
+      const t = norma([g.codigo, g.descripcion, g.etapa, g.planta, ...g.recetas.flatMap((h) => [h.receta, h.texto, h.textoCab && h.textoCab.ahora, h.textoCab && h.textoCab.antes, ...h.dif.flatMap((d) => [d.comp, d.desc, d.compAntes, d.descAntes])])].join(' '));
       return consulta.split(/\s+/).every((p) => t.includes(p));
     });
     const bObs = botonModal('Agregar observación', 'peligro', () => agregarObservacion()), bX = botonModal('Exportar Excel', '', () => exportarCambiosRecetas()),
@@ -9857,7 +9883,7 @@
           <td class="rmd-nowrap">${esc(g.estado)}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-nowrap">${esc(h.receta)}</span>`).join('<br>')}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-cr-tag ${h.tipos.length > 1 ? 'dos' : h.tipos[0]}">${esc(rsTipoTxt(h.tipos))}</span> ${esc(rsResumenReceta(h))}`).join('<br>')}</td>
-          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio de la hoja de ruta">—</span>'}</td>
+          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio del texto de la lista ni de la hoja de ruta">—</span>'}</td>
           <td class="rmd-nowrap">${esc(rsCuando(g.detectado))}</td>
           <td class="rmd-cr-obs">${r ? esc(r) : g.obs ? `<span title="${esc(g.obs.linea)}">✓ ${esc(fechaHoraCorta(g.obs.t).slice(0, 10))}</span>` : ini ? `<input type="text" class="rmd-cr-obs-in" data-a="obs" value="${esc(editadas.has(g.mdId) ? editadas.get(g.mdId) : linea)}" title="Puedes editar el texto antes de agregarlo" aria-label="Observación de ${esc(g.codigo)}">` : ''}</td>
           <td class="rmd-nowrap"><button type="button" class="rmd-link" data-a="ver">${abierto ? 'Ocultar' : 'Ver detalle'}</button> · <button type="button" class="rmd-link" data-a="abrir" title="Abrir «Asociar fórmulas» de este RMD">Abrir</button></td></tr>
@@ -9933,20 +9959,21 @@
     hs.forEach((h) => {
       h.dif.forEach((x) => dif.push([h.codigo, h.version, h.estado, h.receta, 'Lista de materiales', rsMarca[x.tipo], x.tipo === 'reemplazo' ? `${x.compAntes} → ${x.comp}` : x.comp, x.desc + (x.tipo === 'reemplazo' && x.descAntes ? ` (antes: ${x.descAntes})` : ''),
         x.antes ? `${numTxt(x.antes.q)} ${x.antes.u}`.trim() : '', x.ahora ? `${numTxt(x.ahora.q)} ${x.ahora.u}`.trim() : '', x.fecha instanceof Date ? new Date(Date.UTC(x.fecha.getUTCFullYear(), x.fecha.getUTCMonth(), x.fecha.getUTCDate())) : '', x.cambio || '']));
+      if (h.textoCab) dif.push([h.codigo, h.version, h.estado, h.receta, 'Lista de materiales', 'Texto de la lista cambiado en SAP', 'Texto de la lista', 'Nota que el PDF imprime bajo los insumos (Fabricación y Recubrimiento)', h.textoCab.antes || '(sin texto)', h.textoCab.ahora || '(sin texto)', '', '']);
       if (h.rutaAvisa) {
         if (!h.ruta.existe) dif.push([h.codigo, h.version, h.estado, h.receta, 'Hoja de ruta', 'La versión de fabricación ya no existe en SAP', '', '', '', '', '', '']);
         h.ruta.cambios.forEach((c) => dif.push([h.codigo, h.version, h.estado, h.receta, 'Hoja de ruta', c.campo, '', '', c.asociada || '', c.sap || '', '', '']));
       }
     });
     tabla('Diferencias', 'DiferenciasRecetas', ['Código RMD', 'Versión', 'Estado', 'Receta', 'Tipo', 'Diferencia', 'Componente / dato', 'Descripción', 'En el RMD', 'En SAP hoy', 'Fecha en SAP', 'N.º de cambio'],
-      [13, 9, 12, 18, 18, 34, 24, 52, 16, 16, 13, 16], dif, { 10: 'fecha', 7: 'envuelto' });
+      [13, 9, 12, 18, 18, 34, 24, 52, 30, 30, 13, 16], dif, { 10: 'fecha', 7: 'envuelto', 8: 'envuelto', 9: 'envuelto' });
     const hI = libro.hoja('Información', { cols: [[1, 1, 34], [2, 2, 100]]});
     hI.poner('A1', 'Recetas con cambios en SAP (RMD Ingresados y Autorizados)', 'titulo');
     [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())}`],
       ['Última revisión de SAP', `Ingresados ${d.ultima.ing ? fechaHoraCorta(d.ultima.ing) : 'sin revisar'} · Autorizados ${d.ultima.aut ? fechaHoraCorta(d.ultima.aut) : 'sin revisar'}`],
       ['Listas de materiales revisadas', d.cobertura ? `${d.cobertura.alDia} de ${d.cobertura.listas} al día${d.cobertura.alDia < d.cobertura.listas ? ' (el resto se revisa solo, en segundo plano: este Excel puede estar incompleto)' : ''}` : 'sin revisar'],
       ['RMD con cambios', new Set(hs.map((h) => h.mdId)).size], ['Recetas con cambios', hs.length],
-      ['Qué compara', 'La lista de materiales y los datos de la versión de fabricación (puesto de trabajo, hoja de ruta, contador y alternativa) copiados en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
+      ['Qué compara', 'La lista de materiales (componentes, cantidades y, salvo en Acondicionado y Envase, el texto de la lista que el PDF imprime bajo los insumos) y los datos de la versión de fabricación (puesto de trabajo, hoja de ruta, contador y alternativa) copiados en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
       ['Fecha y hora', 'SAP informa la fecha «válido desde» de cada componente, no la hora ni la fecha de la hoja de ruta. «Detectado el» es la fecha y hora de la revisión que vio la diferencia por primera vez.'],
       ['Cómo se corrige', 'En «Asociar fórmulas» del RMD: Eliminar Receta → Agregar Producto → asociarla de nuevo.']]
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
@@ -10174,18 +10201,21 @@
       if (x.cambios.length) x.cambios.forEach((c) => hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : 'Guardado', utc(x.ts), x.usuario, c.campo, c.antes, c.despues]));
       else hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : x.primero ? 'Primer guardado registrado' : 'Guardado sin cambios', utc(x.ts), x.usuario, '', '', '']);
     }));
-    tabla('Historial de versiones', 'HistorialVersiones', ['Código', 'Versión', 'Estado', 'Descripción', 'Etapa', 'Planta', 'Versión origen', 'Registrada', 'Usuario', 'Observaciones'], [14, 9, 16, 60, 18, 18, 14, 17, 18, 80], (e.versiones || []).map((v) => [v.codigo, v.version, v.estado, v.descripcion, v.etapa, v.planta, v.origen, utc(v.fecha), v.usuario, v.obs || '']), { 7: 'fechaHora', 9: 'envuelto' });
+    tabla('Historia del producto', 'HistoriaProducto', ['Código', 'Versión', 'Estado', 'Descripción', 'Etapa', 'Planta', 'Versión origen', 'Registrada', 'Usuario', 'Observaciones'], [14, 9, 16, 60, 18, 18, 14, 17, 18, 80], (e.versiones || []).map((v) => [v.codigo, v.version, v.estado, v.descripcion, v.etapa, v.planta, v.origen, utc(v.fecha), v.usuario, v.obs || '']), { 7: 'fechaHora', 9: 'envuelto' });
     tabla('Diferencia entre versiones', 'CambiosEntreVersiones', ['Sección', 'Elemento', 'Cambio', 'Campo', 'Antes', 'Después', 'Solo cambia el orden', 'Usuario de la fila', 'Fecha de la fila', 'Usuario de la fila es de'],
-      [16, 70, 13, 22, 34, 34, 12, 16, 17, 22], cambios.map((c) => [c.seccion, c.elemento, c.tipo, c.campo, c.antes, c.despues, c.soloOrden ? 'Sí' : '', c.quien, utc(c.cuando), c.tipo === 'Quitado' ? '' : c.alAutorizar ? 'el registro al autorizar (no necesariamente quien editó)' : c.modificado ? 'la última modificación' : 'el registro']), { 1: 'envuelto', 4: 'envuelto', 5: 'envuelto', 8: 'fechaHora' }, { activa: true });
+      [16, 70, 13, 22, 34, 34, 12, 16, 17, 22], cambios.map((c) => [c.seccion, c.elemento, c.tipo, c.campo, c.antes, c.despues, c.soloOrden ? 'Sí' : '', c.quien, utc(c.cuando), c.tipo === 'Quitado' ? (c.quitadoPor ? (c.porCambioDePaso ? 'quien cambió el paso de la fila' : 'quien lo quitó') : '') : c.alAutorizar ? 'el registro al autorizar (no necesariamente quien editó)' : c.modificado ? 'la última modificación' : 'el registro'])
+        .concat((e.revertidos || []).map((f) => [f[0], f[1], f[2], f[3], f[4], f[5], '', f[6], utc(f[7]), 'quien hizo ese cambio'])), { 1: 'envuelto', 4: 'envuelto', 5: 'envuelto', 8: 'fechaHora' }, { activa: true });
     tabla('Historial post autorización', 'HistorialGuardados', ['Fila', 'Evento', 'Fecha y hora', 'Usuario', 'Campo', 'Antes', 'Después'], [70, 24, 17, 16, 30, 40, 40], hist, { 0: 'envuelto', 2: 'fechaHora', 5: 'envuelto', 6: 'envuelto' });
     tabla('Estados', 'EstadosRmd', ['Estado', 'Registrado', 'Usuario'], [30, 20, 18], (e.estados || []).map((x) => [x[0], x[1], x[2]]));
     const hI = libro.hoja('Información', { cols: [[1, 1, 34], [2, 2, 110]] });
     hI.poner('A1', `Trazabilidad del RMD ${e.codigo} — ${e.descripcion || ''}`, 'titulo');
     [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())}`],
-      ['Historial de versiones', 'Las versiones relacionadas del RMD (mismo código principal). «Versión origen» es la versión anterior no cancelada, de la que se creó cada una.'],
+      ['Historia del producto', 'Las versiones relacionadas del RMD (mismo código principal), de la última a la primera y sin las canceladas. «Versión origen» es la versión anterior no cancelada, de la que se creó cada una.'],
       ['Versiones comparadas', e.comparacion || 'no se comparó ninguna'], ['Diferencia entre versiones', `${cambios.length}${cambios.some((c) => c.soloOrden) ? ` (${cambios.filter((c) => c.soloOrden).length} solo cambian el orden, por ejemplo por un paso agregado antes)` : ''}`],
       ['Historial post autorización', e.post ? `${e.post.length} línea${e.post.length === 1 ? '' : 's'}` : (e.historial || []).length ? `${e.historial.length} filas` : 'no se abrió la pestaña'],
       ['Entre versiones', 'Las versiones de un RMD son registros aparte. Se emparejan por estructura, etiqueta y código de paso (y por componente en insumos) y se comparan campo por campo. Un paso quitado y otro agregado en el mismo lugar y orden se muestra como «Reemplazado». Los procesos menores de un paso agregado, quitado o reemplazado van dentro de ese paso.'],
+      ['Cambió y volvió', 'Filas que terminaron igual que en la versión anterior, pero que se cambiaron mientras se editaba la versión nueva (sale de la auditoría): una línea por cambio con su usuario y fecha. Si la fila se quitó y se volvió a agregar, SAP no guarda con qué datos se agregó.'],
+      ['Quitados', 'Quién quitó cada elemento y cuándo sale de la auditoría: la copia de la versión al crearla y el guardado que dejó la fila inactiva.'],
       ['Usuario y fecha de la fila', 'Son los que el portal guarda en cada fila de la versión nueva (última modificación; si nunca se modificó, su registro). Al autorizar, el portal puede volver a crear las filas: entonces figura quien autorizó y no quien editó. Para saber quién cambió cada dato dentro de una versión usa el historial post autorización.'],
       ['Cómo se arma el historial post autorización', 'Las filas cambiadas después de autorizar salen de su fecha de registro y de última modificación; el detalle, de la auditoría del servicio: cada guardado con su usuario. El «antes» se calcula con los guardados anteriores de la misma fila. Las filas borradas del todo no se pueden buscar.']]
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
@@ -10482,7 +10512,7 @@
     esp: ['MD_ES_ESPECIFICACION', 'mdEstructuraEspecificacionId', ''], ins: ['MD_ES_RE_INSUMO', 'estructuraRecetaInsumoId', ''] };
   const TZ_POST_MARGEN = 120000;                                          // 2 min: el propio autorizar toca filas
   const TZ_POST_IGNORAR = /^(mdId_mdId|mdEstructuraId_mdEstructuraId|estructuraId_estructuraId|pasoId_mdEstructuraPasoId|mdRecetaId_mdRecetaId|estructuraRecetaInsumoId_estructuraRecetaInsumoId|mdEsEtiquetaId_mdEsEtiquetaId|imagenBase64|imagenRuta)$/;
-  const TZ_POST_TXT = { agregado: 'Agregado', quitado: 'Quitado', modificado: 'Modificado', reemplazado: 'Reemplazado', orden: 'Solo orden', igual: 'Guardado sin cambios' };
+  const TZ_POST_TXT = { agregado: 'Agregado', quitado: 'Quitado', modificado: 'Modificado', reemplazado: 'Reemplazado', orden: 'Solo orden', igual: 'Guardado sin cambios', revertido: 'Cambió y volvió' };
   const tzMs = (v) => (v ? +new Date(v) : 0);
   async function tzPostLeer(modelo, md) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, f = [new F('mdId_mdId', 'EQ', md.mdId)], out = {};
@@ -10538,7 +10568,7 @@
     const estrB = (idEstrA) => { const ea = nodosA.get(idEstrA); return ea && TB.estructuras.find((e) => e.estructuraId === ea.estructuraId); };
     const claveA = new Map(NA.pasos.map((x) => [x.id, x.key])), pasoBPorClave = new Map(NB.pasos.map((x) => [x.key, x.id]));
     cambios.filter((c) => c.tipo === 'Quitado' && c.idA).forEach((c) => {
-      const a = nodosA.get(c.idA); if (!a) return; const q = { ...copia(a), marca: 'quitado', numQ: TA.num.get(a.id) || '', difs: [c], quien: '', cuando: 0, aud: 'listo' };
+      const a = nodosA.get(c.idA); if (!a) return; const q = { ...copia(a), marca: 'quitado', numQ: TA.num.get(a.id) || '', difs: [c], quien: c.quien || '', cuando: c.cuando ? tzMs(c.cuando) : 0, aud: 'listo' };
       if (a.ent === 'paso') {
         const ta = a.etqNodo && nodosA.get(a.etqNodo), e = estrB(a.estrNodo); if (!e) return;
         const t = ta ? e.etiquetas.find((y) => y.etiquetaId === ta.etiquetaId) : null; if (ta && !t) return;   // va con su etiqueta quitada
@@ -10556,7 +10586,7 @@
     // recetas: sección propia al inicio
     const rec = cambios.filter((c) => c.seccion === 'Recetas').map((c, i) => ({ id: 'rec' + i, ent: 'rec', texto: `${c.elemento}${c.antes || c.despues ? ' — ' + (c.despues || c.antes) : ''}`, marca: c.tipo === 'Agregado' ? 'agregado' : c.tipo === 'Quitado' ? 'quitado' : 'modificado', difs: [c], aud: 'listo', quien: c.quien || '', cuando: c.cuando ? tzMs(c.cuando) : 0 }));
     if (rec.length) TB.estructuras.unshift({ id: 'recetas', ent: 'estr', nombre: 'RECETAS', marca: null, etiquetas: [], pasos: [], equipos: rec, espec: [], insumos: [] });
-    const items = tzPostNodos(TB).filter((x) => x.marca && !x.heredado), cuenta = { agregado: 0, quitado: 0, modificado: 0, reemplazado: 0, orden: 0, igual: 0 };
+    const items = tzPostNodos(TB).filter((x) => x.marca && !x.heredado), cuenta = { agregado: 0, quitado: 0, modificado: 0, reemplazado: 0, orden: 0, igual: 0, revertido: 0 };
     items.forEach((x) => { const c = tzPostClase(x); if (c in cuenta) cuenta[c]++; });
     return { arbol: TB, items, cuenta };
   }
@@ -10598,13 +10628,116 @@
       const pasos = new Map((await leerPorIds(modelo, 'PASO', 'pasoId', ids, { $select: 'pasoId,codigo,descripcion' }).catch(() => [])).map((p) => [p.pasoId, `${p.codigo} — ${ppLimpio(p.descripcion).slice(0, 90)}`]));
       items.forEach((x) => (x.entradas || []).forEach((y) => y.cambios.forEach((c) => { if (/^paso(Hijo)?Id_pasoId$/.test(c.k)) { c.antes = pasos.get(c.crudoAntes) || c.antes; c.despues = pasos.get(c.crudoDespues) || c.despues; } })));
     }
-    items.forEach((x) => { if (x.marca === 'modificado' && x.aud === 'listo') x.estado = !x.entradas.length ? 'igual' : x.entradas.every((y) => y.soloOrden) ? 'orden' : 'modificado'; });
+    // cambió y volvió: cada campo tocado termina como empezó (sin registro previo no se puede saber)
+    const neto = (x) => { const por = new Map(); x.entradas.forEach((y) => y.cambios.forEach((c) => { if (c.k === 'orden') return; const g = por.get(c.k); if (g) g.fin = c; else por.set(c.k, { ini: c, fin: c }); }));
+      return [...por.values()].some(({ ini, fin }) => ini.antes === '(sin registro previo)' || fmt(ini.k, ini.crudoAntes) !== fmt(fin.k, fin.crudoDespues)); };
+    items.forEach((x) => { if (x.marca === 'modificado' && x.aud === 'listo') x.estado = !x.entradas.length ? 'igual' : x.entradas.every((y) => y.soloOrden) ? 'orden' : neto(x) ? 'modificado' : 'revertido'; });
+  }
+  // ---- «Cambió y volvió» en la diferencia entre versiones ----
+  // Filas de la versión nueva iguales a la anterior pero guardadas después de crearla: su historia sale de AUDITORIA, partiendo de la fila de la
+  // versión anterior. Una fila quitada y vuelta a agregar no tiene registro de alta: de ella solo se conocen sus guardados.
+  const TZ_REV_CAMPOS = {
+    etq: ['conforme', 'procesoMenor'],
+    paso: ['pasoId_pasoId', 'tipoDatoId_iMaestraId', 'valorInicial', 'valorFinal', 'margen', 'decimales', 'depende', 'estadoCC', 'estadoMov', 'pmop', 'genpp', 'tab', 'edit', 'rpor', 'vb', 'formato', 'puestoTrabajo', 'clvModelo', 'automatico'],
+    pm: ['pasoHijoId_pasoId', 'tipoDatoId_iMaestraId', 'cantidadInsumo', 'valorInicial', 'valorFinal', 'margen', 'decimales', 'estadoCC', 'estadoMov', 'genpp', 'edit', 'tab', 'formato', 'Component', 'CompUnit'],
+    esp: ['especificacion', 'tipoDatoId_iMaestraId', 'valorInicial', 'valorFinal', 'margen', 'decimales'] };
+  const TZ_REV_TIPO = { valorInicial: 'n', valorFinal: 'n', margen: 'n', decimales: 'n', cantidadInsumo: 'n', estadoCC: 'b', estadoMov: 'b', pmop: 'b', genpp: 'b', tab: 'b', edit: 'b', rpor: 'b', vb: 'b', formato: 'b', automatico: 'b', conforme: 'b', procesoMenor: 'b' };
+  const TZ_REV_LISTA = { etq: 'etiquetas', paso: 'pasos', pm: 'pm', esp: 'espec' }, TZ_REV_PREF = { etq: 'e', paso: 'p', pm: 'm', esp: 's' };
+  const TZ_REV_COPIA = 600000;                                            // la copia de la versión tarda unos minutos
+  const tzEsPaso = (k) => /^paso(Hijo)?Id_pasoId$/.test(k);
+  function tzRevEntradas(eventos, base, campos, recreado) {
+    const estado = {}, visto = new Set(), out = [];
+    campos.forEach((k) => { estado[k] = base[k]; });
+    eventos.forEach((e) => {
+      const p = e.p || {}, cambios = [];
+      campos.forEach((k) => {
+        if (!Object.prototype.hasOwnProperty.call(p, k)) return;
+        const v = p[k], t = TZ_REV_TIPO[k] || 't', primero = recreado && !visto.has(k); visto.add(k);
+        if (primero && tzEsPaso(k)) cambios.push({ k, antes: undefined, despues: v, desconocido: true });   // con qué paso se volvió a agregar no quedó registrado
+        else if (tzNorm(estado[k], t) !== tzNorm(v, t)) cambios.push({ k, antes: estado[k], despues: v });
+        estado[k] = v;
+      });
+      if (cambios.length) out.push({ ts: e.ts, usuario: p.usuarioActualiza || p.usuarioRegistro || '', cambios });
+    });
+    out.forEach((y) => { if (y.usuario) return; const v = out.filter((z) => z.usuario && Math.abs(z.ts - y.ts) <= 60000).sort((a, b) => Math.abs(a.ts - y.ts) - Math.abs(b.ts - y.ts))[0]; if (v) y.usuario = v.usuario; });
+    return out;
+  }
+  // Quién quitó cada fila: el portal solo la deja inactiva y el servicio ya no la devuelve. Su copia está en el alta de la versión (AUDITORIA,
+  // MD_ESTRUCTURA CREATE con las filas anidadas: misma clave que en la versión anterior) y la baja en su guardado con activo = false.
+  async function tzBajasVersion(modelo, md, rA, rB, NB, cat) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, creada = tzMs(md.fechaRegistro), bajas = new Map();
+    const altas = await leerTodoDe(modelo, 'AUDITORIA', [new F('serviceName', 'EQ', 'CatalogService.MD_ESTRUCTURA'), new F('eventAction', 'EQ', 'CREATE'), new F('eventStatus', 'EQ', 'Success'),
+      new F({ filters: [new F('timestamp', 'GE', new Date(creada - 3600000)), new F('timestamp', 'LE', new Date(creada + 3 * 3600000))], and: true }), new F('value', 'Contains', md.mdId)], { $select: 'timestamp,value' });
+    const pasoDe = new Map(); [rA, rB].forEach((r) => { (r.paso || []).forEach((x) => { if (x.pasoId) pasoDe.set(x.pasoId_pasoId, x.pasoId); }); (r.pm || []).forEach((x) => { if (x.pasoHijoId) pasoDe.set(x.pasoHijoId_pasoId, x.pasoHijoId); }); });
+    const d = { etiquetas: [], pasos: [], pm: [], espec: [], insumos: [], recetas: [] }, vistos = new Set();
+    altas.forEach((f) => { let e; try { e = JSON.parse(f.value); } catch (x) { return; } if (!e || e.mdId_mdId !== md.mdId || vistos.has(e.mdEstructuraId)) return; vistos.add(e.mdEstructuraId);
+      (e.aEtiqueta || []).forEach((x) => d.etiquetas.push(x)); (e.aPaso || []).forEach((x) => d.pasos.push({ ...x, pasoId: pasoDe.get(x.pasoId_pasoId) || null }));
+      (e.aPasoInsumoPaso || []).forEach((x) => d.pm.push({ ...x, pasoHijoId: pasoDe.get(x.pasoHijoId_pasoId) || null })); (e.aEspecificacion || []).forEach((x) => d.espec.push(x)); });
+    if (!vistos.size) return bajas;
+    const N0 = tzNormalizar(md, d, cat), quitadas = [];
+    // baja: la copia ya no está; cambio: sigue, pero con otro paso (clave distinta)
+    Object.entries(TZ_REV_LISTA).forEach(([ent, l]) => { const vivos = new Map((NB[l] || []).map((y) => [y.id, y.key]));
+      (N0[l] || []).forEach((y) => { const kb = vivos.get(y.id); if (kb === undefined) quitadas.push({ ent, id: y.id, key: y.key, modo: 'baja' }); else if (kb !== y.key) quitadas.push({ ent, id: y.id, key: y.key, modo: 'cambio' }); }); });
+    const porEnt = new Map(), tandas = []; quitadas.forEach((q) => { (porEnt.get(q.ent) || porEnt.set(q.ent, []).get(q.ent)).push(q); });
+    porEnt.forEach((qs, ent) => { for (let i = 0; i < qs.length; i += 15) tandas.push([ent, qs.slice(i, i + 15)]); });
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(2, tandas.length) }, async () => {
+      while (i < tandas.length) {
+        const [ent, qs] = tandas[i++], [tabla, campoId] = TZ_POST_ENT[ent], filaB = new Map((rB[ent] || []).map((x) => [x[campoId], x]));
+        const filas = await leerTodoDe(modelo, 'AUDITORIA', [new F('serviceName', 'EQ', 'CatalogService.' + tabla), new F('eventStatus', 'EQ', 'Success'), new F('timestamp', 'GE', new Date(creada)),
+          new F({ filters: qs.map((q) => new F('value', 'Contains', q.id)), and: false })], { $select: 'timestamp,eventAction,value' }).catch(() => []);
+        qs.forEach((q) => { const evs = tzParsear(filas, campoId, q.id), ev = q.modo === 'baja' ? evs.filter((x) => x.p.activo === false).pop() : evs.find((x) => Object.keys(x.p).some(tzEsPaso)); if (!ev) return;
+          const vecino = evs.filter((x) => x.p.usuarioActualiza && Math.abs(x.ts - ev.ts) <= 60000).sort((a, b) => Math.abs(a.ts - ev.ts) - Math.abs(b.ts - ev.ts))[0];   // el cambio de paso del script no llevaba usuario
+          const cuando = tzMs(ev.p.fechaActualiza) || +ev.ts, fila = filaB.get(q.id), deFila = fila && fila.usuarioActualiza && Math.abs(tzMs(fila.fechaActualiza) - cuando) <= 120000 ? fila.usuarioActualiza : '';
+          bajas.set(`${TZ_REV_PREF[ent]}|${q.key}`, { quien: ev.p.usuarioActualiza || (vecino && vecino.p.usuarioActualiza) || deFila, cuando, cambio: q.modo === 'cambio' }); });
+      }
+    }));
+    return bajas;
+  }
+  async function tzRevertidos(modelo, dif, rA, rB, NA, NB, creada, fmt, avance, bajas) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, desde = creada + TZ_REV_COPIA, M = {};
+    Object.keys(TZ_REV_CAMPOS).forEach((ent) => { const id = TZ_POST_ENT[ent][1], filas = (r) => new Map((r[ent] || []).map((x) => [x[id], x]));
+      M[ent] = { a: filas(rA), b: filas(rB), clave: new Map((NB[TZ_REV_LISTA[ent]] || []).map((y) => [y.id, y.key])), idA: new Map((NA[TZ_REV_LISTA[ent]] || []).map((y) => [y.key, y.id])) }; });
+    const cands = [];
+    tzPostNodos(dif.arbol).forEach((x) => {
+      const m = M[x.ent]; if (!m || x.marca || x.heredado) return;
+      const r = m.b.get(x.id), k = m.clave.get(x.id), a = k && m.a.get(m.idA.get(k)); if (!r || !a) return;
+      const reg = tzMs(r.fechaRegistro); if (Math.max(reg, tzMs(r.fechaActualiza)) <= desde) return;   // no se guardó después de crear la versión
+      cands.push({ x, r, a, k, recreado: reg > desde });
+    });
+    const porEnt = new Map(), tandas = []; cands.forEach((c) => { (porEnt.get(c.x.ent) || porEnt.set(c.x.ent, []).get(c.x.ent)).push(c); });
+    porEnt.forEach((cs, ent) => { for (let i = 0; i < cs.length; i += 15) tandas.push([ent, cs.slice(i, i + 15)]); });
+    let i = 0, hechas = 0; avance(0, tandas.length);
+    await Promise.all(Array.from({ length: Math.min(2, tandas.length) }, async () => {
+      while (i < tandas.length) {
+        const [ent, cs] = tandas[i++], [tabla, campoId] = TZ_POST_ENT[ent];
+        try {
+          const filas = await leerTodoDe(modelo, 'AUDITORIA', [new F('serviceName', 'EQ', 'CatalogService.' + tabla), new F('eventStatus', 'EQ', 'Success'), new F('timestamp', 'GE', new Date(creada)),
+            new F({ filters: cs.map((c) => new F('value', 'Contains', c.x.id)), and: false })], { $select: 'timestamp,eventAction,value' });
+          cs.forEach((c) => { c.entradas = tzRevEntradas(tzParsear(filas, campoId, c.x.id), c.a, TZ_REV_CAMPOS[ent], c.recreado); });
+        } catch (e) { cs.forEach((c) => { c.error = e.message; }); }
+        avance(++hechas, tandas.length);
+      }
+    }));
+    const revs = cands.filter((c) => c.entradas && c.entradas.length);
+    const ids = [...new Set(revs.flatMap((c) => c.entradas.flatMap((y) => y.cambios.filter((z) => tzEsPaso(z.k)).flatMap((z) => [z.antes, z.despues]))).filter(Boolean))];
+    const pasos = ids.length ? new Map((await leerPorIds(modelo, 'PASO', 'pasoId', ids, { $select: 'pasoId,codigo,descripcion' }).catch(() => [])).map((x) => [x.pasoId, `${x.codigo} — ${ppLimpio(x.descripcion).slice(0, 90)}`])) : new Map();
+    const txt = (k, v) => (tzEsPaso(k) ? pasos.get(v) || (v ? String(v) : '(vacío)') : TZ_REV_TIPO[k] === 'b' ? tzNorm(v, 'b') : TZ_REV_TIPO[k] === 'n' ? tzNum(v) || '(vacío)' : fmt(k, v) || '(vacío)');
+    revs.forEach((c) => {
+      c.entradas.forEach((y) => { if (!y.usuario && c.r.usuarioActualiza && Math.abs(tzMs(c.r.fechaActualiza) - y.ts) <= 120000) y.usuario = c.r.usuarioActualiza; });
+      c.entradas.forEach((y) => y.cambios.forEach((z) => { z.campo = z.k === 'pasoHijoId_pasoId' ? 'Paso del proceso menor' : z.k === 'pasoId_pasoId' ? 'Paso' : TZ_ETIQUETA_CAMPO[z.k] || z.k; z.antes = z.desconocido ? 'otro (SAP no guardó cuál)' : txt(z.k, z.antes); z.despues = txt(z.k, z.despues); }));
+      const u = c.entradas[c.entradas.length - 1], bj = bajas && bajas.get(`${TZ_REV_PREF[c.x.ent]}|${c.k}`), conUsuario = c.entradas.filter((y) => y.usuario).pop();
+      Object.assign(c.x, { marca: 'revertido', entradas: c.entradas, recreado: c.recreado, alta: c.recreado ? { quien: c.r.usuarioRegistro || '', cuando: tzMs(c.r.fechaRegistro) } : null,
+        bajaAnterior: c.recreado && bj ? { quien: bj.quien, cuando: bj.cuando } : null, quien: u.usuario || (conUsuario && conUsuario.usuario) || '', cuando: +u.ts, aud: 'listo' });
+    });
+    dif.items = tzPostNodos(dif.arbol).filter((x) => x.marca && !x.heredado); dif.cuenta.revertido = revs.length;
+    return { candidatos: cands.length, revertidos: revs.length, errores: cands.filter((c) => c.error).length };
   }
   // Clase visible de un nodo: agregado / quitado / modificado / orden / igual / null
   const tzPostClase = (x) => (!x.marca ? null : x.marca === 'modificado' ? (x.estado || 'modificado') : x.marca);
   const tzPostVisible = (x, verOrden) => { const c = tzPostClase(x); return !!c && (verOrden || (c !== 'orden' && c !== 'igual')); };
   // ---- PDF del historial post autorización (pdfMake del portal): misma forma del RMD, con lo cambiado resaltado y su detalle debajo ----
-  const TZ_POST_PDF = { reemplazado: ['#0a6ed1', '#e8f1fb'], agregado: ['#256f3a', '#e5f4e8'], quitado: ['#aa0808', '#fbe6e6'], modificado: ['#a45500', '#fff3e0'], orden: ['#556b82', '#eef2f6'], igual: ['#556b82', '#eef2f6'] };
+  const TZ_POST_PDF = { revertido: ['#6b4fa3', '#f1ecfa'], reemplazado: ['#0a6ed1', '#e8f1fb'], agregado: ['#256f3a', '#e5f4e8'], quitado: ['#aa0808', '#fbe6e6'], modificado: ['#a45500', '#fff3e0'], orden: ['#556b82', '#eef2f6'], igual: ['#556b82', '#eef2f6'] };
   function tzPostPdfDoc(st, info, op) {
     const { verOrden, soloCambios } = op, A = st.arbol, sin = (t) => String(t == null ? '' : t).replace(/\s*→\s*/g, ' > ');
     const fecha = (t) => { const x = t ? new Date(t) : null, d = (n) => String(n).padStart(2, '0'); return x && !isNaN(x) ? `${d(x.getDate())}/${d(x.getMonth() + 1)}/${x.getFullYear()} ${d(x.getHours())}:${d(x.getMinutes())}` : ''; };
@@ -10625,7 +10758,7 @@
     cuerpo.push({ table: { widths: ['*', 150], body: [[{ stack: [{ text: 'HISTORIAL POST AUTORIZACIÓN', bold: true, fontSize: 12, color: '#ffffff' }, { text: `${info.codigo} — ${info.descripcion || ''}`, fontSize: 8.5, color: '#dbe9f8', margin: [0, 2, 0, 0] }], fillColor: AZUL, margin: [6, 6, 6, 6] },
       { stack: [{ text: info.version, bold: true, fontSize: 8.5, color: '#ffffff' }, { text: info.referencia, fontSize: 7, color: '#dbe9f8' }, { text: `Generado ${fecha(new Date())}`, fontSize: 7, color: '#dbe9f8' }], fillColor: AZUL, alignment: 'right', margin: [6, 6, 6, 6] }]] }, layout: 'noBorders', margin: [0, 0, 0, 8] });
     const k = st.cuenta;
-    cuerpo.push({ columns: [['modificado', k.modificado], ['agregado', k.agregado], ['quitado', k.quitado], ['orden', k.orden + k.igual]].map(([c, v]) => ({ text: [{ text: String(v) + ' ', bold: true, fontSize: 12, color: TZ_POST_PDF[c][0] }, { text: c === 'orden' ? 'solo orden / sin cambios' : `${TZ_POST_TXT[c].toLowerCase()}${v === 1 ? '' : 's'}`, fontSize: 8, color: '#32363a' }] })), margin: [2, 0, 0, 4] });
+    cuerpo.push({ columns: [['modificado', k.modificado], ['agregado', k.agregado], ['quitado', k.quitado], ['orden', k.orden + k.igual], ...(k.revertido ? [['revertido', k.revertido]] : [])].map(([c, v]) => ({ text: [{ text: String(v) + ' ', bold: true, fontSize: 12, color: TZ_POST_PDF[c][0] }, { text: c === 'orden' ? 'solo orden / sin cambios' : c === 'revertido' ? 'cambió y volvió' : `${TZ_POST_TXT[c].toLowerCase()}${v === 1 ? '' : 's'}`, fontSize: 8, color: '#32363a' }] })), margin: [2, 0, 0, 4] });
     cuerpo.push({ text: `${soloCambios ? 'Solo las secciones y pasos con cambios' : 'El RMD completo; lo cambiado está resaltado'}${verOrden ? '' : ' (sin los que solo cambian de orden)'}. Debajo de cada fila: fecha, usuario, campo, antes (tachado) y después.`, fontSize: 7, color: '#5b6b7b', margin: [2, 0, 0, 8] });
     let alguno = false;
     A.estructuras.forEach((e) => {
@@ -10651,14 +10784,14 @@
       footer: (p, t) => ({ columns: [{ text: `Historial post autorización · RMD ${info.codigo} · ${info.version}`, fontSize: 6.5, color: '#6a6d70', margin: [26, 8, 0, 0] }, { text: `Página ${p} de ${t}`, fontSize: 6.5, alignment: 'right', color: '#6a6d70', margin: [0, 8, 26, 0] }] }),
       info: { title: `Historial post autorización RMD ${info.codigo}` } };
   }
-  window.__rmdStats.tzPost = { dif: tzDifArbol, arbol: tzPostArbol, entradas: tzPostEntradas, pdf: tzPostPdfDoc, clase: tzPostClase };   // pruebas
+  window.__rmdStats.tzPost = { dif: tzDifArbol, arbol: tzPostArbol, entradas: tzPostEntradas, pdf: tzPostPdfDoc, clase: tzPostClase, revEntradas: tzRevEntradas };   // pruebas
   // ---- Panel en «Trazabilidad del RMD» ----
   function montarHistorial(d, codigo) {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) return;
     const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section') || d;
     const raiz = document.createElement('div'); raiz.className = 'rmd-tz est'; raiz.dataset.codigo = codigo; cont.insertBefore(raiz, cont.firstChild); d.__rmdTz = raiz; raiz.dataset.titulo = tzTituloDe(d).replace(/^Trazabilidad del RMD:\s*/i, '');
     d.classList.add('rmd-tz-dlg');
-    raiz.innerHTML = `<div class="rmd-tz-barra"><div class="rmd-cr-chips" role="tablist"><button type="button" role="tab" data-t="est" class="activo" aria-selected="true">Trazabilidad</button><button type="button" role="tab" data-t="vers" aria-selected="false">Historial de versiones</button><button type="button" role="tab" data-t="ver" aria-selected="false">Diferencia entre versiones</button><button type="button" role="tab" data-t="his" aria-selected="false">Historial post autorización</button></div>
+    raiz.innerHTML = `<div class="rmd-tz-barra"><div class="rmd-cr-chips" role="tablist"><button type="button" role="tab" data-t="est" class="activo" aria-selected="true">Trazabilidad</button><button type="button" role="tab" data-t="vers" aria-selected="false">Historia del producto</button><button type="button" role="tab" data-t="ver" aria-selected="false">Diferencia entre versiones</button><button type="button" role="tab" data-t="his" aria-selected="false">Historial post autorización</button></div>
       <button type="button" class="rmd-btn rmd-tz-excel rmd-tz-pdf" title="PDF como la hoja de la plantilla: la versión nueva completa, con lo quitado tachado en rojo, lo nuevo en verde y lo modificado en ámbar (sin la cabecera)">Exportar PDF</button><button type="button" class="rmd-btn rmd-tz-excel" title="Excel con la comparación y el historial cargado">Exportar Excel</button></div><div class="rmd-tz-cuerpo"></div>`;
     ['pointerdown', 'mousedown', 'touchstart'].forEach((ev) => raiz.addEventListener(ev, (x) => x.stopPropagation()));
     const cuerpo = raiz.querySelector('.rmd-tz-cuerpo'), tabs = raiz.querySelector('.rmd-cr-chips');
@@ -10682,7 +10815,24 @@
         const [A, B, rA, rB] = await Promise.all([leerV(a), leerV(b), tzPostLeer(modelo, a), tzPostLeer(modelo, b)]);
         E.cambios = tzCompararVersiones(A, B); E.comparacion = `${nomVersion(a)} → ${nomVersion(b)}`;
         E.dif = tzDifArbol(tzPostArbol(rA, Infinity), tzPostArbol(rB, Infinity), A, B, E.cambios);
+        buscarRevertidos(E.dif, rA, rB, A, B, b);
       } catch (e) { E.error = 'No se pudo comparar: ' + e.message; E.cambios = null; E.dif = null; } finally { E.cargando = ''; pintar(); }
+    }
+    // «Cambió y volvió»: se busca en la auditoría después de comparar, sin esperar
+    async function buscarRevertidos(dif, rA, rB, A, B, b) {
+      E.rev = { fase: 'leyendo', progreso: 'Buscando quién quitó cada elemento…' };
+      try {
+        const bajas = await tzBajasVersion(modelo, b, rA, rB, B, E.cat).catch(() => new Map());
+        if (E.dif !== dif) return;
+        const claveA = new Map(); Object.entries(TZ_REV_LISTA).forEach(([ent, l]) => (A[l] || []).forEach((y) => claveA.set(y.id, `${TZ_REV_PREF[ent]}|${y.key}`)));
+        const quien = (id) => bajas.get(claveA.get(id));
+        (E.cambios || []).forEach((c) => { const q = c.tipo === 'Quitado' && c.idA && quien(c.idA); if (q) { c.quien = q.quien; c.cuando = q.cuando ? new Date(q.cuando) : null; c.quitadoPor = true; c.porCambioDePaso = !!q.cambio; } });
+        tzPostNodos(dif.arbol).forEach((x) => { const q = x.marca === 'quitado' && !x.heredado && quien(x.id); if (q) { x.quien = q.quien; x.cuando = q.cuando; x.porCambioDePaso = !!q.cambio; } });
+        if (E.tab === 'ver') pintar();
+        const r = await tzRevertidos(modelo, dif, rA, rB, A, B, tzMs(b.fechaRegistro), tzFormato(E.cat), (h, t) => { if (E.dif === dif && E.rev) { E.rev.progreso = h < t ? `Buscando cambios que volvieron a su valor… ${h} de ${t}` : ''; if (E.tab === 'ver') pintar(); } }, bajas);
+        if (E.dif === dif) E.rev = { fase: 'listo', ...r, quitadosConUsuario: [...bajas.keys()].length };
+      } catch (e) { if (E.dif === dif) E.rev = { fase: 'error', error: e.message }; }
+      if (E.dif === dif) { window.__rmdStats.tzRev = E.rev; if (E.tab === 'ver') pintar(); }
     }
     async function iniciar() {
       E.cargando = 'Leyendo las versiones del RMD…'; pintar();
@@ -10693,7 +10843,7 @@
       } catch (e) { E.error = 'No se pudo leer: ' + e.message; E.cargando = ''; pintar(); }
     }
     // ---- Historial post autorización ----
-    const cuentaPost = (P) => { P.cuenta = { modificado: 0, agregado: 0, quitado: 0, orden: 0, igual: 0 }; (P.items || []).forEach((x) => { const c = tzPostClase(x); if (c) P.cuenta[c]++; }); };
+    const cuentaPost = (P) => { P.cuenta = { modificado: 0, agregado: 0, quitado: 0, orden: 0, igual: 0, revertido: 0 }; (P.items || []).forEach((x) => { const c = tzPostClase(x); if (c) P.cuenta[c]++; }); };
     const statsPost = () => { const P = E.post || {}; window.__rmdStats.postAut = { fase: P.fase || null, items: P.items ? P.items.length : null, detalles: P.items ? P.items.filter((x) => x.aud === 'listo').length : 0, cuenta: P.cuenta || null, error: P.error || '' }; };
     const refPost = (P) => (P.autorizada ? `Autorizada el ${tzCuando(new Date(P.ref))}` : `Sin autorizar: cambios desde que se creó la versión (${tzCuando(new Date(P.creada))})`);
     async function iniciarPost() {
@@ -10719,12 +10869,18 @@
       if (x.aud !== 'listo') return base + (x.aud === 'error' ? `<p class="rmd-progreso error">No se pudo leer la auditoría: ${esc(x.error)}</p>` : '<p class="rmd-progreso rmd-espera-mini">Leyendo la auditoría…</p>');
       const es = x.entradas.filter((y) => E.paOrden || !y.soloOrden);
       if (!es.length) return base + (x.marca === 'modificado' ? `<p class="rmd-nota">${x.entradas.length ? 'Solo cambió el orden, por un paso agregado o quitado antes.' : 'Se guardó sin cambiar ningún dato.'}</p>` : '');
-      return base + `<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${es.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${esc(y.usuario || 'portal')}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
+      return base + (x.estado === 'revertido' ? '<p class="rmd-nota">Terminó igual que como estaba al autorizar.</p>' : '') + `<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${es.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${esc(y.usuario || 'portal')}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
+    }
+    const quienCuando = (q, c) => `${q ? esc(q) : 'sin usuario registrado'}${c ? ', ' + esc(tzCuando(new Date(c))) : ''}`;
+    function htmlRevertido(x) {
+      const alta = x.recreado ? `<p class="rmd-nota">Esta fila se volvió a agregar (${quienCuando(x.alta && x.alta.quien, x.alta && x.alta.cuando)})${x.bajaAnterior ? `; la que venía de la versión anterior se quitó (${quienCuando(x.bajaAnterior.quien, x.bajaAnterior.cuando)})` : ''}. SAP no guarda con qué datos se agregó: lo que sigue sale de sus guardados.</p>` : '';
+      return `<p class="rmd-nota">Quedó igual que en la versión anterior, pero cambió mientras se editaba esta versión:</p>${alta}<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${x.entradas.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${y.usuario ? esc(y.usuario) : '<span class="rmd-nota">sin usuario registrado</span>'}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
     }
     function htmlDetalleDif(x) {
+      if (x.marca === 'revertido') return htmlRevertido(x);
       const es = (x.difs || []).filter((c) => E.paOrden || !c.soloOrden), fila = x.quien ? ` Usuario y fecha de la fila: ${esc(x.quien)}${x.cuando ? ', ' + esc(tzCuando(new Date(x.cuando))) : ''}${x.alAutorizar ? ' (al autorizar: no necesariamente quien editó)' : ''}.` : '';
       if (x.marca === 'agregado') return `<p class="rmd-nota">Nuevo en esta versión${x.heredado ? ', con su paso' : ''}.${fila}</p>`;
-      if (x.marca === 'quitado') return `<p class="rmd-nota">Estaba en la versión anterior${x.numQ && x.numQ !== '-' ? ` (${esc(x.numQ)})` : ''} y se quitó${x.heredado ? ' con su paso o etiqueta' : ''}.</p>`;
+      if (x.marca === 'quitado') return `<p class="rmd-nota">Estaba en la versión anterior${x.numQ && x.numQ !== '-' ? ` (${esc(x.numQ)})` : ''} y se quitó${x.heredado ? ' con su paso o etiqueta' : ''}${x.porCambioDePaso ? ' al cambiar el paso de esa fila por otro' : ''}${x.quien || x.cuando ? ` (${quienCuando(x.quien, x.cuando)})` : ''}.</p>`;
       if (!es.length) return `<p class="rmd-nota">Solo cambió el orden, por un paso agregado o quitado antes.${fila}</p>`;
       return `<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${es.map((c) => `<tr><td>${esc(c.tipo === 'Reemplazado' ? 'Paso (reemplazado)' : c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes === '' ? '(vacío)' : c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues === '' ? '(vacío)' : c.despues)}</td></tr>`).join('')}</tbody></table>${fila ? `<p class="rmd-nota">${fila.trim()}</p>` : ''}`;
     }
@@ -10767,10 +10923,13 @@
       if (P.fase === 'error') return `${fichaAct}<p class="rmd-progreso error">No se pudo leer: ${esc(P.error)}</p><button type="button" class="rmd-btn" data-a="pa-reintentar">Reintentar</button>`;
       const k = P.cuenta;
       return `<div class="rmd-pa"><div class="rmd-pa-cabecera"><div class="rmd-pa-tit"><b>${esc(nomVersion(E.linaje.actual))}</b><span>${esc(refPost(P))}</span></div>
-          <div class="rmd-pa-kpis">${kpiPa('modificado', k.modificado, 'Modificados')}${kpiPa('agregado', k.agregado, 'Agregados')}${kpiPa('quitado', k.quitado, 'Quitados')}${kpiPa('orden', k.orden + k.igual, 'Solo orden o sin cambios')}</div></div>
+          <div class="rmd-pa-kpis">${kpiPa('modificado', k.modificado, 'Modificados')}${kpiPa('agregado', k.agregado, 'Agregados')}${kpiPa('quitado', k.quitado, 'Quitados')}${kpiPa('orden', k.orden + k.igual, 'Solo orden o sin cambios')}${k.revertido ? kpiPa('revertido', k.revertido, 'Cambió y volvió') : ''}</div></div>
         ${P.progreso ? `<p class="rmd-progreso rmd-espera" data-orbe="connecting">${esc(P.progreso)}</p>` : '<p class="rmd-nota rmd-pa-ayuda">Haz clic en una fila marcada para ver quién la cambió, cuándo y qué tenía antes.</p>'}
         ${htmlDoc(P.arbol, htmlDetallePost, P.autorizada ? '✓ Sin cambios después de la autorización.' : '✓ Sin cambios desde que se creó la versión.')}</div>`;
     }
+    const TZ_REV_SECCION = { etq: 'Etiquetas', paso: 'Pasos', pm: 'Procesos menores', esp: 'Especificaciones' };
+    const filasRevExcel = () => (E.dif && E.rev && E.rev.fase === 'listo' ? tzPostNodos(E.dif.arbol).filter((x) => x.marca === 'revertido').flatMap((x) => x.entradas.flatMap((y) => y.cambios.map((c) =>
+      [TZ_REV_SECCION[x.ent] || '', `${x.lugar ? x.lugar + ' › ' : ''}${textoNodo(x)}${x.codigo ? ' (' + x.codigo + ')' : ''}`.replace(/\s+/g, ' ').trim(), TZ_POST_TXT.revertido, c.campo, c.antes, c.despues, y.usuario, y.ts]))) : []);
     const filasPostExcel = () => {
       const P = E.post; if (!P || !P.items) return null; const A = P.arbol, out = [];
       P.items.forEach((x) => { const c = tzPostClase(x); if (!c) return;
@@ -10799,14 +10958,16 @@
     const opcionesVersion = (sel) => E.linaje.versiones.filter((m) => tzComparable(m) || m.mdId === sel).map((m) => `<option value="${esc(m.mdId)}" ${m.mdId === sel ? 'selected' : ''}>${esc(nomVersion(m))}</option>`).join('');
     // Observaciones de «Asociar fórmulas»: una línea por anotación; «AAAAMMDD<iniciales>» al inicio se muestra como fecha
     const htmlObs = (t) => { const ls = String(t || '').split('\n').map((x) => x.trim()).filter(Boolean); if (!ls.length) return '<span class="rmd-nota">Sin observaciones.</span>';
-      return `<ul class="rmd-tz-obs-l">${ls.map((l) => { const m = /^(\d{4})(\d{2})(\d{2})([A-ZÑ]{1,5})?[\s\-–:]*(.*)$/.exec(l);
-        return m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31 ? `<li><span class="rmd-tz-obs-f">${m[3]}/${m[2]}/${m[1]}${m[4] ? ' · ' + esc(m[4]) : ''}</span>${esc(m[5] || '')}</li>` : `<li>${esc(l)}</li>`; }).join('')}</ul>`; };
+      return `<ul class="rmd-tz-obs-l">${ls.map((l) => { const m = /^(\d{4})(-?)(\d{2})\2(\d{2})([A-ZÑ]{1,5})?[\s\-–:]*(.*)$/.exec(l);   // AAAAMMDD o AAAA-MM-DD; iniciales pegadas a la fecha
+        return m && +m[3] >= 1 && +m[3] <= 12 && +m[4] >= 1 && +m[4] <= 31 ? `<li><span class="rmd-tz-obs-f">${m[4]}/${m[3]}/${m[1]}${m[5] ? ' · ' + esc(m[5]) : ''}</span>${esc(m[6] || '')}</li>` : `<li>${esc(l)}</li>`; }).join('')}</ul>`; };
+    // Historia del producto: sin Cancelados, de la última versión a la primera (orden fijo)
+    const historiaProducto = () => filasVersiones().filter((x) => !/cancel/i.test(x.estado || ''))
+      .sort((a, b) => (+b.version || 0) - (+a.version || 0) || (b.fecha ? +new Date(b.fecha) : 0) - (a.fecha ? +new Date(a.fecha) : 0));
     function htmlVersionesLista() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
       if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="searching">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
-      const f = filasVersiones(), act = E.linaje.actual;
-      return `${ficha(act)}<p class="rmd-tz-resumen">Todas las versiones relacionadas del RMD, cada una con sus observaciones de «Asociar fórmulas». «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Descripción</th><th>Versión origen</th><th>Registrada</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td class="rmd-nowrap">${esc(x.codigo)}</td><td>${esc(x.version)}</td><td class="rmd-nowrap">${esc(x.estado)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? ' · ' + esc(x.usuario) : ''}</td><td>${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>
-        <tr class="rmd-tz-obs${x.mdId === act.mdId ? ' rmd-tz-actual' : ''}"><td></td><td colspan="6"><div class="rmd-tz-obs-cab">Observaciones · v${esc(x.version)}</div>${htmlObs(x.obs)}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
+      const f = historiaProducto(), act = E.linaje.actual;
+      return `${ficha(act)}<p class="rmd-tz-resumen">Las versiones del producto, de la última a la primera, con sus observaciones de «Asociar fórmulas» (sin las canceladas). «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Versión origen</th><th>Registrada</th><th class="rmd-tz-obs-col">Observaciones</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td><span class="rmd-nowrap">${esc(x.codigo)}</span>${norm(x.descripcion) !== norm(act.descripcion) ? `<br><span class="rmd-nota">${esc(x.descripcion)}</span>` : ''}</td><td class="rmd-tz-num">v${esc(x.version)}</td><td class="rmd-nowrap"><span class="rmd-tz-est ${SIN_ACENTOS(x.estado || '').toLowerCase()}">${esc(x.estado)}</span></td><td class="rmd-nowrap">${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? `<br><span class="rmd-nota">${esc(x.usuario)}</span>` : ''}</td><td class="rmd-tz-obs-col">${htmlObs(x.obs)}</td><td class="rmd-nowrap">${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
     }
     function htmlVersiones() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
@@ -10818,8 +10979,9 @@
       if (!E.cambios) return `<div class="rmd-pa">${cab()}</div>`;
       if (!E.desde || !E.dif) return `<div class="rmd-pa">${cab()}<p class="rmd-nota">Sin datos: es la primera versión, no hay otra con la que compararla.</p></div>`;
       const k = E.dif.cuenta;
-      return `<div class="rmd-pa">${cab(`<div class="rmd-pa-kpis">${kpiPa('modificado', k.modificado, 'Modificados')}${kpiPa('agregado', k.agregado, 'Agregados')}${kpiPa('quitado', k.quitado, 'Quitados')}${kpiPa('reemplazado', k.reemplazado, 'Reemplazados')}${kpiPa('orden', k.orden, 'Solo orden')}</div>`)}
-        <p class="rmd-nota rmd-pa-ayuda">La versión nueva con la forma del RMD. Haz clic en una fila marcada para ver qué tenía antes; lo quitado aparece tachado en su lugar.</p>
+      return `<div class="rmd-pa">${cab(`<div class="rmd-pa-kpis">${kpiPa('modificado', k.modificado, 'Modificados')}${kpiPa('agregado', k.agregado, 'Agregados')}${kpiPa('quitado', k.quitado, 'Quitados')}${kpiPa('reemplazado', k.reemplazado, 'Reemplazados')}${kpiPa('orden', k.orden, 'Solo orden')}${k.revertido ? kpiPa('revertido', k.revertido, 'Cambió y volvió') : ''}</div>`)}
+        ${E.rev && E.rev.fase === 'leyendo' ? `<p class="rmd-progreso rmd-espera" data-orbe="connecting">${esc(E.rev.progreso || 'Buscando cambios que volvieron a su valor…')}</p>` : E.rev && E.rev.fase === 'error' ? `<p class="rmd-progreso error">No se pudieron buscar los cambios que volvieron a su valor: ${esc(E.rev.error)}</p>` : ''}
+        <p class="rmd-nota rmd-pa-ayuda">La versión nueva con la forma del RMD. Haz clic en una fila marcada para ver qué tenía antes; lo quitado aparece tachado en su lugar. «Cambió y volvió»: quedó igual que en la versión anterior, pero se cambió mientras se editaba.</p>
         ${htmlDoc(E.dif.arbol, htmlDetalleDif, '✓ No hay diferencias entre las dos versiones.')}</div>`;
     }
     // ---- Eventos ----
@@ -10860,12 +11022,12 @@
       const btn = e.currentTarget; btn.disabled = true;
       try {
         const est = estadosNativos();
-        const x = tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: est, versiones: filasVersiones() });
+        const x = tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: est, versiones: historiaProducto(), revertidos: filasRevExcel() });
         descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); toast(`Excel de la trazabilidad del RMD ${codigo}: ${x.cambios} cambios entre versiones y ${x.filas} líneas de historial.`);
       } catch (err) { toast('No se pudo armar el Excel: ' + err.message, true); } finally { btn.disabled = false; }
     });
     cuerpo.addEventListener('change', (e) => { if (e.target.dataset.f === 'desde' || e.target.dataset.f === 'hasta') comparar(); });
-    raiz.__tz = { E, filasVersiones, comparar, pintar, iniciar, iniciarPost, pdfPost, filasPostExcel, excel: () => tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: estadosNativos(), versiones: filasVersiones() }) };
+    raiz.__tz = { E, filasVersiones, comparar, pintar, iniciar, iniciarPost, pdfPost, filasPostExcel, excel: () => tzArmarExcel({ codigo, descripcion: E.linaje ? E.linaje.actual.descripcion : '', cambios: E.cambios || [], comparacion: E.comparacion, post: filasPostExcel(), estados: estadosNativos(), versiones: historiaProducto(), revertidos: filasRevExcel() }), filasRevExcel };
   }
   const TZ_ESC = { puesto: false, pausa: 0 };
   function gestionarTrazabilidad() {

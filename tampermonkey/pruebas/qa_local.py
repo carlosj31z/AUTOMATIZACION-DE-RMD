@@ -594,6 +594,40 @@ with sync_playwright() as p:
               and r["r1fecha"] == "2026-09-02" and r["r1cambio"] == ["500000002071", "500000002150"] and r["r2"] == [["ruta"], ["Puesto de trabajo (línea) AAPVAC01→AAPVAC09"]] and r["r3"] == [["ruta"], False]
               and not r["r4"] and not r["r5"] and r["huellaIgual"] and r["huellaDistinta"])
         return ok, json.dumps(r, ensure_ascii=False, default=str)
+    @prueba("LN22b Texto de la lista de materiales (v1.67, lecturas de mentira): si el texto que el PDF imprime bajo los insumos (TextoCab) cambió en SAP, avisa dentro de «Lista de materiales» con el texto del RMD y el de SAP (detalle, resumen y Excel); no avisa por espacios ni por signos de puntuación sueltos (sí por números: 8.0 → 80) ni si no se leyó el texto; Acondicionado y Envase no se consideran")
+    def _():
+        r = pg.evaluate("""async () => { const S = window.__rmdStats.recetasSap;
+          const md = (id, cod) => [id, { mdId: id, codigo: cod, version: 5, estado: 'Ingresado', linaje: cod, descripcion: 'PRODUCTO ' + cod, etapa: 'FABRICACION', area: 'OFT', planta: 'PLANTA ATE' }];
+          const porMd = new Map([md('m6', '2202600016'), md('m7', '2202600017'), md('m8', '2202600018'), md('m9', '2202600019')]);
+          const rc = (matnr, o = {}) => ({ Matnr: matnr, Werks: '1020', Verid: '1001', Stlal: '1', Mdv01: 'FSOFFA01', Plnnr: '842', Alnal: '1', Text1: 'RECETA ' + matnr, ...o });
+          const recs = [{ mdRecetaId: 'r6', mdId_mdId: 'm6', recetaId: rc('700006', { TextoCab: 'CLORURO DE ZINC: Higroscópico.' }) }, { mdRecetaId: 'r7', mdId_mdId: 'm7', recetaId: rc('700007', { TextoCab: 'Proteger  de la humedad. ' }) },
+            { mdRecetaId: 'r8', mdId_mdId: 'm8', recetaId: rc('700008') }, { mdRecetaId: 'r9', mdId_mdId: 'm9', recetaId: rc('700009', { TextoCab: null }) }];
+          const copia = [['C1', '2', 'KG', 'UNO']], copias = { r6: copia, r7: copia, r8: copia, r9: copia }, sap1 = [{ Component: 'C1', CompQty: '2', CompUnit: 'KG', Maktx: 'UNO', ValidFrom: '30.01.2023', ChangeNo: '' }];
+          const bom = new Map(['700006', '700007', '700008', '700009'].map((m) => [m + '|1020|1', sap1]));
+          const v = (matnr, t) => [matnr + '|1020|1001', { Matnr: matnr, Werks: '1020', Verid: '1001', Mdv01: 'FSOFFA01', Plnnr: '842', Alnal: '1', Stlal: '1', TextoCab: t }];
+          const nuevo = ' CLORURO DE ZINC: Higroscópico.  Proteger de la humedad. Dispensar el mismo día de la fabricación.';
+          const versiones = new Map([v('700006', nuevo), v('700007', ' Proteger de la humedad'), v('700008', 'OTRO TEXTO'), v('700009', 'Nota nueva')]);
+          const verOk = new Set(['700006|1020', '700007|1020', '700008|1020', '700009|1020']);
+          const dec = (a, b) => !!S.comparar([{ mdRecetaId: 'rx', mdId_mdId: 'm6', recetaId: rc('700006', { TextoCab: a }) }], porMd, { rx: copia }, bom, new Map([v('700006', b)]), verOk).length;
+          const conEtapa = (et) => S.comparar([{ mdRecetaId: 'ry', mdId_mdId: 'm6', recetaId: rc('700006', { TextoCab: 'A' }) }], new Map([['m6', { ...porMd.get('m6'), etapa: et }]]), { ry: copia }, bom, new Map([v('700006', 'B')]), verOk).length;
+          const etapas = ['FABRICACION', 'RECUBRIMIENTO', 'ACONDICIONADO', 'ENVASE'].map(conEtapa);
+          const signos = [dec('Peso de envasado: 8.0 g', 'Peso de envasado: 8.0 g.'), dec('"ESTADO PERUANO" Peso', '"ESTADO PERUANO" . Peso'), dec('Lote, Fecha', 'Lote Fecha'), dec('Peso 8.0 g', 'Peso 80 g'), dec('1,5 kg', '15 kg'), dec('EAN 13 N° 775', 'EAN 13 N° 776')];
+          const h = S.comparar(recs, porMd, copias, bom, versiones, verOk), por = Object.fromEntries(h.map(x => [x.mdRecetaId, x]));
+          const otra = S.comparar(recs, porMd, copias, bom, new Map([...versiones, v('700006', nuevo + ' Más.')]), verOk).find(x => x.mdRecetaId === 'r6');
+          const det = window.__rmdStats.detalleRecetaHtml(por.r6), caja = document.createElement('div'); caja.innerHTML = det;
+          window.__resp = await S.respaldo(); await S.poner(h, { ing: Date.now(), aut: Date.now() });
+          const g = S.grupos().find(x => x.codigo === '2202600016');
+          const x = await S.excel(); await S.restaurar(window.__resp);
+          return { cuantos: h.map(x => x.mdRecetaId), r6: por.r6 && { tipos: por.r6.tipos, dif: por.r6.dif.length, texto: por.r6.textoCab, fecha: por.r6.fechaSap }, r9: por.r9 && por.r9.textoCab,
+            huellaDistinta: otra && otra.huella !== por.r6.huella, detalle: caja.innerText.replace(/\\s+/g, ' ').trim(), sinTablaComp: !caja.querySelector('th[title]'), tipoGrupo: g && [...g.tipos], signos, etapas, b64: x.base64 }; }""")
+        import base64, io, zipfile
+        z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64")))); todo = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
+        r["excel"] = ["Texto de la lista cambiado en SAP" in todo, "Dispensar el mismo día" in todo, "Lista de materiales: cambió el texto de la lista" in todo]
+        ok = (r["cuantos"] == ["r6", "r9"] and r["r6"] and r["r6"]["tipos"] == ["lista"] and r["r6"]["dif"] == 0 and r["r6"]["fecha"] is None
+              and r["r6"]["texto"] == {"antes": "CLORURO DE ZINC: Higroscópico.", "ahora": "CLORURO DE ZINC: Higroscópico. Proteger de la humedad. Dispensar el mismo día de la fabricación."}
+              and r["r9"] == {"antes": "", "ahora": "Nota nueva"} and r["huellaDistinta"] and "Texto de la lista de materiales · cambió en SAP" in r["detalle"] and "Dispensar el mismo día" in r["detalle"]
+              and r["sinTablaComp"] and r["tipoGrupo"] == ["lista"] and all(r["excel"]) and r["signos"] == [False, False, False, True, True, True] and r["etapas"] == [1, 1, 0, 0])
+        return ok, json.dumps(r, ensure_ascii=False, default=str)[:1500]
     # datos de mentira de dos versiones de un RMD (lo que devuelven las lecturas del servicio) — los usan LN23 y LN25
     TZ_DATOS_JS = """() => { const T = window.__rmdStats.trazabilidad;
       const cat = { estructura: new Map([['E1', 'PROCEDIMIENTO']]), etiqueta: new Map([['T1', 'FABRICACION']]), tipos: new Map(), estados: new Map() };
@@ -647,7 +681,7 @@ with sync_playwright() as p:
         ok = (r["paso"] == [["AA", True, []], ["BB", False, ["Orden:1>2"]], ["BB", False, []], ["CC", False, ["Tab:No>Sí", "Depende del paso:(no registrado)>123", "Tipo Dato:Números>Texto", "Val. Inicial:1>(vacío)"]]]
               and r["cab"] == [["AA", []], ["AA", ["Observaciones (línea agregada):>c", "Estado del proceso:Sin iniciar>En proceso"]], ["DD", ["Observaciones (línea quitada):b>"]]] and r["parseados"] == [2, 3])
         return ok, json.dumps(r, ensure_ascii=False)
-    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Historial de versiones, Diferencia entre versiones, Historial post autorización, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
+    @prueba("LN25 Excel de la trazabilidad (v1.38, datos de mentira): hojas Historia del producto, Diferencia entre versiones, Historial post autorización, Estados e Información con las mismas cantidades que se ven; la fila «al autorizar» lo dice")
     def _():
         r = pg.evaluate(TZ_DATOS_JS.replace("return { T, A, B, cat }; }", """const c = T.comparar(A, B), h = [{ rotulo: 'PROCEDIMIENTO › FABRICACION › Paso 100', entradas: [{ ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [{ campo: 'Tab', antes: 'No', despues: 'Sí' }, { campo: 'Orden', antes: '1', despues: '2' }] }, { ts: new Date(), accion: 'UPDATE', usuario: 'JQUISPEP', primero: false, cambios: [] }] }];
           const x = T.excel({ codigo: '2202600002', descripcion: 'PRODUCTO NUEVO', cambios: c, comparacion: 'v2 → v3', historial: h, estados: [['Ingresado', '28/09/2026 03:26:22', 'JQUISPEP']] });
@@ -656,10 +690,21 @@ with sync_playwright() as p:
         z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r.pop("b64"))))
         hojas = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode("utf-8"))
         compartidas = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".xml"))
-        ok = (hojas == ["Historial de versiones", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
+        ok = (hojas == ["Historia del producto", "Diferencia entre versiones", "Historial post autorización", "Estados", "Información"] and r["cambios"] == r["n"] and r["filas"] == 3 and r["nombre"].startswith("Trazabilidad RMD 2202600002 ")
               and "el registro al autorizar" in compartidas and "Guardado sin cambios" in compartidas and "JQUISPEP" in compartidas)
         return ok, f"{r}; hojas={hojas}"
-    @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
+    @prueba("LN25b «Cambió y volvió» (v1.68, guardados de mentira): una fila igual a la versión anterior que se cambió y se devolvió muestra cada cambio con su usuario; una fila vuelta a agregar marca su paso inicial como no registrado; volver a guardar lo mismo no es un cambio; un guardado sin usuario toma el del guardado vecino")
+    def _():
+        r = pg.evaluate("""() => { const R = window.__rmdStats.tzPost.revEntradas, campos = ['pasoHijoId_pasoId', 'valorInicial', 'valorFinal', 'edit'];
+          const base = { pasoHijoId_pasoId: 'P87680', valorInicial: '2', valorFinal: '4', edit: true }, ev = (min, p) => ({ ts: new Date(Date.UTC(2026, 8, 4, 13, min)), p });
+          const copia = R([ev(0, { usuarioActualiza: 'ANA', orden: 3 }), ev(1, { usuarioActualiza: 'ANA', valorInicial: '2', valorFinal: '3', edit: true }), ev(9, { usuarioActualiza: 'BETO', valorFinal: '4', edit: true })], base, campos, false);
+          const otra = R([ev(1, { usuarioActualiza: 'ANA', valorInicial: '2', valorFinal: '3' }), ev(30, { pasoHijoId_pasoId: 'P87680' }), ev(30, { usuarioActualiza: 'BETO', valorFinal: '4' })], base, campos, true);
+          const igual = R([ev(2, { usuarioActualiza: 'ANA', valorInicial: '2.0', valorFinal: '4', edit: true })], base, campos, false);
+          const txt = (es) => es.map((y) => y.usuario + ': ' + y.cambios.map((c) => `${c.k} ${c.desconocido ? '?' : c.antes}→${c.despues}`).join(', '));
+          return { copia: txt(copia), otra: txt(otra), igual: igual.length }; }""")
+        ok = (r["copia"] == ["ANA: valorFinal 4→3", "BETO: valorFinal 3→4"] and r["otra"] == ["ANA: valorFinal 4→3", "BETO: pasoHijoId_pasoId ?→P87680", "BETO: valorFinal 3→4"] and r["igual"] == 0)
+        return ok, json.dumps(r, ensure_ascii=False)
+    @prueba("LN26Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
     def _():
         r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });
           const sap = [c('C4', '42094.000'), c('C5', '2.000'), c('C6', '5000.000'), c('C7', '1500.000'), c('C8', '900.000'), c('C9', '3000.000', 'KG'), c('C10', '1234567.000')];
