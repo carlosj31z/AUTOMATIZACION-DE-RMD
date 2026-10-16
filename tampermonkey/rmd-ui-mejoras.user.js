@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.69.0
+// @version      1.70.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.69.0';                                                       // mantener igual a @version
+  const VERSION = '1.70.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -297,6 +297,7 @@
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   /* elementos de baja */
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .sapMDialog.sapMMessageDialog.rmd-espera-respuesta { z-index: 100002 !important; box-shadow: 0 0 0 3px var(--rmd-acento), 0 12px 32px rgba(0,0,0,.28) !important; }   /* encima de las ventanas del script: la responde la persona */
   .rmd-dep-aviso, .rmd-etq-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-dep-aviso b, .rmd-etq-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
   .rmd-dep-aviso.ok { border-left-color: var(--rmd-verde); background: color-mix(in srgb, var(--rmd-verde) 14%, transparent); } .rmd-dep-aviso.ok b { color: inherit; } .rmd-dep-aviso.ok .rmd-dep-ico { background: var(--rmd-verde); color: #12331b; }
@@ -2613,16 +2614,30 @@
     for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 120);
   }
 
-  // mensajes del portal: acepta los de guardado; se detiene ante advertencia o error
+  // Mensajes del portal durante un proceso del script: no se responden por la persona. Se espera su respuesta y se lee qué botón pulsó
+  // (null: cerró sin botón o no respondió a tiempo).
+  const esAceptar = (t) => /^(OK|Aceptar|Sí|Si|Confirmar)$/i.test(norm(t || ''));
+  async function esperarRespuestaPortal(m, ms = 600000) {
+    let pulsado = null;
+    const oir = (e) => { const b = e.target.closest && e.target.closest('button'); if (b) pulsado = norm(b.textContent); };
+    m.addEventListener('click', oir, true); m.classList.add('rmd-espera-respuesta');
+    toast('El portal pide tu respuesta: contesta su mensaje para continuar.');
+    const t0 = Date.now(); while (Date.now() - t0 < ms && m.isConnected && m.getClientRects().length) await esperar(200);
+    m.removeEventListener('click', oir, true); m.classList.remove('rmd-espera-respuesta');
+    return pulsado;
+  }
+  // tras un guardado del script: éxito y confirmaciones las contesta la persona; una confirmación no aceptada, una advertencia o un error detienen
   async function atenderMensajes(ms = 20000, quietoMs = 1800) {
-    const t0 = Date.now(); let ultimo = Date.now(); const vistos = [];
-    while (Date.now() - t0 < ms) {
+    let limite = Date.now() + ms, ultimo = Date.now(); const t0 = Date.now(), vistos = [];
+    while (Date.now() < limite) {
       const m = [...document.querySelectorAll('.sapMMessageDialog')].filter((x) => x.getClientRects().length).pop();
       if (m) {
         const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent), texto = norm((m.querySelector('section') || {}).textContent);
-        const botones = [...m.querySelectorAll('footer button')].filter((b) => visible(b) && norm(b.textContent));
-        const ok = botones.find((b) => /^(OK|Aceptar|Sí|Si)$/i.test(norm(b.textContent)));
-        if (/[ÉE]xito|Confirmaci/i.test(titulo) && ok && !/elimin|borrar/i.test(texto)) { vistos.push(`${titulo}: ${texto}`); pulsar(ok); ultimo = Date.now(); await esperar(700); continue; }
+        if (/[ÉE]xito|Confirmaci/i.test(titulo) && !/elimin|borrar/i.test(texto)) {
+          const r = await esperarRespuestaPortal(m);
+          if (/Confirmaci/i.test(titulo) && !esAceptar(r)) return { problema: `${titulo}: ${texto} (no se aceptó)`, vistos };
+          vistos.push(`${titulo}: ${texto}`); ultimo = Date.now(); limite = Date.now() + ms; await esperar(400); continue;
+        }
         return { problema: `${titulo}: ${texto}`, vistos };
       }
       if (vistos.length && Date.now() - ultimo > quietoMs) break;
@@ -6424,11 +6439,14 @@
   }
   const ocupadoGlobal = () => ocupado() || [...document.querySelectorAll('#sapUiBusyIndicator, .sapUiBusyIndicator')].some(visible);
   const mensajesPortal = () => [...document.querySelectorAll('.sapMMessageDialog')].filter(visible);
-  async function cerrarMensajesPortal() {
+  // los mensajes que deja el Guardar los contesta la persona; se devuelven sus textos y lo que pulsó
+  async function responderMensajesPortal() {
     const textos = [];
-    for (const m of mensajesPortal()) {
-      textos.push(norm(m.querySelector('.sapMDialogSection, section') ? m.querySelector('.sapMDialogSection, section').textContent : m.textContent));
-      const b = [...m.querySelectorAll('footer button, .sapMDialogFooter button')].find(visible); if (b) pulsar(b);
+    for (let i = 0; i < 10; i++) {
+      const m = mensajesPortal().pop(); if (!m) break;
+      const texto = norm(m.querySelector('.sapMDialogSection, section') ? m.querySelector('.sapMDialogSection, section').textContent : m.textContent);
+      const r = await esperarRespuestaPortal(m); textos.push({ texto, respuesta: r });
+      if (m.isConnected && m.getClientRects().length) break;               // sin respuesta: se deja para la persona
       await esperar(300);
     }
     return textos;
@@ -6483,15 +6501,23 @@
       const reg = bGuardar && ((bGuardar.mEventRegistry || {}).press || [])[0]; if (!reg) throw new Error('no se encontró el botón Guardar');
       await reg.fFunction.call(reg.oListener, { getSource: () => bGuardar, getParameter: () => undefined, getParameters: () => ({}) });
       await esperar(400); await hasta(() => !ocupadoGlobal(), 60000);
-      const comparador = dialogos().find((x) => !previos.has(x) && x !== d && /compar/i.test(cabecera(x)));
+      // Comparador de fórmula (Autorizados de Fabricación / Envase): su título es «<código> - <producto>: Las cantidades … ¿desea continuar?»
+      const esComparador = (x) => !previos.has(x) && x !== d && (!!x.querySelector('[id*="ComparadorFormula"], [id*="ComparadorInsumo"]') || /compar|presentan diferencias/i.test(cabecera(x)));
+      await hasta(() => dialogos().some(esComparador) || mensajesPortal().length, 5000);
+      const comparador = dialogos().find(esComparador);
       if (comparador) {
-        const c = [...comparador.querySelectorAll('button')].find((x) => visible(x) && /^(Cancelar|Cerrar)$/.test(x.textContent.trim())); if (c) pulsar(c); await esperar(500);
+        const c = [...comparador.querySelectorAll('button')].find((x) => visible(x) && /^(Cancelar|Cerrar)$/.test(x.textContent.trim()));   // «Cerrar» (btnClose), no «Confirmar»
+        if (c) pulsar(c); else { const k = nucleo().byId(comparador.id); if (k && k.close) k.close(); }
+        await esperar(500);
         throw new Error('el portal pidió revisar las cantidades de insumos (Comparador de fórmula) y no guardó: hazlo a mano en este master');
       }
-      const mensajes = (await cerrarMensajesPortal()).filter((t) => !/guardaron los cambios correctamente/i.test(t));
+      const resp = await responderMensajesPortal();
+      const noAceptada = resp.find((x) => /\?\s*$|seguro|desea/i.test(x.texto) && !esAceptar(x.respuesta));
+      if (noAceptada) throw new Error(`no se aceptó el mensaje del portal («${noAceptada.texto.slice(0, 120)}»)`);
+      const mensajes = resp.map((x) => x.texto).filter((t) => !/guardaron los cambios correctamente/i.test(t));
       return { obs, mensajes };
     } finally {
-      await cerrarMensajesPortal();
+      await responderMensajesPortal();
       try { ctrl.onCancelAsociarArticulos(); } catch (e) { const b = [...d.querySelectorAll('button')].find((x) => visible(x) && /^Cancelar$/.test(x.textContent.trim())); if (b) pulsar(b); }
       await esperar(500);
     }
@@ -7708,8 +7734,10 @@
       bu.addEventListener('click', async () => {
         const texto = norm((campoDe(d, 'Descripción Paso') || campoDe(d, 'Descripción') || {}).value || dd.descripcion);
         if (!await confirmar('¿Pasar a un paso de esta etiqueta?', `Esta fila usará un paso «${texto.slice(0, 90)}» de la etiqueta ${nom.get(li.etiquetaId) || 'de la lista'}: el que ya exista o uno nuevo.`, 'Se conserva la configuración de la fila; no cambia otros RMD.')) return;
+        const ya = await pasoIgualEn(modelo, texto, li).catch(() => null), nn = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionadoBackUp' : '/pasoHijoSeleccionadoBackUp');
+        if (!ya && !validarComoGrabar(b, lm, dd, nn, await usoDelPaso(modelo, dd.pasoId, md.mdId), md)) return;
         bu.disabled = true; sap.ui.core.BusyIndicator.show(0);
-        try { const ya = await pasoIgualEn(modelo, texto, li); const cod = await nuevoPasoSoloEste(M, b, comp, { ...dd, descripcion: texto }, ya, li); textosRmd.delete(md.mdId); toast(`Listo: esta fila usa ahora el paso ${cod}${ya ? '' : ', creado para esta etiqueta'}.`); }
+        try { const cod = await nuevoPasoSoloEste(M, b, comp, { ...dd, descripcion: texto }, ya, li); textosRmd.delete(md.mdId); toast(`Listo: esta fila usa ahora el paso ${cod}${ya ? '' : ', creado para esta etiqueta'}.`); }
         catch (e) { bu.disabled = false; toast('No se pudo cambiar el paso: ' + e.message, true); }
         finally { sap.ui.core.BusyIndicator.hide(); }
       });
@@ -7717,6 +7745,23 @@
     } else a.insertAdjacentHTML('beforeend', 'Corrígelo en una versión nueva.');
     const sec = d.querySelector('.sapMDialogSection'); if (sec) sec.prepend(a);
   }
+  // Validaciones del Grabar del portal (onGrabarPasoPadre) para crear un paso solo para este RMD: rango y decimales obligatorios según el tipo,
+  // Clave Modelo en «Notificación» y lapso no modificable en un paso de RMD Autorizados o Suspendidos. Constantes de la tabla del portal.
+  function validarComoGrabar(b, lm, dd, nn, uso, md) {
+    const MB = sap.ui.require('sap/m/MessageBox') || sap.m.MessageBox;
+    const i18n = (k, def) => { try { const t = b.getView().getModel('i18n').getResourceBundle().getText(k); return t && t !== k ? t : def; } catch (e) { return def; } };
+    const cte = (c, def) => { const x = (b.aConstantes || []).find((y) => y.codigoSap === c); return x ? parseInt(x.contenido, 10) : def; };
+    const vacio = (v) => v === '' || v == null;
+    if ((lm.getProperty('/editableEditRango') && ['valorInicial', 'valorFinal', 'margen', 'decimales'].some((k) => vacio(dd[k]))) || (lm.getProperty('/editableEditDecimales') && vacio(dd.decimales))) {
+      MB.alert(i18n('sMissingPasoRango', 'Debe completar los campos obligatorios para el tipo de dato seleccionado.'), { icon: MB.Icon.ERROR, title: 'Error' }); return false; }
+    const notif = cte('IDTIPODATONOTIFICACION', null);
+    if (notif != null && +dd.tipoDatoId_iMaestraId === notif && !dd.clvModelo) { MB.warning('Debes seleccionar un campo de Clave Modelo.'); return false; }
+    const aut = cte('IDESTRMDAUTORIZADO', 465), lapso = nn && nn.tipoLapsoId_motivoLapsoId;
+    if (lapso && lapso !== dd.tipoLapsoId_motivoLapsoId && (uso.bloquean.length || (uso.enEste && +md.estadoIdRmd_iMaestraId === aut))) {
+      MB.error(i18n('txtMessageLapsoNoModif', 'No se puede modificar o eliminar el lapso si ya se encuentra en un RMD Autorizado.')); return false; }
+    return true;
+  }
+  window.__rmdStats.validarComoGrabar = validarComoGrabar;   // pruebas
   function gestionarEdicionPasos() {
     const d = dialogos().find((x) => /^Editar Paso/i.test(cabecera(x))); if (!d || typeof sap === 'undefined') return;
     const bG = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((x) => x && x.getText && x.getText() === 'Grabar');
@@ -7745,6 +7790,7 @@
         const eleccion = await elegirEdicionPaso({ codigo: (nn && nn.codigo) || dd.codigo, antes: norm((nn || {}).descripcion), descripcion: norm(dd.descripcion), cambios, enEste: uso.enEste, abiertos: uso.abiertos, bloquean: uso.bloquean, dup: hayDup });
         if (!eleccion) return undefined;
         if (eleccion === 'sobrescribir') return portal();
+        if (!hayDup && !validarComoGrabar(b, lm, dd, nn, uso, md)) return undefined;   // se crea un paso con estos datos: mismas reglas que el Grabar
         sap.ui.core.BusyIndicator.show(0);
         try { const cod = await nuevoPasoSoloEste(M, b, comp, dd, hayDup, li); toast(hayDup ? `Este RMD usa ahora el paso ${cod}.` : `Se creó el paso ${cod} solo para este RMD.`); }
         finally { sap.ui.core.BusyIndicator.hide(); }
@@ -8503,6 +8549,11 @@
     const modelo = b.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     const pms = esMenor ? [] : await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('pasoId_mdEstructuraPasoId', 'EQ', o.mdEstructuraPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,activo' }).catch(() => []);
     const nPM = pms.filter((x) => x.activo !== false).length;
+    // la lista de la fila manda (de un proceso menor, la de su paso): mismas reglas que la etiqueta de otra etapa
+    const [lista, nomEtq] = await Promise.all([listaDeFila(modelo, esMenor ? (o.pasoId_mdEstructuraPasoId || (o.pasoId && o.pasoId.mdEstructuraPasoId)) : o.mdEstructuraPasoId).catch(() => null), nombresEtiqueta(modelo).catch(() => new Map())]);
+    const destino = lista || { estructuraId: m.estructuraId_estructuraId, etiquetaId: m.etiquetaId_etiquetaId };
+    const permitido = (x) => !etiquetaChoca(destino.etiquetaId, x.etiquetaId_etiquetaId, nomEtq.get(x.etiquetaId_etiquetaId), md.nivelTxt);
+    const nombreLista = destino.etiquetaId ? nomEtq.get(destino.etiquetaId) || 'de la lista' : '';
     const v = ventana('Cambiar el paso por otro código', { cancelar: () => v.cerrar() });
     const tipo = nombreTipo(o.tipoDatoId_iMaestraId, tabla) || '';
     v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>${esMenor ? 'Proceso menor' : 'Paso'} actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p></div>
@@ -8513,6 +8564,7 @@
     let elegido = null, hallados = [];
     const bCambiar = botonModal('Cambiar paso', 'primario', async () => {
       if (!elegido) return;
+      if (!permitido(elegido)) { setTxt(prog, `El paso ${elegido.codigo} es de otra etiqueta: en Producción no se vería en esta lista.`); return; }
       const ok = await confirmar('¿Cambiar el paso?', `Orden ${o.orden}: el ${esMenor ? 'proceso menor' : 'paso'} ${m.codigo} pasa a ser el ${elegido.codigo} — ${elegido.descripcion}.`, `Se conserva la configuración de esta fila${esMenor ? '' : ` y sus ${nPM} proceso(s) menor(es)`}. Los demás RMD no cambian.`, { si: 'Cambiar', no: 'Cancelar' });
       if (!ok) return;
       window.__rmdCambiando = true; bCambiar.disabled = true; sap.ui.core.BusyIndicator.show(0);
@@ -8532,12 +8584,14 @@
     const buscar = async () => {
       const t = norm(q.value); if (t.length < 1) { setTxt(prog, 'Escribe un código o palabras de la descripción.'); return; }
       setTxt(prog, 'Buscando…'); elegido = null;
-      const f = [new F('estructuraId_estructuraId', 'EQ', m.estructuraId_estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId)];
+      const f = [new F('estructuraId_estructuraId', 'EQ', destino.estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId)];
+      if (destino.etiquetaId) f.push(new F('etiquetaId_etiquetaId', 'EQ', destino.etiquetaId));
       if (/^\d+$/.test(t)) f.push(new F('codigo', 'EQ', t)); else t.split(/\s+/).forEach((w) => f.push(new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
       try {
         hallados = (await new Promise((ok, mal) => modelo.read('/PASO', { filters: [new F({ filters: f, and: true })], urlParameters: { $expand: 'etiquetaId,tipoDatoId', $top: '60', $orderby: 'codigo' }, success: (r) => ok(r.results || []), error: mal })));
-        hallados.sort((a, c) => (a.etiquetaId_etiquetaId === m.etiquetaId_etiquetaId ? 0 : 1) - (c.etiquetaId_etiquetaId === m.etiquetaId_etiquetaId ? 0 : 1) || (+a.codigo || 0) - (+c.codigo || 0));
-        setTxt(prog, hallados.length ? `${hallados.length} paso(s) de la misma estructura${hallados.length === 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : 'Ningún paso de la misma estructura coincide.');
+        const fuera = hallados.filter((x) => !permitido(x)).length; hallados = hallados.filter(permitido).sort((a, c) => (+a.codigo || 0) - (+c.codigo || 0));
+        const donde = nombreLista ? `de la estructura y la etiqueta ${nombreLista}` : 'de la misma estructura';
+        setTxt(prog, (hallados.length ? `${hallados.length} paso(s) ${donde}${hallados.length >= 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : `Ningún paso ${donde} coincide.`) + (fuera ? ` Se omiten ${fuera} de la etiqueta de otra etapa (en Producción no se verían).` : ''));
       } catch (e) { hallados = []; setTxt(prog, 'No se pudo buscar: ' + ((e && e.message) || e)); }
       pintar();
     };
@@ -12517,9 +12571,10 @@ td.ult { position: relative; }
     const bt = botonPorTitulo(raiz, 'Nueva Versión'); if (!bt) throw new Error('el RMD no tiene el botón «Nueva Versión»');
     const c = sap.ui.getCore().byId(bt.id.replace(/-inner$/, '')); if (!c.getEnabled()) throw new Error('«Nueva Versión» no está disponible en este RMD');
     c.firePress();
-    const ok = await hasta(() => { const d = [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)); return d && [...d.querySelectorAll('button')].find((x) => /^OK$/i.test(x.textContent.trim())); }, 15000, 200);
-    if (!ok) throw new Error('el portal no mostró su confirmación de «Nueva Versión»');
-    sap.ui.getCore().byId(ok.id.replace(/-inner$/, '')).firePress();
+    const conf = await hasta(() => [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)), 30000, 300);
+    if (!conf) throw new Error('el portal no mostró su confirmación de «Nueva Versión»');
+    avance(seg(), 'Confirma «Nueva Versión» en el mensaje del portal…');
+    if (!esAceptar(await esperarRespuestaPortal(conf))) throw new Error('no se aceptó «Nueva Versión» en el portal');
     avance(seg(), 'El portal está copiando la configuración del RMD…');
     let nueva = null;
     for (let i = 0; i < 225 && !nueva; i++) { await esperar(4000); avance(seg(), 'El portal está copiando la configuración del RMD…'); try { nueva = (await ppVersiones(modelo, principal)).find((m) => !idsAntes.has(m.mdId) && +m.version > +origen.version); } catch (e) { } }
@@ -12714,15 +12769,17 @@ td.ult { position: relative; }
     const cfgCache = new Map(), configDe = async (pasoId) => { if (!cfgCache.has(pasoId)) { cfgCache.set(pasoId, (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('mdId_mdId', 'EQ', dest.mdId), new F('activo', 'EQ', true)], PP_CFG_SEL)) || (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('activo', 'EQ', true)], PP_CFG_SEL))); } return cfgCache.get(pasoId); };
     const muestras = new Map(), muestra = async (estr, etq) => { const k = estr + '|' + (etq || ''); if (!muestras.has(k)) { let m = etq ? await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('etiquetaId_etiquetaId', 'EQ', etq), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion') : null; if (!m) m = await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion'); muestras.set(k, m); } return muestras.get(k); };
     const catNuevo = new Map();                                                           // id del borrador -> fila del catálogo
+    // pasos y procesos menores con la etiqueta de su lista (de un proceso menor, la de su paso): un paso de otra etapa no se ve en Producción
+    const nomEtq = await nombresEtiqueta(modelo).catch(() => new Map()), etapaDest = dest.nivelTxt || '', vale = (etqL, etq) => !etiquetaChoca(etqL, etq || null, nomEtq.get(etq), etapaDest);
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
-      const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL && !pm) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
-      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
+      const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
+      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && vale(etqL, p.etiquetaId_etiquetaId)).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
       if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); continue; }
       // búsqueda normalizada en el catálogo
       if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo));
-      const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && (pm || !etqL || f.etq === etqL)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
-      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
+      const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && vale(etqL, f.etq)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
+      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1 && vale(etqL, pIgual.etiquetaId_etiquetaId)) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
       const key = `${L.e.estructuraId}|${etqL || ''}|${texto.toLowerCase()}`; let n = nuevosPaso.get(key);
       if (!n) {
         const m = await muestra(L.e.estructuraId, etqL); if (!m) { bloqueos.push(`No se pudo preparar el paso nuevo «${texto.slice(0, 70)}»: no hay pasos de ${L.e.nombre} en el catálogo para copiar sus datos.`); continue; }
@@ -12747,6 +12804,14 @@ td.ult { position: relative; }
     const catDe = (x) => (catNuevo.has(x.id) ? { pasoId: catNuevo.get(x.id).pasoId, tipoDatoId_iMaestraId: catNuevo.get(x.id).tipo, ...['decimales', 'margen', 'valorInicial', 'valorFinal', 'clvModelo', 'automatico'].reduce((o, k) => ({ ...o, [k]: catNuevo.get(x.id).fila[k] }), {}) } : porCodigo.get(cod(x)));
     const faltan = [...new Set(listas.flatMap((L) => L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id)) && !catDe(x)).map((x) => cod(x) || String(x.texto || '').slice(0, 40))))];
     faltan.forEach((c) => bloqueos.push(`El paso ${c} no se encontró (¿está de baja?) en el catálogo de SAP.`));
+    // códigos escritos en el borrador: de la etiqueta de su lista
+    listas.forEach((L) => {
+      const etqL = L.t ? L.t.etiquetaId : null, bId = new Set(L.b.map((y) => y.id));
+      const revisa = (x) => { const c = !catNuevo.has(x.id) && porCodigo.get(cod(x)); if (c && !vale(etqL, c.etiquetaId_etiquetaId))
+        bloqueos.push(`El paso ${cod(x)} es de la etiqueta ${nomEtq.get(c.etiquetaId_etiquetaId) || 'sin etiqueta'} y su lista (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) es de otra: en Producción no se vería. Usa un paso de la etiqueta de la lista.`); };
+      L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id))).forEach(revisa);
+      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach(revisa));   // procesos menores de un paso nuevo
+    });
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
     const cfgPorPaso = new Map(); { const ids = new Set(); listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id) && !catNuevo.has(x.id)).forEach((x) => { const p = catDe(x); if (p) ids.add(p.pasoId); }); }); for (const id of [...ids].slice(0, 60)) cfgPorPaso.set(id, await configDe(id)); }
     // predecesores de las listas modificadas

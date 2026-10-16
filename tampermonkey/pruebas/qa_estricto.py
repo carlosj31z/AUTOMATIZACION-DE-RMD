@@ -50,8 +50,10 @@ RMD_LAYOUT = os.environ.get("RMD_LAYOUT", RMD_PRUEBA)
 RES = []
 def registrar(nombre, ok, detalle=""):
     RES.append((nombre, bool(ok), detalle)); print(("PASA  " if ok else "FALLA ") + nombre + (f" — {detalle}" if detalle else ""), flush=True)
+SOLO_P = [x for x in os.environ.get("SOLO_P", "").split(",") if x]   # p. ej. SOLO_P=W8,W9: solo esas pruebas del bloque
 def prueba(nombre):
     def deco(fn):
+        if SOLO_P and nombre.split(" ")[0] not in SOLO_P: return fn
         try:
             r = fn()
             if r is None or r is True: registrar(nombre, True)
@@ -81,6 +83,34 @@ def toast_texto(fr, pg, contiene, ms=20000):
             if contiene in t: return t
         pg.wait_for_timeout(300)
     return None
+
+def contestar_portal(fr, pg, expr, arg, ms=240000):
+    """Ejecuta una promesa del script que espera respuestas del portal (v1.70: el script ya no las contesta) y las contesta como la persona: OK.
+    Devuelve (resultado, textos de los mensajes contestados)."""
+    fr.evaluate("([e, a]) => { window.__resProm = undefined; Promise.resolve(eval(e)(a)).then((x) => { window.__resProm = { x }; }, (err) => { window.__resProm = { x: { error: err.message } }; }); }", [expr, arg])
+    contestados, t0 = [], time.time()
+    while time.time() - t0 < ms / 1000:
+        r = fr.evaluate("window.__resProm")
+        if r is not None: return r["x"], contestados
+        t = fr.evaluate("""() => { const m = [...document.querySelectorAll('.sapMMessageDialog.rmd-espera-respuesta:not([data-qa-contestado])')].find((x) => x.getClientRects().length); if (!m) return null;
+          const b = [...m.querySelectorAll('footer button')].find((x) => /^(OK|Aceptar|Sí|Si)$/i.test(x.textContent.trim())) || [...m.querySelectorAll('footer button')].pop();
+          const txt = (m.querySelector('section') || m).textContent.replace(/\\s+/g, ' ').trim(); m.setAttribute('data-qa-contestado', ''); b.click(); return txt; }""")
+        if t: contestados.append(t)
+        pg.wait_for_timeout(300)
+    return {"error": "sin respuesta del script"}, contestados
+
+
+def esperar_contestando(fr, pg, cond, ms=120000):
+    """Espera `cond` (JS) contestando OK a los mensajes del portal que el script deja a la persona (v1.70). Devuelve los textos contestados."""
+    contestados, t0 = [], time.time()
+    while time.time() - t0 < ms / 1000:
+        if fr.evaluate(cond): return contestados
+        t = fr.evaluate("""() => { const m = [...document.querySelectorAll('.sapMMessageDialog.rmd-espera-respuesta:not([data-qa-contestado])')].find((x) => x.getClientRects().length); if (!m) return null;
+          const b = [...m.querySelectorAll('footer button')].find((x) => /^(OK|Aceptar|Sí|Si)$/i.test(x.textContent.trim())) || [...m.querySelectorAll('footer button')].pop();
+          const txt = (m.querySelector('section') || m).textContent.replace(/\\s+/g, ' ').trim(); m.setAttribute('data-qa-contestado', ''); b.click(); return txt; }""")
+        if t: contestados.append(t)
+        pg.wait_for_timeout(300)
+    raise Exception(f"no se cumplió la condición en {ms // 1000} s (contestados: {contestados})")
 
 def limpiar_seleccion(fr):
     fr.evaluate("""() => { const d=window.__q.top(); const t=d.querySelector('table'); sap.ui.getCore().byId(t.id.replace(/-listUl$/,'')).removeSelections(true); }""")
@@ -1185,7 +1215,8 @@ with sync_playwright() as p:
     # ───────────────────────── T. v1.23: menú Exportar (+ Producción Estado), Buscar por equipo y Suspensión masiva con el guardado SIMULADO — no escribe ─────────────────────────
     if "T" in SOLO:
         RMD_SUSP = os.environ.get("RMD_SUSP", "2202608939")   # un RMD AUTORIZADO: la suspensión se simula (nada sale del navegador)
-        RMD_ING = os.environ.get("RMD_ING", "2202609157")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
+        RMD_ING = os.environ.get("RMD_ING", "2202609241")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
+        RMD_CMP = os.environ.get("RMD_CMP", "2202609157")     # un RMD AUTORIZADO de Fabricación o Envase cuyo Guardar abre el «Comparador de fórmula» (v1.70)
         cerrar_seguro(); pg.wait_for_timeout(1000)
         @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
@@ -1226,7 +1257,7 @@ with sync_playwright() as p:
                   cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
                   cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS', a: a.filter(x => typeof x === 'string') }); return {}; });
                   cambiar(ctrl, 'onTratarInformacionDMS', async (...a) => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
-                r = fr.evaluate("(c) => window.__rmdStats.suspenderUno(c, 'PRUEBA SIMULADA: no se guarda').then(x => x, e => ({ error: e.message }))", RMD_SUSP)
+                r, contestados = contestar_portal(fr, pg, "(c) => window.__rmdStats.suspenderUno(c, 'PRUEBA SIMULADA: no se guarda')", RMD_SUSP)
                 capt = fr.evaluate("window.__capt")
             finally:
                 fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
@@ -1236,8 +1267,8 @@ with sync_playwright() as p:
             traz = [c for c in capt if c["tipo"] == "create" and "TRAZABILIDAD" in c["ruta"]]
             dms = [c for c in capt if c["tipo"] == "DMS" and "ANULAR" in c["a"]]
             obs_ok = bool(upd) and upd[0]["datos"]["observacion"] == (antes[0][1] or "").rstrip() + "\nPRUEBA SIMULADA: no se guarda"
-            ok = (not r.get("error") and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and obs_ok and bool(traz) and bool(dms) and despues == antes and not bloq)
-            return ok, f"estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} trazabilidad={bool(traz)} DMS={[c['a'] for c in dms]} SAP igual={despues == antes} bloqueadas={bloq} {r.get('error', '')}"
+            ok = (not r.get("error") and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and obs_ok and bool(traz) and bool(dms) and despues == antes and not bloq and len(contestados) >= 1)
+            return ok, f"estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} trazabilidad={bool(traz)} DMS={[c['a'] for c in dms]} SAP igual={despues == antes} bloqueadas={bloq} {r.get('error', '')} contestados por la prueba={contestados}"
         @prueba("T4 Observación masiva (guardado SIMULADO + cortafuegos) en un Ingresado: el Guardar del portal envía la observación con la línea nueva y el MISMO Estado, sin trazabilidad ni DMS; en SAP no cambia nada")
         def _():
             bloq = []
@@ -1254,7 +1285,7 @@ with sync_playwright() as p:
                   cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
                   cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS', a: a.filter(x => typeof x === 'string') }); return {}; });
                   cambiar(ctrl, 'onTratarInformacionDMS', async (...a) => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
-                r = fr.evaluate("(c) => window.__rmdStats.observacionUno(c, 'PRUEBA SIMULADA: no se guarda').then(x => x, e => ({ error: e.message }))", RMD_ING)
+                r, contestados = contestar_portal(fr, pg, "(c) => window.__rmdStats.observacionUno(c, 'PRUEBA SIMULADA: no se guarda')", RMD_ING)
                 capt = fr.evaluate("window.__capt")
             finally:
                 fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
@@ -1263,8 +1294,8 @@ with sync_playwright() as p:
             upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
             otros = [c["tipo"] + " " + c["ruta"][:30] for c in capt if not (c["tipo"] == "update" and c["ruta"].startswith("/MD("))]
             obs_ok = bool(upd) and upd[0]["datos"]["observacion"] == (antes[0][1] or "").rstrip() + ("\n" if (antes[0][1] or "").strip() else "") + "PRUEBA SIMULADA: no se guarda"
-            ok = (not r.get("error") and antes[0][0] == "Ingresado" and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 467 and obs_ok and not otros and despues == antes and not bloq)
-            return ok, f"estado enviado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} otras escrituras={otros} SAP igual={despues == antes} {r.get('error', '')}"
+            ok = (not r.get("error") and antes[0][0] == "Ingresado" and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 467 and obs_ok and not otros and despues == antes and not bloq and len(contestados) >= 1)
+            return ok, f"estado enviado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} obs_ok={obs_ok} otras escrituras={otros} SAP igual={despues == antes} {r.get('error', '')} contestados por la prueba={contestados}"
         @prueba("T5 Suspender un INGRESADO (guardado SIMULADO + cortafuegos): el portal lo acepta con Estado 468, el motivo como línea nueva y la trazabilidad; en SAP no cambia nada")
         def _():
             bloq = []
@@ -1281,7 +1312,7 @@ with sync_playwright() as p:
                   cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
                   cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS', a: a.filter(x => typeof x === 'string') }); return {}; });
                   cambiar(ctrl, 'onTratarInformacionDMS', async (...a) => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
-                r = fr.evaluate("(c) => window.__rmdStats.suspenderUno(c, 'PRUEBA SIMULADA: no se guarda').then(x => x, e => ({ error: e.message }))", RMD_ING)
+                r, contestados = contestar_portal(fr, pg, "(c) => window.__rmdStats.suspenderUno(c, 'PRUEBA SIMULADA: no se guarda')", RMD_ING)
                 capt = fr.evaluate("window.__capt")
             finally:
                 fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
@@ -1289,8 +1320,33 @@ with sync_playwright() as p:
             despues = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_ING)
             upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
             traz = [c for c in capt if c["tipo"] == "create" and "TRAZABILIDAD" in c["ruta"]]
-            ok = (not r.get("error") and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and bool(traz) and despues == antes and not bloq)
-            return ok, f"estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} trazabilidad={bool(traz)} DMS={[c['tipo'] for c in capt if 'DMS' in c['tipo']]} SAP igual={despues == antes} {r.get('error', '')}"
+            ok = (not r.get("error") and antes[0][0] == "Ingresado" and bool(upd) and upd[0]["datos"]["estadoIdRmd_iMaestraId"] == 468 and bool(traz) and despues == antes and not bloq and len(contestados) >= 1)
+            return ok, f"antes={antes[0][0]} estado={upd and upd[0]['datos']['estadoIdRmd_iMaestraId']} trazabilidad={bool(traz)} DMS={[c['tipo'] for c in capt if 'DMS' in c['tipo']]} SAP igual={despues == antes} {r.get('error', '')} contestados por la prueba={contestados}"
+        @prueba("T6 Observación masiva en un Autorizado cuyo Guardar abre el «Comparador de fórmula» (SIMULADO + cortafuegos): el script lo reconoce, lo cierra sin confirmar y avisa que hay que hacerlo a mano; no se envía el MD ni queda ninguna ventana abierta")
+        def _():
+            bloq = []
+            def guardia(route):
+                if route.request.method not in ("GET", "HEAD"): bloq.append(route.request.method); route.abort()
+                else: route.continue_()
+            pg.route("**/*", guardia)
+            try:
+                antes = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion, m.nivelTxt]))", RMD_CMP)
+                fr.evaluate("""() => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')); const ctrl = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener;
+                  const m = ctrl.mainModelv2; window.__capt = []; window.__rest = [];
+                  const cambiar = (o, k, f) => { window.__rest.push([o, k, Object.prototype.hasOwnProperty.call(o, k), o[k]]); o[k] = f; };
+                  const sim = (tipo) => function (ruta, datos, params) { window.__capt.push({ tipo, ruta: String(ruta), datos: datos && JSON.parse(JSON.stringify(datos)) }); const p2 = tipo === 'remove' ? datos : params; setTimeout(() => { if (p2 && p2.success) p2.success(datos || {}); }, 30); };
+                  cambiar(m, 'update', sim('update')); cambiar(m, 'create', sim('create')); cambiar(m, 'remove', sim('remove'));
+                  cambiar(ctrl, 'sendDMS', async (...a) => { window.__capt.push({ tipo: 'DMS' }); return {}; }); cambiar(ctrl, 'onTratarInformacionDMS', async () => { window.__capt.push({ tipo: 'DMS-tratar' }); return {}; }); }""")
+                r, contestados = contestar_portal(fr, pg, "(c) => window.__rmdStats.observacionUno(c, 'PRUEBA SIMULADA: no se guarda')", RMD_CMP)
+                capt = fr.evaluate("window.__capt")
+                abiertas = fr.evaluate("[...document.querySelectorAll('.sapMDialog')].filter(x => x.getClientRects().length).map(x => (x.querySelector('h2') || {}).textContent)")
+            finally:
+                fr.evaluate("() => { (window.__rest || []).reverse().forEach(([o, k, propio, v]) => { if (propio) o[k] = v; else delete o[k]; }); window.__rest = []; }")
+                pg.unroute("**/*", guardia)
+            despues = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion, m.nivelTxt]))", RMD_CMP)
+            upd = [c for c in capt if c["tipo"] == "update" and c["ruta"].startswith("/MD(")]
+            ok = (antes[0][0] == "Autorizado" and "Comparador de fórmula" in (r.get("error") or "") and not upd and not abiertas and despues == antes and not bloq and not contestados)
+            return ok, f"antes={antes[0][0]} {antes[0][2]} error={r.get('error')!r} MD enviado={bool(upd)} otras={sorted({c['tipo'] + ' ' + c['ruta'][:16] for c in capt})} abiertas={abiertas} SAP igual={despues == antes}"
         cerrar_seguro()
 
     # ───────────────────────── V. v1.24: barra, selector de pasos (Agregar varias veces, SIMULADO), recetas desactualizadas, RMD en vivo y documentos citados de todos — no escribe ─────────────────────────
@@ -1538,6 +1594,24 @@ with sync_playwright() as p:
                 pg.unroute("**/*", guardia_w)
             ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId", "usuarioActualiza", "fechaActualiza"] and capt[0]["datos"]["usuarioActualiza"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
             return ok, f"enviado={capt} nota={nota[:120]!r}"
+        @prueba("W9 'Cambiar paso' (solo lectura): la búsqueda ofrece solo pasos de la estructura y la etiqueta de la lista de la fila (v1.70: un paso de otra etiqueta no se vería en Producción)")
+        def _():
+            pg.route("**/*", guardia_w)
+            try:
+                RmdAutomation(pg).editor_de_rmd(RMD_EDIT); pg.wait_for_timeout(4000)
+                abrir_dialogo(fr, pg, "PROCEDIMIENTO", "Adicionar Etiqueta"); abrir_dialogo(fr, pg, "FABRICACION", "Adicionar Pasos RMD"); pg.wait_for_timeout(5000)
+                marcar_fila(fr, pg, 3)
+                fr.locator(".rmd-cambiar-paso").click(); pg.wait_for_timeout(2500)
+                busquedas = {}
+                for q in ("calidad", "v°b°", "fecha hora"):
+                    fr.locator(".rmd-cp-q").fill(q); fr.locator(".rmd-cp-q").press("Enter"); pg.wait_for_timeout(4000)
+                    busquedas[q] = fr.evaluate("[[...document.querySelectorAll('.rmd-cp-res tbody tr')].map(tr => tr.children[3].textContent.replace(' (otra etiqueta)', '').trim()), (document.querySelector('.rmd-modal .rmd-progreso') || {}).textContent || '']")
+                cerrar_seguro()
+            finally:
+                pg.unroute("**/*", guardia_w)
+            etiquetas = {e for v in busquedas.values() for e in v[0]}
+            ok = etiquetas == {"FABRICACION"} and sum(len(v[0]) for v in busquedas.values()) > 0 and all("etiqueta FABRICACION" in v[1] or "Ningún paso" in v[1] for v in busquedas.values())
+            return ok, f"etiquetas={etiquetas} " + " · ".join(f"{q}: {len(v[0])} — {v[1][:110]!r}" for q, v in busquedas.items())
         @prueba("W7 Ninguna petición de escritura salió del navegador durante el bloque W")
         def _():
             return (not bloq_w), str(bloq_w[:5])
@@ -1979,8 +2053,9 @@ with sync_playwright() as p:
                     fr.locator(".rmd-cr .rmd-modal-pie button", has_text="Agregar observación a 1").click(); pg.wait_for_timeout(500)
                     aviso = fr.evaluate("(document.querySelector('.rmd-modal-aviso') || {}).innerText || ''")
                     fr.locator(".rmd-modal-aviso button", has_text="Agregar a 1").click()
-                    fr.wait_for_function("() => { const c = document.querySelector('.rmd-cr-fila .rmd-cr-obs'); return c && /^✓/.test(c.textContent.trim()); }", timeout=120000); pg.wait_for_timeout(600)
-                    marca = fr.evaluate("document.querySelector('.rmd-cr-fila .rmd-cr-obs').textContent.trim()")
+                    contestados_u6 = esperar_contestando(fr, pg, "(() => { const c = document.querySelector('.rmd-cr-fila .rmd-cr-obs'); return !!c && /^✓/.test(c.textContent.trim()); })()")
+                    pg.wait_for_timeout(600)
+                    marca = fr.evaluate("(document.querySelector('.rmd-cr-fila .rmd-cr-obs') || {}).textContent || ''").strip()
                     capt = fr.evaluate("window.__capt")
                     extra = fr.evaluate("[(document.querySelector('.rmd-toast') || {}).textContent, [...window.__rmdStats.recetasSap.estado.resultados.entries()]]")
                 finally:
@@ -1991,8 +2066,8 @@ with sync_playwright() as p:
                 obs = upd[0]["datos"].get("observacion", "") if upd else ""
                 nueva = obs[len((antes[0][1] or "").rstrip()):].lstrip("\n") if obs.startswith((antes[0][1] or "").rstrip()) else "?"
                 ok = (bool(upd) and re.fullmatch(r"\d{8}[A-ZÑ]{2} Actualización de Lista de Materiales \(editado\)", nueva) is not None and re.fullmatch(r"\d{8}[A-ZÑ]{2} Actualización de Lista de Materiales", propuesta) is not None and obs.startswith((antes[0][1] or "").rstrip()) and upd[0]["datos"].get("estadoIdRmd_iMaestraId") == 467
-                      and despues == antes and marca.startswith("✓") and "Agregar observación a 1" in " ".join(boton) and not [c for c in capt if c["tipo"] in ("create", "DMS", "DMS-tratar")] and not bloq_u)
-                return ok, f"línea={nueva!r} campos={list((upd[0]['datos'] if upd else {}).keys())} SAP igual={despues == antes} marca={marca!r} aviso={aviso[:160]!r} otras={[c['tipo'] for c in capt if c['tipo'] != 'update']} extra={extra} bloqueadas={bloq_u}"
+                      and despues == antes and marca.startswith("✓") and "Agregar observación a 1" in " ".join(boton) and not [c for c in capt if c["tipo"] in ("create", "DMS", "DMS-tratar")] and not bloq_u and len(contestados_u6) >= 1)
+                return ok, f"contestados por la prueba={contestados_u6} línea={nueva!r} campos={list((upd[0]['datos'] if upd else {}).keys())} SAP igual={despues == antes} marca={marca!r} aviso={aviso[:160]!r} otras={[c['tipo'] for c in capt if c['tipo'] != 'update']} extra={extra} bloqueadas={bloq_u}"
         finally:
             fr.evaluate("async (r) => { await window.__rmdStats.recetasSap.restaurar(r); }", respaldo_u)
             if not respaldo_u["hallazgos"] and not respaldo_u.get("ultima", {}).get("ing"): fr.evaluate("async () => { await window.__rmdStats.recetasSap.borrar(); }")
