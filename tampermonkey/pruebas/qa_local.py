@@ -704,7 +704,38 @@ with sync_playwright() as p:
           return { copia: txt(copia), otra: txt(otra), igual: igual.length }; }""")
         ok = (r["copia"] == ["ANA: valorFinal 4→3", "BETO: valorFinal 3→4"] and r["otra"] == ["ANA: valorFinal 4→3", "BETO: pasoHijoId_pasoId ?→P87680", "BETO: valorFinal 3→4"] and r["igual"] == 0)
         return ok, json.dumps(r, ensure_ascii=False)
-    @prueba("LN26Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
+    @prueba("LN25c Etiqueta del paso frente a su lista y a la etapa (v1.69): con etiqueta en la lista, la del paso del catálogo debe ser la misma; en una lista sin etiqueta solo avisa si el paso es de la etiqueta de otra etapa (no si es de una etiqueta cualquiera ni de la misma etapa); sin etapa conocida no adivina")
+    def _():
+        r = pg.evaluate("""() => { const S = window.__rmdStats.etiquetasPaso;
+          return [S.choca('FAB', 'FAB', 'FABRICACION', 'FABRICACION'), S.choca('FAB', 'ENV', 'ENVASE', 'FABRICACION'), S.choca('INSP', 'ACO', 'ACONDICIONADO', 'INSPECCIÓN'), S.choca(null, 'FAB', 'FABRICACION', 'ENVASE'),
+            S.choca(null, 'FAB', 'FABRICACION', 'FABRICACION'), S.choca(null, 'PRE', 'PREPARACION DEL MATERIAL DE ENVASE', 'FABRICACION'), S.choca(null, 'INSF', 'INSPECCION DE FRASCOS', 'INSPECCIÓN'), S.choca(null, 'ENV', 'ENVASE', ''),
+            S.etapa('Inspección de partículas visibles'), S.etapa('ENVASE'), S.etapa('PREPARACION DEL MATERIAL DE ENVASE')]; }""")
+        ok = r == [False, True, True, True, False, False, False, False, "INSPECCION", "ENVASE", ""]
+        return ok, json.dumps(r, ensure_ascii=False)
+    @prueba("LN25d Crear un paso solo para este RMD aplica las validaciones del Grabar del portal (v1.70): rango y decimales obligatorios según el tipo, Clave Modelo en Notificación y lapso no modificable si el paso está en un RMD Autorizado o Suspendido; con los mismos mensajes")
+    def _():
+        r = pg.evaluate("""() => { const llamadas = [], antes = window.sap;
+          window.sap = { ui: { require: () => null }, m: { MessageBox: { Icon: { ERROR: 'ERROR' }, alert: (t, o) => llamadas.push(['alert', t, o && o.title]), warning: (t) => llamadas.push(['warning', t]), error: (t) => llamadas.push(['error', t]) } } };
+          try {
+            const v = window.__rmdStats.validarComoGrabar, txt = { sMissingPasoRango: 'Debe completar los campos obligatorios para el tipo de dato seleccionado.', txtMessageLapsoNoModif: 'No se puede modificar o eliminar el lapso si ya se encuentra en un RMD Autorizado.' };
+            const b = { aConstantes: [{ codigoSap: 'IDTIPODATONOTIFICACION', contenido: '500' }, { codigoSap: 'IDESTRMDAUTORIZADO', contenido: '465' }], getView: () => ({ getModel: () => ({ getResourceBundle: () => ({ getText: (k) => txt[k] || k }) }) }) };
+            const lm = (p) => ({ getProperty: (k) => !!p[k] }), sinUso = { bloquean: [], enEste: true }, ing = { estadoIdRmd_iMaestraId: 467 }, aut = { estadoIdRmd_iMaestraId: 465 };
+            const dd = (x) => ({ tipoDatoId_iMaestraId: 501, valorInicial: '1', valorFinal: '2', margen: '0', decimales: '1', tipoLapsoId_motivoLapsoId: 'L1', clvModelo: '', ...x });
+            const res = [
+              v(b, lm({ '/editableEditRango': true }), dd({ margen: '' }), dd({}), sinUso, ing),
+              v(b, lm({ '/editableEditDecimales': true }), dd({ decimales: null }), dd({}), sinUso, ing),
+              v(b, lm({}), dd({ tipoDatoId_iMaestraId: 500 }), dd({}), sinUso, ing),
+              v(b, lm({}), dd({ tipoDatoId_iMaestraId: 500, clvModelo: 'PROCESO' }), dd({}), sinUso, ing),
+              v(b, lm({}), dd({ tipoLapsoId_motivoLapsoId: 'L2' }), dd({}), { bloquean: [{ codigo: 'X' }], enEste: false }, ing),
+              v(b, lm({}), dd({ tipoLapsoId_motivoLapsoId: 'L2' }), dd({}), sinUso, aut),
+              v(b, lm({}), dd({ tipoLapsoId_motivoLapsoId: 'L2' }), dd({}), sinUso, ing),
+              v(b, lm({ '/editableEditRango': true }), dd({}), dd({}), sinUso, ing)];
+            return { res, llamadas };
+          } finally { window.sap = antes; } }""")
+        ok = (r["res"] == [False, False, False, True, False, False, True, True] and [x[0] for x in r["llamadas"]] == ["alert", "alert", "warning", "error", "error"]
+              and r["llamadas"][0][1].startswith("Debe completar") and r["llamadas"][0][2] == "Error" and r["llamadas"][2][1] == "Debes seleccionar un campo de Clave Modelo." and r["llamadas"][3][1].startswith("No se puede modificar o eliminar el lapso"))
+        return ok, json.dumps(r, ensure_ascii=False)[:500]
+    @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
     def _():
         r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });
           const sap = [c('C4', '42094.000'), c('C5', '2.000'), c('C6', '5000.000'), c('C7', '1500.000'), c('C8', '900.000'), c('C9', '3000.000', 'KG'), c('C10', '1234567.000')];

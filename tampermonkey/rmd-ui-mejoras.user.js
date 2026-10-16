@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.68.0
+// @version      1.70.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.68.0';                                                       // mantener igual a @version
+  const VERSION = '1.70.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -297,10 +297,11 @@
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   /* elementos de baja */
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
-  .rmd-dep-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
-  .rmd-dep-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
+  .sapMDialog.sapMMessageDialog.rmd-espera-respuesta { z-index: 100002 !important; box-shadow: 0 0 0 3px var(--rmd-acento), 0 12px 32px rgba(0,0,0,.28) !important; }   /* encima de las ventanas del script: la responde la persona */
+  .rmd-dep-aviso, .rmd-etq-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-dep-aviso b, .rmd-etq-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
   .rmd-dep-aviso.ok { border-left-color: var(--rmd-verde); background: color-mix(in srgb, var(--rmd-verde) 14%, transparent); } .rmd-dep-aviso.ok b { color: inherit; } .rmd-dep-aviso.ok .rmd-dep-ico { background: var(--rmd-verde); color: #12331b; }
-  .rmd-dep-aviso button { margin-left: auto; flex: 0 0 auto; padding: 2px 10px; border: 1px solid rgba(229,57,53,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; }
+  .rmd-dep-aviso button, .rmd-etq-aviso button { margin-left: auto; flex: 0 0 auto; padding: 2px 10px; border: 1px solid rgba(229,57,53,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; }
   .rmd-bajas-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #f0b400; color: #1d2733; font: 700 14px/22px var(--rmd-fuente); text-align: center; animation: rmd-baja-pulso 2.4s ease-in-out 2; }
   .rmd-bajas-aviso button { margin-left: auto; padding: 2px 10px; border: 1px solid rgba(240,180,0,.7); border-radius: 12px; background: transparent; color: var(--rmd-texto); font: 600 12px var(--rmd-fuente); cursor: pointer; } .rmd-bajas-aviso button:hover { background: rgba(240,180,0,.25); }
   @keyframes rmd-baja-pulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(240,180,0,.6); } 50% { box-shadow: 0 0 0 7px rgba(240,180,0,0); } }
@@ -1622,6 +1623,7 @@
       d.classList.remove('rmd-g', 'rmd-pasos', 'rmd-medio', 'rmd-ancho', 'rmd-sticky'); revisarOrdenEstructuras(d, tabla); avisoRecetasRaiz(d, tabla);
       try { avisoBajasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoBajasRaiz: ' + e.message); }
       try { avisoDependenciasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoDependenciasRaiz: ' + e.message); }
+      try { avisoEtiquetasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoEtiquetasRaiz: ' + e.message); }
       try { avisoReglasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoReglasRaiz: ' + e.message); }
       return;
     }
@@ -2286,7 +2288,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -2612,16 +2614,30 @@
     for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 120);
   }
 
-  // mensajes del portal: acepta los de guardado; se detiene ante advertencia o error
+  // Mensajes del portal durante un proceso del script: no se responden por la persona. Se espera su respuesta y se lee qué botón pulsó
+  // (null: cerró sin botón o no respondió a tiempo).
+  const esAceptar = (t) => /^(OK|Aceptar|Sí|Si|Confirmar)$/i.test(norm(t || ''));
+  async function esperarRespuestaPortal(m, ms = 600000) {
+    let pulsado = null;
+    const oir = (e) => { const b = e.target.closest && e.target.closest('button'); if (b) pulsado = norm(b.textContent); };
+    m.addEventListener('click', oir, true); m.classList.add('rmd-espera-respuesta');
+    toast('El portal pide tu respuesta: contesta su mensaje para continuar.');
+    const t0 = Date.now(); while (Date.now() - t0 < ms && m.isConnected && m.getClientRects().length) await esperar(200);
+    m.removeEventListener('click', oir, true); m.classList.remove('rmd-espera-respuesta');
+    return pulsado;
+  }
+  // tras un guardado del script: éxito y confirmaciones las contesta la persona; una confirmación no aceptada, una advertencia o un error detienen
   async function atenderMensajes(ms = 20000, quietoMs = 1800) {
-    const t0 = Date.now(); let ultimo = Date.now(); const vistos = [];
-    while (Date.now() - t0 < ms) {
+    let limite = Date.now() + ms, ultimo = Date.now(); const t0 = Date.now(), vistos = [];
+    while (Date.now() < limite) {
       const m = [...document.querySelectorAll('.sapMMessageDialog')].filter((x) => x.getClientRects().length).pop();
       if (m) {
         const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent), texto = norm((m.querySelector('section') || {}).textContent);
-        const botones = [...m.querySelectorAll('footer button')].filter((b) => visible(b) && norm(b.textContent));
-        const ok = botones.find((b) => /^(OK|Aceptar|Sí|Si)$/i.test(norm(b.textContent)));
-        if (/[ÉE]xito|Confirmaci/i.test(titulo) && ok && !/elimin|borrar/i.test(texto)) { vistos.push(`${titulo}: ${texto}`); pulsar(ok); ultimo = Date.now(); await esperar(700); continue; }
+        if (/[ÉE]xito|Confirmaci/i.test(titulo) && !/elimin|borrar/i.test(texto)) {
+          const r = await esperarRespuestaPortal(m);
+          if (/Confirmaci/i.test(titulo) && !esAceptar(r)) return { problema: `${titulo}: ${texto} (no se aceptó)`, vistos };
+          vistos.push(`${titulo}: ${texto}`); ultimo = Date.now(); limite = Date.now() + ms; await esperar(400); continue;
+        }
         return { problema: `${titulo}: ${texto}`, vistos };
       }
       if (vistos.length && Date.now() - ultimo > quietoMs) break;
@@ -6423,11 +6439,14 @@
   }
   const ocupadoGlobal = () => ocupado() || [...document.querySelectorAll('#sapUiBusyIndicator, .sapUiBusyIndicator')].some(visible);
   const mensajesPortal = () => [...document.querySelectorAll('.sapMMessageDialog')].filter(visible);
-  async function cerrarMensajesPortal() {
+  // los mensajes que deja el Guardar los contesta la persona; se devuelven sus textos y lo que pulsó
+  async function responderMensajesPortal() {
     const textos = [];
-    for (const m of mensajesPortal()) {
-      textos.push(norm(m.querySelector('.sapMDialogSection, section') ? m.querySelector('.sapMDialogSection, section').textContent : m.textContent));
-      const b = [...m.querySelectorAll('footer button, .sapMDialogFooter button')].find(visible); if (b) pulsar(b);
+    for (let i = 0; i < 10; i++) {
+      const m = mensajesPortal().pop(); if (!m) break;
+      const texto = norm(m.querySelector('.sapMDialogSection, section') ? m.querySelector('.sapMDialogSection, section').textContent : m.textContent);
+      const r = await esperarRespuestaPortal(m); textos.push({ texto, respuesta: r });
+      if (m.isConnected && m.getClientRects().length) break;               // sin respuesta: se deja para la persona
       await esperar(300);
     }
     return textos;
@@ -6482,15 +6501,23 @@
       const reg = bGuardar && ((bGuardar.mEventRegistry || {}).press || [])[0]; if (!reg) throw new Error('no se encontró el botón Guardar');
       await reg.fFunction.call(reg.oListener, { getSource: () => bGuardar, getParameter: () => undefined, getParameters: () => ({}) });
       await esperar(400); await hasta(() => !ocupadoGlobal(), 60000);
-      const comparador = dialogos().find((x) => !previos.has(x) && x !== d && /compar/i.test(cabecera(x)));
+      // Comparador de fórmula (Autorizados de Fabricación / Envase): su título es «<código> - <producto>: Las cantidades … ¿desea continuar?»
+      const esComparador = (x) => !previos.has(x) && x !== d && (!!x.querySelector('[id*="ComparadorFormula"], [id*="ComparadorInsumo"]') || /compar|presentan diferencias/i.test(cabecera(x)));
+      await hasta(() => dialogos().some(esComparador) || mensajesPortal().length, 5000);
+      const comparador = dialogos().find(esComparador);
       if (comparador) {
-        const c = [...comparador.querySelectorAll('button')].find((x) => visible(x) && /^(Cancelar|Cerrar)$/.test(x.textContent.trim())); if (c) pulsar(c); await esperar(500);
+        const c = [...comparador.querySelectorAll('button')].find((x) => visible(x) && /^(Cancelar|Cerrar)$/.test(x.textContent.trim()));   // «Cerrar» (btnClose), no «Confirmar»
+        if (c) pulsar(c); else { const k = nucleo().byId(comparador.id); if (k && k.close) k.close(); }
+        await esperar(500);
         throw new Error('el portal pidió revisar las cantidades de insumos (Comparador de fórmula) y no guardó: hazlo a mano en este master');
       }
-      const mensajes = (await cerrarMensajesPortal()).filter((t) => !/guardaron los cambios correctamente/i.test(t));
+      const resp = await responderMensajesPortal();
+      const noAceptada = resp.find((x) => /\?\s*$|seguro|desea/i.test(x.texto) && !esAceptar(x.respuesta));
+      if (noAceptada) throw new Error(`no se aceptó el mensaje del portal («${noAceptada.texto.slice(0, 120)}»)`);
+      const mensajes = resp.map((x) => x.texto).filter((t) => !/guardaron los cambios correctamente/i.test(t));
       return { obs, mensajes };
     } finally {
-      await cerrarMensajesPortal();
+      await responderMensajesPortal();
       try { ctrl.onCancelAsociarArticulos(); } catch (e) { const b = [...d.querySelectorAll('button')].find((x) => visible(x) && /^Cancelar$/.test(x.textContent.trim())); if (b) pulsar(b); }
       await esperar(500);
     }
@@ -7521,27 +7548,66 @@
     const otros = [...porMd].filter(([id]) => id !== mdIdActual).map(([, v]) => v);
     return { enEste: porMd.has(mdIdActual), bloquean: otros.filter((x) => ESTADOS_BLOQUEAN.includes(x.idEstado)), abiertos: otros.filter((x) => !ESTADOS_CERRADOS.includes(x.idEstado)) };
   }
-  async function pasoDuplicado(modelo, d) {
+  // Producción muestra cada paso en la etiqueta de su paso del catálogo: un paso sugerido de otra etiqueta no se vería en la OP.
+  // lista = { estructuraId, etiquetaId } de la lista de la fila; sin ella, los del paso actual.
+  async function pasoDuplicado(modelo, d, lista) {
+    const destino = lista || { estructuraId: d.estructuraId_estructuraId, etiquetaId: d.etiquetaId_etiquetaId };
+    return (await pasoIgualEn(modelo, d.descripcion, destino, d.pasoId)) || pasoParecido(modelo, d, destino);
+  }
+  // mismo filtro que el aviso «El Paso ya se encuentra registrado…»
+  async function pasoIgualEn(modelo, texto, destino, sinPasoId) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
-    // mismo filtro que el aviso «El Paso ya se encuentra registrado…»
-    const f = [new Filtro('tolower(descripcion)', FO.EQ, "'" + String(d.descripcion || '').toLowerCase().replace("'", "''") + "'"), new Filtro('estructuraId_estructuraId', FO.EQ, d.estructuraId_estructuraId),
-      new Filtro('etiquetaId_etiquetaId', FO.EQ, d.etiquetaId_etiquetaId), new Filtro('pasoId', FO.NE, d.pasoId)];
-    const r = await leerTodoDe(modelo, 'PASO', f, { $select: 'pasoId,codigo,descripcion,activo' });
-    const exacto = r.filter((x) => x.activo !== false).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0))[0];
-    return exacto || pasoParecido(modelo, d);
+    const f = [new Filtro('tolower(descripcion)', FO.EQ, "'" + String(texto || '').toLowerCase().replace(/'/g, "''") + "'"), new Filtro('estructuraId_estructuraId', FO.EQ, destino.estructuraId),
+      new Filtro('etiquetaId_etiquetaId', FO.EQ, destino.etiquetaId || null)];
+    if (sinPasoId) f.push(new Filtro('pasoId', FO.NE, sinPasoId));
+    const r = await leerTodoDe(modelo, 'PASO', f, { $select: 'pasoId,codigo,descripcion,activo,etiquetaId_etiquetaId' });
+    return r.filter((x) => x.activo !== false).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0))[0] || null;
   }
   // comparación normalizada (mayúsculas, tildes, espacios, signos finales)
   const clavePaso = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9%°]+/g, ' ').trim();
-  async function pasoParecido(modelo, d) {
+  async function pasoParecido(modelo, d, destino) {
     const clave = clavePaso(d.descripcion); if (clave.length < 4) return null;
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     const palabras = clave.split(' ').filter((w) => w.length >= 4).sort((a, b) => b.length - a.length).slice(0, 2); if (!palabras.length) return null;
-    const f = palabras.map((w) => new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })).concat([new F('estructuraId_estructuraId', FO.EQ, d.estructuraId_estructuraId)]);
+    const f = palabras.map((w) => new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false }))
+      .concat([new F('estructuraId_estructuraId', FO.EQ, destino.estructuraId), new F('etiquetaId_etiquetaId', FO.EQ, destino.etiquetaId || null)]);
     if (d.pasoId) f.push(new F('pasoId', FO.NE, d.pasoId));
     const r = await leerTodoDe(modelo, 'PASO', [new F({ filters: f, and: true })], { $select: 'pasoId,codigo,descripcion,activo,etiquetaId_etiquetaId', $top: '200' }).catch(() => []);
-    return r.filter((x) => x.activo !== false && clavePaso(x.descripcion) === clave)
-      .sort((a, b) => (a.etiquetaId_etiquetaId === d.etiquetaId_etiquetaId ? 0 : 1) - (b.etiquetaId_etiquetaId === d.etiquetaId_etiquetaId ? 0 : 1) || (+a.codigo || 0) - (+b.codigo || 0))[0] || null;
+    return r.filter((x) => x.activo !== false && clavePaso(x.descripcion) === clave).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0))[0] || null;
   }
+  // ---- Etiqueta del paso frente a su lista y a la etapa ----
+  // Con etiqueta en la lista, la del paso del catálogo debe ser la misma; sin etiqueta, no puede ser la de otra etapa (las demás etiquetas
+  // en listas sin etiqueta son habituales y se ven en Producción).
+  const ETAPAS_RMD = ['FABRICACION', 'ENVASE', 'ACONDICIONADO', 'INSPECCION', 'RECUBRIMIENTO'];
+  const etapaDeTexto = (t) => { const x = SIN_ACENTOS(t || '').toUpperCase().trim(); return ETAPAS_RMD.find((e) => x === e || x.startsWith(e + ' ')) || ''; };
+  const etiquetaChoca = (etqLista, etqPaso, nombrePaso, etapaRmd) => {
+    if ((etqPaso || null) === (etqLista || null)) return false;
+    if (etqLista) return true;
+    const e = etapaDeTexto(nombrePaso), r = etapaDeTexto(etapaRmd); return !!e && !!r && e !== r;
+  };
+  let catEtiquetas = null;
+  const nombresEtiqueta = (modelo) => (catEtiquetas = catEtiquetas || leerTodoDe(modelo, 'ETIQUETA', [], { $select: 'etiquetaId,descripcion' })
+    .then((r) => new Map(r.map((x) => [x.etiquetaId, norm(x.descripcion)]))).catch((e) => { catEtiquetas = null; throw e; }));
+  async function listaDeFila(modelo, idPaso) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const [x] = await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdEstructuraPasoId', 'EQ', idPaso)], { $select: 'mdEstructuraPasoId,estructuraId_estructuraId,mdEsEtiquetaId_mdEsEtiquetaId' }); if (!x) return null;
+    let etiquetaId = null;
+    if (x.mdEsEtiquetaId_mdEsEtiquetaId) { const [e] = await leerTodoDe(modelo, 'MD_ES_ETIQUETA', [new F('mdEsEtiquetaId', 'EQ', x.mdEsEtiquetaId_mdEsEtiquetaId)], { $select: 'mdEsEtiquetaId,etiquetaId_etiquetaId' }); etiquetaId = e ? e.etiquetaId_etiquetaId : null; }
+    return { estructuraId: x.estructuraId_estructuraId, etiquetaId };
+  }
+  // lista de la fila que se edita (de un proceso menor, la de su paso)
+  async function listaDeEdicion(modelo, lm, comp) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    if (comp === 'pasoHijo') {
+      const c = lm.getProperty('/listMdEsPasoInsumoPaso') || {}; let padre = c.pasoId_mdEstructuraPasoId;
+      if (!padre && c.mdEstructuraPasoInsumoPasoId) { const [m] = await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('mdEstructuraPasoInsumoPasoId', 'EQ', c.mdEstructuraPasoInsumoPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,pasoId_mdEstructuraPasoId' }); padre = m && m.pasoId_mdEstructuraPasoId; }
+      return padre ? listaDeFila(modelo, padre) : null;
+    }
+    const g = lm.getProperty('/listMdEsPasoPadre') || {}; return g.mdEstructuraPasoId ? listaDeFila(modelo, g.mdEstructuraPasoId) : null;
+  }
+  const codigoPasoNuevo = (modelo) => new Promise((ok, mal) => modelo.callFunction('/obtenerCodigoCorrelativo', { method: 'GET', urlParameters: { sTipo: 'PASO_CODIGO' }, async: true,
+    success: (d) => { const c = String(d && d.obtenerCodigoCorrelativo); if (/^\d+$/.test(c)) ok(c); else mal(new Error('el portal no devolvió un código de paso válido')); },
+    error: (e) => mal(new Error((e && (e.responseText || e.message)) || 'no se pudo obtener el código del paso')) }));
   const modeloEscribir = (modelo, metodo, ruta, datos) => new Promise((ok, mal) => {
     const cb = { success: (r) => ok(r), error: (e) => mal(new Error((e && (e.responseText || e.message)) || 'error del servidor')) };
     if (metodo === 'create') modelo.create(ruta, datos, cb); else modelo.update(ruta, datos, cb);
@@ -7585,13 +7651,13 @@
       catch (e) { bt.disabled = false; toast('No se pudo corregir: ' + e.message, true); }
     });
   }
-  async function nuevoPasoSoloEste(M, b, comp, d, dup) {
+  async function nuevoPasoSoloEste(M, b, comp, d, dup, lista) {
     const lm = b.getView().getModel('localModel'), modelo = b.getView().getModel('mainModelv2'), usuario = ((lm.getProperty('/oInfoUsuario') || {}).data || {}).usuario;
     let pasoId = dup && dup.pasoId, codigo = dup && dup.codigo;
     if (!pasoId) {
       codigo = await M.getNextNumber('PASO_CODIGO');
       const nuevo = { usuarioRegistro: usuario, fechaRegistro: new Date(), activo: true, pasoId: crypto.randomUUID(), codigo, descripcion: d.descripcion, numeracion: d.numeracion, tipoDatoId_iMaestraId: d.tipoDatoId_iMaestraId,
-        estadoId_iMaestraId: d.estadoId_iMaestraId, estructuraId_estructuraId: d.estructuraId_estructuraId, etiquetaId_etiquetaId: d.etiquetaId_etiquetaId, valorInicial: d.valorInicial, valorFinal: d.valorFinal, margen: d.margen,
+        estadoId_iMaestraId: d.estadoId_iMaestraId, estructuraId_estructuraId: lista ? lista.estructuraId : d.estructuraId_estructuraId, etiquetaId_etiquetaId: lista ? lista.etiquetaId : d.etiquetaId_etiquetaId, valorInicial: d.valorInicial, valorFinal: d.valorFinal, margen: d.margen,
         decimales: d.decimales, tipoLapsoId_motivoLapsoId: d.tipoLapsoId_motivoLapsoId, tipoCondicionId_iMaestraId: d.tipoCondicionId_iMaestraId };
       await modeloEscribir(modelo, 'create', '/PASO', nuevo); pasoId = nuevo.pasoId;
     }
@@ -7628,12 +7694,14 @@
     const ta = campoDe(d, 'Descripción Paso') || campoDe(d, 'Descripción'); if (!ta) return;
     d.__rmdDupVigilado = true;
     const comp = bG.data && bG.data('component');
-    let reloj = 0, ultima = null;
+    let reloj = 0, ultima = null, listaP = null;
     const revisar = async () => {
       const b = controladorPrincipal(); if (!b || !d.isConnected) return;
       const lm = b.getView().getModel('localModel'), dd = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado'); if (!dd || !dd.pasoId) return;
+      const modelo = b.getView().getModel('mainModelv2'); if (!listaP) { listaP = listaDeEdicion(modelo, lm, comp).catch(() => null); listaP.then((li) => avisoEtiquetaAlEditar(d, M, b, comp, li)); }
       const texto = norm(ta.value); if (texto === ultima) return; ultima = texto;
-      let dup = null; try { dup = await pasoDuplicado(b.getView().getModel('mainModelv2'), { ...dd, descripcion: texto }); } catch (e) { dup = null; }
+      const li = await listaP;
+      let dup = null; try { dup = await pasoDuplicado(modelo, { ...dd, descripcion: texto }, li); } catch (e) { dup = null; }
       if (!d.isConnected || norm(ta.value) !== texto) return;
       d.querySelectorAll('.rmd-ep-dup').forEach((x) => x.remove()); if (!dup) return;
       const a = document.createElement('div'); a.className = 'rmd-ep-aviso rmd-ep-dup';
@@ -7643,7 +7711,7 @@
         const ok = await confirmar('¿Usar el paso que ya existe?', `Esta fila pasará a usar el paso ${dup.codigo} — ${dup.descripcion}.`, 'No se crea un paso nuevo ni se cambia el paso actual en otros RMD; se conserva la configuración de esta fila. Los demás cambios que hayas escrito en esta ventana no se guardan.');
         if (!ok) return;
         bu.disabled = true; sap.ui.core.BusyIndicator.show(0);
-        try { await nuevoPasoSoloEste(M, b, comp, dd, dup); toast(`Listo: esta fila usa ahora el paso ${dup.codigo}, con su misma configuración.`); }
+        try { await nuevoPasoSoloEste(M, b, comp, dd, dup, li); toast(`Listo: esta fila usa ahora el paso ${dup.codigo}, con su misma configuración.`); }
         catch (e) { bu.disabled = false; toast('No se pudo cambiar al paso existente: ' + e.message, true); }
         finally { sap.ui.core.BusyIndicator.hide(); }
       });
@@ -7653,6 +7721,47 @@
     ta.addEventListener('input', () => { clearTimeout(reloj); reloj = setTimeout(revisar, 700); });
     setTimeout(revisar, 300);
   }
+  // el paso que se edita es de otra etiqueta que su lista: no se ve en Producción; se pasa a un paso de esta etiqueta (el que exista o uno nuevo)
+  async function avisoEtiquetaAlEditar(d, M, b, comp, li) {
+    if (!li || !d.isConnected || d.querySelector('.rmd-ep-etq')) return;
+    const lm = b.getView().getModel('localModel'), dd = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado'), md = b.getView().getModel('asociarDatos').getData(); if (!dd || !dd.pasoId) return;
+    const modelo = b.getView().getModel('mainModelv2'), nom = await nombresEtiqueta(modelo).catch(() => new Map());
+    if (!etiquetaChoca(li.etiquetaId, dd.etiquetaId_etiquetaId, nom.get(dd.etiquetaId_etiquetaId), md.nivelTxt) || !d.isConnected) return;
+    const a = document.createElement('div'); a.className = 'rmd-ep-aviso rmd-ep-etq';
+    a.innerHTML = `⚠ Este paso es de la etiqueta <b>${esc(nom.get(dd.etiquetaId_etiquetaId) || 'sin etiqueta')}</b> en el catálogo y esta lista es de <b>${esc(nom.get(li.etiquetaId) || 'sin etiqueta')}</b>: <b>en Producción no se verá</b>. `;
+    if (+md.estadoIdRmd_iMaestraId === 467) {
+      const bu = document.createElement('button'); bu.type = 'button'; bu.className = 'rmd-btn primario'; bu.textContent = 'Pasar a un paso de esta etiqueta';
+      bu.addEventListener('click', async () => {
+        const texto = norm((campoDe(d, 'Descripción Paso') || campoDe(d, 'Descripción') || {}).value || dd.descripcion);
+        if (!await confirmar('¿Pasar a un paso de esta etiqueta?', `Esta fila usará un paso «${texto.slice(0, 90)}» de la etiqueta ${nom.get(li.etiquetaId) || 'de la lista'}: el que ya exista o uno nuevo.`, 'Se conserva la configuración de la fila; no cambia otros RMD.')) return;
+        const ya = await pasoIgualEn(modelo, texto, li).catch(() => null), nn = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionadoBackUp' : '/pasoHijoSeleccionadoBackUp');
+        if (!ya && !validarComoGrabar(b, lm, dd, nn, await usoDelPaso(modelo, dd.pasoId, md.mdId), md)) return;
+        bu.disabled = true; sap.ui.core.BusyIndicator.show(0);
+        try { const cod = await nuevoPasoSoloEste(M, b, comp, { ...dd, descripcion: texto }, ya, li); textosRmd.delete(md.mdId); toast(`Listo: esta fila usa ahora el paso ${cod}${ya ? '' : ', creado para esta etiqueta'}.`); }
+        catch (e) { bu.disabled = false; toast('No se pudo cambiar el paso: ' + e.message, true); }
+        finally { sap.ui.core.BusyIndicator.hide(); }
+      });
+      a.appendChild(bu);
+    } else a.insertAdjacentHTML('beforeend', 'Corrígelo en una versión nueva.');
+    const sec = d.querySelector('.sapMDialogSection'); if (sec) sec.prepend(a);
+  }
+  // Validaciones del Grabar del portal (onGrabarPasoPadre) para crear un paso solo para este RMD: rango y decimales obligatorios según el tipo,
+  // Clave Modelo en «Notificación» y lapso no modificable en un paso de RMD Autorizados o Suspendidos. Constantes de la tabla del portal.
+  function validarComoGrabar(b, lm, dd, nn, uso, md) {
+    const MB = sap.ui.require('sap/m/MessageBox') || sap.m.MessageBox;
+    const i18n = (k, def) => { try { const t = b.getView().getModel('i18n').getResourceBundle().getText(k); return t && t !== k ? t : def; } catch (e) { return def; } };
+    const cte = (c, def) => { const x = (b.aConstantes || []).find((y) => y.codigoSap === c); return x ? parseInt(x.contenido, 10) : def; };
+    const vacio = (v) => v === '' || v == null;
+    if ((lm.getProperty('/editableEditRango') && ['valorInicial', 'valorFinal', 'margen', 'decimales'].some((k) => vacio(dd[k]))) || (lm.getProperty('/editableEditDecimales') && vacio(dd.decimales))) {
+      MB.alert(i18n('sMissingPasoRango', 'Debe completar los campos obligatorios para el tipo de dato seleccionado.'), { icon: MB.Icon.ERROR, title: 'Error' }); return false; }
+    const notif = cte('IDTIPODATONOTIFICACION', null);
+    if (notif != null && +dd.tipoDatoId_iMaestraId === notif && !dd.clvModelo) { MB.warning('Debes seleccionar un campo de Clave Modelo.'); return false; }
+    const aut = cte('IDESTRMDAUTORIZADO', 465), lapso = nn && nn.tipoLapsoId_motivoLapsoId;
+    if (lapso && lapso !== dd.tipoLapsoId_motivoLapsoId && (uso.bloquean.length || (uso.enEste && +md.estadoIdRmd_iMaestraId === aut))) {
+      MB.error(i18n('txtMessageLapsoNoModif', 'No se puede modificar o eliminar el lapso si ya se encuentra en un RMD Autorizado.')); return false; }
+    return true;
+  }
+  window.__rmdStats.validarComoGrabar = validarComoGrabar;   // pruebas
   function gestionarEdicionPasos() {
     const d = dialogos().find((x) => /^Editar Paso/i.test(cabecera(x))); if (!d || typeof sap === 'undefined') return;
     const bG = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((x) => x && x.getText && x.getText() === 'Grabar');
@@ -7673,15 +7782,17 @@
         const dd = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado'), nn = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionadoBackUp' : '/pasoHijoSeleccionadoBackUp');
         if (!dd || !dd.pasoId || JSON.stringify(dd) === JSON.stringify(nn)) return portal();
         const modelo = b.getView().getModel('mainModelv2'), md = b.getView().getModel('asociarDatos').getData();
-        const [uso, dup] = await Promise.all([usoDelPaso(modelo, dd.pasoId, md.mdId), pasoDuplicado(modelo, dd)]);
+        const li = await listaDeEdicion(modelo, lm, comp).catch(() => null);
+        const [uso, dup] = await Promise.all([usoDelPaso(modelo, dd.pasoId, md.mdId), pasoDuplicado(modelo, dd, li)]);
         const hayDup = dup && clavePaso(dd.descripcion) !== clavePaso((nn || {}).descripcion) ? dup : (uso.bloquean.length ? dup : null);
         if (!uso.abiertos.length && !uso.bloquean.length && !hayDup) return portal();
         const cambios = CAMPOS_PASO.filter(([k]) => String((nn || {})[k] == null ? '' : nn[k]) !== String(dd[k] == null ? '' : dd[k])).map(([clave, nombre]) => ({ clave, nombre }));
         const eleccion = await elegirEdicionPaso({ codigo: (nn && nn.codigo) || dd.codigo, antes: norm((nn || {}).descripcion), descripcion: norm(dd.descripcion), cambios, enEste: uso.enEste, abiertos: uso.abiertos, bloquean: uso.bloquean, dup: hayDup });
         if (!eleccion) return undefined;
         if (eleccion === 'sobrescribir') return portal();
+        if (!hayDup && !validarComoGrabar(b, lm, dd, nn, uso, md)) return undefined;   // se crea un paso con estos datos: mismas reglas que el Grabar
         sap.ui.core.BusyIndicator.show(0);
-        try { const cod = await nuevoPasoSoloEste(M, b, comp, dd, hayDup); toast(hayDup ? `Este RMD usa ahora el paso ${cod}.` : `Se creó el paso ${cod} solo para este RMD.`); }
+        try { const cod = await nuevoPasoSoloEste(M, b, comp, dd, hayDup, li); toast(hayDup ? `Este RMD usa ahora el paso ${cod}.` : `Se creó el paso ${cod} solo para este RMD.`); }
         finally { sap.ui.core.BusyIndicator.hide(); }
         return undefined;
       } catch (err) { toast('No se pudo revisar dónde está el paso: ' + (err.message || err) + '. Se sigue con el Grabar del portal.', true); return portal(); }
@@ -8438,6 +8549,11 @@
     const modelo = b.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     const pms = esMenor ? [] : await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('pasoId_mdEstructuraPasoId', 'EQ', o.mdEstructuraPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,activo' }).catch(() => []);
     const nPM = pms.filter((x) => x.activo !== false).length;
+    // la lista de la fila manda (de un proceso menor, la de su paso): mismas reglas que la etiqueta de otra etapa
+    const [lista, nomEtq] = await Promise.all([listaDeFila(modelo, esMenor ? (o.pasoId_mdEstructuraPasoId || (o.pasoId && o.pasoId.mdEstructuraPasoId)) : o.mdEstructuraPasoId).catch(() => null), nombresEtiqueta(modelo).catch(() => new Map())]);
+    const destino = lista || { estructuraId: m.estructuraId_estructuraId, etiquetaId: m.etiquetaId_etiquetaId };
+    const permitido = (x) => !etiquetaChoca(destino.etiquetaId, x.etiquetaId_etiquetaId, nomEtq.get(x.etiquetaId_etiquetaId), md.nivelTxt);
+    const nombreLista = destino.etiquetaId ? nomEtq.get(destino.etiquetaId) || 'de la lista' : '';
     const v = ventana('Cambiar el paso por otro código', { cancelar: () => v.cerrar() });
     const tipo = nombreTipo(o.tipoDatoId_iMaestraId, tabla) || '';
     v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>${esMenor ? 'Proceso menor' : 'Paso'} actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p></div>
@@ -8448,6 +8564,7 @@
     let elegido = null, hallados = [];
     const bCambiar = botonModal('Cambiar paso', 'primario', async () => {
       if (!elegido) return;
+      if (!permitido(elegido)) { setTxt(prog, `El paso ${elegido.codigo} es de otra etiqueta: en Producción no se vería en esta lista.`); return; }
       const ok = await confirmar('¿Cambiar el paso?', `Orden ${o.orden}: el ${esMenor ? 'proceso menor' : 'paso'} ${m.codigo} pasa a ser el ${elegido.codigo} — ${elegido.descripcion}.`, `Se conserva la configuración de esta fila${esMenor ? '' : ` y sus ${nPM} proceso(s) menor(es)`}. Los demás RMD no cambian.`, { si: 'Cambiar', no: 'Cancelar' });
       if (!ok) return;
       window.__rmdCambiando = true; bCambiar.disabled = true; sap.ui.core.BusyIndicator.show(0);
@@ -8467,12 +8584,14 @@
     const buscar = async () => {
       const t = norm(q.value); if (t.length < 1) { setTxt(prog, 'Escribe un código o palabras de la descripción.'); return; }
       setTxt(prog, 'Buscando…'); elegido = null;
-      const f = [new F('estructuraId_estructuraId', 'EQ', m.estructuraId_estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId)];
+      const f = [new F('estructuraId_estructuraId', 'EQ', destino.estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId)];
+      if (destino.etiquetaId) f.push(new F('etiquetaId_etiquetaId', 'EQ', destino.etiquetaId));
       if (/^\d+$/.test(t)) f.push(new F('codigo', 'EQ', t)); else t.split(/\s+/).forEach((w) => f.push(new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
       try {
         hallados = (await new Promise((ok, mal) => modelo.read('/PASO', { filters: [new F({ filters: f, and: true })], urlParameters: { $expand: 'etiquetaId,tipoDatoId', $top: '60', $orderby: 'codigo' }, success: (r) => ok(r.results || []), error: mal })));
-        hallados.sort((a, c) => (a.etiquetaId_etiquetaId === m.etiquetaId_etiquetaId ? 0 : 1) - (c.etiquetaId_etiquetaId === m.etiquetaId_etiquetaId ? 0 : 1) || (+a.codigo || 0) - (+c.codigo || 0));
-        setTxt(prog, hallados.length ? `${hallados.length} paso(s) de la misma estructura${hallados.length === 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : 'Ningún paso de la misma estructura coincide.');
+        const fuera = hallados.filter((x) => !permitido(x)).length; hallados = hallados.filter(permitido).sort((a, c) => (+a.codigo || 0) - (+c.codigo || 0));
+        const donde = nombreLista ? `de la estructura y la etiqueta ${nombreLista}` : 'de la misma estructura';
+        setTxt(prog, (hallados.length ? `${hallados.length} paso(s) ${donde}${hallados.length >= 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : `Ningún paso ${donde} coincide.`) + (fuera ? ` Se omiten ${fuera} de la etiqueta de otra etapa (en Producción no se verían).` : ''));
       } catch (e) { hallados = []; setTxt(prog, 'No se pudo buscar: ' + ((e && e.message) || e)); }
       pintar();
     };
@@ -8785,12 +8904,13 @@
   async function leerTextosRmd(modelo, md) {
     const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new Filtro('mdId_mdId', 'EQ', md.mdId)], t0 = Date.now();
     const activo = (x) => x && x.activo !== false;
-    const [pasos, etiquetas, pms, equipos, utensilios] = await Promise.all([
+    const [pasos, etiquetas, pms, equipos, utensilios, nomEtq] = await Promise.all([
       leerTodoDe(modelo, 'MD_ES_PASO', porMd, { $expand: 'pasoId,mdEstructuraId,mdEstructuraId/estructuraId' }),
       leerTodoDe(modelo, 'MD_ES_ETIQUETA', porMd, { $expand: 'etiquetaId' }),
       leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', porMd, { $expand: 'pasoHijoId' }),
       leerTodoDe(modelo, 'MD_ES_EQUIPO', porMd, { $expand: 'equipoId' }).catch(() => []),
       leerTodoDe(modelo, 'MD_ES_UTENSILIO', porMd, { $expand: 'utensilioId' }).catch(() => []),
+      nombresEtiqueta(modelo).catch(() => new Map()),
     ]);
     const etq = new Map(etiquetas.filter(activo).map((e) => [e.mdEsEtiquetaId, e]));
     const pmsDe = new Map(); pms.filter(activo).filter((x) => x.pasoHijoId).forEach((x) => { const k = x.pasoId_mdEstructuraPasoId; if (!pmsDe.has(k)) pmsDe.set(k, []); pmsDe.get(k).push(x); });
@@ -8844,6 +8964,20 @@
     const grafo = new Map([...vivoId.values()].map((x) => [x.mdEstructuraPasoId, x.dependeMdEstructuraPasoId || '']));
     r.dependencias.forEach((y) => grafo.set(y.id, y.fix.id));
     r.dependencias.forEach((y) => { let c = y.fix.id, n = 0; while (c && n++ < 2000) { if (c === y.id) { y.fix = { id: '', codigo: '', orden: null }; grafo.set(y.id, ''); break; } c = grafo.get(c); } });
+    // Pasos y procesos menores de la etiqueta de otra etapa (Producción los agrupa por la etiqueta de su paso del catálogo y no se ven)
+    r.etiquetas = [];
+    const etapa = md.nivelTxt || '', nombreEtq = (id) => nomEtq.get(id) || '';
+    ordenadas.forEach((l) => l.pasos.forEach((x) => {
+      const e = etq.get(x.mdEsEtiquetaId_mdEsEtiquetaId), eL = e ? e.etiquetaId_etiquetaId : null, pp = obj(x.pasoId);
+      const base = { lista: l.lista, estr: x.mdEstructuraId_mdEstructuraId, etq: x.mdEsEtiquetaId_mdEsEtiquetaId || null, estructuraId: x.estructuraId_estructuraId, etqLista: eL, nombreLista: nombreEtq(eL), orden: x.orden };
+      if (etiquetaChoca(eL, pp.etiquetaId_etiquetaId, nombreEtq(pp.etiquetaId_etiquetaId), etapa))
+        r.etiquetas.push({ ...base, tipo: 'paso', id: x.mdEstructuraPasoId, codigo: String(pp.codigo || ''), desc: norm(pp.descripcion), pasoId: pp.pasoId, nombrePaso: nombreEtq(pp.etiquetaId_etiquetaId) });
+      (pmsDe.get(x.mdEstructuraPasoId) || []).forEach((q) => {
+        if (q.estructuraRecetaInsumoId_estructuraRecetaInsumoId || q.Component) return; const h = obj(q.pasoHijoId);
+        if (etiquetaChoca(eL, h.etiquetaId_etiquetaId, nombreEtq(h.etiquetaId_etiquetaId), etapa))
+          r.etiquetas.push({ ...base, tipo: 'pm', id: q.mdEstructuraPasoInsumoPasoId, padreId: x.mdEstructuraPasoId, pmOrden: q.orden, padreCodigo: String(pp.codigo || ''), codigo: String(h.codigo || ''), desc: norm(h.descripcion), pasoId: h.pasoId, nombrePaso: nombreEtq(h.etiquetaId_etiquetaId) });
+      });
+    }));
     r.segundos = Math.max(1, Math.round((Date.now() - t0) / 1000));
     return r;
   }
@@ -8943,24 +9077,97 @@
       }, () => { /* sin conexión: sin aviso */ });
     } else if (d.__rmdDep && !d.querySelector('.rmd-dep-aviso')) pintarAvisoDependencias(d, tabla, d.__rmdDep, true);
   }
+  // ---- Paso de la etiqueta de otra etapa: aviso en la ventana raíz y al autorizar; «Corregir» en Ingresados ----
+  const ETQ_FIX = { simular: null };   // pruebas: (metodo, ruta, datos) => …
+  const etqLinea = (y) => `${y.lista} › orden ${y.orden}${y.tipo === 'pm' ? ` › proceso menor ${y.pmOrden}` : ''} (${y.codigo}) es de ${y.nombrePaso || 'sin etiqueta'}`;
+  function pintarAvisoEtiquetas(d, ancla, x, antes) {
+    let a = d.querySelector('.rmd-etq-aviso');
+    if (!x || !x.items.length) { if (a) a.remove(); return; }
+    if (!a) { a = document.createElement('div'); a.className = 'rmd-etq-aviso'; a.setAttribute('role', 'alert'); ancla.insertAdjacentElement(antes ? 'beforebegin' : 'afterbegin', a);
+      a.addEventListener('click', (e) => { if (e.target.closest('button')) { e.stopPropagation(); abrirDetalleEtiquetas(a.__x, d); } }); }
+    a.__x = x; const n = x.items.length, ing = +x.md.estadoIdRmd_iMaestraId === 467;
+    const t = `<span class="rmd-dep-ico" aria-hidden="true">✕</span><span><b>${x.autorizar ? 'No autorices todavía: ' : ''}${n} paso${n > 1 ? 's' : ''} de la etiqueta de otra etapa</b>: en Producción no se ve${n > 1 ? 'n' : ''}. ${esc(x.items.slice(0, 2).map(etqLinea).join(' · '))}${n > 2 ? ` y ${n - 2} más` : ''}.${ing ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</span><button type="button">${ing && !x.sinIr ? 'Ver y corregir' : 'Ver'}</button>`;
+    if (a.innerHTML !== t) a.innerHTML = t;
+  }
+  function abrirDetalleEtiquetas(x, dOrigen) {
+    const v = ventana('Pasos de la etiqueta de otra etapa', { cancelar: () => v.cerrar() }), ing = +x.md.estadoIdRmd_iMaestraId === 467;
+    const pintar = () => { v.cuerpo.innerHTML = `<p>Producción muestra cada paso en la etiqueta que tiene en el catálogo. Estos son de otra etiqueta que su lista, así que <b>en la OP no se ven</b>:</p>
+      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Etiqueta del paso</th><th></th></tr></thead><tbody>${x.items.map((y, i) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}${y.tipo === 'pm' ? ` › ${esc(y.pmOrden)}` : ''}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 90))}${y.tipo === 'pm' ? ' <span class="rmd-nota">(proceso menor)</span>' : ''}</td><td class="rmd-dif">${esc(y.nombrePaso || 'sin etiqueta')}</td>
+        <td class="rmd-nowrap">${y.hecho ? `<span class="rmd-nota">✓ ahora ${esc(y.hecho)}</span>` : `${ing ? `<button type="button" class="rmd-btn" data-c="${i}">Corregir</button> ` : ''}${x.sinIr ? '' : `<button type="button" class="rmd-link" data-i="${i}">Ir al paso</button>`}`}</td></tr>`).join('')}</tbody></table>
+      <p class="rmd-nota">${ing ? '«Corregir» deja la fila con un paso del mismo texto de la etiqueta de su lista (el que ya exista o uno nuevo); se conserva su configuración y no cambia otros RMD.' : 'Este RMD no está Ingresado: corrígelo en una versión nueva, cambiando el paso por uno de la etiqueta de su lista.'}</p>`; };
+    pintar();
+    v.cuerpo.addEventListener('click', async (e) => {
+      const bc = e.target.closest('[data-c]'), bi = e.target.closest('[data-i]');
+      if (bi) { const y = x.items[+bi.dataset.i]; v.cerrar(); ppIrASap({ codigo: x.md.codigo, version: x.md.version }, { estr: y.estr, etq: y.etq, id: y.tipo === 'pm' ? y.padreId : y.id }); return; }
+      if (!bc) return; const y = x.items[+bc.dataset.c];
+      if (!await confirmar('¿Corregir la etiqueta de este paso?', `${etqLinea(y)}; su lista es de ${y.nombreLista || 'una etiqueta sin nombre'}.`, 'La fila pasará a usar un paso con el mismo texto de la etiqueta de su lista (el que ya exista o uno nuevo). Se conserva su configuración; no cambia otros RMD.')) return;
+      bc.disabled = true;
+      try { const r = await corregirEtiquetaPaso(controladorPrincipal(), x.md, y); y.hecho = `${r.codigo}${r.nuevo ? ' (nuevo)' : ''}`; textosRmd.delete(x.md.mdId); if (dOrigen) dOrigen.__rmdEtqFirma = '';
+        toast(`Listo: ${y.lista} › orden ${y.orden} usa ahora el paso ${r.codigo}${r.nuevo ? `, creado con la etiqueta ${y.nombreLista || 'de su lista'}` : ''}.`); }
+      catch (err) { bc.disabled = false; toast('No se pudo corregir: ' + err.message, true); }
+      pintar();
+    });
+    v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar()));
+  }
+  async function corregirEtiquetaPaso(ctrl, md, y) {
+    if (+md.estadoIdRmd_iMaestraId !== 467) throw new Error('el RMD no está Ingresado');
+    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, usuario = codigoUsuario(ctrl), ahora = new Date();
+    const escribir = (metodo, ruta, datos) => (ETQ_FIX.simular ? Promise.resolve(ETQ_FIX.simular(metodo, ruta, datos)) : modeloEscribir(modelo, metodo, ruta, datos));
+    const [cat] = await leerTodoDe(modelo, 'PASO', [new F('pasoId', 'EQ', y.pasoId)], {}); if (!cat) throw new Error(`no se encontró el paso ${y.codigo}`);
+    const destino = { estructuraId: y.estructuraId, etiquetaId: y.etqLista };
+    let p = await pasoIgualEn(modelo, cat.descripcion, destino), nuevo = false;
+    if (!p) {
+      const codigo = ETQ_FIX.simular ? 'NUEVO' : await codigoPasoNuevo(modelo);
+      const datos = { usuarioRegistro: usuario, fechaRegistro: ahora, activo: true, pasoId: crypto.randomUUID(), codigo, descripcion: cat.descripcion, numeracion: cat.numeracion, tipoDatoId_iMaestraId: cat.tipoDatoId_iMaestraId,
+        estadoId_iMaestraId: cat.estadoId_iMaestraId, estructuraId_estructuraId: destino.estructuraId, etiquetaId_etiquetaId: destino.etiquetaId, valorInicial: cat.valorInicial, valorFinal: cat.valorFinal, margen: cat.margen,
+        decimales: cat.decimales, tipoLapsoId_motivoLapsoId: cat.tipoLapsoId_motivoLapsoId, tipoCondicionId_iMaestraId: cat.tipoCondicionId_iMaestraId };
+      await escribir('create', '/PASO', datos); p = { pasoId: datos.pasoId, codigo }; nuevo = true;
+    }
+    const firma = { usuarioActualiza: usuario, fechaActualiza: ahora };
+    if (y.tipo === 'pm') await escribir('update', `/MD_ES_PASO_INSUMO_PASO('${y.id}')`, { pasoHijoId_pasoId: p.pasoId, ...firma });
+    else {
+      await escribir('update', `/MD_ES_PASO('${y.id}')`, { pasoId_pasoId: p.pasoId, ...firma });
+      // los pasos que dependen de esta fila guardan su código en «Depende»
+      const dep = await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', md.mdId), new F('dependeMdEstructuraPasoId', 'EQ', y.id)], { $select: 'mdEstructuraPasoId,depende' }).catch(() => []);
+      for (const z of dep) if (String(z.depende) !== String(p.codigo)) await escribir('update', `/MD_ES_PASO('${z.mdEstructuraPasoId}')`, { depende: String(p.codigo), ...firma });
+    }
+    if (!ETQ_FIX.simular) await terminosConCodigo(modelo, y.tipo === 'pm', y.id, p.codigo);
+    return { codigo: String(p.codigo), nuevo };
+  }
+  function avisoEtiquetasRaiz(d, tabla) {
+    if (typeof sap === 'undefined' || !on('reglas')) { if (d.__rmdEtqFirma || d.querySelector('.rmd-etq-aviso')) { d.querySelectorAll('.rmd-etq-aviso').forEach((x) => x.remove()); d.__rmdEtqFirma = ''; d.__rmdEtq = null; } return; }
+    const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
+    if (!md || !md.mdId || !modelo) return;
+    const firma = `${md.mdId}|${generacionRmd}`, prev = d.__rmdEtqFirma || '';
+    if (prev !== firma && dialogos().pop() === d) {
+      d.__rmdEtqFirma = firma;
+      textosDelRmd(modelo, md, prev.startsWith(md.mdId + '|') ? 5000 : 60000).then((base) => {
+        if (!d.isConnected || d.__rmdEtqFirma !== firma) return;
+        d.__rmdEtq = { items: base.etiquetas || [], md };
+        window.__rmdStats.etiquetasRaiz = { rmd: md.codigo, items: d.__rmdEtq.items.map((y) => [y.lista, y.orden, y.tipo, y.codigo, y.nombrePaso]) };
+        pintarAvisoEtiquetas(d, tabla, d.__rmdEtq, true);
+      }, () => { /* sin conexión: sin aviso */ });
+    } else if (d.__rmdEtq && d.__rmdEtq.items.length && !d.querySelector('.rmd-etq-aviso')) pintarAvisoEtiquetas(d, tabla, d.__rmdEtq, true);
+  }
   // «Asociar fórmulas» con Estado Autorizado elegido (y el RMD aún no autorizado)
   function gestionarDependenciasAsociar() {
     const d = typeof sap !== 'undefined' && on('reglas') && dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x))); if (!d) return;
     const ctrl = controladorPrincipal(); if (!ctrl) return;
     const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2'); if (!asoc || !asoc.mdId || !modelo) return;
     const autorizar = +asoc.estadoIdRmd_iMaestraIdBK === 465 && +asoc.estadoIdRmd_iMaestraId !== 465, sec = d.querySelector('section');
-    if (!autorizar || !sec) { const a = d.querySelector('.rmd-dep-aviso'); if (a) a.remove(); return; }
+    if (!autorizar || !sec) { d.querySelectorAll('.rmd-dep-aviso, .rmd-etq-aviso').forEach((a) => a.remove()); return; }
     if (d.__rmdDepMd !== asoc.mdId) {
       d.__rmdDepMd = asoc.mdId; d.__rmdDepItems = null;
       textosDelRmd(modelo, asoc, 30000).then(async (b) => {
         if (!d.isConnected || d.__rmdDepMd !== asoc.mdId) return;
-        d.__rmdDepItems = b.dependencias || []; window.__rmdStats.dependenciasAsociar = { rmd: asoc.codigo, n: d.__rmdDepItems.length };
+        d.__rmdDepItems = b.dependencias || []; d.__rmdEtqItems = b.etiquetas || []; window.__rmdStats.dependenciasAsociar = { rmd: asoc.codigo, n: d.__rmdDepItems.length, etiquetas: d.__rmdEtqItems.length };
         if (d.__rmdDepItems.length && +asoc.estadoIdRmd_iMaestraId === 467) { const r = await corregirDependencias(asoc, d.__rmdDepItems); if (r) { d.__rmdDepItems = r.fallos.map((f) => f.y); d.__rmdDepCorr = r.hechos; } }
         gestionarDependenciasAsociar();
       }, () => {});
       return;
     }
     if (d.__rmdDepItems) pintarAvisoDependencias(d, sec, { items: d.__rmdDepItems, corregidos: d.__rmdDepCorr, md: asoc, autorizar: true, sinIr: true }, false);
+    if (d.__rmdEtqItems) pintarAvisoEtiquetas(d, sec, { items: d.__rmdEtqItems, md: asoc, autorizar: true, sinIr: true }, false);
   }
   // ---- Elementos de baja (RMD Ingresado) ----
   // Paso / PM / utensilio: estado «De Baja»; equipo: estado SAP distinto de «MONT-Montado» (salvo «AEQS»). Solo aviso y resaltado.
@@ -9070,6 +9277,8 @@
   }
   window.__rmdStats.bajas = { equipoDeBaja, bajasDelRmd, resumen: resumenBajas, mapaEstadosErp };
   window.__rmdStats.depFix = DEP_FIX;   // pruebas: depFix.simular = (ruta, datos) => …
+  window.__rmdStats.etiquetasPaso = { fix: ETQ_FIX, choca: etiquetaChoca, etapa: etapaDeTexto, corregir: (md, y) => corregirEtiquetaPaso(controladorPrincipal(), md, y),
+    leer: (md) => textosDelRmd(controladorPrincipal().getView().getModel('mainModelv2'), md, 0).then((b) => b.etiquetas), lista: (idPaso) => listaDeFila(controladorPrincipal().getView().getModel('mainModelv2'), idPaso), duplicado: (d, lista) => pasoDuplicado(controladorPrincipal().getView().getModel('mainModelv2'), d, lista) };   // pruebas
   window.__rmdStats.dependencias = { leer: (md) => textosDelRmd(controladorPrincipal().getView().getModel('mainModelv2'), md, 0).then((b) => b.dependencias) };   // pruebas
   // Aviso del RMD: advertencias de reglas en todo el RMD y «Debe estar presente» no cumplidas. Se recalcula al abrir, al volver y al cambiar reglas o
   // listas.
@@ -12362,9 +12571,10 @@ td.ult { position: relative; }
     const bt = botonPorTitulo(raiz, 'Nueva Versión'); if (!bt) throw new Error('el RMD no tiene el botón «Nueva Versión»');
     const c = sap.ui.getCore().byId(bt.id.replace(/-inner$/, '')); if (!c.getEnabled()) throw new Error('«Nueva Versión» no está disponible en este RMD');
     c.firePress();
-    const ok = await hasta(() => { const d = [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)); return d && [...d.querySelectorAll('button')].find((x) => /^OK$/i.test(x.textContent.trim())); }, 15000, 200);
-    if (!ok) throw new Error('el portal no mostró su confirmación de «Nueva Versión»');
-    sap.ui.getCore().byId(ok.id.replace(/-inner$/, '')).firePress();
+    const conf = await hasta(() => [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)), 30000, 300);
+    if (!conf) throw new Error('el portal no mostró su confirmación de «Nueva Versión»');
+    avance(seg(), 'Confirma «Nueva Versión» en el mensaje del portal…');
+    if (!esAceptar(await esperarRespuestaPortal(conf))) throw new Error('no se aceptó «Nueva Versión» en el portal');
     avance(seg(), 'El portal está copiando la configuración del RMD…');
     let nueva = null;
     for (let i = 0; i < 225 && !nueva; i++) { await esperar(4000); avance(seg(), 'El portal está copiando la configuración del RMD…'); try { nueva = (await ppVersiones(modelo, principal)).find((m) => !idsAntes.has(m.mdId) && +m.version > +origen.version); } catch (e) { } }
@@ -12559,15 +12769,17 @@ td.ult { position: relative; }
     const cfgCache = new Map(), configDe = async (pasoId) => { if (!cfgCache.has(pasoId)) { cfgCache.set(pasoId, (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('mdId_mdId', 'EQ', dest.mdId), new F('activo', 'EQ', true)], PP_CFG_SEL)) || (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('activo', 'EQ', true)], PP_CFG_SEL))); } return cfgCache.get(pasoId); };
     const muestras = new Map(), muestra = async (estr, etq) => { const k = estr + '|' + (etq || ''); if (!muestras.has(k)) { let m = etq ? await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('etiquetaId_etiquetaId', 'EQ', etq), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion') : null; if (!m) m = await ppLeerUno(modelo, 'PASO', [new F('estructuraId_estructuraId', 'EQ', estr), new F('activo', 'EQ', true)], 'estadoId_iMaestraId,numeracion'); muestras.set(k, m); } return muestras.get(k); };
     const catNuevo = new Map();                                                           // id del borrador -> fila del catálogo
+    // pasos y procesos menores con la etiqueta de su lista (de un proceso menor, la de su paso): un paso de otra etapa no se ve en Producción
+    const nomEtq = await nombresEtiqueta(modelo).catch(() => new Map()), etapaDest = dest.nivelTxt || '', vale = (etqL, etq) => !etiquetaChoca(etqL, etq || null, nomEtq.get(etq), etapaDest);
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
-      const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL && !pm) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
-      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
+      const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
+      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && vale(etqL, p.etiquetaId_etiquetaId)).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
       if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); continue; }
       // búsqueda normalizada en el catálogo
       if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo));
-      const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && (pm || !etqL || f.etq === etqL)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
-      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
+      const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && vale(etqL, f.etq)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
+      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1 && vale(etqL, pIgual.etiquetaId_etiquetaId)) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
       const key = `${L.e.estructuraId}|${etqL || ''}|${texto.toLowerCase()}`; let n = nuevosPaso.get(key);
       if (!n) {
         const m = await muestra(L.e.estructuraId, etqL); if (!m) { bloqueos.push(`No se pudo preparar el paso nuevo «${texto.slice(0, 70)}»: no hay pasos de ${L.e.nombre} en el catálogo para copiar sus datos.`); continue; }
@@ -12592,6 +12804,14 @@ td.ult { position: relative; }
     const catDe = (x) => (catNuevo.has(x.id) ? { pasoId: catNuevo.get(x.id).pasoId, tipoDatoId_iMaestraId: catNuevo.get(x.id).tipo, ...['decimales', 'margen', 'valorInicial', 'valorFinal', 'clvModelo', 'automatico'].reduce((o, k) => ({ ...o, [k]: catNuevo.get(x.id).fila[k] }), {}) } : porCodigo.get(cod(x)));
     const faltan = [...new Set(listas.flatMap((L) => L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id)) && !catDe(x)).map((x) => cod(x) || String(x.texto || '').slice(0, 40))))];
     faltan.forEach((c) => bloqueos.push(`El paso ${c} no se encontró (¿está de baja?) en el catálogo de SAP.`));
+    // códigos escritos en el borrador: de la etiqueta de su lista
+    listas.forEach((L) => {
+      const etqL = L.t ? L.t.etiquetaId : null, bId = new Set(L.b.map((y) => y.id));
+      const revisa = (x) => { const c = !catNuevo.has(x.id) && porCodigo.get(cod(x)); if (c && !vale(etqL, c.etiquetaId_etiquetaId))
+        bloqueos.push(`El paso ${cod(x)} es de la etiqueta ${nomEtq.get(c.etiquetaId_etiquetaId) || 'sin etiqueta'} y su lista (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) es de otra: en Producción no se vería. Usa un paso de la etiqueta de la lista.`); };
+      L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id))).forEach(revisa);
+      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach(revisa));   // procesos menores de un paso nuevo
+    });
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
     const cfgPorPaso = new Map(); { const ids = new Set(); listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id) && !catNuevo.has(x.id)).forEach((x) => { const p = catDe(x); if (p) ids.add(p.pasoId); }); }); for (const id of [...ids].slice(0, 60)) cfgPorPaso.set(id, await configDe(id)); }
     // predecesores de las listas modificadas
