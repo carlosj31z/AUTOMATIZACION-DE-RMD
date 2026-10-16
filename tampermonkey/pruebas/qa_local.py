@@ -704,7 +704,15 @@ with sync_playwright() as p:
           return { copia: txt(copia), otra: txt(otra), igual: igual.length }; }""")
         ok = (r["copia"] == ["ANA: valorFinal 4→3", "BETO: valorFinal 3→4"] and r["otra"] == ["ANA: valorFinal 4→3", "BETO: pasoHijoId_pasoId ?→P87680", "BETO: valorFinal 3→4"] and r["igual"] == 0)
         return ok, json.dumps(r, ensure_ascii=False)
-    @prueba("LN26Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
+    @prueba("LN25c Etiqueta del paso frente a su lista y a la etapa (v1.69): con etiqueta en la lista, la del paso del catálogo debe ser la misma; en una lista sin etiqueta solo avisa si el paso es de la etiqueta de otra etapa (no si es de una etiqueta cualquiera ni de la misma etapa); sin etapa conocida no adivina")
+    def _():
+        r = pg.evaluate("""() => { const S = window.__rmdStats.etiquetasPaso;
+          return [S.choca('FAB', 'FAB', 'FABRICACION', 'FABRICACION'), S.choca('FAB', 'ENV', 'ENVASE', 'FABRICACION'), S.choca('INSP', 'ACO', 'ACONDICIONADO', 'INSPECCIÓN'), S.choca(null, 'FAB', 'FABRICACION', 'ENVASE'),
+            S.choca(null, 'FAB', 'FABRICACION', 'FABRICACION'), S.choca(null, 'PRE', 'PREPARACION DEL MATERIAL DE ENVASE', 'FABRICACION'), S.choca(null, 'INSF', 'INSPECCION DE FRASCOS', 'INSPECCIÓN'), S.choca(null, 'ENV', 'ENVASE', ''),
+            S.etapa('Inspección de partículas visibles'), S.etapa('ENVASE'), S.etapa('PREPARACION DEL MATERIAL DE ENVASE')]; }""")
+        ok = r == [False, True, True, True, False, False, False, False, "INSPECCION", "ENVASE", ""]
+        return ok, json.dumps(r, ensure_ascii=False)
+    @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
     def _():
         r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });
           const sap = [c('C4', '42094.000'), c('C5', '2.000'), c('C6', '5000.000'), c('C7', '1500.000'), c('C8', '900.000'), c('C9', '3000.000', 'KG'), c('C10', '1234567.000')];
