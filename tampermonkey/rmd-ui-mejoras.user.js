@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.70.0
+// @version      1.71.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.70.0';                                                       // mantener igual a @version
+  const VERSION = '1.71.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1677,6 +1677,23 @@
     tabla.querySelectorAll('td.rmd-pm-mal').forEach((td) => { td.classList.remove('rmd-pm-mal'); delete td.dataset.rmdPm; });
     const porOrden = {}, infoOrden = {};
     const iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO');
+    // filas guardadas del RMD (asociarDatos): id -> código y orden; códigos de todas sus estructuras
+    let filasRmd = null;
+    const filasDelRmd = () => {
+      if (filasRmd) return filasRmd; filasRmd = { porId: new Map(), codigos: new Set(), ing: false };
+      try { const V = vistaDeTabla(tabla), a = V && V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(); filasRmd.ing = !!a && +a.estadoIdRmd_iMaestraId === 467;
+        ((a && a.aEstructura && a.aEstructura.results) || []).forEach((e) => ((e.aPaso && e.aPaso.results) || []).forEach((x) => {
+          if (x.activo === false || (a.mdId && x.mdId_mdId && x.mdId_mdId !== a.mdId)) return; const c = String((x.pasoId && x.pasoId.codigo) || '');
+          filasRmd.porId.set(x.mdEstructuraPasoId, { codigo: c, orden: x.orden }); if (c) filasRmd.codigos.add(c); })); } catch (e) { /* sin datos del RMD */ }
+      return filasRmd;
+    };
+    const citaDepende = (ob, mm, v) => {
+      const R = filasDelRmd(); if (!v || !R.codigos.size) return '';
+      const cod = mm ? mm[1] : v.split(/\s/)[0], cit = ob.dependeMdEstructuraPasoId && R.porId.get(ob.dependeMdEstructuraPasoId), fuera = !R.codigos.has(cod);
+      if (cit && cit.codigo && cit.codigo !== cod) return `El «Depende» dice ${cod}${fuera ? ' (un paso que no está en ninguna estructura del RMD)' : ''}, pero la fila que cita (orden ${cit.orden}) es el paso ${cit.codigo}: así sale en el PDF del master. ${R.ing ? 'Se corrige solo en cuanto esté guardado.' : 'Este RMD no está Ingresado: corrígelo en una versión nueva.'}`;
+      if (!ob.dependeMdEstructuraPasoId && fuera) return `El «Depende» cita el paso ${cod}, que no está en ninguna estructura del RMD.`;
+      return '';
+    };
     filas.forEach((tr, k) => {
       const o = norm(iOrd >= 0 ? (inputDe(celda(tr, iOrd)) || {}).value : '') || String(k + 1);
       porOrden[o] = norm(celda(tr, iDes) && celda(tr, iDes).textContent);
@@ -1732,6 +1749,7 @@
         else if ((ob.mdEstructuraPasoId && ob.dependeMdEstructuraPasoId === ob.mdEstructuraPasoId) || (mismaLista && Number(mm[2]) === ordenFila)) {
           marcarFalta(iDep, 'El paso depende de sí mismo: en Producción nunca se habilita. Se corrige solo (al paso anterior) en cuanto esté guardado.'); programarCorreccionDependencias(); }
         else if (mismaLista && Number(mm[2]) > ordenFila) { marcarFalta(iDep, `El predecesor (orden ${mm[2]}) está después de este paso: en Producción no se habilita hasta terminar uno posterior. Se corrige solo en cuanto esté guardado.`); programarCorreccionDependencias(); }
+        else if (v && esPasos && citaDepende(ob, mm, v)) { const msg = citaDepende(ob, mm, v); marcarFalta(iDep, msg); if (ob.dependeMdEstructuraPasoId) programarCorreccionDependencias(); }
         else if (sinTipo) { /* sin tipo de dato: solo el propio o el posterior */ }
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
         else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
@@ -6767,7 +6785,16 @@
   // Al asociar, el portal copia MaterialSet (-> MD_ES_RE_INSUMO) y ProduccionVSet (-> RECETA: Mdv01, Plnnr, Alnal, Mksp, validez, lote).
   // Se comparan con SAP actual; solo aviso. Revisión por receta; detalle en el ícono ⚠.
   const revisionesReceta = new Map();                                     // mdRecetaId -> { t, clave, p }
-  const contextosRmd = new Map();                                         // mdId -> { t, p: Promise<{ puestos, anterior }> }
+  const contextosRmd = new Map();                                         // mdId -> { t, gen, p: Promise<{ puestos, anterior }> }
+  // Escrituras en el modelo del portal (Guardar, Eliminar Receta, Agregar Producto…): invalidan los puestos usados y la revisión de la hoja de ruta
+  let escriturasModelo = 0;
+  window.__rmdStats.escrituras = () => escriturasModelo;   // pruebas
+  function vigilarEscrituras(m) {
+    if (!m || m.__rmdEscrituras) return; m.__rmdEscrituras = true;
+    const escribe = (x) => { const t = String(x || '').toUpperCase(); return !!t && t !== 'GET' && t !== 'HEAD'; };
+    m.attachRequestCompleted((e) => { if (escribe(e.getParameter('method')) && !/\$batch/.test(String(e.getParameter('url') || ''))) escriturasModelo++; });
+    if (m.attachBatchRequestCompleted) m.attachBatchRequestCompleted((e) => { if ((e.getParameter('requests') || []).some((r) => escribe(r.method))) escriturasModelo++; });
+  }
   const cantidadNum = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
   const numTxt = (n) => (n == null ? '' : (Math.round(n * 1000) / 1000).toLocaleString('es-PE', { maximumFractionDigits: 3 }));
   function leerErp(erpPortal, entidad, filtros) {
@@ -6817,8 +6844,8 @@
   ];
   // Datos comunes del RMD: puestos usados y receta de la versión anterior
   function contextoRmd(ctrl, mdId) {
-    const g = contextosRmd.get(mdId); if (g && Date.now() - g.t < 5 * 60000) return g.p;
-    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter; vigilarEscrituras(modelo);
+    const g = contextosRmd.get(mdId); if (g && g.gen === escriturasModelo && Date.now() - g.t < 5 * 60000) return g.p;
     const p = (async () => {
       const [pasos, md] = await Promise.all([
         leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', mdId)], { $select: 'mdEstructuraPasoId,puestoTrabajo' }).catch(() => []),
@@ -6830,7 +6857,7 @@
         anterior = { version: ma[0] && ma[0].version, recetas: mr.filter((x) => x.recetaId && x.activo !== false).map((x) => x.recetaId) }; } catch (e) { /* sin versión anterior */ } }
       return { puestos: cuenta, anterior };
     })();
-    p.catch(() => contextosRmd.delete(mdId)); contextosRmd.set(mdId, { t: Date.now(), p }); return p;
+    p.catch(() => contextosRmd.delete(mdId)); contextosRmd.set(mdId, { t: Date.now(), gen: escriturasModelo, p }); return p;
   }
   async function revisarRuta(ctrl, rc, werks, ctx, versionesP) {
     const erp = ctrl.oModelErpNec, F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
@@ -6855,7 +6882,8 @@
     };
   }
   function revisarReceta(ctrl, r, werksRmd, mdId, forzar, etapa) {
-    const conRuta = !!on('recetaruta'), clave = (conRuta ? 'r' : 'b') + (r.recetaId && r.recetaId.Verid), g = revisionesReceta.get(r.mdRecetaId);
+    vigilarEscrituras(ctrl.getView().getModel('mainModelv2'));
+    const conRuta = !!on('recetaruta'), clave = (conRuta ? 'r' + escriturasModelo : 'b') + (r.recetaId && r.recetaId.Verid), g = revisionesReceta.get(r.mdRecetaId);
     if (!forzar && g && g.clave === clave && Date.now() - g.t < 30 * 60000) return g.p;
     const p = (async () => {
       const erp = ctrl.oModelErpNec, modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
@@ -7662,7 +7690,9 @@
       await modeloEscribir(modelo, 'create', '/PASO', nuevo); pasoId = nuevo.pasoId;
     }
     if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() }); await terminosConCodigo(modelo, true, c.mdEstructuraPasoInsumoPasoId, codigo); }
-    else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() }); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
+    else { const g = lm.getProperty('/listMdEsPasoPadre'), mdId = b.getView().getModel('asociarDatos').getData().mdId, deps = await dependientesDe(modelo, mdId, g.mdEstructuraPasoId);
+      await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() });
+      await actualizarDependientes(modelo, deps, codigo, { usuarioActualiza: usuario, fechaActualiza: new Date() }, window.__rmdStats.dependientes.simular); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
     // mismos refrescos que el portal
     await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
     const etq = b.getView().getModel('headerAddEtiqueta');
@@ -8666,6 +8696,18 @@
       catch (e) { br.disabled = false; toast('No se pudo reemplazar: ' + e.message, true); }
     });
   }
+  // Los pasos que dependen de una fila guardan en «Depende» el código de su paso (el PDF del master lo imprime): al cambiar el paso de la fila se actualizan.
+  // Se leen antes de escribir la fila; escribir(metodo, ruta, datos) para pruebas.
+  async function dependientesDe(modelo, mdId, filaId) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    return (await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', mdId), new F('dependeMdEstructuraPasoId', 'EQ', filaId)], { $select: 'mdEstructuraPasoId,depende,activo' })).filter((z) => z.activo !== false);
+  }
+  async function actualizarDependientes(modelo, deps, codigo, firma, escribir) {
+    const w = escribir || ((m, r, d) => modeloEscribir(modelo, m, r, d)); let n = 0;
+    for (const z of deps) if (String(z.depende) !== String(codigo)) { await w('update', `/MD_ES_PASO('${z.mdEstructuraPasoId}')`, { depende: String(codigo), ...firma }); n++; }
+    return n;
+  }
+  window.__rmdStats.dependientes = { de: (filaId, mdId) => dependientesDe(controladorPrincipal().getView().getModel('mainModelv2'), mdId, filaId), actualizar: actualizarDependientes, simular: null };   // pruebas
   async function reemplazarPasoDeFila(origen, nuevo) {
     const b = controladorPrincipal(), md = b.getView().getModel('asociarDatos').getData(), modelo = b.getView().getModel('mainModelv2');
     if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) throw new Error('el RMD está autorizado o suspendido');
@@ -8673,7 +8715,11 @@
     try {
       const firma = { usuarioActualiza: codigoUsuario(b), fechaActualiza: new Date() };
       if (origen.tipo === 'menor') await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${origen.id}')`, { pasoHijoId_pasoId: nuevo.pasoId, ...firma });
-      else await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId, ...firma });
+      else {
+        const deps = await dependientesDe(modelo, md.mdId, origen.id), S = window.__rmdStats.dependientes;
+        await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId, ...firma });
+        await actualizarDependientes(modelo, deps, nuevo.codigo, firma, S.simular);
+      }
       await terminosConCodigo(modelo, origen.tipo === 'menor', origen.id, nuevo.codigo);
       await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
       const d = dialogos().filter((x) => controladorPasos(x)).pop(), M = d && controladorPasos(d);
@@ -8946,18 +8992,23 @@
     const vivoId = new Map(pasos.filter(activo).map((x) => [x.mdEstructuraPasoId, x])), claveDe = (x) => (x.mdEstructuraId_mdEstructuraId || '') + '|' + (x.mdEsEtiquetaId_mdEsEtiquetaId || '');
     r.dependencias = [];
     const ordenadas = [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2), tipado = (x) => x.tipoDatoId_iMaestraId != null && +x.tipoDatoId_iMaestraId !== 446;   // 446: «Sin tipo de dato»
+    const codigosRmd = new Set(pasos.filter(activo).map((x) => String(obj(x.pasoId).codigo || '')).filter(Boolean));
     ordenadas.forEach((l, il) => l.pasos.forEach((x, ix) => {
-      const dep = x.dependeMdEstructuraPasoId; if (!dep) return;
-      const pr = vivoId.get(dep), tipo = dep === x.mdEstructuraPasoId ? 'propio' : !pr ? 'colgante' : claveDe(pr) === claveDe(x) && +pr.orden > +x.orden ? 'posterior' : '';
-      if (!tipo) return; const pp = obj(x.pasoId), q = pr ? obj(pr.pasoId) : {};
+      // «codigo»: la fila citada es correcta pero «Depende» guarda el código de otro paso (p. ej. el que tenía antes esa fila); el PDF imprime ese código
+      const dep = x.dependeMdEstructuraPasoId, txt = norm(String(x.depende == null ? '' : x.depende)); if (!dep && !txt) return;
+      const pr = dep ? vivoId.get(dep) : null, q = pr ? obj(pr.pasoId) : {};
+      const tipo = dep ? (dep === x.mdEstructuraPasoId ? 'propio' : !pr ? 'colgante' : claveDe(pr) === claveDe(x) && +pr.orden > +x.orden ? 'posterior' : txt && txt !== String(q.codigo || '') ? 'codigo' : '')
+        : !codigosRmd.has(txt) ? 'inexistente' : '';
+      if (!tipo) return; const pp = obj(x.pasoId);
       // predecesor correcto: el paso anterior con tipo de dato de la lista; si es el primero, el último con tipo de la lista anterior de su estructura; si no hay, ninguno
       let bueno = null;
-      if (tipado(x)) {
+      if (tipo === 'codigo') bueno = pr;
+      else if (tipado(x)) {
         bueno = l.pasos.slice(0, ix).reverse().find(tipado) || null;
         if (!bueno) { const ant = ordenadas.slice(0, il).reverse().find((y) => y.pasos[0] && y.pasos[0].mdEstructuraId_mdEstructuraId === x.mdEstructuraId_mdEstructuraId); bueno = ant ? ant.pasos.slice().reverse().find(tipado) || null : null; }
       }
       r.dependencias.push({ tipo, lista: l.lista, orden: x.orden, codigo: String(pp.codigo || ''), desc: norm(pp.descripcion), predOrden: pr ? pr.orden : null, predCodigo: String(q.codigo || x.depende || ''),
-        estr: x.mdEstructuraId_mdEstructuraId, etq: x.mdEsEtiquetaId_mdEsEtiquetaId || null, id: x.mdEstructuraPasoId, deAntes: { depende: x.depende || '', id: dep },
+        citado: txt, enRmd: codigosRmd.has(txt), estr: x.mdEstructuraId_mdEstructuraId, etq: x.mdEsEtiquetaId_mdEsEtiquetaId || null, id: x.mdEstructuraPasoId, deAntes: { depende: x.depende || '', id: dep || '' },
         fix: bueno ? { id: bueno.mdEstructuraPasoId, codigo: String(obj(bueno.pasoId).codigo || ''), orden: bueno.orden } : { id: '', codigo: '', orden: null } });
     }));
     // sin ciclos tras corregir: si el nuevo predecesor lleva de vuelta al paso, queda sin predecesor
@@ -8990,17 +9041,22 @@
     return p;
   }
   // ---- Predecesores imposibles: aviso en la ventana raíz del RMD y al autorizar en «Asociar fórmulas» ----
-  const DEP_TXT = { propio: 'depende de sí mismo', posterior: 'depende de un paso posterior', colgante: 'depende de un paso que ya no está en el RMD' };
-  const depLinea = (y) => `${y.lista} › orden ${y.orden} (${y.codigo}) ${DEP_TXT[y.tipo]}${y.tipo === 'posterior' ? ` (orden ${y.predOrden})` : ''}`;
+  const DEP_TXT = { propio: 'depende de sí mismo', posterior: 'depende de un paso posterior', colgante: 'depende de un paso que ya no está en el RMD',
+    codigo: 'su «Depende» cita un código que no es el del paso de esa fila', inexistente: 'su «Depende» cita un paso que no está en ninguna estructura del RMD' };
+  const depTexto = (y) => y.tipo === 'posterior' ? `${DEP_TXT.posterior} (orden ${y.predOrden})`
+    : y.tipo === 'codigo' ? `su «Depende» dice ${y.citado}${y.enRmd ? '' : ' (no está en el RMD)'}, pero la fila citada (orden ${y.predOrden}) es el paso ${y.predCodigo}`
+    : y.tipo === 'inexistente' ? `su «Depende» cita el paso ${y.citado}, que no está en ninguna estructura del RMD` : DEP_TXT[y.tipo];
+  const depLinea = (y) => `${y.lista} › orden ${y.orden} (${y.codigo}) ${depTexto(y)}`;
+  const depSoloCita = (items) => items.every((y) => y.tipo === 'codigo' || y.tipo === 'inexistente');
   function abrirDetalleDependencias(x, sinIr) {
-    const v = ventana('Predecesores imposibles', { cancelar: () => v.cerrar() }), corr = x.corregidos || [], todos = [...x.items, ...corr];
-    const tablaCorr = corr.length ? `<p><b>Corregidos solos</b> (el «Depende» pasó al paso anterior con tipo de dato):</p><table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Antes</th><th>Ahora</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${corr.map((y) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 80))}</td><td class="rmd-tz-antes">${esc(y.deAntes.depende || '—')} · ${esc(DEP_TXT[y.tipo])}</td><td class="rmd-tz-desp">${y.fix.codigo ? `${esc(y.fix.codigo)} (orden ${esc(y.fix.orden)})` : 'sin predecesor'}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${x.items.length + corr.indexOf(y)}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>` : '';
+    const v = ventana('Predecesores imposibles o mal citados', { cancelar: () => v.cerrar() }), corr = x.corregidos || [], todos = [...x.items, ...corr];
+    const tablaCorr = corr.length ? `<p><b>Corregidos solos</b> (el «Depende» pasó al paso anterior con tipo de dato o, si citaba otro código, al de su fila):</p><table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Antes</th><th>Ahora</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${corr.map((y) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 80))}</td><td class="rmd-tz-antes">${esc(y.deAntes.depende || '—')} · ${esc(DEP_TXT[y.tipo])}</td><td class="rmd-tz-desp">${y.fix.codigo ? `${esc(y.fix.codigo)} (orden ${esc(y.fix.orden)})` : 'sin predecesor'}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${x.items.length + corr.indexOf(y)}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>` : '';
     if (!x.items.length) { v.cuerpo.innerHTML = tablaCorr + '<p class="rmd-nota">Si el predecesor debía ser otro paso, cámbialo en la lista.</p>';
       v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const y = todos[+b.dataset.i]; v.cerrar(); ppIrASap({ codigo: x.md.codigo, version: x.md.version }, { estr: y.estr, etq: y.etq, id: y.id }); });
       v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar())); return; }
-    v.cuerpo.innerHTML = `${tablaCorr}<p>En Producción un paso se habilita cuando termina el paso de su «Depende». Estos <b>nunca se habilitan</b>:</p>
-      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Problema</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${x.items.map((y, i) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 90))}</td><td class="rmd-dif">${esc(DEP_TXT[y.tipo])}${y.tipo === 'posterior' ? ` (orden ${esc(y.predOrden)})` : ''}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${i}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>
-      <p class="rmd-nota">Corrige «Depende» con el paso anterior de la lista, o déjalo vacío si el paso no depende de otro.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</p>`;
+    v.cuerpo.innerHTML = `${tablaCorr}<p>${depSoloCita(x.items) ? 'El «Depende» de estos pasos cita un código que no es el de su predecesor (así sale en el PDF del master):' : 'En Producción un paso se habilita cuando termina el paso de su «Depende». Estos <b>nunca se habilitan</b> o citan un paso que no es su predecesor:'}</p>
+      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Problema</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${x.items.map((y, i) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 90))}</td><td class="rmd-dif">${esc(depTexto(y))}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${i}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>
+      <p class="rmd-nota">${depSoloCita(x.items) ? 'Para corregirlo, vuelve a elegir el predecesor en «Depende»: el portal guarda el código actual de su paso.' : 'Corrige «Depende» con el paso anterior de la lista, o déjalo vacío si el paso no depende de otro.'}${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</p>`;
     v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const y = todos[+b.dataset.i]; v.cerrar(); ppIrASap({ codigo: x.md.codigo, version: x.md.version }, { estr: y.estr, etq: y.etq, id: y.id }); });
     v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar()));
   }
@@ -9011,8 +9067,8 @@
       a.addEventListener('click', (e) => { if (e.target.closest('button')) { e.stopPropagation(); const y = a.__x; abrirDetalleDependencias(y, y.sinIr); } }); }
     a.__x = x; const n = x.items.length, ej = x.items.slice(0, 2).map(depLinea).join(' · '), c = (x.corregidos || []).length;
     a.classList.toggle('ok', !n);
-    const t = n ? `<span class="rmd-dep-ico" aria-hidden="true">✕</span><span><b>${x.autorizar ? 'No autorices todavía: ' : ''}${n} paso${n > 1 ? 's' : ''} con un predecesor imposible</b>: en Producción nunca se habilita${n > 1 ? 'n' : ''}. ${esc(ej)}${n > 2 ? ` y ${n - 2} más` : ''}.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</span><button type="button">${x.sinIr ? 'Ver' : 'Ver y corregir'}</button>`
-      : `<span class="rmd-dep-ico" aria-hidden="true">✓</span><span><b>Se corrigió solo el «Depende» de ${c} paso${c > 1 ? 's' : ''}</b> que dejaba${c > 1 ? 'n' : ''} a Producción sin avanzar: ${esc(x.corregidos.slice(0, 2).map((y) => `${y.lista} › orden ${y.orden} (${y.codigo}): ${y.deAntes.depende || '—'} → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · '))}${c > 2 ? ` y ${c - 2} más` : ''}. Revisa que sea el predecesor correcto.</span><button type="button">Ver</button>`;
+    const t = n ? `<span class="rmd-dep-ico" aria-hidden="true">✕</span><span><b>${x.autorizar ? 'No autorices todavía: ' : ''}${n} paso${n > 1 ? 's' : ''} ${depSoloCita(x.items) ? 'con el «Depende» mal citado' : 'con un predecesor imposible o mal citado'}</b>${depSoloCita(x.items) ? ': el PDF del master cita un paso que no es su predecesor' : ''}. ${esc(ej)}${n > 2 ? ` y ${n - 2} más` : ''}.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</span><button type="button">${x.sinIr || +x.md.estadoIdRmd_iMaestraId !== 467 ? 'Ver' : 'Ver y corregir'}</button>`
+      : `<span class="rmd-dep-ico" aria-hidden="true">✓</span><span><b>Se corrigió solo el «Depende» de ${c} paso${c > 1 ? 's' : ''}</b>: ${esc(x.corregidos.slice(0, 2).map((y) => `${y.lista} › orden ${y.orden} (${y.codigo}): ${y.deAntes.depende || '—'} → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · '))}${c > 2 ? ` y ${c - 2} más` : ''}. Revisa que sea el predecesor correcto.</span><button type="button">Ver</button>`;
     if (a.innerHTML !== t) a.innerHTML = t;
   }
   // Corrección obligatoria en RMD Ingresados: un predecesor imposible deja a Producción sin poder avanzar. Se escribe «Depende» como el
@@ -9040,7 +9096,7 @@
     } finally { DEP_FIX.enCurso.delete(md.mdId); }
     const r = { t: Date.now(), hechos, fallos }; DEP_FIX.hecho.set(md.mdId, r);
     window.__rmdStats.dependenciasCorregidas = { rmd: md.codigo, hechos: hechos.map((y) => [y.lista, y.orden, y.codigo, y.deAntes.depende, y.fix.codigo]), fallos: fallos.map((f) => f.error) };
-    if (hechos.length) toast(`Se corrigió solo el «Depende» de ${hechos.length} paso${hechos.length > 1 ? 's' : ''} que dejaba${hechos.length > 1 ? 'n' : ''} a Producción sin avanzar: ${hechos.slice(0, 3).map((y) => `orden ${y.orden} (${y.codigo}) → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · ')}.`);
+    if (hechos.length) toast(`Se corrigió solo el «Depende» de ${hechos.length} paso${hechos.length > 1 ? 's' : ''}: ${hechos.slice(0, 3).map((y) => `orden ${y.orden} (${y.codigo}) → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · ')}.`);
     if (fallos.length) toast(`No se pudo corregir el «Depende» de ${fallos.length} paso${fallos.length > 1 ? 's' : ''}: ${fallos[0].error}. Corrígelo a mano.`, true);
     return r;
   }
@@ -9126,10 +9182,9 @@
     const firma = { usuarioActualiza: usuario, fechaActualiza: ahora };
     if (y.tipo === 'pm') await escribir('update', `/MD_ES_PASO_INSUMO_PASO('${y.id}')`, { pasoHijoId_pasoId: p.pasoId, ...firma });
     else {
+      const deps = await dependientesDe(modelo, md.mdId, y.id);
       await escribir('update', `/MD_ES_PASO('${y.id}')`, { pasoId_pasoId: p.pasoId, ...firma });
-      // los pasos que dependen de esta fila guardan su código en «Depende»
-      const dep = await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', md.mdId), new F('dependeMdEstructuraPasoId', 'EQ', y.id)], { $select: 'mdEstructuraPasoId,depende' }).catch(() => []);
-      for (const z of dep) if (String(z.depende) !== String(p.codigo)) await escribir('update', `/MD_ES_PASO('${z.mdEstructuraPasoId}')`, { depende: String(p.codigo), ...firma });
+      await actualizarDependientes(modelo, deps, p.codigo, firma, escribir);
     }
     if (!ETQ_FIX.simular) await terminosConCodigo(modelo, y.tipo === 'pm', y.id, p.codigo);
     return { codigo: String(p.codigo), nuevo };
