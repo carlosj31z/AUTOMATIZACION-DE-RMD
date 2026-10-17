@@ -1664,6 +1664,17 @@ with sync_playwright() as p:
                 pg.wait_for_timeout(8000); sigue = fr.evaluate("!!document.querySelector('.rmd-saludo')")
                 ok = (re.match(r"^(Buenos días|Buenas tardes|Buenas noches)(, \w+)?\n", s_["texto"]) and "RMD en Ingresado" in s_["texto"] and s_["izq"] < 120 and s_["abajo"] < 40 and s_["ancho"] < 500 and not sigue)
                 return ok, f"{s_} ¿sigue a los 10 s?={sigue}"
+            @prueba("X1b Saludo en una festividad (v1.73, Navidad forzada): insignia y cuenta regresiva con el color de la fiesta, sin animaciones en el portal")
+            def _():
+                fr.evaluate("() => { window.__rmdStats.fiestas.forzar('navidad'); window.__rmdStats.productividad.saludar(); }")
+                try:
+                    fr.wait_for_selector(".rmd-saludo.visible .rmd-saludo-fz", timeout=20000); pg.wait_for_timeout(1600)
+                    s_ = fr.evaluate("() => { const e = document.querySelector('.rmd-saludo'); return { fiesta: (e.querySelector('.rmd-saludo-fiesta') || {}).textContent, color: e.style.getPropertyValue('--fz-color'), titulo: e.querySelector('.rmd-saludo-fz').title, capas: document.querySelectorAll('.fz-capa').length, lienzos: document.querySelectorAll('.fz-capa canvas').length }; }")
+                    pg.wait_for_timeout(6500); despues = fr.evaluate("document.querySelectorAll('.fz-capa').length")
+                finally:
+                    fr.evaluate("window.__rmdStats.fiestas.forzar(null)")
+                ok = (s_["fiesta"] or "").startswith("Faltan") and s_["fiesta"] == s_["titulo"] and s_["color"] in ("#e0606f", "#a8323f") and s_["capas"] == 0 and s_["lienzos"] == 0 and despues == 0
+                return ok, f"{s_} capas a los 8 s={despues}"
             @prueba("X2 Ctrl+K → escribir un código → Enter abre 'Configurar el RMD' (el mismo menú de la fila); la pestaña lleva la etapa abreviada y la descripción ('FAB - …') y vuelve a su título al cerrar; queda en Recientes")
             def _():
                 t0 = pg.title()

@@ -751,6 +751,19 @@ with sync_playwright() as p:
         esperado = [['102', 'Ingresado', 4, '101', '103', None], ['200', 'Autorizado', 2, None, '', None], ['300', 'Suspendido', 1, None, '', '200'], ['500', 'Suspendido', 2, None, '', None]]
         ok = (r["us"] == esperado and r["prods"] == ['DEXTROSA 5%', 'SOLUTRES 150mg/mL', 'LEVOCERT 5mg', 'LEVOCERT 5mg', 'LINEA GOTAS OFTALMICAS PV2', 'SOLICARE 9‰', 'AMOXIDIN CL 600'] and r["hojas"] and r["conteo"] == {"a": 1, "i": 1, "s": 2, "n": 4})
         return ok, json.dumps(r, ensure_ascii=False)[:600]
+    @prueba("LN25f Festividades del Perú (v1.73): calendario con la hora de Lima (como máximo 2 semanas antes; si se cruzan, la de fecha más cercana; Químico Farmacéutico el 13/5), textos e insignias SVG válidas; en el portal sin animaciones")
+    def _():
+        r = pg.evaluate("""() => { const F = window.__rmdStats.fiestas, d = (y, m, dd) => new Date(Date.UTC(y, m - 1, dd));
+          const casos = [[2026, 10, 16], [2026, 10, 17], [2026, 12, 10], [2026, 12, 11], [2026, 12, 30], [2027, 1, 1], [2027, 2, 11], [2027, 5, 8], [2027, 5, 12], [2027, 5, 13], [2027, 6, 19], [2027, 7, 28], [2026, 11, 15], [2028, 5, 13], [2028, 5, 14]]
+            .map(([y, m, dd]) => { const f = F.deHoy({ hoy: d(y, m, dd), forzada: null }); return f ? [f.id, F.texto(f), F.esDia(f)] : null; });
+          let max = 0; for (let t = Date.UTC(2026, 0, 1); t < Date.UTC(2029, 0, 1); t += 864e5) { const f = F.deHoy({ hoy: new Date(t), forzada: null }); if (f) max = Math.max(max, F.faltan(f)); }
+          const ins = Object.values(F.FIESTAS).map((f) => { const s = F.svgInsignia(f), doc = new DOMParser().parseFromString(s, 'image/svg+xml'); return !doc.querySelector('parsererror') && s.length > 300; });
+          return { casos, max, ins, felic: F.felicitacion(F.FIESTAS.patrias), n: Object.keys(F.FIESTAS).length, sinAnimar: typeof F.lanzar === 'undefined' }; }""")
+        ids = [c[0] if c else None for c in r["casos"]]
+        ok = (ids == [None, "halloween", None, "navidad", "anionuevo", "anionuevo", "sanvalentin", "madre", "quimico", "quimico", "padre", "patrias", None, "quimico", "madre"]
+              and r["casos"][3][1] == "Faltan 14 días para Navidad" and r["casos"][9][1] == "¡Feliz Día del Químico Farmacéutico!" and r["casos"][9][2] is True
+              and r["max"] == 14 and all(r["ins"]) and r["n"] == 9 and r["felic"] == "¡Felices Fiestas Patrias!" and r["sinAnimar"])
+        return ok, json.dumps(r, ensure_ascii=False)[:700]
     @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
     def _():
         r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.72.1
+// @version      1.73.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.72.1';                                                       // mantener igual a @version
+  const VERSION = '1.73.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -29,6 +29,7 @@
   const OPC = [
     ['activo', 'Mejoras activas', 'Apágalo para usar el portal tal como es, sin ninguna mejora.'],
     ['saludo', 'Saludo de bienvenida', 'Tus RMD en Ingresado y acceso directo al último que abriste.'],
+    ['fiestas', 'Festividades en el saludo', 'Hasta 2 semanas antes de cada fiesta del Perú, el saludo lleva su insignia y su cuenta regresiva o felicitación.'],
     ['titulo', 'Nombre de la pestaña', 'La pestaña del navegador muestra la etapa y la descripción del RMD abierto.'],
     ['enter', 'Enter para buscar', 'En un filtro, Enter pulsa «Ir».'],
     ['singuardar', 'Avisar cambios sin guardar', 'Avisa antes de cerrar una ventana con cambios.'],
@@ -455,6 +456,8 @@
     opacity: 0; transform: translateY(10px); transition: opacity .7s ease, transform .7s ease; pointer-events: none; }
   .rmd-saludo.visible { opacity: 1; transform: none; pointer-events: auto; }
   .rmd-saludo b { font-size: 14.5px; font-weight: 600; } .rmd-saludo-resumen:empty { display: none; } .rmd-saludo-resumen, .rmd-saludo-tip { color: var(--rmd-apagado); font-size: 12px; } .rmd-saludo-tip { opacity: .8; }
+  .rmd-saludo.rmd-fz { padding-left: 50px; border-left: 3px solid var(--fz-color); } .rmd-saludo-fz { position: absolute; left: 11px; top: 10px; width: 30px; height: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+  .rmd-saludo-fz svg { width: 100%; height: 100%; display: block; overflow: visible; } .rmd-saludo-fiesta { color: var(--fz-color); font-size: 12px; font-weight: 600; }
   .rmd-saludo-continuar { margin: 2px 0 1px; padding: 0; border: 0; background: none; color: var(--rmd-acento-texto); font: 600 12.5px var(--rmd-fuente); cursor: pointer; text-align: left; } .rmd-saludo-continuar:hover { text-decoration: underline; }
   .rmd-paleta-fondo { position: fixed; inset: 0; z-index: 100000; display: flex; justify-content: center; align-items: flex-start; padding-top: 11vh; background: rgba(0,0,0,.34); }
   .rmd-paleta { width: min(720px, 92vw); overflow: hidden; border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); box-shadow: 0 18px 50px rgba(0,0,0,.45); font: 13px var(--rmd-fuente); animation: rmd-paleta-entra .14s ease-out; }
@@ -8036,6 +8039,132 @@
     const rech = cuenta(/RECHAZ/i), env = cuenta(/ENVIADO/i);
     return `Tienes ${lista.length} RMD en Ingresado` + (env ? ` · ${env} en revisión` : '') + (rech ? ` · ${rech} con la revisión rechazada` : '') + '.';
   }
+  // ---- Festividades del Perú: calendario, textos e insignias (los del núcleo de Status RMD, sin sus animaciones) ----
+  // Hora de Lima; como máximo 2 semanas antes de cada fiesta.
+  const FiestasRMD = (() => {
+    // ---------- Calendario ----------
+    const dia = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
+    const sumar = (f, n) => new Date(f.getTime() + n * 864e5);
+    const hoyLima = () => {
+      const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+      const v = (t) => +p.find((x) => x.type === t).value; return dia(v('year'), v('month'), v('day'));
+    };
+    const domingoN = (y, m, n) => { const d1 = dia(y, m, 1); return dia(y, m, 1 + ((7 - d1.getUTCDay()) % 7) + 7 * (n - 1)); };
+    const previos = (d, n) => [sumar(d, -n), d, d];
+    // rango(y) -> [desde, hasta, día de la fiesta]; base: [color en tema oscuro, en tema claro]
+    const FIESTAS = {
+      anionuevo:  { nombre: 'Año Nuevo', rango: (y) => [dia(y - 1, 12, 27), dia(y, 1, 2), dia(y, 1, 1)], base: ['#e6c47a', '#8a6a1f'], efectos: ['fuegos'], insignia: 'destello' },
+      sanvalentin: { nombre: 'Día del Amor y la Amistad', rango: (y) => [dia(y, 2, 7), dia(y, 2, 14), dia(y, 2, 14)], base: ['#ef6f8f', '#b02a52'], efectos: ['corazones'], insignia: 'corazon' },
+      mujer:      { nombre: 'Día Internacional de la Mujer', rango: (y) => [dia(y, 3, 6), dia(y, 3, 8), dia(y, 3, 8)], base: ['#b693ea', '#6f3fb0'], efectos: ['petalos', 'mariposas'], insignia: 'flor', tono: 'violeta' },
+      madre:      { nombre: 'Día de la Madre', rango: (y) => previos(domingoN(y, 5, 2), 7), base: ['#ea8fbd', '#a3407a'], efectos: ['petalos', 'mariposas'], insignia: 'flor', tono: 'rosa' },
+      quimico:    { nombre: 'Día del Químico Farmacéutico', rango: (y) => [dia(y, 5, 7), dia(y, 5, 13), dia(y, 5, 13)], base: ['#3cc7a4', '#127a62'], efectos: ['molecula', 'burbujas'], insignia: 'higia' },
+      padre:      { nombre: 'Día del Padre', rango: (y) => previos(domingoN(y, 6, 3), 7), base: ['#74abdc', '#2c5f8f'], efectos: ['destellos', 'fugaces'], insignia: 'corbata' },
+      patrias:    { nombre: 'Fiestas Patrias', rango: (y) => [dia(y, 7, 15), dia(y, 7, 29), dia(y, 7, 28)], base: ['#ec4655', '#c0111f'], efectos: ['bandera', 'confeti'], insignia: 'escarapela', plural: true },
+      halloween:  { nombre: 'Halloween y Día de la Canción Criolla', rango: (y) => [dia(y, 10, 17), dia(y, 10, 31), dia(y, 10, 31)], base: ['#f28c3e', '#b4541a'], efectos: ['murcielagos'], insignia: 'calabaza' },
+      navidad:    { nombre: 'Navidad', rango: (y) => [dia(y, 12, 11), dia(y, 12, 26), dia(y, 12, 25)], base: ['#e0606f', '#a8323f'], efectos: ['guirnalda', 'nieve'], insignia: 'esfera' },
+    };
+    const ANTICIPACION = 14;                                             // días: ninguna fiesta se anuncia antes
+    let forzada = null;                                                   // pruebas y vista previa: id o 'no'
+    // Fiesta activa: si se cruzan dos rangos, la de fecha más cercana (a igual distancia, la que viene)
+    function deHoy(op = {}) {
+      const q = op.forzada !== undefined ? op.forzada : forzada; if (q === 'no') return null;
+      const hoy = op.hoy || hoyLima(), y = hoy.getUTCFullYear();
+      if (q && FIESTAS[q]) { const F = FIESTAS[q]; let [, b, d] = F.rango(y); if (b < hoy) [, , d] = F.rango(y + 1); return { id: q, ...F, dia: d, hoy }; }
+      let mejor = null;
+      for (const [id, F] of Object.entries(FIESTAS)) for (const yy of [y, y + 1]) {
+        const [a, b, d] = F.rango(yy); if (hoy < a || hoy < sumar(d, -ANTICIPACION) || hoy > b) continue;
+        const dist = Math.abs(d - hoy) / 864e5 + (d < hoy ? 0.5 : 0);
+        if (!mejor || dist < mejor.dist) mejor = { id, ...F, dia: d, hoy, dist };
+      }
+      return mejor;
+    }
+    const faltan = (f) => Math.round((f.dia - f.hoy) / 864e5);
+    const esDia = (f) => !!f && faltan(f) <= 0;
+    const felicitacion = (f) => (f.plural ? `¡Felices ${f.nombre}!` : `¡Feliz ${f.nombre}!`);
+    function texto(f) {
+      const n = faltan(f), con = f.plural ? 'las ' + f.nombre : /^Día /.test(f.nombre) ? 'el ' + f.nombre : f.nombre;
+      return n > 1 ? `Faltan ${n} días para ${con}` : n === 1 ? `Mañana: ${f.plural ? f.nombre : con.replace(/^el /, '')}` : felicitacion(f);
+    }
+    // ---------- Insignias ----------
+    let nId = 0; const uid = (p) => `fz${p}${++nId}`;
+    function svgInsignia(f) {
+      const g = uid('g'), tono = f.tono;
+      switch (f.insignia) {
+        case 'calabaza': return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <radialGradient id="${g}a" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffd08a"/><stop offset=".45" stop-color="#f4892a"/><stop offset="1" stop-color="#8f3a07"/></radialGradient>
+          <radialGradient id="${g}b" cx="50%" cy="30%" r="80%"><stop offset="0" stop-color="#ffc173"/><stop offset=".5" stop-color="#ee7c1c"/><stop offset="1" stop-color="#7d3205"/></radialGradient>
+          <linearGradient id="${g}t" x1="0" x2="1"><stop offset="0" stop-color="#8fb24a"/><stop offset="1" stop-color="#3d5a17"/></linearGradient>
+          <radialGradient id="${g}l"><stop offset="0" stop-color="#fff6b0"/><stop offset=".55" stop-color="#ffbf2e"/><stop offset="1" stop-color="#e46b00"/></radialGradient>
+          <filter id="${g}f" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter></defs>
+          <ellipse cx="32" cy="57" rx="20" ry="3.2" fill="#000" opacity=".25"/>
+          <ellipse cx="19" cy="38" rx="14" ry="17" fill="url(#${g}a)"/><ellipse cx="45" cy="38" rx="14" ry="17" fill="url(#${g}a)"/><ellipse cx="32" cy="38" rx="13.5" ry="19" fill="url(#${g}b)"/>
+          <path d="M25 21 Q22 38 25 56 M39 21 Q42 38 39 56" stroke="#7a2e04" stroke-opacity=".35" stroke-width="1.4" fill="none"/>
+          <path d="M30 20 C30 14 31 10 35 7 L37 9 C34 12 34 15 34.5 20 Z" fill="url(#${g}t)"/><path d="M34 11 C40 8 45 11 46 15 C42 13 38 13 34 14 Z" fill="#5f8a25" opacity=".9"/>
+          <g class="fz-cara"><g filter="url(#${g}f)" opacity=".8"><path d="M20 33 L26 28 L28 35 Z M44 33 L38 28 L36 35 Z M19 42 Q32 52 45 42 Q41 47 37 46 L35 49 L32 46 L29 49 L27 46 Q23 47 19 42 Z" fill="#ffcf40"/></g>
+          <path d="M20 33 L26 28 L28 35 Z M44 33 L38 28 L36 35 Z M19 42 Q32 52 45 42 Q41 47 37 46 L35 49 L32 46 L29 49 L27 46 Q23 47 19 42 Z" fill="url(#${g}l)"/></g>
+          <ellipse cx="24" cy="27" rx="4" ry="6" fill="#fff" opacity=".22" transform="rotate(-25 24 27)"/></svg>`;
+        case 'esfera': return `<svg viewBox="0 0 40 60" aria-hidden="true"><defs>
+          <radialGradient id="${g}e" cx="35%" cy="32%" r="72%"><stop offset="0" stop-color="#ffb3bd"/><stop offset=".35" stop-color="#e2384f"/><stop offset=".8" stop-color="#8e0f24"/><stop offset="1" stop-color="#5a0714"/></radialGradient>
+          <linearGradient id="${g}m" x1="0" x2="1"><stop offset="0" stop-color="#8a6a1f"/><stop offset=".45" stop-color="#ffe9a8"/><stop offset=".6" stop-color="#e2b84f"/><stop offset="1" stop-color="#7a5a12"/></linearGradient>
+          <filter id="${g}f"><feGaussianBlur stdDeviation="1.2"/></filter></defs>
+          <path d="M20 0 V16" stroke="#d9c27a" stroke-width="1.2"/><path d="M16 15 Q20 9 24 15" stroke="url(#${g}m)" stroke-width="2" fill="none"/>
+          <rect x="14.5" y="15" width="11" height="6" rx="1.5" fill="url(#${g}m)"/><circle cx="20" cy="39" r="17" fill="url(#${g}e)"/>
+          <path d="M4 37 Q20 44 36 37" stroke="url(#${g}m)" stroke-width="2.2" fill="none" opacity=".9"/>
+          <circle cx="11" cy="40" r="1.2" fill="#ffe9a8"/><circle cx="20" cy="42.5" r="1.4" fill="#ffe9a8"/><circle cx="29" cy="40" r="1.2" fill="#ffe9a8"/>
+          <ellipse cx="13.5" cy="30" rx="4.5" ry="6.5" fill="#fff" opacity=".55" filter="url(#${g}f)" transform="rotate(30 13.5 30)"/></svg>`;
+        case 'destello': return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <radialGradient id="${g}s"><stop offset="0" stop-color="#fffbe6"/><stop offset=".35" stop-color="#ffe08a"/><stop offset=".75" stop-color="#d9a52a"/><stop offset="1" stop-color="#8a6312"/></radialGradient>
+          <radialGradient id="${g}h"><stop offset="0" stop-color="#ffe9a8" stop-opacity=".8"/><stop offset="1" stop-color="#ffe9a8" stop-opacity="0"/></radialGradient></defs>
+          <circle cx="32" cy="32" r="26" fill="url(#${g}h)"/><path d="M32 4 C35 24 40 29 60 32 C40 35 35 40 32 60 C29 40 24 35 4 32 C24 29 29 24 32 4 Z" fill="url(#${g}s)"/>
+          <path d="M32 18 C33 28 36 31 46 32 C36 33 33 36 32 46 C31 36 28 33 18 32 C28 31 31 28 32 18 Z" fill="#fff" opacity=".55"/>
+          <circle cx="52" cy="12" r="2.2" fill="#ffe9a8"/><circle cx="12" cy="52" r="1.6" fill="#ffe9a8"/><circle cx="54" cy="50" r="1.3" fill="#fff"/></svg>`;
+        case 'corazon': return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <radialGradient id="${g}c" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffc2cf"/><stop offset=".4" stop-color="#ee4b72"/><stop offset="1" stop-color="#7d0f2c"/></radialGradient>
+          <filter id="${g}f"><feGaussianBlur stdDeviation="1.4"/></filter></defs>
+          <ellipse cx="32" cy="60" rx="16" ry="2.6" fill="#000" opacity=".22"/>
+          <path d="M32 56 C9 41 4 25 13 15.5 C21 7.5 29.5 11 32 18.5 C34.5 11 43 7.5 51 15.5 C60 25 55 41 32 56 Z" fill="url(#${g}c)"/>
+          <ellipse cx="20" cy="21" rx="5" ry="7.5" fill="#fff" opacity=".5" filter="url(#${g}f)" transform="rotate(-35 20 21)"/></svg>`;
+        case 'flor': { const vi = tono === 'violeta', p1 = vi ? '#f1e3ff' : '#ffe0ee', p2 = vi ? '#a777e6' : '#ec7fb2', p3 = vi ? '#55248f' : '#9c2c62';
+          return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <radialGradient id="${g}p" cx="50%" cy="85%" r="95%"><stop offset="0" stop-color="${p3}"/><stop offset=".45" stop-color="${p2}"/><stop offset="1" stop-color="${p1}"/></radialGradient>
+          <radialGradient id="${g}c" cx="40%" cy="35%"><stop offset="0" stop-color="#fff6c2"/><stop offset=".6" stop-color="#f5c542"/><stop offset="1" stop-color="#b07a12"/></radialGradient>
+          <linearGradient id="${g}h" x1="0" x2="1"><stop offset="0" stop-color="#7fb35a"/><stop offset="1" stop-color="#2f6b2a"/></linearGradient></defs>
+          <path d="M33 40 C30 50 26 56 22 62" stroke="url(#${g}h)" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M27 52 C18 50 14 44 15 40 C22 41 26 45 27 52 Z" fill="url(#${g}h)"/>
+          ${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="32" cy="17" rx="9" ry="13" fill="url(#${g}p)" transform="rotate(${a} 32 28)"/>`).join('')}
+          ${[36, 108, 180, 252, 324].map((a) => `<ellipse cx="32" cy="20" rx="6" ry="9" fill="url(#${g}p)" opacity=".85" transform="rotate(${a} 32 28)"/>`).join('')}
+          <circle cx="32" cy="28" r="5.5" fill="url(#${g}c)"/><circle cx="30.5" cy="26.5" r="1.6" fill="#fff" opacity=".7"/></svg>`; }
+        case 'corbata': return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <linearGradient id="${g}c" x1="0" x2="1"><stop offset="0" stop-color="#173a63"/><stop offset=".5" stop-color="#3f7fc0"/><stop offset="1" stop-color="#132f52"/></linearGradient>
+          <pattern id="${g}r" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="8" height="8" fill="url(#${g}c)"/><rect width="2.2" height="8" fill="#9cc6ef" opacity=".55"/></pattern></defs>
+          <path d="M22 4 H42 L44 9 L36 16 H28 L20 9 Z" fill="#f2f4f7"/><path d="M22 4 L32 14 L42 4" fill="none" stroke="#c8ced8" stroke-width="1.2"/>
+          <path d="M27 13 H37 L35 20 H29 Z" fill="url(#${g}c)"/><path d="M29 20 H35 L41 48 L32 60 L23 48 Z" fill="url(#${g}r)"/>
+          <path d="M29 20 H32 L28 48 L32 60 L23 48 Z" fill="#000" opacity=".18"/><path d="M33 22 L37 46" stroke="#fff" stroke-opacity=".35" stroke-width="1.4"/></svg>`;
+        case 'escarapela': {
+          const pl = (n, r, rx, ry, c1, c2) => Array.from({ length: n }, (_, i) => `<ellipse cx="32" cy="${32 - r}" rx="${rx}" ry="${ry}" fill="${i % 2 ? c1 : c2}" transform="rotate(${(360 / n) * i} 32 32)"/>`).join('');
+          return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <radialGradient id="${g}r" cx="40%" cy="35%"><stop offset="0" stop-color="#ff6b78"/><stop offset=".6" stop-color="#d91023"/><stop offset="1" stop-color="#7e0611"/></radialGradient>
+          <radialGradient id="${g}b" cx="40%" cy="35%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9dde3"/></radialGradient>
+          <linearGradient id="${g}c" x1="0" x2="1"><stop offset="0" stop-color="#a50c1a"/><stop offset=".5" stop-color="#e8303f"/><stop offset="1" stop-color="#a50c1a"/></linearGradient></defs>
+          <path d="M24 40 L18 62 L24 58 L28 63 L31 42 Z" fill="url(#${g}c)"/><path d="M40 40 L46 62 L40 58 L36 63 L33 42 Z" fill="#f4f5f7"/><path d="M40 40 L46 62 L44 61 L37 42Z" fill="#000" opacity=".12"/>
+          <circle cx="32" cy="32" r="22" fill="#9c0a17"/>${pl(22, 15, 4.2, 8.5, `url(#${g}r)`, '#b30d1d')}${pl(16, 8.5, 3.4, 6.2, `url(#${g}b)`, '#e9ecf0')}
+          <circle cx="32" cy="32" r="6" fill="url(#${g}r)"/><circle cx="30" cy="30" r="1.8" fill="#fff" opacity=".6"/></svg>`; }
+        case 'higia': return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs>
+          <linearGradient id="${g}c" x1="0" x2="1"><stop offset="0" stop-color="#5d6b78"/><stop offset=".35" stop-color="#eef3f6"/><stop offset=".55" stop-color="#b9c6cf"/><stop offset="1" stop-color="#4a5763"/></linearGradient>
+          <linearGradient id="${g}r" x1="0" x2="1"><stop offset="0" stop-color="#8b98a3"/><stop offset=".5" stop-color="#ffffff"/><stop offset="1" stop-color="#8b98a3"/></linearGradient>
+          <linearGradient id="${g}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9df0c4"/><stop offset=".5" stop-color="#2fbf7f"/><stop offset="1" stop-color="#0f6b45"/></linearGradient>
+          <radialGradient id="${g}l"><stop offset="0" stop-color="#a6ffe3"/><stop offset="1" stop-color="#1fa883"/></radialGradient></defs>
+          <ellipse cx="32" cy="60" rx="14" ry="2.4" fill="#000" opacity=".22"/>
+          <path d="M14 14 H50 C50 26 42 32 32 32 C22 32 14 26 14 14 Z" fill="url(#${g}c)"/><ellipse cx="32" cy="14" rx="18" ry="3.6" fill="url(#${g}r)"/><ellipse cx="32" cy="14.6" rx="15" ry="2.4" fill="url(#${g}l)"/>
+          <rect x="29.5" y="31" width="5" height="19" rx="2" fill="url(#${g}c)"/><path d="M20 57 C22 50 42 50 44 57 Z" fill="url(#${g}c)"/><ellipse cx="32" cy="57" rx="12" ry="2.6" fill="url(#${g}r)"/>
+          <path d="M34 54 C44 50 22 46 32 42 C42 38 22 35 31 30 C38 26 45 22 47 14 C48 10 45 7 42 8" stroke="url(#${g}s)" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+          <ellipse cx="41" cy="8.4" rx="3.8" ry="2.7" fill="url(#${g}s)" transform="rotate(-20 41 8.4)"/><circle cx="40" cy="7.7" r=".75" fill="#10241a"/><path d="M37.5 9.6 L35 10.6 M35.6 10.3 L34.6 9.6" stroke="#d22" stroke-width=".7"/>
+          <path d="M18 18 C20 24 25 28 30 29" stroke="#fff" stroke-opacity=".45" stroke-width="1.6" fill="none"/></svg>`;
+      }
+      return '';
+    }
+    return { FIESTAS, deHoy, texto, felicitacion, esDia, faltan, svgInsignia, forzar: (id) => { forzada = id || null; } };
+  })();
+  window.__rmdStats.fiestas = FiestasRMD;   // pruebas: fiestas.forzar('navidad') y productividad.saludar()
   let saludoHecho = false;
   function gestionarSaludo() {
     if (saludoHecho || !on('saludo')) return;
@@ -8043,9 +8172,14 @@
     saludoHecho = true;
     try { const u = +localStorage.getItem(CLAVE_SALUDO) || 0; if (Date.now() - u < 10 * 60000) return; localStorage.setItem(CLAVE_SALUDO, String(Date.now())); } catch (e) { }
     const nombre = primerNombre(), ult = leerRecientes()[0], reciente = ult && Date.now() - ult.t < 14 * 86400000 ? ult : null;
+    // festividad: insignia y felicitación del día o cuenta regresiva, con su color (sin animaciones)
+    const fz = on('fiestas') ? FiestasRMD.deHoy() : null, esDiaFz = FiestasRMD.esDia(fz), textoFz = fz ? FiestasRMD.texto(fz) : '';
+    const linea = esDiaFz ? FiestasRMD.felicitacion(fz).replace(/!$/, nombre ? `, ${nombre}!` : '!') : `${saludoDelMomento()}${nombre ? ', ' + nombre : ''}`;
     const el = document.createElement('div'); el.className = 'rmd-saludo'; el.setAttribute('role', 'status');
-    el.innerHTML = `<b>${esc(saludoDelMomento())}${nombre ? ', ' + esc(nombre) : ''}</b><span class="rmd-saludo-resumen"></span>` +
+    el.innerHTML = (fz ? `<span class="rmd-saludo-fz" title="${esc(textoFz)}" role="img" aria-label="${esc(textoFz)}">${FiestasRMD.svgInsignia(fz)}</span>` : '') +
+      `<b>${esc(linea)}</b>${fz && !esDiaFz ? `<span class="rmd-saludo-fiesta">${esc(textoFz)}</span>` : ''}<span class="rmd-saludo-resumen"></span>` +
       (reciente ? `<button type="button" class="rmd-saludo-continuar" title="Abrir la configuración de este RMD">Continuar con ${esc(reciente.codigo)} · ${esc(reciente.descripcion.slice(0, 38))}</button>` : '');
+    if (fz) { el.classList.add('rmd-fz'); el.style.setProperty('--fz-color', fz.base[temaOscuro() ? 0 : 1]); }
     html.appendChild(el);
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
     let t = null;
@@ -13468,7 +13602,7 @@ td.ult { position: relative; }
   // ---- 10. Panel de mejoras ----
   // [nombre, ícono, claves de OPC]
   const GRUPOS_PANEL = [
-    ['Uso diario', 'inicio', ['saludo', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
+    ['Uso diario', 'inicio', ['saludo', 'fiestas', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
     ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios']],
     ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
