@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.70.0
+// @version      1.72.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.70.0';                                                       // mantener igual a @version
+  const VERSION = '1.72.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -71,6 +71,7 @@
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
+    ['ultimaversion', 'Última versión de cada master', 'Excel de los Autorizados, Ingresados y Suspendidos (su última versión) con sus Observaciones y un resumen por producto.'],
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
     ['citastodos', 'Documentos citados en todos los master', 'Qué master citan cada instructivo, procedimiento o formato.'],
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
@@ -297,6 +298,9 @@
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   /* elementos de baja */
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-uv-filtros { display: grid; gap: 8px; margin: 8px 0; } .rmd-uv-filtros fieldset { margin: 0; padding: 6px 12px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; }
+  .rmd-uv-filtros legend { padding: 0 4px; font-weight: 600; font-size: 12px; } .rmd-uv-filtros label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+  .rmd-uv-lista { display: flex; flex-wrap: wrap; gap: 2px 16px; max-height: 112px; overflow: auto; } .rmd-uv-desde { margin-left: 16px; }
   .sapMDialog.sapMMessageDialog.rmd-espera-respuesta { z-index: 100002 !important; box-shadow: 0 0 0 3px var(--rmd-acento), 0 12px 32px rgba(0,0,0,.28) !important; }   /* encima de las ventanas del script: la responde la persona */
   .rmd-dep-aviso, .rmd-etq-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-dep-aviso b, .rmd-etq-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
@@ -1677,6 +1681,23 @@
     tabla.querySelectorAll('td.rmd-pm-mal').forEach((td) => { td.classList.remove('rmd-pm-mal'); delete td.dataset.rmdPm; });
     const porOrden = {}, infoOrden = {};
     const iCod = nombres.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO');
+    // filas guardadas del RMD (asociarDatos): id -> código y orden; códigos de todas sus estructuras
+    let filasRmd = null;
+    const filasDelRmd = () => {
+      if (filasRmd) return filasRmd; filasRmd = { porId: new Map(), codigos: new Set(), ing: false };
+      try { const V = vistaDeTabla(tabla), a = V && V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(); filasRmd.ing = !!a && +a.estadoIdRmd_iMaestraId === 467;
+        ((a && a.aEstructura && a.aEstructura.results) || []).forEach((e) => ((e.aPaso && e.aPaso.results) || []).forEach((x) => {
+          if (x.activo === false || (a.mdId && x.mdId_mdId && x.mdId_mdId !== a.mdId)) return; const c = String((x.pasoId && x.pasoId.codigo) || '');
+          filasRmd.porId.set(x.mdEstructuraPasoId, { codigo: c, orden: x.orden }); if (c) filasRmd.codigos.add(c); })); } catch (e) { /* sin datos del RMD */ }
+      return filasRmd;
+    };
+    const citaDepende = (ob, mm, v) => {
+      const R = filasDelRmd(); if (!v || !R.codigos.size) return '';
+      const cod = mm ? mm[1] : v.split(/\s/)[0], cit = ob.dependeMdEstructuraPasoId && R.porId.get(ob.dependeMdEstructuraPasoId), fuera = !R.codigos.has(cod);
+      if (cit && cit.codigo && cit.codigo !== cod) return `El «Depende» dice ${cod}${fuera ? ' (un paso que no está en ninguna estructura del RMD)' : ''}, pero la fila que cita (orden ${cit.orden}) es el paso ${cit.codigo}: así sale en el PDF del master. ${R.ing ? 'Se corrige solo en cuanto esté guardado.' : 'Este RMD no está Ingresado: corrígelo en una versión nueva.'}`;
+      if (!ob.dependeMdEstructuraPasoId && fuera) return `El «Depende» cita el paso ${cod}, que no está en ninguna estructura del RMD.`;
+      return '';
+    };
     filas.forEach((tr, k) => {
       const o = norm(iOrd >= 0 ? (inputDe(celda(tr, iOrd)) || {}).value : '') || String(k + 1);
       porOrden[o] = norm(celda(tr, iDes) && celda(tr, iDes).textContent);
@@ -1732,6 +1753,7 @@
         else if ((ob.mdEstructuraPasoId && ob.dependeMdEstructuraPasoId === ob.mdEstructuraPasoId) || (mismaLista && Number(mm[2]) === ordenFila)) {
           marcarFalta(iDep, 'El paso depende de sí mismo: en Producción nunca se habilita. Se corrige solo (al paso anterior) en cuanto esté guardado.'); programarCorreccionDependencias(); }
         else if (mismaLista && Number(mm[2]) > ordenFila) { marcarFalta(iDep, `El predecesor (orden ${mm[2]}) está después de este paso: en Producción no se habilita hasta terminar uno posterior. Se corrige solo en cuanto esté guardado.`); programarCorreccionDependencias(); }
+        else if (v && esPasos && citaDepende(ob, mm, v)) { const msg = citaDepende(ob, mm, v); marcarFalta(iDep, msg); if (ob.dependeMdEstructuraPasoId) programarCorreccionDependencias(); }
         else if (sinTipo) { /* sin tipo de dato: solo el propio o el posterior */ }
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
         else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
@@ -4583,7 +4605,7 @@
 
     // ---- Estilos (índices fijos) ----
     // [nombre, numFmt, fuente, relleno, borde, alineación]. Fuentes: 0 normal, 1 negrita, 2 título, 3 nota, 4 negrita blanca, 5 negrita roja, 6 negrita 10.
-    // Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo, 9 amarillo claro. numFmt: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0,
+    // Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo, 9 amarillo claro, 10 verde claro, 11 salmón claro. numFmt: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0,
     // 167 dd/mm/aaaa, 168 0.0%, 17 mmm-aa.
     const ESTILOS = [['normal', 0, 0, 0, 0], ['cabecera', 0, 1, 2, 0], ['cabeceraVerde', 0, 0, 3, 0, 'horizontal="center"'],
       ['cabeceraVerdeFecha', 165, 0, 3, 0, 'horizontal="center" wrapText="1"'], ['cabeceraAmbar', 0, 1, 4, 0, 'horizontal="center"'],
@@ -4592,14 +4614,17 @@
       ['decimal', 166, 0, 0, 1], ['porcentaje', 168, 0, 0, 1], ['fechaDia', 167, 0, 0, 0], ['alerta', 0, 5, 0, 0], ['tituloAzul', 0, 1, 7, 0],
       ['negrita', 0, 1, 0, 0], ['mesAnio', 17, 1, 0, 0, 'horizontal="left"'], ['entrada', 0, 0, 8, 1], ['sugerido', 0, 0, 9, 0], ['nombre', 0, 6, 0, 0],
       ['decimal1', 166, 0, 0, 0], ['envuelto', 0, 0, 0, 1, 'vertical="top" wrapText="1"'], ['celda', 0, 0, 0, 1, 'vertical="top"'],
-      ['notaAmarilla', 0, 1, 8, 0, 'horizontal="center"'], ['entero', 0, 0, 0, 1], ['fechaHora', 169, 0, 0, 0]];
+      ['notaAmarilla', 0, 1, 8, 0, 'horizontal="center"'], ['entero', 0, 0, 0, 1], ['fechaHora', 169, 0, 0, 0],
+      ['estAut', 0, 1, 10, 1, 'vertical="top"'], ['estIng', 0, 1, 9, 1, 'vertical="top"'], ['estSus', 0, 1, 11, 1, 'vertical="top"'],
+      ['fechaCelda', 167, 0, 0, 1, 'vertical="top"'], ['numCelda', 0, 0, 0, 1, 'horizontal="center" vertical="top"'], ['pctCelda', 168, 0, 0, 1, 'horizontal="center" vertical="top"'],
+      ['textoCelda', 0, 0, 0, 1, 'vertical="top" wrapText="1"'], ['codigoCelda', 0, 1, 0, 1, 'vertical="top"']];
     const S = Object.fromEntries(ESTILOS.map(([n], i) => [n, i]));
     const fuente = (b, i, sz, color) => `<font>${b ? '<b/>' : ''}${i ? '<i/>' : ''}<sz val="${sz}"/><color rgb="FF${color}"/><name val="Arial"/><family val="2"/></font>`;
     const relleno = (rgb) => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
     const XML_ESTILOS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="6"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="yyyy\\-mm\\-dd;@"/><numFmt numFmtId="166" formatCode="0.0"/><numFmt numFmtId="167" formatCode="dd/mm/yyyy"/><numFmt numFmtId="168" formatCode="0.0%"/><numFmt numFmtId="169" formatCode="dd/mm/yyyy hh:mm"/></numFmts>
 <fonts count="7">${fuente(0, 0, 11, '000000')}${fuente(1, 0, 11, '000000')}${fuente(1, 0, 12, '1F3A5F')}${fuente(0, 1, 9, '595959')}${fuente(1, 0, 11, 'FFFFFF')}${fuente(1, 0, 11, 'C00000')}${fuente(1, 0, 10, '000000')}</fonts>
-<fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['F7F7F7', '00B050', 'FFC000', 'C9C9C9', 'DDEBF7', '00B0F0', 'FFFF00', 'FFF2CC'].map(relleno).join('')}</fills>
+<fills count="12"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['F7F7F7', '00B050', 'FFC000', 'C9C9C9', 'DDEBF7', '00B0F0', 'FFFF00', 'FFF2CC', 'E2EFDA', 'FCE4D6'].map(relleno).join('')}</fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
 <cellXfs count="${ESTILOS.length}">${ESTILOS.map(([, nf, fo, fi, bo, al]) => `<xf numFmtId="${nf}" fontId="${fo}" fillId="${fi}" borderId="${bo}" xfId="0"${nf ? ' applyNumberFormat="1"' : ''}${fo ? ' applyFont="1"' : ''}${fi ? ' applyFill="1"' : ''}${bo ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1"><alignment ${al}/></xf>` : '/>'}`).join('')}</cellXfs>
@@ -6208,6 +6233,160 @@
       finally { window.__rmdEquipos = false; trabajando = false; bGen.disabled = false; }
     });
   }
+  // ---- Última versión de cada master (Autorizados, Ingresados y Suspendidos) ----
+  // Linaje como «Historia del producto»: codigoversionprincipal, mdIdVersionAnt y, sin enlace, la misma descripción, planta, área y etapa.
+  // De cada linaje, la versión más alta en esos tres estados;
+  // las solicitudes (Solicitado, Solicitud Aprobada / Rechazada) y los Cancelados no entran. Producto: la descripción hasta la forma farmacéutica.
+  const ESTADOS_UV = ['Autorizado', 'Ingresado', 'Suspendido'];
+  const SELECT_MD_UV = 'mdId,mdIdVersionAnt,sucursalId_iMaestraId,codigo,codigoversionprincipal,codigoSolicitud,version,descripcion,codDefectoReceta,codAgrupadorReceta,nivelTxt,areaRmdTxt,af,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,fechaSolicitud,observacion,estadoIdProceso_iMaestraId,estadoIdRmd/contenido,sucursalId/contenido,motivoId/descripcion';
+  const FORMAS_UV = /\s(INY|INYECTABLE|TAB|TABLETAS?|CAP|CAPS|CAPSULAS?|SOL|SUS|SUSP|SOF|OVU|OVULOS?|PVO|POLVO|JBE|JARABE|UNG|CREMA|GEL|SAC|SOB|POT|AMP\d*|VIAL|PEBD|PEAD|FCO\S*|CJA\S*|BOL|GTS|EMULSION|LOCION|SPRAY|AEROSOL)(?=\s|$|[^A-Za-zÁÉÍÓÚÑáéíóúñ])/i;
+  function productoDeDescripcion(d) {
+    const t = norm(String(d || '')).replace(/(\d)\s+(mg|g|mL|ml|L|UI|ug|mcg|%)(?![A-Za-z])/g, '$1$2');
+    const cortes = [t.search(FORMAS_UV), t.search(/\s-\s/), t.indexOf('(')].filter((i) => i > 0), i = cortes.length ? Math.min(...cortes) : -1;
+    let x = (i > 0 ? t.slice(0, i) : t).trim().replace(/[-–,]+$/, '').trim();
+    if (x.length < 3) x = t.split(' ').slice(0, 3).join(' ');
+    return x;
+  }
+  const estadoUV = (m) => (m.estadoIdRmd && m.estadoIdRmd.contenido) || '';
+  function ultimasVersiones(mds) {
+    const padre = new Map(), raiz = (k) => { let r = k; while (padre.has(r) && padre.get(r) !== r) r = padre.get(r); let c = k; while (c !== r) { const n = padre.get(c); padre.set(c, r); c = n; } return r; };
+    const unir = (a, b) => { if (!padre.has(a)) padre.set(a, a); if (!padre.has(b)) padre.set(b, b); const ra = raiz(a), rb = raiz(b); if (ra !== rb) padre.set(ra < rb ? rb : ra, ra < rb ? ra : rb); };
+    const porId = new Map(mds.map((m) => [m.mdId, m])), nodo = (m) => 'c:' + String(m.codigo || m.mdId).trim();
+    mds.forEach((m) => {
+      const c = nodo(m), p = String(m.codigoversionprincipal || '').trim(), a = m.mdIdVersionAnt && porId.get(m.mdIdVersionAnt); unir(c, c);
+      if (p) unir(c, 'c:' + p); if (a) unir(c, nodo(a));
+      unir(c, 'd:' + [SIN_ACENTOS(norm(m.descripcion || '')), m.sucursalId_iMaestraId, SIN_ACENTOS(norm(m.areaRmdTxt || '')), SIN_ACENTOS(norm(m.nivelTxt || ''))].join('|'));
+    });
+    const lin = new Map(); mds.forEach((m) => { const k = raiz(nodo(m)); if (!lin.has(k)) lin.set(k, []); lin.get(k).push(m); });
+    const out = [];
+    lin.forEach((vs, k) => {
+      vs.sort((a, b) => (+b.version || 0) - (+a.version || 0) || new Date(b.fechaRegistro || 0) - new Date(a.fechaRegistro || 0));
+      const u = vs.find((m) => ESTADOS_UV.includes(estadoUV(m))); if (!u) return;
+      const aut = vs.find((m) => m !== u && estadoUV(m) === 'Autorizado');
+      const posterior = vs.filter((m) => (+m.version || 0) > (+u.version || 0) && !ESTADOS_UV.includes(estadoUV(m)) && estadoUV(m) !== 'Cancelado');
+      const principal = String(u.codigoversionprincipal || '').trim() || vs[vs.length - 1].codigo;
+      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, reemplazo: null });
+    });
+    const claveMat = (m) => [norm(m.codDefectoReceta || ''), SIN_ACENTOS(norm(m.nivelTxt || '')), m.sucursalId_iMaestraId].join('|'), vivos = new Map();
+    out.filter((x) => x.estado !== 'Suspendido' && norm(x.md.codDefectoReceta || '')).sort((a, b) => (a.estado === 'Autorizado' ? 0 : 1) - (b.estado === 'Autorizado' ? 0 : 1))
+      .forEach((x) => { const k = claveMat(x.md); if (!vivos.has(k)) vivos.set(k, x.md); });
+    out.forEach((x) => { if (x.estado === 'Suspendido' && norm(x.md.codDefectoReceta || '')) { const v = vivos.get(claveMat(x.md)); if (v && v.codigo !== x.md.codigo) x.reemplazo = v; } });
+    return out;
+  }
+  const lineasObs = (t) => String(t || '').split(/\r?\n/).map((x) => norm(x)).filter(Boolean);
+  const ORDEN_ETAPAS_UV = ['FABRICACION', 'RECUBRIMIENTO', 'ENVASE', 'INSPECCION', 'ACONDICIONADO'];
+  const etapaUV = (e) => SIN_ACENTOS(norm(e || '')) || '(sin etapa)';
+  const NOMBRE_ETAPA_UV = { FABRICACION: 'Fabricación', RECUBRIMIENTO: 'Recubrimiento', ENVASE: 'Envase', INSPECCION: 'Inspección', ACONDICIONADO: 'Acondicionado' };
+  const etapaBonita = (e) => NOMBRE_ETAPA_UV[e] || (e.charAt(0) + e.slice(1).toLowerCase());
+  function armarUltimaVersionExcel(items, mapaProd, hoy = new Date(), filtros = []) {
+    const libro = Xlsx.crearLibro(), dd = (n) => String(n).padStart(2, '0');
+    const fx = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null; };
+    const estiloEst = (e) => (e === 'Autorizado' ? 'estAut' : e === 'Suspendido' ? 'estSus' : 'estIng');
+    const nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
+    const filas = items.map((x) => {
+      const m = x.md, obs = lineasObs(m.observacion), fEstado = x.estado === 'Autorizado' ? m.fechaAutorizacion : x.estado === 'Suspendido' ? (m.fechaActualiza || m.fechaRegistro) : m.fechaRegistro;
+      const f = fEstado ? new Date(fEstado) : null;
+      const reemp = x.reemplazo ? `${x.reemplazo.codigo} v${x.reemplazo.version} (${estadoUV(x.reemplazo)})` : '';
+      return { ...x, m, reemp, producto: productoDeDescripcion(m.descripcion), etapa: etapaUV(m.nivelTxt), planta: (m.sucursalId && m.sucursalId.contenido) || '', seccion: m.areaRmdTxt || '', motivo: (m.motivoId && m.motivoId.descripcion) || '',
+        obs: obs.join('\n'), ultima: obs[obs.length - 1] || '', fEstado: f, dias: f && !isNaN(f) ? Math.max(0, Math.floor((hoy - f) / 864e5)) : null, prod: mapaProd[m.estadoIdProceso_iMaestraId] || '' };
+    });
+    const clave = (p) => SIN_ACENTOS(p).toUpperCase(), nombreProd = new Map(); filas.forEach((x) => { const k = clave(x.producto); if (!nombreProd.has(k)) nombreProd.set(k, x.producto); x.claveProd = k; x.producto = nombreProd.get(k); });
+    const ordenEst = { Ingresado: 0, Suspendido: 1, Autorizado: 2 };
+    const tabla = (nombre, nt, cab, anchos, datos, estilos, op = {}) => {
+      const h = libro.hoja(nombre, { activa: !!op.activa, congelar: op.congelar || 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+      datos.forEach((f, i) => f.forEach((v, c) => { if (v !== '' && v != null) { const e = estilos[c]; h.poner({ c, r: i + 1 }, v, typeof e === 'function' ? e(f) : e || 'celda'); } }));
+      return h;
+    };
+    const conteo = (xs) => ({ a: xs.filter((x) => x.estado === 'Autorizado').length, i: xs.filter((x) => x.estado === 'Ingresado').length, s: xs.filter((x) => x.estado === 'Suspendido').length, n: xs.length });
+    const cR = conteo(filas), pct = (a, n) => (n ? a / n : 0);
+    const ordenEtapa = (a, b) => { const ia = ORDEN_ETAPAS_UV.findIndex((e) => a.startsWith(e)), ib = ORDEN_ETAPAS_UV.findIndex((e) => b.startsWith(e)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || nat(a, b); };
+    //  Pendientes
+    // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
+    const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda' }, { congelar: 'E2', activa: true });
+    //  Última versión
+    const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
+    tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
+      'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
+      todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
+        fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
+      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'fechaCelda', 16: 'fechaCelda', 19: 'fechaCelda', 21: 'numCelda' }, { congelar: 'C2' });
+    //  Por producto
+    const etapas = [...new Set(filas.map((x) => x.etapa))].sort(ordenEtapa), gP = new Map();
+    filas.forEach((x) => { if (!gP.has(x.claveProd)) gP.set(x.claveProd, []); gP.get(x.claveProd).push(x); });
+    const resumenEtapa = (xs) => { if (!xs.length) return ''; const c = conteo(xs); return [c.a && `${c.a} aut.`, c.i && `${c.i} ing.`, c.s && `${c.s} susp.`].filter(Boolean).join(' · '); };
+    const ORDEN_PROD = { 'Por autorizar': 0, 'Con suspendidos': 1, 'Todo autorizado': 2, Suspendido: 3 };
+    const prods = [...gP.values()].map((xs) => { const c = conteo(xs); return { xs, c, nombre: xs[0].producto, estado: c.i ? 'Por autorizar' : c.s === c.n ? 'Suspendido' : c.s ? 'Con suspendidos' : 'Todo autorizado' }; })
+      .sort((a, b) => ORDEN_PROD[a.estado] - ORDEN_PROD[b.estado] || nat(a.nombre, b.nombre));
+    tabla('Por producto', 'PorProducto', ['Producto', 'Estado del producto', 'Masters', 'Autorizados', 'Ingresados', 'Suspendidos', '% autorizados', ...etapas.map(etapaBonita), 'Pendientes y su última observación'],
+      [32, 17, 9, 11, 11, 12, 12, ...etapas.map(() => 15), 90],
+      prods.map((p) => [p.nombre, p.estado, p.c.n, p.c.a, p.c.i, p.c.s, pct(p.c.a, p.c.n), ...etapas.map((e) => resumenEtapa(p.xs.filter((x) => x.etapa === e))),
+        p.xs.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado]).map((x) => `${x.estado} · ${x.m.codigo} v${x.m.version} (${etapaBonita(x.etapa).toLowerCase()}): ${x.ultima || 'sin observaciones'}`).join('\n')]),
+      { 0: 'codigoCelda', 1: (f) => (f[1] === 'Todo autorizado' ? 'estAut' : f[1] === 'Por autorizar' ? 'estIng' : 'estSus'), 2: 'numCelda', 3: 'numCelda', 4: 'numCelda', 5: 'numCelda', 6: 'pctCelda', [7 + etapas.length]: 'textoCelda' }, { congelar: 'B2' });
+    return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length };
+  }
+  async function abrirUltimaVersion() {
+    if (window.__rmdUltimaVersion) return;
+    const ctrl = controladorPrincipal(), modelo = modeloListaPrincipal(); if (!modelo || !ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
+    let trabajando = true; window.__rmdUltimaVersion = true;
+    const v = ventana('Última versión de cada master', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.cuerpo.innerHTML = `<p>Excel con la <b>última versión</b> de cada master que está <b>Autorizado, Ingresado o Suspendido</b> (sin solicitudes ni Cancelados), con lo que dicen sus <b>Observaciones</b> para saber por qué está pendiente, y un resumen por producto. No cambia nada en SAP.</p>
+      <div class="rmd-uv-filtros" hidden></div><p class="rmd-progreso">Leyendo los master de SAP…</p>`;
+    const prog = v.cuerpo.querySelector('.rmd-progreso'), caja = v.cuerpo.querySelector('.rmd-uv-filtros'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const bGen = botonModal('Exportar Excel', 'primario', () => {}); bGen.disabled = true;
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
+    let items = [], mapa = {};
+    const valores = (k) => { const n = new Map(); items.forEach((x) => { const val = k(x) || '(sin dato)'; n.set(val, (n.get(val) || 0) + 1); }); return [...n.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es')); };
+    const grupo = (titulo, nombre, pares) => `<fieldset><legend>${esc(titulo)}${pares.length > 3 ? ` <button type="button" class="rmd-link" data-todos="${nombre}">todas</button> · <button type="button" class="rmd-link" data-ninguna="${nombre}">ninguna</button>` : ''}</legend><div class="rmd-uv-lista">${pares.map(([val, n]) => `<label><input type="checkbox" data-g="${nombre}" value="${esc(val)}" checked> ${esc(val)} <span class="rmd-nota">(${n.toLocaleString('es-PE')})</span></label>`).join('')}</div></fieldset>`;
+    const etapaDe = (x) => etapaBonita(etapaUV(x.md.nivelTxt)), plantaDe = (x) => (x.md.sucursalId && x.md.sucursalId.contenido) || '', areaDe = (x) => x.md.areaRmdTxt || '';
+    const elegidos = () => {
+      const marcados = (g) => new Set([...caja.querySelectorAll(`input[data-g="${g}"]:checked`)].map((i) => i.value));
+      const est = marcados('estado'), et = marcados('etapa'), pl = marcados('planta'), ar = marcados('area'), sinReemp = caja.querySelector('#rmd-uv-reemp').checked, desde = caja.querySelector('#rmd-uv-desde').value;
+      const d0 = desde ? new Date(desde + 'T00:00:00') : null;
+      const lista = items.filter((x) => est.has(x.estado) && et.has(etapaDe(x) || '(sin dato)') && pl.has(plantaDe(x) || '(sin dato)') && ar.has(areaDe(x) || '(sin dato)')
+        && !(x.estado === 'Suspendido' && ((sinReemp && x.reemplazo) || (d0 && new Date(x.md.fechaActualiza || x.md.fechaRegistro || 0) < d0))));
+      const filtros = [], todos = (g) => caja.querySelectorAll(`input[data-g="${g}"]`).length === marcados(g).size;
+      if (!todos('estado')) filtros.push('Estados: ' + [...est].join(', '));
+      if (!todos('etapa')) filtros.push('Etapas: ' + [...et].join(', ')); if (!todos('planta')) filtros.push('Plantas: ' + [...pl].join(', ')); if (!todos('area')) filtros.push('Áreas: ' + [...ar].join(', '));
+      if (sinReemp) filtros.push('Sin los Suspendidos reemplazados por otro master vigente'); if (d0) filtros.push(`Suspendidos solo desde el ${desde.split('-').reverse().join('/')}`);
+      return { lista, filtros };
+    };
+    const contar = () => { const { lista } = elegidos(), c = (e) => lista.filter((x) => x.estado === e).length;
+      avance(`Se exportarán ${lista.length.toLocaleString('es-PE')} master: ${c('Autorizado')} autorizados, ${c('Ingresado')} ingresados y ${c('Suspendido')} suspendidos.`); bGen.disabled = !lista.length; };
+    try {
+      [items, mapa] = await Promise.all([
+        leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId,motivoId', $select: SELECT_MD_UV }, 'mdId', (h, t) => avance(`Leyendo los master de SAP… página ${h} de ${t}`)).then(ultimasVersiones),
+        mapaProduccionEstado(ctrl).catch(() => ({}))]);
+      const nReemp = items.filter((x) => x.reemplazo).length;
+      caja.innerHTML = grupo('Estado de la última versión', 'estado', ESTADOS_UV.map((e) => [e, items.filter((x) => x.estado === e).length]))
+        + `<fieldset><legend>Suspendidos</legend><label><input type="checkbox" id="rmd-uv-reemp" checked> Quitar los ${nReemp} que ya tienen otro master Autorizado o Ingresado (mismo material, etapa y planta)</label>
+           <label class="rmd-uv-desde">Solo los suspendidos desde <input type="date" id="rmd-uv-desde"> <span class="rmd-nota">(vacío: todos)</span></label></fieldset>`
+        + grupo('Etapa', 'etapa', valores(etapaDe)) + grupo('Planta', 'planta', valores(plantaDe)) + grupo('Área (sección)', 'area', valores(areaDe));
+      caja.hidden = false; caja.addEventListener('change', contar); contar();
+      caja.addEventListener('click', (e) => { const b = e.target.closest('[data-todos],[data-ninguna]'); if (!b) return; const g = b.dataset.todos || b.dataset.ninguna;
+        caja.querySelectorAll(`input[data-g="${g}"]`).forEach((i) => { i.checked = !!b.dataset.todos; }); contar(); });
+    } catch (e) { avance('No se pudieron leer los master: ' + e.message, true); }
+    finally { trabajando = false; window.__rmdUltimaVersion = false; }
+    bGen.addEventListener('click', async () => {
+      if (window.__rmdUltimaVersion) return;
+      const { lista, filtros } = elegidos(); if (!lista.length) return;
+      window.__rmdUltimaVersion = true; trabajando = true; bGen.disabled = true;
+      try {
+        const t0 = Date.now(); avance(`Armando el Excel con ${lista.length.toLocaleString('es-PE')} master…`); await esperar(40);
+        const { libro, nombre, conteo, productos } = armarUltimaVersionExcel(lista, mapa, new Date(), filtros), u8 = await libro.generar();
+        descargarArchivo(nombre, u8, TIPO_XLSX);
+        avance(`✓ Descargado «${nombre}» (${Math.round((Date.now() - t0) / 1000)} s): ${lista.length.toLocaleString('es-PE')} master (${conteo.a} autorizados, ${conteo.i} ingresados, ${conteo.s} suspendidos) de ${productos} productos.`);
+      } catch (e) { avance('No se pudo exportar: ' + e.message, true); }
+      finally { window.__rmdUltimaVersion = false; trabajando = false; bGen.disabled = false; }
+    });
+  }
+  window.__rmdStats.ultimaVersion = { producto: productoDeDescripcion, ultimas: ultimasVersiones, armar: armarUltimaVersionExcel, abrir: () => abrirUltimaVersion(), exportar: () => { const b = [...document.querySelectorAll('.rmd-modal-pie button')].find((x) => x.textContent === 'Exportar Excel'); if (b) b.click(); return !!b; } };   // pruebas
   // ---- Menú del icono «Exportar» de la lista principal ----
   // Exportado original (+ «Producción Estado» al final), Equipos por master e Indicadores.
   const buscarExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
@@ -6248,6 +6427,7 @@
     const ic = (d) => `<svg viewBox="0 0 16 16" aria-hidden="true">${d}</svg>`;
     const opciones = [
       [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
+      on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
       on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
       on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
@@ -6767,7 +6947,16 @@
   // Al asociar, el portal copia MaterialSet (-> MD_ES_RE_INSUMO) y ProduccionVSet (-> RECETA: Mdv01, Plnnr, Alnal, Mksp, validez, lote).
   // Se comparan con SAP actual; solo aviso. Revisión por receta; detalle en el ícono ⚠.
   const revisionesReceta = new Map();                                     // mdRecetaId -> { t, clave, p }
-  const contextosRmd = new Map();                                         // mdId -> { t, p: Promise<{ puestos, anterior }> }
+  const contextosRmd = new Map();                                         // mdId -> { t, gen, p: Promise<{ puestos, anterior }> }
+  // Escrituras en el modelo del portal (Guardar, Eliminar Receta, Agregar Producto…): invalidan los puestos usados y la revisión de la hoja de ruta
+  let escriturasModelo = 0;
+  window.__rmdStats.escrituras = () => escriturasModelo;   // pruebas
+  function vigilarEscrituras(m) {
+    if (!m || m.__rmdEscrituras) return; m.__rmdEscrituras = true;
+    const escribe = (x) => { const t = String(x || '').toUpperCase(); return !!t && t !== 'GET' && t !== 'HEAD'; };
+    m.attachRequestCompleted((e) => { if (escribe(e.getParameter('method')) && !/\$batch/.test(String(e.getParameter('url') || ''))) escriturasModelo++; });
+    if (m.attachBatchRequestCompleted) m.attachBatchRequestCompleted((e) => { if ((e.getParameter('requests') || []).some((r) => escribe(r.method))) escriturasModelo++; });
+  }
   const cantidadNum = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
   const numTxt = (n) => (n == null ? '' : (Math.round(n * 1000) / 1000).toLocaleString('es-PE', { maximumFractionDigits: 3 }));
   function leerErp(erpPortal, entidad, filtros) {
@@ -6817,8 +7006,8 @@
   ];
   // Datos comunes del RMD: puestos usados y receta de la versión anterior
   function contextoRmd(ctrl, mdId) {
-    const g = contextosRmd.get(mdId); if (g && Date.now() - g.t < 5 * 60000) return g.p;
-    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter; vigilarEscrituras(modelo);
+    const g = contextosRmd.get(mdId); if (g && g.gen === escriturasModelo && Date.now() - g.t < 5 * 60000) return g.p;
     const p = (async () => {
       const [pasos, md] = await Promise.all([
         leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', mdId)], { $select: 'mdEstructuraPasoId,puestoTrabajo' }).catch(() => []),
@@ -6830,7 +7019,7 @@
         anterior = { version: ma[0] && ma[0].version, recetas: mr.filter((x) => x.recetaId && x.activo !== false).map((x) => x.recetaId) }; } catch (e) { /* sin versión anterior */ } }
       return { puestos: cuenta, anterior };
     })();
-    p.catch(() => contextosRmd.delete(mdId)); contextosRmd.set(mdId, { t: Date.now(), p }); return p;
+    p.catch(() => contextosRmd.delete(mdId)); contextosRmd.set(mdId, { t: Date.now(), gen: escriturasModelo, p }); return p;
   }
   async function revisarRuta(ctrl, rc, werks, ctx, versionesP) {
     const erp = ctrl.oModelErpNec, F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
@@ -6855,7 +7044,8 @@
     };
   }
   function revisarReceta(ctrl, r, werksRmd, mdId, forzar, etapa) {
-    const conRuta = !!on('recetaruta'), clave = (conRuta ? 'r' : 'b') + (r.recetaId && r.recetaId.Verid), g = revisionesReceta.get(r.mdRecetaId);
+    vigilarEscrituras(ctrl.getView().getModel('mainModelv2'));
+    const conRuta = !!on('recetaruta'), clave = (conRuta ? 'r' + escriturasModelo : 'b') + (r.recetaId && r.recetaId.Verid), g = revisionesReceta.get(r.mdRecetaId);
     if (!forzar && g && g.clave === clave && Date.now() - g.t < 30 * 60000) return g.p;
     const p = (async () => {
       const erp = ctrl.oModelErpNec, modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
@@ -7662,7 +7852,9 @@
       await modeloEscribir(modelo, 'create', '/PASO', nuevo); pasoId = nuevo.pasoId;
     }
     if (comp === 'pasoHijo') { const c = lm.getProperty('/listMdEsPasoInsumoPaso'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${c.mdEstructuraPasoInsumoPasoId}')`, { pasoHijoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() }); await terminosConCodigo(modelo, true, c.mdEstructuraPasoInsumoPasoId, codigo); }
-    else { const g = lm.getProperty('/listMdEsPasoPadre'); await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() }); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
+    else { const g = lm.getProperty('/listMdEsPasoPadre'), mdId = b.getView().getModel('asociarDatos').getData().mdId, deps = await dependientesDe(modelo, mdId, g.mdEstructuraPasoId);
+      await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${g.mdEstructuraPasoId}')`, { pasoId_pasoId: pasoId, usuarioActualiza: usuario, fechaActualiza: new Date() });
+      await actualizarDependientes(modelo, deps, codigo, { usuarioActualiza: usuario, fechaActualiza: new Date() }, window.__rmdStats.dependientes.simular); await terminosConCodigo(modelo, false, g.mdEstructuraPasoId, codigo); }
     // mismos refrescos que el portal
     await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
     const etq = b.getView().getModel('headerAddEtiqueta');
@@ -8666,6 +8858,18 @@
       catch (e) { br.disabled = false; toast('No se pudo reemplazar: ' + e.message, true); }
     });
   }
+  // Los pasos que dependen de una fila guardan en «Depende» el código de su paso (el PDF del master lo imprime): al cambiar el paso de la fila se actualizan.
+  // Se leen antes de escribir la fila; escribir(metodo, ruta, datos) para pruebas.
+  async function dependientesDe(modelo, mdId, filaId) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    return (await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', mdId), new F('dependeMdEstructuraPasoId', 'EQ', filaId)], { $select: 'mdEstructuraPasoId,depende,activo' })).filter((z) => z.activo !== false);
+  }
+  async function actualizarDependientes(modelo, deps, codigo, firma, escribir) {
+    const w = escribir || ((m, r, d) => modeloEscribir(modelo, m, r, d)); let n = 0;
+    for (const z of deps) if (String(z.depende) !== String(codigo)) { await w('update', `/MD_ES_PASO('${z.mdEstructuraPasoId}')`, { depende: String(codigo), ...firma }); n++; }
+    return n;
+  }
+  window.__rmdStats.dependientes = { de: (filaId, mdId) => dependientesDe(controladorPrincipal().getView().getModel('mainModelv2'), mdId, filaId), actualizar: actualizarDependientes, simular: null };   // pruebas
   async function reemplazarPasoDeFila(origen, nuevo) {
     const b = controladorPrincipal(), md = b.getView().getModel('asociarDatos').getData(), modelo = b.getView().getModel('mainModelv2');
     if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) throw new Error('el RMD está autorizado o suspendido');
@@ -8673,7 +8877,11 @@
     try {
       const firma = { usuarioActualiza: codigoUsuario(b), fechaActualiza: new Date() };
       if (origen.tipo === 'menor') await modeloEscribir(modelo, 'update', `/MD_ES_PASO_INSUMO_PASO('${origen.id}')`, { pasoHijoId_pasoId: nuevo.pasoId, ...firma });
-      else await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId, ...firma });
+      else {
+        const deps = await dependientesDe(modelo, md.mdId, origen.id), S = window.__rmdStats.dependientes;
+        await modeloEscribir(modelo, 'update', `/MD_ES_PASO('${origen.id}')`, { pasoId_pasoId: nuevo.pasoId, ...firma });
+        await actualizarDependientes(modelo, deps, nuevo.codigo, firma, S.simular);
+      }
       await terminosConCodigo(modelo, origen.tipo === 'menor', origen.id, nuevo.codigo);
       await b.onGetDataEstructuraMD(); await b.onCreateModelTree();
       const d = dialogos().filter((x) => controladorPasos(x)).pop(), M = d && controladorPasos(d);
@@ -8946,18 +9154,23 @@
     const vivoId = new Map(pasos.filter(activo).map((x) => [x.mdEstructuraPasoId, x])), claveDe = (x) => (x.mdEstructuraId_mdEstructuraId || '') + '|' + (x.mdEsEtiquetaId_mdEsEtiquetaId || '');
     r.dependencias = [];
     const ordenadas = [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2), tipado = (x) => x.tipoDatoId_iMaestraId != null && +x.tipoDatoId_iMaestraId !== 446;   // 446: «Sin tipo de dato»
+    const codigosRmd = new Set(pasos.filter(activo).map((x) => String(obj(x.pasoId).codigo || '')).filter(Boolean));
     ordenadas.forEach((l, il) => l.pasos.forEach((x, ix) => {
-      const dep = x.dependeMdEstructuraPasoId; if (!dep) return;
-      const pr = vivoId.get(dep), tipo = dep === x.mdEstructuraPasoId ? 'propio' : !pr ? 'colgante' : claveDe(pr) === claveDe(x) && +pr.orden > +x.orden ? 'posterior' : '';
-      if (!tipo) return; const pp = obj(x.pasoId), q = pr ? obj(pr.pasoId) : {};
+      // «codigo»: la fila citada es correcta pero «Depende» guarda el código de otro paso (p. ej. el que tenía antes esa fila); el PDF imprime ese código
+      const dep = x.dependeMdEstructuraPasoId, txt = norm(String(x.depende == null ? '' : x.depende)); if (!dep && !txt) return;
+      const pr = dep ? vivoId.get(dep) : null, q = pr ? obj(pr.pasoId) : {};
+      const tipo = dep ? (dep === x.mdEstructuraPasoId ? 'propio' : !pr ? 'colgante' : claveDe(pr) === claveDe(x) && +pr.orden > +x.orden ? 'posterior' : txt && txt !== String(q.codigo || '') ? 'codigo' : '')
+        : !codigosRmd.has(txt) ? 'inexistente' : '';
+      if (!tipo) return; const pp = obj(x.pasoId);
       // predecesor correcto: el paso anterior con tipo de dato de la lista; si es el primero, el último con tipo de la lista anterior de su estructura; si no hay, ninguno
       let bueno = null;
-      if (tipado(x)) {
+      if (tipo === 'codigo') bueno = pr;
+      else if (tipado(x)) {
         bueno = l.pasos.slice(0, ix).reverse().find(tipado) || null;
         if (!bueno) { const ant = ordenadas.slice(0, il).reverse().find((y) => y.pasos[0] && y.pasos[0].mdEstructuraId_mdEstructuraId === x.mdEstructuraId_mdEstructuraId); bueno = ant ? ant.pasos.slice().reverse().find(tipado) || null : null; }
       }
       r.dependencias.push({ tipo, lista: l.lista, orden: x.orden, codigo: String(pp.codigo || ''), desc: norm(pp.descripcion), predOrden: pr ? pr.orden : null, predCodigo: String(q.codigo || x.depende || ''),
-        estr: x.mdEstructuraId_mdEstructuraId, etq: x.mdEsEtiquetaId_mdEsEtiquetaId || null, id: x.mdEstructuraPasoId, deAntes: { depende: x.depende || '', id: dep },
+        citado: txt, enRmd: codigosRmd.has(txt), estr: x.mdEstructuraId_mdEstructuraId, etq: x.mdEsEtiquetaId_mdEsEtiquetaId || null, id: x.mdEstructuraPasoId, deAntes: { depende: x.depende || '', id: dep || '' },
         fix: bueno ? { id: bueno.mdEstructuraPasoId, codigo: String(obj(bueno.pasoId).codigo || ''), orden: bueno.orden } : { id: '', codigo: '', orden: null } });
     }));
     // sin ciclos tras corregir: si el nuevo predecesor lleva de vuelta al paso, queda sin predecesor
@@ -8990,17 +9203,22 @@
     return p;
   }
   // ---- Predecesores imposibles: aviso en la ventana raíz del RMD y al autorizar en «Asociar fórmulas» ----
-  const DEP_TXT = { propio: 'depende de sí mismo', posterior: 'depende de un paso posterior', colgante: 'depende de un paso que ya no está en el RMD' };
-  const depLinea = (y) => `${y.lista} › orden ${y.orden} (${y.codigo}) ${DEP_TXT[y.tipo]}${y.tipo === 'posterior' ? ` (orden ${y.predOrden})` : ''}`;
+  const DEP_TXT = { propio: 'depende de sí mismo', posterior: 'depende de un paso posterior', colgante: 'depende de un paso que ya no está en el RMD',
+    codigo: 'su «Depende» cita un código que no es el del paso de esa fila', inexistente: 'su «Depende» cita un paso que no está en ninguna estructura del RMD' };
+  const depTexto = (y) => y.tipo === 'posterior' ? `${DEP_TXT.posterior} (orden ${y.predOrden})`
+    : y.tipo === 'codigo' ? `su «Depende» dice ${y.citado}${y.enRmd ? '' : ' (no está en el RMD)'}, pero la fila citada (orden ${y.predOrden}) es el paso ${y.predCodigo}`
+    : y.tipo === 'inexistente' ? `su «Depende» cita el paso ${y.citado}, que no está en ninguna estructura del RMD` : DEP_TXT[y.tipo];
+  const depLinea = (y) => `${y.lista} › orden ${y.orden} (${y.codigo}) ${depTexto(y)}`;
+  const depSoloCita = (items) => items.every((y) => y.tipo === 'codigo' || y.tipo === 'inexistente');
   function abrirDetalleDependencias(x, sinIr) {
-    const v = ventana('Predecesores imposibles', { cancelar: () => v.cerrar() }), corr = x.corregidos || [], todos = [...x.items, ...corr];
-    const tablaCorr = corr.length ? `<p><b>Corregidos solos</b> (el «Depende» pasó al paso anterior con tipo de dato):</p><table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Antes</th><th>Ahora</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${corr.map((y) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 80))}</td><td class="rmd-tz-antes">${esc(y.deAntes.depende || '—')} · ${esc(DEP_TXT[y.tipo])}</td><td class="rmd-tz-desp">${y.fix.codigo ? `${esc(y.fix.codigo)} (orden ${esc(y.fix.orden)})` : 'sin predecesor'}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${x.items.length + corr.indexOf(y)}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>` : '';
+    const v = ventana('Predecesores imposibles o mal citados', { cancelar: () => v.cerrar() }), corr = x.corregidos || [], todos = [...x.items, ...corr];
+    const tablaCorr = corr.length ? `<p><b>Corregidos solos</b> (el «Depende» pasó al paso anterior con tipo de dato o, si citaba otro código, al de su fila):</p><table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Antes</th><th>Ahora</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${corr.map((y) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 80))}</td><td class="rmd-tz-antes">${esc(y.deAntes.depende || '—')} · ${esc(DEP_TXT[y.tipo])}</td><td class="rmd-tz-desp">${y.fix.codigo ? `${esc(y.fix.codigo)} (orden ${esc(y.fix.orden)})` : 'sin predecesor'}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${x.items.length + corr.indexOf(y)}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>` : '';
     if (!x.items.length) { v.cuerpo.innerHTML = tablaCorr + '<p class="rmd-nota">Si el predecesor debía ser otro paso, cámbialo en la lista.</p>';
       v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const y = todos[+b.dataset.i]; v.cerrar(); ppIrASap({ codigo: x.md.codigo, version: x.md.version }, { estr: y.estr, etq: y.etq, id: y.id }); });
       v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar())); return; }
-    v.cuerpo.innerHTML = `${tablaCorr}<p>En Producción un paso se habilita cuando termina el paso de su «Depende». Estos <b>nunca se habilitan</b>:</p>
-      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Problema</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${x.items.map((y, i) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 90))}</td><td class="rmd-dif">${esc(DEP_TXT[y.tipo])}${y.tipo === 'posterior' ? ` (orden ${esc(y.predOrden)})` : ''}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${i}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>
-      <p class="rmd-nota">Corrige «Depende» con el paso anterior de la lista, o déjalo vacío si el paso no depende de otro.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</p>`;
+    v.cuerpo.innerHTML = `${tablaCorr}<p>${depSoloCita(x.items) ? 'El «Depende» de estos pasos cita un código que no es el de su predecesor (así sale en el PDF del master):' : 'En Producción un paso se habilita cuando termina el paso de su «Depende». Estos <b>nunca se habilitan</b> o citan un paso que no es su predecesor:'}</p>
+      <table class="rmd-tabla"><thead><tr><th>Lista</th><th>Orden</th><th>Paso</th><th>Problema</th>${sinIr ? '' : '<th></th>'}</tr></thead><tbody>${x.items.map((y, i) => `<tr><td>${esc(y.lista)}</td><td>${esc(y.orden)}</td><td><b>${esc(y.codigo)}</b> ${esc(y.desc.slice(0, 90))}</td><td class="rmd-dif">${esc(depTexto(y))}</td>${sinIr ? '' : `<td><button type="button" class="rmd-link" data-i="${i}">Ir al paso</button></td>`}</tr>`).join('')}</tbody></table>
+      <p class="rmd-nota">${depSoloCita(x.items) ? 'Para corregirlo, vuelve a elegir el predecesor en «Depende»: el portal guarda el código actual de su paso.' : 'Corrige «Depende» con el paso anterior de la lista, o déjalo vacío si el paso no depende de otro.'}${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</p>`;
     v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const y = todos[+b.dataset.i]; v.cerrar(); ppIrASap({ codigo: x.md.codigo, version: x.md.version }, { estr: y.estr, etq: y.etq, id: y.id }); });
     v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar()));
   }
@@ -9011,8 +9229,8 @@
       a.addEventListener('click', (e) => { if (e.target.closest('button')) { e.stopPropagation(); const y = a.__x; abrirDetalleDependencias(y, y.sinIr); } }); }
     a.__x = x; const n = x.items.length, ej = x.items.slice(0, 2).map(depLinea).join(' · '), c = (x.corregidos || []).length;
     a.classList.toggle('ok', !n);
-    const t = n ? `<span class="rmd-dep-ico" aria-hidden="true">✕</span><span><b>${x.autorizar ? 'No autorices todavía: ' : ''}${n} paso${n > 1 ? 's' : ''} con un predecesor imposible</b>: en Producción nunca se habilita${n > 1 ? 'n' : ''}. ${esc(ej)}${n > 2 ? ` y ${n - 2} más` : ''}.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</span><button type="button">${x.sinIr ? 'Ver' : 'Ver y corregir'}</button>`
-      : `<span class="rmd-dep-ico" aria-hidden="true">✓</span><span><b>Se corrigió solo el «Depende» de ${c} paso${c > 1 ? 's' : ''}</b> que dejaba${c > 1 ? 'n' : ''} a Producción sin avanzar: ${esc(x.corregidos.slice(0, 2).map((y) => `${y.lista} › orden ${y.orden} (${y.codigo}): ${y.deAntes.depende || '—'} → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · '))}${c > 2 ? ` y ${c - 2} más` : ''}. Revisa que sea el predecesor correcto.</span><button type="button">Ver</button>`;
+    const t = n ? `<span class="rmd-dep-ico" aria-hidden="true">✕</span><span><b>${x.autorizar ? 'No autorices todavía: ' : ''}${n} paso${n > 1 ? 's' : ''} ${depSoloCita(x.items) ? 'con el «Depende» mal citado' : 'con un predecesor imposible o mal citado'}</b>${depSoloCita(x.items) ? ': el PDF del master cita un paso que no es su predecesor' : ''}. ${esc(ej)}${n > 2 ? ` y ${n - 2} más` : ''}.${+x.md.estadoIdRmd_iMaestraId === 467 ? '' : ' Este RMD no está Ingresado: corrígelo en una versión nueva.'}</span><button type="button">${x.sinIr || +x.md.estadoIdRmd_iMaestraId !== 467 ? 'Ver' : 'Ver y corregir'}</button>`
+      : `<span class="rmd-dep-ico" aria-hidden="true">✓</span><span><b>Se corrigió solo el «Depende» de ${c} paso${c > 1 ? 's' : ''}</b>: ${esc(x.corregidos.slice(0, 2).map((y) => `${y.lista} › orden ${y.orden} (${y.codigo}): ${y.deAntes.depende || '—'} → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · '))}${c > 2 ? ` y ${c - 2} más` : ''}. Revisa que sea el predecesor correcto.</span><button type="button">Ver</button>`;
     if (a.innerHTML !== t) a.innerHTML = t;
   }
   // Corrección obligatoria en RMD Ingresados: un predecesor imposible deja a Producción sin poder avanzar. Se escribe «Depende» como el
@@ -9040,7 +9258,7 @@
     } finally { DEP_FIX.enCurso.delete(md.mdId); }
     const r = { t: Date.now(), hechos, fallos }; DEP_FIX.hecho.set(md.mdId, r);
     window.__rmdStats.dependenciasCorregidas = { rmd: md.codigo, hechos: hechos.map((y) => [y.lista, y.orden, y.codigo, y.deAntes.depende, y.fix.codigo]), fallos: fallos.map((f) => f.error) };
-    if (hechos.length) toast(`Se corrigió solo el «Depende» de ${hechos.length} paso${hechos.length > 1 ? 's' : ''} que dejaba${hechos.length > 1 ? 'n' : ''} a Producción sin avanzar: ${hechos.slice(0, 3).map((y) => `orden ${y.orden} (${y.codigo}) → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · ')}.`);
+    if (hechos.length) toast(`Se corrigió solo el «Depende» de ${hechos.length} paso${hechos.length > 1 ? 's' : ''}: ${hechos.slice(0, 3).map((y) => `orden ${y.orden} (${y.codigo}) → ${y.fix.codigo ? `${y.fix.codigo} (${y.fix.orden})` : 'sin predecesor'}`).join(' · ')}.`);
     if (fallos.length) toast(`No se pudo corregir el «Depende» de ${fallos.length} paso${fallos.length > 1 ? 's' : ''}: ${fallos[0].error}. Corrígelo a mano.`, true);
     return r;
   }
@@ -9126,10 +9344,9 @@
     const firma = { usuarioActualiza: usuario, fechaActualiza: ahora };
     if (y.tipo === 'pm') await escribir('update', `/MD_ES_PASO_INSUMO_PASO('${y.id}')`, { pasoHijoId_pasoId: p.pasoId, ...firma });
     else {
+      const deps = await dependientesDe(modelo, md.mdId, y.id);
       await escribir('update', `/MD_ES_PASO('${y.id}')`, { pasoId_pasoId: p.pasoId, ...firma });
-      // los pasos que dependen de esta fila guardan su código en «Depende»
-      const dep = await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', md.mdId), new F('dependeMdEstructuraPasoId', 'EQ', y.id)], { $select: 'mdEstructuraPasoId,depende' }).catch(() => []);
-      for (const z of dep) if (String(z.depende) !== String(p.codigo)) await escribir('update', `/MD_ES_PASO('${z.mdEstructuraPasoId}')`, { depende: String(p.codigo), ...firma });
+      await actualizarDependientes(modelo, deps, p.codigo, firma, escribir);
     }
     if (!ETQ_FIX.simular) await terminosConCodigo(modelo, y.tipo === 'pm', y.id, p.codigo);
     return { codigo: String(p.codigo), nuevo };
@@ -13257,7 +13474,7 @@ td.ult { position: relative; }
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
-    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
+    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
   ];
   const ICONOS_PANEL = {
     flecha: '<path d="M6 3.5 10.5 8 6 12.5"/>', buscar: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>', cerrar: '<path d="M4 4l8 8M12 4l-8 8"/>',

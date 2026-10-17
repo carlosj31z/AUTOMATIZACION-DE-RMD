@@ -735,6 +735,22 @@ with sync_playwright() as p:
         ok = (r["res"] == [False, False, False, True, False, False, True, True] and [x[0] for x in r["llamadas"]] == ["alert", "alert", "warning", "error", "error"]
               and r["llamadas"][0][1].startswith("Debe completar") and r["llamadas"][0][2] == "Error" and r["llamadas"][2][1] == "Debes seleccionar un campo de Clave Modelo." and r["llamadas"][3][1].startswith("No se puede modificar o eliminar el lapso"))
         return ok, json.dumps(r, ensure_ascii=False)[:500]
+    @prueba("LN25e Última versión de cada master (v1.72): producto por la descripción; de cada linaje (versión principal, versión anterior o misma descripción/planta/área/etapa) la versión más alta Autorizada, Ingresada o Suspendida; sin solicitudes ni Cancelados; «Reemplazado por» y el Excel con sus 3 hojas (Pendientes, Última versión, Por producto)")
+    def _():
+        r = pg.evaluate("""async () => { const U = window.__rmdStats.ultimaVersion, e = (c) => ({ contenido: c });
+          const md = (o) => ({ mdId: 'id' + o.codigo, codigo: o.codigo, version: o.v, estadoIdRmd: e(o.e), descripcion: o.d || 'RAQUIFEROL D3 CB 100 000 UI CAP BLANDA-14.000 kg', nivelTxt: o.n || 'FABRICACION', sucursalId_iMaestraId: 68, sucursalId: { contenido: 'PLANTA LIMA' },
+            areaRmdTxt: 'CAPSULAS BLANDAS', codigoversionprincipal: o.p || '', mdIdVersionAnt: o.a || null, codDefectoReceta: o.mat || '', observacion: o.obs || '', fechaRegistro: new Date(2026, 0, o.v), fechaActualiza: new Date(2026, 1, o.v) });
+          const mds = [md({ codigo: '100', v: 1, e: 'Suspendido', obs: 'linea 1' }), md({ codigo: '101', v: 2, e: 'Autorizado', p: '100' }), md({ codigo: '102', v: 3, e: 'Ingresado', a: 'id101', obs: 'linea 1\\nPENDIENTE CC 26-300' }), md({ codigo: '103', v: 4, e: 'Solicitado', p: '100' }),
+            md({ codigo: '200', v: 1, e: 'Autorizado', d: 'DEXTROSA 5% INY PEBD 1000mL CJAx12 - ACO3', n: 'ACONDICIONADO', mat: '6000' }), md({ codigo: '201', v: 2, e: 'Cancelado', p: '200', d: 'DEXTROSA 5% INY PEBD 1000mL CJAx12 - ACO3', n: 'ACONDICIONADO', mat: '6000' }),
+            md({ codigo: '300', v: 1, e: 'Suspendido', d: 'DEXTROSA 5% INY PEBD 1L CJA x12 viejo', n: 'ACONDICIONADO', mat: '6000' }), md({ codigo: '400', v: 1, e: 'Solicitud Aprobada', d: 'NUEVO' }),
+            md({ codigo: '500', v: 2, e: 'Suspendido', d: 'LEVOCERT 5 mg TAB NUC' }), md({ codigo: '499', v: 1, e: 'Suspendido', d: 'LEVOCERT 5 mg TAB NUC' })];
+          const us = U.ultimas(mds).map((x) => [x.md.codigo, x.estado, x.versiones, x.autVigente && x.autVigente.codigo, x.posterior.map((y) => y.codigo).join(','), x.reemplazo && x.reemplazo.codigo]).sort();
+          const prods = ['DEXTROSA 5% INY PEBD 1000mL CJAx12 - ACO3', 'SOLUTRES 150mg/mL INY AMP1mL - INH', 'LEVOCERT 5 mg TAB NUC', 'LEVOCERT 5mg TAB B10 CJA x100', 'LINEA GOTAS OFTALMICAS PV2 - TANQUE REACTOR AUSTAR', 'SOLICARE 9‰ INY (9 000 L)FA01', 'AMOXIDIN CL 600 PVO SUS'].map(U.producto);
+          const x = U.armar(U.ultimas(mds), {}, new Date(2026, 9, 16), ['prueba']), u8 = await x.libro.generar();
+          return { us, prods, hojas: x.libro && u8.length > 1000, conteo: x.conteo, productos: x.productos }; }""")
+        esperado = [['102', 'Ingresado', 4, '101', '103', None], ['200', 'Autorizado', 2, None, '', None], ['300', 'Suspendido', 1, None, '', '200'], ['500', 'Suspendido', 2, None, '', None]]
+        ok = (r["us"] == esperado and r["prods"] == ['DEXTROSA 5%', 'SOLUTRES 150mg/mL', 'LEVOCERT 5mg', 'LEVOCERT 5mg', 'LINEA GOTAS OFTALMICAS PV2', 'SOLICARE 9‰', 'AMOXIDIN CL 600'] and r["hojas"] and r["conteo"] == {"a": 1, "i": 1, "s": 2, "n": 4})
+        return ok, json.dumps(r, ensure_ascii=False)[:600]
     @prueba("LN26 Cantidades con el separador de miles mal leído al copiar la receta (v1.39): SAP 42094.000 y la copia «42.094000» (o 5000 → «5.000000») NO son un cambio; una cantidad realmente distinta, una unidad distinta o un valor menor de 1000 sí lo son")
     def _():
         r = pg.evaluate("""() => { const f = window.__rmdStats.diferenciasBom, c = (comp, q, u = 'AMP') => ({ Component: comp, CompQty: q, CompUnit: u, Maktx: 'M ' + comp });

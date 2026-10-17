@@ -1218,7 +1218,7 @@ with sync_playwright() as p:
         RMD_ING = os.environ.get("RMD_ING", "2202609241")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
         RMD_CMP = os.environ.get("RMD_CMP", "2202609157")     # un RMD AUTORIZADO de Fabricación o Envase cuyo Guardar abre el «Comparador de fórmula» (v1.70)
         cerrar_seguro(); pg.wait_for_timeout(1000)
-        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
+        @prueba("T1 El icono 'Exportar' abre el menú (original, Última versión de cada master, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
             fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)   # sin el filtro de código que dejan otros bloques (exporta la lista entera)
             fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
@@ -1232,7 +1232,7 @@ with sync_playwright() as p:
             e = fr.evaluate("window.__exp.pop()")
             fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
             vm = (e["ultima"] or {}).get("valueMap") or {}
-            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+            ok = (items == ["Exportado original", "Última versión de cada master", "Equipos por master", "Indicadores del mes", "Documentos citados", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
                   and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
             return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
         @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
@@ -1450,6 +1450,7 @@ with sync_playwright() as p:
             if route.request.method not in ("GET", "HEAD"): bloq_w.append(route.request.method + " " + route.request.url[:80]); route.abort()
             else: route.continue_()
         pg.route("**/*", guardia_w)
+        fr.evaluate("() => { window.__depSim = []; window.__rmdStats.depFix.simular = (ruta, datos) => window.__depSim.push([ruta, datos]); }")   # la corrección automática del «Depende» se simula
         cerrar_seguro(); pg.set_viewport_size({"width": 1920, "height": 945}); pg.wait_for_timeout(1500)
         try:
             @prueba("W1 Producción Estatus: nombre y apellido del jefe (y del gerente) a quien se envió a revisión")
@@ -1584,16 +1585,22 @@ with sync_playwright() as p:
                     if not nota: raise Exception(f"no se abrió «Cambiar paso»: el RMD {RMD_EDIT} debe estar Ingresado (no Autorizado ni Suspendido)")
                     fr.locator(".rmd-cp-q").fill("fecha hora inicio"); fr.locator(".rmd-cp-q").press("Enter"); pg.wait_for_timeout(4000)
                     fr.locator(".rmd-cp-res tbody tr").first.click(); pg.wait_for_timeout(300)
+                    nuevo_cod = fr.evaluate("document.querySelector('.rmd-cp-res tbody tr.rmd-cp-sel').children[1].textContent.trim()")
                     fr.locator(".rmd-modal-pie button", has_text="Cambiar paso").click(); pg.wait_for_timeout(700)
                     fr.locator(".rmd-modal-pie button", has_text="Cambiar").last.click(); pg.wait_for_timeout(8000)
                     capt = fr.evaluate("window.__capt")
+                    fila_id = re.search(r"'([^']+)'", capt[0]["ruta"]).group(1) if capt else ""
+                    deps = fr.evaluate("async (id) => (await window.__rmdStats.dependientes.de(id, " + CTRL + ".getView().getModel('asociarDatos').getData().mdId)).map((z) => [z.mdEstructuraPasoId, String(z.depende)])", fila_id) if fila_id else []
                 finally:
                     fr.evaluate("() => { " + CTRL + ".mainModelv2.update = window.__u0; }")
                 cerrar_seguro()
             finally:
                 pg.unroute("**/*", guardia_w)
-            ok = (len(capt) == 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId", "usuarioActualiza", "fechaActualiza"] and capt[0]["datos"]["usuarioActualiza"] and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
-            return ok, f"enviado={capt} nota={nota[:120]!r}"
+            # v1.71: los pasos que dependen de la fila reciben el código nuevo en «Depende» (antes quedaba el del paso anterior)
+            esperadas = sorted(i for i, d in deps if d != nuevo_cod); resto = capt[1:]
+            deps_ok = sorted(re.search(r"'([^']+)'", c["ruta"]).group(1) for c in resto) == esperadas and all(list(c["datos"].keys()) == ["depende", "usuarioActualiza", "fechaActualiza"] and c["datos"]["depende"] == nuevo_cod for c in resto)
+            ok = (len(capt) >= 1 and capt[0]["ruta"].startswith("/MD_ES_PASO('") and list(capt[0]["datos"].keys()) == ["pasoId_pasoId", "usuarioActualiza", "fechaActualiza"] and capt[0]["datos"]["usuarioActualiza"] and deps_ok and "Se conserva" in nota and "proceso(s) menor(es)" in nota)
+            return ok, f"paso nuevo={nuevo_cod} dependientes={deps} enviado={[(c['ruta'][:40], c['datos']) for c in capt]} nota={nota[:80]!r}"
         @prueba("W9 'Cambiar paso' (solo lectura): la búsqueda ofrece solo pasos de la estructura y la etiqueta de la lista de la fila (v1.70: un paso de otra etiqueta no se vería en Producción)")
         def _():
             pg.route("**/*", guardia_w)
@@ -1612,9 +1619,29 @@ with sync_playwright() as p:
             etiquetas = {e for v in busquedas.values() for e in v[0]}
             ok = etiquetas == {"FABRICACION"} and sum(len(v[0]) for v in busquedas.values()) > 0 and all("etiqueta FABRICACION" in v[1] or "Ningún paso" in v[1] for v in busquedas.values())
             return ok, f"etiquetas={etiquetas} " + " · ".join(f"{q}: {len(v[0])} — {v[1][:110]!r}" for q, v in busquedas.items())
+        @prueba("W8b Al cambiar el paso de una fila, los pasos que dependen de ella reciben en «Depende» el código nuevo (v1.71, SIMULADO): con las filas mal citadas reales del RMD_EDIT, solo depende + quién y cuándo")
+        def _():
+            r = fr.evaluate("""async (cod) => { const c = """ + CTRL + """, F = sap.ui.model.Filter, m = c.getView().getModel('mainModelv2');
+              const md = await new Promise((ok) => m.read('/MD', { filters: [new F('codigo', 'EQ', +cod)], urlParameters: { $select: 'mdId,codigo,version,nivelTxt,estadoIdRmd_iMaestraId' }, success: (d) => ok(d.results.sort((a, b) => b.version - a.version)[0]), error: () => ok(null) }));
+              const its = (await window.__rmdStats.dependencias.leer(md)).filter((y) => y.tipo === 'codigo'); if (!its.length) return { sin: true };
+              const y = its[0], D = window.__rmdStats.dependientes, deps = await D.de(y.deAntes.id, md.mdId), cap = [];
+              const n = await D.actualizar(m, deps, y.predCodigo, { usuarioActualiza: 'QA', fechaActualiza: new Date() }, (met, ruta, datos) => cap.push([met, ruta, datos]));
+              return { y: [y.orden, y.citado, y.predCodigo, y.id], deps: deps.map((z) => [z.mdEstructuraPasoId, String(z.depende)]), n, cap }; }""", RMD_EDIT)
+            if r.get("sin"): return False, f"{RMD_EDIT} no tiene «Depende» mal citado para probar (define RMD_EDIT)"
+            ids = [c[1] for c in r["cap"]]
+            ok = (r["n"] >= 1 and f"/MD_ES_PASO('{r['y'][3]}')" in ids and all(c[0] == "update" and list(c[2].keys()) == ["depende", "usuarioActualiza", "fechaActualiza"] and c[2]["depende"] == r["y"][2] for c in r["cap"]))
+            return ok, f"fila={r['y']} dependientes={r['deps']} escrituras={[(c[1][:40], c[2]['depende']) for c in r['cap']]}"
+        @prueba("W10 «Depende» mal citado (v1.71, solo lectura): la lectura del RMD detecta los pasos cuyo «Depende» guarda el código de otro paso que el de la fila citada (RMD_DEP = 2202609269, Autorizado: no se corrige)")
+        def _():
+            RMD_DEP = os.environ.get("RMD_DEP", "2202609269")
+            md = fr.evaluate("""async (cod) => { const F = sap.ui.model.Filter; return new Promise((ok) => """ + CTRL + """.getView().getModel('mainModelv2').read('/MD', { filters: [new F('codigo', 'EQ', +cod)], urlParameters: { $select: 'mdId,codigo,version,nivelTxt,estadoIdRmd_iMaestraId' }, success: (d) => ok(d.results.sort((a, b) => b.version - a.version)[0]), error: () => ok(null) })); }""", RMD_DEP)
+            its = fr.evaluate("async (md) => (await window.__rmdStats.dependencias.leer(md)).map((y) => [y.tipo, y.orden, y.citado, y.predCodigo, y.fix.codigo])", md)
+            cod = [x for x in its if x[0] == "codigo"]
+            return (bool(cod) and all(x[2] != x[3] and x[4] == x[3] for x in cod) and md["estadoIdRmd_iMaestraId"] != 467), f"{RMD_DEP} v{md['version']} estado={md['estadoIdRmd_iMaestraId']} items={its}"
         @prueba("W7 Ninguna petición de escritura salió del navegador durante el bloque W")
         def _():
-            return (not bloq_w), str(bloq_w[:5])
+            sim = fr.evaluate("(() => { const x = window.__depSim || []; window.__rmdStats.depFix.simular = null; return x.map((y) => [y[0].slice(0, 40), y[1].depende]); })()")
+            return (not bloq_w), f"{bloq_w[:5]} · corrección automática del «Depende» simulada: {sim}"
 
     # ───────────────────────── X. v1.26: saludo, Ir a… (Ctrl+K), recientes y título de la pestaña (no escribe: cortafuegos) ─────────────────────────
     if "X" in SOLO:
@@ -2033,6 +2060,18 @@ with sync_playwright() as p:
                 paleta = fr.evaluate("[...document.querySelectorAll('.rmd-paleta-fondo *')].some(x => x.children.length === 0 && /Cambios de recetas en SAP/.test(x.textContent))")
                 pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
                 return ("Recetas con cambios en SAP" in items), f"menú={items} paleta={paleta}"
+            @prueba("U8 Hoja de ruta (v1.71): tras un guardado del portal (Eliminar Receta, Agregar Producto, Guardar…) se rehace la revisión de la receta; una lectura no la invalida")
+            def _():
+                r = fr.evaluate("""async () => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')), c = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener, m = c.getView().getModel('mainModelv2');
+                  await window.__rmdStats.revisarRecetas('""" + RMD_OBS_U + """', true).catch(() => null); const e0 = window.__rmdStats.escrituras();
+                  m.fireRequestCompleted({ method: 'GET', url: 'lectura', success: true }); const e1 = window.__rmdStats.escrituras();
+                  m.fireRequestCompleted({ method: 'MERGE', url: "MD_RECETA('x')", success: true }); const e2 = window.__rmdStats.escrituras();
+                  if (m.fireBatchRequestCompleted) { m.fireBatchRequestCompleted({ requests: [{ method: 'GET' }], success: true }); }
+                  const e3 = window.__rmdStats.escrituras();
+                  if (m.fireBatchRequestCompleted) m.fireBatchRequestCompleted({ requests: [{ method: 'POST' }], success: true });
+                  return [e0, e1, e2, e3, window.__rmdStats.escrituras(), !!m.fireBatchRequestCompleted]; }""")
+                ok = r[1] == r[0] and r[2] == r[0] + 1 and r[3] == r[2] and (r[4] == r[3] + 1 or not r[5])
+                return ok, f"contador de escrituras (inicio, tras GET, tras MERGE, tras lote GET, tras lote POST, hay lotes)={r}"
             @prueba("U6 Agregar observación desde la ventana (guardado SIMULADO + cortafuegos): la propuesta «AAAAMMDD<iniciales> Actualización de Lista de Materiales» es editable y el Guardar del portal envía el texto editado al final de las Observaciones y el Estado no cambia; en SAP no cambia nada")
             def _():
                 antes = fr.evaluate("(c) => window.__rmdStats.leerMDPorCodigos([c]).then(r => r.sort((a, b) => b.version - a.version).map(m => [m.estadoIdRmd.contenido, m.observacion]))", RMD_OBS_U)
