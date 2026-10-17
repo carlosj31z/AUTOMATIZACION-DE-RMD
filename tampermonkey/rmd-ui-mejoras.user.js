@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.72.0
+// @version      1.72.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.72.0';                                                       // mantener igual a @version
+  const VERSION = '1.72.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -6299,36 +6299,16 @@
       return h;
     };
     const conteo = (xs) => ({ a: xs.filter((x) => x.estado === 'Autorizado').length, i: xs.filter((x) => x.estado === 'Ingresado').length, s: xs.filter((x) => x.estado === 'Suspendido').length, n: xs.length });
-    // 1. Resumen
-    const hR = libro.hoja('Resumen', { activa: true, cols: [[1, 1, 26], [2, 6, 14], [7, 7, 16]] }); let r = 0;
     const cR = conteo(filas), pct = (a, n) => (n ? a / n : 0);
-    hR.poner({ c: 0, r: r++ }, 'Masters RMD: última versión', 'titulo');
-    hR.poner({ c: 0, r: r++ }, `Generado el ${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} con los datos de SAP. Solo Autorizados, Ingresados y Suspendidos; de cada master, su última versión en esos estados (sin solicitudes ni Cancelados).`, 'nota');
-    r++;
-    ['Estado', 'Masters', '% del total'].forEach((t, c) => hR.poner({ c, r }, t, 'encabezado')); r++;
-    [['Autorizado', cR.a, 'Listos para producir'], ['Ingresado', cR.i, 'En configuración: falta autorizar'], ['Suspendido', cR.s, 'No se pueden usar: ver el motivo en «Pendientes»']].forEach(([e, n, nota]) => {
-      hR.poner({ c: 0, r }, e, estiloEst(e)); hR.poner({ c: 1, r }, n, 'numCelda'); hR.poner({ c: 2, r }, pct(n, cR.n), 'pctCelda'); hR.poner({ c: 3, r }, nota, 'nota'); r++; });
-    hR.poner({ c: 0, r }, 'Total', 'codigoCelda'); hR.poner({ c: 1, r }, cR.n, 'numCelda'); hR.poner({ c: 2, r }, 1, 'pctCelda'); r += 2;
-    const matriz = (titulo, campo, orden, mostrar = (k) => k) => {
-      hR.poner({ c: 0, r: r++ }, titulo, 'negrita');
-      [titulo.replace(/^Por /, '').replace(/^./, (x) => x.toUpperCase()), 'Autorizados', 'Ingresados', 'Suspendidos', 'Total', '% autorizados'].forEach((t, c) => hR.poner({ c, r }, t, 'encabezado')); r++;
-      const g = new Map(); filas.forEach((x) => { const k = x[campo] || '(sin dato)'; if (!g.has(k)) g.set(k, []); g.get(k).push(x); });
-      [...g.keys()].sort(orden).forEach((k) => { const c = conteo(g.get(k)); [mostrar(k), c.a, c.i, c.s, c.n].forEach((v, j) => hR.poner({ c: j, r }, v, j ? 'numCelda' : 'codigoCelda')); hR.poner({ c: 5, r }, pct(c.a, c.n), 'pctCelda'); r++; });
-      r++;
-    };
     const ordenEtapa = (a, b) => { const ia = ORDEN_ETAPAS_UV.findIndex((e) => a.startsWith(e)), ib = ORDEN_ETAPAS_UV.findIndex((e) => b.startsWith(e)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || nat(a, b); };
-    matriz('Por etapa', 'etapa', ordenEtapa, etapaBonita); matriz('Por planta', 'planta', nat); matriz('Por área (sección)', 'seccion', nat);
-    hR.poner({ c: 0, r: r++ }, 'Hojas', 'negrita');
-    [['Pendientes', 'Ingresados y Suspendidos con lo que dicen sus Observaciones (por qué están pendientes) y los días en ese estado.'], ['Última versión', 'Todos los masters con las columnas del exportado del portal y algunas más.'],
-      ['Por producto', 'Cada producto con sus etapas y su estado; los pendientes con su última observación.'], ['Información', 'Cómo se arma este reporte.']].forEach(([a, b]) => { hR.poner({ c: 0, r }, a, 'negrita'); hR.poner({ c: 1, r }, b, 'texto'); r++; });
-    // 2. Pendientes
+    //  Pendientes
     // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
     tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
       [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 16, 20, 16, 16, 18],
       pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
-      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda' }, { congelar: 'E2' });
-    // 3. Última versión
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda' }, { congelar: 'E2', activa: true });
+    //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
       'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
@@ -6337,7 +6317,7 @@
         fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
         x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
       { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'fechaCelda', 16: 'fechaCelda', 19: 'fechaCelda', 21: 'numCelda' }, { congelar: 'C2' });
-    // 4. Por producto
+    //  Por producto
     const etapas = [...new Set(filas.map((x) => x.etapa))].sort(ordenEtapa), gP = new Map();
     filas.forEach((x) => { if (!gP.has(x.claveProd)) gP.set(x.claveProd, []); gP.get(x.claveProd).push(x); });
     const resumenEtapa = (xs) => { if (!xs.length) return ''; const c = conteo(xs); return [c.a && `${c.a} aut.`, c.i && `${c.i} ing.`, c.s && `${c.s} susp.`].filter(Boolean).join(' · '); };
@@ -6349,21 +6329,6 @@
       prods.map((p) => [p.nombre, p.estado, p.c.n, p.c.a, p.c.i, p.c.s, pct(p.c.a, p.c.n), ...etapas.map((e) => resumenEtapa(p.xs.filter((x) => x.etapa === e))),
         p.xs.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado]).map((x) => `${x.estado} · ${x.m.codigo} v${x.m.version} (${etapaBonita(x.etapa).toLowerCase()}): ${x.ultima || 'sin observaciones'}`).join('\n')]),
       { 0: 'codigoCelda', 1: (f) => (f[1] === 'Todo autorizado' ? 'estAut' : f[1] === 'Por autorizar' ? 'estIng' : 'estSus'), 2: 'numCelda', 3: 'numCelda', 4: 'numCelda', 5: 'numCelda', 6: 'pctCelda', [7 + etapas.length]: 'textoCelda' }, { congelar: 'B2' });
-    // 5. Información
-    const hI = libro.hoja('Información', { cols: [[1, 1, 28], [2, 2, 110]] });
-    hI.poner('A1', 'Cómo se arma este reporte', 'titulo');
-    [['Masters', `${filas.length} (Autorizados ${cR.a}, Ingresados ${cR.i}, Suspendidos ${cR.s}).`],
-      ['Última versión', 'Las versiones de un master se reconocen por el «Código de la versión principal» (como en «Historia del producto»). Se toma la versión más alta que esté Autorizada, Ingresada o Suspendida.'],
-      ['Qué no entra', 'Las solicitudes (Solicitado, Solicitud Aprobada, Solicitud Rechazada) y los Cancelados. Si un master tiene una versión más nueva en solicitud, sale en «Versión posterior en solicitud».'],
-      ['Versión autorizada vigente', 'Cuando la última versión está Ingresada o Suspendida, la versión Autorizada más alta del mismo master (si la hay).'],
-      ['Días en el estado', 'Ingresado: desde el registro de la versión. Suspendido: desde su última actualización (cuando se suspendió, si no se tocó después). Autorizado: desde la autorización.'],
-      ['Última observación', 'La última línea de las Observaciones de «Asociar fórmulas»: en un Suspendido suele ser el motivo de la suspensión. «Observaciones completas» trae todas las líneas.'],
-      ['Producto', 'La descripción hasta la forma farmacéutica o la presentación (INY, TAB, CAP, SOL, SUS, FCO, CJA…), un « - » o un paréntesis. Es una agrupación aproximada: revisa los productos con nombres parecidos.'],
-      ['Estado del producto', '«Por autorizar»: alguna de sus etapas está Ingresada. «Con suspendidos»: unas autorizadas y otras suspendidas. «Todo autorizado»: todas autorizadas. «Suspendido»: todas suspendidas (sin versión vigente).'],
-      ['Orden de «Pendientes»', 'Primero los Ingresados, del más antiguo al más nuevo; después los Suspendidos, del más reciente al más antiguo.'],
-      ['Reemplazado por', 'En un Suspendido: otro master Autorizado o Ingresado con el mismo código por defecto (material de la receta), etapa y planta.'],
-      ['Filtros', filtros.length ? filtros.join(' · ') : 'Ninguno: todos los masters en esos estados.']]
-      .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length };
   }
   async function abrirUltimaVersion() {

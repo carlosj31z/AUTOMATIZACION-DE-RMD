@@ -735,7 +735,7 @@ with sync_playwright() as p:
         ok = (r["res"] == [False, False, False, True, False, False, True, True] and [x[0] for x in r["llamadas"]] == ["alert", "alert", "warning", "error", "error"]
               and r["llamadas"][0][1].startswith("Debe completar") and r["llamadas"][0][2] == "Error" and r["llamadas"][2][1] == "Debes seleccionar un campo de Clave Modelo." and r["llamadas"][3][1].startswith("No se puede modificar o eliminar el lapso"))
         return ok, json.dumps(r, ensure_ascii=False)[:500]
-    @prueba("LN25e Última versión de cada master (v1.72): producto por la descripción; de cada linaje (versión principal, versión anterior o misma descripción/planta/área/etapa) la versión más alta Autorizada, Ingresada o Suspendida; sin solicitudes ni Cancelados; «Reemplazado por» y el Excel con sus 5 hojas")
+    @prueba("LN25e Última versión de cada master (v1.72): producto por la descripción; de cada linaje (versión principal, versión anterior o misma descripción/planta/área/etapa) la versión más alta Autorizada, Ingresada o Suspendida; sin solicitudes ni Cancelados; «Reemplazado por» y el Excel con sus 3 hojas (Pendientes, Última versión, Por producto)")
     def _():
         r = pg.evaluate("""async () => { const U = window.__rmdStats.ultimaVersion, e = (c) => ({ contenido: c });
           const md = (o) => ({ mdId: 'id' + o.codigo, codigo: o.codigo, version: o.v, estadoIdRmd: e(o.e), descripcion: o.d || 'RAQUIFEROL D3 CB 100 000 UI CAP BLANDA-14.000 kg', nivelTxt: o.n || 'FABRICACION', sucursalId_iMaestraId: 68, sucursalId: { contenido: 'PLANTA LIMA' },
