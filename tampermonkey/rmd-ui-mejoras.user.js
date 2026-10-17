@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.71.0
+// @version      1.72.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.71.0';                                                       // mantener igual a @version
+  const VERSION = '1.72.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -71,6 +71,7 @@
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
+    ['ultimaversion', 'Última versión de cada master', 'Excel de los Autorizados, Ingresados y Suspendidos (su última versión) con sus Observaciones y un resumen por producto.'],
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
     ['citastodos', 'Documentos citados en todos los master', 'Qué master citan cada instructivo, procedimiento o formato.'],
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
@@ -297,6 +298,9 @@
   tr.rmd-ing-fila > td:first-child { border-left: 5px solid #9b6bd6 !important; } tr.rmd-ing-fila > td { background-image: linear-gradient(rgba(155,107,214,.16), rgba(155,107,214,.16)); } tr.rmd-ing-agregado > td:first-child { border-left-color: #2ea043 !important; } tr.rmd-ing-cambiado > td:first-child { border-left-color: #e0a000 !important; } tr.rmd-ing-movido > td:first-child, tr.rmd-ing-predecesor > td:first-child { border-left-color: #0a6ed1 !important; }
   /* elementos de baja */
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  .rmd-uv-filtros { display: grid; gap: 8px; margin: 8px 0; } .rmd-uv-filtros fieldset { margin: 0; padding: 6px 12px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; }
+  .rmd-uv-filtros legend { padding: 0 4px; font-weight: 600; font-size: 12px; } .rmd-uv-filtros label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+  .rmd-uv-lista { display: flex; flex-wrap: wrap; gap: 2px 16px; max-height: 112px; overflow: auto; } .rmd-uv-desde { margin-left: 16px; }
   .sapMDialog.sapMMessageDialog.rmd-espera-respuesta { z-index: 100002 !important; box-shadow: 0 0 0 3px var(--rmd-acento), 0 12px 32px rgba(0,0,0,.28) !important; }   /* encima de las ventanas del script: la responde la persona */
   .rmd-dep-aviso, .rmd-etq-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-dep-aviso b, .rmd-etq-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
@@ -4601,7 +4605,7 @@
 
     // ---- Estilos (índices fijos) ----
     // [nombre, numFmt, fuente, relleno, borde, alineación]. Fuentes: 0 normal, 1 negrita, 2 título, 3 nota, 4 negrita blanca, 5 negrita roja, 6 negrita 10.
-    // Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo, 9 amarillo claro. numFmt: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0,
+    // Rellenos: 2 gris claro, 3 verde, 4 ámbar, 5 gris, 6 celeste, 7 azul, 8 amarillo, 9 amarillo claro, 10 verde claro, 11 salmón claro. numFmt: 164 aaaa-mm-dd, 165 aaaa-mm-dd;@, 166 0.0,
     // 167 dd/mm/aaaa, 168 0.0%, 17 mmm-aa.
     const ESTILOS = [['normal', 0, 0, 0, 0], ['cabecera', 0, 1, 2, 0], ['cabeceraVerde', 0, 0, 3, 0, 'horizontal="center"'],
       ['cabeceraVerdeFecha', 165, 0, 3, 0, 'horizontal="center" wrapText="1"'], ['cabeceraAmbar', 0, 1, 4, 0, 'horizontal="center"'],
@@ -4610,14 +4614,17 @@
       ['decimal', 166, 0, 0, 1], ['porcentaje', 168, 0, 0, 1], ['fechaDia', 167, 0, 0, 0], ['alerta', 0, 5, 0, 0], ['tituloAzul', 0, 1, 7, 0],
       ['negrita', 0, 1, 0, 0], ['mesAnio', 17, 1, 0, 0, 'horizontal="left"'], ['entrada', 0, 0, 8, 1], ['sugerido', 0, 0, 9, 0], ['nombre', 0, 6, 0, 0],
       ['decimal1', 166, 0, 0, 0], ['envuelto', 0, 0, 0, 1, 'vertical="top" wrapText="1"'], ['celda', 0, 0, 0, 1, 'vertical="top"'],
-      ['notaAmarilla', 0, 1, 8, 0, 'horizontal="center"'], ['entero', 0, 0, 0, 1], ['fechaHora', 169, 0, 0, 0]];
+      ['notaAmarilla', 0, 1, 8, 0, 'horizontal="center"'], ['entero', 0, 0, 0, 1], ['fechaHora', 169, 0, 0, 0],
+      ['estAut', 0, 1, 10, 1, 'vertical="top"'], ['estIng', 0, 1, 9, 1, 'vertical="top"'], ['estSus', 0, 1, 11, 1, 'vertical="top"'],
+      ['fechaCelda', 167, 0, 0, 1, 'vertical="top"'], ['numCelda', 0, 0, 0, 1, 'horizontal="center" vertical="top"'], ['pctCelda', 168, 0, 0, 1, 'horizontal="center" vertical="top"'],
+      ['textoCelda', 0, 0, 0, 1, 'vertical="top" wrapText="1"'], ['codigoCelda', 0, 1, 0, 1, 'vertical="top"']];
     const S = Object.fromEntries(ESTILOS.map(([n], i) => [n, i]));
     const fuente = (b, i, sz, color) => `<font>${b ? '<b/>' : ''}${i ? '<i/>' : ''}<sz val="${sz}"/><color rgb="FF${color}"/><name val="Arial"/><family val="2"/></font>`;
     const relleno = (rgb) => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
     const XML_ESTILOS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="6"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="yyyy\\-mm\\-dd;@"/><numFmt numFmtId="166" formatCode="0.0"/><numFmt numFmtId="167" formatCode="dd/mm/yyyy"/><numFmt numFmtId="168" formatCode="0.0%"/><numFmt numFmtId="169" formatCode="dd/mm/yyyy hh:mm"/></numFmts>
 <fonts count="7">${fuente(0, 0, 11, '000000')}${fuente(1, 0, 11, '000000')}${fuente(1, 0, 12, '1F3A5F')}${fuente(0, 1, 9, '595959')}${fuente(1, 0, 11, 'FFFFFF')}${fuente(1, 0, 11, 'C00000')}${fuente(1, 0, 10, '000000')}</fonts>
-<fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['F7F7F7', '00B050', 'FFC000', 'C9C9C9', 'DDEBF7', '00B0F0', 'FFFF00', 'FFF2CC'].map(relleno).join('')}</fills>
+<fills count="12"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['F7F7F7', '00B050', 'FFC000', 'C9C9C9', 'DDEBF7', '00B0F0', 'FFFF00', 'FFF2CC', 'E2EFDA', 'FCE4D6'].map(relleno).join('')}</fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
 <cellXfs count="${ESTILOS.length}">${ESTILOS.map(([, nf, fo, fi, bo, al]) => `<xf numFmtId="${nf}" fontId="${fo}" fillId="${fi}" borderId="${bo}" xfId="0"${nf ? ' applyNumberFormat="1"' : ''}${fo ? ' applyFont="1"' : ''}${fi ? ' applyFill="1"' : ''}${bo ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1"><alignment ${al}/></xf>` : '/>'}`).join('')}</cellXfs>
@@ -6226,6 +6233,195 @@
       finally { window.__rmdEquipos = false; trabajando = false; bGen.disabled = false; }
     });
   }
+  // ---- Última versión de cada master (Autorizados, Ingresados y Suspendidos) ----
+  // Linaje como «Historia del producto»: codigoversionprincipal, mdIdVersionAnt y, sin enlace, la misma descripción, planta, área y etapa.
+  // De cada linaje, la versión más alta en esos tres estados;
+  // las solicitudes (Solicitado, Solicitud Aprobada / Rechazada) y los Cancelados no entran. Producto: la descripción hasta la forma farmacéutica.
+  const ESTADOS_UV = ['Autorizado', 'Ingresado', 'Suspendido'];
+  const SELECT_MD_UV = 'mdId,mdIdVersionAnt,sucursalId_iMaestraId,codigo,codigoversionprincipal,codigoSolicitud,version,descripcion,codDefectoReceta,codAgrupadorReceta,nivelTxt,areaRmdTxt,af,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,fechaSolicitud,observacion,estadoIdProceso_iMaestraId,estadoIdRmd/contenido,sucursalId/contenido,motivoId/descripcion';
+  const FORMAS_UV = /\s(INY|INYECTABLE|TAB|TABLETAS?|CAP|CAPS|CAPSULAS?|SOL|SUS|SUSP|SOF|OVU|OVULOS?|PVO|POLVO|JBE|JARABE|UNG|CREMA|GEL|SAC|SOB|POT|AMP\d*|VIAL|PEBD|PEAD|FCO\S*|CJA\S*|BOL|GTS|EMULSION|LOCION|SPRAY|AEROSOL)(?=\s|$|[^A-Za-zÁÉÍÓÚÑáéíóúñ])/i;
+  function productoDeDescripcion(d) {
+    const t = norm(String(d || '')).replace(/(\d)\s+(mg|g|mL|ml|L|UI|ug|mcg|%)(?![A-Za-z])/g, '$1$2');
+    const cortes = [t.search(FORMAS_UV), t.search(/\s-\s/), t.indexOf('(')].filter((i) => i > 0), i = cortes.length ? Math.min(...cortes) : -1;
+    let x = (i > 0 ? t.slice(0, i) : t).trim().replace(/[-–,]+$/, '').trim();
+    if (x.length < 3) x = t.split(' ').slice(0, 3).join(' ');
+    return x;
+  }
+  const estadoUV = (m) => (m.estadoIdRmd && m.estadoIdRmd.contenido) || '';
+  function ultimasVersiones(mds) {
+    const padre = new Map(), raiz = (k) => { let r = k; while (padre.has(r) && padre.get(r) !== r) r = padre.get(r); let c = k; while (c !== r) { const n = padre.get(c); padre.set(c, r); c = n; } return r; };
+    const unir = (a, b) => { if (!padre.has(a)) padre.set(a, a); if (!padre.has(b)) padre.set(b, b); const ra = raiz(a), rb = raiz(b); if (ra !== rb) padre.set(ra < rb ? rb : ra, ra < rb ? ra : rb); };
+    const porId = new Map(mds.map((m) => [m.mdId, m])), nodo = (m) => 'c:' + String(m.codigo || m.mdId).trim();
+    mds.forEach((m) => {
+      const c = nodo(m), p = String(m.codigoversionprincipal || '').trim(), a = m.mdIdVersionAnt && porId.get(m.mdIdVersionAnt); unir(c, c);
+      if (p) unir(c, 'c:' + p); if (a) unir(c, nodo(a));
+      unir(c, 'd:' + [SIN_ACENTOS(norm(m.descripcion || '')), m.sucursalId_iMaestraId, SIN_ACENTOS(norm(m.areaRmdTxt || '')), SIN_ACENTOS(norm(m.nivelTxt || ''))].join('|'));
+    });
+    const lin = new Map(); mds.forEach((m) => { const k = raiz(nodo(m)); if (!lin.has(k)) lin.set(k, []); lin.get(k).push(m); });
+    const out = [];
+    lin.forEach((vs, k) => {
+      vs.sort((a, b) => (+b.version || 0) - (+a.version || 0) || new Date(b.fechaRegistro || 0) - new Date(a.fechaRegistro || 0));
+      const u = vs.find((m) => ESTADOS_UV.includes(estadoUV(m))); if (!u) return;
+      const aut = vs.find((m) => m !== u && estadoUV(m) === 'Autorizado');
+      const posterior = vs.filter((m) => (+m.version || 0) > (+u.version || 0) && !ESTADOS_UV.includes(estadoUV(m)) && estadoUV(m) !== 'Cancelado');
+      const principal = String(u.codigoversionprincipal || '').trim() || vs[vs.length - 1].codigo;
+      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, reemplazo: null });
+    });
+    const claveMat = (m) => [norm(m.codDefectoReceta || ''), SIN_ACENTOS(norm(m.nivelTxt || '')), m.sucursalId_iMaestraId].join('|'), vivos = new Map();
+    out.filter((x) => x.estado !== 'Suspendido' && norm(x.md.codDefectoReceta || '')).sort((a, b) => (a.estado === 'Autorizado' ? 0 : 1) - (b.estado === 'Autorizado' ? 0 : 1))
+      .forEach((x) => { const k = claveMat(x.md); if (!vivos.has(k)) vivos.set(k, x.md); });
+    out.forEach((x) => { if (x.estado === 'Suspendido' && norm(x.md.codDefectoReceta || '')) { const v = vivos.get(claveMat(x.md)); if (v && v.codigo !== x.md.codigo) x.reemplazo = v; } });
+    return out;
+  }
+  const lineasObs = (t) => String(t || '').split(/\r?\n/).map((x) => norm(x)).filter(Boolean);
+  const ORDEN_ETAPAS_UV = ['FABRICACION', 'RECUBRIMIENTO', 'ENVASE', 'INSPECCION', 'ACONDICIONADO'];
+  const etapaUV = (e) => SIN_ACENTOS(norm(e || '')) || '(sin etapa)';
+  const NOMBRE_ETAPA_UV = { FABRICACION: 'Fabricación', RECUBRIMIENTO: 'Recubrimiento', ENVASE: 'Envase', INSPECCION: 'Inspección', ACONDICIONADO: 'Acondicionado' };
+  const etapaBonita = (e) => NOMBRE_ETAPA_UV[e] || (e.charAt(0) + e.slice(1).toLowerCase());
+  function armarUltimaVersionExcel(items, mapaProd, hoy = new Date(), filtros = []) {
+    const libro = Xlsx.crearLibro(), dd = (n) => String(n).padStart(2, '0');
+    const fx = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null; };
+    const estiloEst = (e) => (e === 'Autorizado' ? 'estAut' : e === 'Suspendido' ? 'estSus' : 'estIng');
+    const nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
+    const filas = items.map((x) => {
+      const m = x.md, obs = lineasObs(m.observacion), fEstado = x.estado === 'Autorizado' ? m.fechaAutorizacion : x.estado === 'Suspendido' ? (m.fechaActualiza || m.fechaRegistro) : m.fechaRegistro;
+      const f = fEstado ? new Date(fEstado) : null;
+      const reemp = x.reemplazo ? `${x.reemplazo.codigo} v${x.reemplazo.version} (${estadoUV(x.reemplazo)})` : '';
+      return { ...x, m, reemp, producto: productoDeDescripcion(m.descripcion), etapa: etapaUV(m.nivelTxt), planta: (m.sucursalId && m.sucursalId.contenido) || '', seccion: m.areaRmdTxt || '', motivo: (m.motivoId && m.motivoId.descripcion) || '',
+        obs: obs.join('\n'), ultima: obs[obs.length - 1] || '', fEstado: f, dias: f && !isNaN(f) ? Math.max(0, Math.floor((hoy - f) / 864e5)) : null, prod: mapaProd[m.estadoIdProceso_iMaestraId] || '' };
+    });
+    const clave = (p) => SIN_ACENTOS(p).toUpperCase(), nombreProd = new Map(); filas.forEach((x) => { const k = clave(x.producto); if (!nombreProd.has(k)) nombreProd.set(k, x.producto); x.claveProd = k; x.producto = nombreProd.get(k); });
+    const ordenEst = { Ingresado: 0, Suspendido: 1, Autorizado: 2 };
+    const tabla = (nombre, nt, cab, anchos, datos, estilos, op = {}) => {
+      const h = libro.hoja(nombre, { activa: !!op.activa, congelar: op.congelar || 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+      datos.forEach((f, i) => f.forEach((v, c) => { if (v !== '' && v != null) { const e = estilos[c]; h.poner({ c, r: i + 1 }, v, typeof e === 'function' ? e(f) : e || 'celda'); } }));
+      return h;
+    };
+    const conteo = (xs) => ({ a: xs.filter((x) => x.estado === 'Autorizado').length, i: xs.filter((x) => x.estado === 'Ingresado').length, s: xs.filter((x) => x.estado === 'Suspendido').length, n: xs.length });
+    // 1. Resumen
+    const hR = libro.hoja('Resumen', { activa: true, cols: [[1, 1, 26], [2, 6, 14], [7, 7, 16]] }); let r = 0;
+    const cR = conteo(filas), pct = (a, n) => (n ? a / n : 0);
+    hR.poner({ c: 0, r: r++ }, 'Masters RMD: última versión', 'titulo');
+    hR.poner({ c: 0, r: r++ }, `Generado el ${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} con los datos de SAP. Solo Autorizados, Ingresados y Suspendidos; de cada master, su última versión en esos estados (sin solicitudes ni Cancelados).`, 'nota');
+    r++;
+    ['Estado', 'Masters', '% del total'].forEach((t, c) => hR.poner({ c, r }, t, 'encabezado')); r++;
+    [['Autorizado', cR.a, 'Listos para producir'], ['Ingresado', cR.i, 'En configuración: falta autorizar'], ['Suspendido', cR.s, 'No se pueden usar: ver el motivo en «Pendientes»']].forEach(([e, n, nota]) => {
+      hR.poner({ c: 0, r }, e, estiloEst(e)); hR.poner({ c: 1, r }, n, 'numCelda'); hR.poner({ c: 2, r }, pct(n, cR.n), 'pctCelda'); hR.poner({ c: 3, r }, nota, 'nota'); r++; });
+    hR.poner({ c: 0, r }, 'Total', 'codigoCelda'); hR.poner({ c: 1, r }, cR.n, 'numCelda'); hR.poner({ c: 2, r }, 1, 'pctCelda'); r += 2;
+    const matriz = (titulo, campo, orden, mostrar = (k) => k) => {
+      hR.poner({ c: 0, r: r++ }, titulo, 'negrita');
+      [titulo.replace(/^Por /, '').replace(/^./, (x) => x.toUpperCase()), 'Autorizados', 'Ingresados', 'Suspendidos', 'Total', '% autorizados'].forEach((t, c) => hR.poner({ c, r }, t, 'encabezado')); r++;
+      const g = new Map(); filas.forEach((x) => { const k = x[campo] || '(sin dato)'; if (!g.has(k)) g.set(k, []); g.get(k).push(x); });
+      [...g.keys()].sort(orden).forEach((k) => { const c = conteo(g.get(k)); [mostrar(k), c.a, c.i, c.s, c.n].forEach((v, j) => hR.poner({ c: j, r }, v, j ? 'numCelda' : 'codigoCelda')); hR.poner({ c: 5, r }, pct(c.a, c.n), 'pctCelda'); r++; });
+      r++;
+    };
+    const ordenEtapa = (a, b) => { const ia = ORDEN_ETAPAS_UV.findIndex((e) => a.startsWith(e)), ib = ORDEN_ETAPAS_UV.findIndex((e) => b.startsWith(e)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || nat(a, b); };
+    matriz('Por etapa', 'etapa', ordenEtapa, etapaBonita); matriz('Por planta', 'planta', nat); matriz('Por área (sección)', 'seccion', nat);
+    hR.poner({ c: 0, r: r++ }, 'Hojas', 'negrita');
+    [['Pendientes', 'Ingresados y Suspendidos con lo que dicen sus Observaciones (por qué están pendientes) y los días en ese estado.'], ['Última versión', 'Todos los masters con las columnas del exportado del portal y algunas más.'],
+      ['Por producto', 'Cada producto con sus etapas y su estado; los pendientes con su última observación.'], ['Información', 'Cómo se arma este reporte.']].forEach(([a, b]) => { hR.poner({ c: 0, r }, a, 'negrita'); hR.poner({ c: 1, r }, b, 'texto'); r++; });
+    // 2. Pendientes
+    // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
+    const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda' }, { congelar: 'E2' });
+    // 3. Última versión
+    const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
+    tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
+      'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
+      todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
+        fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
+      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'fechaCelda', 16: 'fechaCelda', 19: 'fechaCelda', 21: 'numCelda' }, { congelar: 'C2' });
+    // 4. Por producto
+    const etapas = [...new Set(filas.map((x) => x.etapa))].sort(ordenEtapa), gP = new Map();
+    filas.forEach((x) => { if (!gP.has(x.claveProd)) gP.set(x.claveProd, []); gP.get(x.claveProd).push(x); });
+    const resumenEtapa = (xs) => { if (!xs.length) return ''; const c = conteo(xs); return [c.a && `${c.a} aut.`, c.i && `${c.i} ing.`, c.s && `${c.s} susp.`].filter(Boolean).join(' · '); };
+    const ORDEN_PROD = { 'Por autorizar': 0, 'Con suspendidos': 1, 'Todo autorizado': 2, Suspendido: 3 };
+    const prods = [...gP.values()].map((xs) => { const c = conteo(xs); return { xs, c, nombre: xs[0].producto, estado: c.i ? 'Por autorizar' : c.s === c.n ? 'Suspendido' : c.s ? 'Con suspendidos' : 'Todo autorizado' }; })
+      .sort((a, b) => ORDEN_PROD[a.estado] - ORDEN_PROD[b.estado] || nat(a.nombre, b.nombre));
+    tabla('Por producto', 'PorProducto', ['Producto', 'Estado del producto', 'Masters', 'Autorizados', 'Ingresados', 'Suspendidos', '% autorizados', ...etapas.map(etapaBonita), 'Pendientes y su última observación'],
+      [32, 17, 9, 11, 11, 12, 12, ...etapas.map(() => 15), 90],
+      prods.map((p) => [p.nombre, p.estado, p.c.n, p.c.a, p.c.i, p.c.s, pct(p.c.a, p.c.n), ...etapas.map((e) => resumenEtapa(p.xs.filter((x) => x.etapa === e))),
+        p.xs.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado]).map((x) => `${x.estado} · ${x.m.codigo} v${x.m.version} (${etapaBonita(x.etapa).toLowerCase()}): ${x.ultima || 'sin observaciones'}`).join('\n')]),
+      { 0: 'codigoCelda', 1: (f) => (f[1] === 'Todo autorizado' ? 'estAut' : f[1] === 'Por autorizar' ? 'estIng' : 'estSus'), 2: 'numCelda', 3: 'numCelda', 4: 'numCelda', 5: 'numCelda', 6: 'pctCelda', [7 + etapas.length]: 'textoCelda' }, { congelar: 'B2' });
+    // 5. Información
+    const hI = libro.hoja('Información', { cols: [[1, 1, 28], [2, 2, 110]] });
+    hI.poner('A1', 'Cómo se arma este reporte', 'titulo');
+    [['Masters', `${filas.length} (Autorizados ${cR.a}, Ingresados ${cR.i}, Suspendidos ${cR.s}).`],
+      ['Última versión', 'Las versiones de un master se reconocen por el «Código de la versión principal» (como en «Historia del producto»). Se toma la versión más alta que esté Autorizada, Ingresada o Suspendida.'],
+      ['Qué no entra', 'Las solicitudes (Solicitado, Solicitud Aprobada, Solicitud Rechazada) y los Cancelados. Si un master tiene una versión más nueva en solicitud, sale en «Versión posterior en solicitud».'],
+      ['Versión autorizada vigente', 'Cuando la última versión está Ingresada o Suspendida, la versión Autorizada más alta del mismo master (si la hay).'],
+      ['Días en el estado', 'Ingresado: desde el registro de la versión. Suspendido: desde su última actualización (cuando se suspendió, si no se tocó después). Autorizado: desde la autorización.'],
+      ['Última observación', 'La última línea de las Observaciones de «Asociar fórmulas»: en un Suspendido suele ser el motivo de la suspensión. «Observaciones completas» trae todas las líneas.'],
+      ['Producto', 'La descripción hasta la forma farmacéutica o la presentación (INY, TAB, CAP, SOL, SUS, FCO, CJA…), un « - » o un paréntesis. Es una agrupación aproximada: revisa los productos con nombres parecidos.'],
+      ['Estado del producto', '«Por autorizar»: alguna de sus etapas está Ingresada. «Con suspendidos»: unas autorizadas y otras suspendidas. «Todo autorizado»: todas autorizadas. «Suspendido»: todas suspendidas (sin versión vigente).'],
+      ['Orden de «Pendientes»', 'Primero los Ingresados, del más antiguo al más nuevo; después los Suspendidos, del más reciente al más antiguo.'],
+      ['Reemplazado por', 'En un Suspendido: otro master Autorizado o Ingresado con el mismo código por defecto (material de la receta), etapa y planta.'],
+      ['Filtros', filtros.length ? filtros.join(' · ') : 'Ninguno: todos los masters en esos estados.']]
+      .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
+    return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length };
+  }
+  async function abrirUltimaVersion() {
+    if (window.__rmdUltimaVersion) return;
+    const ctrl = controladorPrincipal(), modelo = modeloListaPrincipal(); if (!modelo || !ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
+    let trabajando = true; window.__rmdUltimaVersion = true;
+    const v = ventana('Última versión de cada master', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.cuerpo.innerHTML = `<p>Excel con la <b>última versión</b> de cada master que está <b>Autorizado, Ingresado o Suspendido</b> (sin solicitudes ni Cancelados), con lo que dicen sus <b>Observaciones</b> para saber por qué está pendiente, y un resumen por producto. No cambia nada en SAP.</p>
+      <div class="rmd-uv-filtros" hidden></div><p class="rmd-progreso">Leyendo los master de SAP…</p>`;
+    const prog = v.cuerpo.querySelector('.rmd-progreso'), caja = v.cuerpo.querySelector('.rmd-uv-filtros'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const bGen = botonModal('Exportar Excel', 'primario', () => {}); bGen.disabled = true;
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
+    let items = [], mapa = {};
+    const valores = (k) => { const n = new Map(); items.forEach((x) => { const val = k(x) || '(sin dato)'; n.set(val, (n.get(val) || 0) + 1); }); return [...n.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es')); };
+    const grupo = (titulo, nombre, pares) => `<fieldset><legend>${esc(titulo)}${pares.length > 3 ? ` <button type="button" class="rmd-link" data-todos="${nombre}">todas</button> · <button type="button" class="rmd-link" data-ninguna="${nombre}">ninguna</button>` : ''}</legend><div class="rmd-uv-lista">${pares.map(([val, n]) => `<label><input type="checkbox" data-g="${nombre}" value="${esc(val)}" checked> ${esc(val)} <span class="rmd-nota">(${n.toLocaleString('es-PE')})</span></label>`).join('')}</div></fieldset>`;
+    const etapaDe = (x) => etapaBonita(etapaUV(x.md.nivelTxt)), plantaDe = (x) => (x.md.sucursalId && x.md.sucursalId.contenido) || '', areaDe = (x) => x.md.areaRmdTxt || '';
+    const elegidos = () => {
+      const marcados = (g) => new Set([...caja.querySelectorAll(`input[data-g="${g}"]:checked`)].map((i) => i.value));
+      const est = marcados('estado'), et = marcados('etapa'), pl = marcados('planta'), ar = marcados('area'), sinReemp = caja.querySelector('#rmd-uv-reemp').checked, desde = caja.querySelector('#rmd-uv-desde').value;
+      const d0 = desde ? new Date(desde + 'T00:00:00') : null;
+      const lista = items.filter((x) => est.has(x.estado) && et.has(etapaDe(x) || '(sin dato)') && pl.has(plantaDe(x) || '(sin dato)') && ar.has(areaDe(x) || '(sin dato)')
+        && !(x.estado === 'Suspendido' && ((sinReemp && x.reemplazo) || (d0 && new Date(x.md.fechaActualiza || x.md.fechaRegistro || 0) < d0))));
+      const filtros = [], todos = (g) => caja.querySelectorAll(`input[data-g="${g}"]`).length === marcados(g).size;
+      if (!todos('estado')) filtros.push('Estados: ' + [...est].join(', '));
+      if (!todos('etapa')) filtros.push('Etapas: ' + [...et].join(', ')); if (!todos('planta')) filtros.push('Plantas: ' + [...pl].join(', ')); if (!todos('area')) filtros.push('Áreas: ' + [...ar].join(', '));
+      if (sinReemp) filtros.push('Sin los Suspendidos reemplazados por otro master vigente'); if (d0) filtros.push(`Suspendidos solo desde el ${desde.split('-').reverse().join('/')}`);
+      return { lista, filtros };
+    };
+    const contar = () => { const { lista } = elegidos(), c = (e) => lista.filter((x) => x.estado === e).length;
+      avance(`Se exportarán ${lista.length.toLocaleString('es-PE')} master: ${c('Autorizado')} autorizados, ${c('Ingresado')} ingresados y ${c('Suspendido')} suspendidos.`); bGen.disabled = !lista.length; };
+    try {
+      [items, mapa] = await Promise.all([
+        leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId,motivoId', $select: SELECT_MD_UV }, 'mdId', (h, t) => avance(`Leyendo los master de SAP… página ${h} de ${t}`)).then(ultimasVersiones),
+        mapaProduccionEstado(ctrl).catch(() => ({}))]);
+      const nReemp = items.filter((x) => x.reemplazo).length;
+      caja.innerHTML = grupo('Estado de la última versión', 'estado', ESTADOS_UV.map((e) => [e, items.filter((x) => x.estado === e).length]))
+        + `<fieldset><legend>Suspendidos</legend><label><input type="checkbox" id="rmd-uv-reemp" checked> Quitar los ${nReemp} que ya tienen otro master Autorizado o Ingresado (mismo material, etapa y planta)</label>
+           <label class="rmd-uv-desde">Solo los suspendidos desde <input type="date" id="rmd-uv-desde"> <span class="rmd-nota">(vacío: todos)</span></label></fieldset>`
+        + grupo('Etapa', 'etapa', valores(etapaDe)) + grupo('Planta', 'planta', valores(plantaDe)) + grupo('Área (sección)', 'area', valores(areaDe));
+      caja.hidden = false; caja.addEventListener('change', contar); contar();
+      caja.addEventListener('click', (e) => { const b = e.target.closest('[data-todos],[data-ninguna]'); if (!b) return; const g = b.dataset.todos || b.dataset.ninguna;
+        caja.querySelectorAll(`input[data-g="${g}"]`).forEach((i) => { i.checked = !!b.dataset.todos; }); contar(); });
+    } catch (e) { avance('No se pudieron leer los master: ' + e.message, true); }
+    finally { trabajando = false; window.__rmdUltimaVersion = false; }
+    bGen.addEventListener('click', async () => {
+      if (window.__rmdUltimaVersion) return;
+      const { lista, filtros } = elegidos(); if (!lista.length) return;
+      window.__rmdUltimaVersion = true; trabajando = true; bGen.disabled = true;
+      try {
+        const t0 = Date.now(); avance(`Armando el Excel con ${lista.length.toLocaleString('es-PE')} master…`); await esperar(40);
+        const { libro, nombre, conteo, productos } = armarUltimaVersionExcel(lista, mapa, new Date(), filtros), u8 = await libro.generar();
+        descargarArchivo(nombre, u8, TIPO_XLSX);
+        avance(`✓ Descargado «${nombre}» (${Math.round((Date.now() - t0) / 1000)} s): ${lista.length.toLocaleString('es-PE')} master (${conteo.a} autorizados, ${conteo.i} ingresados, ${conteo.s} suspendidos) de ${productos} productos.`);
+      } catch (e) { avance('No se pudo exportar: ' + e.message, true); }
+      finally { window.__rmdUltimaVersion = false; trabajando = false; bGen.disabled = false; }
+    });
+  }
+  window.__rmdStats.ultimaVersion = { producto: productoDeDescripcion, ultimas: ultimasVersiones, armar: armarUltimaVersionExcel, abrir: () => abrirUltimaVersion(), exportar: () => { const b = [...document.querySelectorAll('.rmd-modal-pie button')].find((x) => x.textContent === 'Exportar Excel'); if (b) b.click(); return !!b; } };   // pruebas
   // ---- Menú del icono «Exportar» de la lista principal ----
   // Exportado original (+ «Producción Estado» al final), Equipos por master e Indicadores.
   const buscarExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
@@ -6266,6 +6462,7 @@
     const ic = (d) => `<svg viewBox="0 0 16 16" aria-hidden="true">${d}</svg>`;
     const opciones = [
       [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
+      on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
       on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
       on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
@@ -13312,7 +13509,7 @@ td.ult { position: relative; }
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
-    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
+    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
   ];
   const ICONOS_PANEL = {
     flecha: '<path d="M6 3.5 10.5 8 6 12.5"/>', buscar: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>', cerrar: '<path d="M4 4l8 8M12 4l-8 8"/>',

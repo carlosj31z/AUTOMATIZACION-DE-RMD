@@ -1218,7 +1218,7 @@ with sync_playwright() as p:
         RMD_ING = os.environ.get("RMD_ING", "2202609241")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
         RMD_CMP = os.environ.get("RMD_CMP", "2202609157")     # un RMD AUTORIZADO de Fabricación o Envase cuyo Guardar abre el «Comparador de fórmula» (v1.70)
         cerrar_seguro(); pg.wait_for_timeout(1000)
-        @prueba("T1 El icono 'Exportar' abre el menú (original, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
+        @prueba("T1 El icono 'Exportar' abre el menú (original, Última versión de cada master, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
             fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)   # sin el filtro de código que dejan otros bloques (exporta la lista entera)
             fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
@@ -1232,7 +1232,7 @@ with sync_playwright() as p:
             e = fr.evaluate("window.__exp.pop()")
             fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
             vm = (e["ultima"] or {}).get("valueMap") or {}
-            ok = (items == ["Exportado original", "Equipos por master", "Indicadores del mes", "Documentos citados", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+            ok = (items == ["Exportado original", "Última versión de cada master", "Equipos por master", "Indicadores del mes", "Documentos citados", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
                   and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
             return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
         @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
