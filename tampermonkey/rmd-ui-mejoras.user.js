@@ -605,6 +605,7 @@
 
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
+  .rmd-obs-fila { width: 100% !important; margin-left: 0 !important; clear: both; }
   #rmd-aviso-pendientes.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); }
   #rmd-aviso-pendientes.bloquea { border-left-color: var(--rmd-rojo); }
   #rmd-aviso-pendientes .rmd-pd-cc { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); font-weight: 600; cursor: help; }
@@ -2114,17 +2115,49 @@
     else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
     return out.join('<br>');
   }
-  // Observaciones: crece con el texto (de 8 a 30 líneas) en lugar de las pocas filas del portal
+  // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas) con alto fijo
+  // de 70 px. Se pasa a una fila propia de ancho completo debajo de las tres columnas (Title vacío + Label y TextArea con GridData de 12) y crece
+  // con el texto (8 a 30 líneas). Al apagar la opción vuelve el contenido original del formulario.
+  const SPAN_TODO = 'XL12 L12 M12 S12';
+  let obsModificada = null;                                                         // { c: TextArea, sf: SimpleForm } con los cambios puestos
+  function restaurarObservaciones() {
+    document.querySelectorAll('.rmd-obs-fila').forEach((e) => e.classList.remove('rmd-obs-fila'));
+    if (!obsModificada) return; const { c, sf } = obsModificada; obsModificada = null;
+    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); }
+    if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x)); o.titulo.destroy();
+      o.layout.forEach(([x, ld]) => { const nuevo = x.getLayoutData(); x.setLayoutData(ld || null); if (nuevo && nuevo !== ld) nuevo.destroy(); }); }
+  }
   function agrandarObservaciones(el) {
     const c = el && el.tagName === 'TEXTAREA' && sap.ui.getCore().byId(el.id.replace(/-inner$/, ''));
     if (!c || !c.setRows) return;
-    if (!on('obsalto')) { if (c.__rmdFilas) { c.setRows(c.__rmdFilas.rows); c.setGrowing(c.__rmdFilas.growing); c.__rmdFilas = null; } return; }
-    if (c.__rmdFilas) return;
-    c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false };
-    if (c.getRows() < 8) c.setRows(8);
-    if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(30); }
+    let sf = c.getParent(); while (sf && !(sf.getMetadata && sf.getMetadata().getName() === 'sap.ui.layout.form.SimpleForm')) sf = sf.getParent && sf.getParent();
+    if (!on('obsalto')) { restaurarObservaciones(); return; }
+    obsModificada = { c, sf };
+    if (!c.__rmdFilas) {
+      c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false, height: c.getHeight ? c.getHeight() : '' };
+      if (c.getRows() < 8) c.setRows(8);
+      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(30); }
+      c.setHeight('');                                                               // sin esto el alto fijo del portal gana a rows y growing
+    }
+    if (sf && sf.__rmdObs) { filaObservacionesCompleta(c); return; }
+    if (!sf) return;
+    const GridData = sap.ui.require('sap/ui/layout/GridData'), Title = sap.ui.require('sap/ui/core/Title'); if (!GridData || !Title) return;
+    const contenido = sf.getContent(), iT = contenido.indexOf(c); if (iT < 0) return;
+    const etq = contenido[iT - 1] && /Label$/.test(contenido[iT - 1].getMetadata().getName()) ? contenido[iT - 1] : null;
+    const titulo = new Title({ text: '' });
+    titulo.setLayoutData(new GridData({ span: SPAN_TODO }));                        // el SimpleForm lo usa como tamaño del FormContainer nuevo
+    sf.__rmdObs = { contenido: contenido.slice(), titulo, layout: [c, etq].filter(Boolean).map((x) => [x, x.getLayoutData()]) };
+    sf.removeContent(c); if (etq) sf.removeContent(etq);
+    if (etq) { etq.setLayoutData(new GridData({ span: SPAN_TODO })); }
+    c.setLayoutData(new GridData({ span: SPAN_TODO }));
+    sf.addContent(titulo); if (etq) sf.addContent(etq); sf.addContent(c);
   }
-
+  // Por si la versión de UI5 no pasa el GridData del Title al FormContainer: su celda de la rejilla se estira a todo el ancho.
+  function filaObservacionesCompleta(c) {
+    const el = c.getDomRef(), celdas = []; let n = el && el.parentElement;
+    while (n && celdas.length < 2 && !n.classList.contains('sapUiSimpleForm')) { if (/\bsapUiRespGridSpanL\d/.test(n.className)) celdas.push(n); n = n.parentElement; }
+    const cont = celdas[1]; if (cont && !/\bsapUiRespGridSpanL12\b/.test(cont.className)) cont.classList.add('rmd-obs-fila');
+  }
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
   // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
   // orden).
@@ -2386,6 +2419,7 @@
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
     document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
+    try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -5844,32 +5878,39 @@
   const Pendientes = (() => {
     const plano = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
     const limpio = (t) => String(t || '').replace(/\s+/g, ' ').trim();
-    // 26-379-CC · 26-379 CC · CC 26-379 · CC N.° 26-379
-    const RE_CC = /\b(\d{2})\s*[-–]\s*(\d{2,4})\s*[-–]?\s*CC\b|\bC\.?\s?C\.?\s*(?:N\.?\s*[°º]?\s*)?(\d{2})\s*[-–]\s*(\d{2,4})\b/gi;
-    const codigoCC = (a, n) => `${a}-${String(n).padStart(3, '0')}-CC`;
+    // 26-379-CC · 26-379 -CC · 2026-379-CC · CC-26-379-CC · CC 26-379 · CC-26-379 · CC N.° 26-379
+    const RE_CC = /\b((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\s*[-–]?\s*CC\b|\bC\.?\s?C\.?\s*(?:N\.?\s*[°º]?\s*|[-–]\s*)?((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\b/gi;
+    const codigoCC = (a, n) => `${String(a).slice(-2)}-${String(n).padStart(3, '0')}-CC`;
     function ccsDe(texto) {
       const out = []; let m; RE_CC.lastIndex = 0;
       while ((m = RE_CC.exec(String(texto || '')))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
       return out;
     }
-    // pendiente / suspendido por algo que falta / para la próxima versión
+    // Pendiente: «pendiente», «pend», «falta», «por aplicar», «siguiente versión»… En las Observaciones reales (12.926 MD, oct-2026) casi
+    // todos los «se suspende» dan el motivo (nueva versión, migración, auditoría, NC, antigüedad): «se suspende» solo cuenta como pendiente
+    // si nombra un control de cambio («se suspende por 26-379-CC», «se suspende por CC lotizado») y no es «por nueva versión».
+    const RE_SUSP = /\bSUSPEN(?:DE|DIDO|DIDA|DER|DIO|DEMOS)\b/;
+    const RE_SUSP_CC = /\bC\.?C\b|\bCONTROL(?:ES)?\s+DE\s+CAMBIOS?\b/;
+    const RE_SUSP_MOTIVO = /\bPOR\s+(?:LA\s+|UNA\s+)?NUEVA\s+VERSION\b/;
     const RE_PEND = new RegExp([
-      '\\bSUSPEN(?:DE|DIDO|DIDA|SION|DER|DIO)\\b',
-      '\\bPENDIENTES?\\b', '\\bPOR\\s+(?:APLICAR|INCLUIR|ACTUALIZAR|IMPLEMENTAR|CORREGIR|AGREGAR|INGRESAR|CAMBIAR|REVISAR|DEFINIR|CONFIRMAR|VALIDAR)\\b',
-      '\\bFALTA(?:N|RIA)?\\b', '\\bQUEDA(?:N)?\\s+PENDIENTE', '\\b(?:SIGUIENTE|PROXIMA|NUEVA|OTRA|POSTERIOR)\\s+VERSION\\b', '\\bA\\s+LA\\s+ESPERA\\b', '\\bEN\\s+ESPERA\\b',
+      '\\bPENDIENTES?\\b', '\\bPEND\\b\\.?', '\\bPEN\\)', '\\bPOR\\s+(?:APLICAR|INCLUIR|ACTUALIZAR|IMPLEMENTAR|CORREGIR|AGREGAR|INGRESAR|CAMBIAR|REVISAR|DEFINIR|CONFIRMAR|VALIDAR)\\b',
+      '\\bFALTA(?:N|RIA)?\\b', '\\bQUEDA(?:N)?\\s+PENDIENTE', '\\b(?:SIGUIENTE|PROXIMA|POSTERIOR)\\s+VERSION\\b', '\\bEN\\s+OTRA\\s+VERSION\\b', '\\bA\\s+LA\\s+ESPERA\\b', '\\bEN\\s+ESPERA\\b',
       '\\bNO\\s+SE\\s+(?:APLICO|INCLUYO|ACTUALIZO|CONSIDERO|IMPLEMENTO)\\b', '\\bSE\\s+APLICARA\\b', '\\bHASTA\\s+(?:QUE|LA\\s+APROBACION|APROBAR)\\b'].join('|'));
     // ya hecho
     const RE_HECHO = /\b(?:SE\s+APLICO|APLICAD[OA]S?|SE\s+INCLUYO|INCLUID[OA]S?|SE\s+IMPLEMENTO|IMPLEMENTAD[OA]S?|LEVANTAD[OA]S?|SUBSANAD[OA]S?|RESUELT[OA]S?|ATENDID[OA]S?|CERRAD[OA]S?|YA\s+SE)\b/;
     const NIVELES = /^(MENOR|MODERADO|MAYOR|CRITICO|MINIMO|ALTO|MEDIO|BAJO)$/;
     const RE_NOMENCLATURA = /^\d{8}[A-ZÑ]{2}-\d-C/i;
+    const esPendiente = (p, ccs) => !RE_HECHO.test(p) && (RE_PEND.test(p) || (RE_SUSP.test(p) && (ccs.length > 0 || RE_SUSP_CC.test(p)) && !RE_SUSP_MOTIVO.test(p)));
+    // delante del código puede ir la fecha e iniciales («20261022CJ», «20261022CJ-1-C1.0-…»), «CONTROL DE CAMBIO» o «CC-»
+    const PREFIJO_CC = /^\s*(?:\d{8}\s*[A-ZÑ]{2,3}(?:-[^\s]*)?[\s:-]*)?(?:CONTROL\s+DE\s+CAMBIO\s*[:-]?\s*|C\.?C\.?\s*[-:]\s*(?=\d))?/i;
     // «26-379-CC/L.Fernandez/2026-10-22;Descripción;proceso;moderado» -> partes
     function entradaCC(linea) {
-      const m = /^\s*(\d{2})\s*-\s*(\d{2,4})\s*-\s*CC\b\s*(.*)$/i.exec(linea); if (!m) return null;
+      const m = /^\s*((?:20)?\d{2})\s*-\s*(\d{2,4})\s*-?\s*CC\b\s*(.*)$/i.exec(String(linea).replace(PREFIJO_CC, '')); if (!m) return null;
       const e = { codigo: codigoCC(m[1], m[2]), responsable: '', fecha: '', descripcion: '', tipo: '', nivel: '', linea: limpio(linea) };
       let resto = m[3];
-      const cab = /^\s*\/+\s*([^/;]*?)\s*\/+\s*(\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}|\d{8})?\s*/.exec(resto);
+      const cab = /^\s*\/+\s*([^/;]*?)\s*\/+\s*(\d{4}-\d{2}-\d{2}|\d{2}[-/]\d{2}[-/]\d{4}|\d{8})?\s*/.exec(resto);
       if (cab) { e.responsable = cab[1]; e.fecha = cab[2] || ''; resto = resto.slice(cab[0].length); }
-      const partes = resto.replace(/^[\s;,:-]+/, '').replace(/[\s.;]+$/, '').split(';').map(limpio).filter(Boolean);
+      const partes = resto.replace(/^[\s;,:/-]+/, '').replace(/[\s.;]+$/, '').split(';').map(limpio).filter(Boolean);
       // «…;proceso,moderado»: el nivel puede venir tras una coma
       if (partes.length) { const u = partes[partes.length - 1].split(','); if (u.length > 1 && NIVELES.test(plano(limpio(u[u.length - 1])))) partes.splice(partes.length - 1, 1, limpio(u.slice(0, -1).join(',')), limpio(u[u.length - 1])); }
       if (partes.length > 1 && NIVELES.test(plano(partes[partes.length - 1]))) e.nivel = partes.pop();
@@ -5886,11 +5927,14 @@
       lineas(texto).forEach((l, i) => {
         const p = plano(l), ccs = ccsDe(l);
         r.lineas.push(l);
-        if (RE_NOMENCLATURA.test(l) && !ccs.length && !RE_PEND.test(p)) return;
-        const pend = RE_PEND.test(p) && !RE_HECHO.test(p), ent = !pend && entradaCC(l);
+        const pend = esPendiente(p, ccs);
+        if (RE_NOMENCLATURA.test(l) && !ccs.length && !pend) return;
+        const ent = !pend && entradaCC(l);
         if (pend) r.pendientes.push({ linea: l, ccs, i });
+        else if (RE_HECHO.test(p) && ccs.length) r.hechos.push({ linea: l, ccs, i });
         else if (ent) r.aplicados.push({ ...ent, i });
-        else if (ccs.length) r.hechos.push({ linea: l, ccs, i });
+        // otra mención de un CC sin nada pendiente («… CONTROL DE CAMBIO 24-161-CC INCLUSIÓN DE LOTIZADO»): aplicado, sin sus partes
+        else ccs.forEach((c) => r.aplicados.push({ codigo: c, responsable: '', fecha: '', descripcion: l, tipo: '', nivel: '', linea: l, i }));
       });
       return r;
     }
