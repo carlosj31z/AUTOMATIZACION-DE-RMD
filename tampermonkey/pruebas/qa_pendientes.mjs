@@ -45,6 +45,29 @@ ok('Pendiente: «Pendiente aplicar…», «Falta…», «… en la siguiente ver
 ok('No es pendiente: «Se aplicó lo pendiente del 26-379-CC» (ya hecho)', pend('Se aplicó lo pendiente del 26-379-CC').length === 0 && Pendientes.analizar('Se aplicó lo pendiente del 26-379-CC').hechos.length === 1);
 ok('No es pendiente: una observación normal', pend('20261001CJ Actualización de Lista de Materiales').length === 0);
 
+// ---- frases reales de las Observaciones (lectura de 12.926 MD, oct-2026) ----
+const esPend = (l) => Pendientes.analizar(l).pendientes.length === 1;
+const motivos = ['20250310VM SE SUSPENDE POR NUEVA VERSION', '20250310VM SE SUSPENDE POR NUEVA VERSION CC FASE 2', '20240101 JC SUSPENDIDO POR MIGRACION',
+  '20250310VM SE SUSPENDE POR NC EPP AUDITORIA INT', '20250310JQ-SE SUSPENDE POR ANTIGUEDAD, VOLVER A INGRESAR', '20250310YH-CC FASE 1( CORREO 15 DE MAYO)',
+  'CONTROL DE CAMBIO 24-161-CC: BETACORT DEPOT 5mg/mL + 2mg/mL Suspensión Inyectable'];
+motivos.forEach((l) => ok(`Motivo, no pendiente: «${l}»`, !esPend(l), J(Pendientes.analizar(l))));
+const reales = ['20250310JC SE SUSPENDE, PENDIENTE FASE I', '20250310VM SE SUSPENDE POR CC LOTIZADO PENDIENTE.', 'PENDIENTE CC', 'OBS: PENDIENTE CC', '- PENDIENTE CONTROL DE CAMBIO.',
+  '20250310VM SE SUSPENDE PENDIENTE ACTUALIZAR CC FASE 2', '20250310VM SE SUSPENDE POR CC', '20250310VM SE SUSPENDE POR CC LOTIZADO PEND', '20250310JQ SE SUSPENDE POR CC 24-110',
+  '20250310VM SE SUSPENDE POR CAMBIO DE TERMOMETRO 24-095-CC *A1*', 'SE SUSPENDE POR 24-101 -CC (PESADO DE CAJAS) Y 24-102-CC (BALANZAS PEN)- VERIFICAR FAJAS', '20250310JQ-SE SUSPENDE CC-24-133 INCLUSION DE ENCINTADORA DE CAJAS'];
+reales.forEach((l) => ok(`Pendiente real: «${l}»`, esPend(l), J(Pendientes.analizar(l))));
+ok('Pendiente real: «24-101 -CC … Y 24-102-CC» da los dos CC', J(Pendientes.analizar(reales[10]).pendientes[0].ccs) === '["24-101-CC","24-102-CC"]');
+ok('Pendiente real: «CC-24-133» y «CC 24-110» dan el código', J(Pendientes.analizar(reales[11]).pendientes[0].ccs) === '["24-133-CC"]' && J(Pendientes.analizar(reales[8]).pendientes[0].ccs) === '["24-110-CC"]');
+const apl = (l) => Pendientes.analizar(l).aplicados;
+let x = apl('24-120-CC / V.REYES / 10-05-2024/ ACTUALIZACION DE UTENSILIOS Y ACCESORIOS EN FAB');
+ok('Aplicado: «/ V.REYES / 10-05-2024/ …» con espacios y fecha día-mes-año', x.length === 1 && x[0].responsable === 'V.REYES' && x[0].fecha === '10-05-2024' && /^ACTUALIZACION DE UTENSILIOS/.test(x[0].descripcion), J(x));
+x = apl('CC-24-118-CC/F.ARONI/2024-06-01; REEMPLAZO DE LAS PANTALLAS REVISADORAS; EQUIPO; MENOR');
+ok('Aplicado: «CC-24-118-CC/…» con el prefijo CC-', x.length === 1 && x[0].codigo === '24-118-CC' && x[0].responsable === 'F.ARONI' && x[0].nivel === 'MENOR', J(x));
+x = apl('20250310LR-1-C1.0-FI1.0-FA1.0 CONTROL DE CAMBIO 24-140-CC INCLUSION DE LOTIZADO EN ACO');
+ok('Aplicado: nomenclatura + «CONTROL DE CAMBIO 24-140-CC …»', x.length === 1 && x[0].codigo === '24-140-CC' && /^INCLUSION DE LOTIZADO/.test(x[0].descripcion), J(x));
+x = apl('CONTROL DE CAMBIO 24-161-CC: BETACORT DEPOT 5mg/mL + 2mg/mL Suspensión Inyectable');
+ok('Aplicado: «CONTROL DE CAMBIO 24-161-CC: …» (la forma «Suspensión» no lo vuelve pendiente)', x.length === 1 && x[0].codigo === '24-161-CC', J(x));
+ok('Aplicado: «24-150-CC FLUJO DE AIRE» sin responsable', apl('24-150-CC FLUJO DE AIRE')[0].descripcion === 'FLUJO DE AIRE');
+
 // ---- pendientes heredados entre versiones ----
 const v4 = { version: 4, codigo: '2202600004', estado: 'Suspendido', observacion: '26-300-CC/X/2026-01-01;algo;proceso;menor\n20261022CJ Se suspende por 26-379-CC\nPendiente: actualizar especificación de dureza' };
 let h = Pendientes.heredados([v4], { version: 5, observacion: '20261023CJ-1-C1.0-FI1.0-FA1.0-F1' });
