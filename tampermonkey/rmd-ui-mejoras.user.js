@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.0
+// @version      1.76.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.0';                                                       // mantener igual a @version
+  const VERSION = '1.76.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -6020,7 +6020,7 @@
     }
     // Producto a dar de baja o descontinuado («dar de baja», «descontinuado», «ya no se fabrica»…); «equipo / balanza … de baja» no cuenta.
     const RE_BAJA = /\b(?:DAR(?:SE|LO|LA)?\s+DE\s+BAJA|(?:SE\s+)?DA\s+DE\s+BAJA|DADO\s+DE\s+BAJA|DADA\s+DE\s+BAJA|PARA\s+BAJA|DE\s+BAJA|DESCONTINUAD[OA]S?|DESCONTINUA(?:R|DO|CION)?|DISCONTINUAD[OA]S?|DISCONTINUA(?:R|CION)?|YA\s+NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA|COMERCIALIZA|VENDE)|NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA)\s+MAS|FUERA\s+DE\s+(?:LINEA|PORTAFOLIO|PORTAFOLIO)|RETIRAD[OA]\s+DEL\s+(?:MERCADO|PORTAFOLIO)|PRODUCTO\s+INACTIVO|SIN\s+DEMANDA)\b/;
-    const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?)\b[^.;]*\bBAJA\b/;
+    const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?|CODIFICADORAS?|IMPRESORAS?|SENSORE?S?)\b[^.;]*\bBAJA\b|\bBAJA\b[^.;]*\b(?:CODIGO\s+[A-Z]{2,3}\d*-[A-Z]{2,3}\d*-|SEM-|CODIFICADORA|EQUIPO)/;
     const esBaja = (p) => RE_BAJA.test(p) && !(RE_BAJA_NO.test(p) && !/DESCONTINU|DISCONTINU|NO\s+SE\s+(?:FABRICA|PRODUCE)/.test(p));
     const RE_ACTUALIZA = /\bACTUALIZA(?:CION|DO|DA|R)?\b|\bMODIFICACION\b|\bCAMBIO\s+DE\b/;
     // Tipos de línea: baja, pendiente, cc, suspension (motivo), actualizacion, nomenclatura, nota
