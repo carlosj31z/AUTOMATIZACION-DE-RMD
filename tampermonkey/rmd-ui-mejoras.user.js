@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.77.1
+// @version      1.77.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.77.1';                                                       // mantener igual a @version
+  const VERSION = '1.77.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2123,7 +2123,7 @@
     if (av.className !== cls) av.className = cls;
     if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
     barraObservaciones(elObs);
-    window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length,
+    window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, elegido, suspender, autorizar, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length,
       nuevas: r.nuevas.length, resueltos: r.resueltos.map((x) => x.cc), revision: r.revision.map((x) => x.texto) };
   }
   // Versiones del master con su planta (la planta sirve para ubicar los CC en el listado)
@@ -2637,12 +2637,19 @@
       t.querySelectorAll('tbody input').forEach((i) => { f += i.value + '|'; }); t.querySelectorAll('tbody td:not(.sapMListTblSelCol) [role=checkbox]').forEach((c) => { f += (c.getAttribute('aria-checked') || '')[0]; }); });
     return f + ts.length;
   };
+  // «Asociar fórmulas»: el combo Estado y el texto de Observaciones cambian el modelo sin tocar el DOM que vigila el observador; se comparan aquí
+  let firmaAsocPrev = '';
+  const firmaAsociar = () => {
+    const d = dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x))); if (!d) return '';
+    const ctrl = controladorPrincipal(), m = ctrl && ctrl.getView().getModel('asociarDatos'), a = m && m.getData(), el = campoDe(d, 'Observaciones');
+    return a ? `${a.mdId}|${a.estadoIdRmd_iMaestraIdBK}|${el ? el.value : ''}` : '';
+  };
   let sinVentanas = 0;
   function revisionPeriodica() {
     montarPanel();
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
-    if (opc.activo) { vigilarListaPrincipal(); revisarAsociar(); }
+    if (opc.activo) { vigilarListaPrincipal(); revisarAsociar(); const fa = firmaAsociar(); if (fa !== firmaAsocPrev) { firmaAsocPrev = fa; if (fa) aislar('gestionarPendientesAsociar', gestionarPendientesAsociar); } }
     if (espAbierta) {                                                    // Especificaciones cerrada sin guardar: se descartan cambios
       if (dialogos().includes(espAbierta.d)) espSinVer = 0;
       else if (++espSinVer >= 2 && !espEnviando) { descartarEspec(espAbierta.datos); espAbierta = null; espSinVer = 0; }   // (no mientras haya un guardado en curso)
