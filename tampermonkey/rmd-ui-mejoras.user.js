@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.0
+// @version      1.76.6
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.0';                                                       // mantener igual a @version
+  const VERSION = '1.76.6';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2125,7 +2125,8 @@
     const anotados = new Set(r.actual.aplicados.map((x) => x.codigo).concat(r.actual.pendientes.flatMap((x) => x.ccs)));
     const lista = Pendientes.cambiosQueAplican(RR.cambios.cambios, { planta: yo.planta || '', etapa: yo.nivelTxt || asoc.nivelTxt || '', area: `${yo.areaRmdTxt || asoc.areaRmdTxt || ''} ${yo.descripcion || ''}`,
       producto: productoDeDescripcion(yo.descripcion || asoc.descripcion || ''), desde });
-    const faltan = lista.filter((c) => c.codigos.length ? !c.codigos.some((k) => anotados.has(k)) : !String(r.actual.lineas.join('\n')).includes(c.nomenclatura || c.descripcion));
+    // solo los que nombran el producto: los del área en general son demasiados y casi nunca tocan la receta
+    const faltan = lista.filter((c) => c.por === 'producto').filter((c) => c.codigos.length ? !c.codigos.some((k) => anotados.has(k)) : !String(r.actual.lineas.join('\n')).includes(c.nomenclatura || c.descripcion));
     return { desde, previa: previa ? previa.version : null, faltan, total: lista.length };
   }
   function agregarTextoObs(c, linea) {
@@ -2173,32 +2174,33 @@
     const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
     if (porTipo.size) out.push(`<span class="rmd-pd-tipos">${Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t)).map((t) => `<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`).join('')}</span>`);
     r.formato.forEach((x) => out.push(`<span>✎ <q>${esc(x.linea.slice(0, 60))}${x.linea.length > 60 ? '…' : ''}</q>: falta ${esc(x.faltan.join(', '))} (formato «26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»).</span>`));
-    if (nuevos.length) out.push(`<b>Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}:</b> ${nuevos.map(chip).join('')}`);
+    const soloCC = nuevos.every((x) => /-CC$/.test(x.codigo));
+    if (nuevos.length) out.push(`<b>${soloCC ? `Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}` : `CC / NC registrado${nuevos.length > 1 ? 's' : ''}`}:</b> ${nuevos.map(chip).join('')}`);
     if (viejos.length) out.push(`<span>De versiones anteriores: ${viejos.map(chip).join('')}</span>`);
     const items = [];
     r.ccs.forEach((x) => items.push(`<li>⚠ <b>Falta aplicar ${esc(x.cc)}</b>: lo dejó pendiente la ${vTxt(x)} — <q>${esc(x.linea)}</q>. Anótalo como aplicado («${esc(x.cc)}/responsable/fecha;descripción;tipo;nivel») cuando lo ingreses.</li>`));
     r.textos.forEach((x) => items.push(`<li>⚠ Pendiente anotado en la ${vTxt(x)}: <q>${esc(x.linea)}</q> — revisa si ya se aplicó en esta versión.</li>`));
     r.propios.forEach((x) => items.push(`<li>ℹ Anotado como pendiente en esta versión: <q>${esc(x.linea)}</q></li>`));
     if (items.length) out.push(`<b>${autorizar ? 'No autorices todavía: ' : ''}${items.length} pendiente${items.length > 1 ? 's' : ''}</b><ul>${items.join('')}</ul>`);
-    if (r.listado && r.listado.faltan.length) {
-      const L = r.listado, fila = (c) => `<li>${c.por === 'producto' ? '📦' : '🏭'} <b>${esc(c.codigos.join(', ') || 'Sin código')}</b>${c.fecha ? ` (${esc(c.fecha)})` : ''}: ${esc((c.descripcion || c.nomenclatura).slice(0, 110))}${(c.descripcion || c.nomenclatura).length > 110 ? '…' : ''}`
-        + `${c.estatus ? ` · <i>${esc(c.estatus)}</i>` : ''}${!c.aplica ? ' · <i>APLICA: NO</i>' : ''} <button type="button" class="rmd-pd-agregar" data-linea="${esc(c.nomenclatura || c.descripcion)}" title="Agrega a Observaciones: ${esc(c.nomenclatura || c.descripcion)}">Agregar</button></li>`;
-      out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este ${L.faltan.some((c) => c.por === 'producto') ? 'producto o área' : 'área'} sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
-    }
     else if (cargando) out.push('<span>Buscando pendientes en las versiones anteriores…</span>');
     else if (error) out.push('<span>No se pudieron leer las versiones anteriores para buscar pendientes.</span>');
     else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
+    if (r.listado && r.listado.faltan.length) {
+      const L = r.listado, fila = (c) => `<li>${c.por === 'producto' ? '📦' : '🏭'} <b>${esc(c.codigos.join(', ') || 'Sin código')}</b>${c.fecha ? ` (${esc(c.fecha)})` : ''}: ${esc((c.descripcion || c.nomenclatura).slice(0, 110))}${(c.descripcion || c.nomenclatura).length > 110 ? '…' : ''}`
+        + `${c.estatus ? ` · <i>${esc(c.estatus)}</i>` : ''}${!c.aplica ? ' · <i>APLICA: NO</i>' : ''} <button type="button" class="rmd-pd-agregar" data-linea="${esc(c.nomenclatura || c.descripcion)}" title="Agrega a Observaciones: ${esc(c.nomenclatura || c.descripcion)}">Agregar</button></li>`;
+      out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este producto sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
+    }
     return out.join('<br>');
   }
   // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas: Title + Label/campo)
   // junto a Motivo de Solicitud y RM Digital Paralelo, con alto fijo de 70 px. Se deja sola en la 3.ª columna (etiqueta arriba, ancho completo de la
-  // columna) y los otros campos de esa columna pasan al final de la 1.ª y la 2.ª; el cuadro toma el alto de las otras columnas y crece con el texto.
+  // columna) y los otros campos de esa columna pasan al final de la 1.ª y la 2.ª; el cuadro toma el alto de las otras columnas, sin pasarlo (barra si el texto no cabe).
   // Al apagar la opción vuelve el contenido original del formulario.
   const SPAN_TODO = 'XL12 L12 M12 S12';
   let obsModificada = null;                                                         // { c: TextArea, sf: SimpleForm } con los cambios puestos
   function restaurarObservaciones() {
     if (!obsModificada) return; const { c, sf } = obsModificada; obsModificada = null;
-    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); const i = c.getFocusDomRef && c.getFocusDomRef(); if (i) i.style.minHeight = ''; }
+    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); const i = c.getFocusDomRef && c.getFocusDomRef(); if (i) Object.assign(i.style, { minHeight: '', height: '', maxHeight: '', overflowY: '' }); }
     if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x));
       o.layout.forEach(([x, ld]) => { const nuevo = x.getLayoutData(); x.setLayoutData(ld || null); if (nuevo && nuevo !== ld) nuevo.destroy(); }); }
   }
@@ -2212,7 +2214,7 @@
     if (!c.__rmdFilas) {
       c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false, height: c.getHeight ? c.getHeight() : '' };
       if (c.getRows() < 8) c.setRows(8);
-      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(40); }
+      if (c.setGrowing) c.setGrowing(false);                                       // alto fijo al de las otras columnas; el resto, con barra
       c.setHeight('');                                                               // sin esto el alto fijo del portal gana a rows y growing
     }
     if (sf && !sf.__rmdObs) repartirColumnas(sf, c);
@@ -2245,10 +2247,13 @@
   // El cuadro llega hasta el pie de la columna más alta (sin pasar de 520 px); con más texto sigue creciendo.
   function igualarAltoObservaciones(c, sf) {
     const ta = c.getFocusDomRef && c.getFocusDomRef(), form = sf && sf.getAggregation && sf.getAggregation('form'); if (!ta || !form) return;
-    const conts = form.getFormContainers().map((k) => k.getDomRef()).filter(Boolean), propio = conts.find((x) => x.contains(ta));
-    const pie = Math.max(0, ...conts.filter((x) => x !== propio).map((x) => x.getBoundingClientRect().bottom)); if (!pie) return;
-    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top - 4)));
-    if (ta.style.minHeight !== alto + 'px') ta.style.minHeight = alto + 'px';
+    // el pie de las otras columnas se mide con sus campos y etiquetas (FormContainer.getDomRef() es null con ResponsiveGridLayout)
+    const doms = (k) => k.getFormElements().flatMap((fe) => [fe.getLabelControl && fe.getLabelControl(), ...fe.getFields()]).map((x) => x && x.getDomRef && x.getDomRef()).filter(Boolean);
+    const otros = form.getFormContainers().map(doms).filter((d) => d.length && !d.some((x) => x.contains(ta)));
+    const pie = Math.max(0, ...otros.flat().map((x) => x.getBoundingClientRect().bottom)); if (!pie) return;
+    // no pasa del pie de las otras columnas: alto fijo y, si el texto no cabe, barra de desplazamiento
+    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top))) + 'px';
+    if (ta.style.height !== alto) Object.assign(ta.style, { minHeight: '', height: alto, maxHeight: alto, overflowY: 'auto' });
   }
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
   // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
@@ -6020,7 +6025,7 @@
     }
     // Producto a dar de baja o descontinuado («dar de baja», «descontinuado», «ya no se fabrica»…); «equipo / balanza … de baja» no cuenta.
     const RE_BAJA = /\b(?:DAR(?:SE|LO|LA)?\s+DE\s+BAJA|(?:SE\s+)?DA\s+DE\s+BAJA|DADO\s+DE\s+BAJA|DADA\s+DE\s+BAJA|PARA\s+BAJA|DE\s+BAJA|DESCONTINUAD[OA]S?|DESCONTINUA(?:R|DO|CION)?|DISCONTINUAD[OA]S?|DISCONTINUA(?:R|CION)?|YA\s+NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA|COMERCIALIZA|VENDE)|NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA)\s+MAS|FUERA\s+DE\s+(?:LINEA|PORTAFOLIO|PORTAFOLIO)|RETIRAD[OA]\s+DEL\s+(?:MERCADO|PORTAFOLIO)|PRODUCTO\s+INACTIVO|SIN\s+DEMANDA)\b/;
-    const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?)\b[^.;]*\bBAJA\b/;
+    const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?|CODIFICADORAS?|IMPRESORAS?|SENSORE?S?)\b[^.;]*\bBAJA\b|\bBAJA\b[^.;]*\b(?:CODIGO\s+[A-Z]{2,3}\d*-[A-Z]{2,3}\d*-|SEM-|CODIFICADORA|EQUIPO)/;
     const esBaja = (p) => RE_BAJA.test(p) && !(RE_BAJA_NO.test(p) && !/DESCONTINU|DISCONTINU|NO\s+SE\s+(?:FABRICA|PRODUCE)/.test(p));
     const RE_ACTUALIZA = /\bACTUALIZA(?:CION|DO|DA|R)?\b|\bMODIFICACION\b|\bCAMBIO\s+DE\b/;
     // Tipos de línea: baja, pendiente, cc, suspension (motivo), actualizacion, nomenclatura, nota
