@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.3
+// @version      1.76.4
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.3';                                                       // mantener igual a @version
+  const VERSION = '1.76.4';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2125,7 +2125,8 @@
     const anotados = new Set(r.actual.aplicados.map((x) => x.codigo).concat(r.actual.pendientes.flatMap((x) => x.ccs)));
     const lista = Pendientes.cambiosQueAplican(RR.cambios.cambios, { planta: yo.planta || '', etapa: yo.nivelTxt || asoc.nivelTxt || '', area: `${yo.areaRmdTxt || asoc.areaRmdTxt || ''} ${yo.descripcion || ''}`,
       producto: productoDeDescripcion(yo.descripcion || asoc.descripcion || ''), desde });
-    const faltan = lista.filter((c) => c.codigos.length ? !c.codigos.some((k) => anotados.has(k)) : !String(r.actual.lineas.join('\n')).includes(c.nomenclatura || c.descripcion));
+    // solo los que nombran el producto: los del área en general son demasiados y casi nunca tocan la receta
+    const faltan = lista.filter((c) => c.por === 'producto').filter((c) => c.codigos.length ? !c.codigos.some((k) => anotados.has(k)) : !String(r.actual.lineas.join('\n')).includes(c.nomenclatura || c.descripcion));
     return { desde, previa: previa ? previa.version : null, faltan, total: lista.length };
   }
   function agregarTextoObs(c, linea) {
@@ -2187,7 +2188,7 @@
     if (r.listado && r.listado.faltan.length) {
       const L = r.listado, fila = (c) => `<li>${c.por === 'producto' ? '📦' : '🏭'} <b>${esc(c.codigos.join(', ') || 'Sin código')}</b>${c.fecha ? ` (${esc(c.fecha)})` : ''}: ${esc((c.descripcion || c.nomenclatura).slice(0, 110))}${(c.descripcion || c.nomenclatura).length > 110 ? '…' : ''}`
         + `${c.estatus ? ` · <i>${esc(c.estatus)}</i>` : ''}${!c.aplica ? ' · <i>APLICA: NO</i>' : ''} <button type="button" class="rmd-pd-agregar" data-linea="${esc(c.nomenclatura || c.descripcion)}" title="Agrega a Observaciones: ${esc(c.nomenclatura || c.descripcion)}">Agregar</button></li>`;
-      out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este ${L.faltan.some((c) => c.por === 'producto') ? 'producto o área' : 'área'} sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
+      out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este producto sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
     }
     return out.join('<br>');
   }
