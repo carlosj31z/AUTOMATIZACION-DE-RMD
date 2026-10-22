@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.1
+// @version      1.76.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.1';                                                       // mantener igual a @version
+  const VERSION = '1.76.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2173,21 +2173,22 @@
     const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
     if (porTipo.size) out.push(`<span class="rmd-pd-tipos">${Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t)).map((t) => `<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`).join('')}</span>`);
     r.formato.forEach((x) => out.push(`<span>✎ <q>${esc(x.linea.slice(0, 60))}${x.linea.length > 60 ? '…' : ''}</q>: falta ${esc(x.faltan.join(', '))} (formato «26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»).</span>`));
-    if (nuevos.length) out.push(`<b>Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}:</b> ${nuevos.map(chip).join('')}`);
+    const soloCC = nuevos.every((x) => /-CC$/.test(x.codigo));
+    if (nuevos.length) out.push(`<b>${soloCC ? `Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}` : `CC / NC registrado${nuevos.length > 1 ? 's' : ''}`}:</b> ${nuevos.map(chip).join('')}`);
     if (viejos.length) out.push(`<span>De versiones anteriores: ${viejos.map(chip).join('')}</span>`);
     const items = [];
     r.ccs.forEach((x) => items.push(`<li>⚠ <b>Falta aplicar ${esc(x.cc)}</b>: lo dejó pendiente la ${vTxt(x)} — <q>${esc(x.linea)}</q>. Anótalo como aplicado («${esc(x.cc)}/responsable/fecha;descripción;tipo;nivel») cuando lo ingreses.</li>`));
     r.textos.forEach((x) => items.push(`<li>⚠ Pendiente anotado en la ${vTxt(x)}: <q>${esc(x.linea)}</q> — revisa si ya se aplicó en esta versión.</li>`));
     r.propios.forEach((x) => items.push(`<li>ℹ Anotado como pendiente en esta versión: <q>${esc(x.linea)}</q></li>`));
     if (items.length) out.push(`<b>${autorizar ? 'No autorices todavía: ' : ''}${items.length} pendiente${items.length > 1 ? 's' : ''}</b><ul>${items.join('')}</ul>`);
+    else if (cargando) out.push('<span>Buscando pendientes en las versiones anteriores…</span>');
+    else if (error) out.push('<span>No se pudieron leer las versiones anteriores para buscar pendientes.</span>');
+    else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
     if (r.listado && r.listado.faltan.length) {
       const L = r.listado, fila = (c) => `<li>${c.por === 'producto' ? '📦' : '🏭'} <b>${esc(c.codigos.join(', ') || 'Sin código')}</b>${c.fecha ? ` (${esc(c.fecha)})` : ''}: ${esc((c.descripcion || c.nomenclatura).slice(0, 110))}${(c.descripcion || c.nomenclatura).length > 110 ? '…' : ''}`
         + `${c.estatus ? ` · <i>${esc(c.estatus)}</i>` : ''}${!c.aplica ? ' · <i>APLICA: NO</i>' : ''} <button type="button" class="rmd-pd-agregar" data-linea="${esc(c.nomenclatura || c.descripcion)}" title="Agrega a Observaciones: ${esc(c.nomenclatura || c.descripcion)}">Agregar</button></li>`;
       out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este ${L.faltan.some((c) => c.por === 'producto') ? 'producto o área' : 'área'} sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
     }
-    else if (cargando) out.push('<span>Buscando pendientes en las versiones anteriores…</span>');
-    else if (error) out.push('<span>No se pudieron leer las versiones anteriores para buscar pendientes.</span>');
-    else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
     return out.join('<br>');
   }
   // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas: Title + Label/campo)
