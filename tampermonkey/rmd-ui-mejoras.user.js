@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.77.2
+// @version      1.77.3
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.77.2';                                                       // mantener igual a @version
+  const VERSION = '1.77.3';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2091,6 +2091,7 @@
     const ctrl = controladorPrincipal(); if (!ctrl || !elObs) return;
     const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2');
     if (!asoc || !asoc.mdId || !modelo) return;
+    escucharAsociar(d, elObs);
     if (d.__rmdPendMd !== asoc.mdId) {
       d.__rmdPendMd = asoc.mdId; d.__rmdPendVs = null;
       const principal = String(asoc.codigoversionprincipal || asoc.codigo || '');
@@ -2125,6 +2126,19 @@
     barraObservaciones(elObs);
     window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, elegido, suspender, autorizar, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length,
       nuevas: r.nuevas.length, resueltos: r.resueltos.map((x) => x.cc), revision: r.revision.map((x) => x.texto) };
+  }
+  // Elegir otro Estado o escribir en Observaciones cambia el modelo sin tocar el DOM que vigila el observador: se escuchan esos controles
+  // (una vez por control) y la tarjeta se vuelve a armar al momento.
+  let pendTimer = 0;
+  const repasarPendientes = (ms) => { clearTimeout(pendTimer); pendTimer = setTimeout(() => aislar('gestionarPendientesAsociar', gestionarPendientesAsociar), ms); };
+  function escucharAsociar(d, elObs) {
+    const ta = sap.ui.getCore().byId(elObs.id.replace(/-inner$/, ''));
+    if (ta && ta.attachLiveChange && !ta.__rmdPendEscucha) { ta.__rmdPendEscucha = true; ta.attachLiveChange(() => repasarPendientes(250)); }
+    const prev = d.__rmdEstadoCtl, dom = prev && prev.getDomRef && prev.getDomRef();
+    if (dom && d.contains(dom)) return;
+    const est = controlesDe(d).find((c) => rutaDe(c, 'selectedKey') === '/estadoIdRmd_iMaestraIdBK'); if (!est) return;
+    d.__rmdEstadoCtl = est;
+    if (!est.__rmdPendEscucha) { est.__rmdPendEscucha = true; ['attachSelectionChange', 'attachChange'].forEach((m) => { if (est[m]) est[m](() => repasarPendientes(60)); }); }
   }
   // Versiones del master con su planta (la planta sirve para ubicar los CC en el listado)
   async function versionesConPlanta(modelo, principal) {
