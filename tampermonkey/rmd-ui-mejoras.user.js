@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.5
+// @version      1.76.6
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.5';                                                       // mantener igual a @version
+  const VERSION = '1.76.6';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2252,7 +2252,7 @@
     const otros = form.getFormContainers().map(doms).filter((d) => d.length && !d.some((x) => x.contains(ta)));
     const pie = Math.max(0, ...otros.flat().map((x) => x.getBoundingClientRect().bottom)); if (!pie) return;
     // no pasa del pie de las otras columnas: alto fijo y, si el texto no cabe, barra de desplazamiento
-    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top - 4))) + 'px';
+    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top))) + 'px';
     if (ta.style.height !== alto) Object.assign(ta.style, { minHeight: '', height: alto, maxHeight: alto, overflowY: 'auto' });
   }
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
