@@ -131,9 +131,7 @@ ok('Listado: un código que no está da null', Pendientes.delListado(cam, '26-99
 const hoy = new Date(2026, 9, 22);
 const ant = { version: 8, codigo: 'B8', estado: 'Autorizado', observacion: '20260901CJ-1-C1.0-FI1.0-FA1.0-F1\n26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor\n20260901CJ Pendiente aplicar 26-379-CC\n20260901CJ Nota que se quitará' };
 let hv = Pendientes.heredados([ant], { version: 9, observacion: '20261022CJ-1-C1.0-FI1.0-FA1.0-F1\n26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor\n20260901CJ Pendiente aplicar 26-379-CC\n26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado' });
-ok('Frente a la anterior: 1 línea nueva (sin contar la nomenclatura), 1 quitada y el pendiente 26-379-CC resuelto', hv.nuevas.length === 1 && hv.quitadas.length === 1 && /Nota que se quitar/.test(hv.quitadas[0].linea) && J(hv.resueltos.map((x) => [x.cc, x.version])) === '[["26-379-CC",8]]' && hv.ccs.length === 0 && hv.previa.version === 8, J({ n: hv.nuevas, q: hv.quitadas, r: hv.resueltos }));
-hv = Pendientes.heredados([ant], { version: 9, observacion: '20261022CJ-1-C1.0-FI1.0-FA1.0-F1\nTexto nuevo sin copiar nada' });
-ok('Si no se copió el texto de la anterior, no cuenta líneas quitadas', hv.quitadas.length === 0 && hv.copia === false);
+ok('Frente a la anterior: 1 línea nueva (sin contar la nomenclatura) y el pendiente 26-379-CC resuelto', hv.nuevas.length === 1 && J(hv.resueltos.map((x) => [x.cc, x.version])) === '[["26-379-CC",8]]' && hv.ccs.length === 0 && hv.previa.version === 8, J({ n: hv.nuevas, r: hv.resueltos }));
 const susp = (obs, guardado) => Pendientes.revisar(Pendientes.heredados([ant], { version: 9, observacion: obs }), { suspender: true, guardado, hoy });
 const base9 = ant.observacion.replace('20260901CJ-1', '20261001CJ-1');
 ok('Revisión: suspender sin motivo avisa', susp(base9, base9).some((x) => x.nivel === 'aviso' && /suspender/.test(x.texto)), J(susp(base9, base9)));

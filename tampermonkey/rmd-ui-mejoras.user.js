@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.77.0
+// @version      1.77.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.77.0';                                                       // mantener igual a @version
+  const VERSION = '1.77.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -607,7 +607,7 @@
   #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
   #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
   #rmd-aviso-pendientes .rmd-pd-ok { display: inline-block; margin: 2px 6px 0 0; color: var(--rmd-apagado); font-size: 11.5px; }
-  #rmd-aviso-pendientes .rmd-pd-tipo.t-nueva { background: rgba(143,209,158,.2); } #rmd-aviso-pendientes .rmd-pd-tipo.t-quitada { background: rgba(127,127,127,.1); text-decoration: line-through; }
+  #rmd-aviso-pendientes .rmd-pd-tipo.t-nueva { background: rgba(143,209,158,.2); }
   #rmd-aviso-pendientes .rmd-pd-cc.en-listado::after { content: ' ✓'; font-weight: 400; color: var(--rmd-verde); }
   #rmd-aviso-pendientes .rmd-pd-info, #rmd-aviso-pendientes .rmd-pd-viejos, #rmd-aviso-pendientes .rmd-pd-lis { color: var(--rmd-apagado); }
   #rmd-aviso-pendientes .rmd-pd-lis { font-size: 11.5px; cursor: help; }
@@ -2124,7 +2124,7 @@
     if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
     barraObservaciones(elObs);
     window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length,
-      nuevas: r.nuevas.length, quitadas: r.quitadas.length, resueltos: r.resueltos.map((x) => x.cc), revision: r.revision.map((x) => x.texto) };
+      nuevas: r.nuevas.length, resueltos: r.resueltos.map((x) => x.cc), revision: r.revision.map((x) => x.texto) };
   }
   // Versiones del master con su planta (la planta sirve para ubicar los CC en el listado)
   async function versionesConPlanta(modelo, principal) {
@@ -2167,7 +2167,7 @@
     c.setValue(nuevo); c.fireLiveChange && c.fireLiveChange({ value: nuevo }); c.fireChange({ value: nuevo });
     setTimeout(() => { const i = c.getFocusDomRef(); if (!i) return; i.focus(); i.setSelectionRange(base.length + p.sel[0], base.length + p.sel[1]); i.scrollTop = i.scrollHeight; }, 50);
   }
-  // Tarjeta de Observaciones: qué dice esta versión y qué cambió frente a la anterior (una línea), lo pendiente y lo que conviene revisar.
+  // Tarjeta de Observaciones: qué dice esta versión y qué trae de nuevo frente a la anterior (una línea), lo pendiente y lo que conviene revisar.
   // Solo informa: no propone ni agrega controles de cambio.
   function htmlPendientes(r, { cargando, error, autorizar, planta, cambios }) {
     const vTxt = (x) => `v${esc(x.version)}${x.estado ? ` (${esc(x.estado)})` : ''}`;
@@ -2175,11 +2175,10 @@
     const cita = (t, n = 80) => `<q title="${esc(t)}">${esc(t.length > n ? t.slice(0, n) + '…' : t)}</q>`;
     const chip = (x) => { const l = listado(x.codigo); return `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}${l ? ' en-listado' : ''}" title="${esc([[x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · '), l && `Listado: ${l}`, x.heredado && '(ya estaba en la versión anterior)'].filter(Boolean).join('\n'))}">${esc(x.codigo)}</span>`; };
     const out = [], cab = [], pv = r.previa ? `v${esc(r.previa.version)}` : '';
-    // 1) resumen en una línea: tipos de línea, cambios frente a la versión anterior y lo resuelto
+    // 1) resumen en una línea: tipos de línea, líneas nuevas frente a la versión anterior y lo resuelto
     const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
     Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t) && t !== 'nomenclatura').forEach((t) => cab.push(`<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`));
     if (r.previa && r.nuevas.length) cab.push(`<span class="rmd-pd-tipo t-nueva" title="${esc(r.nuevas.map((t) => t.linea).join('\n'))}">+${r.nuevas.length} nueva${r.nuevas.length > 1 ? 's' : ''} frente a la ${pv}</span>`);
-    if (r.quitadas.length) cab.push(`<span class="rmd-pd-tipo t-quitada" title="${esc(r.quitadas.map((t) => t.linea).join('\n'))}">−${r.quitadas.length} quitada${r.quitadas.length > 1 ? 's' : ''} de la ${pv}</span>`);
     r.resueltos.forEach((x) => cab.push(`<span class="rmd-pd-ok" title="${esc(x.linea)}">✓ Aplicado ${esc(x.cc)}, pendiente de la v${esc(x.version)}</span>`));
     if (cargando) cab.push('<span class="rmd-pd-ok">Leyendo la versión anterior…</span>');
     else if (error) cab.push('<span class="rmd-pd-ok">No se pudo leer la versión anterior.</span>');
@@ -6125,13 +6124,11 @@
       const bajas = new Map();
       [...vs.map((v) => [v, v.an]), [{ version: actual.version, estado: '', propia: true }, anA]].forEach(([v, an]) => an.bajas.forEach((b) => { const k = plano(b.linea); if (!bajas.has(k)) bajas.set(k, { version: v.version, estado: v.estado, linea: b.linea, propia: !!v.propia }); }));
       const formato = anA.tipos.filter((x) => x.tipo === 'cc' && !previos.has(plano(x.linea))).map((x) => ({ linea: x.linea, faltan: faltantesCC(x.linea) })).filter((x) => x.faltan.length);
-      // frente a la versión anterior (sin la 1.ª línea de nomenclatura, que cambia en cada versión): líneas nuevas y, si se copió su texto, las que se quitaron
-      const previa = vs[vs.length - 1] || null, sinNom = (t) => t.tipo !== 'nomenclatura';
-      const nuevas = anA.tipos.filter((t) => sinNom(t) && !previos.has(plano(t.linea)));
-      const copia = !!previa && previa.an.tipos.some((t) => sinNom(t) && setA.has(plano(t.linea)));
-      const quitadas = copia ? previa.an.tipos.filter((t) => sinNom(t) && !setA.has(plano(t.linea))) : [];
+      // líneas nuevas frente a la versión anterior (sin la 1.ª línea de nomenclatura, que cambia en cada versión)
+      const previa = vs[vs.length - 1] || null;
+      const nuevas = anA.tipos.filter((t) => t.tipo !== 'nomenclatura' && !previos.has(plano(t.linea)));
       return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
-        bajas: [...bajas.values()], formato, resueltos, nuevas, quitadas, copia, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an } };
+        bajas: [...bajas.values()], formato, resueltos, nuevas, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an } };
     }
     // ---- Listado de CC / NC / DES para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima) ----
     // Columnas por su encabezado: AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES, ESTATUS (o ESTATUS DE FILE), MOTIVO.
