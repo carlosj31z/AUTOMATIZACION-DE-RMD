@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.6
+// @version      1.76.7
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.6';                                                       // mantener igual a @version
+  const VERSION = '1.76.7';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -6074,6 +6074,7 @@
     function heredados(versiones, actual) {
       const vA = +actual.version || 0;
       const vs = versiones.filter((v) => (+v.version || 0) < vA && !/cancel/i.test(v.estado || '')).sort((a, b) => (+a.version || 0) - (+b.version || 0))
+        .slice(-1)                                                                    // solo la versión inmediatamente anterior (pedido de Carlos)
         .map((v) => ({ ...v, an: analizar(v.observacion), set: new Set(lineas(v.observacion).map(plano)) }));
       const anA = analizar(actual.observacion), setA = new Set(lineas(actual.observacion).map(plano));
       const ccs = new Map(), textos = new Map();

@@ -77,6 +77,8 @@ h = Pendientes.heredados([v4], { version: 5, observacion: '26-379-CC/L.Fernandez
 ok('Heredado: si la v5 registra el 26-379-CC ya no avisa', h.ccs.length === 0 && J(h.aplicados.map((x) => [x.codigo, x.heredado])) === '[["26-379-CC",false]]');
 h = Pendientes.heredados([v4], { version: 5, observacion: v4.observacion });
 ok('Heredado: con las Observaciones copiadas de la v4, el pendiente sigue y el CC de la v4 sale como anterior', h.ccs.length === 1 && h.propios.length === 0 && h.aplicados[0].heredado === true, J(h));
+h = Pendientes.heredados([v4, { version: 5, codigo: '2202600005', estado: 'Suspendido', observacion: 'Sin cambios' }], { version: 6, observacion: '' });
+ok('Heredado: solo se mira la versión inmediatamente anterior (lo de la v4 no llega a la v6)', h.ccs.length === 0 && h.textos.length === 0, J(h));
 const v5 = { version: 5, codigo: '2202600005', estado: 'Autorizado', observacion: '26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado' };
 h = Pendientes.heredados([v4, v5], { version: 6, observacion: '' });
 ok('Heredado: resuelto en una versión intermedia (v5) no se avisa en la v6; el texto tampoco tras una autorizada', h.ccs.length === 0 && h.textos.length === 0, J(h));
