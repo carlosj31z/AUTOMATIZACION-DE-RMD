@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.75.0
+// @version      1.76.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.75.0';                                                       // mantener igual a @version
+  const VERSION = '1.76.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -606,6 +606,7 @@
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
   #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
+  #rmd-aviso-pendientes .rmd-pd-agregar { margin-left: 4px; padding: 0 6px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 11.5px/1.5 var(--rmd-fuente); cursor: pointer; }
   #rmd-aviso-pendientes .rmd-pd-tipo { display: inline-block; margin: 2px 4px 0 0; padding: 0 6px; border-radius: 9px; font-size: 11.5px; background: rgba(127,127,127,.14); cursor: help; }
   #rmd-aviso-pendientes .rmd-pd-tipo.t-baja { background: rgba(230,90,90,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-pendiente { background: rgba(240,180,90,.28); }
   #rmd-aviso-pendientes .rmd-pd-tipo.t-cc { background: rgba(110,160,240,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-suspension { background: rgba(180,140,220,.22); }
@@ -2083,13 +2084,17 @@
     if (d.__rmdPendMd !== asoc.mdId) {
       d.__rmdPendMd = asoc.mdId; d.__rmdPendVs = null;
       const principal = String(asoc.codigoversionprincipal || asoc.codigo || '');
-      (principal ? ppVersiones(modelo, principal) : Promise.resolve([])).then((vs) => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = vs; gestionarPendientesAsociar(); } },
+      (principal ? versionesConPlanta(modelo, principal) : Promise.resolve([])).then((vs) => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = vs; gestionarPendientesAsociar(); } },
         () => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = []; d.__rmdPendError = true; gestionarPendientesAsociar(); } });
     }
     const vs = d.__rmdPendVs || [], version = +asoc.version || +((vs.find((m) => m.mdId === asoc.mdId) || {}).version) || 0;
     const clave = `${vs.length}|${version}|${elObs.value}`;
     if (d.__rmdPendClave !== clave) { d.__rmdPendClave = clave; d.__rmdPendRes = Pendientes.heredados(vs.filter((m) => m.mdId !== asoc.mdId).map((m) => ({ version: m.version, codigo: m.codigo, estado: m.estado, observacion: m.observacion })), { version, observacion: elObs.value }); }
     const r = d.__rmdPendRes;
+    // listado de CC / NC / DES (Reglas de revisión): los de este producto, etapa y planta desde la última versión autorizada, sin anotar
+    const claveL = `${clave}|${RR.cambiosVer || 0}`;
+    if (d.__rmdPendClaveL !== claveL) { d.__rmdPendClaveL = claveL; d.__rmdPendListado = RR.cambios && d.__rmdPendVs ? listadoParaRmd(asoc, vs, version, r) : null; }
+    r.listado = d.__rmdPendListado;
     const autorizar = +asoc.estadoIdRmd_iMaestraIdBK === 465 && +asoc.estadoIdRmd_iMaestraId !== 465;
     const html = htmlPendientes(r, { cargando: !d.__rmdPendVs, error: d.__rmdPendError, autorizar });
     if (!html) { if (av) av.remove(); return; }
@@ -2103,8 +2108,30 @@
     const cls = abiertos ? (autorizar ? 'bloquea' : 'aviso') : 'ok';
     if (av.className !== cls) av.className = cls;
     if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
+    if (!av.__rmdClic) { av.__rmdClic = true; av.addEventListener('click', (e) => { const b = e.target.closest('button[data-linea]'); if (!b) return; const c = sap.ui.getCore().byId(elObs.id.replace(/-inner$/, '')); if (c) agregarTextoObs(c, b.dataset.linea); }); }
     barraObservaciones(elObs);
     window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length };
+  }
+  // Versiones del master con su planta (para el listado de CC)
+  async function versionesConPlanta(modelo, principal) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, p = isNaN(+principal) ? principal : +principal;
+    return (await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', String(principal)), new F('codigo', 'EQ', p)], and: false })], { $expand: 'estadoIdRmd,sucursalId', $orderby: 'mdId' }))
+      .map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '', planta: (m.sucursalId && m.sucursalId.contenido) || '' }));
+  }
+  // Cambios del listado para el RMD abierto que aún no figuran en sus Observaciones
+  function listadoParaRmd(asoc, vs, version, r) {
+    const yo = vs.find((m) => m.mdId === asoc.mdId) || asoc, previa = vs.filter((m) => (+m.version || 0) < version && m.fechaAutorizacion).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0];
+    const desde = previa ? new Date(previa.fechaAutorizacion).toISOString().slice(0, 10) : '';
+    const anotados = new Set(r.actual.aplicados.map((x) => x.codigo).concat(r.actual.pendientes.flatMap((x) => x.ccs)));
+    const lista = Pendientes.cambiosQueAplican(RR.cambios.cambios, { planta: yo.planta || '', etapa: yo.nivelTxt || asoc.nivelTxt || '', area: `${yo.areaRmdTxt || asoc.areaRmdTxt || ''} ${yo.descripcion || ''}`,
+      producto: productoDeDescripcion(yo.descripcion || asoc.descripcion || ''), desde });
+    const faltan = lista.filter((c) => c.codigos.length ? !c.codigos.some((k) => anotados.has(k)) : !String(r.actual.lineas.join('\n')).includes(c.nomenclatura || c.descripcion));
+    return { desde, previa: previa ? previa.version : null, faltan, total: lista.length };
+  }
+  function agregarTextoObs(c, linea) {
+    const v = String(c.getValue() || ''), base = v && !/\n$/.test(v) ? v + '\n' : v, nuevo = base + linea;
+    c.setValue(nuevo); c.fireLiveChange && c.fireLiveChange({ value: nuevo }); c.fireChange({ value: nuevo });
+    setTimeout(() => { const i = c.getFocusDomRef(); if (i) { i.focus(); i.setSelectionRange(nuevo.length, nuevo.length); i.scrollTop = i.scrollHeight; } }, 50);
   }
   // Botones bajo Observaciones: agregan al final una línea con el formato acordado (fecha + iniciales) y dejan seleccionada la parte a escribir.
   // Se escribe con setValue + change del TextArea, como al teclear: se guarda con el Guardar del portal.
@@ -2138,7 +2165,8 @@
   }
   function htmlPendientes(r, { cargando, error, autorizar }) {
     const vTxt = (x) => `v${esc(x.version)}${x.estado ? ` (${esc(x.estado)})` : ''}`;
-    const chip = (x) => `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}" title="${esc([x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · ') + (x.heredado ? '\n(ya estaba en una versión anterior)' : ''))}">${esc(x.codigo)}</span>`;
+    const delListado = (k) => { const c = RR.cambios && RR.cambios.cambios.find((y) => y.codigos.includes(k)); return c ? `\nListado: ${c.descripcion}${c.estatus ? ` (${c.estatus})` : ''}` : ''; };
+    const chip = (x) => `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}" title="${esc([x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · ') + delListado(x.codigo) + (x.heredado ? '\n(ya estaba en una versión anterior)' : ''))}">${esc(x.codigo)}</span>`;
     const nuevos = r.aplicados.filter((x) => !x.heredado), viejos = r.aplicados.filter((x) => x.heredado), out = [];
     if (r.bajas.length) out.push(`<span class="rmd-pd-baja">⛔ <b>Producto para dar de baja / descontinuado</b>: ${r.bajas.map((b) => `<q>${esc(b.linea)}</q>${b.propia ? ' (esta versión)' : ` (${vTxt(b)})`}`).join(' · ')}</span>`);
     // resumen por tipo de línea; al pasar el ratón, las líneas de ese tipo
@@ -2152,6 +2180,11 @@
     r.textos.forEach((x) => items.push(`<li>⚠ Pendiente anotado en la ${vTxt(x)}: <q>${esc(x.linea)}</q> — revisa si ya se aplicó en esta versión.</li>`));
     r.propios.forEach((x) => items.push(`<li>ℹ Anotado como pendiente en esta versión: <q>${esc(x.linea)}</q></li>`));
     if (items.length) out.push(`<b>${autorizar ? 'No autorices todavía: ' : ''}${items.length} pendiente${items.length > 1 ? 's' : ''}</b><ul>${items.join('')}</ul>`);
+    if (r.listado && r.listado.faltan.length) {
+      const L = r.listado, fila = (c) => `<li>${c.por === 'producto' ? '📦' : '🏭'} <b>${esc(c.codigos.join(', ') || 'Sin código')}</b>${c.fecha ? ` (${esc(c.fecha)})` : ''}: ${esc((c.descripcion || c.nomenclatura).slice(0, 110))}${(c.descripcion || c.nomenclatura).length > 110 ? '…' : ''}`
+        + `${c.estatus ? ` · <i>${esc(c.estatus)}</i>` : ''}${!c.aplica ? ' · <i>APLICA: NO</i>' : ''} <button type="button" class="rmd-pd-agregar" data-linea="${esc(c.nomenclatura || c.descripcion)}" title="Agrega a Observaciones: ${esc(c.nomenclatura || c.descripcion)}">Agregar</button></li>`;
+      out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este ${L.faltan.some((c) => c.por === 'producto') ? 'producto o área' : 'área'} sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
+    }
     else if (cargando) out.push('<span>Buscando pendientes en las versiones anteriores…</span>');
     else if (error) out.push('<span>No se pudieron leer las versiones anteriores para buscar pendientes.</span>');
     else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
@@ -5941,9 +5974,12 @@
     // 26-379-CC · 26-379 -CC · 2026-379-CC · CC-26-379-CC · CC 26-379 · CC-26-379 · CC N.° 26-379
     const RE_CC = /\b((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\s*[-–]?\s*CC\b|\bC\.?\s?C\.?\s*(?:N\.?\s*[°º]?\s*|[-–]\s*)?((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\b/gi;
     const codigoCC = (a, n) => `${String(a).slice(-2)}-${String(n).padStart(3, '0')}-CC`;
+    // No conformidades / desviaciones: 24-1012-DES · 22-1221-D · NC 24-1012 · NC-24-2044-DES -> «24-1012-DES»
+    const RE_NC = /\b(?:N\.?C|DES)\.?\s*[-–:]?\s*((?:20)?\d{2})\s*[-–]\s*(\d{3,4})(?:\s*[-–]\s*(?:DES|D))?\b|\b((?:20)?\d{2})\s*[-–]\s*(\d{3,4})\s*[-–]\s*(?:DES|D)\b/gi;
     function ccsDe(texto) {
-      const out = []; let m; RE_CC.lastIndex = 0;
-      while ((m = RE_CC.exec(String(texto || '')))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
+      const out = [], t = String(texto || ''); let m; RE_CC.lastIndex = 0; RE_NC.lastIndex = 0;
+      while ((m = RE_CC.exec(t))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
+      while ((m = RE_NC.exec(t))) { const c = `${String(m[1] || m[3]).slice(-2)}-${m[2] || m[4]}-DES`; if (!out.includes(c)) out.push(c); }
       return out;
     }
     // Pendiente: «pendiente», «pend», «falta», «por aplicar», «siguiente versión»… En las Observaciones reales (12.926 MD, oct-2026) casi
@@ -6061,8 +6097,59 @@
       return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
         bajas: [...bajas.values()], formato };
     }
-    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
-    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA };
+    // ---- Listado de CC / NC / DES para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima) ----
+    // Columnas por su encabezado: AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES, ESTATUS (o ESTATUS DE FILE), MOTIVO.
+    const ETAPAS_CAMBIO = { FAB: 'FABRICACION', ENV: 'ENVASE', ACO: 'ACONDICIONADO', ACOND: 'ACONDICIONADO', REC: 'RECUBRIMIENTO', INSP: 'INSPECCION', INS: 'INSPECCION' };
+    const plantaDeHoja = (h) => (/PLANTA\s*1\b|\bATE\b|\bPL\s*1\b/i.test(h) ? 'Ate' : /PLANTA\s*2\b|\bLIMA\b|\bPL\s*2\b/i.test(h) ? 'Lima' : '');
+    function fechaCambio(v) {
+      if (v == null || v === '') return '';
+      if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Date.UTC(1899, 11, 30) + v * 864e5); return d.toISOString().slice(0, 10); }
+      const t = String(v).trim(), a = /^(\d{4})-(\d{2})-(\d{2})/.exec(t), b = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/.exec(t);
+      return a ? `${a[1]}-${a[2]}-${a[3]}` : b ? `${b[3]}-${b[2].padStart(2, '0')}-${b[1].padStart(2, '0')}` : '';
+    }
+    const partirLista = (t) => plano(t).split(/[-/,;+\s]+/).map((x) => x.trim()).filter(Boolean);
+    // hojas = [{ hoja, filas: [[celdas]] }] -> [{ planta, hoja, area: [], etapa: [], aplica, borrador, descripcion, fecha, nomenclatura, estatus, motivo, codigos: [] }]
+    function cambiosDeFilas(hojas) {
+      const out = [];
+      (hojas || []).forEach(({ hoja, filas }) => {
+        const iCab = (filas || []).findIndex((f) => Array.isArray(f) && f.some((c) => /NOMENCLATURA\s+PARA\s+OBSERVACIONES/.test(plano(c))) && f.some((c) => /DESCRIPCION\s+DEL\s+CAMBIO/.test(plano(c))));
+        if (iCab < 0) return;
+        const cab = filas[iCab].map((c) => plano(c).trim()), col = (re) => cab.findIndex((c) => re.test(c));
+        const k = { area: col(/^AREA$/), etapa: col(/^ETAPA$/), aplica: col(/^APLICA$/), desc: col(/DESCRIPCION DEL CAMBIO/), fecha: col(/^FECHA$/), nom: col(/NOMENCLATURA PARA OBSERVACIONES/), estatus: col(/^ESTATUS/), motivo: col(/^MOTIVO$/) };
+        const planta = plantaDeHoja(hoja);
+        filas.slice(iCab + 1).forEach((f) => {
+          if (!Array.isArray(f)) return;
+          const v = (i) => (i >= 0 && f[i] != null ? String(f[i]).replace(/\s+/g, ' ').trim() : ''), desc = v(k.desc), nom = v(k.nom);
+          if (!desc && !nom) return;
+          let codigos = ccsDe(`${nom} ${desc}`);
+          const suelto = /^\s*(?:C\.?C\.?\s*[-–]?\s*)?(\d{2})\s*-\s*(\d{3})\s*\//.exec(nom);              // «26-280/D.Ayala/…» (Planta 1, sin «-CC»)
+          if (!codigos.length && suelto) codigos = [codigoCC(suelto[1], suelto[2])];
+          const ap = plano(v(k.aplica));
+          out.push({ planta, hoja, area: partirLista(v(k.area)), etapa: partirLista(v(k.etapa)).map((e) => ETAPAS_CAMBIO[e] || (e === 'TODOS' ? 'TODAS' : e)), aplica: /^SI/.test(ap), borrador: /BORR/.test(ap),
+            descripcion: desc, fecha: fechaCambio(f[k.fecha]), nomenclatura: nom, estatus: v(k.estatus), motivo: v(k.motivo), codigos });
+        });
+      });
+      return out;
+    }
+    // Áreas del listado -> palabras del Área / descripción del RMD (las de planta como PV1, GV2… se comparan tal cual)
+    const AREAS_CAMBIO = { SOL: ['SOLIDO'], LIQ: ['LIQUIDO'], SEM: ['SEMISOLIDO', 'SEMI SOLIDO'], SEH: ['SEMISOLIDO', 'HORMONA'], SHO: ['SOLIDO', 'HORMONA'], COS: ['COSMETIC'], PEN: ['PENICILIN', 'BETALACTAM'],
+      CEF: ['CEFALOSPORIN'], CEFA: ['CEFALOSPORIN'], BEB: ['BEBIDA'], INH: ['INHALA'], INY: ['INYECTABLE'], ACO: ['ACONDICIONADO'] };
+    // Cambios del listado que tocan a un RMD: misma planta, la etapa y (el producto en la descripción, o el área). rmd: { planta, etapa, area, descripcion, producto, desde }
+    function cambiosQueAplican(cambios, rmd) {
+      const etapa = plano(rmd.etapa || ''), area = plano(`${rmd.area || ''}`), prod = plano(rmd.producto || '').replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !/^(TABLETA|TABLETAS|CAPSULA|CAPSULAS|RECUBIERTA|SUSPENSION|SOLUCION|CREMA|JARABE|INYECTABLE|BLANDA)$/.test(w));
+      const planta = rmd.planta ? plano(rmd.planta) : '';
+      return (cambios || []).filter((c) => (!planta || !c.planta || plano(c.planta) === planta || planta.includes(plano(c.planta)))
+        && (!c.etapa.length || c.etapa.includes('TODAS') || c.etapa.some((e) => etapa.startsWith(e) || e.startsWith(etapa.slice(0, 3))))
+        && (!rmd.desde || !c.fecha || c.fecha >= rmd.desde))
+        .map((c) => {
+          const texto = plano(`${c.descripcion} ${c.nomenclatura}`), porProducto = prod.length > 0 && texto.includes(prod[0]) && (prod.length < 2 || texto.includes(prod[1]) || prod[0].length >= 6);
+          const porArea = c.area.includes('TODAS') || c.area.some((a) => area.includes(a) || (AREAS_CAMBIO[a] || []).some((w) => area.includes(w)));
+          // APLICA = NO solo cuenta si nombra el producto; por área solo los que APLICA = SI
+          return porProducto || (porArea && c.aplica) ? { ...c, por: porProducto ? 'producto' : 'area' } : null;
+        }).filter(Boolean);
+    }
+    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
+    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA, cambiosDeFilas, cambiosQueAplican, fechaCambio };
   })();
   // ==PENDIENTES-FIN==
 
@@ -8550,6 +8637,7 @@
       lista && on('statusrmd') && document.querySelector('.rmd-status-rmd') && ['Enviar a Status RMD', 'Maestro completo a Status RMD', clic('.rmd-status-rmd')],
       on('reglasrev') && ['Reglas de revisión', 'Crear o activar reglas, exportarlas / importarlas y cargar las listas', () => abrirReglas()],
       on('reglasrev') && ['Equipos calificados', 'Cargar o consultar la lista de equipos calificados (registro OQ / PQ)', () => abrirReglas('calificados')],
+      on('reglasrev') && ['Controles de cambio', 'Cargar o consultar el listado de CC / NC / DES para actualizar RMD', () => abrirReglas('cambios')],
       ['Mejoras de interfaz', 'Activar o desactivar las mejoras', () => { const p = document.getElementById('rmd-ui-panel'); if (p) p.open = true; }],
     ].filter(Boolean);
   }
@@ -9365,7 +9453,8 @@
     }));
     return { leer: (k) => tx('readonly', (s) => s.get(k)), guardar: (k, v) => tx('readwrite', (s) => s.put(v, k)), borrar: (k) => tx('readwrite', (s) => s.delete(k)) };
   })();
-  const RR = { reglas: null, ver: 1, vigentes: null, mapa: null, calif: null, mapaCalif: null, catalogo: null, pidiendoCat: false, comp: null, compClave: '', errorGuardar: '', listo: null };
+  const CLAVE_CAMBIOS_LS = 'rmdUiCambios', SELLO_CAMBIOS = 'rmdUiCambiosSello';
+  const RR = { cambios: null, cambiosVer: 0, reglas: null, ver: 1, vigentes: null, mapa: null, calif: null, mapaCalif: null, catalogo: null, pidiendoCat: false, comp: null, compClave: '', errorGuardar: '', listo: null };
   function leerDatoReglasLS() { try { const o = JSON.parse(localStorage.getItem(CLAVE_REGLAS) || 'null'); return o && Array.isArray(o.reglas) ? o : null; } catch (e) { return null; } }   // dañado: se recupera de IndexedDB
   function leerReglasLS() { const o = leerDatoReglasLS(); return o ? o.reglas.map(Reglas.normalizar) : null; }
   // guardadas + predeterminadas nuevas
@@ -9439,6 +9528,33 @@
     ponerCalificados(v); ajustarTodo(); refrescarVentanaReglas();
     return { ok, error };
   }
+  // ---- Listado de CC / NC / DES: { archivo, cargado, n, hojas, cambios: [...] } (Pendientes.cambiosDeFilas) ----
+  function ponerCambios(v) { RR.cambios = v && Array.isArray(v.cambios) && v.cambios.length ? v : null; RR.cambiosVer = (RR.cambiosVer || 0) + 1; }
+  async function leerCambiosGuardados() {
+    let v = null;
+    try { v = await Almacen.leer('cambios'); } catch (e) { v = null; }
+    if (!v) { try { v = JSON.parse(localStorage.getItem(CLAVE_CAMBIOS_LS) || 'null'); } catch (e) { v = null; } }
+    ponerCambios(v); refrescarVentanaReglas();
+  }
+  async function guardarCambios(v) {
+    let ok = false, error = '';
+    if (v) {
+      try { await Almacen.guardar('cambios', v); ok = true; try { localStorage.removeItem(CLAVE_CAMBIOS_LS); } catch (e) { } }
+      catch (e) { error = e.message; try { localStorage.setItem(CLAVE_CAMBIOS_LS, JSON.stringify(v)); ok = true; } catch (e2) { error = e2.message; } }
+    } else {
+      try { await Almacen.borrar('cambios'); } catch (e) { }
+      try { localStorage.removeItem(CLAVE_CAMBIOS_LS); } catch (e) { }
+      ok = true;
+    }
+    try { localStorage.setItem(SELLO_CAMBIOS, String(Date.now())); } catch (e) { }
+    ponerCambios(v); ajustarTodo(); refrescarVentanaReglas();
+    return { ok, error };
+  }
+  async function leerListaCambios(u8, archivo) {
+    const hojas = await filasDeArchivo(u8, archivo), cambios = Pendientes.cambiosDeFilas(hojas);
+    if (!cambios.length) throw new Error('no se encontró una hoja con «DESCRIPCION DEL CAMBIO» y «NOMENCLATURA PARA OBSERVACIONES»');
+    return { archivo, n: cambios.length, hojas: [...new Set(cambios.map((c) => c.hoja))], cambios };
+  }
   // Arranque: sincroniza reglas entre localStorage e IndexedDB, carga listas y agrega predeterminadas nuevas.
   RR.listo = (async () => {
     try {
@@ -9452,12 +9568,14 @@
     } catch (e) { }
     await leerVigentesGuardados();
     await leerCalificadosGuardados();
+    await leerCambiosGuardados();
   })();
   // cambios desde otra pestaña
   window.addEventListener('storage', (e) => {
     if (e.key === CLAVE_REGLAS) { RR.reglas = null; RR.ver++; ajustarTodo(); refrescarVentanaReglas(); }
     else if (e.key === SELLO_VIGENTES) leerVigentesGuardados();
     else if (e.key === SELLO_CALIF) leerCalificadosGuardados();
+    else if (e.key === SELLO_CAMBIOS) leerCambiosGuardados();
   });
   const firmaReglas = () => `${RR.ver}|${RR.mapa ? 1 : 0}|${RR.catalogo ? 1 : 0}|${RR.mapaCalif ? 1 : 0}`;
   const ctxReglas = (x) => ({ vigentes: RR.mapa, catalogo: RR.catalogo, calificados: RR.mapaCalif && RR.mapaCalif.porCodigo, calificadosSap: RR.mapaCalif && RR.mapaCalif.porSap, ...(x || {}) });
@@ -10128,13 +10246,13 @@
   function abrirReglas(pestana) {
     if (ventanaReglas && ventanaReglas.fondo.isConnected) { ventanaReglas.irA(pestana || 'reglas'); return; }
     registrarExternosUI5();
-    let vista = ['vigentes', 'calificados'].includes(pestana) ? pestana : 'reglas', editando = null, sucio = false, importando = null, cargandoVig = null, cargandoCal = null, consulta = '', consultaCal = '';
+    let vista = ['vigentes', 'calificados', 'cambios'].includes(pestana) ? pestana : 'reglas', editando = null, sucio = false, importando = null, cargandoVig = null, cargandoCal = null, cargandoCam = null, consulta = '', consultaCal = '', consultaCam = '';
     const esArriba = () => [...document.querySelectorAll('.rmd-modal-fondo')].pop() === v.fondo;
     const v = ventana('Reglas de revisión', { cancelar: () => { if (esArriba()) salir(); } });
     const tarjeta = v.fondo.querySelector('.rmd-modal'), h3 = tarjeta.querySelector('h3');
     tarjeta.classList.add('rmd-reglas'); v.fondo.classList.add('rmd-reglas-fondo');
     const tabs = document.createElement('div'); tabs.className = 'rmd-rg-tabs'; tabs.setAttribute('role', 'tablist');
-    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button><button type="button" role="tab" data-p="calificados">Equipos calificados <span></span></button>';
+    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button><button type="button" role="tab" data-p="calificados">Equipos calificados <span></span></button><button type="button" role="tab" data-p="cambios">Controles de cambio <span></span></button>';
     h3.insertAdjacentElement('afterend', tabs);
     const archivo = document.createElement('input'); archivo.type = 'file'; archivo.hidden = true; archivo.className = 'rmd-rg-archivo'; tarjeta.appendChild(archivo);
     let alElegir = null;
@@ -10160,6 +10278,11 @@
       try {
         const u8 = new Uint8Array(await f.arrayBuffer()), ini = textoDeBytes(u8.subarray(0, 200)).replace(/^﻿/, '').trimStart();
         if (/\.json$/i.test(f.name) || ini.startsWith('{') || ini.startsWith('[')) { importando = { archivo: f.name, ...Reglas.leerExportado(JSON.parse(textoDeBytes(u8).replace(/^﻿/, ''))) }; vista = 'importar'; pintar(); return; }
+        let lcam = null; try { lcam = await leerListaCambios(u8, f.name); } catch (e) { lcam = null; }
+        if (lcam) {
+          const antes = RR.cambios ? new Set(RR.cambios.cambios.flatMap((c) => c.codigos)) : null;
+          cargandoCam = { ...lcam, nuevos: antes ? [...new Set(lcam.cambios.flatMap((c) => c.codigos))].filter((k) => !antes.has(k)).length : null }; vista = 'cargarCam'; pintar(); return;
+        }
         let lc = null; try { lc = await leerListaCalificados(u8, f.name); } catch (e) { lc = null; }
         if (lc) {
           const antes = RR.mapaCalif ? RR.mapaCalif.porCodigo : null, ahora = Reglas.mapaCalificados(lc, lc.estadosOk).porCodigo;
@@ -10172,17 +10295,18 @@
       } catch (e) { toast(`No se pudo leer «${f.name}»: ${e.message}`, true); }
     }
     function pintar() {
-      const pest = vista === 'vigentes' || vista === 'cargarVig' ? 'vigentes' : vista === 'calificados' || vista === 'cargarCalif' ? 'calificados' : 'reglas';
+      const pest = vista === 'vigentes' || vista === 'cargarVig' ? 'vigentes' : vista === 'calificados' || vista === 'cargarCalif' ? 'calificados' : vista === 'cambios' || vista === 'cargarCam' ? 'cambios' : 'reglas';
       tabs.querySelectorAll('button').forEach((b) => { const act = b.dataset.p === pest; b.classList.toggle('activa', act); b.setAttribute('aria-selected', String(act)); });
       tabs.querySelector('[data-p=reglas] span').textContent = `(${reglasActuales().length})`;
       tabs.querySelector('[data-p=vigentes] span').textContent = RR.vigentes ? `(${RR.vigentes.docs.length.toLocaleString('es-PE')})` : '';
       tabs.querySelector('[data-p=calificados] span').textContent = RR.calif ? `(${RR.calif.equipos.length.toLocaleString('es-PE')})` : '';
+      tabs.querySelector('[data-p=cambios] span').textContent = RR.cambios ? `(${RR.cambios.cambios.length.toLocaleString('es-PE')})` : '';
       tabs.style.display = vista === 'editor' || vista === 'importar' ? 'none' : '';
       h3.textContent = vista === 'editor' ? (editando.nueva ? 'Nueva regla de revisión' : `Editar regla — ${editando.regla.nombre || ''}`) : vista === 'importar' ? 'Importar configuración'
-        : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : vista === 'cargarCalif' ? 'Cargar la lista de equipos calificados' : 'Reglas de revisión';
+        : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : vista === 'cargarCalif' ? 'Cargar la lista de equipos calificados' : vista === 'cargarCam' ? 'Cargar el listado de controles de cambio' : 'Reglas de revisión';
       v.pie.innerHTML = ''; v.fondo.__ctrlS = null; v.cuerpo.oninput = null; v.cuerpo.onchange = null;
-      ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif })[vista]();
-      if (['reglas', 'vigentes', 'calificados'].includes(vista)) {
+      ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, cambios: pintarCambios, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif, cargarCam: pintarCargaCam })[vista]();
+      if (['reglas', 'vigentes', 'calificados', 'cambios'].includes(vista)) {
         const bT = botonModal('Restablecer todo…', 'peligro', () => restablecerTodo()); bT.title = 'Vuelve todo a como venía: reglas predeterminadas y sin listas cargadas';
         v.pie.insertBefore(bT, v.pie.lastElementChild);
       }
@@ -10223,7 +10347,11 @@
       else if (a === 'restablecer') restablecer();
       else if (a === 'ir-vigentes') ir('vigentes');
       else if (a === 'ir-calificados') ir('calificados');
-      else if (a === 'cargar' || a === 'cargar-calif') elegirArchivo('.xls,.xlsx,.csv,.txt', abrirArchivo);
+      else if (a === 'cargar' || a === 'cargar-calif' || a === 'cargar-cam') elegirArchivo('.xls,.xlsx,.csv,.txt', abrirArchivo);
+      else if (a === 'restablecer-cam') {
+        if (!RR.cambios) return;
+        if (await confirmar('¿Quitar el listado de controles de cambio?', `Se quita de este navegador «${RR.cambios.archivo}» (${RR.cambios.cambios.length} cambios).`, 'Sin listado, «Asociar fórmulas» no puede sugerir los CC del producto. Puedes volver a cargarlo cuando quieras.', { si: 'Quitar', no: 'Cancelar', peligro: true })) { await guardarCambios(null); toast('Listado de controles de cambio quitado.'); }
+      }
       else if (a === 'restablecer-vig') {
         if (!RR.vigentes) return;
         if (await confirmar('¿Restablecer los documentos vigentes?', `Se quita de este navegador la lista «${RR.vigentes.archivo}» (${RR.vigentes.docs.length} documentos) y queda como al principio, sin lista.`, 'Sin lista no se puede saber qué documentos citados están vigentes. Puedes volver a cargarla cuando quieras.', { si: 'Restablecer', no: 'Cancelar', peligro: true })) { await guardarVigentes(null); toast('Documentos vigentes restablecidos: sin lista cargada.'); }
@@ -10258,7 +10386,7 @@
       const w = ventana('Restablecer todo', { cancelar: () => w.cerrar() });
       w.fondo.querySelector('.rmd-modal').classList.add('rmd-modal-aviso');
       w.cuerpo.innerHTML = `<p>Todo lo configurado en «Reglas de revisión» vuelve a como venía: solo las reglas predeterminadas, sin la lista de documentos vigentes${RR.vigentes ? ` («${esc(RR.vigentes.archivo)}»)` : ''} y sin la de equipos calificados${RR.calif ? ` («${esc(RR.calif.archivo)}»)` : ''}.</p><p class="rmd-aviso-ayuda">Se borra de este navegador. Si quieres conservarlo, antes usa «Exportar configuración».</p>`;
-      const bSi = botonModal('Restablecer todo', 'peligro', async () => { w.cerrar(); await guardarReglas(Reglas.predeterminadas()); await guardarVigentes(null); await guardarCalificados(null); vista = 'reglas'; pintar(); toast('Reglas de revisión restablecidas: predeterminadas y sin listas.'); });
+      const bSi = botonModal('Restablecer todo', 'peligro', async () => { w.cerrar(); await guardarReglas(Reglas.predeterminadas()); await guardarVigentes(null); await guardarCalificados(null); await guardarCambios(null); vista = 'reglas'; pintar(); toast('Reglas de revisión restablecidas: predeterminadas y sin listas.'); });
       w.pie.append(bSi, botonModal('Cancelar', 'primario', () => w.cerrar()));
     }
     function restablecer() {
@@ -10400,6 +10528,40 @@
     const califOk = (g) => ((RR.calif && RR.calif.estadosOk) || Reglas.ESTADOS_OK).some((x) => Reglas.plegar(x).p.trim() === Reglas.plegar(g || '').p.trim());
     const filaCal = (e) => `<tr><td class="rmd-nowrap">${esc(e[0] || '—')}</td><td class="rmd-nowrap">${esc(e[1] || '—')}</td><td>${esc(e[2])}</td><td class="rmd-nowrap"><b class="${califOk(e[3]) ? 'rmd-vig-si' : 'rmd-vig-no'}">${esc(e[3] || '(sin estado)')}</b></td><td>${esc(e[4])}</td><td>${esc(e[5])}</td><td class="rmd-nowrap">${esc(e[6] || '')}${e[7] ? ' / ' + esc(e[7]) : ''}</td></tr>`;
     const CAB_CAL = '<thead><tr><th>Código</th><th>SAP</th><th>Descripción</th><th>Estado general</th><th>OQ</th><th>PQ</th><th>Próxima OQ / PQ</th></tr></thead>';
+    // -- listado de controles de cambio / NC / DES --
+    const CAB_CAM = '<thead><tr><th>Planta</th><th>Código</th><th>Área</th><th>Etapa</th><th>Aplica</th><th>Fecha</th><th>Descripción</th><th>Estatus</th></tr></thead>';
+    const filaCam = (c) => `<tr><td>${esc(c.planta)}</td><td>${esc(c.codigos.join(', ') || '—')}</td><td>${esc(c.area.join(' / '))}</td><td>${esc(c.etapa.map((e) => e.slice(0, 3)).join(' / '))}</td><td>${c.aplica ? (c.borrador ? 'Sí (borrador)' : 'Sí') : 'No'}</td><td>${esc(c.fecha)}</td><td title="${esc(c.nomenclatura)}">${esc(c.descripcion)}</td><td>${esc(c.estatus)}</td></tr>`;
+    function pintarCambios() {
+      const C = RR.cambios, porPlanta = C ? [...C.cambios.reduce((m, c) => m.set(c.planta || '(sin planta)', (m.get(c.planta || '(sin planta)') || 0) + 1), new Map())].map(([p, n]) => `${esc(p)}: ${n}`).join(' · ') : '';
+      v.cuerpo.innerHTML = `${C ? `<p class="rmd-rg-vig-ok">✓ <b>${C.cambios.length.toLocaleString('es-PE')} cambios</b> (${porPlanta}) · «${esc(C.archivo)}» · cargado el ${esc(fechaHoraCorta(C.cargado))}</p>` : '<p class="rmd-rg-falta">Aún no hay un listado cargado.</p>'}
+        <p class="rmd-nota"><b>Qué es:</b> el Excel de controles de cambio, no conformidades y desviaciones para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima, con AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES y ESTATUS).</p>
+        <p class="rmd-nota"><b>Dónde se usa:</b> en «Asociar fórmulas», el aviso de Observaciones lista los cambios de la misma planta y etapa que nombran el producto (📦) o, si APLICA = SI, su área (🏭), desde la autorización de la versión anterior, que todavía no están anotados; «Agregar» pone su nomenclatura al final de Observaciones. Las etiquetas de CC muestran su descripción del listado.</p>
+        <div class="rmd-rg-barra"><button type="button" class="rmd-btn primario" data-a="cargar-cam">${C ? 'Cargar otro listado' : 'Cargar el listado'} (.xlsx, .xls o .csv)</button><span class="rmd-nota">o suelta el archivo en esta ventana</span><span class="rmd-rg-esp"></span>
+          <button type="button" class="rmd-btn peligro" data-a="restablecer-cam" ${C ? '' : 'disabled'}>Quitar</button></div>
+        ${C ? '<div class="rmd-rg-buscar"><input type="search" class="rmd-rg-q rmd-rg-qcam" placeholder="Buscar por código, producto o descripción" aria-label="Buscar en el listado de controles de cambio"></div><div class="rmd-rg-cam-res"></div>' : ''}`;
+      const inp = q('.rmd-rg-qcam');
+      if (inp) { inp.value = consultaCam; inp.addEventListener('input', () => { consultaCam = inp.value; buscarCam(); }); buscarCam(); }
+      v.pie.append(Object.assign(document.createElement('span'), { className: 'rmd-rg-estado', textContent: 'Listado guardado solo en este navegador' }), botonModal('Cerrar', 'primario', () => salir()));
+    }
+    function buscarCam() {
+      const out = q('.rmd-rg-cam-res'); if (!out || !RR.cambios) return;
+      const t = Reglas.plegar(consultaCam.trim()).p; if (!t) { out.innerHTML = ''; return; }
+      const hall = RR.cambios.cambios.filter((c) => Reglas.plegar(`${c.codigos.join(' ')} ${c.descripcion} ${c.nomenclatura} ${c.area.join(' ')}`).p.includes(t)).slice(0, 40);
+      out.innerHTML = hall.length ? `<table class="rmd-tabla">${CAB_CAM}<tbody>${hall.map(filaCam).join('')}</tbody></table>` : '<p class="rmd-nota">Nada coincide.</p>';
+    }
+    function pintarCargaCam() {
+      const c = cargandoCam, sin = c.cambios.filter((x) => !x.codigos.length).length, si = c.cambios.filter((x) => x.aplica).length;
+      v.cuerpo.innerHTML = `<p>Se leyeron <b>${c.n.toLocaleString('es-PE')} cambios</b> de «${esc(c.archivo)}» (hojas ${c.hojas.map((h) => `«${esc(h)}»`).join(', ')}): ${si} con APLICA = SI y ${sin} sin código (anotaciones internas «PEND-», «ACT-»…).</p>
+        ${RR.cambios ? `<p>Reemplaza el listado actual (${RR.cambios.cambios.length} cambios, cargado el ${esc(fechaHoraCorta(RR.cambios.cargado))})${c.nuevos != null ? `: <b>${c.nuevos}</b> código(s) nuevo(s)` : ''}.</p>` : ''}
+        <table class="rmd-tabla">${CAB_CAM}<tbody>${c.cambios.slice(-6).reverse().map(filaCam).join('')}</tbody></table><p class="rmd-nota">(los 6 últimos)</p>`;
+      const usar = async () => {
+        const r = await guardarCambios({ archivo: c.archivo, cargado: new Date().toISOString(), n: c.n, hojas: c.hojas, cambios: c.cambios });
+        cargandoCam = null; vista = 'cambios'; pintar();
+        toast(r.ok ? `Listado cargado: ${c.n} cambios. Queda guardado en este navegador.` : `Listado cargado solo mientras la página siga abierta (${r.error}).`, !r.ok);
+      };
+      v.pie.append(botonModal('Cancelar', '', () => { cargandoCam = null; vista = 'cambios'; pintar(); }), botonModal('Usar este listado', 'primario', usar));
+      v.fondo.__ctrlS = usar;
+    }
     function pintarCalificados() {
       const C = RR.calif, dias = C ? diasDesde(C.cargado) : 0, ok = (C && C.estadosOk) || Reglas.ESTADOS_OK;
       const sin = RR.mapaCalif ? [...RR.mapaCalif.porCodigo.values()].filter((x) => !x.ok).length : 0, codigos = RR.mapaCalif ? RR.mapaCalif.porCodigo.size : 0;
@@ -10464,7 +10626,7 @@
       v.pie.append(botonModal('Cancelar', '', () => { importando = null; vista = 'reglas'; pintar(); }), botonModal('Importar', 'primario', importar));
       v.fondo.__ctrlS = importar;
     }
-    ventanaReglas = { fondo: v.fondo, irA: (p) => ir(p), refrescar: () => { if (['reglas', 'vigentes', 'calificados'].includes(vista)) { const foco = document.activeElement && document.activeElement.classList.contains('rmd-rg-q'); pintar(); if (foco) { const i = q('.rmd-rg-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } } }, elegir: abrirArchivo };
+    ventanaReglas = { fondo: v.fondo, irA: (p) => ir(p), refrescar: () => { if (['reglas', 'vigentes', 'calificados', 'cambios'].includes(vista)) { const foco = document.activeElement && document.activeElement.classList.contains('rmd-rg-q'); pintar(); if (foco) { const i = q('.rmd-rg-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } } }, elegir: abrirArchivo };
     pintar();
   }
   window.__rmdStats.reglas = {
