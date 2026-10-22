@@ -85,5 +85,28 @@ ok('Heredado: no se leen las versiones Canceladas', h.ccs.length === 0 && h.text
 h = Pendientes.heredados([], { version: 1, observacion: 'Falta la firma de Calidad' });
 ok('Propio: lo anotado como pendiente en la versión abierta se lista', h.propios.length === 1);
 
+// ---- tipos de línea, baja / descontinuado, formato y plantillas ----
+const tipos = (t) => Pendientes.analizar(t).tipos.map((x) => x.tipo);
+ok('Tipos: nomenclatura, CC, pendiente, motivo de suspensión, actualización, nota y baja', J(tipos(`20261013LF-1-C1.0-FI1.0-FA1.0-F1
+26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado
+PENDIENTE CC
+20250310VM SE SUSPENDE POR NUEVA VERSION
+20260929CJ Actualización de Lista de Materiales
+20260930CJ Revisado con Producción
+20261022CJ Producto descontinuado, no ingresar nuevas versiones`)) === '["nomenclatura","cc","pendiente","suspension","actualizacion","nota","baja"]', J(tipos('')));
+['20261022CJ Dar de baja el producto', 'PRODUCTO DESCONTINUADO', 'Se da de baja por falta de demanda', 'Ya no se fabrica', 'DISCONTINUADO - NO INGRESAR'].forEach((l) => ok(`Baja: «${l}»`, Pendientes.analizar(l).bajas.length === 1));
+['SE SUSPENDE POR EQUIPO DE BAJA MEN-E034', 'Balanza BAL-12 dada de baja, se cambia por BAL-20', 'Paso de baja reemplazado'].forEach((l) => ok(`No es baja del producto: «${l}»`, Pendientes.analizar(l).bajas.length === 0));
+h = Pendientes.heredados([{ version: 3, codigo: 'A3', estado: 'Suspendido', observacion: 'Producto descontinuado por Marketing' }], { version: 4, observacion: '' });
+ok('Baja heredada: lo anotado en una versión anterior se avisa en la siguiente', h.bajas.length === 1 && h.bajas[0].version === 3);
+ok('Formato: «26-379-CC/L.Fernandez/;Actualización» avisa lo que falta', J(Pendientes.faltantesCC('26-379-CC/L.Fernandez/;Actualización')) === '["fecha","tipo (proceso, insumo…)","nivel (menor, moderado, mayor)"]', J(Pendientes.faltantesCC('26-379-CC/L.Fernandez/;Actualización')));
+ok('Formato: una línea completa no avisa', Pendientes.faltantesCC('26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado').length === 0);
+h = Pendientes.heredados([], { version: 2, observacion: '26-379-CC/L.Fernandez/;Actualización' });
+ok('Formato: heredados lo informa para la versión abierta', h.formato.length === 1);
+const pl = Pendientes.plantilla('cc', { fecha: new Date(2026, 9, 22), iniciales: 'CJ', responsable: 'C.Jesus' });
+ok('Plantilla CC: «26-###-CC/C.Jesus/2026-10-22;descripción;proceso;moderado» con «###» seleccionado', pl.texto === '26-###-CC/C.Jesus/2026-10-22;descripción;proceso;moderado' && pl.texto.slice(...pl.sel) === '###', J(pl));
+const pp = Pendientes.plantilla('pendiente', { fecha: new Date(2026, 9, 22), iniciales: 'CJ' });
+ok('Plantilla pendiente: fecha + iniciales y el CC seleccionado; se reconoce como pendiente', pp.texto === '20261022CJ Pendiente aplicar 26-###-CC' && Pendientes.analizar(pp.texto).pendientes.length === 1, J(pp));
+ok('Plantilla baja: se reconoce como baja', Pendientes.analizar(Pendientes.plantilla('baja', { iniciales: 'CJ' }).texto + 'motivo').bajas.length === 1);
+
 console.log(fallas ? `\n${fallas} prueba(s) fallaron.` : '\nTodas las pruebas pasaron.');
 process.exit(fallas ? 1 : 0);

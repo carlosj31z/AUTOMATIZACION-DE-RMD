@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.74.1
+// @version      1.75.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.74.1';                                                       // mantener igual a @version
+  const VERSION = '1.75.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -59,7 +59,7 @@
     ['formulas', 'Ordenar fórmulas', 'Subir y bajar los términos de una fórmula (Alt+↑ / Alt+↓).'],
     ['espec', 'Especificaciones editables', 'Reordenar filas y editar sus textos.'],
     ['asociar', 'Revisión de Asociar fórmulas', 'Avisa códigos distintos a la versión anterior y valida la 1.ª línea de Observaciones.'],
-    ['pendientes', 'Controles de cambio y pendientes', 'En «Asociar fórmulas» lista los CC aplicados y avisa lo que una versión anterior dejó pendiente («se suspende por 26-379-CC», «pendiente aplicar…»).'],
+    ['pendientes', 'Observaciones inteligentes', 'En «Asociar fórmulas» clasifica cada línea de Observaciones (CC, pendiente, motivo de suspensión, baja o descontinuado…), avisa lo que una versión anterior dejó pendiente y agrega líneas con formato.'],
     ['obsalto', 'Observaciones más alto', 'En «Asociar fórmulas» el cuadro de Observaciones crece con el texto.'],
     ['recetas', 'Recetas frente a SAP', 'Avisa si la lista de materiales de una receta asociada cambió en SAP.'],
     ['recetasvarias', 'Eliminar varias recetas', 'Marca varias recetas y elimínalas de una vez.'],
@@ -605,6 +605,13 @@
 
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
+  #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
+  #rmd-aviso-pendientes .rmd-pd-tipo { display: inline-block; margin: 2px 4px 0 0; padding: 0 6px; border-radius: 9px; font-size: 11.5px; background: rgba(127,127,127,.14); cursor: help; }
+  #rmd-aviso-pendientes .rmd-pd-tipo.t-baja { background: rgba(230,90,90,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-pendiente { background: rgba(240,180,90,.28); }
+  #rmd-aviso-pendientes .rmd-pd-tipo.t-cc { background: rgba(110,160,240,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-suspension { background: rgba(180,140,220,.22); }
+  .rmd-obs-barra { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+  .rmd-obs-barra button { padding: 1px 8px; border: 1px solid var(--rmd-borde); border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 12px/1.6 var(--rmd-fuente); cursor: pointer; }
+  .rmd-obs-barra button:hover { border-color: var(--rmd-acento-texto); }
   #rmd-aviso-pendientes.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); }
   #rmd-aviso-pendientes.bloquea { border-left-color: var(--rmd-rojo); }
   #rmd-aviso-pendientes .rmd-pd-cc { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); font-weight: 600; cursor: help; }
@@ -2069,7 +2076,7 @@
     const elObs = campoDe(d, 'Observaciones');
     agrandarObservaciones(elObs);
     let av = d.querySelector('#rmd-aviso-pendientes');
-    if (!on('pendientes')) { if (av) av.remove(); return; }
+    if (!on('pendientes')) { if (av) av.remove(); d.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); return; }
     const ctrl = controladorPrincipal(); if (!ctrl || !elObs) return;
     const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2');
     if (!asoc || !asoc.mdId || !modelo) return;
@@ -2092,16 +2099,52 @@
       if (ref) ref.insertAdjacentElement('afterend', av);
       else { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return; cont.insertBefore(av, cont.firstChild); }
     }
-    const abiertos = r.ccs.length + r.textos.length + r.propios.length;
+    const abiertos = r.ccs.length + r.textos.length + r.propios.length + r.bajas.length;
     const cls = abiertos ? (autorizar ? 'bloquea' : 'aviso') : 'ok';
     if (av.className !== cls) av.className = cls;
     if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
+    barraObservaciones(elObs);
     window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length };
+  }
+  // Botones bajo Observaciones: agregan al final una línea con el formato acordado (fecha + iniciales) y dejan seleccionada la parte a escribir.
+  // Se escribe con setValue + change del TextArea, como al teclear: se guarda con el Guardar del portal.
+  const BOTONES_OBS = [['cc', '+ Control de cambio', 'CC aplicado: 26-###-CC/Responsable/fecha;descripción;proceso;moderado'], ['pendiente', '+ Pendiente', 'Lo que falta aplicar en la siguiente versión'],
+    ['suspension', '+ Motivo de suspensión', 'Por qué se suspende esta versión'], ['baja', '+ Baja / descontinuado', 'El producto se dará de baja o está descontinuado'], ['nota', '+ Nota', 'Otra anotación con fecha e iniciales']];
+  function barraObservaciones(el) {
+    const c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')), dom = c && c.getDomRef(); if (!dom) return;
+    if (dom.nextElementSibling && dom.nextElementSibling.classList.contains('rmd-obs-barra')) return;
+    const b = document.createElement('div'); b.className = 'rmd-obs-barra';
+    b.innerHTML = BOTONES_OBS.map(([k, t, ay]) => `<button type="button" data-t="${k}" title="${esc(ay)}">${esc(t)}</button>`).join('');
+    b.addEventListener('click', (e) => { const bt = e.target.closest('button'); if (bt) agregarLineaObs(c, bt.dataset.t); });
+    dom.insertAdjacentElement('afterend', b);
+  }
+  // «L.Fernandez»: inicial del nombre y primer apellido según SAP (como en las líneas de CC)
+  function responsableSap() {
+    for (const w of [window, window.parent, window.top]) {
+      try {
+        const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
+        let n = String((u.getFirstName && u.getFirstName()) || '').trim(), a = String((u.getLastName && u.getLastName()) || '').trim().split(/\s+/)[0] || '';
+        if (!n || !a) { const t = String((u.getFullName && u.getFullName()) || '').trim().split(/\s+/); n = n || t[0] || ''; a = a || t[1] || ''; }
+        if (n && a) return `${n.charAt(0).toUpperCase()}.${a.charAt(0).toUpperCase()}${a.slice(1).toLowerCase()}`;
+      } catch (e) { /* otro origen */ }
+    }
+    return '';
+  }
+  function agregarLineaObs(c, tipo) {
+    const p = Pendientes.plantilla(tipo, { iniciales: rsUsuarioIniciales(), responsable: responsableSap() }); if (!p) return;
+    const v = String(c.getValue() || ''), base = v && !/\n$/.test(v) ? v + '\n' : v, nuevo = base + p.texto;
+    c.setValue(nuevo); c.fireLiveChange && c.fireLiveChange({ value: nuevo }); c.fireChange({ value: nuevo });
+    setTimeout(() => { const i = c.getFocusDomRef(); if (!i) return; i.focus(); i.setSelectionRange(base.length + p.sel[0], base.length + p.sel[1]); i.scrollTop = i.scrollHeight; }, 50);
   }
   function htmlPendientes(r, { cargando, error, autorizar }) {
     const vTxt = (x) => `v${esc(x.version)}${x.estado ? ` (${esc(x.estado)})` : ''}`;
     const chip = (x) => `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}" title="${esc([x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · ') + (x.heredado ? '\n(ya estaba en una versión anterior)' : ''))}">${esc(x.codigo)}</span>`;
     const nuevos = r.aplicados.filter((x) => !x.heredado), viejos = r.aplicados.filter((x) => x.heredado), out = [];
+    if (r.bajas.length) out.push(`<span class="rmd-pd-baja">⛔ <b>Producto para dar de baja / descontinuado</b>: ${r.bajas.map((b) => `<q>${esc(b.linea)}</q>${b.propia ? ' (esta versión)' : ` (${vTxt(b)})`}`).join(' · ')}</span>`);
+    // resumen por tipo de línea; al pasar el ratón, las líneas de ese tipo
+    const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
+    if (porTipo.size) out.push(`<span class="rmd-pd-tipos">${Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t)).map((t) => `<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`).join('')}</span>`);
+    r.formato.forEach((x) => out.push(`<span>✎ <q>${esc(x.linea.slice(0, 60))}${x.linea.length > 60 ? '…' : ''}</q>: falta ${esc(x.faltan.join(', '))} (formato «26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»).</span>`));
     if (nuevos.length) out.push(`<b>Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}:</b> ${nuevos.map(chip).join('')}`);
     if (viejos.length) out.push(`<span>De versiones anteriores: ${viejos.map(chip).join('')}</span>`);
     const items = [];
@@ -2436,6 +2479,7 @@
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
     document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
+    document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -5938,21 +5982,50 @@
     function lineas(texto) {
       return String(texto || '').split(/\r?\n/).flatMap((l) => l.split(/(?=\b\d{2}\s*-\s*\d{2,4}\s*-\s*CC\s*\/)/i)).map(limpio).filter(Boolean);
     }
+    // Producto a dar de baja o descontinuado («dar de baja», «descontinuado», «ya no se fabrica»…); «equipo / balanza … de baja» no cuenta.
+    const RE_BAJA = /\b(?:DAR(?:SE|LO|LA)?\s+DE\s+BAJA|(?:SE\s+)?DA\s+DE\s+BAJA|DADO\s+DE\s+BAJA|DADA\s+DE\s+BAJA|PARA\s+BAJA|DE\s+BAJA|DESCONTINUAD[OA]S?|DESCONTINUA(?:R|DO|CION)?|DISCONTINUAD[OA]S?|DISCONTINUA(?:R|CION)?|YA\s+NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA|COMERCIALIZA|VENDE)|NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA)\s+MAS|FUERA\s+DE\s+(?:LINEA|PORTAFOLIO|PORTAFOLIO)|RETIRAD[OA]\s+DEL\s+(?:MERCADO|PORTAFOLIO)|PRODUCTO\s+INACTIVO|SIN\s+DEMANDA)\b/;
+    const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?)\b[^.;]*\bBAJA\b/;
+    const esBaja = (p) => RE_BAJA.test(p) && !(RE_BAJA_NO.test(p) && !/DESCONTINU|DISCONTINU|NO\s+SE\s+(?:FABRICA|PRODUCE)/.test(p));
+    const RE_ACTUALIZA = /\bACTUALIZA(?:CION|DO|DA|R)?\b|\bMODIFICACION\b|\bCAMBIO\s+DE\b/;
+    // Tipos de línea: baja, pendiente, cc, suspension (motivo), actualizacion, nomenclatura, nota
     function analizar(texto) {
-      const r = { aplicados: [], pendientes: [], hechos: [], lineas: [] };
+      const r = { aplicados: [], pendientes: [], hechos: [], bajas: [], tipos: [], lineas: [] };
       lineas(texto).forEach((l, i) => {
-        const p = plano(l), ccs = ccsDe(l);
+        const p = plano(l), ccs = ccsDe(l), poner = (tipo) => r.tipos.push({ linea: l, tipo, ccs, i });
         r.lineas.push(l);
+        if (esBaja(p)) { r.bajas.push({ linea: l, i }); poner('baja'); return; }
         const pend = esPendiente(p, ccs);
-        if (RE_NOMENCLATURA.test(l) && !ccs.length && !pend) return;
+        if (RE_NOMENCLATURA.test(l) && !ccs.length && !pend) { poner(/^\S+\s+\S/.test(l) && RE_SUSP.test(p) ? 'suspension' : 'nomenclatura'); return; }
         const ent = !pend && entradaCC(l);
-        if (pend) r.pendientes.push({ linea: l, ccs, i });
-        else if (RE_HECHO.test(p) && ccs.length) r.hechos.push({ linea: l, ccs, i });
-        else if (ent) r.aplicados.push({ ...ent, i });
+        if (pend) { r.pendientes.push({ linea: l, ccs, i }); poner('pendiente'); }
+        else if (RE_HECHO.test(p) && ccs.length) { r.hechos.push({ linea: l, ccs, i }); poner('cc'); }
+        else if (ent) { r.aplicados.push({ ...ent, i }); poner('cc'); }
         // otra mención de un CC sin nada pendiente («… CONTROL DE CAMBIO 24-161-CC INCLUSIÓN DE LOTIZADO»): aplicado, sin sus partes
-        else ccs.forEach((c) => r.aplicados.push({ codigo: c, responsable: '', fecha: '', descripcion: l, tipo: '', nivel: '', linea: l, i }));
+        else if (ccs.length) { ccs.forEach((c) => r.aplicados.push({ codigo: c, responsable: '', fecha: '', descripcion: l, tipo: '', nivel: '', linea: l, i })); poner('cc'); }
+        else poner(RE_SUSP.test(p) ? 'suspension' : RE_ACTUALIZA.test(p) ? 'actualizacion' : 'nota');
       });
       return r;
+    }
+    // Una línea que empieza como CC con plantilla («26-379-CC/…») y le falta alguna parte
+    function faltantesCC(linea) {
+      if (!/^\s*(?:20)?\d{2}\s*-\s*\d{2,4}\s*-?\s*CC\s*\//i.test(linea)) return [];
+      const e = entradaCC(linea); if (!e) return [];
+      return [!e.responsable && 'responsable', !e.fecha && 'fecha', !e.descripcion && 'descripción', !e.tipo && 'tipo (proceso, insumo…)', !e.nivel && 'nivel (menor, moderado, mayor)'].filter(Boolean);
+    }
+    // Línea nueva para el botón «+»: texto y la parte a seleccionar para escribir encima
+    function plantilla(tipo, { fecha = new Date(), iniciales = '', responsable = '' } = {}) {
+      const p2 = (n) => String(n).padStart(2, '0'), aaaammdd = `${fecha.getFullYear()}${p2(fecha.getMonth() + 1)}${p2(fecha.getDate())}`, iso = `${fecha.getFullYear()}-${p2(fecha.getMonth() + 1)}-${p2(fecha.getDate())}`;
+      const pre = `${aaaammdd}${iniciales} `, aa = String(fecha.getFullYear()).slice(-2);
+      const t = {
+        cc: [`${aa}-`, '###', `-CC/${responsable || 'Responsable'}/${iso};`, 'descripción', ';proceso;moderado'],
+        pendiente: [`${pre}Pendiente aplicar `, `${aa}-###-CC`, ''],
+        suspension: [`${pre}Se suspende por `, 'motivo o CC', ''],
+        baja: [`${pre}Producto para dar de baja / descontinuado: `, 'motivo', ''],
+        nota: [pre, 'nota', ''],
+      }[tipo];
+      if (!t) return null;
+      const texto = t.join(''), ini = t[0].length;
+      return { texto, sel: [ini, ini + t[1].length] };
     }
     const ccsAplicados = (a) => new Set([...a.aplicados.map((x) => x.codigo), ...a.hechos.flatMap((x) => x.ccs)]);
     // versiones: [{ version, codigo, estado, observacion }]; actual: { version, observacion } (el texto que está en pantalla).
@@ -5981,9 +6054,15 @@
       // lo anotado como pendiente en la propia versión (no copiado de una anterior)
       const previos = new Set(vs.flatMap((v) => [...v.set]));
       const propios = anA.pendientes.filter((p) => !previos.has(plano(p.linea)));
-      return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length };
+      // baja / descontinuado: en cualquier versión (es del producto, no de la versión)
+      const bajas = new Map();
+      [...vs.map((v) => [v, v.an]), [{ version: actual.version, estado: '', propia: true }, anA]].forEach(([v, an]) => an.bajas.forEach((b) => { const k = plano(b.linea); if (!bajas.has(k)) bajas.set(k, { version: v.version, estado: v.estado, linea: b.linea, propia: !!v.propia }); }));
+      const formato = anA.tipos.filter((x) => x.tipo === 'cc' && !previos.has(plano(x.linea))).map((x) => ({ linea: x.linea, faltan: faltantesCC(x.linea) })).filter((x) => x.faltan.length);
+      return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
+        bajas: [...bajas.values()], formato };
     }
-    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas };
+    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
+    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA };
   })();
   // ==PENDIENTES-FIN==
 
@@ -6520,6 +6599,7 @@
     });
     const ccTxt = (x) => x.pd.aplicados.map((a) => a.codigo + (a.heredado ? ' (ant.)' : '')).join(', ');
     const pendCcTxt = (x) => x.pd.ccs.map((p) => `${p.cc} (v${p.version}: ${p.linea})`).join('\n');
+    const bajaTxt = (x) => x.pd.bajas.map((b) => `v${b.version}: ${b.linea}`).join('\n');
     const pendTxt = (x) => [...x.pd.textos.map((p) => `v${p.version}: ${p.linea}`), ...x.pd.propios.map((p) => `esta versión: ${p.linea}`)].join('\n');
     const clave = (p) => SIN_ACENTOS(p).toUpperCase(), nombreProd = new Map(); filas.forEach((x) => { const k = clave(x.producto); if (!nombreProd.has(k)) nombreProd.set(k, x.producto); x.claveProd = k; x.producto = nombreProd.get(k); });
     const ordenEst = { Ingresado: 0, Suspendido: 1, Autorizado: 2 };
@@ -6535,25 +6615,26 @@
     //  Pendientes
     // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
-    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
-      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
-      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda' }, { congelar: 'E2', activa: true });
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda' }, { congelar: 'E2', activa: true });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
-      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
-      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
+      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
       todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
-        ccTxt(x), pendCcTxt(x), pendTxt(x), fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
         x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
-      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'fechaCelda', 19: 'fechaCelda', 22: 'fechaCelda', 24: 'numCelda' }, { congelar: 'C2' });
+      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'fechaCelda', 20: 'fechaCelda', 23: 'fechaCelda', 25: 'numCelda' }, { congelar: 'C2' });
     //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
     const frases = [];
     filas.forEach((x) => (x.historial || [x.m]).forEach((m) => { const a = Pendientes.analizar(m.observacion);
       a.aplicados.forEach((e) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'CC aplicado', e.codigo, e.responsable, e.fecha, e.descripcion, e.tipo, e.nivel, e.linea]));
       a.pendientes.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Pendiente', p.ccs.join(', '), '', '', '', '', '', p.linea]));
-      a.hechos.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Menciona un CC', p.ccs.join(', '), '', '', '', '', '', p.linea])); }));
+      a.hechos.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Menciona un CC', p.ccs.join(', '), '', '', '', '', '', p.linea]));
+      a.bajas.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Baja / descontinuado', '', '', '', '', '', '', p.linea])); }));
     frases.sort((a, b) => nat(a[0], b[0]) || nat(a[1], b[1]) || (a[2] - b[2]));
     tabla('Frases de Observaciones', 'FrasesObs', ['Producto', 'Código RMD', 'Versión', 'Estado', 'Tipo de línea', 'CC', 'Responsable', 'Fecha CC', 'Descripción del CC', 'Tipo CC', 'Nivel', 'Línea completa'],
       [30, 13, 8, 12, 15, 22, 16, 11, 50, 10, 10, 90], frases, { 3: (f) => estiloEst(f[3]), 1: 'codigoCelda', 2: 'numCelda', 8: 'textoCelda', 11: 'textoCelda' });
