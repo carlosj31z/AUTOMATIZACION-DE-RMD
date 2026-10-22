@@ -85,5 +85,45 @@ ok('Heredado: no se leen las versiones Canceladas', h.ccs.length === 0 && h.text
 h = Pendientes.heredados([], { version: 1, observacion: 'Falta la firma de Calidad' });
 ok('Propio: lo anotado como pendiente en la versión abierta se lista', h.propios.length === 1);
 
+// ---- tipos de línea, baja / descontinuado, formato y plantillas ----
+const tipos = (t) => Pendientes.analizar(t).tipos.map((x) => x.tipo);
+ok('Tipos: nomenclatura, CC, pendiente, motivo de suspensión, actualización, nota y baja', J(tipos(`20261013LF-1-C1.0-FI1.0-FA1.0-F1
+26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado
+PENDIENTE CC
+20250310VM SE SUSPENDE POR NUEVA VERSION
+20260929CJ Actualización de Lista de Materiales
+20260930CJ Revisado con Producción
+20261022CJ Producto descontinuado, no ingresar nuevas versiones`)) === '["nomenclatura","cc","pendiente","suspension","actualizacion","nota","baja"]', J(tipos('')));
+['20261022CJ Dar de baja el producto', 'PRODUCTO DESCONTINUADO', 'Se da de baja por falta de demanda', 'Ya no se fabrica', 'DISCONTINUADO - NO INGRESAR'].forEach((l) => ok(`Baja: «${l}»`, Pendientes.analizar(l).bajas.length === 1));
+['SE SUSPENDE POR EQUIPO DE BAJA MEN-E034', 'Balanza BAL-12 dada de baja, se cambia por BAL-20', 'Paso de baja reemplazado'].forEach((l) => ok(`No es baja del producto: «${l}»`, Pendientes.analizar(l).bajas.length === 0));
+h = Pendientes.heredados([{ version: 3, codigo: 'A3', estado: 'Suspendido', observacion: 'Producto descontinuado por Marketing' }], { version: 4, observacion: '' });
+ok('Baja heredada: lo anotado en una versión anterior se avisa en la siguiente', h.bajas.length === 1 && h.bajas[0].version === 3);
+ok('Formato: «26-379-CC/L.Fernandez/;Actualización» avisa lo que falta', J(Pendientes.faltantesCC('26-379-CC/L.Fernandez/;Actualización')) === '["fecha","tipo (proceso, insumo…)","nivel (menor, moderado, mayor)"]', J(Pendientes.faltantesCC('26-379-CC/L.Fernandez/;Actualización')));
+ok('Formato: una línea completa no avisa', Pendientes.faltantesCC('26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado').length === 0);
+h = Pendientes.heredados([], { version: 2, observacion: '26-379-CC/L.Fernandez/;Actualización' });
+ok('Formato: heredados lo informa para la versión abierta', h.formato.length === 1);
+const pl = Pendientes.plantilla('cc', { fecha: new Date(2026, 9, 22), iniciales: 'CJ', responsable: 'C.Jesus' });
+ok('Plantilla CC: «26-###-CC/C.Jesus/2026-10-22;descripción;proceso;moderado» con «###» seleccionado', pl.texto === '26-###-CC/C.Jesus/2026-10-22;descripción;proceso;moderado' && pl.texto.slice(...pl.sel) === '###', J(pl));
+const pp = Pendientes.plantilla('pendiente', { fecha: new Date(2026, 9, 22), iniciales: 'CJ' });
+ok('Plantilla pendiente: fecha + iniciales y el CC seleccionado; se reconoce como pendiente', pp.texto === '20261022CJ Pendiente aplicar 26-###-CC' && Pendientes.analizar(pp.texto).pendientes.length === 1, J(pp));
+ok('Plantilla baja: se reconoce como baja', Pendientes.analizar(Pendientes.plantilla('baja', { iniciales: 'CJ' }).texto + 'motivo').bajas.length === 1);
+
+// ---- NC / DES y listado de controles de cambio (Excel «CC-NC-DES para actualizar RMD») ----
+ok('NC/DES: 24-1012-DES, 22-1221-D, NC 24-1012, NC-24-2044-DES, DES-24-1137', J(Pendientes.ccsDe('24-1012-DES; 22-1221-D; NC 23-1128; NC-24-2044-DES; DES-24-1137')) === '["24-1012-DES","22-1221-DES","23-1128-DES","24-2044-DES","24-1137-DES"]', J(Pendientes.ccsDe('24-1012-DES; 22-1221-D; NC 23-1128; NC-24-2044-DES; DES-24-1137')));
+const hojasCC = [
+  { hoja: 'PLANTA 1', filas: [null, ['AREA', 'ETAPA ', 'APLICA', 'DESCRIPCION DEL CAMBIO', 'FECHA', 'OBSERVACION', 'NOMENCLATURA PARA OBSERVACIONES', 'ESTATUS DE FILE'],
+    ['GV2', 'ENV-ACO', 'SI', 'CC-26-280 Muestras de análisis', '2026-08-17', '', '26-280/D.Ayala /2026-08-17/ACTUALIZACIÓN DE RMDS ENV, ACO GV2/Proceso/Mayor.', 'conforme'],
+    ['BEB', 'FAB', 'NO', 'PEND-28-11-2023 NC por Actualizacion tren de equipos', '2025-03-17', '', '', 'no aplica']] },
+  { hoja: 'PLANTA 2', filas: [['CONTROLES DE CAMBIO - NO CONFORMIDADES'], null, ['AREA', 'ETAPA ', 'APLICA', 'DESCRIPCION DEL CAMBIO', 'FECHA', 'NOMENCLATURA PARA OBSERVACIONES', 'ESTATUS', 'EVIDENCIA', 'RESPONSABLE', 'AÑOS', 'MOTIVO'],
+    ['SOL', 'ACO', 'NO', '26-379-CC ACTUALIZACION RMD ACO GASEOVET CB 500mg CAP BLANDA B5 CJA X 30', 46317, '26-379-CC/L.Fernandez/2026-10-22; ACTUALIZACION RMD ACO GASEOVET CB 500mg;proceso,moderado.', 'CUMPLIDO'],
+    ['SOL/ACO', 'ENV/ACO', 'SI', '26-300-CC Cambio de estuche en sólidos', '2026-09-01', '26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor', 'PENDIENTE'],
+    ['COS', 'FAB', 'SI', '25-100-CC Antiguo', '2025-01-01', '25-100-CC/X.Y/2025-01-01;Antiguo;proceso;menor', 'CUMPLIDO']] }];
+const cam = Pendientes.cambiosDeFilas(hojasCC);
+ok('Listado: lee las dos plantas por el encabezado (Ate = PLANTA 1, Lima = PLANTA 2)', cam.length === 5 && cam[0].planta === 'Ate' && cam[2].planta === 'Lima', J(cam.map((c) => c.planta)));
+ok('Listado: «26-280/D.Ayala/…» (sin «-CC») da 26-280-CC; etapa ENV-ACO -> Envase y Acondicionado', J(cam[0].codigos) === '["26-280-CC"]' && J(cam[0].etapa) === '["ENVASE","ACONDICIONADO"]', J(cam[0]));
+ok('Listado: fecha serial de Excel (46317) -> 2026-10-22', cam[2].fecha === '2026-10-22', cam[2].fecha);
+const ap = Pendientes.cambiosQueAplican(cam, { planta: 'LIMA', etapa: 'ACONDICIONADO', area: 'SOLIDOS', producto: 'GASEOVET CB', desde: '2026-06-01' });
+ok('Aplican: el del producto (aunque APLICA = NO) y el del área con APLICA = SI; no el antiguo ni el de otra planta o etapa', J(ap.map((c) => [c.codigos[0], c.por])) === '[["26-379-CC","producto"],["26-300-CC","area"]]', J(ap.map((c) => [c.codigos, c.por])));
+
 console.log(fallas ? `\n${fallas} prueba(s) fallaron.` : '\nTodas las pruebas pasaron.');
 process.exit(fallas ? 1 : 0);

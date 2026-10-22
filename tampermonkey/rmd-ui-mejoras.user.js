@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.74
+// @version      1.76.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.74';                                                       // mantener igual a @version
+  const VERSION = '1.76.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -59,7 +59,7 @@
     ['formulas', 'Ordenar fórmulas', 'Subir y bajar los términos de una fórmula (Alt+↑ / Alt+↓).'],
     ['espec', 'Especificaciones editables', 'Reordenar filas y editar sus textos.'],
     ['asociar', 'Revisión de Asociar fórmulas', 'Avisa códigos distintos a la versión anterior y valida la 1.ª línea de Observaciones.'],
-    ['pendientes', 'Controles de cambio y pendientes', 'En «Asociar fórmulas» lista los CC aplicados y avisa lo que una versión anterior dejó pendiente («se suspende por 26-379-CC», «pendiente aplicar…»).'],
+    ['pendientes', 'Observaciones inteligentes', 'En «Asociar fórmulas» clasifica cada línea de Observaciones (CC, pendiente, motivo de suspensión, baja o descontinuado…), avisa lo que una versión anterior dejó pendiente y agrega líneas con formato.'],
     ['obsalto', 'Observaciones más alto', 'En «Asociar fórmulas» el cuadro de Observaciones crece con el texto.'],
     ['recetas', 'Recetas frente a SAP', 'Avisa si la lista de materiales de una receta asociada cambió en SAP.'],
     ['recetasvarias', 'Eliminar varias recetas', 'Marca varias recetas y elimínalas de una vez.'],
@@ -605,7 +605,14 @@
 
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
-  .rmd-obs-fila { width: 100% !important; margin-left: 0 !important; clear: both; }
+  #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
+  #rmd-aviso-pendientes .rmd-pd-agregar { margin-left: 4px; padding: 0 6px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 11.5px/1.5 var(--rmd-fuente); cursor: pointer; }
+  #rmd-aviso-pendientes .rmd-pd-tipo { display: inline-block; margin: 2px 4px 0 0; padding: 0 6px; border-radius: 9px; font-size: 11.5px; background: rgba(127,127,127,.14); cursor: help; }
+  #rmd-aviso-pendientes .rmd-pd-tipo.t-baja { background: rgba(230,90,90,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-pendiente { background: rgba(240,180,90,.28); }
+  #rmd-aviso-pendientes .rmd-pd-tipo.t-cc { background: rgba(110,160,240,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-suspension { background: rgba(180,140,220,.22); }
+  .rmd-obs-barra { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+  .rmd-obs-barra button { padding: 1px 8px; border: 1px solid var(--rmd-borde); border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 12px/1.6 var(--rmd-fuente); cursor: pointer; }
+  .rmd-obs-barra button:hover { border-color: var(--rmd-acento-texto); }
   #rmd-aviso-pendientes.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); }
   #rmd-aviso-pendientes.bloquea { border-left-color: var(--rmd-rojo); }
   #rmd-aviso-pendientes .rmd-pd-cc { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); font-weight: 600; cursor: help; }
@@ -2070,20 +2077,24 @@
     const elObs = campoDe(d, 'Observaciones');
     agrandarObservaciones(elObs);
     let av = d.querySelector('#rmd-aviso-pendientes');
-    if (!on('pendientes')) { if (av) av.remove(); return; }
+    if (!on('pendientes')) { if (av) av.remove(); d.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); return; }
     const ctrl = controladorPrincipal(); if (!ctrl || !elObs) return;
     const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2');
     if (!asoc || !asoc.mdId || !modelo) return;
     if (d.__rmdPendMd !== asoc.mdId) {
       d.__rmdPendMd = asoc.mdId; d.__rmdPendVs = null;
       const principal = String(asoc.codigoversionprincipal || asoc.codigo || '');
-      (principal ? ppVersiones(modelo, principal) : Promise.resolve([])).then((vs) => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = vs; gestionarPendientesAsociar(); } },
+      (principal ? versionesConPlanta(modelo, principal) : Promise.resolve([])).then((vs) => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = vs; gestionarPendientesAsociar(); } },
         () => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = []; d.__rmdPendError = true; gestionarPendientesAsociar(); } });
     }
     const vs = d.__rmdPendVs || [], version = +asoc.version || +((vs.find((m) => m.mdId === asoc.mdId) || {}).version) || 0;
     const clave = `${vs.length}|${version}|${elObs.value}`;
     if (d.__rmdPendClave !== clave) { d.__rmdPendClave = clave; d.__rmdPendRes = Pendientes.heredados(vs.filter((m) => m.mdId !== asoc.mdId).map((m) => ({ version: m.version, codigo: m.codigo, estado: m.estado, observacion: m.observacion })), { version, observacion: elObs.value }); }
     const r = d.__rmdPendRes;
+    // listado de CC / NC / DES (Reglas de revisión): los de este producto, etapa y planta desde la última versión autorizada, sin anotar
+    const claveL = `${clave}|${RR.cambiosVer || 0}`;
+    if (d.__rmdPendClaveL !== claveL) { d.__rmdPendClaveL = claveL; d.__rmdPendListado = RR.cambios && d.__rmdPendVs ? listadoParaRmd(asoc, vs, version, r) : null; }
+    r.listado = d.__rmdPendListado;
     const autorizar = +asoc.estadoIdRmd_iMaestraIdBK === 465 && +asoc.estadoIdRmd_iMaestraId !== 465;
     const html = htmlPendientes(r, { cargando: !d.__rmdPendVs, error: d.__rmdPendError, autorizar });
     if (!html) { if (av) av.remove(); return; }
@@ -2093,16 +2104,75 @@
       if (ref) ref.insertAdjacentElement('afterend', av);
       else { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return; cont.insertBefore(av, cont.firstChild); }
     }
-    const abiertos = r.ccs.length + r.textos.length + r.propios.length;
+    const abiertos = r.ccs.length + r.textos.length + r.propios.length + r.bajas.length;
     const cls = abiertos ? (autorizar ? 'bloquea' : 'aviso') : 'ok';
     if (av.className !== cls) av.className = cls;
     if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
+    if (!av.__rmdClic) { av.__rmdClic = true; av.addEventListener('click', (e) => { const b = e.target.closest('button[data-linea]'); if (!b) return; const c = sap.ui.getCore().byId(elObs.id.replace(/-inner$/, '')); if (c) agregarTextoObs(c, b.dataset.linea); }); }
+    barraObservaciones(elObs);
     window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length };
+  }
+  // Versiones del master con su planta (para el listado de CC)
+  async function versionesConPlanta(modelo, principal) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, p = isNaN(+principal) ? principal : +principal;
+    return (await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', String(principal)), new F('codigo', 'EQ', p)], and: false })], { $expand: 'estadoIdRmd,sucursalId', $orderby: 'mdId' }))
+      .map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '', planta: (m.sucursalId && m.sucursalId.contenido) || '' }));
+  }
+  // Cambios del listado para el RMD abierto que aún no figuran en sus Observaciones
+  function listadoParaRmd(asoc, vs, version, r) {
+    const yo = vs.find((m) => m.mdId === asoc.mdId) || asoc, previa = vs.filter((m) => (+m.version || 0) < version && m.fechaAutorizacion).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0];
+    const desde = previa ? new Date(previa.fechaAutorizacion).toISOString().slice(0, 10) : '';
+    const anotados = new Set(r.actual.aplicados.map((x) => x.codigo).concat(r.actual.pendientes.flatMap((x) => x.ccs)));
+    const lista = Pendientes.cambiosQueAplican(RR.cambios.cambios, { planta: yo.planta || '', etapa: yo.nivelTxt || asoc.nivelTxt || '', area: `${yo.areaRmdTxt || asoc.areaRmdTxt || ''} ${yo.descripcion || ''}`,
+      producto: productoDeDescripcion(yo.descripcion || asoc.descripcion || ''), desde });
+    const faltan = lista.filter((c) => c.codigos.length ? !c.codigos.some((k) => anotados.has(k)) : !String(r.actual.lineas.join('\n')).includes(c.nomenclatura || c.descripcion));
+    return { desde, previa: previa ? previa.version : null, faltan, total: lista.length };
+  }
+  function agregarTextoObs(c, linea) {
+    const v = String(c.getValue() || ''), base = v && !/\n$/.test(v) ? v + '\n' : v, nuevo = base + linea;
+    c.setValue(nuevo); c.fireLiveChange && c.fireLiveChange({ value: nuevo }); c.fireChange({ value: nuevo });
+    setTimeout(() => { const i = c.getFocusDomRef(); if (i) { i.focus(); i.setSelectionRange(nuevo.length, nuevo.length); i.scrollTop = i.scrollHeight; } }, 50);
+  }
+  // Botones bajo Observaciones: agregan al final una línea con el formato acordado (fecha + iniciales) y dejan seleccionada la parte a escribir.
+  // Se escribe con setValue + change del TextArea, como al teclear: se guarda con el Guardar del portal.
+  const BOTONES_OBS = [['cc', '+ Control de cambio', 'CC aplicado: 26-###-CC/Responsable/fecha;descripción;proceso;moderado'], ['pendiente', '+ Pendiente', 'Lo que falta aplicar en la siguiente versión'],
+    ['suspension', '+ Motivo de suspensión', 'Por qué se suspende esta versión'], ['baja', '+ Baja / descontinuado', 'El producto se dará de baja o está descontinuado'], ['nota', '+ Nota', 'Otra anotación con fecha e iniciales']];
+  function barraObservaciones(el) {
+    const c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')), dom = c && c.getDomRef(); if (!dom) return;
+    if (dom.nextElementSibling && dom.nextElementSibling.classList.contains('rmd-obs-barra')) return;
+    const b = document.createElement('div'); b.className = 'rmd-obs-barra';
+    b.innerHTML = BOTONES_OBS.map(([k, t, ay]) => `<button type="button" data-t="${k}" title="${esc(ay)}">${esc(t)}</button>`).join('');
+    b.addEventListener('click', (e) => { const bt = e.target.closest('button'); if (bt) agregarLineaObs(c, bt.dataset.t); });
+    dom.insertAdjacentElement('afterend', b);
+  }
+  // «L.Fernandez»: inicial del nombre y primer apellido según SAP (como en las líneas de CC)
+  function responsableSap() {
+    for (const w of [window, window.parent, window.top]) {
+      try {
+        const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
+        let n = String((u.getFirstName && u.getFirstName()) || '').trim(), a = String((u.getLastName && u.getLastName()) || '').trim().split(/\s+/)[0] || '';
+        if (!n || !a) { const t = String((u.getFullName && u.getFullName()) || '').trim().split(/\s+/); n = n || t[0] || ''; a = a || t[1] || ''; }
+        if (n && a) return `${n.charAt(0).toUpperCase()}.${a.charAt(0).toUpperCase()}${a.slice(1).toLowerCase()}`;
+      } catch (e) { /* otro origen */ }
+    }
+    return '';
+  }
+  function agregarLineaObs(c, tipo) {
+    const p = Pendientes.plantilla(tipo, { iniciales: rsUsuarioIniciales(), responsable: responsableSap() }); if (!p) return;
+    const v = String(c.getValue() || ''), base = v && !/\n$/.test(v) ? v + '\n' : v, nuevo = base + p.texto;
+    c.setValue(nuevo); c.fireLiveChange && c.fireLiveChange({ value: nuevo }); c.fireChange({ value: nuevo });
+    setTimeout(() => { const i = c.getFocusDomRef(); if (!i) return; i.focus(); i.setSelectionRange(base.length + p.sel[0], base.length + p.sel[1]); i.scrollTop = i.scrollHeight; }, 50);
   }
   function htmlPendientes(r, { cargando, error, autorizar }) {
     const vTxt = (x) => `v${esc(x.version)}${x.estado ? ` (${esc(x.estado)})` : ''}`;
-    const chip = (x) => `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}" title="${esc([x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · ') + (x.heredado ? '\n(ya estaba en una versión anterior)' : ''))}">${esc(x.codigo)}</span>`;
+    const delListado = (k) => { const c = RR.cambios && RR.cambios.cambios.find((y) => y.codigos.includes(k)); return c ? `\nListado: ${c.descripcion}${c.estatus ? ` (${c.estatus})` : ''}` : ''; };
+    const chip = (x) => `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}" title="${esc([x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · ') + delListado(x.codigo) + (x.heredado ? '\n(ya estaba en una versión anterior)' : ''))}">${esc(x.codigo)}</span>`;
     const nuevos = r.aplicados.filter((x) => !x.heredado), viejos = r.aplicados.filter((x) => x.heredado), out = [];
+    if (r.bajas.length) out.push(`<span class="rmd-pd-baja">⛔ <b>Producto para dar de baja / descontinuado</b>: ${r.bajas.map((b) => `<q>${esc(b.linea)}</q>${b.propia ? ' (esta versión)' : ` (${vTxt(b)})`}`).join(' · ')}</span>`);
+    // resumen por tipo de línea; al pasar el ratón, las líneas de ese tipo
+    const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
+    if (porTipo.size) out.push(`<span class="rmd-pd-tipos">${Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t)).map((t) => `<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`).join('')}</span>`);
+    r.formato.forEach((x) => out.push(`<span>✎ <q>${esc(x.linea.slice(0, 60))}${x.linea.length > 60 ? '…' : ''}</q>: falta ${esc(x.faltan.join(', '))} (formato «26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»).</span>`));
     if (nuevos.length) out.push(`<b>Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}:</b> ${nuevos.map(chip).join('')}`);
     if (viejos.length) out.push(`<span>De versiones anteriores: ${viejos.map(chip).join('')}</span>`);
     const items = [];
@@ -2110,53 +2180,75 @@
     r.textos.forEach((x) => items.push(`<li>⚠ Pendiente anotado en la ${vTxt(x)}: <q>${esc(x.linea)}</q> — revisa si ya se aplicó en esta versión.</li>`));
     r.propios.forEach((x) => items.push(`<li>ℹ Anotado como pendiente en esta versión: <q>${esc(x.linea)}</q></li>`));
     if (items.length) out.push(`<b>${autorizar ? 'No autorices todavía: ' : ''}${items.length} pendiente${items.length > 1 ? 's' : ''}</b><ul>${items.join('')}</ul>`);
+    if (r.listado && r.listado.faltan.length) {
+      const L = r.listado, fila = (c) => `<li>${c.por === 'producto' ? '📦' : '🏭'} <b>${esc(c.codigos.join(', ') || 'Sin código')}</b>${c.fecha ? ` (${esc(c.fecha)})` : ''}: ${esc((c.descripcion || c.nomenclatura).slice(0, 110))}${(c.descripcion || c.nomenclatura).length > 110 ? '…' : ''}`
+        + `${c.estatus ? ` · <i>${esc(c.estatus)}</i>` : ''}${!c.aplica ? ' · <i>APLICA: NO</i>' : ''} <button type="button" class="rmd-pd-agregar" data-linea="${esc(c.nomenclatura || c.descripcion)}" title="Agrega a Observaciones: ${esc(c.nomenclatura || c.descripcion)}">Agregar</button></li>`;
+      out.push(`<b>Listado de CC: ${L.faltan.length} cambio${L.faltan.length > 1 ? 's' : ''} de este ${L.faltan.some((c) => c.por === 'producto') ? 'producto o área' : 'área'} sin anotar</b>${L.desde ? ` (desde la autorización de la v${esc(L.previa)}, ${esc(L.desde)})` : ''}<ul>${L.faltan.slice(0, 8).map(fila).join('')}</ul>${L.faltan.length > 8 ? `<span>…y ${L.faltan.length - 8} más.</span>` : ''}`);
+    }
     else if (cargando) out.push('<span>Buscando pendientes en las versiones anteriores…</span>');
     else if (error) out.push('<span>No se pudieron leer las versiones anteriores para buscar pendientes.</span>');
     else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
     return out.join('<br>');
   }
-  // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas) con alto fijo
-  // de 70 px. Se pasa a una fila propia de ancho completo debajo de las tres columnas (Title vacío + Label y TextArea con GridData de 12) y crece
-  // con el texto (8 a 30 líneas). Al apagar la opción vuelve el contenido original del formulario.
+  // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas: Title + Label/campo)
+  // junto a Motivo de Solicitud y RM Digital Paralelo, con alto fijo de 70 px. Se deja sola en la 3.ª columna (etiqueta arriba, ancho completo de la
+  // columna) y los otros campos de esa columna pasan al final de la 1.ª y la 2.ª; el cuadro toma el alto de las otras columnas y crece con el texto.
+  // Al apagar la opción vuelve el contenido original del formulario.
   const SPAN_TODO = 'XL12 L12 M12 S12';
   let obsModificada = null;                                                         // { c: TextArea, sf: SimpleForm } con los cambios puestos
   function restaurarObservaciones() {
-    document.querySelectorAll('.rmd-obs-fila').forEach((e) => e.classList.remove('rmd-obs-fila'));
     if (!obsModificada) return; const { c, sf } = obsModificada; obsModificada = null;
-    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); }
-    if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x)); o.titulo.destroy();
+    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); const i = c.getFocusDomRef && c.getFocusDomRef(); if (i) i.style.minHeight = ''; }
+    if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x));
       o.layout.forEach(([x, ld]) => { const nuevo = x.getLayoutData(); x.setLayoutData(ld || null); if (nuevo && nuevo !== ld) nuevo.destroy(); }); }
   }
+  const esDe = (x, tipo) => !!x && x.getMetadata().getName() === tipo;
   function agrandarObservaciones(el) {
     const c = el && el.tagName === 'TEXTAREA' && sap.ui.getCore().byId(el.id.replace(/-inner$/, ''));
     if (!c || !c.setRows) return;
-    let sf = c.getParent(); while (sf && !(sf.getMetadata && sf.getMetadata().getName() === 'sap.ui.layout.form.SimpleForm')) sf = sf.getParent && sf.getParent();
+    let sf = c.getParent(); while (sf && !esDe(sf, 'sap.ui.layout.form.SimpleForm')) sf = sf.getParent && sf.getParent();
     if (!on('obsalto')) { restaurarObservaciones(); return; }
     obsModificada = { c, sf };
     if (!c.__rmdFilas) {
       c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false, height: c.getHeight ? c.getHeight() : '' };
       if (c.getRows() < 8) c.setRows(8);
-      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(30); }
+      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(40); }
       c.setHeight('');                                                               // sin esto el alto fijo del portal gana a rows y growing
     }
-    if (sf && sf.__rmdObs) { filaObservacionesCompleta(c); return; }
-    if (!sf) return;
-    const GridData = sap.ui.require('sap/ui/layout/GridData'), Title = sap.ui.require('sap/ui/core/Title'); if (!GridData || !Title) return;
-    const contenido = sf.getContent(), iT = contenido.indexOf(c); if (iT < 0) return;
-    const etq = contenido[iT - 1] && /Label$/.test(contenido[iT - 1].getMetadata().getName()) ? contenido[iT - 1] : null;
-    const titulo = new Title({ text: '' });
-    titulo.setLayoutData(new GridData({ span: SPAN_TODO }));                        // el SimpleForm lo usa como tamaño del FormContainer nuevo
-    sf.__rmdObs = { contenido: contenido.slice(), titulo, layout: [c, etq].filter(Boolean).map((x) => [x, x.getLayoutData()]) };
-    sf.removeContent(c); if (etq) sf.removeContent(etq);
-    if (etq) { etq.setLayoutData(new GridData({ span: SPAN_TODO })); }
-    c.setLayoutData(new GridData({ span: SPAN_TODO }));
-    sf.addContent(titulo); if (etq) sf.addContent(etq); sf.addContent(c);
+    if (sf && !sf.__rmdObs) repartirColumnas(sf, c);
+    if (sf) igualarAltoObservaciones(c, sf);
   }
-  // Por si la versión de UI5 no pasa el GridData del Title al FormContainer: su celda de la rejilla se estira a todo el ancho.
-  function filaObservacionesCompleta(c) {
-    const el = c.getDomRef(), celdas = []; let n = el && el.parentElement;
-    while (n && celdas.length < 2 && !n.classList.contains('sapUiSimpleForm')) { if (/\bsapUiRespGridSpanL\d/.test(n.className)) celdas.push(n); n = n.parentElement; }
-    const cont = celdas[1]; if (cont && !/\bsapUiRespGridSpanL12\b/.test(cont.className)) cont.classList.add('rmd-obs-fila');
+  // [Title, Label, campo…, Label, campo…, Title, …] -> columnas [{ titulo, pares: [[Label, campo…]] }]
+  function columnasDe(contenido) {
+    const cols = [];
+    contenido.forEach((x) => {
+      if (esDe(x, 'sap.ui.core.Title') || /Toolbar$/.test(x.getMetadata().getName())) cols.push({ titulo: x, pares: [] });
+      else { if (!cols.length) cols.push({ titulo: null, pares: [] }); const col = cols[cols.length - 1];
+        if (/Label$/.test(x.getMetadata().getName()) || !col.pares.length) col.pares.push([x]); else col.pares[col.pares.length - 1].push(x); }
+    });
+    return cols;
+  }
+  function repartirColumnas(sf, c) {
+    const GridData = sap.ui.require('sap/ui/layout/GridData'); if (!GridData) return;
+    const contenido = sf.getContent(), cols = columnasDe(contenido);
+    const iCol = cols.findIndex((k) => k.pares.some((p) => p.includes(c))); if (iCol < 1) return;
+    const col = cols[iCol], par = col.pares.find((p) => p.includes(c)), otros = col.pares.filter((p) => p !== par), destinos = cols.slice(0, iCol);
+    const etq = /Label$/.test(par[0].getMetadata().getName()) ? par[0] : null;
+    sf.__rmdObs = { contenido: contenido.slice(), layout: [c, etq].filter(Boolean).map((x) => [x, x.getLayoutData()]) };
+    otros.forEach((p, i) => destinos[i % destinos.length].pares.push(p));            // Motivo de Solicitud -> 1.ª, RM Digital Paralelo -> 2.ª
+    col.pares = [par];
+    if (etq) etq.setLayoutData(new GridData({ span: SPAN_TODO }));                  // etiqueta arriba y el cuadro con todo el ancho de la columna
+    c.setLayoutData(new GridData({ span: SPAN_TODO }));
+    sf.removeAllContent();
+    cols.forEach((k) => { if (k.titulo) sf.addContent(k.titulo); k.pares.forEach((p) => p.forEach((x) => sf.addContent(x))); });
+  }
+  // El cuadro llega hasta el pie de la columna más alta (sin pasar de 520 px); con más texto sigue creciendo.
+  function igualarAltoObservaciones(c, sf) {
+    const ta = c.getFocusDomRef && c.getFocusDomRef(), form = sf && sf.getAggregation && sf.getAggregation('form'); if (!ta || !form) return;
+    const conts = form.getFormContainers().map((k) => k.getDomRef()).filter(Boolean), propio = conts.find((x) => x.contains(ta));
+    const pie = Math.max(0, ...conts.filter((x) => x !== propio).map((x) => x.getBoundingClientRect().bottom)); if (!pie) return;
+    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top - 4)));
+    if (ta.style.minHeight !== alto + 'px') ta.style.minHeight = alto + 'px';
   }
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
   // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
@@ -2420,6 +2512,7 @@
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
     document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
+    document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -5881,9 +5974,12 @@
     // 26-379-CC · 26-379 -CC · 2026-379-CC · CC-26-379-CC · CC 26-379 · CC-26-379 · CC N.° 26-379
     const RE_CC = /\b((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\s*[-–]?\s*CC\b|\bC\.?\s?C\.?\s*(?:N\.?\s*[°º]?\s*|[-–]\s*)?((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\b/gi;
     const codigoCC = (a, n) => `${String(a).slice(-2)}-${String(n).padStart(3, '0')}-CC`;
+    // No conformidades / desviaciones: 24-1012-DES · 22-1221-D · NC 24-1012 · NC-24-2044-DES -> «24-1012-DES»
+    const RE_NC = /\b(?:N\.?C|DES)\.?\s*[-–:]?\s*((?:20)?\d{2})\s*[-–]\s*(\d{3,4})(?:\s*[-–]\s*(?:DES|D))?\b|\b((?:20)?\d{2})\s*[-–]\s*(\d{3,4})\s*[-–]\s*(?:DES|D)\b/gi;
     function ccsDe(texto) {
-      const out = []; let m; RE_CC.lastIndex = 0;
-      while ((m = RE_CC.exec(String(texto || '')))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
+      const out = [], t = String(texto || ''); let m; RE_CC.lastIndex = 0; RE_NC.lastIndex = 0;
+      while ((m = RE_CC.exec(t))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
+      while ((m = RE_NC.exec(t))) { const c = `${String(m[1] || m[3]).slice(-2)}-${m[2] || m[4]}-DES`; if (!out.includes(c)) out.push(c); }
       return out;
     }
     // Pendiente: «pendiente», «pend», «falta», «por aplicar», «siguiente versión»… En las Observaciones reales (12.926 MD, oct-2026) casi
@@ -5922,21 +6018,50 @@
     function lineas(texto) {
       return String(texto || '').split(/\r?\n/).flatMap((l) => l.split(/(?=\b\d{2}\s*-\s*\d{2,4}\s*-\s*CC\s*\/)/i)).map(limpio).filter(Boolean);
     }
+    // Producto a dar de baja o descontinuado («dar de baja», «descontinuado», «ya no se fabrica»…); «equipo / balanza … de baja» no cuenta.
+    const RE_BAJA = /\b(?:DAR(?:SE|LO|LA)?\s+DE\s+BAJA|(?:SE\s+)?DA\s+DE\s+BAJA|DADO\s+DE\s+BAJA|DADA\s+DE\s+BAJA|PARA\s+BAJA|DE\s+BAJA|DESCONTINUAD[OA]S?|DESCONTINUA(?:R|DO|CION)?|DISCONTINUAD[OA]S?|DISCONTINUA(?:R|CION)?|YA\s+NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA|COMERCIALIZA|VENDE)|NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA)\s+MAS|FUERA\s+DE\s+(?:LINEA|PORTAFOLIO|PORTAFOLIO)|RETIRAD[OA]\s+DEL\s+(?:MERCADO|PORTAFOLIO)|PRODUCTO\s+INACTIVO|SIN\s+DEMANDA)\b/;
+    const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?)\b[^.;]*\bBAJA\b/;
+    const esBaja = (p) => RE_BAJA.test(p) && !(RE_BAJA_NO.test(p) && !/DESCONTINU|DISCONTINU|NO\s+SE\s+(?:FABRICA|PRODUCE)/.test(p));
+    const RE_ACTUALIZA = /\bACTUALIZA(?:CION|DO|DA|R)?\b|\bMODIFICACION\b|\bCAMBIO\s+DE\b/;
+    // Tipos de línea: baja, pendiente, cc, suspension (motivo), actualizacion, nomenclatura, nota
     function analizar(texto) {
-      const r = { aplicados: [], pendientes: [], hechos: [], lineas: [] };
+      const r = { aplicados: [], pendientes: [], hechos: [], bajas: [], tipos: [], lineas: [] };
       lineas(texto).forEach((l, i) => {
-        const p = plano(l), ccs = ccsDe(l);
+        const p = plano(l), ccs = ccsDe(l), poner = (tipo) => r.tipos.push({ linea: l, tipo, ccs, i });
         r.lineas.push(l);
+        if (esBaja(p)) { r.bajas.push({ linea: l, i }); poner('baja'); return; }
         const pend = esPendiente(p, ccs);
-        if (RE_NOMENCLATURA.test(l) && !ccs.length && !pend) return;
+        if (RE_NOMENCLATURA.test(l) && !ccs.length && !pend) { poner(/^\S+\s+\S/.test(l) && RE_SUSP.test(p) ? 'suspension' : 'nomenclatura'); return; }
         const ent = !pend && entradaCC(l);
-        if (pend) r.pendientes.push({ linea: l, ccs, i });
-        else if (RE_HECHO.test(p) && ccs.length) r.hechos.push({ linea: l, ccs, i });
-        else if (ent) r.aplicados.push({ ...ent, i });
+        if (pend) { r.pendientes.push({ linea: l, ccs, i }); poner('pendiente'); }
+        else if (RE_HECHO.test(p) && ccs.length) { r.hechos.push({ linea: l, ccs, i }); poner('cc'); }
+        else if (ent) { r.aplicados.push({ ...ent, i }); poner('cc'); }
         // otra mención de un CC sin nada pendiente («… CONTROL DE CAMBIO 24-161-CC INCLUSIÓN DE LOTIZADO»): aplicado, sin sus partes
-        else ccs.forEach((c) => r.aplicados.push({ codigo: c, responsable: '', fecha: '', descripcion: l, tipo: '', nivel: '', linea: l, i }));
+        else if (ccs.length) { ccs.forEach((c) => r.aplicados.push({ codigo: c, responsable: '', fecha: '', descripcion: l, tipo: '', nivel: '', linea: l, i })); poner('cc'); }
+        else poner(RE_SUSP.test(p) ? 'suspension' : RE_ACTUALIZA.test(p) ? 'actualizacion' : 'nota');
       });
       return r;
+    }
+    // Una línea que empieza como CC con plantilla («26-379-CC/…») y le falta alguna parte
+    function faltantesCC(linea) {
+      if (!/^\s*(?:20)?\d{2}\s*-\s*\d{2,4}\s*-?\s*CC\s*\//i.test(linea)) return [];
+      const e = entradaCC(linea); if (!e) return [];
+      return [!e.responsable && 'responsable', !e.fecha && 'fecha', !e.descripcion && 'descripción', !e.tipo && 'tipo (proceso, insumo…)', !e.nivel && 'nivel (menor, moderado, mayor)'].filter(Boolean);
+    }
+    // Línea nueva para el botón «+»: texto y la parte a seleccionar para escribir encima
+    function plantilla(tipo, { fecha = new Date(), iniciales = '', responsable = '' } = {}) {
+      const p2 = (n) => String(n).padStart(2, '0'), aaaammdd = `${fecha.getFullYear()}${p2(fecha.getMonth() + 1)}${p2(fecha.getDate())}`, iso = `${fecha.getFullYear()}-${p2(fecha.getMonth() + 1)}-${p2(fecha.getDate())}`;
+      const pre = `${aaaammdd}${iniciales} `, aa = String(fecha.getFullYear()).slice(-2);
+      const t = {
+        cc: [`${aa}-`, '###', `-CC/${responsable || 'Responsable'}/${iso};`, 'descripción', ';proceso;moderado'],
+        pendiente: [`${pre}Pendiente aplicar `, `${aa}-###-CC`, ''],
+        suspension: [`${pre}Se suspende por `, 'motivo o CC', ''],
+        baja: [`${pre}Producto para dar de baja / descontinuado: `, 'motivo', ''],
+        nota: [pre, 'nota', ''],
+      }[tipo];
+      if (!t) return null;
+      const texto = t.join(''), ini = t[0].length;
+      return { texto, sel: [ini, ini + t[1].length] };
     }
     const ccsAplicados = (a) => new Set([...a.aplicados.map((x) => x.codigo), ...a.hechos.flatMap((x) => x.ccs)]);
     // versiones: [{ version, codigo, estado, observacion }]; actual: { version, observacion } (el texto que está en pantalla).
@@ -5965,9 +6090,66 @@
       // lo anotado como pendiente en la propia versión (no copiado de una anterior)
       const previos = new Set(vs.flatMap((v) => [...v.set]));
       const propios = anA.pendientes.filter((p) => !previos.has(plano(p.linea)));
-      return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length };
+      // baja / descontinuado: en cualquier versión (es del producto, no de la versión)
+      const bajas = new Map();
+      [...vs.map((v) => [v, v.an]), [{ version: actual.version, estado: '', propia: true }, anA]].forEach(([v, an]) => an.bajas.forEach((b) => { const k = plano(b.linea); if (!bajas.has(k)) bajas.set(k, { version: v.version, estado: v.estado, linea: b.linea, propia: !!v.propia }); }));
+      const formato = anA.tipos.filter((x) => x.tipo === 'cc' && !previos.has(plano(x.linea))).map((x) => ({ linea: x.linea, faltan: faltantesCC(x.linea) })).filter((x) => x.faltan.length);
+      return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
+        bajas: [...bajas.values()], formato };
     }
-    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas };
+    // ---- Listado de CC / NC / DES para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima) ----
+    // Columnas por su encabezado: AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES, ESTATUS (o ESTATUS DE FILE), MOTIVO.
+    const ETAPAS_CAMBIO = { FAB: 'FABRICACION', ENV: 'ENVASE', ACO: 'ACONDICIONADO', ACOND: 'ACONDICIONADO', REC: 'RECUBRIMIENTO', INSP: 'INSPECCION', INS: 'INSPECCION' };
+    const plantaDeHoja = (h) => (/PLANTA\s*1\b|\bATE\b|\bPL\s*1\b/i.test(h) ? 'Ate' : /PLANTA\s*2\b|\bLIMA\b|\bPL\s*2\b/i.test(h) ? 'Lima' : '');
+    function fechaCambio(v) {
+      if (v == null || v === '') return '';
+      if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Date.UTC(1899, 11, 30) + v * 864e5); return d.toISOString().slice(0, 10); }
+      const t = String(v).trim(), a = /^(\d{4})-(\d{2})-(\d{2})/.exec(t), b = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/.exec(t);
+      return a ? `${a[1]}-${a[2]}-${a[3]}` : b ? `${b[3]}-${b[2].padStart(2, '0')}-${b[1].padStart(2, '0')}` : '';
+    }
+    const partirLista = (t) => plano(t).split(/[-/,;+\s]+/).map((x) => x.trim()).filter(Boolean);
+    // hojas = [{ hoja, filas: [[celdas]] }] -> [{ planta, hoja, area: [], etapa: [], aplica, borrador, descripcion, fecha, nomenclatura, estatus, motivo, codigos: [] }]
+    function cambiosDeFilas(hojas) {
+      const out = [];
+      (hojas || []).forEach(({ hoja, filas }) => {
+        const iCab = (filas || []).findIndex((f) => Array.isArray(f) && f.some((c) => /NOMENCLATURA\s+PARA\s+OBSERVACIONES/.test(plano(c))) && f.some((c) => /DESCRIPCION\s+DEL\s+CAMBIO/.test(plano(c))));
+        if (iCab < 0) return;
+        const cab = filas[iCab].map((c) => plano(c).trim()), col = (re) => cab.findIndex((c) => re.test(c));
+        const k = { area: col(/^AREA$/), etapa: col(/^ETAPA$/), aplica: col(/^APLICA$/), desc: col(/DESCRIPCION DEL CAMBIO/), fecha: col(/^FECHA$/), nom: col(/NOMENCLATURA PARA OBSERVACIONES/), estatus: col(/^ESTATUS/), motivo: col(/^MOTIVO$/) };
+        const planta = plantaDeHoja(hoja);
+        filas.slice(iCab + 1).forEach((f) => {
+          if (!Array.isArray(f)) return;
+          const v = (i) => (i >= 0 && f[i] != null ? String(f[i]).replace(/\s+/g, ' ').trim() : ''), desc = v(k.desc), nom = v(k.nom);
+          if (!desc && !nom) return;
+          let codigos = ccsDe(`${nom} ${desc}`);
+          const suelto = /^\s*(?:C\.?C\.?\s*[-–]?\s*)?(\d{2})\s*-\s*(\d{3})\s*\//.exec(nom);              // «26-280/D.Ayala/…» (Planta 1, sin «-CC»)
+          if (!codigos.length && suelto) codigos = [codigoCC(suelto[1], suelto[2])];
+          const ap = plano(v(k.aplica));
+          out.push({ planta, hoja, area: partirLista(v(k.area)), etapa: partirLista(v(k.etapa)).map((e) => ETAPAS_CAMBIO[e] || (e === 'TODOS' ? 'TODAS' : e)), aplica: /^SI/.test(ap), borrador: /BORR/.test(ap),
+            descripcion: desc, fecha: fechaCambio(f[k.fecha]), nomenclatura: nom, estatus: v(k.estatus), motivo: v(k.motivo), codigos });
+        });
+      });
+      return out;
+    }
+    // Áreas del listado -> palabras del Área / descripción del RMD (las de planta como PV1, GV2… se comparan tal cual)
+    const AREAS_CAMBIO = { SOL: ['SOLIDO'], LIQ: ['LIQUIDO'], SEM: ['SEMISOLIDO', 'SEMI SOLIDO'], SEH: ['SEMISOLIDO', 'HORMONA'], SHO: ['SOLIDO', 'HORMONA'], COS: ['COSMETIC'], PEN: ['PENICILIN', 'BETALACTAM'],
+      CEF: ['CEFALOSPORIN'], CEFA: ['CEFALOSPORIN'], BEB: ['BEBIDA'], INH: ['INHALA'], INY: ['INYECTABLE'], ACO: ['ACONDICIONADO'] };
+    // Cambios del listado que tocan a un RMD: misma planta, la etapa y (el producto en la descripción, o el área). rmd: { planta, etapa, area, descripcion, producto, desde }
+    function cambiosQueAplican(cambios, rmd) {
+      const etapa = plano(rmd.etapa || ''), area = plano(`${rmd.area || ''}`), prod = plano(rmd.producto || '').replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !/^(TABLETA|TABLETAS|CAPSULA|CAPSULAS|RECUBIERTA|SUSPENSION|SOLUCION|CREMA|JARABE|INYECTABLE|BLANDA)$/.test(w));
+      const planta = rmd.planta ? plano(rmd.planta) : '';
+      return (cambios || []).filter((c) => (!planta || !c.planta || plano(c.planta) === planta || planta.includes(plano(c.planta)))
+        && (!c.etapa.length || c.etapa.includes('TODAS') || c.etapa.some((e) => etapa.startsWith(e) || e.startsWith(etapa.slice(0, 3))))
+        && (!rmd.desde || !c.fecha || c.fecha >= rmd.desde))
+        .map((c) => {
+          const texto = plano(`${c.descripcion} ${c.nomenclatura}`), porProducto = prod.length > 0 && texto.includes(prod[0]) && (prod.length < 2 || texto.includes(prod[1]) || prod[0].length >= 6);
+          const porArea = c.area.includes('TODAS') || c.area.some((a) => area.includes(a) || (AREAS_CAMBIO[a] || []).some((w) => area.includes(w)));
+          // APLICA = NO solo cuenta si nombra el producto; por área solo los que APLICA = SI
+          return porProducto || (porArea && c.aplica) ? { ...c, por: porProducto ? 'producto' : 'area' } : null;
+        }).filter(Boolean);
+    }
+    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
+    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA, cambiosDeFilas, cambiosQueAplican, fechaCambio };
   })();
   // ==PENDIENTES-FIN==
 
@@ -6504,6 +6686,7 @@
     });
     const ccTxt = (x) => x.pd.aplicados.map((a) => a.codigo + (a.heredado ? ' (ant.)' : '')).join(', ');
     const pendCcTxt = (x) => x.pd.ccs.map((p) => `${p.cc} (v${p.version}: ${p.linea})`).join('\n');
+    const bajaTxt = (x) => x.pd.bajas.map((b) => `v${b.version}: ${b.linea}`).join('\n');
     const pendTxt = (x) => [...x.pd.textos.map((p) => `v${p.version}: ${p.linea}`), ...x.pd.propios.map((p) => `esta versión: ${p.linea}`)].join('\n');
     const clave = (p) => SIN_ACENTOS(p).toUpperCase(), nombreProd = new Map(); filas.forEach((x) => { const k = clave(x.producto); if (!nombreProd.has(k)) nombreProd.set(k, x.producto); x.claveProd = k; x.producto = nombreProd.get(k); });
     const ordenEst = { Ingresado: 0, Suspendido: 1, Autorizado: 2 };
@@ -6519,25 +6702,26 @@
     //  Pendientes
     // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
-    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
-      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
-      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda' }, { congelar: 'E2', activa: true });
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda' }, { congelar: 'E2', activa: true });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
-      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
-      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
+      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
       todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
-        ccTxt(x), pendCcTxt(x), pendTxt(x), fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
         x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
-      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'fechaCelda', 19: 'fechaCelda', 22: 'fechaCelda', 24: 'numCelda' }, { congelar: 'C2' });
+      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'fechaCelda', 20: 'fechaCelda', 23: 'fechaCelda', 25: 'numCelda' }, { congelar: 'C2' });
     //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
     const frases = [];
     filas.forEach((x) => (x.historial || [x.m]).forEach((m) => { const a = Pendientes.analizar(m.observacion);
       a.aplicados.forEach((e) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'CC aplicado', e.codigo, e.responsable, e.fecha, e.descripcion, e.tipo, e.nivel, e.linea]));
       a.pendientes.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Pendiente', p.ccs.join(', '), '', '', '', '', '', p.linea]));
-      a.hechos.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Menciona un CC', p.ccs.join(', '), '', '', '', '', '', p.linea])); }));
+      a.hechos.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Menciona un CC', p.ccs.join(', '), '', '', '', '', '', p.linea]));
+      a.bajas.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Baja / descontinuado', '', '', '', '', '', '', p.linea])); }));
     frases.sort((a, b) => nat(a[0], b[0]) || nat(a[1], b[1]) || (a[2] - b[2]));
     tabla('Frases de Observaciones', 'FrasesObs', ['Producto', 'Código RMD', 'Versión', 'Estado', 'Tipo de línea', 'CC', 'Responsable', 'Fecha CC', 'Descripción del CC', 'Tipo CC', 'Nivel', 'Línea completa'],
       [30, 13, 8, 12, 15, 22, 16, 11, 50, 10, 10, 90], frases, { 3: (f) => estiloEst(f[3]), 1: 'codigoCelda', 2: 'numCelda', 8: 'textoCelda', 11: 'textoCelda' });
@@ -8453,6 +8637,7 @@
       lista && on('statusrmd') && document.querySelector('.rmd-status-rmd') && ['Enviar a Status RMD', 'Maestro completo a Status RMD', clic('.rmd-status-rmd')],
       on('reglasrev') && ['Reglas de revisión', 'Crear o activar reglas, exportarlas / importarlas y cargar las listas', () => abrirReglas()],
       on('reglasrev') && ['Equipos calificados', 'Cargar o consultar la lista de equipos calificados (registro OQ / PQ)', () => abrirReglas('calificados')],
+      on('reglasrev') && ['Controles de cambio', 'Cargar o consultar el listado de CC / NC / DES para actualizar RMD', () => abrirReglas('cambios')],
       ['Mejoras de interfaz', 'Activar o desactivar las mejoras', () => { const p = document.getElementById('rmd-ui-panel'); if (p) p.open = true; }],
     ].filter(Boolean);
   }
@@ -9268,7 +9453,8 @@
     }));
     return { leer: (k) => tx('readonly', (s) => s.get(k)), guardar: (k, v) => tx('readwrite', (s) => s.put(v, k)), borrar: (k) => tx('readwrite', (s) => s.delete(k)) };
   })();
-  const RR = { reglas: null, ver: 1, vigentes: null, mapa: null, calif: null, mapaCalif: null, catalogo: null, pidiendoCat: false, comp: null, compClave: '', errorGuardar: '', listo: null };
+  const CLAVE_CAMBIOS_LS = 'rmdUiCambios', SELLO_CAMBIOS = 'rmdUiCambiosSello';
+  const RR = { cambios: null, cambiosVer: 0, reglas: null, ver: 1, vigentes: null, mapa: null, calif: null, mapaCalif: null, catalogo: null, pidiendoCat: false, comp: null, compClave: '', errorGuardar: '', listo: null };
   function leerDatoReglasLS() { try { const o = JSON.parse(localStorage.getItem(CLAVE_REGLAS) || 'null'); return o && Array.isArray(o.reglas) ? o : null; } catch (e) { return null; } }   // dañado: se recupera de IndexedDB
   function leerReglasLS() { const o = leerDatoReglasLS(); return o ? o.reglas.map(Reglas.normalizar) : null; }
   // guardadas + predeterminadas nuevas
@@ -9342,6 +9528,33 @@
     ponerCalificados(v); ajustarTodo(); refrescarVentanaReglas();
     return { ok, error };
   }
+  // ---- Listado de CC / NC / DES: { archivo, cargado, n, hojas, cambios: [...] } (Pendientes.cambiosDeFilas) ----
+  function ponerCambios(v) { RR.cambios = v && Array.isArray(v.cambios) && v.cambios.length ? v : null; RR.cambiosVer = (RR.cambiosVer || 0) + 1; }
+  async function leerCambiosGuardados() {
+    let v = null;
+    try { v = await Almacen.leer('cambios'); } catch (e) { v = null; }
+    if (!v) { try { v = JSON.parse(localStorage.getItem(CLAVE_CAMBIOS_LS) || 'null'); } catch (e) { v = null; } }
+    ponerCambios(v); refrescarVentanaReglas();
+  }
+  async function guardarCambios(v) {
+    let ok = false, error = '';
+    if (v) {
+      try { await Almacen.guardar('cambios', v); ok = true; try { localStorage.removeItem(CLAVE_CAMBIOS_LS); } catch (e) { } }
+      catch (e) { error = e.message; try { localStorage.setItem(CLAVE_CAMBIOS_LS, JSON.stringify(v)); ok = true; } catch (e2) { error = e2.message; } }
+    } else {
+      try { await Almacen.borrar('cambios'); } catch (e) { }
+      try { localStorage.removeItem(CLAVE_CAMBIOS_LS); } catch (e) { }
+      ok = true;
+    }
+    try { localStorage.setItem(SELLO_CAMBIOS, String(Date.now())); } catch (e) { }
+    ponerCambios(v); ajustarTodo(); refrescarVentanaReglas();
+    return { ok, error };
+  }
+  async function leerListaCambios(u8, archivo) {
+    const hojas = await filasDeArchivo(u8, archivo), cambios = Pendientes.cambiosDeFilas(hojas);
+    if (!cambios.length) throw new Error('no se encontró una hoja con «DESCRIPCION DEL CAMBIO» y «NOMENCLATURA PARA OBSERVACIONES»');
+    return { archivo, n: cambios.length, hojas: [...new Set(cambios.map((c) => c.hoja))], cambios };
+  }
   // Arranque: sincroniza reglas entre localStorage e IndexedDB, carga listas y agrega predeterminadas nuevas.
   RR.listo = (async () => {
     try {
@@ -9355,12 +9568,14 @@
     } catch (e) { }
     await leerVigentesGuardados();
     await leerCalificadosGuardados();
+    await leerCambiosGuardados();
   })();
   // cambios desde otra pestaña
   window.addEventListener('storage', (e) => {
     if (e.key === CLAVE_REGLAS) { RR.reglas = null; RR.ver++; ajustarTodo(); refrescarVentanaReglas(); }
     else if (e.key === SELLO_VIGENTES) leerVigentesGuardados();
     else if (e.key === SELLO_CALIF) leerCalificadosGuardados();
+    else if (e.key === SELLO_CAMBIOS) leerCambiosGuardados();
   });
   const firmaReglas = () => `${RR.ver}|${RR.mapa ? 1 : 0}|${RR.catalogo ? 1 : 0}|${RR.mapaCalif ? 1 : 0}`;
   const ctxReglas = (x) => ({ vigentes: RR.mapa, catalogo: RR.catalogo, calificados: RR.mapaCalif && RR.mapaCalif.porCodigo, calificadosSap: RR.mapaCalif && RR.mapaCalif.porSap, ...(x || {}) });
@@ -10031,13 +10246,13 @@
   function abrirReglas(pestana) {
     if (ventanaReglas && ventanaReglas.fondo.isConnected) { ventanaReglas.irA(pestana || 'reglas'); return; }
     registrarExternosUI5();
-    let vista = ['vigentes', 'calificados'].includes(pestana) ? pestana : 'reglas', editando = null, sucio = false, importando = null, cargandoVig = null, cargandoCal = null, consulta = '', consultaCal = '';
+    let vista = ['vigentes', 'calificados', 'cambios'].includes(pestana) ? pestana : 'reglas', editando = null, sucio = false, importando = null, cargandoVig = null, cargandoCal = null, cargandoCam = null, consulta = '', consultaCal = '', consultaCam = '';
     const esArriba = () => [...document.querySelectorAll('.rmd-modal-fondo')].pop() === v.fondo;
     const v = ventana('Reglas de revisión', { cancelar: () => { if (esArriba()) salir(); } });
     const tarjeta = v.fondo.querySelector('.rmd-modal'), h3 = tarjeta.querySelector('h3');
     tarjeta.classList.add('rmd-reglas'); v.fondo.classList.add('rmd-reglas-fondo');
     const tabs = document.createElement('div'); tabs.className = 'rmd-rg-tabs'; tabs.setAttribute('role', 'tablist');
-    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button><button type="button" role="tab" data-p="calificados">Equipos calificados <span></span></button>';
+    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button><button type="button" role="tab" data-p="calificados">Equipos calificados <span></span></button><button type="button" role="tab" data-p="cambios">Controles de cambio <span></span></button>';
     h3.insertAdjacentElement('afterend', tabs);
     const archivo = document.createElement('input'); archivo.type = 'file'; archivo.hidden = true; archivo.className = 'rmd-rg-archivo'; tarjeta.appendChild(archivo);
     let alElegir = null;
@@ -10063,6 +10278,11 @@
       try {
         const u8 = new Uint8Array(await f.arrayBuffer()), ini = textoDeBytes(u8.subarray(0, 200)).replace(/^﻿/, '').trimStart();
         if (/\.json$/i.test(f.name) || ini.startsWith('{') || ini.startsWith('[')) { importando = { archivo: f.name, ...Reglas.leerExportado(JSON.parse(textoDeBytes(u8).replace(/^﻿/, ''))) }; vista = 'importar'; pintar(); return; }
+        let lcam = null; try { lcam = await leerListaCambios(u8, f.name); } catch (e) { lcam = null; }
+        if (lcam) {
+          const antes = RR.cambios ? new Set(RR.cambios.cambios.flatMap((c) => c.codigos)) : null;
+          cargandoCam = { ...lcam, nuevos: antes ? [...new Set(lcam.cambios.flatMap((c) => c.codigos))].filter((k) => !antes.has(k)).length : null }; vista = 'cargarCam'; pintar(); return;
+        }
         let lc = null; try { lc = await leerListaCalificados(u8, f.name); } catch (e) { lc = null; }
         if (lc) {
           const antes = RR.mapaCalif ? RR.mapaCalif.porCodigo : null, ahora = Reglas.mapaCalificados(lc, lc.estadosOk).porCodigo;
@@ -10075,17 +10295,18 @@
       } catch (e) { toast(`No se pudo leer «${f.name}»: ${e.message}`, true); }
     }
     function pintar() {
-      const pest = vista === 'vigentes' || vista === 'cargarVig' ? 'vigentes' : vista === 'calificados' || vista === 'cargarCalif' ? 'calificados' : 'reglas';
+      const pest = vista === 'vigentes' || vista === 'cargarVig' ? 'vigentes' : vista === 'calificados' || vista === 'cargarCalif' ? 'calificados' : vista === 'cambios' || vista === 'cargarCam' ? 'cambios' : 'reglas';
       tabs.querySelectorAll('button').forEach((b) => { const act = b.dataset.p === pest; b.classList.toggle('activa', act); b.setAttribute('aria-selected', String(act)); });
       tabs.querySelector('[data-p=reglas] span').textContent = `(${reglasActuales().length})`;
       tabs.querySelector('[data-p=vigentes] span').textContent = RR.vigentes ? `(${RR.vigentes.docs.length.toLocaleString('es-PE')})` : '';
       tabs.querySelector('[data-p=calificados] span').textContent = RR.calif ? `(${RR.calif.equipos.length.toLocaleString('es-PE')})` : '';
+      tabs.querySelector('[data-p=cambios] span').textContent = RR.cambios ? `(${RR.cambios.cambios.length.toLocaleString('es-PE')})` : '';
       tabs.style.display = vista === 'editor' || vista === 'importar' ? 'none' : '';
       h3.textContent = vista === 'editor' ? (editando.nueva ? 'Nueva regla de revisión' : `Editar regla — ${editando.regla.nombre || ''}`) : vista === 'importar' ? 'Importar configuración'
-        : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : vista === 'cargarCalif' ? 'Cargar la lista de equipos calificados' : 'Reglas de revisión';
+        : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : vista === 'cargarCalif' ? 'Cargar la lista de equipos calificados' : vista === 'cargarCam' ? 'Cargar el listado de controles de cambio' : 'Reglas de revisión';
       v.pie.innerHTML = ''; v.fondo.__ctrlS = null; v.cuerpo.oninput = null; v.cuerpo.onchange = null;
-      ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif })[vista]();
-      if (['reglas', 'vigentes', 'calificados'].includes(vista)) {
+      ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, cambios: pintarCambios, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif, cargarCam: pintarCargaCam })[vista]();
+      if (['reglas', 'vigentes', 'calificados', 'cambios'].includes(vista)) {
         const bT = botonModal('Restablecer todo…', 'peligro', () => restablecerTodo()); bT.title = 'Vuelve todo a como venía: reglas predeterminadas y sin listas cargadas';
         v.pie.insertBefore(bT, v.pie.lastElementChild);
       }
@@ -10126,7 +10347,11 @@
       else if (a === 'restablecer') restablecer();
       else if (a === 'ir-vigentes') ir('vigentes');
       else if (a === 'ir-calificados') ir('calificados');
-      else if (a === 'cargar' || a === 'cargar-calif') elegirArchivo('.xls,.xlsx,.csv,.txt', abrirArchivo);
+      else if (a === 'cargar' || a === 'cargar-calif' || a === 'cargar-cam') elegirArchivo('.xls,.xlsx,.csv,.txt', abrirArchivo);
+      else if (a === 'restablecer-cam') {
+        if (!RR.cambios) return;
+        if (await confirmar('¿Quitar el listado de controles de cambio?', `Se quita de este navegador «${RR.cambios.archivo}» (${RR.cambios.cambios.length} cambios).`, 'Sin listado, «Asociar fórmulas» no puede sugerir los CC del producto. Puedes volver a cargarlo cuando quieras.', { si: 'Quitar', no: 'Cancelar', peligro: true })) { await guardarCambios(null); toast('Listado de controles de cambio quitado.'); }
+      }
       else if (a === 'restablecer-vig') {
         if (!RR.vigentes) return;
         if (await confirmar('¿Restablecer los documentos vigentes?', `Se quita de este navegador la lista «${RR.vigentes.archivo}» (${RR.vigentes.docs.length} documentos) y queda como al principio, sin lista.`, 'Sin lista no se puede saber qué documentos citados están vigentes. Puedes volver a cargarla cuando quieras.', { si: 'Restablecer', no: 'Cancelar', peligro: true })) { await guardarVigentes(null); toast('Documentos vigentes restablecidos: sin lista cargada.'); }
@@ -10161,7 +10386,7 @@
       const w = ventana('Restablecer todo', { cancelar: () => w.cerrar() });
       w.fondo.querySelector('.rmd-modal').classList.add('rmd-modal-aviso');
       w.cuerpo.innerHTML = `<p>Todo lo configurado en «Reglas de revisión» vuelve a como venía: solo las reglas predeterminadas, sin la lista de documentos vigentes${RR.vigentes ? ` («${esc(RR.vigentes.archivo)}»)` : ''} y sin la de equipos calificados${RR.calif ? ` («${esc(RR.calif.archivo)}»)` : ''}.</p><p class="rmd-aviso-ayuda">Se borra de este navegador. Si quieres conservarlo, antes usa «Exportar configuración».</p>`;
-      const bSi = botonModal('Restablecer todo', 'peligro', async () => { w.cerrar(); await guardarReglas(Reglas.predeterminadas()); await guardarVigentes(null); await guardarCalificados(null); vista = 'reglas'; pintar(); toast('Reglas de revisión restablecidas: predeterminadas y sin listas.'); });
+      const bSi = botonModal('Restablecer todo', 'peligro', async () => { w.cerrar(); await guardarReglas(Reglas.predeterminadas()); await guardarVigentes(null); await guardarCalificados(null); await guardarCambios(null); vista = 'reglas'; pintar(); toast('Reglas de revisión restablecidas: predeterminadas y sin listas.'); });
       w.pie.append(bSi, botonModal('Cancelar', 'primario', () => w.cerrar()));
     }
     function restablecer() {
@@ -10303,6 +10528,40 @@
     const califOk = (g) => ((RR.calif && RR.calif.estadosOk) || Reglas.ESTADOS_OK).some((x) => Reglas.plegar(x).p.trim() === Reglas.plegar(g || '').p.trim());
     const filaCal = (e) => `<tr><td class="rmd-nowrap">${esc(e[0] || '—')}</td><td class="rmd-nowrap">${esc(e[1] || '—')}</td><td>${esc(e[2])}</td><td class="rmd-nowrap"><b class="${califOk(e[3]) ? 'rmd-vig-si' : 'rmd-vig-no'}">${esc(e[3] || '(sin estado)')}</b></td><td>${esc(e[4])}</td><td>${esc(e[5])}</td><td class="rmd-nowrap">${esc(e[6] || '')}${e[7] ? ' / ' + esc(e[7]) : ''}</td></tr>`;
     const CAB_CAL = '<thead><tr><th>Código</th><th>SAP</th><th>Descripción</th><th>Estado general</th><th>OQ</th><th>PQ</th><th>Próxima OQ / PQ</th></tr></thead>';
+    // -- listado de controles de cambio / NC / DES --
+    const CAB_CAM = '<thead><tr><th>Planta</th><th>Código</th><th>Área</th><th>Etapa</th><th>Aplica</th><th>Fecha</th><th>Descripción</th><th>Estatus</th></tr></thead>';
+    const filaCam = (c) => `<tr><td>${esc(c.planta)}</td><td>${esc(c.codigos.join(', ') || '—')}</td><td>${esc(c.area.join(' / '))}</td><td>${esc(c.etapa.map((e) => e.slice(0, 3)).join(' / '))}</td><td>${c.aplica ? (c.borrador ? 'Sí (borrador)' : 'Sí') : 'No'}</td><td>${esc(c.fecha)}</td><td title="${esc(c.nomenclatura)}">${esc(c.descripcion)}</td><td>${esc(c.estatus)}</td></tr>`;
+    function pintarCambios() {
+      const C = RR.cambios, porPlanta = C ? [...C.cambios.reduce((m, c) => m.set(c.planta || '(sin planta)', (m.get(c.planta || '(sin planta)') || 0) + 1), new Map())].map(([p, n]) => `${esc(p)}: ${n}`).join(' · ') : '';
+      v.cuerpo.innerHTML = `${C ? `<p class="rmd-rg-vig-ok">✓ <b>${C.cambios.length.toLocaleString('es-PE')} cambios</b> (${porPlanta}) · «${esc(C.archivo)}» · cargado el ${esc(fechaHoraCorta(C.cargado))}</p>` : '<p class="rmd-rg-falta">Aún no hay un listado cargado.</p>'}
+        <p class="rmd-nota"><b>Qué es:</b> el Excel de controles de cambio, no conformidades y desviaciones para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima, con AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES y ESTATUS).</p>
+        <p class="rmd-nota"><b>Dónde se usa:</b> en «Asociar fórmulas», el aviso de Observaciones lista los cambios de la misma planta y etapa que nombran el producto (📦) o, si APLICA = SI, su área (🏭), desde la autorización de la versión anterior, que todavía no están anotados; «Agregar» pone su nomenclatura al final de Observaciones. Las etiquetas de CC muestran su descripción del listado.</p>
+        <div class="rmd-rg-barra"><button type="button" class="rmd-btn primario" data-a="cargar-cam">${C ? 'Cargar otro listado' : 'Cargar el listado'} (.xlsx, .xls o .csv)</button><span class="rmd-nota">o suelta el archivo en esta ventana</span><span class="rmd-rg-esp"></span>
+          <button type="button" class="rmd-btn peligro" data-a="restablecer-cam" ${C ? '' : 'disabled'}>Quitar</button></div>
+        ${C ? '<div class="rmd-rg-buscar"><input type="search" class="rmd-rg-q rmd-rg-qcam" placeholder="Buscar por código, producto o descripción" aria-label="Buscar en el listado de controles de cambio"></div><div class="rmd-rg-cam-res"></div>' : ''}`;
+      const inp = q('.rmd-rg-qcam');
+      if (inp) { inp.value = consultaCam; inp.addEventListener('input', () => { consultaCam = inp.value; buscarCam(); }); buscarCam(); }
+      v.pie.append(Object.assign(document.createElement('span'), { className: 'rmd-rg-estado', textContent: 'Listado guardado solo en este navegador' }), botonModal('Cerrar', 'primario', () => salir()));
+    }
+    function buscarCam() {
+      const out = q('.rmd-rg-cam-res'); if (!out || !RR.cambios) return;
+      const t = Reglas.plegar(consultaCam.trim()).p; if (!t) { out.innerHTML = ''; return; }
+      const hall = RR.cambios.cambios.filter((c) => Reglas.plegar(`${c.codigos.join(' ')} ${c.descripcion} ${c.nomenclatura} ${c.area.join(' ')}`).p.includes(t)).slice(0, 40);
+      out.innerHTML = hall.length ? `<table class="rmd-tabla">${CAB_CAM}<tbody>${hall.map(filaCam).join('')}</tbody></table>` : '<p class="rmd-nota">Nada coincide.</p>';
+    }
+    function pintarCargaCam() {
+      const c = cargandoCam, sin = c.cambios.filter((x) => !x.codigos.length).length, si = c.cambios.filter((x) => x.aplica).length;
+      v.cuerpo.innerHTML = `<p>Se leyeron <b>${c.n.toLocaleString('es-PE')} cambios</b> de «${esc(c.archivo)}» (hojas ${c.hojas.map((h) => `«${esc(h)}»`).join(', ')}): ${si} con APLICA = SI y ${sin} sin código (anotaciones internas «PEND-», «ACT-»…).</p>
+        ${RR.cambios ? `<p>Reemplaza el listado actual (${RR.cambios.cambios.length} cambios, cargado el ${esc(fechaHoraCorta(RR.cambios.cargado))})${c.nuevos != null ? `: <b>${c.nuevos}</b> código(s) nuevo(s)` : ''}.</p>` : ''}
+        <table class="rmd-tabla">${CAB_CAM}<tbody>${c.cambios.slice(-6).reverse().map(filaCam).join('')}</tbody></table><p class="rmd-nota">(los 6 últimos)</p>`;
+      const usar = async () => {
+        const r = await guardarCambios({ archivo: c.archivo, cargado: new Date().toISOString(), n: c.n, hojas: c.hojas, cambios: c.cambios });
+        cargandoCam = null; vista = 'cambios'; pintar();
+        toast(r.ok ? `Listado cargado: ${c.n} cambios. Queda guardado en este navegador.` : `Listado cargado solo mientras la página siga abierta (${r.error}).`, !r.ok);
+      };
+      v.pie.append(botonModal('Cancelar', '', () => { cargandoCam = null; vista = 'cambios'; pintar(); }), botonModal('Usar este listado', 'primario', usar));
+      v.fondo.__ctrlS = usar;
+    }
     function pintarCalificados() {
       const C = RR.calif, dias = C ? diasDesde(C.cargado) : 0, ok = (C && C.estadosOk) || Reglas.ESTADOS_OK;
       const sin = RR.mapaCalif ? [...RR.mapaCalif.porCodigo.values()].filter((x) => !x.ok).length : 0, codigos = RR.mapaCalif ? RR.mapaCalif.porCodigo.size : 0;
@@ -10367,7 +10626,7 @@
       v.pie.append(botonModal('Cancelar', '', () => { importando = null; vista = 'reglas'; pintar(); }), botonModal('Importar', 'primario', importar));
       v.fondo.__ctrlS = importar;
     }
-    ventanaReglas = { fondo: v.fondo, irA: (p) => ir(p), refrescar: () => { if (['reglas', 'vigentes', 'calificados'].includes(vista)) { const foco = document.activeElement && document.activeElement.classList.contains('rmd-rg-q'); pintar(); if (foco) { const i = q('.rmd-rg-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } } }, elegir: abrirArchivo };
+    ventanaReglas = { fondo: v.fondo, irA: (p) => ir(p), refrescar: () => { if (['reglas', 'vigentes', 'calificados', 'cambios'].includes(vista)) { const foco = document.activeElement && document.activeElement.classList.contains('rmd-rg-q'); pintar(); if (foco) { const i = q('.rmd-rg-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } } }, elegir: abrirArchivo };
     pintar();
   }
   window.__rmdStats.reglas = {
