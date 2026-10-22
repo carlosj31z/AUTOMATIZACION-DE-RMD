@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.73.1
+// @version      1.74
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.73.1';                                                       // mantener igual a @version
+  const VERSION = '1.74';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -59,6 +59,8 @@
     ['formulas', 'Ordenar fórmulas', 'Subir y bajar los términos de una fórmula (Alt+↑ / Alt+↓).'],
     ['espec', 'Especificaciones editables', 'Reordenar filas y editar sus textos.'],
     ['asociar', 'Revisión de Asociar fórmulas', 'Avisa códigos distintos a la versión anterior y valida la 1.ª línea de Observaciones.'],
+    ['pendientes', 'Controles de cambio y pendientes', 'En «Asociar fórmulas» lista los CC aplicados y avisa lo que una versión anterior dejó pendiente («se suspende por 26-379-CC», «pendiente aplicar…»).'],
+    ['obsalto', 'Observaciones más alto', 'En «Asociar fórmulas» el cuadro de Observaciones crece con el texto.'],
     ['recetas', 'Recetas frente a SAP', 'Avisa si la lista de materiales de una receta asociada cambió en SAP.'],
     ['recetasvarias', 'Eliminar varias recetas', 'Marca varias recetas y elimínalas de una vez.'],
     ['puestoreceta', 'Mismo puesto de trabajo', 'No deja asociar recetas de otro puesto de trabajo.'],
@@ -602,6 +604,12 @@
   .rmd-toast.error { border-left-color: var(--rmd-rojo); }
 
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
+  #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
+  #rmd-aviso-pendientes.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); }
+  #rmd-aviso-pendientes.bloquea { border-left-color: var(--rmd-rojo); }
+  #rmd-aviso-pendientes .rmd-pd-cc { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); font-weight: 600; cursor: help; }
+  #rmd-aviso-pendientes .rmd-pd-cc.viejo { opacity: .65; font-weight: 400; }
+  #rmd-aviso-pendientes ul { margin: 2px 0 0; padding-left: 18px; } #rmd-aviso-pendientes q { font-style: italic; color: var(--rmd-apagado); }
   #rmd-aviso-asociar.ok, #rmd-aviso-nomenclatura.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
   .rmd-campo-aviso .sapMInputBaseContentWrapper, .rmd-campo-aviso .sapMInputBaseInner { box-shadow: 0 0 0 2px var(--rmd-ambar) !important; border-radius: 2px; }
   /* ── Botón y panel de mejoras: vidrio translúcido; el desenfoque solo se calcula con el panel abierto o el botón activo ── */
@@ -2053,6 +2061,70 @@
     } else if (avN) avN.remove();
   }
 
+  // ---- 6b-bis. «Asociar Fórmula»: controles de cambio aplicados y pendientes de versiones anteriores (solo lectura) ----
+  // Las versiones del master se leen una vez por ventana (codigoversionprincipal); el texto de Observaciones se toma de la pantalla.
+  function gestionarPendientesAsociar() {
+    const d = typeof sap !== 'undefined' && dialogos().find((x) => /^Asociar F[oó]rmula/i.test(cabecera(x)));
+    if (!d) return;
+    const elObs = campoDe(d, 'Observaciones');
+    agrandarObservaciones(elObs);
+    let av = d.querySelector('#rmd-aviso-pendientes');
+    if (!on('pendientes')) { if (av) av.remove(); return; }
+    const ctrl = controladorPrincipal(); if (!ctrl || !elObs) return;
+    const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2');
+    if (!asoc || !asoc.mdId || !modelo) return;
+    if (d.__rmdPendMd !== asoc.mdId) {
+      d.__rmdPendMd = asoc.mdId; d.__rmdPendVs = null;
+      const principal = String(asoc.codigoversionprincipal || asoc.codigo || '');
+      (principal ? ppVersiones(modelo, principal) : Promise.resolve([])).then((vs) => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = vs; gestionarPendientesAsociar(); } },
+        () => { if (d.__rmdPendMd === asoc.mdId) { d.__rmdPendVs = []; d.__rmdPendError = true; gestionarPendientesAsociar(); } });
+    }
+    const vs = d.__rmdPendVs || [], version = +asoc.version || +((vs.find((m) => m.mdId === asoc.mdId) || {}).version) || 0;
+    const clave = `${vs.length}|${version}|${elObs.value}`;
+    if (d.__rmdPendClave !== clave) { d.__rmdPendClave = clave; d.__rmdPendRes = Pendientes.heredados(vs.filter((m) => m.mdId !== asoc.mdId).map((m) => ({ version: m.version, codigo: m.codigo, estado: m.estado, observacion: m.observacion })), { version, observacion: elObs.value }); }
+    const r = d.__rmdPendRes;
+    const autorizar = +asoc.estadoIdRmd_iMaestraIdBK === 465 && +asoc.estadoIdRmd_iMaestraId !== 465;
+    const html = htmlPendientes(r, { cargando: !d.__rmdPendVs, error: d.__rmdPendError, autorizar });
+    if (!html) { if (av) av.remove(); return; }
+    if (!av) {
+      av = document.createElement('div'); av.id = 'rmd-aviso-pendientes';
+      const ref = d.querySelector('#rmd-aviso-nomenclatura') || d.querySelector('#rmd-aviso-asociar');
+      if (ref) ref.insertAdjacentElement('afterend', av);
+      else { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return; cont.insertBefore(av, cont.firstChild); }
+    }
+    const abiertos = r.ccs.length + r.textos.length + r.propios.length;
+    const cls = abiertos ? (autorizar ? 'bloquea' : 'aviso') : 'ok';
+    if (av.className !== cls) av.className = cls;
+    if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
+    window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length };
+  }
+  function htmlPendientes(r, { cargando, error, autorizar }) {
+    const vTxt = (x) => `v${esc(x.version)}${x.estado ? ` (${esc(x.estado)})` : ''}`;
+    const chip = (x) => `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}" title="${esc([x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · ') + (x.heredado ? '\n(ya estaba en una versión anterior)' : ''))}">${esc(x.codigo)}</span>`;
+    const nuevos = r.aplicados.filter((x) => !x.heredado), viejos = r.aplicados.filter((x) => x.heredado), out = [];
+    if (nuevos.length) out.push(`<b>Control${nuevos.length > 1 ? 'es' : ''} de cambio aplicado${nuevos.length > 1 ? 's' : ''}:</b> ${nuevos.map(chip).join('')}`);
+    if (viejos.length) out.push(`<span>De versiones anteriores: ${viejos.map(chip).join('')}</span>`);
+    const items = [];
+    r.ccs.forEach((x) => items.push(`<li>⚠ <b>Falta aplicar ${esc(x.cc)}</b>: lo dejó pendiente la ${vTxt(x)} — <q>${esc(x.linea)}</q>. Anótalo como aplicado («${esc(x.cc)}/responsable/fecha;descripción;tipo;nivel») cuando lo ingreses.</li>`));
+    r.textos.forEach((x) => items.push(`<li>⚠ Pendiente anotado en la ${vTxt(x)}: <q>${esc(x.linea)}</q> — revisa si ya se aplicó en esta versión.</li>`));
+    r.propios.forEach((x) => items.push(`<li>ℹ Anotado como pendiente en esta versión: <q>${esc(x.linea)}</q></li>`));
+    if (items.length) out.push(`<b>${autorizar ? 'No autorices todavía: ' : ''}${items.length} pendiente${items.length > 1 ? 's' : ''}</b><ul>${items.join('')}</ul>`);
+    else if (cargando) out.push('<span>Buscando pendientes en las versiones anteriores…</span>');
+    else if (error) out.push('<span>No se pudieron leer las versiones anteriores para buscar pendientes.</span>');
+    else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
+    return out.join('<br>');
+  }
+  // Observaciones: crece con el texto (de 8 a 30 líneas) en lugar de las pocas filas del portal
+  function agrandarObservaciones(el) {
+    const c = el && el.tagName === 'TEXTAREA' && sap.ui.getCore().byId(el.id.replace(/-inner$/, ''));
+    if (!c || !c.setRows) return;
+    if (!on('obsalto')) { if (c.__rmdFilas) { c.setRows(c.__rmdFilas.rows); c.setGrowing(c.__rmdFilas.growing); c.__rmdFilas = null; } return; }
+    if (c.__rmdFilas) return;
+    c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false };
+    if (c.getRows() < 8) c.setRows(8);
+    if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(30); }
+  }
+
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
   // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
   // orden).
@@ -2313,7 +2385,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
     document.querySelectorAll('[data-rmd-reglas]').forEach((el) => { quitarMarcasReglas(el); delete el.dataset.rmdReglas; el.__rmdReglasRes = null; });
     document.querySelectorAll('.sapMDialog').forEach((d) => { d.__rmdReglasFirma = ''; d.__rmdReglasRes = null; });
@@ -2389,7 +2461,7 @@
     if (on('sesion')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -5764,6 +5836,96 @@
       listaVigentesDeFilas, listaCalificadosDeFilas, mapaCalificados, faseDeObservacion, csvAFilas, paraExportar, leerExportado, fusionar, nuevoId };
   })();
   // ==REGLAS-FIN==
+  // ==PENDIENTES-INICIO==
+  // ---- Controles de cambio y pendientes en las Observaciones de «Asociar fórmulas» ----
+  // Una línea de CC: «26-379-CC/L.Fernandez/2026-10-22;Descripción;proceso;moderado» (acepta «//», «,» antes del nivel y espacios).
+  // Un pendiente: «Se suspende por 26-379-CC», «Pendiente aplicar…», «Falta…», «… en la siguiente versión». Lo que queda pendiente en
+  // una versión se avisa en las siguientes hasta que alguna registre ese CC como aplicado (los CC) o hasta revisarlo (el resto).
+  const Pendientes = (() => {
+    const plano = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+    const limpio = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+    // 26-379-CC · 26-379 CC · CC 26-379 · CC N.° 26-379
+    const RE_CC = /\b(\d{2})\s*[-–]\s*(\d{2,4})\s*[-–]?\s*CC\b|\bC\.?\s?C\.?\s*(?:N\.?\s*[°º]?\s*)?(\d{2})\s*[-–]\s*(\d{2,4})\b/gi;
+    const codigoCC = (a, n) => `${a}-${String(n).padStart(3, '0')}-CC`;
+    function ccsDe(texto) {
+      const out = []; let m; RE_CC.lastIndex = 0;
+      while ((m = RE_CC.exec(String(texto || '')))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
+      return out;
+    }
+    // pendiente / suspendido por algo que falta / para la próxima versión
+    const RE_PEND = new RegExp([
+      '\\bSUSPEN(?:DE|DIDO|DIDA|SION|DER|DIO)\\b',
+      '\\bPENDIENTES?\\b', '\\bPOR\\s+(?:APLICAR|INCLUIR|ACTUALIZAR|IMPLEMENTAR|CORREGIR|AGREGAR|INGRESAR|CAMBIAR|REVISAR|DEFINIR|CONFIRMAR|VALIDAR)\\b',
+      '\\bFALTA(?:N|RIA)?\\b', '\\bQUEDA(?:N)?\\s+PENDIENTE', '\\b(?:SIGUIENTE|PROXIMA|NUEVA|OTRA|POSTERIOR)\\s+VERSION\\b', '\\bA\\s+LA\\s+ESPERA\\b', '\\bEN\\s+ESPERA\\b',
+      '\\bNO\\s+SE\\s+(?:APLICO|INCLUYO|ACTUALIZO|CONSIDERO|IMPLEMENTO)\\b', '\\bSE\\s+APLICARA\\b', '\\bHASTA\\s+(?:QUE|LA\\s+APROBACION|APROBAR)\\b'].join('|'));
+    // ya hecho
+    const RE_HECHO = /\b(?:SE\s+APLICO|APLICAD[OA]S?|SE\s+INCLUYO|INCLUID[OA]S?|SE\s+IMPLEMENTO|IMPLEMENTAD[OA]S?|LEVANTAD[OA]S?|SUBSANAD[OA]S?|RESUELT[OA]S?|ATENDID[OA]S?|CERRAD[OA]S?|YA\s+SE)\b/;
+    const NIVELES = /^(MENOR|MODERADO|MAYOR|CRITICO|MINIMO|ALTO|MEDIO|BAJO)$/;
+    const RE_NOMENCLATURA = /^\d{8}[A-ZÑ]{2}-\d-C/i;
+    // «26-379-CC/L.Fernandez/2026-10-22;Descripción;proceso;moderado» -> partes
+    function entradaCC(linea) {
+      const m = /^\s*(\d{2})\s*-\s*(\d{2,4})\s*-\s*CC\b\s*(.*)$/i.exec(linea); if (!m) return null;
+      const e = { codigo: codigoCC(m[1], m[2]), responsable: '', fecha: '', descripcion: '', tipo: '', nivel: '', linea: limpio(linea) };
+      let resto = m[3];
+      const cab = /^\s*\/+\s*([^/;]*?)\s*\/+\s*(\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}|\d{8})?\s*/.exec(resto);
+      if (cab) { e.responsable = cab[1]; e.fecha = cab[2] || ''; resto = resto.slice(cab[0].length); }
+      const partes = resto.replace(/^[\s;,:-]+/, '').replace(/[\s.;]+$/, '').split(';').map(limpio).filter(Boolean);
+      // «…;proceso,moderado»: el nivel puede venir tras una coma
+      if (partes.length) { const u = partes[partes.length - 1].split(','); if (u.length > 1 && NIVELES.test(plano(limpio(u[u.length - 1])))) partes.splice(partes.length - 1, 1, limpio(u.slice(0, -1).join(',')), limpio(u[u.length - 1])); }
+      if (partes.length > 1 && NIVELES.test(plano(partes[partes.length - 1]))) e.nivel = partes.pop();
+      if (partes.length > 1 && partes[partes.length - 1].split(' ').length <= 2) e.tipo = partes.pop();
+      e.descripcion = partes.join('; ');
+      return e;
+    }
+    // Una línea por anotación; varias entradas de CC en la misma línea se separan.
+    function lineas(texto) {
+      return String(texto || '').split(/\r?\n/).flatMap((l) => l.split(/(?=\b\d{2}\s*-\s*\d{2,4}\s*-\s*CC\s*\/)/i)).map(limpio).filter(Boolean);
+    }
+    function analizar(texto) {
+      const r = { aplicados: [], pendientes: [], hechos: [], lineas: [] };
+      lineas(texto).forEach((l, i) => {
+        const p = plano(l), ccs = ccsDe(l);
+        r.lineas.push(l);
+        if (RE_NOMENCLATURA.test(l) && !ccs.length && !RE_PEND.test(p)) return;
+        const pend = RE_PEND.test(p) && !RE_HECHO.test(p), ent = !pend && entradaCC(l);
+        if (pend) r.pendientes.push({ linea: l, ccs, i });
+        else if (ent) r.aplicados.push({ ...ent, i });
+        else if (ccs.length) r.hechos.push({ linea: l, ccs, i });
+      });
+      return r;
+    }
+    const ccsAplicados = (a) => new Set([...a.aplicados.map((x) => x.codigo), ...a.hechos.flatMap((x) => x.ccs)]);
+    // versiones: [{ version, codigo, estado, observacion }]; actual: { version, observacion } (el texto que está en pantalla).
+    // Devuelve lo pendiente de las versiones anteriores que la actual (o una intermedia) no resolvió, más lo anotado en la actual.
+    function heredados(versiones, actual) {
+      const vA = +actual.version || 0;
+      const vs = versiones.filter((v) => (+v.version || 0) < vA && !/cancel/i.test(v.estado || '')).sort((a, b) => (+a.version || 0) - (+b.version || 0))
+        .map((v) => ({ ...v, an: analizar(v.observacion), set: new Set(lineas(v.observacion).map(plano)) }));
+      const anA = analizar(actual.observacion), setA = new Set(lineas(actual.observacion).map(plano));
+      const ccs = new Map(), textos = new Map();
+      vs.forEach((v, iv) => {
+        v.an.pendientes.forEach((p) => {
+          // resuelto en una versión posterior: una línea nueva (no copiada de la que lo dejó pendiente) que lo registra como aplicado
+          const despues = [...vs.slice(iv + 1).map((w) => ({ an: w.an, set: w.set })), { an: anA, set: setA }];
+          const aplicadoEn = (cc) => despues.some((w) => [...w.an.aplicados.filter((x) => x.codigo === cc).map((x) => x.linea), ...w.an.hechos.filter((x) => x.ccs.includes(cc)).map((x) => x.linea)]
+            .some((l) => !v.set.has(plano(l))));
+          if (p.ccs.length) p.ccs.forEach((cc) => { if (!aplicadoEn(cc) && !ccs.has(cc)) ccs.set(cc, { cc, version: v.version, codigo: v.codigo, estado: v.estado, linea: p.linea }); });
+          else {
+            const k = plano(p.linea);
+            // un pendiente sin CC se da por revisado si una versión posterior ya autorizada existe entre medio
+            const autorizadaDespues = vs.slice(iv + 1).some((w) => /autoriz/i.test(w.estado || '') && !w.set.has(k));
+            if (!autorizadaDespues && !textos.has(k)) textos.set(k, { version: v.version, codigo: v.codigo, estado: v.estado, linea: p.linea });
+          }
+        });
+      });
+      // lo anotado como pendiente en la propia versión (no copiado de una anterior)
+      const previos = new Set(vs.flatMap((v) => [...v.set]));
+      const propios = anA.pendientes.filter((p) => !previos.has(plano(p.linea)));
+      return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length };
+    }
+    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas };
+  })();
+  // ==PENDIENTES-FIN==
 
   // ---- Documentos citados del RMD ----
   // Lee MD_ES_PASO, MD_ES_ETIQUETA y MD_ES_PASO_INSUMO_PASO (3 lecturas) y busca códigos de documento (Reglas.FUENTE_DOC).
@@ -6268,7 +6430,7 @@
       const aut = vs.find((m) => m !== u && estadoUV(m) === 'Autorizado');
       const posterior = vs.filter((m) => (+m.version || 0) > (+u.version || 0) && !ESTADOS_UV.includes(estadoUV(m)) && estadoUV(m) !== 'Cancelado');
       const principal = String(u.codigoversionprincipal || '').trim() || vs[vs.length - 1].codigo;
-      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, reemplazo: null });
+      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, reemplazo: null, historial: vs });
     });
     const claveMat = (m) => [norm(m.codDefectoReceta || ''), SIN_ACENTOS(norm(m.nivelTxt || '')), m.sucursalId_iMaestraId].join('|'), vivos = new Map();
     out.filter((x) => x.estado !== 'Suspendido' && norm(x.md.codDefectoReceta || '')).sort((a, b) => (a.estado === 'Autorizado' ? 0 : 1) - (b.estado === 'Autorizado' ? 0 : 1))
@@ -6277,6 +6439,9 @@
     return out;
   }
   const lineasObs = (t) => String(t || '').split(/\r?\n/).map((x) => norm(x)).filter(Boolean);
+  // CC aplicados y pendientes heredados de la última versión, con sus versiones anteriores del mismo linaje
+  const pendientesDeLinaje = (x) => Pendientes.heredados((x.historial || []).filter((m) => m !== x.md).map((m) => ({ version: m.version, codigo: m.codigo, estado: estadoUV(m), observacion: m.observacion })),
+    { version: x.md.version, observacion: x.md.observacion });
   const ORDEN_ETAPAS_UV = ['FABRICACION', 'RECUBRIMIENTO', 'ENVASE', 'INSPECCION', 'ACONDICIONADO'];
   const etapaUV = (e) => SIN_ACENTOS(norm(e || '')) || '(sin etapa)';
   const NOMBRE_ETAPA_UV = { FABRICACION: 'Fabricación', RECUBRIMIENTO: 'Recubrimiento', ENVASE: 'Envase', INSPECCION: 'Inspección', ACONDICIONADO: 'Acondicionado' };
@@ -6291,8 +6456,11 @@
       const f = fEstado ? new Date(fEstado) : null;
       const reemp = x.reemplazo ? `${x.reemplazo.codigo} v${x.reemplazo.version} (${estadoUV(x.reemplazo)})` : '';
       return { ...x, m, reemp, producto: productoDeDescripcion(m.descripcion), etapa: etapaUV(m.nivelTxt), planta: (m.sucursalId && m.sucursalId.contenido) || '', seccion: m.areaRmdTxt || '', motivo: (m.motivoId && m.motivoId.descripcion) || '',
-        obs: obs.join('\n'), ultima: obs[obs.length - 1] || '', fEstado: f, dias: f && !isNaN(f) ? Math.max(0, Math.floor((hoy - f) / 864e5)) : null, prod: mapaProd[m.estadoIdProceso_iMaestraId] || '' };
+        obs: obs.join('\n'), ultima: obs[obs.length - 1] || '', fEstado: f, dias: f && !isNaN(f) ? Math.max(0, Math.floor((hoy - f) / 864e5)) : null, prod: mapaProd[m.estadoIdProceso_iMaestraId] || '', pd: pendientesDeLinaje(x) };
     });
+    const ccTxt = (x) => x.pd.aplicados.map((a) => a.codigo + (a.heredado ? ' (ant.)' : '')).join(', ');
+    const pendCcTxt = (x) => x.pd.ccs.map((p) => `${p.cc} (v${p.version}: ${p.linea})`).join('\n');
+    const pendTxt = (x) => [...x.pd.textos.map((p) => `v${p.version}: ${p.linea}`), ...x.pd.propios.map((p) => `esta versión: ${p.linea}`)].join('\n');
     const clave = (p) => SIN_ACENTOS(p).toUpperCase(), nombreProd = new Map(); filas.forEach((x) => { const k = clave(x.producto); if (!nombreProd.has(k)) nombreProd.set(k, x.producto); x.claveProd = k; x.producto = nombreProd.get(k); });
     const ordenEst = { Ingresado: 0, Suspendido: 1, Autorizado: 2 };
     const tabla = (nombre, nt, cab, anchos, datos, estilos, op = {}) => {
@@ -6307,19 +6475,28 @@
     //  Pendientes
     // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
-    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
-      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
-      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda' }, { congelar: 'E2', activa: true });
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda' }, { congelar: 'E2', activa: true });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
-      'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
-      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
+      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
       todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
-        fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        ccTxt(x), pendCcTxt(x), pendTxt(x), fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
         x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
-      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'fechaCelda', 16: 'fechaCelda', 19: 'fechaCelda', 21: 'numCelda' }, { congelar: 'C2' });
+      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'fechaCelda', 19: 'fechaCelda', 22: 'fechaCelda', 24: 'numCelda' }, { congelar: 'C2' });
+    //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
+    const frases = [];
+    filas.forEach((x) => (x.historial || [x.m]).forEach((m) => { const a = Pendientes.analizar(m.observacion);
+      a.aplicados.forEach((e) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'CC aplicado', e.codigo, e.responsable, e.fecha, e.descripcion, e.tipo, e.nivel, e.linea]));
+      a.pendientes.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Pendiente', p.ccs.join(', '), '', '', '', '', '', p.linea]));
+      a.hechos.forEach((p) => frases.push([x.producto, m.codigo, +m.version || m.version, estadoUV(m), 'Menciona un CC', p.ccs.join(', '), '', '', '', '', '', p.linea])); }));
+    frases.sort((a, b) => nat(a[0], b[0]) || nat(a[1], b[1]) || (a[2] - b[2]));
+    tabla('Frases de Observaciones', 'FrasesObs', ['Producto', 'Código RMD', 'Versión', 'Estado', 'Tipo de línea', 'CC', 'Responsable', 'Fecha CC', 'Descripción del CC', 'Tipo CC', 'Nivel', 'Línea completa'],
+      [30, 13, 8, 12, 15, 22, 16, 11, 50, 10, 10, 90], frases, { 3: (f) => estiloEst(f[3]), 1: 'codigoCelda', 2: 'numCelda', 8: 'textoCelda', 11: 'textoCelda' });
     //  Por producto
     const etapas = [...new Set(filas.map((x) => x.etapa))].sort(ordenEtapa), gP = new Map();
     filas.forEach((x) => { if (!gP.has(x.claveProd)) gP.set(x.claveProd, []); gP.get(x.claveProd).push(x); });
@@ -13606,7 +13783,7 @@ td.ult { position: relative; }
     ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios']],
     ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
-    ['Recetas y fórmulas', 'matraz', ['asociar', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
+    ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
     ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
   ];
