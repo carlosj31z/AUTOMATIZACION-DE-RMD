@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.76.2
+// @version      1.76.3
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.76.2';                                                       // mantener igual a @version
+  const VERSION = '1.76.3';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2193,13 +2193,13 @@
   }
   // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas: Title + Label/campo)
   // junto a Motivo de Solicitud y RM Digital Paralelo, con alto fijo de 70 px. Se deja sola en la 3.ª columna (etiqueta arriba, ancho completo de la
-  // columna) y los otros campos de esa columna pasan al final de la 1.ª y la 2.ª; el cuadro toma el alto de las otras columnas y crece con el texto.
+  // columna) y los otros campos de esa columna pasan al final de la 1.ª y la 2.ª; el cuadro toma el alto de las otras columnas, sin pasarlo (barra si el texto no cabe).
   // Al apagar la opción vuelve el contenido original del formulario.
   const SPAN_TODO = 'XL12 L12 M12 S12';
   let obsModificada = null;                                                         // { c: TextArea, sf: SimpleForm } con los cambios puestos
   function restaurarObservaciones() {
     if (!obsModificada) return; const { c, sf } = obsModificada; obsModificada = null;
-    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); const i = c.getFocusDomRef && c.getFocusDomRef(); if (i) i.style.minHeight = ''; }
+    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); const i = c.getFocusDomRef && c.getFocusDomRef(); if (i) Object.assign(i.style, { minHeight: '', height: '', maxHeight: '', overflowY: '' }); }
     if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x));
       o.layout.forEach(([x, ld]) => { const nuevo = x.getLayoutData(); x.setLayoutData(ld || null); if (nuevo && nuevo !== ld) nuevo.destroy(); }); }
   }
@@ -2213,7 +2213,7 @@
     if (!c.__rmdFilas) {
       c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false, height: c.getHeight ? c.getHeight() : '' };
       if (c.getRows() < 8) c.setRows(8);
-      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(40); }
+      if (c.setGrowing) c.setGrowing(false);                                       // alto fijo al de las otras columnas; el resto, con barra
       c.setHeight('');                                                               // sin esto el alto fijo del portal gana a rows y growing
     }
     if (sf && !sf.__rmdObs) repartirColumnas(sf, c);
@@ -2248,8 +2248,9 @@
     const ta = c.getFocusDomRef && c.getFocusDomRef(), form = sf && sf.getAggregation && sf.getAggregation('form'); if (!ta || !form) return;
     const conts = form.getFormContainers().map((k) => k.getDomRef()).filter(Boolean), propio = conts.find((x) => x.contains(ta));
     const pie = Math.max(0, ...conts.filter((x) => x !== propio).map((x) => x.getBoundingClientRect().bottom)); if (!pie) return;
-    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top - 4)));
-    if (ta.style.minHeight !== alto + 'px') ta.style.minHeight = alto + 'px';
+    // no pasa del pie de las otras columnas: alto fijo y, si el texto no cabe, barra de desplazamiento
+    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top - 4))) + 'px';
+    if (ta.style.height !== alto) Object.assign(ta.style, { minHeight: '', height: alto, maxHeight: alto, overflowY: 'auto' });
   }
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
   // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
