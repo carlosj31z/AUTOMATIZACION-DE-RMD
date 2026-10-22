@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.74.0
+// @version      1.74.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.74.0';                                                       // mantener igual a @version
+  const VERSION = '1.74.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -605,7 +605,6 @@
 
   #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
   #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
-  .rmd-obs-fila { width: 100% !important; margin-left: 0 !important; clear: both; }
   #rmd-aviso-pendientes.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); }
   #rmd-aviso-pendientes.bloquea { border-left-color: var(--rmd-rojo); }
   #rmd-aviso-pendientes .rmd-pd-cc { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); font-weight: 600; cursor: help; }
@@ -2115,48 +2114,65 @@
     else if (out.length) out.push('<span>✓ Sin pendientes de versiones anteriores.</span>');
     return out.join('<br>');
   }
-  // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas) con alto fijo
-  // de 70 px. Se pasa a una fila propia de ancho completo debajo de las tres columnas (Title vacío + Label y TextArea con GridData de 12) y crece
-  // con el texto (8 a 30 líneas). Al apagar la opción vuelve el contenido original del formulario.
+  // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas: Title + Label/campo)
+  // junto a Motivo de Solicitud y RM Digital Paralelo, con alto fijo de 70 px. Se deja sola en la 3.ª columna (etiqueta arriba, ancho completo de la
+  // columna) y los otros campos de esa columna pasan al final de la 1.ª y la 2.ª; el cuadro toma el alto de las otras columnas y crece con el texto.
+  // Al apagar la opción vuelve el contenido original del formulario.
   const SPAN_TODO = 'XL12 L12 M12 S12';
   let obsModificada = null;                                                         // { c: TextArea, sf: SimpleForm } con los cambios puestos
   function restaurarObservaciones() {
-    document.querySelectorAll('.rmd-obs-fila').forEach((e) => e.classList.remove('rmd-obs-fila'));
     if (!obsModificada) return; const { c, sf } = obsModificada; obsModificada = null;
-    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); }
-    if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x)); o.titulo.destroy();
+    if (c && c.__rmdFilas) { const o = c.__rmdFilas; c.__rmdFilas = null; c.setRows(o.rows); if (c.setGrowing) c.setGrowing(o.growing); c.setHeight(o.height); const i = c.getFocusDomRef && c.getFocusDomRef(); if (i) i.style.minHeight = ''; }
+    if (sf && sf.__rmdObs) { const o = sf.__rmdObs; sf.__rmdObs = null; sf.removeAllContent(); o.contenido.forEach((x) => sf.addContent(x));
       o.layout.forEach(([x, ld]) => { const nuevo = x.getLayoutData(); x.setLayoutData(ld || null); if (nuevo && nuevo !== ld) nuevo.destroy(); }); }
   }
+  const esDe = (x, tipo) => !!x && x.getMetadata().getName() === tipo;
   function agrandarObservaciones(el) {
     const c = el && el.tagName === 'TEXTAREA' && sap.ui.getCore().byId(el.id.replace(/-inner$/, ''));
     if (!c || !c.setRows) return;
-    let sf = c.getParent(); while (sf && !(sf.getMetadata && sf.getMetadata().getName() === 'sap.ui.layout.form.SimpleForm')) sf = sf.getParent && sf.getParent();
+    let sf = c.getParent(); while (sf && !esDe(sf, 'sap.ui.layout.form.SimpleForm')) sf = sf.getParent && sf.getParent();
     if (!on('obsalto')) { restaurarObservaciones(); return; }
     obsModificada = { c, sf };
     if (!c.__rmdFilas) {
       c.__rmdFilas = { rows: c.getRows(), growing: c.getGrowing ? c.getGrowing() : false, height: c.getHeight ? c.getHeight() : '' };
       if (c.getRows() < 8) c.setRows(8);
-      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(30); }
+      if (c.setGrowing) { c.setGrowing(true); if (c.setGrowingMaxLines) c.setGrowingMaxLines(40); }
       c.setHeight('');                                                               // sin esto el alto fijo del portal gana a rows y growing
     }
-    if (sf && sf.__rmdObs) { filaObservacionesCompleta(c); return; }
-    if (!sf) return;
-    const GridData = sap.ui.require('sap/ui/layout/GridData'), Title = sap.ui.require('sap/ui/core/Title'); if (!GridData || !Title) return;
-    const contenido = sf.getContent(), iT = contenido.indexOf(c); if (iT < 0) return;
-    const etq = contenido[iT - 1] && /Label$/.test(contenido[iT - 1].getMetadata().getName()) ? contenido[iT - 1] : null;
-    const titulo = new Title({ text: '' });
-    titulo.setLayoutData(new GridData({ span: SPAN_TODO }));                        // el SimpleForm lo usa como tamaño del FormContainer nuevo
-    sf.__rmdObs = { contenido: contenido.slice(), titulo, layout: [c, etq].filter(Boolean).map((x) => [x, x.getLayoutData()]) };
-    sf.removeContent(c); if (etq) sf.removeContent(etq);
-    if (etq) { etq.setLayoutData(new GridData({ span: SPAN_TODO })); }
-    c.setLayoutData(new GridData({ span: SPAN_TODO }));
-    sf.addContent(titulo); if (etq) sf.addContent(etq); sf.addContent(c);
+    if (sf && !sf.__rmdObs) repartirColumnas(sf, c);
+    if (sf) igualarAltoObservaciones(c, sf);
   }
-  // Por si la versión de UI5 no pasa el GridData del Title al FormContainer: su celda de la rejilla se estira a todo el ancho.
-  function filaObservacionesCompleta(c) {
-    const el = c.getDomRef(), celdas = []; let n = el && el.parentElement;
-    while (n && celdas.length < 2 && !n.classList.contains('sapUiSimpleForm')) { if (/\bsapUiRespGridSpanL\d/.test(n.className)) celdas.push(n); n = n.parentElement; }
-    const cont = celdas[1]; if (cont && !/\bsapUiRespGridSpanL12\b/.test(cont.className)) cont.classList.add('rmd-obs-fila');
+  // [Title, Label, campo…, Label, campo…, Title, …] -> columnas [{ titulo, pares: [[Label, campo…]] }]
+  function columnasDe(contenido) {
+    const cols = [];
+    contenido.forEach((x) => {
+      if (esDe(x, 'sap.ui.core.Title') || /Toolbar$/.test(x.getMetadata().getName())) cols.push({ titulo: x, pares: [] });
+      else { if (!cols.length) cols.push({ titulo: null, pares: [] }); const col = cols[cols.length - 1];
+        if (/Label$/.test(x.getMetadata().getName()) || !col.pares.length) col.pares.push([x]); else col.pares[col.pares.length - 1].push(x); }
+    });
+    return cols;
+  }
+  function repartirColumnas(sf, c) {
+    const GridData = sap.ui.require('sap/ui/layout/GridData'); if (!GridData) return;
+    const contenido = sf.getContent(), cols = columnasDe(contenido);
+    const iCol = cols.findIndex((k) => k.pares.some((p) => p.includes(c))); if (iCol < 1) return;
+    const col = cols[iCol], par = col.pares.find((p) => p.includes(c)), otros = col.pares.filter((p) => p !== par), destinos = cols.slice(0, iCol);
+    const etq = /Label$/.test(par[0].getMetadata().getName()) ? par[0] : null;
+    sf.__rmdObs = { contenido: contenido.slice(), layout: [c, etq].filter(Boolean).map((x) => [x, x.getLayoutData()]) };
+    otros.forEach((p, i) => destinos[i % destinos.length].pares.push(p));            // Motivo de Solicitud -> 1.ª, RM Digital Paralelo -> 2.ª
+    col.pares = [par];
+    if (etq) etq.setLayoutData(new GridData({ span: SPAN_TODO }));                  // etiqueta arriba y el cuadro con todo el ancho de la columna
+    c.setLayoutData(new GridData({ span: SPAN_TODO }));
+    sf.removeAllContent();
+    cols.forEach((k) => { if (k.titulo) sf.addContent(k.titulo); k.pares.forEach((p) => p.forEach((x) => sf.addContent(x))); });
+  }
+  // El cuadro llega hasta el pie de la columna más alta (sin pasar de 520 px); con más texto sigue creciendo.
+  function igualarAltoObservaciones(c, sf) {
+    const ta = c.getFocusDomRef && c.getFocusDomRef(), form = sf && sf.getAggregation && sf.getAggregation('form'); if (!ta || !form) return;
+    const conts = form.getFormContainers().map((k) => k.getDomRef()).filter(Boolean), propio = conts.find((x) => x.contains(ta));
+    const pie = Math.max(0, ...conts.filter((x) => x !== propio).map((x) => x.getBoundingClientRect().bottom)); if (!pie) return;
+    const alto = Math.min(520, Math.max(70, Math.round(pie - ta.getBoundingClientRect().top - 4)));
+    if (ta.style.minHeight !== alto + 'px') ta.style.minHeight = alto + 'px';
   }
   // ---- 6c. Especificaciones: reordenar filas y editar Descripción / Especificaciones ----
   // El Guardar del portal solo envía Tipo Dato y valores; los textos y el orden se añaden a la actualización de cada fila (ensayoHijo, especificacion,
