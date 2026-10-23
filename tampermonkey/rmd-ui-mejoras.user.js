@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.77.3
+// @version      1.78.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.77.3';                                                       // mantener igual a @version
+  const VERSION = '1.78.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -81,7 +81,7 @@
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
-    ['suspension', 'Modificaciones masivas', 'Suspende varios master o agrégales una observación.'],
+    ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
   opc.recetaruta = true;
@@ -407,6 +407,12 @@
   .rmd-v-pegar .rmd-susp-motivo, .rmd-v-pegar .rmd-pp-campo input { height: 36px; border-radius: 10px; padding: 0 12px; }
   .rmd-v-pegar .rmd-pp-campo input { width: 100%; max-width: 320px; font-size: 16px; letter-spacing: .5px; }
   .rmd-v-pegar .rmd-pp-campo input { height: 46px; border: 1.5px dashed var(--rmd-borde-campo); background: rgba(27,141,236,.04); outline: 0; } .rmd-v-pegar .rmd-pp-campo input:focus { border-color: var(--rmd-acento); background: rgba(27,141,236,.08); }
+  .rmd-mm-mat-fila { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 8px; } .rmd-mm-mat label { display: flex; flex-direction: column; gap: 3px; color: var(--rmd-apagado); font: 600 12px var(--rmd-fuente); }
+  .rmd-mm-mat input, .rmd-mm-mat select { box-sizing: border-box; height: 34px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13.5px var(--rmd-fuente); }
+  .rmd-mm-mat-fila input { width: 150px; } .rmd-mm-mat-txt input { width: 100%; } .rmd-mm-mat .rmd-mat-ej { margin: 6px 0 0; }
+  .rmd-mm-mat label.rmd-mm-mat-basta { flex-direction: row; align-items: flex-start; gap: 8px; margin: 2px 0 10px; color: var(--rmd-texto); font: 13px/1.4 var(--rmd-fuente); }
+  .rmd-mm-mat label.rmd-mm-mat-basta input { flex: none; width: 16px; height: 16px; margin: 1px 0 0; padding: 0; }
+  .rmd-mat-celda-sel { width: 28px; text-align: center; } .rmd-mat-celda-sel input { width: 16px; height: 16px; margin: 0; cursor: pointer; }
   .rmd-v-pegar .rmd-mm-ayuda { margin: 12px 0 8px; } .rmd-v-pegar .rmd-mm-nota { padding: 8px 12px; border-radius: 10px; background: rgba(118,118,128,.1); }
   .rmd-mm-modo { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-mm-modo.activo { color: var(--rmd-texto); border-bottom-color: var(--rmd-acento); }
   .rmd-sel-panel { margin: 6px 16px 8px; padding: 8px 10px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: rgba(27,141,236,.07); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
@@ -7146,12 +7152,17 @@
   const MODOS_MASIVOS = {
     suspender: { titulo: 'Suspender', estados: ['Autorizado', 'Ingresado'], verbo: 'Suspender', hecho: 'Suspendido' },
     observacion: { titulo: 'Agregar observación', estados: ['Autorizado', 'Ingresado', 'Suspendido', 'Solicitado', 'Solicitud Aprobada', 'Solicitud Rechazada'], verbo: 'Agregar la observación a', hecho: 'Observación agregada' },
+    material: { titulo: 'Cambio de material', estados: ['Autorizado', 'Ingresado'], verbo: 'Actualizar', hecho: 'Actualizado' },
   };
   // Modifica un master con el Guardar del portal -> { obs, mensajes }; lanza error si falla.
-  async function modificarUno(ctrl, codigo, { suspender, linea }) {
-    const d = await abrirAsociarFormulas(ctrl, codigo), vista = ctrl.getView(), asoc = vista.getModel('asociarDatos');
+  // previo(d): se ejecuta con «Asociar fórmulas» abierto, antes del Guardar; reemplazar: Observaciones completas en lugar de agregar una línea
+  async function modificarUno(ctrl, codigo, { suspender, linea, reemplazar, previo }) {
+    const d = await abrirAsociarFormulas(ctrl, codigo), vista = ctrl.getView();
+    let asoc = vista.getModel('asociarDatos');
     const previos = new Set(dialogos());
     try {
+      if (asoc.getData().codigo !== codigo) throw new Error(`se abrió otro RMD (${asoc.getData().codigo})`);
+      if (previo) { await previo(d); previos.clear(); dialogos().forEach((x) => previos.add(x)); asoc = vista.getModel('asociarDatos'); }   // el portal pone un modelo nuevo
       const a = asoc.getData(); if (a.codigo !== codigo) throw new Error(`se abrió otro RMD (${a.codigo})`);
       const ctls = controlesDe(d), combo = ctls.find((c) => rutaDe(c, 'selectedKey') === '/estadoIdRmd_iMaestraIdBK');
       if (suspender) {
@@ -7164,9 +7175,9 @@
         combo.setSelectedKey(sus.getKey()); combo.fireSelectionChange({ selectedItem: sus }); combo.fireChange({ value: sus.getText(), newValue: sus.getText(), itemPressed: true });
         asoc.setProperty('/estadoIdRmd_iMaestraIdBK', isNaN(+sus.getKey()) ? sus.getKey() : +sus.getKey());
         if (ctrl.localModel) ctrl.localModel.setProperty('/flagEstadoFormula', true);
-      } else if (!linea) throw new Error('falta el texto de la observación');
+      } else if (!linea && reemplazar == null) throw new Error('falta el texto de la observación');
       const antes = String(a.observacionBK != null ? a.observacionBK : a.observacion || '').replace(/\s+$/, '');
-      const obs = linea ? (antes ? antes + '\n' : '') + linea : antes;
+      const obs = reemplazar != null ? reemplazar : linea ? (antes ? antes + '\n' : '') + linea : antes;
       asoc.setProperty('/observacionBK', obs);
       // mismo manejador del botón Guardar (espera guardado, trazabilidad y DMS)
       const bGuardar = ctls.find((c) => c.getMetadata().getName() === 'sap.m.Button' && c.getText && c.getText() === 'Guardar' && c.getDomRef() && visible(c.getDomRef()));
@@ -7195,6 +7206,96 @@
     }
   }
   const suspenderUno = (ctrl, codigo, motivo) => modificarUno(ctrl, codigo, { suspender: true, linea: motivo });
+  // ---- Cambio de material en la receta ----
+  // Última versión (Ingresada o Autorizada) de cada master cuya copia de la receta tiene el material anterior; solo aplica si en SAP
+  // TODAS esas recetas ya tienen el nuevo y ya no el anterior. Autorizado: versión nueva; Ingresado: se reasocia en esa misma versión.
+  const COMPLEJIDADES = ['C0.5', 'C1.0', 'C1.5', 'C2.0', 'C2.5', 'C3.0'];
+  const faseNomenclatura = (obs) => { const t = String(obs || '').split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)(F\d{1,2}(?:-?R)?)$/i.exec(t); return m ? m[1].toUpperCase() : ''; };
+  const nomenclaturaMaterial = (fecha, ini, prioridad, complejidad, fase) => `${fecha}${ini}-${prioridad}-${complejidad}-FI1.0-FA1.0-${fase}`;
+  async function detectarCambioMaterial(modelo, erp, { anterior, nuevo, codigos, basta }, avance = () => {}) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    avance('Leyendo los RMD Ingresados y Autorizados…');
+    let cand = await rsCandidatos(modelo);
+    if (codigos && codigos.length) { const s = new Set(codigos.map(String)); cand = cand.filter((m) => s.has(String(m.codigo)) || s.has(String(m.linaje))); }
+    const porMd = new Map(cand.map((m) => [m.mdId, m]));
+    avance(`Buscando el material ${anterior} en las recetas copiadas en los RMD…`);
+    const filas = (await leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('Component', 'EQ', anterior), new F('activo', 'EQ', true)], { $select: 'estructuraRecetaInsumoId,mdId_mdId,mdRecetaId_mdRecetaId' })).filter((x) => porMd.has(x.mdId_mdId));
+    const conAnterior = new Map(); filas.forEach((x) => { const a = conAnterior.get(x.mdRecetaId_mdRecetaId) || []; a.push(x.estructuraRecetaInsumoId); conAnterior.set(x.mdRecetaId_mdRecetaId, a); });
+    const mdIds = [...new Set(filas.map((x) => x.mdId_mdId))];
+    if (!mdIds.length) return { filas: [], material: null, buscados: cand.length };
+    const recs = (await leerPorIds(modelo, 'MD_RECETA', 'mdId_mdId', mdIds, { $expand: 'recetaId', $select: 'mdRecetaId,mdId_mdId,activo,recetaId/Matnr,recetaId/Werks,recetaId/Verid,recetaId/Stlal,recetaId/Text1' }, null,
+      (h, n) => avance(`Leyendo las recetas de ${mdIds.length} RMD (${h} de ${n})…`))).filter((r) => r.activo !== false && r.recetaId && r.recetaId.Matnr && conAnterior.has(r.mdRecetaId));
+    // SAP: una lectura por lista de materiales (material + planta + alternativa)
+    const listas = new Map(); recs.forEach((r) => listas.set(rsClave3(r.recetaId), null));
+    const claves = [...listas.keys()]; let i = 0, hechas = 0, material = null;
+    await Promise.all(Array.from({ length: Math.min(6, claves.length) }, async () => {
+      while (i < claves.length) {
+        const k = claves[i++], [matnr, werks, stlal] = k.split('|');
+        try {
+          const bom = await leerErp(erp, 'MaterialSet', [new F('Matnr', 'EQ', matnr), new F('Werks', 'EQ', werks), new F('Stlal', 'EQ', stlal)]);
+          const n = bom.find((x) => norm(x.Component) === nuevo); if (n && !material) material = norm(n.Maktx);
+          listas.set(k, { nuevo: !!n, anterior: bom.some((x) => norm(x.Component) === anterior), cambio: n ? norm(n.ChangeNo) : '', desde: n ? norm(n.ValidFrom) : '' });
+        } catch (e) { listas.set(k, { error: e.message }); }
+        if (++hechas % 10 === 0 || hechas === claves.length) avance(`Revisando en SAP las listas de materiales… ${hechas} de ${claves.length}`);
+      }
+    }));
+    // procesos menores que usan el material anterior como insumo de la receta (al reasociar, el portal los enlaza por código de componente)
+    const idsIns = filas.filter((x) => recs.some((r) => r.mdRecetaId === x.mdRecetaId_mdRecetaId)).map((x) => x.estructuraRecetaInsumoId), pmPorMd = new Map();
+    if (idsIns.length) (await leerPorIds(modelo, 'MD_ES_PASO_INSUMO_PASO', 'estructuraRecetaInsumoId_estructuraRecetaInsumoId', idsIns, { $select: 'mdEstructuraPasoInsumoPasoId,mdId_mdId,activo' }).catch(() => []))
+      .forEach((x) => { if (x.activo !== false) pmPorMd.set(x.mdId_mdId, (pmPorMd.get(x.mdId_mdId) || 0) + 1); });
+    const obs = new Map((await leerPorIds(modelo, 'MD', 'mdId', mdIds, { $select: 'mdId,observacion' })).map((m) => [m.mdId, m.observacion || '']));
+    const nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
+    const out = mdIds.map((id) => {
+      const md = porMd.get(id), rs = recs.filter((r) => r.mdId_mdId === id).map((r) => {
+        const s = listas.get(rsClave3(r.recetaId)) || {};
+        return { mdRecetaId: r.mdRecetaId, matnr: norm(r.recetaId.Matnr), verid: norm(r.recetaId.Verid), texto: norm(r.recetaId.Text1 || ''), sap: s.error ? 'error' : s.nuevo && !s.anterior ? 'nuevo' : s.nuevo ? 'ambos' : s.anterior ? 'anterior' : 'ninguno', cambio: s.cambio || '', desde: s.desde || '' };
+      });
+      const version = md.estado === 'Autorizado';
+      return reglaCambioMaterial({ md, mdId: id, codigo: md.codigo, version: md.version, estado: md.estado, descripcion: md.descripcion, etapa: md.etapa, planta: md.planta, linaje: md.linaje,
+        recetas: rs, fase: faseNomenclatura(obs.get(id)), observacion: obs.get(id) || '', pm: pmPorMd.get(id) || 0, accion: version ? 'version' : 'reasociar' }, basta);
+    }).sort((a, b) => (+b.aplica - +a.aplica) || nat(a.codigo, b.codigo));
+    return { filas: out, material, buscados: cand.length };
+  }
+  // basta: con una receta ya cambiada en SAP es suficiente (se reasocian solo las cambiadas); si no, deben estar cambiadas todas
+  function reglaCambioMaterial(x, basta) {
+    const rs = x.recetas, listas = rs.filter((r) => r.sap === 'nuevo'), faltan = rs.length - listas.length;
+    const motivoNo = !rs.length ? 'La receta con el material ya no está activa'
+      : (basta ? !listas.length : faltan) ? `En SAP ${rs.length === 1 ? 'la lista' : `${basta ? rs.length : faltan} de ${rs.length} listas`} ${rs.some((r) => r.sap === 'error') ? 'no se pudo leer' : rs.some((r) => r.sap === 'ambos') ? 'tiene los dos materiales' : 'todavía tiene el material anterior'}`
+      : x.accion === 'version' && !x.fase ? 'La 1.ª línea de Observaciones no tiene la fase (F1, F2…)' : '';
+    return Object.assign(x, { aplica: !motivoNo, motivoNo, reasociar: listas, pendientes: faltan });
+  }
+  // Con «Asociar fórmulas» abierto: quita cada receta (Eliminar Receta) y la vuelve a asociar con la función de «Agregar Producto» del portal,
+  // que copia la lista actual de SAP. No pasa por la lista filtrada (oculta las recetas que usa una versión Autorizada). Solo en Ingresados.
+  async function reasociarRecetas(ctrl, recetas, avance = () => {}) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JSONModel = sap.ui.require('sap/ui/model/json/JSONModel') || sap.ui.model.json.JSONModel;
+    const vista = ctrl.getView(), a = vista.getModel('asociarDatos').getData();
+    if (+a.estadoIdRmd_iMaestraId !== 467) throw new Error('solo se reasocia la receta en un RMD Ingresado');
+    for (const rc of recetas) {
+      const fila = (vista.getModel('listMdReceta').getData() || []).find((x) => x.activo !== false && x.recetaId && norm(x.recetaId.Matnr) === rc.matnr && norm(x.recetaId.Verid) === rc.verid);
+      if (!fila) throw new Error(`la receta ${rc.matnr} / ${rc.verid} no está asociada en ${a.codigo}`);
+      const leer = (atwrt) => ctrl.onGetReceta([new F('Matnr', 'EQ', rc.matnr), new F('Werks', 'EQ', a.sucursalId.codigo), new F('PrfgF', 'EQ', fila.recetaId.PrfgF), new F('Atwrt', 'EQ', atwrt), new F('Verid', 'EQ', rc.verid)]).then((r) => (r.results || []).find((x) => norm(x.Verid) === rc.verid));
+      const pv = (await leer(a.nivelTxt)) || (await leer(''));
+      if (!pv) throw new Error(`SAP no devolvió la versión de fabricación ${rc.matnr} / ${rc.verid}`);
+      avance(`quitando la receta ${rc.matnr} / ${rc.verid}…`);
+      await ctrl.onBorrarRecetasAsignada(fila);
+      try {
+        await ctrl._updateModelRest(); await ctrl.onGetMdRecetaGeneral();
+        avance(`volviendo a asociar la receta ${rc.matnr} / ${rc.verid} (lista actual de SAP)…`);
+        ctrl.onAsociarRecetasFrg();
+        vista.setModel(new JSONModel([pv]), 'aListReceta');
+        const tabla = sap.ui.getCore().byId('frgAsocRecetas--idTblRecetas'); if (!tabla) throw new Error('no se encontró la tabla de «Agregar Producto»');
+        tabla._aSelectedPaths = ['/0'];
+        try { await ctrl.onAgregarRecetas(); } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
+      } catch (e) { throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó quitada y no se pudo volver a asociar (${e.message || e}): asóciala a mano`); }
+      finally { sap.ui.core.BusyIndicator.hide(); }
+      // la lista principal se vuelve a leer solo con este código para que «Asociar fórmulas» tome el RMD actualizado
+      await soloCodigoEnLista(ctrl, a.codigo);
+      if (!await hasta(() => (vista.getModel('listMD').getData() || []).some((x) => x.mdId === a.mdId), 30000)) throw new Error('la receta quedó asociada, pero el RMD no volvió a aparecer en la lista: guarda las Observaciones a mano');
+      await ctrl.actualizarCabeceraAsociarDatos(); await ctrl.onGetMdRecetaGeneral();
+      sap.ui.core.BusyIndicator.hide(); await esperar(400);
+    }
+  }
+  window.__rmdStats.detectarCambioMaterial = (anterior, nuevo, codigos) => { const c = controladorPrincipal(); return detectarCambioMaterial(c.getView().getModel('mainModelv2'), c.oModelErpNec, { anterior, nuevo, codigos }, (t) => console.log(t)); };   // pruebas
   function abrirModificacionesMasivas(modoInicial = 'suspender') {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
     if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para las modificaciones masivas.', true); return; }
@@ -7206,6 +7307,13 @@
       <div class="rmd-pegar"><textarea class="rmd-min-texto rmd-susp-codigos" placeholder="Pega aquí los códigos&#10;2202608939&#10;2202607784"></textarea><div class="rmd-pegar-chips" aria-live="polite"></div></div>
       <p class="rmd-mm-rotulo"></p>
       <input type="text" class="rmd-susp-motivo" maxlength="400">
+      <div class="rmd-mm-mat" style="display:none">
+        <div class="rmd-mm-mat-fila"><label>Material anterior<input class="rmd-mat-ant" inputmode="numeric" placeholder="ej. 1100002760"></label><label>Material nuevo<input class="rmd-mat-nue" inputmode="numeric" placeholder="ej. 1100011265"></label>
+          <label>Prioridad<select class="rmd-mat-pri"><option>1</option><option selected>2</option><option>3</option></select></label><label>Complejidad<select class="rmd-mat-com">${COMPLEJIDADES.map((c) => `<option${c === 'C1.0' ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
+        <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-basta"><span>Basta con que <b>una</b> de las recetas asociadas tenga el cambio en SAP (se reasocian solo las que lo tienen; si no se marca, deben tenerlo todas)</span></label>
+        <label class="rmd-mm-mat-txt">Texto debajo de la nomenclatura<input class="rmd-mat-txt" maxlength="400"></label>
+        <p class="rmd-nota rmd-mat-ej"></p>
+      </div>
       <p class="rmd-nota rmd-mm-nota"></p>
       <p class="rmd-progreso"></p><div class="rmd-susp-res"></div>`;
     const ta = v.cuerpo.querySelector('.rmd-susp-codigos'), mot = v.cuerpo.querySelector('.rmd-susp-motivo'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-susp-res');
@@ -7217,9 +7325,36 @@
     };
     ta.addEventListener('input', pintarChips);
     const puede = (est) => MODOS_MASIVOS[modo].estados.includes(est);
+    // Cambio de material: campos propios y el ejemplo de Observaciones
+    const q = (c) => v.cuerpo.querySelector(c), mAnt = q('.rmd-mat-ant'), mNue = q('.rmd-mat-nue'), mPri = q('.rmd-mat-pri'), mCom = q('.rmd-mat-com'), mTxt = q('.rmd-mat-txt'), mEj = q('.rmd-mat-ej'), mBasta = q('.rmd-mat-basta');
+    const hoyTxt = (() => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; })(), ini = rsUsuarioIniciales() || 'XX';
+    let detectado = null; const elegidos = new Set();                     // códigos marcados en la tabla
+    mTxt.value = `${hoyTxt}${ini} Actualización de `;
+    const pintarEjemplo = () => { mEj.innerHTML = `Observaciones de la versión nueva: <b>${esc(nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…'))}</b> (fase de la versión anterior)<br>${esc(norm(mTxt.value) || '(texto)')}`; };
+    [mPri, mCom, mTxt].forEach((x) => x.addEventListener('input', pintarEjemplo));
+    const resumenMaterial = () => { const n = plan.filter((x) => x.aplica), nv = n.filter((x) => x.accion === 'version').length;
+      setTxt(prog, plan.length ? `${plan.length} master tienen el ${detectado.anterior} en su receta copiada${detectado.material ? `; el nuevo es «${detectado.material}»` : ''}. Listos para actualizar: ${n.length} (${nv} versiones nuevas desde Autorizados y ${n.length - nv} Ingresados a reasociar)${mBasta.checked ? ', con una receta cambiada como mínimo' : ''}. Los demás dicen por qué no.` : '');
+      pintarElegidos(); };
+    const marcables = () => plan.filter((x) => x.aplica && !resultados.some((y) => y.codigo === x.codigo));
+    const pintarElegidos = () => { [...elegidos].forEach((c) => { if (!marcables().some((x) => x.codigo === c)) elegidos.delete(c); });
+      bEje.disabled = trabajando || !elegidos.size; setTxt(bEje, elegidos.size ? `Actualizar ${elegidos.size} RMD` : 'Marca los master a actualizar');
+      const t = res.querySelector('.rmd-mat-todos'), n = marcables().length; if (t) { t.checked = !!n && elegidos.size === n; t.indeterminate = !!elegidos.size && elegidos.size < n; } };
+    res.addEventListener('change', (e) => { if (trabajando || modo !== 'material') return;
+      if (e.target.classList.contains('rmd-mat-todos')) { elegidos.clear(); if (e.target.checked) marcables().forEach((x) => elegidos.add(x.codigo)); res.querySelectorAll('.rmd-mat-sel').forEach((c) => { c.checked = elegidos.has(c.dataset.codigo); }); }
+      else if (e.target.classList.contains('rmd-mat-sel')) { if (e.target.checked) elegidos.add(e.target.dataset.codigo); else elegidos.delete(e.target.dataset.codigo); }
+      pintarElegidos(); });
+    mBasta.addEventListener('change', () => { if (!detectado || trabajando || resultados.length) return; plan.forEach((x) => reglaCambioMaterial(x, mBasta.checked)); plan.sort((a, b) => (+b.aplica - +a.aplica) || String(a.codigo).localeCompare(String(b.codigo), 'es', { numeric: true })); resumenMaterial(); tablaMaterial(); });
+    [mAnt, mNue].forEach((x) => x.addEventListener('input', () => { detectado = null; plan = []; elegidos.clear(); res.innerHTML = ''; bEje.disabled = true; }));
     const pintarModo = () => {
       v.cuerpo.querySelectorAll('.rmd-mm-modo').forEach((b) => { const s = b.dataset.modo === modo; b.classList.toggle('activo', s); b.setAttribute('aria-selected', String(s)); });
-      const sus = modo === 'suspender';
+      const mat = modo === 'material'; q('.rmd-mm-mat').style.display = mat ? '' : 'none'; mot.style.display = mat ? 'none' : ''; q('.rmd-pegar').style.display = mat ? 'none' : '';   // en material los master se buscan solos
+      if (mat) {
+        q('.rmd-mm-ayuda').innerHTML = 'Indica el material que se <b>retiró</b> y el que <b>entró</b> en las recetas de SAP. «Revisar» busca los master (última versión Ingresada o Autorizada) cuya receta copiada aún tiene el anterior y cuya lista de materiales en SAP ya tiene el nuevo y ya no el anterior. <b>Revisar no crea ni cambia nada.</b>';
+        q('.rmd-mm-rotulo').innerHTML = '';
+        q('.rmd-mm-nota').textContent = 'Autorizados: se crea una versión nueva con «Nueva Versión» del portal (queda Ingresada), se quita y se vuelve a asociar la receta para traer la lista actual de SAP, y sus Observaciones quedan con la nomenclatura (prioridad y complejidad que elijas, fase de la versión anterior) y tu texto debajo. Ingresados: solo se reasocia la receta y se agrega tu texto al final.';
+        pintarEjemplo(); plan = []; resultados = []; detectado = null; elegidos.clear(); res.innerHTML = ''; setTxt(prog, ''); bEje.disabled = true; setTxt(bEje, MODOS_MASIVOS[modo].verbo); return;
+      }
+      const sus = modo === 'suspender'; bEje.title = '';
       v.cuerpo.querySelector('.rmd-mm-ayuda').innerHTML = sus ? 'Pega los códigos de los master <b>Autorizados o Ingresados</b> que quieres suspender (uno por línea o separados por espacios o comas).'
         : 'Pega los códigos de los master (en <b>cualquier estado</b> salvo Cancelado) a los que quieres agregar una observación.';
       v.cuerpo.querySelector('.rmd-mm-rotulo').innerHTML = sus ? '<b>Motivo de la suspensión</b> (opcional): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas".'
@@ -7235,7 +7370,72 @@
         const r = resultados.find((y) => y.codigo === x.codigo);
         return `<tr><td>${esc(x.codigo)}</td><td>${esc(x.md ? x.md.version : '')}</td><td>${esc(x.md ? x.md.descripcion : '')}</td><td>${esc(x.md ? x.md.nivelTxt : '')}</td><td>${esc(x.estadoTxt)}</td><td class="${r && !r.ok ? 'rmd-dif' : ''}">${esc(r ? r.resultado : x.aplica ? (modo === 'suspender' ? 'Se suspenderá' : 'Se agregará la observación') : x.motivoNo)}</td></tr>`; }).join('')}</tbody></table>`;
     };
+    const tablaMaterial = () => {
+      const fila = (x) => { const r = resultados.find((y) => y.codigo === x.codigo);
+        const recs = x.recetas.map((y) => `${esc(y.matnr)} / ${esc(y.verid)}${y.sap === 'nuevo' ? '' : ` <span class="rmd-dif">(${esc({ ambos: 'SAP tiene los dos', anterior: 'SAP aún tiene el anterior', ninguno: 'SAP no tiene ninguno', error: 'SAP no respondió' }[y.sap])})</span>`}${y.cambio ? ` <span class="rmd-nota">cambio ${esc(y.cambio)} del ${esc(y.desde)}</span>` : ''}`).join('<br>');
+        const que = r ? r.resultado : x.aplica ? (x.accion === 'version' ? `Versión ${+x.version + 1} Ingresada · ${x.fase}` : 'Reasociar la receta en esta versión') + (x.pendientes ? ` (se reasocian ${x.reasociar.length} de ${x.recetas.length} recetas; las demás siguen con el material anterior)` : '') : x.motivoNo;
+        const marca = x.aplica && !r ? `<input type="checkbox" class="rmd-mat-sel" data-codigo="${esc(x.codigo)}"${elegidos.has(x.codigo) ? ' checked' : ''}${trabajando ? ' disabled' : ''} aria-label="Actualizar ${esc(x.codigo)}">` : '';
+        return `<tr><td class="rmd-mat-celda-sel">${marca}</td><td>${esc(x.codigo)}</td><td>${esc(x.version)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.estado)}</td><td>${esc(x.etapa)}</td><td>${esc(x.planta)}</td><td>${recs}</td><td class="${(r && !r.ok) || !x.aplica ? 'rmd-dif' : ''}">${esc(que)}${x.aplica && x.pm ? `<br><span class="rmd-nota">⚠ ${x.pm} proceso(s) menor(es) usan el material anterior: revísalos tras reasociar</span>` : ''}</td></tr>`; };
+      res.innerHTML = `<table class="rmd-tabla"><thead><tr><th class="rmd-mat-celda-sel"><input type="checkbox" class="rmd-mat-todos" title="Marcar todos los listos" aria-label="Marcar todos los listos"${trabajando ? ' disabled' : ''}></th><th>Código</th><th>Versión</th><th>Descripción</th><th>Estado</th><th>Etapa</th><th>Planta</th><th>Receta (material / versión)</th><th>Qué se hará</th></tr></thead><tbody>${plan.map(fila).join('')}</tbody></table>`;
+      pintarElegidos();
+    };
+    const revisarMaterial = async () => {
+      const ant = norm(mAnt.value).replace(/\s/g, ''), nue = norm(mNue.value).replace(/\s/g, '');
+      if (!/^\d{6,}$/.test(ant) || !/^\d{6,}$/.test(nue) || ant === nue) { setTxt(prog, 'Escribe el código del material anterior y el del nuevo (distintos).'); return; }
+      const codigos = [];                                                  // todos los master: no se pegan códigos
+      bRev.disabled = true; resultados = []; plan = []; res.innerHTML = '';
+      try {
+        detectado = await detectarCambioMaterial(modelo, ctrl.oModelErpNec, { anterior: ant, nuevo: nue, codigos, basta: mBasta.checked }, (t) => setTxt(prog, t));
+        detectado.anterior = ant; detectado.nuevo = nue; plan = detectado.filas;
+        resumenMaterial(); if (!plan.length) setTxt(prog, `Ningún master Ingresado o Autorizado tiene el ${ant} en su receta copiada${codigos.length ? ' (entre los códigos pegados)' : ''}.`);
+        tablaMaterial();
+      } catch (e) { setTxt(prog, 'No se pudo revisar: ' + e.message); } finally { bRev.disabled = false; }
+    };
+    const ejecutarMaterial = async () => {
+      const lista = marcables().filter((x) => elegidos.has(x.codigo)), texto = norm(mTxt.value), nv = lista.filter((x) => x.accion === 'version').length;
+      if (!lista.length || !detectado) return;
+      if (!texto || /Actualización de\s*$/.test(texto)) { setTxt(prog, 'Completa el texto que va debajo de la nomenclatura.'); mTxt.focus(); return; }
+      const ok = await confirmar(`¿Actualizar ${lista.length} RMD?`,
+        `${nv ? `Se creará con «Nueva Versión» del portal una versión Ingresada de ${nv} RMD Autorizado(s), con sus Observaciones: «${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…')}» y «${texto}». ` : ''}${lista.length - nv ? `En ${lista.length - nv} RMD Ingresado(s) se agrega «${texto}» al final de las Observaciones. ` : ''}En todos se quita la receta y se vuelve a asociar para traer la lista actual de SAP (${detectado.nuevo} en lugar de ${detectado.anterior}). Quedan Ingresados.`,
+        `${nv ? 'En cada versión nueva el portal pide aceptar su mensaje de «Nueva Versión». ' : ''}No uses el portal mientras tanto. Una versión creada no se borra desde aquí (habría que cancelarla en el portal).`, { si: `Actualizar ${lista.length}`, no: 'Cancelar', peligro: true });
+      if (!ok) return;
+      trabajando = true; detenido = false; bEje.disabled = true; bRev.disabled = true; ta.readOnly = true; [mAnt, mNue, mPri, mCom, mTxt, mBasta].forEach((x) => { x.disabled = true; }); tablaMaterial();
+      const bDet = botonModal('Detener', '', () => { detenido = true; bDet.disabled = true; setTxt(bDet, 'Se detiene tras el actual…'); }); v.pie.prepend(bDet);
+      const filtrosAntes = guardarFiltrosLista(ctrl), usuario = usuarioSapActual(), quien = usuario ? (usuario.nombre || usuario.id) : '', F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+      resultados = [];
+      try {
+        for (let i = 0; i < lista.length && !detenido; i++) {
+          const x = lista[i], paso = (t) => setTxt(prog, `${i + 1} de ${lista.length} · ${x.codigo}: ${t}`);
+          const r = { codigo: x.codigo, md: { version: x.version, descripcion: x.descripcion, nivelTxt: x.etapa, sucursalId: { contenido: x.planta } }, modo: 'Cambio de material', estadoAntes: x.estado, motivo: texto, fecha: new Date(), usuario: quien, ok: false, obs: '', estadoDespues: '', resultado: '' };
+          let destino = x.codigo;
+          try {
+            if (x.accion === 'version') {
+              const nueva = await ppCrearVersionNueva(modelo, { ...x.md, codigoversionprincipal: x.linaje }, (sg, t) => paso(`${t} (${Math.floor(sg / 60)}:${String(sg % 60).padStart(2, '0')})`));
+              destino = String(nueva.codigo); r.versionNueva = `${destino} v${nueva.version}`; await esperar(1500);
+            }
+            const s = await modificarUno(ctrl, destino, { linea: x.accion === 'version' ? '' : texto, reemplazar: x.accion === 'version' ? `${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, x.fase)}\n${texto}` : null,
+              previo: () => reasociarRecetas(ctrl, x.reasociar, paso) });
+            paso('comprobando en SAP…');
+            const md2 = (await leerMDPorCodigos(modelo, [destino])).sort((p2, q2) => q2.version - p2.version)[0];
+            const ins = md2 ? await leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('mdId_mdId', 'EQ', md2.mdId), new F('activo', 'EQ', true)], { $select: 'Component' }) : [];
+            const tieneNuevo = ins.some((y) => norm(y.Component) === detectado.nuevo), tieneAnt = ins.some((y) => norm(y.Component) === detectado.anterior);
+            r.estadoDespues = md2 && md2.estadoIdRmd ? md2.estadoIdRmd.contenido : ''; r.obs = md2 ? md2.observacion || '' : s.obs;
+            r.ok = r.estadoDespues === 'Ingresado' && tieneNuevo && (!tieneAnt || x.pendientes > 0) && String(r.obs).includes(texto);
+            r.resultado = r.ok ? `${r.versionNueva ? `Versión nueva ${r.versionNueva}` : 'Receta reasociada'} · Ingresado con el ${detectado.nuevo}`
+              : `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}revisar: ${[r.estadoDespues !== 'Ingresado' && `quedó ${r.estadoDespues || 'sin estado'}`, !tieneNuevo && `no tiene el ${detectado.nuevo}`, tieneAnt && !x.pendientes && `aún tiene el ${detectado.anterior}`, !String(r.obs).includes(texto) && 'las Observaciones no quedaron', ...s.mensajes].filter(Boolean).join(' · ')}`;
+          } catch (e) { r.resultado = `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}no se completó: ${e.message}`; ppCerrarDialogosSap(); }
+          resultados.push(r); tablaMaterial();
+          if (!r.ok) { detenido = true; setTxt(prog, `Se detuvo en ${x.codigo}: ${r.resultado}`); break; }
+        }
+        const hechos = resultados.filter((y) => y.ok).length;
+        if (resultados.every((y) => y.ok)) setTxt(prog, `${detenido ? 'Detenido. ' : ''}Actualizados: ${hechos} de ${lista.length}. Descarga el detalle con «Exportar Excel».`);
+      } finally {
+        trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; [mAnt, mNue, mPri, mCom, mTxt, mBasta].forEach((x) => { x.disabled = false; }); bX.disabled = !resultados.length; elegidos.clear(); tablaMaterial();
+        try { await restaurarFiltrosLista(ctrl, filtrosAntes); } catch (e) { }
+      }
+    };
     const bRev = botonModal('Revisar', 'primario', async () => {
+      if (modo === 'material') return revisarMaterial();
       const codigos = [...new Set((ta.value.match(/\d{6,}/g) || []))];
       if (!codigos.length) { setTxt(prog, 'No se encontró ningún código (números de 6 o más cifras).'); return; }
       bRev.disabled = true; resultados = []; setTxt(prog, `Leyendo ${codigos.length} código(s) en SAP…`);
@@ -7250,6 +7450,7 @@
       } catch (e) { setTxt(prog, 'No se pudieron leer los códigos: ' + e.message); } finally { bRev.disabled = false; }
     });
     const bEje = botonModal('Suspender', 'peligro', async () => {
+      if (modo === 'material') return ejecutarMaterial();
       const lista = plan.filter((x) => x.aplica), linea = norm(mot.value), sus = modo === 'suspender';
       if (!lista.length) return;
       if (!sus && !linea) { setTxt(prog, 'Escribe la observación que se agregará.'); mot.focus(); return; }
@@ -7303,6 +7504,7 @@
   // pruebas (guardado simulado)
   window.__rmdStats.suspenderUno = (codigo, motivo) => suspenderUno(controladorPrincipal(), codigo, motivo);
   window.__rmdStats.observacionUno = (codigo, linea) => modificarUno(controladorPrincipal(), codigo, { suspender: false, linea });
+  window.__rmdStats.reemplazarObservacion = (codigo, texto) => modificarUno(controladorPrincipal(), codigo, { suspender: false, reemplazar: texto });
   window.__rmdStats.filtrosLista = { guardar: () => guardarFiltrosLista(controladorPrincipal()), soloCodigo: (c) => soloCodigoEnLista(controladorPrincipal(), c), restaurar: (g) => restaurarFiltrosLista(controladorPrincipal(), g) };   // pruebas
   window.__rmdStats.leerMDPorCodigos = (codigos) => leerMDPorCodigos(controladorPrincipal().getView().getModel('mainModelv2'), codigos);
 
