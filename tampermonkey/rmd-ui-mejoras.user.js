@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.81.0
+// @version      1.81.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.81.0';                                                       // mantener igual a @version
+  const VERSION = '1.81.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2143,14 +2143,16 @@
     const avisos = [], cortos = []; let malAgr = false, malCod = false, estado = 'ok', valor = '';
     if (!agr) { avisos.push('El Código Agrupador está vacío.'); cortos.push('Agrupador vacío'); malAgr = true; }
     if (!cod) { avisos.push('El Código está vacío.'); cortos.push('Código vacío'); malCod = true; }
-    const rel = filaPrincipal(codigoRmd); let nota = '';
-    if (rel && rel.anterior) {
-      const ant = rel.anterior, etq = `versión anterior v${ant.version} (RMD ${ant.codigo})`;
+    const rel = filaPrincipal(codigoRmd), leida = rel && rel.anterior ? null : anteriorLeida(d); let nota = '';
+    const anterior = (rel && rel.anterior) || (leida && leida.md);
+    if (anterior) {
+      const ant = anterior, etq = `versión anterior v${ant.version} (RMD ${ant.codigo})`;
       if (agr && String(ant.codAgrupadorReceta || '') !== agr) { avisos.push(`El Código Agrupador (${agr}) no coincide con la ${etq}: ${ant.codAgrupadorReceta || 'vacío'}.`); cortos.push(`Agrupador ≠ v${ant.version}`); malAgr = true; }
       if (cod && String(ant.codDefectoReceta || '') !== cod) { avisos.push(`El Código (${cod}) no coincide con la ${etq}: ${ant.codDefectoReceta || 'vacío'}.`); cortos.push(`Código ≠ v${ant.version}`); malCod = true; }
       if (!avisos.length) { nota = `✓ Código Agrupador y Código coinciden con la ${etq}.`; valor = `= v${esc(ant.version)}`; }
-    } else if (rel.actual && Number(rel.actual.version) <= 1) { nota = 'Es la primera versión: no hay versión anterior con la que comparar.'; valor = '1.ª versión'; estado = 'nd'; }
-    else { nota = 'No se encontró la versión anterior entre los RMD consultados: busca el producto por descripción (sin filtrar por código) para poder compararla.'; valor = 'sin v. anterior'; estado = 'nd'; }
+    } else if ((rel.actual && Number(rel.actual.version) <= 1) || (leida && leida.version != null && +leida.version <= 1)) { nota = 'Es la primera versión: no hay versión anterior con la que comparar.'; valor = '1.ª versión'; estado = 'nd'; }
+    else if (leida && leida.buscando) { nota = 'Buscando la versión anterior…'; valor = 'buscando v. anterior…'; estado = 'nd'; }
+    else { nota = leida && leida.error ? 'No se pudo leer la versión anterior (sin conexión con el portal). Se vuelve a intentar al abrir de nuevo «Asociar fórmulas».' : 'Este producto no tiene una versión anterior (sin contar las canceladas) con la que comparar.'; valor = 'sin v. anterior'; estado = 'nd'; }
     const texto = avisos.length ? avisos.map((a) => '⚠ ' + a).join('\n') : nota;
     if (avisos.length) { estado = 'aviso'; valor = cortos.map(esc).join(' · '); }
     fijarSegmento(d, 'asociar', { estado, valor, titulo: texto, detalle: avisos.length || estado === 'nd' ? texto : '' });
@@ -2177,6 +2179,26 @@
       }
       marcarCampo(d, 'Observaciones', !res.ok || copiada);
     } else fijarSegmento(d, 'nomenclatura', null);
+  }
+  // Versión anterior leída del portal cuando la lista principal no la tiene (p. ej. filtrada por un solo código): por el enlace mdIdVersionAnt o, si
+  // falta, la versión más alta menor que esta del mismo producto. Una lectura por ventana; al llegar se vuelve a revisar.
+  function anteriorLeida(d) {
+    const ctrl = controladorPrincipal(), V = ctrl && ctrl.getView(), am = V && V.getModel('asociarDatos'), asoc = am && am.getData(), modelo = V && V.getModel('mainModelv2');
+    if (!asoc || !asoc.mdId || !modelo) return { buscando: true, md: null };
+    if (d.__rmdAntMd !== asoc.mdId) {
+      d.__rmdAntMd = asoc.mdId; d.__rmdAnt = { buscando: true, md: null, version: asoc.version };
+      const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, vA = +asoc.version || 0, vale = (m) => m && m.mdId !== asoc.mdId && !/cancel/i.test((m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '');
+      (async () => {
+        let md = asoc.mdIdVersionAnt ? (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', asoc.mdIdVersionAnt)], { $expand: 'estadoIdRmd' }))[0] : null;
+        if (!vale(md)) {
+          const principal = String(asoc.codigoversionprincipal || asoc.codigo || '');
+          md = principal ? (await versionesConPlanta(modelo, principal)).filter((m) => vale(m) && (+m.version || 0) < vA).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0] : null;
+        }
+        return md || null;
+      })().then((md) => { if (d.__rmdAntMd === asoc.mdId) { d.__rmdAnt = { buscando: false, md, version: asoc.version }; aislar('revisarAsociar', revisarAsociar); } },
+        () => { if (d.__rmdAntMd === asoc.mdId) { d.__rmdAnt = { buscando: false, md: null, error: true, version: asoc.version }; aislar('revisarAsociar', revisarAsociar); } });
+    }
+    return d.__rmdAnt;
   }
   // Partes reconocibles de una 1.ª línea aunque tenga errores (para proponer la corrección)
   function partesNomenclatura(linea) {
