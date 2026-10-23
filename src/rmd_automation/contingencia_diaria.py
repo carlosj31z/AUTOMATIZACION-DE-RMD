@@ -35,9 +35,10 @@ def fecha_objetivo(hoy: Optional[date] = None, del_dia: bool = False) -> str:
     return (hoy if del_dia else hoy - timedelta(days=1)).isoformat()
 
 
-def nombre_archivo(r: Rmd) -> str:
+def nombre_archivo(r: Rmd, descripcion: str = "") -> str:
+    """`descripcion`: la de la fórmula (receta), como en el master descargado; si no, la del RMD."""
     etapa = ABREVIATURA.get(normalizar(r.etapa), normalizar(r.etapa)[:3])
-    desc = re.sub(r"[\\/:*?\"<>|#%]+", "_", r.descripcion.strip())
+    desc = re.sub(r"[\\/:*?\"<>|#%]+", "_", (descripcion or r.descripcion).strip())
     desc = re.sub(r"\s+", "_", desc)[:120]
     return f"{r.codigo}-{etapa}-{r.version}-{desc}.pdf"
 
@@ -108,7 +109,7 @@ def plan_a_texto(plan: List[Paso], fecha: str) -> str:
 
 # ---------------------------------------------------------------- portal: PDF del master
 
-# Igual que «Ver master» del portal (onGetMd… + onCompletarAsociarDatos + tratarInformacion) sobre una vista
+# Igual que «Descargar master» del portal (onGetMd… + onCompletarAsociarDatos + tratarInformacion) sobre una vista
 # aparte, para no tocar la lista ni grabar nada; se captura la definición de pdfMake y se genera el PDF.
 _JS_PDF_MASTER = r"""
 async (mdId) => {
@@ -117,10 +118,10 @@ async (mdId) => {
   const ctrl = reg && reg.oListener; if (!ctrl || !ctrl.getView) throw new Error('abre la lista «Configuración Manufactura Digital» en el portal');
   const LECT = ['onGetMdEstructura', 'onGetMdEsPaso', 'onGetMdEsEquipo', 'onGetMdEsUtensilio', 'onGetMdEsEtiqueta', 'onGetMdEsReInsumo', 'onGetMdEsEspecificacion', 'onGetMdEsPasoInsumoPaso'];
   const MODS = ['listMdEstructura', 'listMdEsPaso', 'listMdEsEquipo', 'listMdEsUtensilio', 'listMdEsEtiqueta', 'listMdEsReInsumo', 'listMdEsEspecificacion', 'listEsPasoInsumoPasoGeneral'];
-  if ([...LECT, 'onCompletarAsociarDatos', 'tratarInformacion'].some((n) => typeof ctrl[n] !== 'function')) throw new Error('no se encontró «Ver master» en el portal');
+  if ([...LECT, 'onCompletarAsociarDatos', 'tratarInformacion'].some((n) => typeof ctrl[n] !== 'function')) throw new Error('no se encontró «Descargar master» en el portal');
   const V = ctrl.getView(), modelo = V.getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter'), JM = sap.ui.require('sap/ui/model/json/JSONModel');
   const EXPAND = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,destinatariosMD/usuarioId,aStatusProceso/estadoIdProceso,aStatusProceso/mdId,aReceta/recetaId,aTrazabilidad/estadoTrazab';
-  const md = await new Promise((ok, mal) => modelo.read('/MD', { filters: [new F('mdId', 'EQ', Number(mdId))], urlParameters: { $expand: EXPAND },
+  const md = await new Promise((ok, mal) => modelo.read('/MD', { filters: [new F('mdId', 'EQ', mdId)], urlParameters: { $expand: EXPAND },
     success: (r) => ok((r.results || [])[0]), error: () => mal(new Error('el portal no respondió al leer el RMD')) }));
   if (!md) throw new Error('no se encontró el RMD ' + mdId);
   const clonar = (x) => Array.isArray(x) ? x.map(clonar) : x && typeof x === 'object' && Object.getPrototypeOf(x) === Object.prototype ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, clonar(v)])) : x;
@@ -130,7 +131,14 @@ async (mdId) => {
     if (k === 'setModel') return (m, n) => { locales.set(n, m); return vista; };
     const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } });
   const BI = sap.ui.core.BusyIndicator, bi0 = [BI.show, BI.hide], propio = Object.prototype.hasOwnProperty.call(ctrl, 'getView'), gv0 = ctrl.getView;
-  const pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open; let dd = null;
+  const pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open, docs = [];
+  // Una descarga por fórmula, como el botón «Descargar» de cada receta en «Asociar fórmulas»: la cabecera
+  // lleva la descripción, el código, la versión de fabricación y el teórico de la receta.
+  const recetas = ((md.aReceta && md.aReceta.results) || []).filter((r) => r.recetaId);
+  const evento = (rc) => { const obj = { mdRecetaId: rc.mdRecetaId, recetaId: rc.recetaId };
+    const fila = { getBindingContext: () => ({ getObject: () => obj }) };
+    const fuente = { getProperty: (p) => (p === 'text' ? 'Descargar' : undefined), getParent: () => ({ getParent: () => fila }) };
+    return { getSource: () => fuente }; };
   try {
     ctrl.getView = () => vista; BI.show = () => {}; BI.hide = () => {};
     const res = await Promise.all(LECT.map((n) => ctrl[n]()));
@@ -138,18 +146,26 @@ async (mdId) => {
     const estr = (res[0].results || []).slice().sort((a, b) => (a.orden !== b.orden ? a.orden - b.orden : esFormula(a) ? -1 : esFormula(b) ? 1 : 0));
     estr.forEach((e, i) => { e.orden = i + 1; });
     [estr, ...res.slice(1).map((r) => r.results || [])].forEach((d, i) => { const m = new JM(d); m.setSizeLimit(999999999); locales.set(MODS[i], m); });
-    await ctrl.onCompletarAsociarDatos();
     window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
     const nada = () => {};
-    pm.createPdf = function (d) { if (!dd) dd = clonar(d); return { open: nada, print: nada, download: nada, getBlob(cb) { if (cb) cb(new Blob()); return Promise.resolve(new Blob()); }, getDataUrl(cb) { if (cb) cb(''); }, getBase64(cb) { if (cb) cb(''); }, getBuffer(cb) { if (cb) cb(new Uint8Array()); } }; };
-    await ctrl.tratarInformacion(false, true);
-    for (let t = 0; !dd && t < 130; t++) await new Promise((r) => setTimeout(r, 150));
+    for (const rc of (recetas.length ? recetas : [null])) {
+      let dd = null;
+      pm.createPdf = function (d) { if (!dd) dd = clonar(d); return { open: nada, print: nada, download: nada, getBlob(cb) { if (cb) cb(new Blob()); return Promise.resolve(new Blob()); }, getDataUrl(cb) { if (cb) cb(''); }, getBase64(cb) { if (cb) cb(''); }, getBuffer(cb) { if (cb) cb(new Uint8Array()); } }; };
+      await ctrl.onCompletarAsociarDatos();
+      await (rc ? ctrl.tratarInformacion(evento(rc), false) : ctrl.tratarInformacion(false, false));
+      for (let t = 0; !dd && t < 130; t++) await new Promise((r) => setTimeout(r, 150));
+      if (!dd) throw new Error('el portal no armó el documento del master');
+      docs.push({ receta: rc ? (rc.recetaId.Text1 || '').trim() : '', verid: rc ? rc.recetaId.Verid || '' : '', dd });
+    }
   } finally {
     if (propio) ctrl.getView = gv0; else delete ctrl.getView;
     [BI.show, BI.hide] = bi0; pm.createPdf = cp0; window.open = open0;
   }
-  if (!dd) throw new Error('el portal no armó el documento del master');
-  return await new Promise((ok) => cp0.call(pm, dd).getBase64(ok));
+  // pdfmake 0.3 devuelve una promesa; las versiones anteriores llaman al callback.
+  const b64 = (dd) => new Promise((ok, mal) => { const v = cp0.call(pm, dd).getBase64(ok); if (v && v.then) v.then(ok, mal); });
+  const out = [];
+  for (const d of docs) out.push({ receta: d.receta, verid: d.verid, b64: await b64(d.dd) });
+  return out;
 }
 """
 
@@ -267,17 +283,21 @@ def ejecutar(cdp_url: str, url_carpeta: str, fecha: str, carpeta_local: str, apl
             if not r.md_id:
                 paso.nota = "Sin id del portal: no se pudo generar el PDF."
                 continue
-            pdf = base64.b64decode(frame.evaluate(_JS_PDF_MASTER, r.md_id))
-            destino_local = salida / (pendientes[0] if pendientes else (paso.carpetas[0] if paso.carpetas else "_SIN_CARPETA")) / paso.archivo
-            destino_local.parent.mkdir(parents=True, exist_ok=True)
-            destino_local.write_bytes(pdf)
-            avisar(f"PDF {r.codigo} ({len(pdf) // 1024} KB) → {destino_local}")
-            if not aplicar:
-                continue
-            for c in pendientes:
-                sp.subir(c, paso.archivo, pdf)
-                avisar(f"  subido a {c}/{paso.archivo}")
-            for x in paso.a_obsoleto:
-                avisar(f"  archivado {sp.archivar(x)}")
+            # Un PDF por fórmula (como «Descargar» de cada receta), con su descripción en el nombre.
+            carpeta = pendientes[0] if pendientes else (paso.carpetas[0] if paso.carpetas else "_SIN_CARPETA")
+            for doc in frame.evaluate(_JS_PDF_MASTER, r.md_id):
+                pdf = base64.b64decode(doc["b64"])
+                nombre = nombre_archivo(r, doc["receta"])
+                destino_local = salida / carpeta / nombre
+                destino_local.parent.mkdir(parents=True, exist_ok=True)
+                destino_local.write_bytes(pdf)
+                avisar(f"PDF {r.codigo} {doc['receta']} ({len(pdf) // 1024} KB) → {destino_local}")
+                if aplicar:
+                    for c in pendientes:
+                        sp.subir(c, nombre, pdf)
+                        avisar(f"  subido a {c}/{nombre}")
+            if aplicar:
+                for x in paso.a_obsoleto:
+                    avisar(f"  archivado {sp.archivar(x)}")
         # No se llama a browser.close(): cerraría el Chromium de la persona.
     return plan
