@@ -81,7 +81,7 @@ const hp = C.htmlPdf(dPdf, LP, (k) => (k === kLimpiar ? { tipo: 'modificado', ce
 ok('html: filas y textos con su línea (data-l)', hp.includes(`<tr data-l="${kLimpiar}" class="pdf-modificado">`) && new RegExp(`class="pdf-t pdf-agregado" data-l="${kPrec}"`).test(hp));
 ok('html: palabras cambiadas marcadas y escapadas', hp.includes('<mark>&lt;LA&gt;</mark>') && !hp.includes('<LA>'));
 ok('html: colSpan sin celdas de relleno', /<td colspan="3"[^>]*>USAR EL UNIFORME COMPLETO\.<\/td><\/tr>/.test(hp), hp.slice(hp.indexOf('USAR') - 200, hp.indexOf('USAR') + 60));
-ok('html: bordes de la celda y estilos (negrita del subtítulo)', /border-left:1px solid #000;/.test(hp) && /font-weight:700;[^"]*"[^>]*>PRECAUCIONES/.test(hp.replace(/data-l="\d+" /g, '')));
+ok('html: bordes de la celda y estilos (negrita del subtítulo)', /border-left:1pt solid #000;/.test(hp) && /font-weight:700;[^"]*"[^>]*>PRECAUCIONES/.test(hp.replace(/data-l="\d+" /g, '')));
 ok('html: cabecera sin función ni n.º de página en las líneas', hp.startsWith('<div class="pdf-hoja"') && hp.includes('REGISTRO DE MANUFACTURA'));
 ok('html: color y alineación peligrosos se descartan', !C.htmlPdf({ content: [{ text: 'x', color: 'red;background:url(x)', alignment: 'left;x' }] }, C.lineas({ content: [{ text: 'x' }] }), () => null).includes('url('));
 
