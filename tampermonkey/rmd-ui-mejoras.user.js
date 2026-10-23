@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.80.0
+// @version      1.80.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.80.0';                                                       // mantener igual a @version
+  const VERSION = '1.80.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -830,8 +830,8 @@
   @property --beam-hue-base { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
   .rmd-beam[data-beam] { transition: --beam-hue-base .7s var(--rmd-curva); } .rmd-beam[data-fin="ok"] { --beam-hue-base: -110deg; } .rmd-beam[data-fin="mal"] { --beam-hue-base: 165deg; }
 
-  /* Insumos procesados: contraste en tema oscuro */
-  html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.30); }
+  /* Insumos procesados: contraste en tema oscuro (el portal pone #ddf4ff con !important, pensado para el tema claro: texto blanco sobre celeste) */
+  html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.22) !important; box-shadow: inset 3px 0 0 var(--rmd-acento-texto); }
   /* ── Vista móvil (html.rmd-movil) ── */
   html.rmd-movil, html.rmd-movil body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
   /* tabla -> tarjetas */
@@ -1914,14 +1914,15 @@
     let visibles = 0, total = 0;
     const todas = [...tabla.querySelectorAll('tbody tr')];
     todas.forEach((tr, k) => {
-      if (/SubRow/.test(tr.className)) return;
+      if (/SubRow/.test(tr.className) || tr.classList.contains('sapMListNoData') || /-nodata$/.test(tr.id)) return;   // «Sin datos» no es un paso
       total++;
       const sub = /SubRow/.test((todas[k + 1] || {}).className || '') ? todas[k + 1] : null;
       const ok = !q || NORM(tr.textContent + ' ' + [...tr.querySelectorAll('input')].map((i) => i.value).join(' ')).includes(q);
       tr.style.display = ok ? '' : 'none'; if (sub) sub.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     });
-    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} ${barra.dataset.nombre || (inp ? 'pasos' : 'procesos menores')}`);
+    const nombre = barra.dataset.nombre || (inp ? 'pasos' : 'procesos menores'), uno = { pasos: 'paso', 'procesos menores': 'proceso menor' }[nombre];
+    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} ${total === 1 && uno ? uno : nombre}`);
   }
   function actualizarBarra(d, tabla) {
     const barra = d.querySelector('#rmd-filtro-bar'); if (!barra || !tabla.__rmdAlertas) return;
