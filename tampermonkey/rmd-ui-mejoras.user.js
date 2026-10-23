@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.79.0
+// @version      1.80.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.79.0';                                                       // mantener igual a @version
+  const VERSION = '1.80.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -610,13 +610,13 @@
   .rmd-toast.error { border-left-color: var(--rmd-rojo); }
 
   /* «Asociar fórmulas»: tira de revisión (un segmento por revisión, con su luz) y detalle plegable debajo */
-  #rmd-asoc-panel { --c: var(--rmd-verde); margin: 6px 16px 0; color: var(--rmd-texto); font: 12.5px/1.35 var(--rmd-fuente); }
+  #rmd-asoc-panel { --c: var(--rmd-verde); margin: 10px 16px 4px; color: var(--rmd-texto); font: 12.5px/1.35 var(--rmd-fuente); }
   #rmd-asoc-panel.e-aviso { --c: var(--rmd-ambar); } #rmd-asoc-panel.e-bloquea { --c: var(--rmd-rojo); }
   .rmd-ap-tira { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; overflow: hidden; border: 1px solid var(--rmd-borde); border-radius: 7px;
     background: linear-gradient(90deg, color-mix(in srgb, var(--c) 13%, transparent), transparent 55%); }
   .rmd-ap-tira::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); }
-  .rmd-ap-seg { --c: var(--rmd-verde); display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 2px 10px; border-left: 1px solid var(--rmd-borde); box-sizing: border-box; }
-  .rmd-ap-seg:first-child { padding-left: 13px; border-left: 0; } .rmd-ap-seg[hidden] { display: none; }
+  .rmd-ap-seg { --c: var(--rmd-verde); display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 5px 12px; border-left: 1px solid var(--rmd-borde); box-sizing: border-box; }
+  .rmd-ap-seg:first-child { padding-left: 15px; border-left: 0; } .rmd-ap-seg[hidden] { display: none; }
   .rmd-ap-seg.e-aviso { --c: var(--rmd-ambar); } .rmd-ap-seg.e-bloquea { --c: var(--rmd-rojo); } .rmd-ap-seg.e-nd { --c: var(--rmd-apagado); }
   .rmd-ap-seg[data-s="pendientes"] { flex: 1 1 280px; }
   .rmd-ap-luz { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
@@ -628,8 +628,18 @@
   .rmd-ap-seg.con-det[aria-expanded="true"]::after { margin-top: 3px; transform: rotate(-135deg); }
   .rmd-ap-seg.con-det[data-s="pendientes"]::after { margin-left: auto; }
   .rmd-ap-seg:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
-  .rmd-ap-det { --c: var(--rmd-ambar); margin-top: 4px; padding: 4px 10px 4px 12px; border-left: 3px solid var(--c); border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--c) 11%, transparent); white-space: pre-line; }
+  .rmd-ap-det { --c: var(--rmd-ambar); margin-top: 6px; padding: 7px 12px 7px 14px; border-left: 3px solid var(--c); border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--c) 11%, transparent); white-space: pre-line; }
   .rmd-ap-det.bloquea { --c: var(--rmd-rojo); } .rmd-ap-det.nd { --c: var(--rmd-apagado); color: var(--rmd-apagado); } .rmd-ap-det.ok { --c: var(--rmd-verde); }
+  #rmd-asoc-panel .rmd-nm-ant { color: var(--rmd-apagado); font-size: 11px; font-weight: 400; } #rmd-asoc-panel .rmd-nm-ant.cambia { color: var(--rmd-acento-texto); font-weight: 600; }
+  .rmd-nm-gen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed color-mix(in srgb, var(--c) 45%, transparent); white-space: normal; }
+  .rmd-nm-et { color: var(--rmd-apagado); font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+  .rmd-nm-cod { display: inline-flex; align-items: center; padding: 3px 8px; border: 1px solid var(--rmd-borde); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 600 12.5px/18px ui-monospace, Consolas, monospace; }
+  .rmd-nm-cod input, .rmd-nm-cod select { box-sizing: content-box; height: 18px; margin: 0 1px; padding: 0 2px; border: 0; border-bottom: 1px dashed var(--rmd-acento-texto); border-radius: 0; background: transparent; color: var(--rmd-acento-texto); font: inherit; cursor: pointer; }
+  .rmd-nm-cod input { width: 2.2ch; text-transform: uppercase; cursor: text; } .rmd-nm-cod select option { background: var(--rmd-superficie); color: var(--rmd-texto); }
+  .rmd-nm-cod input:focus, .rmd-nm-cod select:focus { outline: 0; border-bottom-style: solid; }
+  .rmd-nm-pista { color: var(--rmd-apagado); font-size: 11.5px; } .rmd-nm-pista b { color: var(--rmd-texto); font-family: ui-monospace, Consolas, monospace; }
+  .rmd-nm-usar { margin-left: auto; padding: 4px 12px; border: 0; border-radius: 6px; background: var(--rmd-acento); color: #fff; font: 600 12px/16px var(--rmd-fuente); cursor: pointer; }
+  .rmd-nm-usar:hover { filter: brightness(1.1); } .rmd-nm-usar:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
   #rmd-aviso-pendientes { white-space: normal; line-height: 1.45; }
   #rmd-aviso-pendientes ul { margin: 0; padding: 0; list-style: none; } #rmd-aviso-pendientes q { font-style: italic; color: var(--rmd-apagado); }
   #rmd-aviso-pendientes .rmd-pd-alto { font-weight: 700; color: var(--rmd-rojo); } #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
@@ -2128,16 +2138,73 @@
     const av = d.querySelector('#rmd-aviso-asociar'); if (av && av.textContent !== texto) av.textContent = texto;
     marcarCampo(d, 'Código Agrupador', malAgr); marcarCampo(d, 'Código', malCod);
 
-    // Nomenclatura de la 1ª línea de Observaciones
+    // Nomenclatura de la 1ª línea de Observaciones: si falta, está mal o es la misma de la versión anterior (copiada al crear la versión),
+    // el detalle se abre con la nomenclatura sugerida (fecha de hoy, iniciales y la prioridad, complejidad y fase de la versión anterior)
     if (obs !== null) {
-      const res = analizarNomenclatura((obs || '').split(/\r?\n/)[0]);
-      const textoN = res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' : res.avisos.map((a) => '⚠ ' + a).join('\n');
-      fijarSegmento(d, 'nomenclatura', res.ok ? { estado: 'ok', valor: esc(res.corto), titulo: textoN }
-        : { estado: 'aviso', valor: `${res.avisos.length} por corregir`, titulo: 'Formato: AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase (p. ej. 20260918CJ-1-C2.0-FI1.0-FA1.0-F2)', detalle: textoN });
-      const avN = d.querySelector('#rmd-aviso-nomenclatura'); if (avN && avN.textContent !== textoN) avN.textContent = textoN;
-      marcarCampo(d, 'Observaciones', !res.ok);
+      const l0 = (obs || '').split(/\r?\n/)[0], res = analizarNomenclatura(l0), act = partesNomenclatura(l0);
+      const pr = d.__rmdPendRes && d.__rmdPendRes.previa, l0Ant = pr ? String(pr.observacion || '').split(/\r?\n/)[0].trim() : '', ant = l0Ant ? partesNomenclatura(l0Ant) : null;
+      const vAnt = pr ? `v${pr.version}` : '', copiada = res.ok && !!l0Ant && l0.trim() === l0Ant;
+      const textoN = copiada ? `⚠ La 1.ª línea es la misma de la ${vAnt} (se copió al crear la versión): pon la fecha de hoy y tus iniciales, y revisa prioridad, complejidad y fase.`
+        : res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' : res.avisos.map((a) => '⚠ ' + a).join('\n');
+      const det = d.querySelector('#rmd-aviso-nomenclatura');
+      if (res.ok && !copiada) {
+        const nota = ant && ant.fase ? (ant.fase === act.fase ? ` <small class="rmd-nm-ant" title="Misma fase que la ${vAnt}">= ${esc(vAnt)}</small>` : ` <small class="rmd-nm-ant cambia" title="La ${vAnt} estaba en ${esc(ant.fase)}">${esc(vAnt)}: ${esc(ant.fase)}</small>`) : '';
+        fijarSegmento(d, 'nomenclatura', { estado: 'ok', valor: esc(res.corto) + nota, titulo: textoN + (ant && ant.fase ? `\nFase de la ${vAnt}: ${ant.fase}` : '') });
+        if (det && det.textContent !== textoN) det.textContent = textoN;
+      } else {
+        fijarSegmento(d, 'nomenclatura', { estado: 'aviso', valor: copiada ? `copiada de la ${esc(vAnt)}` : `${res.avisos.length} por corregir`, detalle: '1', abrir: true,
+          titulo: 'Formato: AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase (p. ej. 20260918CJ-1-C2.0-FI1.0-FA1.0-F2)' });
+        if (det) generadorNomenclatura(d, det, { texto: textoN, act: copiada ? {} : act, ant, vAnt, reemplazar: act.parece });
+      }
+      marcarCampo(d, 'Observaciones', !res.ok || copiada);
     } else fijarSegmento(d, 'nomenclatura', null);
   }
+  // Partes reconocibles de una 1.ª línea aunque tenga errores (para proponer la corrección)
+  function partesNomenclatura(linea) {
+    const tok = String(linea || '').trim().split(/\s+/)[0] || '', m = /^(\d{8})?([A-ZÑ]{2})?/i.exec(tok), partes = tok.split('-');
+    const c = partes.map((x) => /^C(\d(?:\.\d)?)$/i.exec(x)).find(Boolean), com = c ? 'C' + Number(c[1]).toFixed(1) : '';
+    return { fecha: m[1] || '', ini: (m[2] || '').toUpperCase(), prioridad: partes.find((x, i) => i > 0 && /^[123]$/.test(x)) || '', complejidad: COMPLEJIDADES.includes(com) ? com : '',
+      fase: faseNomenclatura(tok), parece: /^\d{6}/.test(tok) || /(^|-)F[IA]\d/i.test(tok) };
+  }
+  // Nomenclatura sugerida, editable: el botón reemplaza la 1.ª línea (o la agrega arriba si no era una nomenclatura).
+  // Se escribe como al teclear: se guarda con el Guardar del portal.
+  const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R', 'F4', 'F4R', 'F5', 'F5R', 'F6', 'F6R'];
+  function generadorNomenclatura(d, det, { texto, act, ant, vAnt, reemplazar }) {
+    let g = det.querySelector('.rmd-nm-gen');
+    if (!g) {
+      det.innerHTML = '<div class="rmd-nm-avisos"></div><div class="rmd-nm-gen"><span class="rmd-nm-et">Sugerida</span><span class="rmd-nm-cod"><span class="rmd-nm-hoy"></span>' +
+        '<input class="rmd-nm-ini" maxlength="2" spellcheck="false" title="Tus iniciales (nombre + apellido)">-<select class="rmd-nm-pri" title="Prioridad">' + ['1', '2', '3'].map((x) => `<option>${x}</option>`).join('') +
+        '</select>-<select class="rmd-nm-com" title="Complejidad">' + COMPLEJIDADES.map((x) => `<option>${x}</option>`).join('') + '</select>-FI1.0-FA1.0-<select class="rmd-nm-fase" title="Fase"></select></span>' +
+        '<span class="rmd-nm-pista"></span><button type="button" class="rmd-nm-usar"></button></div>';
+      g = det.querySelector('.rmd-nm-gen'); d.__rmdNmClave = null; d.__rmdNmToco = false;
+      g.addEventListener('click', (e) => e.stopPropagation());
+      g.addEventListener('change', () => { d.__rmdNmToco = true; });
+      g.querySelector('.rmd-nm-ini').addEventListener('input', (e) => { d.__rmdNmToco = true; e.target.value = e.target.value.toUpperCase().replace(/[^A-ZÑ]/g, ''); });
+      g.querySelector('.rmd-nm-usar').addEventListener('click', () => {
+        const q = (s) => g.querySelector(s).value, ini = q('.rmd-nm-ini');
+        if (ini.length !== 2) { toast('Escribe tus 2 iniciales (nombre + apellido).', true); g.querySelector('.rmd-nm-ini').focus(); return; }
+        const el = campoDe(d, 'Observaciones'), c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')); if (!c) return;
+        const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), ini, q('.rmd-nm-pri'), q('.rmd-nm-com'), q('.rmd-nm-fase'));
+        const lineas = String(c.getValue() || '').split(/\r?\n/), valor = (g.__rmdReemplazar ? [nueva, ...lineas.slice(1)] : [nueva, ...lineas.filter((x, i) => i || x.trim())]).join('\n');
+        c.setValue(valor); if (c.fireLiveChange) c.fireLiveChange({ value: valor }); c.fireChange({ value: valor }); d.__rmdNmToco = false;
+        toast(`1.ª línea: ${nueva}. Se guarda con el Guardar del portal.`);
+      });
+    }
+    const av = g.previousElementSibling; if (av.textContent !== texto) av.textContent = texto;
+    g.__rmdReemplazar = reemplazar;
+    const b = g.querySelector('.rmd-nm-usar'), tb = reemplazar ? 'Reemplazar la 1.ª línea' : 'Agregar como 1.ª línea'; if (b.textContent !== tb) b.textContent = tb;
+    const hoy = hoyAAAAMMDD(), h = g.querySelector('.rmd-nm-hoy'); if (h.textContent !== hoy) h.textContent = hoy;
+    const pri = act.prioridad || (ant && ant.prioridad) || '2', com = act.complejidad || (ant && ant.complejidad) || 'C1.0', fase = act.fase || (ant && ant.fase) || 'F1';
+    const ini = rsUsuarioIniciales() || act.ini || (ant && ant.ini) || '';
+    const pista = ant && ant.fase ? `fase de la ${esc(vAnt)}: <b>${esc(ant.fase)}</b>${ant.prioridad ? ` · prioridad ${esc(ant.prioridad)}` : ''}${ant.complejidad ? ` · ${esc(ant.complejidad)}` : ''}` : vAnt ? `la ${esc(vAnt)} no tiene nomenclatura` : '';
+    const ps = g.querySelector('.rmd-nm-pista'); if (ps.innerHTML !== pista) ps.innerHTML = pista;
+    const clave = [pri, com, fase, ini].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) return;
+    d.__rmdNmClave = clave;
+    const sf = g.querySelector('.rmd-nm-fase'), fases = FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
+    sf.innerHTML = fases.map((x) => `<option>${esc(x)}</option>`).join('');
+    sf.value = fase; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
+  }
+  const hoyAAAAMMDD = () => { const f = new Date(); return `${f.getFullYear()}${String(f.getMonth() + 1).padStart(2, '0')}${String(f.getDate()).padStart(2, '0')}`; };
 
   // ---- 6b-bis. «Asociar Fórmula»: controles de cambio aplicados y pendientes de versiones anteriores (solo lectura) ----
   // Las versiones del master se leen una vez por ventana (codigoversionprincipal); el texto de Observaciones se toma de la pantalla.
@@ -6205,7 +6272,7 @@
       const previa = vs[vs.length - 1] || null;
       const nuevas = anA.tipos.filter((t) => t.tipo !== 'nomenclatura' && !previos.has(plano(t.linea)));
       return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
-        bajas: [...bajas.values()], formato, resueltos, nuevas, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an } };
+        bajas: [...bajas.values()], formato, resueltos, nuevas, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an, observacion: previa.observacion } };
     }
     // ---- Listado de CC / NC / DES para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima) ----
     // Columnas por su encabezado: AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES, ESTATUS (o ESTATUS DE FILE), MOTIVO.
