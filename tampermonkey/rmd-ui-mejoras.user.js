@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.83.0
+// @version      1.85.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.83.0';                                                       // mantener igual a @version
+  const VERSION = '1.85.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -61,7 +61,7 @@
     ['editarpaso', 'Editar paso con aviso', 'Avisa si otros RMD usan el paso y deja elegir dónde aplicar el cambio.'],
     ['cambiarpaso', 'Cambiar paso', 'Cambia un paso por otro código sin perder su configuración.'],
     ['pasominusculas', 'Pasar a minúsculas', 'Botón «En minúsculas» en pasos y «Aa» al escribir una descripción.'],
-    ['formulas', 'Ordenar fórmulas', 'Subir y bajar los términos de una fórmula (Alt+↑ / Alt+↓).'],
+    ['formulas', 'Fórmulas claras', 'Subir y bajar los términos (Alt+↑ / Alt+↓), los pasos de cada fórmula enlazados con su signo hasta el paso que la usa, y un aviso discreto si no coinciden con lo citado en la descripción o usan un paso sin número.'],
     ['espec', 'Especificaciones editables', 'Reordenar filas y editar sus textos.'],
     ['asociar', 'Revisión de Asociar fórmulas', 'Avisa códigos distintos a la versión anterior y valida la 1.ª línea de Observaciones.'],
     ['pendientes', 'Observaciones inteligentes', 'En «Asociar fórmulas» clasifica cada línea de Observaciones (CC, pendiente, motivo de suspensión, baja o descontinuado…), avisa lo que una versión anterior dejó pendiente y agrega líneas con formato.'],
@@ -561,6 +561,23 @@
   .rmd-formula-desfase { display: flex; align-items: center; gap: 12px; margin: 8px 16px 4px; padding: 8px 12px; border-left: 4px solid var(--rmd-acento, #0a6ed1); border-radius: 4px; background: rgba(10,110,209,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-formula-desfase .rmd-btn { margin-left: auto; flex: 0 0 auto; } .rmd-formula-desfase.ok { border-left-color: var(--rmd-verde); background: rgba(46,160,67,.1); }
   .rmd-formula-legible { margin: 4px 16px 0; color: var(--rmd-apagado); font: 12.5px/1.45 var(--rmd-fuente); } .rmd-formula-legible.rmd-formula-rep { color: var(--rmd-texto); }
+  .rmd-fx { display: flex; flex-wrap: nowrap; align-items: center; gap: 5px; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .rmd-fx-paso { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 5px; min-width: 0; max-width: 300px; height: 18px; box-sizing: border-box; padding: 0 8px 0 2px; border: 1px solid var(--rmd-borde); border-radius: 10px; color: var(--rmd-texto); }
+  .rmd-fx-num { flex: 0 0 auto; padding: 0 6px; border-radius: 8px; background: rgba(128,140,155,.18); font-weight: 700; font-size: 11.5px; line-height: 14px; font-variant-numeric: tabular-nums; }
+  .rmd-fx-txt { min-width: 24px; overflow: hidden; text-overflow: ellipsis; }
+  .rmd-fx-op { flex: 0 0 auto; min-width: 10px; text-align: center; font-weight: 700; color: var(--rmd-texto); } .rmd-fx-igual { margin: 0 2px; color: var(--rmd-apagado); }
+  .rmd-fx-cte { flex: 0 0 auto; color: var(--rmd-texto); font-variant-numeric: tabular-nums; }
+  .rmd-fx-res { border-style: dashed; } .rmd-fx-ct .rmd-fx-num { background: rgba(27,141,236,.16); color: var(--rmd-acento-texto); }
+  .rmd-fx-paso.aviso { border-color: var(--rmd-ambar); } .rmd-fx-paso.aviso .rmd-fx-num { background: rgba(240,180,90,.2); color: var(--rmd-ambar); } .rmd-fx-op.aviso, .rmd-fx-cte.aviso { color: var(--rmd-ambar); }
+  .rmd-fx-ver { flex: 0 0 auto; margin-left: 6px; font-size: 12px; } .rmd-fx-ver.ok { color: var(--rmd-verde); } .rmd-fx-ver.aviso { color: var(--rmd-ambar); cursor: help; }
+  .rmd-fx-btn { position: relative; overflow: visible !important; }
+  .rmd-fx-marca { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; }
+  .rmd-fx-marca.ok { background: var(--rmd-verde); } .rmd-fx-marca.aviso { background: var(--rmd-ambar); } .rmd-fx-marca.vacia { box-shadow: inset 0 0 0 1px var(--rmd-apagado); } .rmd-fx-marca.neutro { display: none; }
+  tr.rmd-fx-ref > td { background-image: linear-gradient(rgba(27,141,236,.12), rgba(27,141,236,.12)); } tr.rmd-fx-ref > td.sapMListTblSelCol { box-shadow: inset 3px 0 0 var(--rmd-acento); }
+  tr.rmd-fx-dueno > td.sapMListTblSelCol { box-shadow: inset 3px 0 0 var(--rmd-apagado); }
+  td.rmd-fx-td { position: relative; }
+  .rmd-fx-insignia { position: absolute; right: 6px; bottom: 3px; padding: 0 7px; border-radius: 9px; font: 700 11px/16px var(--rmd-fuente); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+  .rmd-fx-insignia.ref { background: rgba(27,141,236,.18); color: var(--rmd-acento-texto); } .rmd-fx-insignia.dueno { background: var(--rmd-superficie); border: 1px solid var(--rmd-borde); color: var(--rmd-texto); }
   .rmd-codigo-pegado .sapMInputBaseContentWrapper { box-shadow: 0 0 0 2px rgba(240,180,90,.6); background: rgba(240,180,90,.12) !important; }   /* código pegado en el selector */
   .rmd-exportar-op, .rmd-documentos-citados { margin: 0 4px; height: 32px; }
   .rmd-cuenta-verop { align-self: center; margin: 0 4px; color: var(--rmd-apagado); font-size: 12.5px; white-space: nowrap; }
@@ -2808,7 +2825,7 @@
     if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -8745,19 +8762,33 @@
     lm.refresh(true); mDisp.refresh(true);
   }
   window.__rmdStats.corregirFormula = () => { const d = dialogos().find((x) => /^F[oó]rmulas$/i.test(cabecera(x))); return d ? corregirFormulaCargada(d, listaFormula(d)) : null; };   // pruebas
+  // Términos de la ventana como en MD_ES_FORMULA_PASO: el paso de cada término se busca en los disponibles (los cargados traen el id del dueño).
+  function terminosDeVentana(sel) {
+    const b = controladorPrincipal(), mDisp = b && b.getView().getModel('aListFormulaPasoDisponible'), disp = (mDisp && mDisp.getData()) || [];
+    return sel.map((x) => {
+      const v = String(x.codigo == null ? '' : x.codigo).trim();
+      if (!x.descrPaso) return { valor: v };
+      const pm = /^Proceso menor/i.test(x.descrPaso) || !!x.mdEstructuraPasoInsumoPasoId;
+      const a = (x.mdEstructuraPasoInsumoPasoId && disp.find((y) => y.mdEstructuraPasoInsumoPasoId === x.mdEstructuraPasoInsumoPasoId))
+        || disp.find((y) => String(y.codigo) === v && y.orden === x.orden && y.descrEstructura === x.descrEstructura && !!y.mdEstructuraPasoInsumoPasoId === pm);
+      return { paso: true, pm, id: a ? (pm ? a.mdEstructuraPasoInsumoPasoId : a.pasoPadreId) : null, valor: v, orden: x.orden, descr: x.descrPaso };
+    });
+  }
   function formulaLegible(d, lista) {
-    const bi = lista.getBindingInfo('items'), sel = lista.getModel(bi.model).getProperty(RUTA_FORMULA) || [];
-    const corto = (t) => norm(String(t || '').replace(/^Proceso menor\s*/i, 'PM '));
-    const txt = sel.map((x) => (x.descrPaso ? `orden ${x.orden} (${String(x.codigo).trim()})` : x.codigo === 'CT' ? 'cantidad teórica' : String(x.codigo || '').trim())).filter(Boolean).join(' ');
-    const detalle = sel.filter((x) => x.descrPaso).map((x) => `orden ${x.orden} · ${x.codigo} · ${corto(x.descrPaso)}`).join('\n');
+    const bi = lista.getBindingInfo('items'), lm = lista.getModel(bi.model), sel = lm.getProperty(RUTA_FORMULA) || [];
     const ancla = [...d.querySelectorAll('.sapMMsgStrip, input, textarea')].find((el) => { const c = sap.ui.getCore().byId(el.id) || ctlDe(el); return c && ['text', 'value'].some((k) => /formulaText/.test(rutaDe(c, k) || '')); });
     if (!ancla) return;
     let p = d.querySelector('.rmd-formula-legible');
-    if (!txt) { if (p) p.remove(); return; }
-    if (!p || p.previousElementSibling !== ancla) { if (p) p.remove(); p = document.createElement('p'); p.className = 'rmd-formula-legible'; ancla.insertAdjacentElement('afterend', p); }
-    const repetidos = new Set(sel.map((x) => String(x.codigo)).filter((c, i, a) => c && c !== '+' && a.indexOf(c) !== i));
-    setTxt(p, 'Por orden: ' + txt); p.title = (repetidos.size ? `El texto de arriba (del portal) usa códigos y repite ${[...repetidos].join(', ')}: aquí se ve a qué fila (orden) corresponde cada término.\n\n` : '') + detalle;
-    p.classList.toggle('rmd-formula-rep', repetidos.size > 0);
+    if (!sel.length) { if (p) p.remove(); return; }
+    if (!p || p.previousElementSibling !== ancla) { if (p) p.remove(); p = document.createElement('div'); p.className = 'rmd-formula-legible rmd-fx'; ancla.insertAdjacentElement('afterend', p); }
+    const b = controladorPrincipal(), am = b && b.getView().getModel('asociarDatos'), md = am && am.getData(), modelo = b && b.getView().getModel('mainModelv2');
+    const info = md && modelo ? numeracionFormulas(modelo, md.mdId) : null, duenio = lm.getProperty('/listMsEstructuraPaso') || {};
+    const ev = evaluarFormula(terminosDeVentana(sel), { id: duenio.mdEstructuraPasoInsumoPasoId || duenio.mdEstructuraPasoId, pm: !!duenio.mdEstructuraPasoInsumoPasoId, descr: (duenio.pasoId && duenio.pasoId.descripcion) || '' }, info);
+    const repetidos = new Set(sel.map((x) => String(x.codigo)).filter((c, i, a) => c && !OPS_FORMULA[c] && a.indexOf(c) !== i));
+    const html = cadenaFormulaHtml(ev);
+    if (p.__rmdHtml !== html) { p.__rmdHtml = html; p.innerHTML = html; }
+    const tit = (repetidos.size ? `El texto de arriba (del portal) usa códigos y repite ${[...repetidos].join(', ')}: aquí se ve a qué paso (número y orden) corresponde cada término.\n\n` : '') + ev.detalle;
+    if (p.title !== tit) p.title = tit;
   }
   function gestionarFormulas() {
     const d = typeof sap !== 'undefined' && dialogos().find((x) => /^F[oó]rmulas$/i.test(cabecera(x)));
@@ -8783,6 +8814,175 @@
     avisoFormulaDesfasada(d).catch((e) => { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('fórmula desfasada: ' + e.message); });
     if (!d.__rmdCorrigiendo) { d.__rmdCorrigiendo = true; corregirFormulaCargada(d, lista).catch((e) => { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('fórmula: ' + e.message); }).finally(() => { d.__rmdCorrigiendo = false; }); }
     formulaLegible(d, lista);
+  }
+
+  // ---- Fórmulas: pasos enlazados («4.5.2 + 4.5.3 = 4.5.4») y comprobación frente a lo citado en la descripción ----
+  const OPS_FORMULA = { '+': '+', '-': '−', '*': '×', '/': '÷', '(': '(', ')': ')' };
+  const TIPOS_CON_NUMERO = new Set([434, 438, 443, 445, 448, 450]);   // Cantidad, Números, Rango, Fórmula, MuestraCC, Entrega
+  const RE_NUM_PASO = /\b\d{1,2}\.\d{1,2}\.\d{1,3}\b/g;
+  const NUM_FORMULAS = new Map();   // mdId -> { gen, t, info, cargando }
+  // Numeración como el PDF (n.etiqueta.orden en estructuras numeradas), tipo de dato de cada fila y términos de las fórmulas del RMD.
+  async function leerNumeracionFormulas(modelo, mdId) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, porMd = [new F('mdId_mdId', 'EQ', mdId)], act = (x) => x.activo !== false;
+    const [estr, etqs, pasos, pms] = await Promise.all([
+      leerTodoDe(modelo, 'MD_ESTRUCTURA', porMd, { $expand: 'estructuraId', $select: 'mdEstructuraId,orden,activo,estructuraId/numeracion' }),
+      leerTodoDe(modelo, 'MD_ES_ETIQUETA', porMd, { $select: 'mdEsEtiquetaId,orden,activo' }),
+      leerTodoDe(modelo, 'MD_ES_PASO', porMd, { $expand: 'pasoId', $select: 'mdEstructuraPasoId,orden,activo,mdEstructuraId_mdEstructuraId,mdEsEtiquetaId_mdEsEtiquetaId,tipoDatoId_iMaestraId,pasoId/codigo,pasoId/descripcion' }),
+      leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', porMd, { $expand: 'pasoHijoId', $select: 'mdEstructuraPasoInsumoPasoId,orden,activo,pasoId_mdEstructuraPasoId,tipoDatoId_iMaestraId,pasoHijoId/codigo,pasoHijoId/descripcion' }).catch(() => [])]);
+    const numE = new Map(), ordE = new Map(); let n = 0;
+    estr.filter(act).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((e) => { ordE.set(e.mdEstructuraId, +e.orden || 0); if (e.estructuraId && e.estructuraId.numeracion) numE.set(e.mdEstructuraId, String(++n)); });
+    const ordT = new Map(etqs.filter(act).map((t) => [t.mdEsEtiquetaId, +t.orden || 0]));
+    const P = new Map(), PM = new Map();
+    pasos.filter(act).forEach((p) => {
+      const ne = numE.get(p.mdEstructuraId_mdEstructuraId), ot = ordT.get(p.mdEsEtiquetaId_mdEsEtiquetaId);
+      P.set(p.mdEstructuraPasoId, { num: ne ? (ot != null ? `${ne}.${ot}.${p.orden}` : `${ne}.${p.orden}`) : '', orden: p.orden, tipo: p.tipoDatoId_iMaestraId, codigo: p.pasoId ? String(p.pasoId.codigo) : '',
+        descr: (p.pasoId && p.pasoId.descripcion) || '', pos: [ordE.get(p.mdEstructuraId_mdEstructuraId) || 0, ot || 0, +p.orden || 0] });
+    });
+    pms.filter(act).forEach((m) => {
+      const pa = P.get(m.pasoId_mdEstructuraPasoId); if (!pa) return;
+      PM.set(m.mdEstructuraPasoInsumoPasoId, { num: pa.num, pm: m.orden, orden: m.orden, tipo: m.tipoDatoId_iMaestraId, codigo: m.pasoHijoId ? String(m.pasoHijoId.codigo) : '', descr: (m.pasoHijoId && m.pasoHijoId.descripcion) || '', pos: pa.pos.concat(+m.orden || 0) });
+    });
+    const duenos = pasos.filter((p) => act(p) && +p.tipoDatoId_iMaestraId === 445).map((p) => p.mdEstructuraPasoId);
+    const fp = duenos.length ? await leerPorIds(modelo, 'MD_ES_FORMULA_PASO', 'pasoPadreId_mdEstructuraPasoId', duenos, { $select: 'pasoPadreId_mdEstructuraPasoId,orden,activo,esPaso,bFlagPM,valor,pasoFormulaId_mdEstructuraPasoId,pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId' }) : [];
+    const formulas = new Map();
+    fp.filter(act).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((g) => {
+      const v = String(g.valor == null ? '' : g.valor).trim(), es = !!g.esPaso && v !== 'CT';
+      const t = es ? { paso: true, pm: !!g.bFlagPM, id: g.bFlagPM ? g.pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId : g.pasoFormulaId_mdEstructuraPasoId, valor: v } : { valor: v };
+      if (!formulas.has(g.pasoPadreId_mdEstructuraPasoId)) formulas.set(g.pasoPadreId_mdEstructuraPasoId, []);
+      formulas.get(g.pasoPadreId_mdEstructuraPasoId).push(t);
+    });
+    return { pasos: P, pms: PM, formulas };
+  }
+  // Devuelve lo ya leído (o null) y lee de nuevo en segundo plano si cambió la generación de ventanas (p. ej. al cerrar «Fórmulas») o pasó 1 min.
+  function numeracionFormulas(modelo, mdId) {
+    if (!mdId) return null;
+    let c = NUM_FORMULAS.get(mdId); if (!c) { c = { gen: -1, t: 0, info: null, cargando: false }; NUM_FORMULAS.set(mdId, c); }
+    if (!c.cargando && (c.gen !== generacionRmd || Date.now() - c.t > 60000)) {
+      c.cargando = true; const gen = generacionRmd;
+      leerNumeracionFormulas(modelo, mdId).then((info) => { c.info = info; c.gen = gen; c.t = Date.now(); programarAjuste(); })
+        .catch((e) => { c.t = Date.now(); c.gen = gen; window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('numeración de fórmulas: ' + e.message); })
+        .finally(() => { c.cargando = false; });
+    }
+    return c.info;
+  }
+  window.__rmdStats.formulasDelRmd = async (mdId) => {   // pruebas: estado de cada fórmula del RMD
+    const info = await leerNumeracionFormulas(controladorPrincipal().getView().getModel('mainModelv2'), mdId);
+    return [...info.formulas].map(([id, t]) => { const f = info.pasos.get(id) || {}, ev = evaluarFormula(t, { id, pm: false, descr: f.descr }, info); return { num: f.num, estado: ev.estado, detalle: ev.detalle }; });
+  };
+  const antesDe = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) return x < y; } return false; };
+  const textoPasoCorto = (t) => { const l = String(t || '').replace(/^Proceso menor\s*/i, '').split(/\r?\n/).map(norm).find(Boolean) || ''; return l.replace(/\s*\((?:\s*\d{1,2}\.\d{1,2}\.\d{1,3}\s*[-+*/x×÷]?\s*)+\)/gi, '').replace(/\s*:\s*$/, ''); };
+  // terminos: [{ paso, pm, id, valor }] en orden; duenio: { id, pm, descr }
+  function evaluarFormula(terminos, duenio, info) {
+    const P = info ? info.pasos : new Map(), PM = info ? info.pms : new Map(), yo = duenio.id ? (duenio.pm ? PM : P).get(duenio.id) : null;
+    const partes = [], avisos = []; let previo = null, abiertos = 0;
+    const numTxt = (f, t) => (f ? (f.num ? f.num + (f.pm != null ? ` · PM ${f.pm}` : '') : `orden ${f.orden}`) : t.orden != null ? `orden ${t.orden}` : `cód. ${t.valor}`);
+    terminos.forEach((t) => {
+      const v = t.valor; let clase;
+      if (t.paso) {
+        // id de otra versión (copia): como el portal, por código si en este RMD hay un solo paso con él
+        const M = t.pm ? PM : P, porCodigo = () => { const c = [...M.values()].filter((x) => x.codigo === t.valor); return c.length === 1 ? c[0] : null; };
+        const f = (t.id && M.get(t.id)) || (info ? porCodigo() : null), av = [];
+        if (info && !f) av.push('ese paso ya no está en este RMD (se eliminó o se cambió de código)');
+        if (f && !TIPOS_CON_NUMERO.has(+f.tipo)) av.push(`es «${nombreTipo(f.tipo) || 'sin tipo de dato'}»: no registra un número`);
+        if (f && f === yo) av.push('es el mismo paso de la fórmula');
+        else if (f && yo && antesDe(yo.pos, f.pos)) av.push('va después de este paso: al calcular aún no tendrá valor');
+        partes.push({ clase: 'paso', num: f ? f.num : '', etq: numTxt(f, t), descr: textoPasoCorto(f ? f.descr : t.descr), largo: norm(f ? f.descr : t.descr), codigo: v, avisos: av }); clase = 'x';
+      } else if (v === 'CT') { partes.push({ clase: 'ct', etq: 'CT', descr: 'cantidad teórica', avisos: [] }); clase = 'x'; }
+      else if (OPS_FORMULA[v]) { partes.push({ clase: 'op', op: v, avisos: [] }); clase = v === '(' || v === ')' ? v : 'b'; }
+      else { partes.push({ clase: 'cte', valor: v, avisos: [] }); clase = 'x'; }
+      const p = partes[partes.length - 1];
+      if (clase === 'x' && (previo === 'x' || previo === ')')) p.avisos.push('falta un signo antes de este término');
+      if (clase === 'b' && (previo === null || previo === 'b' || previo === '(') && v !== '-') p.avisos.push('signo sin término delante');
+      if (clase === '(') abiertos++;
+      if (clase === ')') { if (abiertos) abiertos--; else p.avisos.push('cierra un paréntesis que no se abrió'); }
+      previo = clase;
+    });
+    if (previo === 'b') avisos.push('La fórmula termina en un signo');
+    if (abiertos) avisos.push('Falta cerrar un paréntesis');
+    // lo citado en la descripción, p. ej. «CANTIDAD OBTENIDA (kg) (4.5.2 + 4.5.3):»
+    const desc = norm(duenio.descr), citados = desc.match(RE_NUM_PASO) || [];
+    let cita = null;
+    if (citados.length && info) {
+      const ini = desc.search(RE_NUM_PASO), fin = desc.lastIndexOf(citados[citados.length - 1]) + citados[citados.length - 1].length, tramo = desc.slice(ini, fin);
+      const tokD = (tramo.match(/\d{1,2}\.\d{1,2}\.\d{1,3}|[-+*/x×÷]/gi) || []).map((x) => ({ x: '*', '×': '*', '÷': '/' }[x.toLowerCase()] || x));
+      const tokF = partes.filter((p) => (p.clase === 'paso' && p.num) || (p.clase === 'op' && '+-*/'.includes(p.op))).map((p) => (p.clase === 'paso' ? p.num : p.op));
+      const nums = (a) => a.filter((x) => /\d/.test(x)), ops = (a) => a.filter((x) => !/\d/.test(x));
+      const conSignos = ops(tokD).length === citados.length - 1, b = conSignos ? tokF : nums(tokF);
+      const coincide = (a) => a.join(' ') === b.join(' ') || (nums(a).slice().sort().join() === nums(b).slice().sort().join() && ops(a).sort().join() === ops(b).sort().join() && ops(a).every((o) => o === ops(a)[0] && '+*'.includes(o)));
+      const a = conSignos ? tokD : nums(tokD); let igual = coincide(a), corrida = '';
+      // texto del catálogo escrito para otra numeración (p. ej. «4.5.2 - 4.5.5» en un RMD sin Insumos, donde Procedimiento es el 3): mismos pasos
+      const primero = (x) => x.split('.')[0], eD = [...new Set(citados.map(primero))], eF = [...new Set(nums(tokF).map(primero))];
+      if (!igual && eD.length === 1 && eF.length === 1 && eD[0] !== eF[0]) {
+        const a2 = a.map((x) => (/\d/.test(x) ? eF[0] + x.slice(eD[0].length) : x));
+        if (coincide(a2)) { igual = true; corrida = `La descripción numera ${eD[0]}.x; en este RMD esos pasos son ${eF[0]}.x (${a2.map((x) => OPS_FORMULA[x] || x).join(' ')}).`; }
+      }
+      cita = { ok: igual, texto: tramo, corrida };
+      if (!igual) {
+        const usados = new Set(nums(tokF)), corr = eD.length === 1 && eF.length === 1 && eD[0] !== eF[0], enRmd = (x) => (corr ? eF[0] + x.slice(eD[0].length) : x);
+        const cit = citados.map(enRmd);
+        partes.forEach((p) => { if (p.clase === 'paso' && p.num && !cit.includes(p.num)) p.avisos.push(`la descripción no lo cita (${tramo})`); });
+        const faltan = cit.filter((x) => !usados.has(x));
+        avisos.push(faltan.length ? `La descripción cita ${tramo}: falta ${faltan.join(', ')}${corr ? ` (aquí ${eD[0]}.x es ${eF[0]}.x)` : ''}` : `La descripción cita ${tramo}: los signos u orden no coinciden`);
+      }
+    }
+    const nAvisos = avisos.length + partes.filter((p) => p.avisos.length).length;
+    const resultado = yo ? { etq: numTxt(yo, {}), descr: textoPasoCorto(yo.descr), largo: norm(yo.descr) } : { etq: '', descr: textoPasoCorto(duenio.descr), largo: desc };
+    const enLinea = (p) => (p.clase === 'op' ? OPS_FORMULA[p.op] : p.clase === 'cte' ? p.valor : `${p.etq} ${p.descr}`);
+    const texto = partes.map(enLinea).join(' ') + (partes.length ? ` = ${resultado.etq} ${resultado.descr}`.replace(/\s+/g, ' ') : '');
+    const detalle = [texto].concat(partes.filter((p) => p.avisos.length).map((p) => `⚠ ${p.etq}: ${p.avisos.join('; ')}`), avisos.map((x) => '⚠ ' + x),
+      cita && cita.ok ? [`✓ Usa los pasos que cita la descripción (${cita.texto})`].concat(cita.corrida ? [cita.corrida] : []) : []).join('\n');
+    const corto = partes.map((p) => (p.clase === 'op' ? OPS_FORMULA[p.op] : p.clase === 'cte' ? p.valor : p.clase === 'ct' ? 'CT' : p.num || p.etq)).join(' ');
+    return { partes, resultado, avisos, cita, nAvisos, texto, corto, detalle, estado: !partes.length ? 'vacia' : nAvisos ? 'aviso' : cita && cita.ok ? 'ok' : 'neutro' };
+  }
+  function cadenaFormulaHtml(ev) {
+    const chip = (p, extra) => `<span class="rmd-fx-paso${p.avisos && p.avisos.length ? ' aviso' : ''}${extra || ''}" title="${esc((p.largo || p.descr) + (p.avisos && p.avisos.length ? '\n⚠ ' + p.avisos.join('\n⚠ ') : ''))}"><b class="rmd-fx-num">${esc(p.etq)}</b><span class="rmd-fx-txt">${esc(p.descr)}</span></span>`;
+    const partes = ev.partes.map((p) => (p.clase === 'op' ? `<span class="rmd-fx-op${p.avisos.length ? ' aviso' : ''}">${esc(OPS_FORMULA[p.op])}</span>`
+      : p.clase === 'cte' ? `<span class="rmd-fx-cte${p.avisos.length ? ' aviso' : ''}">${esc(p.valor)}</span>` : chip(p, p.clase === 'ct' ? ' rmd-fx-ct' : ''))).join('');
+    const ver = ev.nAvisos ? `<span class="rmd-fx-ver aviso" title="${esc(ev.detalle)}">⚠ ${ev.nAvisos} por revisar</span>`
+      : ev.cita && ev.cita.ok ? `<span class="rmd-fx-ver ok" title="${esc('La fórmula usa los pasos que cita la descripción.' + (ev.cita.corrida ? '\n' + ev.cita.corrida : ''))}">✓ ${esc(ev.cita.texto)}${ev.cita.corrida ? ' *' : ''}</span>` : '';
+    return `${partes}<span class="rmd-fx-op rmd-fx-igual">=</span>${chip(ev.resultado, ' rmd-fx-res')}${ver}`;
+  }
+  // Lista de pasos: marca en el botón «Fórmula» (verde: usa lo citado; ámbar: por revisar; hueca: sin términos) y, al pasar el ratón por la fila,
+  // los pasos que usa se resaltan.
+  function gestionarFormulasLista() {
+    const tablas = document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) .sapMList');
+    if (!tablas.length) return;
+    if (!on('formulas')) { document.querySelectorAll('.rmd-fx-marca').forEach((e) => e.remove()); return; }
+    const b = controladorPrincipal(), am = b && b.getView().getModel('asociarDatos'), md = am && am.getData(), modelo = b && b.getView().getModel('mainModelv2');
+    tablas.forEach((el) => {
+      const lista = sap.ui.getCore().byId(el.id), bi = lista && lista.getBindingInfo && lista.getBindingInfo('items');
+      if (!bi || bi.model !== 'aListPasoAssignResponsive' || !md || !modelo) return;
+      const items = lista.getItems(), objs = items.map((it) => { const c = it.getBindingContext('aListPasoAssignResponsive'); return c && c.getObject(); });
+      if (!objs.some((o) => o && +o.tipoDatoId_iMaestraId === 445)) return;
+      const info = numeracionFormulas(modelo, md.mdId); if (!info) return;
+      items.forEach((it, i) => {
+        const o = objs[i], tr = it.getDomRef(); if (!o || !tr) return;
+        const btn = [...tr.querySelectorAll('button')].find((x) => { const c = sap.ui.getCore().byId(x.id.replace(/-inner$/, '')); return c && c.getIcon && c.getIcon() === 'sap-icon://lab'; });
+        const marca = btn && btn.querySelector('.rmd-fx-marca');
+        if (+o.tipoDatoId_iMaestraId !== 445 || !btn || btn.offsetParent === null) { if (marca) marca.remove(); tr.__rmdFxRefs = null; return; }
+        const ev = evaluarFormula(info.formulas.get(o.mdEstructuraPasoId) || [], { id: o.mdEstructuraPasoId, pm: false, descr: (o.pasoId && o.pasoId.descripcion) || '' }, info);
+        const tit = ev.estado === 'vacia' ? 'Fórmula sin términos' : ev.detalle;
+        let m = marca; if (!m) { m = document.createElement('span'); m.setAttribute('aria-hidden', 'true'); btn.classList.add('rmd-fx-btn'); btn.appendChild(m); }
+        const cls = 'rmd-fx-marca ' + ev.estado; if (m.className !== cls) m.className = cls;
+        if (btn.title !== tit) { btn.title = tit; btn.setAttribute('aria-description', tit); }
+        tr.__rmdFxRefs = new Set((info.formulas.get(o.mdEstructuraPasoId) || []).filter((t) => t.paso && !t.pm).map((t) => t.id));
+        tr.__rmdFxCorto = ev.estado === 'vacia' ? '' : `= ${ev.corto}`; tr.__rmdFxNum = ev.resultado.etq;
+        if (!tr.__rmdFxHover) {
+          tr.__rmdFxHover = true;
+          tr.addEventListener('mouseenter', () => {
+            const refs = tr.__rmdFxRefs; if (!refs) return;
+            const i = [...el.querySelectorAll('thead th')].findIndex((th) => /^Descripci[oó]n$/i.test(norm(th.textContent)));
+            const insignia = (r, txt, cls) => { const td = i >= 0 && r.children[i]; if (!td || !txt) return; const s = document.createElement('span'); s.className = 'rmd-fx-insignia ' + cls; s.textContent = txt; td.classList.add('rmd-fx-td'); td.appendChild(s); };
+            lista.getItems().forEach((x) => { const c = x.getBindingContext('aListPasoAssignResponsive'), r = x.getDomRef(); if (c && r && r !== tr && refs.has(c.getObject().mdEstructuraPasoId)) { r.classList.add('rmd-fx-ref'); insignia(r, `→ ${tr.__rmdFxNum}`, 'ref'); } });
+            tr.classList.add('rmd-fx-dueno'); insignia(tr, tr.__rmdFxCorto, 'dueno');
+          });
+          tr.addEventListener('mouseleave', () => {
+            el.querySelectorAll('.rmd-fx-insignia').forEach((x) => x.remove());
+            el.querySelectorAll('.rmd-fx-ref, .rmd-fx-dueno, .rmd-fx-td').forEach((x) => x.classList.remove('rmd-fx-ref', 'rmd-fx-dueno', 'rmd-fx-td'));
+          });
+        }
+      });
+    });
   }
 
   // ---- Producción Estatus: destinatarios de la revisión ----
