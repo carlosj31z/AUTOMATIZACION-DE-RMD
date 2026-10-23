@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.81.1
+// @version      1.81.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.81.1';                                                       // mantener igual a @version
+  const VERSION = '1.81.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2160,7 +2160,7 @@
     marcarCampo(d, 'Código Agrupador', malAgr); marcarCampo(d, 'Código', malCod);
 
     // Nomenclatura de la 1ª línea de Observaciones: si falta, está mal o es la misma de la versión anterior (copiada al crear la versión),
-    // el detalle se abre con la nomenclatura sugerida (fecha de hoy, iniciales y la prioridad, complejidad y fase de la versión anterior)
+    // el detalle se abre con la nomenclatura sugerida (fecha de hoy, iniciales y la prioridad y complejidad de la versión anterior; la fase se elige, con la anterior a la vista)
     if (obs !== null) {
       const l0 = (obs || '').split(/\r?\n/)[0], res = analizarNomenclatura(l0), act = partesNomenclatura(l0);
       const pr = d.__rmdPendRes && d.__rmdPendRes.previa, l0Ant = pr ? String(pr.observacion || '').split(/\r?\n/)[0].trim() : '', ant = l0Ant ? partesNomenclatura(l0Ant) : null;
@@ -2224,6 +2224,7 @@
       g.querySelector('.rmd-nm-usar').addEventListener('click', () => {
         const q = (s) => g.querySelector(s).value, ini = q('.rmd-nm-ini');
         if (ini.length !== 2) { toast('Escribe tus 2 iniciales (nombre + apellido).', true); g.querySelector('.rmd-nm-ini').focus(); return; }
+        if (!q('.rmd-nm-fase')) { toast(`Elige la fase de esta versión${g.__rmdFaseAnt ? ` (la ${g.__rmdFaseAnt})` : ''}: no siempre es la misma que la anterior.`, true); g.querySelector('.rmd-nm-fase').focus(); return; }
         const el = campoDe(d, 'Observaciones'), c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')); if (!c) return;
         const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), ini, q('.rmd-nm-pri'), q('.rmd-nm-com'), q('.rmd-nm-fase'));
         const lineas = String(c.getValue() || '').split(/\r?\n/), valor = (g.__rmdReemplazar ? [nueva, ...lineas.slice(1)] : [nueva, ...lineas.filter((x, i) => i || x.trim())]).join('\n');
@@ -2235,14 +2236,15 @@
     g.__rmdReemplazar = reemplazar;
     const b = g.querySelector('.rmd-nm-usar'), tb = reemplazar ? 'Reemplazar la 1.ª línea' : 'Agregar como 1.ª línea'; if (b.textContent !== tb) b.textContent = tb;
     const hoy = hoyAAAAMMDD(), h = g.querySelector('.rmd-nm-hoy'); if (h.textContent !== hoy) h.textContent = hoy;
-    const pri = act.prioridad || (ant && ant.prioridad) || '2', com = act.complejidad || (ant && ant.complejidad) || 'C1.0', fase = act.fase || (ant && ant.fase) || 'F1';
+    const pri = act.prioridad || (ant && ant.prioridad) || '2', com = act.complejidad || (ant && ant.complejidad) || 'C1.0', fase = act.fase || '';   // la fase no se copia de la versión anterior: no siempre es la misma
     const ini = rsUsuarioIniciales() || act.ini || (ant && ant.ini) || '';
     const pista = ant && ant.fase ? `fase de la ${esc(vAnt)}: <b>${esc(ant.fase)}</b>${ant.prioridad ? ` · prioridad ${esc(ant.prioridad)}` : ''}${ant.complejidad ? ` · ${esc(ant.complejidad)}` : ''}` : vAnt ? `la ${esc(vAnt)} no tiene nomenclatura` : '';
     const ps = g.querySelector('.rmd-nm-pista'); if (ps.innerHTML !== pista) ps.innerHTML = pista;
     const clave = [pri, com, fase, ini].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) return;
     d.__rmdNmClave = clave;
-    const sf = g.querySelector('.rmd-nm-fase'), fases = FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
-    sf.innerHTML = fases.map((x) => `<option>${esc(x)}</option>`).join('');
+    const sf = g.querySelector('.rmd-nm-fase'), fases = !fase || FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
+    sf.innerHTML = '<option value="">F?</option>' + fases.filter(Boolean).map((x) => `<option>${esc(x)}</option>`).join('');
+    g.__rmdFaseAnt = ant && ant.fase ? `${vAnt} estaba en ${ant.fase}` : '';
     sf.value = fase; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
   }
   const hoyAAAAMMDD = () => { const f = new Date(); return `${f.getFullYear()}${String(f.getMonth() + 1).padStart(2, '0')}${String(f.getDate()).padStart(2, '0')}`; };
