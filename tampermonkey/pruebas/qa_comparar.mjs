@@ -66,6 +66,12 @@ const t0 = Date.now(), big = (n, f) => Array.from({ length: n }, (_, i) => ({ zo
 const rb = C.comparar(big(2500, (i) => `PASO ${i} TEXTO ${i % 7}`), big(2600, (i) => `PASO ${i} TEXTO ${i % 5}`));
 ok('2500 × 2600 líneas en menos de 4 s', Date.now() - t0 < 4000 && rb.filas.length >= 2600, `${Date.now() - t0} ms`);
 
+// ---- cabecera: se muestra pero no se compara ----
+const conCab = (lote) => { const d = doc(['PESAR.']); const h = d.header; d.header = (p, n) => { const x = h(p, n); x.columns[0].table.body[1][3] = { text: lote }; return x; }; return C.lineas(d); };
+const RC = C.comparar(conCab('L-001'), conCab('L-999'));
+ok('cabecera distinta: sin cambios', RC.resumen.cambios === 0 && RC.filas.filter((f) => f.tipo === 'cabecera').length === 2, J(RC.resumen));
+ok('cabecera: filas presentes a cada lado', RC.filas[1].a === 1 && RC.filas[1].b === 1 && C.sinCambio(RC.filas[1]));
+
 // ---- vista «Como el PDF» ----
 const cc = C.celdasCambiadas(['4.1.2.-', 'PESAR 10 kg', 'Realizado Por'], ['4.1.2.-', 'PESAR 12 kg', 'Realizado Por', 'VB']);
 ok('celdas: solo la cambiada lleva tramos', cc.a[0] === null && cc.a[2] === null && cc.a[1].some(([t, c]) => c && t === '10') && J(cc.b[3]) === J([['VB', true]]), J(cc));

@@ -243,8 +243,8 @@
   html.rmd-ui .rmd-cont-tabla th { position: sticky; top: 0; background: #f7f7f7; text-align: left; padding: 6px 8px; font-weight: 600; }
   html.rmd-ui .rmd-cont-tabla td { padding: 6px 8px; border-top: 1px solid #eee; vertical-align: top; word-break: break-word; }
   /* ── Comparar dos RMD (lado a lado) ── */
-  .rmd-modal.rmd-cmp-ventana { width: min(1600px, 97vw); height: 92vh; max-height: 92vh; }
-  .rmd-cmp-ventana .rmd-modal-cuerpo { display: flex; flex-direction: column; overflow: hidden; }
+  .rmd-modal.rmd-cmp-ventana { width: min(1100px, 96vw); }
+  .rmd-cmp-ventana .rmd-modal-cuerpo { overflow: visible; min-height: 300px; }
   .rmd-cmp-elegir { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: start; flex: 0 0 auto; }
   .rmd-cmp-lado { position: relative; padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); min-width: 0; }
   .rmd-cmp-rot { font-weight: 600; font-size: 13px; margin-bottom: 6px; } .rmd-cmp-rot small { font-weight: 400; color: var(--rmd-apagado); }
@@ -258,6 +258,8 @@
   .rmd-cmp-cambiar { align-self: center; min-width: 34px; font-size: 16px; }
   .rmd-cmp-opc { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin: 8px 0 6px; font-size: 13px; flex: 0 0 auto; } .rmd-cmp-opc .rmd-progreso { margin: 0; }
   .rmd-cmp-resultado { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  body.rmd-cmp-pagina { margin: 0; height: 100vh; display: flex; flex-direction: column; padding: 10px 16px 12px; box-sizing: border-box; background: var(--rmd-superficie); color: var(--rmd-texto); font: 14px/1.45 var(--rmd-fuente); }
+  .rmd-cmp-titulo { display: flex; gap: 12px; align-items: baseline; font-size: 15px; } .rmd-cmp-titulo span { color: var(--rmd-apagado); font-size: 13px; } .rmd-cmp-cargando { margin: 16px 0; }
   .rmd-cmp-barra { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 6px 0; font-size: 13px; }
   .rmd-cmp-resumen .modificado { color: var(--rmd-ambar); } .rmd-cmp-resumen .agregado { color: var(--rmd-verde); } .rmd-cmp-resumen .quitado { color: var(--rmd-rojo); } .rmd-cmp-resumen small { color: var(--rmd-apagado); }
   .rmd-cmp-nav { display: inline-flex; gap: 8px; align-items: center; margin-left: auto; } .rmd-cmp-pos { min-width: 5.5em; text-align: center; font-variant-numeric: tabular-nums; }
@@ -7195,9 +7197,13 @@
       return out;
     }
     // Filas alineadas: { tipo: 'igual' | 'modificado' | 'quitado' | 'agregado', a, b (índices o null), pa, pb (tramos), grupo (n.º de cambio o -1), seccion }
+    // La cabecera (código, versión, estado, fechas…) se muestra pero no se compara: filas «cabecera», una al lado de la otra
+    const sinCambio = (f) => f.tipo === 'igual' || f.tipo === 'cabecera';
     function comparar(A, B) {
-      const pares = emparejar(A.map((x) => clave(x.texto)), B.map((x) => clave(x.texto))), filas = [];
-      let i = 0, j = 0;
+      const ha = A.filter((x) => x.zona === 'cabecera').length, hb = B.filter((x) => x.zona === 'cabecera').length, filas = [];
+      for (let k = 0; k < Math.max(ha, hb); k++) filas.push({ tipo: 'cabecera', a: k < ha ? k : null, b: k < hb ? k : null, pa: k < ha ? [[A[k].texto, false]] : null, pb: k < hb ? [[B[k].texto, false]] : null });
+      const pares = emparejar(A.slice(ha).map((x) => clave(x.texto)), B.slice(hb).map((x) => clave(x.texto))).map(([x, y]) => [x + ha, y + hb]);
+      let i = ha, j = hb;
       const tramo = (i1, j1) => {
         const qs = [], as = []; for (; i < i1; i++) qs.push(i); for (; j < j1; j++) as.push(j);
         alinearTramo(qs, as, A, B).forEach(([x, y]) => {
@@ -7212,8 +7218,8 @@
       const cambios = []; let g = -1;
       filas.forEach((f, k) => {
         f.seccion = (f.b != null ? B[f.b] : A[f.a]).seccion;
-        if (f.tipo === 'igual') { f.grupo = -1; return; }
-        if (!k || filas[k - 1].tipo === 'igual') { g = cambios.length; cambios.push({ fila: k, filas: 0, tipos: new Set(), seccion: f.seccion }); }
+        if (sinCambio(f)) { f.grupo = -1; return; }
+        if (!k || sinCambio(filas[k - 1])) { g = cambios.length; cambios.push({ fila: k, filas: 0, tipos: new Set(), seccion: f.seccion }); }
         f.grupo = g; cambios[g].filas++; cambios[g].tipos.add(f.tipo);
       });
       const cuenta = (t) => filas.filter((f) => f.tipo === t).length;
@@ -7307,7 +7313,7 @@
       const base = { fontSize: 12, ...(doc.defaultStyle || {}) };
       return `<div class="pdf-hoja" style="width:${PT(anchoHoja(doc))};${css(base)}"><div class="pdf-cab">${bloque(L.cabecera, base)}</div>${bloque(doc.content, base)}</div>`;
     }
-    return { lineas, emparejar, parecido, palabras, comparar, celdasCambiadas, htmlPdf, SEP };
+    return { lineas, emparejar, parecido, palabras, comparar, sinCambio, celdasCambiadas, htmlPdf, SEP };
   })();
   // ==COMPARAR-FIN==
   window.__rmdStats.comparar = Comparar;   // pruebas
@@ -7338,15 +7344,31 @@
     v.cuerpo.innerHTML = `<div class="rmd-cmp-elegir">${lado('a')}<button type="button" class="rmd-btn rmd-cmp-cambiar" title="Intercambiar original y modificado" aria-label="Intercambiar original y modificado">⇄</button>${lado('b')}</div>
       <div class="rmd-cmp-opc"><label><input type="checkbox" class="rmd-cmp-receta"> Incluir la receta (si el RMD tiene una sola fórmula)</label><span class="rmd-progreso"></span></div>
       <div class="rmd-cmp-resultado"></div>`;
-    const prog = v.cuerpo.querySelector('.rmd-progreso'), resultado = v.cuerpo.querySelector('.rmd-cmp-resultado'), chkReceta = v.cuerpo.querySelector('.rmd-cmp-receta');
-    const setProg = (t, error) => { prog.textContent = t || ''; prog.classList.toggle('error', !!error); };
+    const prog = v.cuerpo.querySelector('.rmd-progreso'), aviso = v.cuerpo.querySelector('.rmd-cmp-resultado'), chkReceta = v.cuerpo.querySelector('.rmd-cmp-receta');
+    let pagina = null, res = null;                                         // pestaña con el resultado y su contenedor
+    const setProg = (t, error) => {
+      prog.textContent = t || ''; prog.classList.toggle('error', !!error);
+      const p = res && !R && res.querySelector('.rmd-progreso'); if (p) { p.textContent = t || ''; p.classList.toggle('error', !!error); }
+    };
     const bComparar = botonModal('Comparar', 'primario', () => comparar()), bCerrar = botonModal('Cerrar', '', () => { if (!ocupado) cerrar(); });
     v.pie.append(bCerrar, bComparar);
     const teclas = (e) => { if (!R || !e.altKey || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return; e.preventDefault(); e.stopPropagation(); ir(actual + (e.key === 'ArrowDown' ? 1 : -1)); };
     document.addEventListener('keydown', teclas, true);
-    const alCambiarTamano = () => { if (R && vista === 'pdf') ajustarPdf(); };
-    window.addEventListener('resize', alCambiarTamano);
-    function cerrar() { document.removeEventListener('keydown', teclas, true); window.removeEventListener('resize', alCambiarTamano); v.cerrar(); }
+    const alCambiarTamano = () => { if (R && vista === 'pdf' && res && res.isConnected) ajustarPdf(); };
+    function cerrar() { document.removeEventListener('keydown', teclas, true); v.cerrar(); }
+    // El resultado se abre en una pestaña nueva (o en la que ya está abierta), con los estilos del script
+    function abrirPagina() {
+      if (pagina && !pagina.closed && res && res.isConnected) return true;
+      const w = window.open('', '_blank'); if (!w) return false;
+      const d = w.document;
+      d.open(); d.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Comparar dos RMD</title></head><body class="rmd-cmp-pagina"><div class="rmd-cmp-resultado"></div></body></html>`); d.close();
+      d.documentElement.className = document.documentElement.className;
+      const st = d.createElement('style'); st.textContent = CSS; d.head.appendChild(st);
+      pagina = w; res = d.querySelector('.rmd-cmp-resultado');
+      res.addEventListener('click', alClic); res.addEventListener('change', alCambio);
+      d.addEventListener('keydown', teclas, true); w.addEventListener('resize', alCambiarTamano);
+      return true;
+    }
     const nombre = (m) => `${m.codigo} · v${m.version}`;
     const estCls = (e) => SIN_ACENTOS(e || '').toLowerCase().replace(/\s+/g, '-');
     const fichaMd = (m) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc(m.etapa)}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>`;
@@ -7390,13 +7412,17 @@
     }
     async function comparar() {
       if (!lados.a || !lados.b || ocupado) return;
-      ocupado = true; pintarLados(); resultado.innerHTML = '';
+      if (!abrirPagina()) { setProg('El navegador no dejó abrir la pestaña: permite las ventanas emergentes de este sitio y vuelve a pulsar «Comparar».', true); return; }
+      ocupado = true; R = null; pintarLados(); aviso.innerHTML = '';
+      pagina.document.title = `Comparar ${nombre(lados.a)} y ${nombre(lados.b)}`;
+      res.innerHTML = `<p class="rmd-progreso rmd-cmp-cargando"></p>`; pagina.focus();
       try {
         setProg(`Armando el master de ${nombre(lados.a)}…`); const da = await docDe(lados.a);
         setProg(`Armando el master de ${nombre(lados.b)}…`); const db = await docDe(lados.b);
         setProg('Comparando…'); await esperar(20);
         R = { ...Comparar.comparar(da.L, db.L), A: da.L, B: db.L, docA: da.doc, docB: db.doc, ma: lados.a, mb: lados.b }; actual = -1; abiertos = new Set(); setProg(''); pintarResultado();
         if (R.cambios.length) ir(0);
+        aviso.innerHTML = `<p class="rmd-nota">La comparación de ${esc(nombre(lados.a))} y ${esc(nombre(lados.b))} está en otra pestaña. <button type="button" class="rmd-link" data-a="pestana">Ir a la pestaña</button></p>`;
       } catch (e) { R = null; setProg('No se pudo comparar: ' + e.message, true); }
       finally { ocupado = false; pintarLados(); }
     }
@@ -7413,7 +7439,7 @@
       if (vista === 'pdf') { /* las hojas las arma hojaPdf */ } else if (!soloCambios) html = filas.map(linea).join('');
       else {
         const ver = new Uint8Array(filas.length);
-        filas.forEach((f, k) => { if (f.tipo !== 'igual') for (let d = -2; d <= 2; d++) if (k + d >= 0 && k + d < filas.length) ver[k + d] = 1; });
+        filas.forEach((f, k) => { if (!Comparar.sinCambio(f)) for (let d = -2; d <= 2; d++) if (k + d >= 0 && k + d < filas.length) ver[k + d] = 1; });
         for (let k = 0; k < filas.length;) {
           if (ver[k] || abiertos.has(k)) { html += linea(filas[k], k); k++; continue; }
           let e = k; while (e < filas.length && !ver[e]) e++;
@@ -7426,7 +7452,7 @@
         const quitado = fs.map((f) => muestra(f.pa)).filter(Boolean).join(' … '), agregado = fs.map((f) => muestra(f.pb)).filter(Boolean).join(' … ');
         return `<li><button type="button" data-g="${g}" class="${tipo}"><span class="rmd-cmp-tipo">${esc(NOMBRE_TIPO[tipo])}${c.filas > 1 ? ` · ${c.filas} líneas` : ''}</span><span class="rmd-cmp-secc">${esc(c.seccion || '')}</span>${quitado ? `<del>${esc(quitado.slice(0, 140))}</del>` : ''}${agregado ? `<ins>${esc(agregado.slice(0, 140))}</ins>` : ''}</button></li>`;
       };
-      resultado.innerHTML = `<div class="rmd-cmp-barra" role="toolbar" aria-label="Diferencias">
+      res.innerHTML = `<div class="rmd-cmp-titulo"><b>Comparar dos RMD</b> <span>${esc(nombre(ma))} → ${esc(nombre(mb))}</span></div><div class="rmd-cmp-barra" role="toolbar" aria-label="Diferencias">
           <span class="rmd-cmp-resumen">${resumen.cambios ? `<b>${resumen.cambios}</b> cambio${resumen.cambios === 1 ? '' : 's'}: <span class="modificado">${resumen.modificado} modificada${resumen.modificado === 1 ? '' : 's'}</span> · <span class="agregado">${resumen.agregado} agregada${resumen.agregado === 1 ? '' : 's'}</span> · <span class="quitado">${resumen.quitado} quitada${resumen.quitado === 1 ? '' : 's'}</span> <small>(líneas)</small>` : '<b>Sin diferencias</b> en el texto de los dos master.'}</span>
           <span class="rmd-cmp-vista" role="group" aria-label="Vista"><button type="button" data-vista="pdf" aria-pressed="${vista === 'pdf'}">Como el PDF</button><button type="button" data-vista="texto" aria-pressed="${vista === 'texto'}">Solo texto</button></span>
           ${vista === 'texto' ? `<label><input type="checkbox" class="rmd-cmp-solo" ${soloCambios ? 'checked' : ''}> Solo cambios</label>` : ''}
@@ -7448,7 +7474,7 @@
       if (!R.html) {
         const ma = new Map(), mb = new Map();
         R.filas.forEach((f) => {
-          if (f.tipo === 'igual') return;
+          if (Comparar.sinCambio(f)) return;
           const c = f.tipo === 'modificado' ? Comparar.celdasCambiadas(R.A[f.a].celdas, R.B[f.b].celdas) : null;
           if (f.a != null) ma.set(f.a, { tipo: f.tipo, celdas: c ? c.a : null });
           if (f.b != null) mb.set(f.b, { tipo: f.tipo, celdas: c ? c.b : null });
@@ -7457,9 +7483,9 @@
       }
       return R.html[l];
     }
-    const panel = (l) => resultado.querySelector(`.rmd-cmp-pdf[data-lado="${l}"] .rmd-cmp-pdf-scroll`);
+    const panel = (l) => res.querySelector(`.rmd-cmp-pdf[data-lado="${l}"] .rmd-cmp-pdf-scroll`);
     let anclas = null, sincronizando = 0;
-    const soltar = () => requestAnimationFrame(() => requestAnimationFrame(() => { sincronizando = Math.max(0, sincronizando - 1); }));
+    const soltar = () => { const w = (res && res.ownerDocument.defaultView) || window; w.requestAnimationFrame(() => w.requestAnimationFrame(() => { sincronizando = Math.max(0, sincronizando - 1); })); };   // en la pestaña visible
     function prepararPdf() {
       const grupoA = new Map(), grupoB = new Map();
       R.filas.forEach((f) => { if (f.grupo < 0) return; if (f.a != null) grupoA.set(f.a, f.grupo); if (f.b != null) grupoB.set(f.b, f.grupo); });
@@ -7490,14 +7516,14 @@
       const t = Math.min(1, Math.max(0, (ref - Y[lo]) / (Y[hi] - Y[lo])));
       sincronizando++; pt.scrollTop = Z[lo] + t * (Z[hi] - Z[lo]) - pt.clientHeight / 3; soltar();
     }
-    const docEl = () => resultado.querySelector('.rmd-cmp-doc');
+    const docEl = () => res.querySelector('.rmd-cmp-doc');
     function marcarActual(desplazar) {
       if (!R) return;
-      resultado.querySelectorAll('.rmd-cmp-actual').forEach((x) => x.classList.remove('rmd-cmp-actual'));
-      const pos = resultado.querySelector('.rmd-cmp-pos'); if (pos) pos.textContent = R.cambios.length ? `${actual >= 0 ? actual + 1 : '–'} de ${R.cambios.length}` : '';
+      res.querySelectorAll('.rmd-cmp-actual').forEach((x) => x.classList.remove('rmd-cmp-actual'));
+      const pos = res.querySelector('.rmd-cmp-pos'); if (pos) pos.textContent = R.cambios.length ? `${actual >= 0 ? actual + 1 : '–'} de ${R.cambios.length}` : '';
       if (actual < 0) return;
-      const fs = resultado.querySelectorAll(`.rmd-cmp-doc [data-g="${actual}"], .rmd-cmp-pdf [data-g="${actual}"]`); fs.forEach((x) => x.classList.add('rmd-cmp-actual'));
-      const li = resultado.querySelector(`.rmd-cmp-cambios button[data-g="${actual}"]`); if (li) li.classList.add('rmd-cmp-actual');
+      const fs = res.querySelectorAll(`.rmd-cmp-doc [data-g="${actual}"], .rmd-cmp-pdf [data-g="${actual}"]`); fs.forEach((x) => x.classList.add('rmd-cmp-actual'));
+      const li = res.querySelector(`.rmd-cmp-cambios button[data-g="${actual}"]`); if (li) li.classList.add('rmd-cmp-actual');
       if (desplazar && vista === 'pdf') {
         const poner = (l) => { const p = panel(l), el = p.querySelector(`[data-g="${actual}"]`); if (!el) return false; sincronizando++; p.scrollTop += el.getBoundingClientRect().top - p.getBoundingClientRect().top - p.clientHeight / 3; soltar(); return true; };
         const hayA = poner('a'), hayB = poner('b');
@@ -7510,15 +7536,16 @@
       }
     }
     function ir(g) { if (!R || !R.cambios.length) return; actual = (g + R.cambios.length) % R.cambios.length; marcarActual(true); }
-    resultado.addEventListener('click', (e) => {
+    function alClic(e) {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.a === 'sig') ir(actual + 1); else if (b.dataset.a === 'ant') ir(actual < 0 ? -1 : actual - 1);
       else if (b.classList.contains('rmd-cmp-pliegue')) { for (let k = +b.dataset.desde; k < +b.dataset.hasta; k++) abiertos.add(k); const y = docEl().scrollTop; pintarResultado(); docEl().scrollTop = y; }
       else if (b.dataset.vista) { if (vista !== b.dataset.vista) { vista = b.dataset.vista; pintarResultado(); if (actual >= 0) marcarActual(true); } }
       else if (b.dataset.g != null) ir(+b.dataset.g);
-    });
-    resultado.addEventListener('change', (e) => { if (e.target.classList.contains('rmd-cmp-solo')) { soloCambios = e.target.checked; abiertos = new Set(); pintarResultado(); if (actual >= 0) marcarActual(true); } });
+    }
+    function alCambio(e) { if (e.target.classList.contains('rmd-cmp-solo')) { soloCambios = e.target.checked; abiertos = new Set(); pintarResultado(); if (actual >= 0) marcarActual(true); } }
     chkReceta.addEventListener('change', () => { if (R) comparar(); });
+    aviso.addEventListener('click', (e) => { if (e.target.closest('[data-a="pestana"]') && pagina && !pagina.closed) pagina.focus(); });
     pintarLados();
     setTimeout(() => { const q = v.cuerpo.querySelector('.rmd-cmp-lado[data-l="a"] input'); if (q) q.focus(); }, 40);
   }
