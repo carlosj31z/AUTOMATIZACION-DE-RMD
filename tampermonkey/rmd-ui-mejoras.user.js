@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.81.2
+// @version      1.82.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.81.2';                                                       // mantener igual a @version
+  const VERSION = '1.82.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -67,7 +67,7 @@
     ['pendientes', 'Observaciones inteligentes', 'En «Asociar fórmulas» clasifica cada línea de Observaciones (CC, pendiente, motivo de suspensión, baja o descontinuado…), avisa lo que una versión anterior dejó pendiente y agrega líneas con formato.'],
     ['obsalto', 'Observaciones más alto', 'En «Asociar fórmulas» el cuadro de Observaciones crece con el texto.'],
     ['recetas', 'Recetas frente a SAP', 'Avisa si la lista de materiales de una receta asociada cambió en SAP.'],
-    ['recetasvarias', 'Eliminar varias recetas', 'Marca varias recetas y elimínalas de una vez.'],
+    ['recetasvarias', 'Eliminar o sacar y meter varias recetas', 'Marca varias recetas y elimínalas de una vez, o sácalas y vuelve a meterlas para traer lo vigente en SAP.'],
     ['puestoreceta', 'Mismo puesto de trabajo', 'No deja asociar recetas de otro puesto de trabajo.'],
     ['cambiosrecetas', 'Cambios de recetas en SAP', 'Lista los RMD Ingresados y Autorizados cuya receta cambió en SAP.'],
     ['recetasauto', 'Revisar recetas en segundo plano', 'Ingresados cada 3 h y Autorizados cada 24 h, poco a poco.'],
@@ -454,7 +454,8 @@
   td.rmd-grip-td { position: relative; padding-left: 26px !important; }
   .rmd-revisor { display: inline-block; vertical-align: middle; margin: 2px 0 2px 6px; text-align: left; font-size: 11.5px; line-height: 1.25; color: var(--rmd-apagado); white-space: pre-line; }
   .sapMListTbl td.rmd-con-revisor > .sapMBtn { vertical-align: middle; }
-  .rmd-borrar-recetas { margin: 0 8px; height: 30px; }
+  .rmd-borrar-recetas, .rmd-reasociar-recetas { margin: 0 8px; height: 30px; }
+  .rmd-reasociar-recetas { margin-right: 0; }
   html.rmd-vivo .sapMDialog:not(.sapMMessageDialog) { position: fixed !important; left: 8px !important; top: 8px !important; transform: none !important; width: calc(50vw - 16px) !important; max-width: calc(50vw - 16px) !important; max-height: calc(100vh - 16px) !important; }
   html.rmd-vivo .sapMDialog.sapMMessageDialog { left: 25vw !important; }
   .rmd-vivo-panel { position: fixed; top: 0; right: 0; width: 50vw; height: 100vh; z-index: 5000; display: flex; flex-direction: column; background: var(--rmd-superficie); border-left: 1px solid var(--rmd-borde); box-shadow: -6px 0 18px rgba(0,0,0,.25); }
@@ -2716,7 +2717,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
     document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); document.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda'));
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
@@ -8587,15 +8588,49 @@
     const t = [...d.querySelectorAll('table.sapMListTbl')].pop(), lista = t && sap.ui.getCore().byId(t.id.replace(/-listUl$/, '')); if (!lista) return;
     const bi = lista.getBindingInfo('items'); if (!bi || bi.model !== 'listMdReceta') return;
     const barra = lista.getDomRef() && lista.getDomRef().querySelector('.sapMTB, .sapMListHdr');
-    if (!on('recetasvarias')) { if (lista.__rmdModo) { lista.setMode(lista.__rmdModo); delete lista.__rmdModo; } d.querySelectorAll('.rmd-borrar-recetas').forEach((e) => e.remove()); return; }
+    if (!on('recetasvarias')) { if (lista.__rmdModo) { lista.setMode(lista.__rmdModo); delete lista.__rmdModo; } d.querySelectorAll('.rmd-borrar-recetas, .rmd-reasociar-recetas').forEach((e) => e.remove()); return; }
     if (!lista.__rmdModo) { lista.__rmdModo = lista.getMode(); if (lista.getMode() !== 'MultiSelect') lista.setMode('MultiSelect'); }
     if (barra && !barra.querySelector('.rmd-borrar-recetas')) {
       const b = botonModal('Eliminar seleccionadas', 'peligro', () => borrarRecetasSeleccionadas(ctrl, lista)); b.classList.add('rmd-borrar-recetas');
       b.title = 'Elimina de una vez las recetas marcadas (con el mismo proceso del botón Eliminar Receta de cada fila).';
       const ref = barra.querySelector('.sapMTBSpacer'); if (ref) ref.insertAdjacentElement('afterend', b); else barra.appendChild(b);
     }
+    if (barra && !barra.querySelector('.rmd-reasociar-recetas')) {
+      const b = botonModal('Sacar y meter', '', () => reasociarRecetasSeleccionadas(ctrl, lista)); b.classList.add('rmd-reasociar-recetas');
+      barra.querySelector('.rmd-borrar-recetas').insertAdjacentElement('beforebegin', b);
+    }
     const n = lista.getSelectedItems().length, b = barra && barra.querySelector('.rmd-borrar-recetas');
     if (b) { if (b.disabled !== !n) b.disabled = !n; const tx = n ? `Eliminar seleccionadas (${n})` : 'Eliminar seleccionadas'; if (b.textContent !== tx) b.textContent = tx; }
+    // Sacar y meter: solo en Ingresados (en un Autorizado el portal anula el documento DMS y oculta sus recetas)
+    const bR = barra && barra.querySelector('.rmd-reasociar-recetas');
+    if (bR && !bR.__rmdTrabajando) {
+      const ingresado = +((ctrl.getView().getModel('asociarDatos') || { getData: () => ({}) }).getData() || {}).estadoIdRmd_iMaestraId === 467;
+      if (bR.disabled !== (!n || !ingresado)) bR.disabled = !n || !ingresado;
+      const tx = n ? `Sacar y meter (${n})` : 'Sacar y meter'; if (bR.textContent !== tx) bR.textContent = tx;
+      const ti = ingresado ? 'Quita las recetas marcadas y las vuelve a asociar para traer la lista de materiales actual de SAP (Eliminar Receta → Agregar Producto, como en «Cambio de material»).'
+        : 'Solo en un RMD Ingresado. Para un Autorizado, crea antes la versión nueva (o usa «Cambio de material» en Modificaciones masivas).';
+      if (bR.title !== ti) bR.title = ti;
+    }
+  }
+  // Quita y vuelve a asociar las recetas marcadas (misma función que «Cambio de material»): toma lo vigente en SAP
+  async function reasociarRecetasSeleccionadas(ctrl, lista) {
+    const sel = lista.getSelectedItems().map((it) => it.getBindingContext('listMdReceta').getObject()).filter((r) => r && r.recetaId); if (!sel.length) return;
+    const ok = await confirmar(`¿Sacar y meter ${sel.length} receta(s)?`, sel.map((r) => `${r.recetaId.Matnr} / ${r.recetaId.Verid} ${norm(r.recetaId.Text1 || '')}`).join(' · '),
+      'Cada receta se quita del RMD y se vuelve a asociar en el momento (como Eliminar Receta → Agregar Producto), con la lista de materiales y la hoja de ruta actuales de SAP. Las Observaciones no cambian: guárdalas tú si quieres anotar algo.',
+      { si: `Sacar y meter ${sel.length}`, no: 'Cancelar', peligro: true });
+    if (!ok) return;
+    const bR = document.querySelector('.rmd-reasociar-recetas'), filtros = guardarFiltrosLista(ctrl);
+    if (bR) { bR.__rmdTrabajando = true; bR.disabled = true; }
+    try {
+      await reasociarRecetas(ctrl, sel.map((r) => ({ matnr: norm(r.recetaId.Matnr), verid: norm(r.recetaId.Verid) })), (t) => { if (bR) bR.textContent = t.replace(/^\w/, (c) => c.toUpperCase()); });
+      toast(`✓ ${sel.length} receta(s) reasociada(s) con lo vigente en SAP.`);
+    } catch (e) { toast('No se pudo sacar y meter: ' + ((e && (e.message || e.responseText)) || e), true); }
+    finally {
+      try { sap.ui.core.BusyIndicator.hide(); } catch (e) { /* sin UI5 */ }
+      try { await restaurarFiltrosLista(ctrl, filtros); } catch (e) { /* la lista queda con el código */ }
+      if (bR) bR.__rmdTrabajando = false;
+      const l = sap.ui.getCore().byId(lista.getId()); if (l && l.removeSelections) l.removeSelections(true);
+    }
   }
   async function borrarRecetasSeleccionadas(ctrl, lista) {
     const sel = lista.getSelectedItems().map((it) => it.getBindingContext('listMdReceta').getObject()); if (!sel.length) return;
