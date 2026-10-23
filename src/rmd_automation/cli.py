@@ -238,6 +238,90 @@ def _preguntar_revisiones(sp, flujo) -> None:
         flujo.omitir("revisiones", "el usuario no las necesita")
 
 
+CONTINGENCIA_URL = (
+    "https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/"
+    "PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA"
+)
+
+
+@cli.group("contingencia")
+def contingencia_group() -> None:
+    """RMD de contingencia (04.-RMD/3.-CONTINGENCIA): ¿cada RMD Autorizado tiene su PDF? Solo lee."""
+
+
+@contingencia_group.command("revisar")
+@click.option("--maestro", type=click.Path(exists=True), default=None,
+              help="Exportación SAPUI5 del maestro (.xlsx/.csv). Sin él, se lee del portal abierto en el Chromium de RMD_CDP_URL.")
+@click.option("--carpeta", type=click.Path(exists=True, file_okay=False), default=None,
+              help="Copia local de 3.-CONTINGENCIA (sincronizada con OneDrive).")
+@click.option("--listado", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="Texto con una ruta de PDF por línea, relativa a 3.-CONTINGENCIA.")
+@click.option("--sharepoint", "url_sp", default=None, is_flag=False, flag_value=CONTINGENCIA_URL,
+              help="Lee la carpeta en SharePoint con la sesión del Chromium de RMD_CDP_URL (sin valor: 3.-CONTINGENCIA).")
+@click.option("--guardar-listado", type=click.Path(dir_okay=False), default=None,
+              help="Guarda las rutas leídas para repetir la revisión sin volver a SharePoint.")
+@click.option("--salida", type=click.Path(dir_okay=False), default="brechas_contingencia.xlsx", show_default=True)
+def contingencia_revisar(maestro: str | None, carpeta: str | None, listado: str | None, url_sp: str | None,
+                         guardar_listado: str | None, salida: str) -> None:
+    """Compara los RMD Autorizados del maestro con los PDF de la carpeta de contingencia y arma un Excel."""
+    from . import contingencia as ct
+
+    fuentes = [x for x in (carpeta, listado, url_sp) if x]
+    if len(fuentes) != 1:
+        raise click.UsageError("Indica una sola fuente de PDF: --carpeta, --listado o --sharepoint.")
+    import os
+
+    cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
+    if carpeta:
+        rutas = ct.listar_carpeta(carpeta)
+    elif listado:
+        rutas = ct.leer_listado(listado)
+    else:
+        from .sharepoint import listar_pdfs
+
+        click.echo(f"Leyendo SharePoint con el Chromium de {cdp}…")
+        rutas = listar_pdfs(cdp, url_sp)
+    if guardar_listado:
+        from pathlib import Path
+
+        Path(guardar_listado).write_text("\n".join(rutas) + "\n", encoding="utf-8")
+    if maestro:
+        rmds = ct.leer_maestro(maestro)
+    else:
+        from .maestro_portal import leer_maestro_portal
+
+        click.echo("Leyendo el maestro del portal…")
+        rmds = leer_maestro_portal(cdp)
+    brechas = ct.comparar(rmds, rutas)
+    ct.escribir_excel(brechas, salida)
+    click.echo(ct.resumen(brechas))
+    click.echo(f"Detalle en {salida}")
+
+
+@contingencia_group.command("diaria")
+@click.option("--fecha", default=None, help="Fecha de autorización AAAA-MM-DD (por defecto, ayer).")
+@click.option("--hoy", is_flag=True, help="Los autorizados hoy, en vez de ayer.")
+@click.option("--aplicar", is_flag=True, help="Sube los PDF a SharePoint y pasa las versiones anteriores a OBSOLETO.")
+@click.option("--local", "carpeta_local", default="data/contingencia", show_default=True,
+              help="Dónde se guarda la copia local de los PDF (por fecha).")
+def contingencia_diaria(fecha: str | None, hoy: bool, aplicar: bool, carpeta_local: str) -> None:
+    """Master en PDF de los RMD autorizados ayer (u hoy) y su lugar en 3.-CONTINGENCIA.
+
+    Sin --aplicar solo muestra el plan y guarda los PDF en local. Usa el Chromium de RMD_CDP_URL con
+    sesión iniciada en el portal RMD (lista «Configuración Manufactura Digital») y en SharePoint.
+    """
+    import os
+
+    from .contingencia_diaria import ejecutar, fecha_objetivo
+
+    if fecha and hoy:
+        raise click.UsageError("Usa --fecha o --hoy, no los dos.")
+    fecha = fecha or fecha_objetivo(del_dia=hoy)
+    cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
+    click.echo(f"Contingencia de los RMD autorizados el {fecha}{'' if aplicar else ' (vista previa: no se sube nada)'}")
+    ejecutar(cdp, CONTINGENCIA_URL, fecha, carpeta_local, aplicar, avisar=click.echo)
+
+
 REVISIONES = [
     "Tren de equipos (TREN DE EQUIPOS PL2.xlsx): los equipos del RMD deben coincidir con la línea/sala de la etapa.",
     'Controles de cambio pendientes (1.-CC-NC-DES Para actualizar RMD.xlsx, hoja "PLANTA 2"): ¿alguno aplica a este RMD?',

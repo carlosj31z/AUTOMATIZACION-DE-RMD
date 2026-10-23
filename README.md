@@ -126,6 +126,40 @@ utensilios/motivo-lapsos en Configuración Maestra, configuración de un RMD
 (número/rango/fórmula/notificación), predecesores—, exportar máster, agregar
 documento/nota, envío a jefe, cambio de destinatario, autorización.
 
+### Contingencia: ¿cada RMD vigente tiene su PDF? (solo lectura)
+
+Compara los RMD **Autorizados** del maestro (exportación SAPUI5, p. ej. `BD RMD SETIEMBRE 2026 - P1-P2.xlsx`)
+con los PDF de `04.-RMD/3.-CONTINGENCIA` y arma un Excel con los RMD sin PDF, los PDF de una versión anterior,
+los de RMD ya no vigentes fuera de `OBSOLETO` y los repetidos. Reconoce los nombres `código-ETAPA-versión-…`,
+`código-versión-…` y los códigos antiguos. No escribe en SharePoint.
+
+Sin `--maestro`, lee el maestro de hoy del portal abierto (lista «Configuración Manufactura Digital»). Con
+`--sharepoint` recorre la carpeta con la sesión de SharePoint del mismo Chromium (~8 min para ~10 000 PDF,
+porque SharePoint limita las lecturas seguidas).
+
+```bash
+# todo desde el Chromium de RMD_CDP_URL (sesión iniciada en el portal y en SharePoint)
+rmd-automation contingencia revisar --sharepoint --guardar-listado data/contingencia.txt
+# o con una copia sincronizada por OneDrive, o con el listado guardado
+rmd-automation contingencia revisar --maestro maestro.xlsx --carpeta "C:/Users/.../3.-CONTINGENCIA"
+rmd-automation contingencia revisar --maestro maestro.xlsx --listado data/contingencia.txt
+```
+
+### Contingencia del día: subir el master de los RMD autorizados ayer (u hoy)
+
+```bash
+rmd-automation contingencia diaria            # autorizados ayer: plan + PDF en data/contingencia/<fecha>/ (no sube nada)
+rmd-automation contingencia diaria --hoy      # autorizados hoy
+rmd-automation contingencia diaria --fecha 2026-10-22 --aplicar   # sube a SharePoint y archiva la versión anterior
+```
+
+Para cada RMD Autorizado en la fecha busca en 3.-CONTINGENCIA el PDF de sus versiones anteriores (mismo
+material y etapa): esa carpeta es el destino y esas versiones pasan a `OBSOLETO/`. El PDF se arma con el
+mismo código de «Ver master» del portal, sin abrir el RMD, y se nombra `código-ETAPA-versión-descripción.pdf`.
+Un producto nuevo (sin versiones anteriores en la carpeta) no se sube: queda marcado para ubicarlo a mano.
+Necesita el Chromium de `RMD_CDP_URL` con sesión en el portal (lista «Configuración Manufactura Digital»)
+y en SharePoint.
+
 ### Flujo: RMD de referencia y revisiones posteriores
 
 `cambios aplicar` pregunta primero si hay un RMD de referencia (su "Codigo RMD") y, al terminar, si se desean
