@@ -5,7 +5,8 @@ Para cada RMD Autorizado en esa fecha:
 
 1. Se busca en 3.-CONTINGENCIA el PDF de sus versiones anteriores (mismo agrupador/material y etapa): su
    carpeta de etapa es el destino, y esas versiones pasan a `OBSOLETO/`.
-2. Se arma el PDF del master con el mismo código del portal que usa «Ver master» (sin abrir el RMD).
+2. Se arma el PDF con el mismo código del portal (sin abrir el RMD): master + receta si el RMD tiene una
+   sola fórmula asociada (como su «Descargar» en «Asociar fórmulas»); si tiene varias, el master solo.
 3. Se sube como `<código>-<ETAPA>-<versión>-<descripción>.pdf`.
 
 Sin `aplicar` solo se arma el plan y se guardan los PDF en local. Un RMD sin versiones anteriores en la
@@ -132,8 +133,9 @@ async (mdId) => {
     const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } });
   const BI = sap.ui.core.BusyIndicator, bi0 = [BI.show, BI.hide], propio = Object.prototype.hasOwnProperty.call(ctrl, 'getView'), gv0 = ctrl.getView;
   const pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open, docs = [];
-  // Una descarga por fórmula, como el botón «Descargar» de cada receta en «Asociar fórmulas»: la cabecera
-  // lleva la descripción, el código, la versión de fabricación y el teórico de la receta.
+  // Un PDF por RMD. Con una sola fórmula, como su botón «Descargar» en «Asociar fórmulas» (la cabecera lleva
+  // la descripción, el código, la versión de fabricación y el teórico de la receta); con varias o ninguna,
+  // el master solo, como «Descargar master».
   const recetas = ((md.aReceta && md.aReceta.results) || []).filter((r) => r.recetaId);
   const evento = (rc) => { const obj = { mdRecetaId: rc.mdRecetaId, recetaId: rc.recetaId };
     const fila = { getBindingContext: () => ({ getObject: () => obj }) };
@@ -148,7 +150,7 @@ async (mdId) => {
     [estr, ...res.slice(1).map((r) => r.results || [])].forEach((d, i) => { const m = new JM(d); m.setSizeLimit(999999999); locales.set(MODS[i], m); });
     window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
     const nada = () => {};
-    for (const rc of (recetas.length ? recetas : [null])) {
+    for (const rc of (recetas.length === 1 ? recetas : [null])) {
       let dd = null;
       pm.createPdf = function (d) { if (!dd) dd = clonar(d); return { open: nada, print: nada, download: nada, getBlob(cb) { if (cb) cb(new Blob()); return Promise.resolve(new Blob()); }, getDataUrl(cb) { if (cb) cb(''); }, getBase64(cb) { if (cb) cb(''); }, getBuffer(cb) { if (cb) cb(new Uint8Array()); } }; };
       await ctrl.onCompletarAsociarDatos();
@@ -283,15 +285,11 @@ def ejecutar(cdp_url: str, url_carpeta: str, fecha: str, carpeta_local: str, apl
             if not r.md_id:
                 paso.nota = "Sin id del portal: no se pudo generar el PDF."
                 continue
-            # Un PDF por fórmula (como «Descargar» de cada receta), con su descripción en el nombre.
             carpeta = pendientes[0] if pendientes else (paso.carpetas[0] if paso.carpetas else "_SIN_CARPETA")
-            docs = frame.evaluate(_JS_PDF_MASTER, r.md_id)
-            repetidas = {d["receta"] for d in docs if sum(x["receta"] == d["receta"] for x in docs) > 1}
-            for doc in docs:
+            # Un PDF por RMD: master + receta si tiene una sola fórmula; si no, el master solo.
+            for doc in frame.evaluate(_JS_PDF_MASTER, r.md_id):
                 pdf = base64.b64decode(doc["b64"])
-                # Fórmulas con la misma descripción (otra versión de fabricación): se distinguen por la versión.
-                desc = f"{doc['receta']} V{doc['verid']}" if doc["receta"] in repetidas else doc["receta"]
-                nombre = nombre_archivo(r, desc)
+                nombre = nombre_archivo(r, doc["receta"])
                 destino_local = salida / carpeta / nombre
                 destino_local.parent.mkdir(parents=True, exist_ok=True)
                 destino_local.write_bytes(pdf)
