@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.83.0
+// @version      1.83.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.83.0';                                                       // mantener igual a @version
+  const VERSION = '1.83.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -6303,10 +6303,13 @@
     const codigoCC = (a, n) => `${String(a).slice(-2)}-${String(n).padStart(3, '0')}-CC`;
     // No conformidades / desviaciones: 24-1012-DES · 22-1221-D · NC 24-1012 · NC-24-2044-DES -> «24-1012-DES»
     const RE_NC = /\b(?:N\.?C|DES)\.?\s*[-–:]?\s*((?:20)?\d{2})\s*[-–]\s*(\d{3,4})(?:\s*[-–]\s*(?:DES|D))?\b|\b((?:20)?\d{2})\s*[-–]\s*(\d{3,4})\s*[-–]\s*(?:DES|D)\b/gi;
+    // P1 también escribe el CC sin «-CC» delante del responsable: «26-280/D.Ayala/…»
+    const RE_CC_P1 = /(?<![\d\-–/.])\b((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\s*(?=\/\s*[A-ZÑ][a-zñ]*\.?\s*[A-ZÑa-zñ])/g;
     function ccsDe(texto) {
       const out = [], t = String(texto || ''); let m; RE_CC.lastIndex = 0; RE_NC.lastIndex = 0;
       while ((m = RE_CC.exec(t))) { const c = m[1] ? codigoCC(m[1], m[2]) : codigoCC(m[3], m[4]); if (!out.includes(c)) out.push(c); }
       while ((m = RE_NC.exec(t))) { const c = `${String(m[1] || m[3]).slice(-2)}-${m[2] || m[4]}-DES`; if (!out.includes(c)) out.push(c); }
+      RE_CC_P1.lastIndex = 0; while ((m = RE_CC_P1.exec(t))) { const c = codigoCC(m[1], m[2]); if (!out.includes(c)) out.push(c); }
       return out;
     }
     // Pendiente: «pendiente», «pend», «falta», «por aplicar», «siguiente versión»… En las Observaciones reales (12.926 MD, oct-2026) casi
@@ -6324,19 +6327,38 @@
     const NIVELES = /^(MENOR|MODERADO|MAYOR|CRITICO|MINIMO|ALTO|MEDIO|BAJO)$/;
     const RE_NOMENCLATURA = /^\d{8}[A-ZÑ]{2}-\d-C/i;
     const esPendiente = (p, ccs) => !RE_HECHO.test(p) && (RE_PEND.test(p) || (RE_SUSP.test(p) && (ccs.length > 0 || RE_SUSP_CC.test(p)) && !RE_SUSP_MOTIVO.test(p)));
-    // delante del código puede ir la fecha e iniciales («20261022CJ», «20261022CJ-1-C1.0-…»), «CONTROL DE CAMBIO» o «CC-»
-    const PREFIJO_CC = /^\s*(?:\d{8}\s*[A-ZÑ]{2,3}(?:-[^\s]*)?[\s:-]*)?(?:CONTROL\s+DE\s+CAMBIO\s*[:-]?\s*|C\.?C\.?\s*[-:]\s*(?=\d))?/i;
-    // «26-379-CC/L.Fernandez/2026-10-22;Descripción;proceso;moderado» -> partes
+    // Delante del código puede ir la fecha e iniciales («20261022CJ», «20261022CJ-1-C1.0-…», «2026-10-15:») y «CONTROL DE CAMBIO».
+    // Las dos plantas escriben lo mismo de forma distinta (12.947 MD leídos, 23-oct-2026):
+    //   Lima (P2): «26-379-CC/L.Fernandez/2026-10-22;…», «25-2306-DES/R.Osorio/…», «NC 24-2044-DES …»
+    //   Ate (P1):  «CC-25-440/F.Vivanco/2026-01-16;…», «CC-23-282/O.Santacruz/06-11-2023;…», «26-280/D.Ayala/2026-08-17/…/Proceso/Mayor»,
+    //              «NC 24-1012/E.Román/01-02-2024;…», «NC: 23-1438-DES: …», «CC 25-326-CC …», «26-110-CC:/J.Paredes/…»
+    const PREFIJO_CC = /^\s*(?:(?:\d{8}\s*[A-ZÑ]{2,3}(?:-[^\s]*)?|\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})[\s:-]*)?(?:CONTROL\s+DE\s+CAMBIOS?\s*(?:N\.?\s*[°º]?\s*)?[:-]?\s*)?/i;
+    const INICIO_CC = [
+      [/^(?:C\.?\s?C\.?\s*[-:]?\s*)?((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\s*[-–]?\s*CC\b/i, 'cc'],                       // 26-379-CC · CC 26-379-CC · CC-26-379-CC
+      [/^C\.?\s?C\.?\s*(?:N\.?\s*[°º]?\s*)?[-:]?\s*((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\b(?!\s*[-–]\s*\d)/i, 'cc'],        // CC-26-379 · C.C. 26-379 (P1)
+      [/^N\.?\s?C\.?\s*[-:]?\s*((?:20)?\d{2})\s*[-–]\s*(\d{3,4})(?:\s*[-–]\s*(?:DES|D)\b)?/i, 'nc'],                 // NC 24-1012 · NC: 23-1438-DES
+      [/^(?:DES\s*[-:]?\s*)?((?:20)?\d{2})\s*[-–]\s*(\d{3,4})\s*[-–]\s*(?:DES|D)\b/i, 'nc'],                          // 25-2306-DES · 22-1221-D
+      [/^((?:20)?\d{2})\s*[-–]\s*(\d{2,4})\s*(?=\/\s*[A-ZÑ])/i, 'cc'],                                               // 26-280/D.Ayala (P1, sin «-CC»)
+    ];
+    // Código con el que EMPIEZA la línea (tras la fecha e iniciales o «CONTROL DE CAMBIO»), o null
+    function codigoAlInicio(linea) {
+      const s = String(linea || '').replace(PREFIJO_CC, '');
+      for (const [re, t] of INICIO_CC) { const m = re.exec(s); if (m) return { codigo: t === 'cc' ? codigoCC(m[1], m[2]) : `${String(m[1]).slice(-2)}-${m[2]}-DES`, resto: s.slice(m[0].length) }; }
+      return null;
+    }
+    // «26-379-CC/L.Fernandez/2026-10-22;Descripción;proceso;moderado» -> partes (también con «/» en lugar de «;», como en P1)
     function entradaCC(linea) {
-      const m = /^\s*((?:20)?\d{2})\s*-\s*(\d{2,4})\s*-?\s*CC\b\s*(.*)$/i.exec(String(linea).replace(PREFIJO_CC, '')); if (!m) return null;
-      const e = { codigo: codigoCC(m[1], m[2]), responsable: '', fecha: '', descripcion: '', tipo: '', nivel: '', linea: limpio(linea) };
-      let resto = m[3];
-      const cab = /^\s*\/+\s*([^/;]*?)\s*\/+\s*(\d{4}-\d{2}-\d{2}|\d{2}[-/]\d{2}[-/]\d{4}|\d{8})?\s*/.exec(resto);
+      const ini = codigoAlInicio(linea); if (!ini) return null;
+      const e = { codigo: ini.codigo, responsable: '', fecha: '', descripcion: '', tipo: '', nivel: '', linea: limpio(linea) };
+      let resto = ini.resto.replace(/^\s*:\s*(?=\/)/, '');                                 // «26-110-CC:/J.Paredes/…»
+      // la fecha admite días-mes-año y erratas de un dígito de más o de menos («22026-08-25», «025-06-17»)
+      const cab = /^\s*\/+\s*([^/;]*?)\s*\/+\s*(\d{2,5}[-/.]\d{1,2}[-/.]\d{2,5}|\d{8})?\s*/.exec(resto);
       if (cab) { e.responsable = cab[1]; e.fecha = cab[2] || ''; resto = resto.slice(cab[0].length); }
-      const partes = resto.replace(/^[\s;,:/-]+/, '').replace(/[\s.;]+$/, '').split(';').map(limpio).filter(Boolean);
+      const sep = resto.includes(';') ? ';' : (cab && resto.includes('/') ? '/' : ';');
+      const partes = resto.replace(/^[\s;,:/-]+/, '').replace(/[\s.;]+$/, '').split(sep).map(limpio).filter(Boolean);
       // «…;proceso,moderado»: el nivel puede venir tras una coma
       if (partes.length) { const u = partes[partes.length - 1].split(','); if (u.length > 1 && NIVELES.test(plano(limpio(u[u.length - 1])))) partes.splice(partes.length - 1, 1, limpio(u.slice(0, -1).join(',')), limpio(u[u.length - 1])); }
-      if (partes.length > 1 && NIVELES.test(plano(partes[partes.length - 1]))) e.nivel = partes.pop();
+      if (partes.length > 1 && NIVELES.test(plano(partes[partes.length - 1]).replace(/[.\s]+$/, ''))) e.nivel = partes.pop();
       if (partes.length > 1 && partes[partes.length - 1].split(' ').length <= 2) e.tipo = partes.pop();
       e.descripcion = partes.join('; ');
       return e;
@@ -6377,7 +6399,7 @@
     }
     // Una línea que empieza como CC con plantilla («26-379-CC/…») y le falta alguna parte
     function faltantesCC(linea) {
-      if (!/^\s*(?:20)?\d{2}\s*-\s*\d{2,4}\s*-?\s*CC\s*\//i.test(linea)) return [];
+      const ini = codigoAlInicio(linea); if (!ini || !/^\s*:?\s*\//.test(ini.resto)) return [];
       const e = entradaCC(linea); if (!e) return [];
       return [!e.responsable && 'responsable', !e.fecha && 'fecha', !e.descripcion && 'descripción', !e.tipo && 'tipo (proceso, insumo…)', !e.nivel && 'nivel (menor, moderado, mayor)'].filter(Boolean);
     }

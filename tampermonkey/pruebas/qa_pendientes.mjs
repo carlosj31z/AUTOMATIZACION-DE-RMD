@@ -171,5 +171,31 @@ ok('No aplicado: «20261023CJ No aplica el 26-244-CC»', Pendientes.analizar('20
 const h7 = Pendientes.heredados([{ version: 5, estado: 'Suspendido', observacion: '20261023CJ no aplica el CC 26-244 POR RETIRO DE ETIQUETA DE ECUADOR.' }], { version: 6, observacion: '20261023CJ No aplica el 26-244-CC' });
 ok('La v6 no dice «26-244-CC ya figuraba como aplicado en la v5»', !Pendientes.revisar(h7, {}).some((x) => /ya figuraba/.test(x.texto)) && h7.aplicados.length === 0, J(Pendientes.revisar(h7, {})));
 
+// ---- P1 (Ate) y P2 (Lima): las mismas estructuras escritas distinto (12.947 MD reales, 23-oct-2026) ----
+const ap1 = (l) => Pendientes.analizar(l).aplicados.map((x) => x.codigo);
+const P1P2 = [
+  ['CC-25-440/F.Vivanco/2026-01-16;  el retiro de la etapa de lotizado en ACON-INSP;Equipo;Menor', '25-440-CC'],
+  ['CC-23-282/O.Santacruz/06-11-2023;Actualización de Titulación,(unidades) conservantes y antioxidantes ; CQA;Moderado', '23-282-CC'],
+  ['CC-25-180  CCAMBIO MASIVO FASE 1;', '25-180-CC'],
+  ['26-280/D.Ayala /2026-08-17/ACTUALIZACIÓN DE RMDS ENV, ACO GV2/Proceso/Mayor.', '26-280-CC'],
+  ['26-110-CC:/J.Paredes/2026-04-10/Actualización de RMD SINEBUPIV SP 0.5% INY VIA20mL, /equipos, proceso/ Mayor.', '26-110-CC'],
+  ['CC 25-326-CC RMD- RETIRO V°B° FASE 0 y FASE 2', '25-326-CC'],
+  ['C.C: 23-358 REEMPLAZO DE BALANZA', '23-358-CC'],
+  ['NC 24-1012/E.Román/01-02-2024;Inclusión de item para registrar N° del lote de agua ;Documental;Menor', '24-1012-DES'],
+  ['NC: 23-1438-DES: Corregir la descripcion de la olla (PL1-PV1-U005)', '23-1438-DES'],
+  ['NC-25-1086DES/L.Orbegoso/17-03-2025;Actualizacion de temperatura en la sala de lavado; Moderado.', '25-1086-DES'],
+  ['26-294-CC/F.Aroni/22026-08-25; Cambio de ET y TA del producto TRI AZIT 200 mg/5 mL Polvo para Suspensión Oral;CQA;Moderado.', '26-294-CC'],
+  ['25-2306-DES/ R.Osorio/2026-01-22; Inclusión de verificación de saturación de filtros HEPA;Equipo;Menor', '25-2306-DES'],
+  ['NC 24-2044-DES DETECTORES DE METAL / DESEMPOLVADOR SALA 4 y SALA 7', '24-2044-DES'],
+  ['2022-09-13: CONTROL DE CAMBIO 22-183-CC: RETIRO DEL ENSAYO DE pH EN OVULOS', '22-183-CC'],
+  ['20241204LR-2-C1-FI1.0-FA1.0 NC: 24-2155-DES Inclusión de balanza según los equipos a utilizar', '24-2155-DES'],
+];
+P1P2.forEach(([l, c]) => ok(`P1/P2 aplicado ${c}: «${l.slice(0, 50)}…»`, J(ap1(l)) === J([c]), J(ap1(l))));
+const e294 = Pendientes.entradaCC(P1P2[10][0]), e280 = Pendientes.entradaCC(P1P2[3][0]);
+ok('Partes: fecha con errata «22026-08-25» y nivel sin el punto final', e294.responsable === 'F.Aroni' && e294.fecha === '22026-08-25' && e294.nivel === 'Moderado' && e294.tipo === 'CQA', J(e294));
+ok('Partes P1 con «/» en lugar de «;»', e280.responsable === 'D.Ayala' && e280.fecha === '2026-08-17' && /^Mayor/.test(e280.nivel) && e280.tipo === 'Proceso', J(e280));
+ok('No aplicado: «pendiente CC-26-294/F.Aroni/…» ni «Se suspende por CC-26-108»', ap1('pendiente CC-26-294/F.Aroni/2026-08-25;algo;CQA;Moderado').length === 0 && ap1('20260703JQ Se suspende por cc-26-108 (inclusion de tunel de paso)').length === 0);
+ok('Una fecha «…/2026-08-17/…» no se confunde con un CC de P1', !Pendientes.ccsDe('26-280/D.Ayala /2026-08-17/ACTUALIZACIÓN').includes('08-017-CC'));
+
 console.log(fallas ? `\n${fallas} prueba(s) fallaron.` : '\nTodas las pruebas pasaron.');
 process.exit(fallas ? 1 : 0);
