@@ -238,6 +238,59 @@ def _preguntar_revisiones(sp, flujo) -> None:
         flujo.omitir("revisiones", "el usuario no las necesita")
 
 
+CONTINGENCIA_URL = (
+    "https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/"
+    "PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA"
+)
+
+
+@cli.group("contingencia")
+def contingencia_group() -> None:
+    """RMD de contingencia (04.-RMD/3.-CONTINGENCIA): ¿cada RMD Autorizado tiene su PDF? Solo lee."""
+
+
+@contingencia_group.command("revisar")
+@click.option("--maestro", type=click.Path(exists=True), required=True,
+              help="Exportación SAPUI5 del maestro (.xlsx/.csv), p. ej. «BD RMD SETIEMBRE 2026 - P1-P2.xlsx».")
+@click.option("--carpeta", type=click.Path(exists=True, file_okay=False), default=None,
+              help="Copia local de 3.-CONTINGENCIA (sincronizada con OneDrive).")
+@click.option("--listado", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="Texto con una ruta de PDF por línea, relativa a 3.-CONTINGENCIA.")
+@click.option("--sharepoint", "url_sp", default=None, is_flag=False, flag_value=CONTINGENCIA_URL,
+              help="Lee la carpeta en SharePoint con la sesión del Chromium de RMD_CDP_URL (sin valor: 3.-CONTINGENCIA).")
+@click.option("--guardar-listado", type=click.Path(dir_okay=False), default=None,
+              help="Guarda las rutas leídas para repetir la revisión sin volver a SharePoint.")
+@click.option("--salida", type=click.Path(dir_okay=False), default="brechas_contingencia.xlsx", show_default=True)
+def contingencia_revisar(maestro: str, carpeta: str | None, listado: str | None, url_sp: str | None,
+                         guardar_listado: str | None, salida: str) -> None:
+    """Compara los RMD Autorizados del maestro con los PDF de la carpeta de contingencia y arma un Excel."""
+    from . import contingencia as ct
+
+    fuentes = [x for x in (carpeta, listado, url_sp) if x]
+    if len(fuentes) != 1:
+        raise click.UsageError("Indica una sola fuente de PDF: --carpeta, --listado o --sharepoint.")
+    if carpeta:
+        rutas = ct.listar_carpeta(carpeta)
+    elif listado:
+        rutas = ct.leer_listado(listado)
+    else:
+        import os
+
+        from .sharepoint import listar_pdfs
+
+        cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
+        click.echo(f"Leyendo SharePoint con el Chromium de {cdp}…")
+        rutas = listar_pdfs(cdp, url_sp)
+    if guardar_listado:
+        from pathlib import Path
+
+        Path(guardar_listado).write_text("\n".join(rutas) + "\n", encoding="utf-8")
+    brechas = ct.comparar(ct.leer_maestro(maestro), rutas)
+    ct.escribir_excel(brechas, salida)
+    click.echo(ct.resumen(brechas))
+    click.echo(f"Detalle en {salida}")
+
+
 REVISIONES = [
     "Tren de equipos (TREN DE EQUIPOS PL2.xlsx): los equipos del RMD deben coincidir con la línea/sala de la etapa.",
     'Controles de cambio pendientes (1.-CC-NC-DES Para actualizar RMD.xlsx, hoja "PLANTA 2"): ¿alguno aplica a este RMD?',

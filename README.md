@@ -126,6 +126,21 @@ utensilios/motivo-lapsos en Configuración Maestra, configuración de un RMD
 (número/rango/fórmula/notificación), predecesores—, exportar máster, agregar
 documento/nota, envío a jefe, cambio de destinatario, autorización.
 
+### Contingencia: ¿cada RMD vigente tiene su PDF? (solo lectura)
+
+Compara los RMD **Autorizados** del maestro (exportación SAPUI5, p. ej. `BD RMD SETIEMBRE 2026 - P1-P2.xlsx`)
+con los PDF de `04.-RMD/3.-CONTINGENCIA` y arma un Excel con los RMD sin PDF, los PDF de una versión anterior,
+los de RMD ya no vigentes fuera de `OBSOLETO` y los repetidos. Reconoce los nombres `código-ETAPA-versión-…`,
+`código-versión-…` y los códigos antiguos. No escribe en SharePoint.
+
+```bash
+# leyendo SharePoint con la sesión del Chromium de RMD_CDP_URL (inicia sesión en SharePoint ahí)
+rmd-automation contingencia revisar --maestro "BD RMD SETIEMBRE 2026 - P1-P2.xlsx" --sharepoint --guardar-listado data/contingencia.txt
+# o con una copia sincronizada por OneDrive, o con el listado guardado
+rmd-automation contingencia revisar --maestro maestro.xlsx --carpeta "C:/Users/.../3.-CONTINGENCIA"
+rmd-automation contingencia revisar --maestro maestro.xlsx --listado data/contingencia.txt
+```
+
 ### Flujo: RMD de referencia y revisiones posteriores
 
 `cambios aplicar` pregunta primero si hay un RMD de referencia (su "Codigo RMD") y, al terminar, si se desean
