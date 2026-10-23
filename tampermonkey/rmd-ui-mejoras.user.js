@@ -86,7 +86,7 @@
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
-    ['contingencia', 'Contingencia a SharePoint', 'Botón en la lista principal: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Necesita el cargador 1.1.0.'],
+    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Necesita el cargador 1.1.0.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
@@ -2729,7 +2729,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-contingencia, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
     document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); document.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda'));
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
@@ -2808,7 +2808,7 @@
     if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarBotonContingencia, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -6809,7 +6809,6 @@
   window.__rmdStats.contingencia = { Contingencia, leer: (f) => contLeer(controladorPrincipal().getView().getModel('mainModelv2'), f), pdf: (id) => contPdf(controladorPrincipal().getView().getModel('mainModelv2'), id), buscar: (c) => spBuscar(c) };   // pruebas
   const CONT_SITIO = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA';
   const CONT_RAIZ = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA';
-  const ICONO_CONTINGENCIA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/></svg>';
 
   // Puente con el cargador: { tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras, cuerpo (Uint8Array) } -> { tipo: 'rmd-sp-respuesta', id, estado, texto }
   let contSec = 0;
@@ -6911,21 +6910,6 @@
     if (!doc) throw new Error('el portal no armó el documento del master');
     const b64 = await new Promise((ok, mal) => { const v = cp0.call(pm, doc).getBase64(ok); if (v && v.then) v.then(ok, mal); });   // pdfmake 0.3: promesa
     return { receta: rc ? String(rc.recetaId.Text1 || '').trim() : '', bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)) };
-  }
-
-  function gestionarBotonContingencia() {
-    if (!on('contingencia')) { document.querySelectorAll('.rmd-contingencia').forEach((e) => e.remove()); return; }
-    document.querySelectorAll('.sapMDialog .rmd-contingencia').forEach((e) => e.remove());
-    const btnExportar = botonExportar(); if (!btnExportar) return;
-    const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra || barra.querySelector('.rmd-contingencia')) return;
-    const s = botonIcono(ICONO_CONTINGENCIA, 'Contingencia', 'rmd-status-rmd rmd-contingencia', () => abrirContingencia());
-    s.title = 'Contingencia: el master de los RMD autorizados ayer (u hoy) a su carpeta de 3.-CONTINGENCIA en SharePoint'; s.setAttribute('aria-label', 'Contingencia');
-    const IP = sap.ui.core.IconPool, info = IP && IP.getIconInfo && IP.getIconInfo('sap-icon://pdf-attachment'), svg = s.querySelector('svg');
-    if (info && svg) { const i = document.createElement('i'); i.className = 'rmd-ico-sap'; i.setAttribute('aria-hidden', 'true'); i.style.fontFamily = `'${info.fontFamily}'`; i.textContent = info.content; svg.replaceWith(i); }
-    const ico = btnExportar.querySelector('.sapUiIcon'), caja = (btnExportar.closest('.sapMBtn') || btnExportar).getBoundingClientRect();
-    if (ico) { const cs = getComputedStyle(ico); s.style.setProperty('--rmd-ico-portal', cs.color); s.style.setProperty('--rmd-ico-tam', cs.fontSize); }
-    if (caja.height) s.style.setProperty('--rmd-btn-alto', Math.round(caja.height) + 'px');
-    colocarEnBarra(barra, s);
   }
 
   async function abrirContingencia() {
@@ -7450,6 +7434,7 @@
       on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
       on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
+      on('contingencia') && [ic('<path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/>'), 'Contingencia a SharePoint', 'Master de lo autorizado ayer (u hoy) a 3.-CONTINGENCIA', () => abrirContingencia()],
       on('plantillaprod') && [ic('<path d="M3 13.5h3l7-7-3-3-7 7z"/><path d="M8.5 5 11 7.5"/>'), 'Plantilla para Producción', 'Borrador .html para que Producción proponga cambios', () => abrirPlantillaProduccion()],
       on('cambiosrecetas') && [ic('<path d="M13 6.5A5 5 0 0 0 3.6 4.4M3 9.5a5 5 0 0 0 9.4 2.1"/><path d="M3.5 2v2.6h2.6M12.5 14v-2.6H9.9"/>'), 'Recetas con cambios en SAP', 'Master cuya receta u hoja de ruta cambió en SAP', () => exportarCambiosRecetas()],
     ].filter(Boolean);
