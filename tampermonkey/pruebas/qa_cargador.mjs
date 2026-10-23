@@ -28,6 +28,7 @@ function cargar({ pathname = '/cp.portal/ui5appruntime.html', conBody = true } =
       if (modo === 'sin-sesion') return o.onload({ status: 403, responseText: '' });
       if (modo === 'login') return o.onload({ status: 200, responseText: '<html>Iniciar sesión</html>' });
       if (modo === 'red') return o.onerror({});
+      if (o.method === 'POST' || /search\/query/.test(o.url)) return o.onload({ status: 200, responseText: JSON.stringify({ url: o.url, metodo: o.method, cab: o.headers, cuerpo: !!o.data }) });
       if (/\/Files\?/.test(o.url)) {
         if (!/GetFolderByServerRelativePath\(decodedurl='%2Fsites%2FDOCUMENTACIONMEDIFARMA%2FDocumentos%20compartidos%2F.*MEJORAS%20DE%20INTERFAZ'\)/.test(o.url)) return o.onload({ status: 404, responseText: '' });
         return o.onload({ status: 200, responseText: JSON.stringify({ value: [...carpeta].map(([n, f]) => ({ Name: n, ServerRelativeUrl: '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/x/' + n, TimeLastModified: f.fecha, Length: String(f.texto.length) })) }) });
@@ -36,12 +37,16 @@ function cargar({ pathname = '/cp.portal/ui5appruntime.html', conBody = true } =
       return f ? o.onload({ status: 200, responseText: f.texto }) : o.onload({ status: 404, responseText: '' });
     }, 1);
   };
+  const mensajes = [], oyentesMsg = [];
+  const window = { addEventListener: (t, f) => { if (t === 'message') oyentesMsg.push(f); }, postMessage: (data) => mensajes.push(data) };
+  const enviar = (data) => oyentesMsg.forEach((f) => f({ data, origin: 'https://x.hana.ondemand.com', source: window }));
   const ctx = {
-    document, location: { pathname }, Event: class { constructor(t) { this.type = t; } }, console, setTimeout, Promise, JSON, Date, Map, Set, Object, String, Error, encodeURIComponent, decodeURIComponent, parseInt,
+    window, Blob: class { constructor(p, o) { this.partes = p; this.type = o && o.type; } },
+    document, location: { pathname, origin: 'https://x.hana.ondemand.com' }, Event: class { constructor(t) { this.type = t; } }, console, setTimeout, Promise, JSON, Date, Map, Set, Object, String, Error, encodeURIComponent, decodeURIComponent, parseInt,
     GM_xmlhttpRequest, GM_getValue: (k, d) => (almacen.has(k) ? JSON.parse(almacen.get(k)) : d), GM_setValue: (k, v) => { almacen.set(k, JSON.stringify(v)); },
   };
   vm.runInNewContext(CARGADOR, ctx);
-  return { attrs, inyectados, document, estado: () => JSON.parse(attrs['data-rmd-cargador-estado'] || 'null'), revisar: () => document.dispatchEvent(new ctx.Event('rmd-cargador-revisar')), listo: () => new Promise((r) => document.addEventListener('rmd-cargador-estado', r)) };
+  return { attrs, inyectados, document, mensajes, enviar, estado: () => JSON.parse(attrs['data-rmd-cargador-estado'] || 'null'), revisar: () => document.dispatchEvent(new ctx.Event('rmd-cargador-revisar')), listo: () => new Promise((r) => document.addEventListener('rmd-cargador-estado', r)) };
 }
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 const bajadas = () => pedidos.filter((u) => /\$value$/.test(u)).map((u) => decodeURIComponent(/decodedurl='([^']+)'/.exec(u)[1]).split('/').pop());
@@ -59,7 +64,7 @@ subir('rmd-ui-mejoras-cargador.user.js', CARGADOR, '2026-10-10T10:00:00Z');
 let c = cargar(); await c.listo(); await pausa(20);
 ok(listados() === 1 && JSON.stringify(bajadas()) === JSON.stringify([`${V}.js`]), `1. primera carga: 1 listado y solo baja ${V}.js (${bajadas()})`);
 ok(c.inyectados.length === 1 && c.inyectados[0].startsWith(`window.__rmdDesdeCargador = "${V}";`) && c.inyectados[0].includes(`const VERSION = '${V}';`), '1. inyecta el script con la marca __rmdDesdeCargador');
-ok(c.attrs['data-rmd-cargador'] === '1.0.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
+ok(c.attrs['data-rmd-cargador'] === '1.1.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
 
 // 2. otra página antes de 10 min: inyecta de la caché sin pedir nada
 pedidos = []; c = cargar(); await pausa(20);
@@ -113,6 +118,32 @@ ok(pedidos.length === 0 && c.inyectados.length === 1, '9. marco del portal: inye
 c = cargar({ conBody: false }); await pausa(5);
 const antes = c.inyectados.length; c.document.body = {}; c.document.dispatchEvent({ type: 'DOMContentLoaded' });
 ok(antes === 0 && c.inyectados.length === 1, '10. sin <body> todavía: inyecta en DOMContentLoaded');
+
+// 11. puente de la contingencia: solo la API del sitio y solo escrituras dentro de 3.-CONTINGENCIA
+{
+  const API = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/_api/';
+  const CONT = encodeURIComponent('/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA/1.- PLANTA 1/X/ACONDICIONADO');
+  const OTRA = encodeURIComponent('/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/OTRA');
+  const casos = [
+    ['búsqueda', 'GET', API + "search/query?querytext='x'", 200],
+    ['contextinfo', 'POST', API + 'contextinfo', 200],
+    ['subir en contingencia', 'POST', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${CONT}'&@n='a.pdf'`, 200],
+    ['mover dentro de contingencia', 'POST', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/MoveToUsingPath(DecodedUrl=@b,moveOperations=1)?@a='${CONT}%2Fa.pdf'&@b='${CONT}%2FOBSOLETO%2Fa.pdf'`, 200],
+    ['subir fuera de contingencia', 'POST', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${OTRA}'&@n='a.pdf'`, 400],
+    ['mover fuera de contingencia', 'POST', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/MoveToUsingPath(DecodedUrl=@b,moveOperations=1)?@a='${CONT}%2Fa.pdf'&@b='${OTRA}%2Fa.pdf'`, 400],
+    ['borrar', 'POST', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/recycle()?@a='${CONT}%2Fa.pdf'`, 400],
+    ['otro sitio', 'GET', "https://otro.sharepoint.com/_api/search/query?querytext='x'", 400],
+    ['GET de archivos', 'GET', API + "web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='x'", 400],
+  ];
+  c = cargar();
+  for (const [n, metodo, url, esperado] of casos) {
+    const id = 'p' + n; c.enviar({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras: { Accept: 'application/json', Cookie: 'x' }, cuerpo: metodo === 'POST' ? new Uint8Array([1, 2]) : null });
+    await pausa(5);
+    const r = c.mensajes.find((m) => m.id === id);
+    ok(r && r.estado === esperado, `11. puente, ${n}: ${r ? r.estado : 'sin respuesta'}`);
+    if (r && r.estado === 200 && n === 'contextinfo') ok(!('Cookie' in JSON.parse(r.texto).cab), '11. puente: solo pasa las cabeceras permitidas');
+  }
+}
 
 console.log(fallos.length ? `\n${fallos.length} falla(s)` : '\nTodo pasa.');
 process.exit(fallos.length ? 1 : 0);

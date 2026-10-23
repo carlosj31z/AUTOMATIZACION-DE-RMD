@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.82.1
+// @version      1.83.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.82.1';                                                       // mantener igual a @version
+  const VERSION = '1.83.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -86,6 +86,7 @@
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
+    ['contingencia', 'Contingencia a SharePoint', 'Botón en la lista principal: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Necesita el cargador 1.1.0.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
@@ -232,6 +233,16 @@
   .rmd-menu-item b { grid-column: 2; font-size: 13.5px; font-weight: 600; } .rmd-menu-item span { grid-column: 2; font-size: 12px; color: var(--rmd-apagado); }
   html.rmd-ui .rmd-btn.rmd-status-rmd { width: auto; min-width: var(--rmd-btn-alto, 36px); height: var(--rmd-btn-alto, 36px); padding: 0 8px; gap: 7px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--rmd-ico-portal, var(--rmd-acento-texto)); }
   html.rmd-ui .rmd-status-rmd .rmd-ico-sap { font-style: normal; font-size: var(--rmd-ico-tam, 1rem); line-height: 1; }
+  html.rmd-ui .rmd-cont-intro { margin: 0 0 10px; font-size: 13px; line-height: 1.45; color: #32363a; max-width: 760px; }
+  html.rmd-ui .rmd-cont-fecha { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 12px; font-size: 13px; }
+  html.rmd-ui .rmd-cont-fecha label { display: inline-flex; gap: 6px; align-items: center; }
+  html.rmd-ui .rmd-cont-tabla { max-height: 55vh; overflow: auto; border: 1px solid #e5e5e5; border-radius: 6px; }
+  html.rmd-ui .rmd-cont-tabla table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  html.rmd-ui .rmd-cont-tabla th { position: sticky; top: 0; background: #f7f7f7; text-align: left; padding: 6px 8px; font-weight: 600; }
+  html.rmd-ui .rmd-cont-tabla td { padding: 6px 8px; border-top: 1px solid #eee; vertical-align: top; word-break: break-word; }
+  html.rmd-ui .rmd-cont-ya { font-size: 11px; color: #256f3a; background: #e3f4e4; border-radius: 3px; padding: 0 4px; }
+  html.rmd-ui .rmd-cont-nota, html.rmd-ui .rmd-cont-error { color: #b26a00; }
+  html.rmd-ui .rmd-cont-est { font-size: 11px; white-space: nowrap; } html.rmd-ui .rmd-cont-est.ok { color: #256f3a; } html.rmd-ui .rmd-cont-est.error { color: #c62828; white-space: normal; } html.rmd-ui .rmd-cont-est.curso { color: #0a6ed1; }
   html.rmd-ui .rmd-btn.rmd-status-rmd svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   html.rmd-ui .rmd-btn.rmd-status-rmd:hover, html.rmd-ui .rmd-btn.rmd-status-rmd:focus-visible { background: color-mix(in srgb, currentColor 12%, transparent); outline: none; }
   html.rmd-ui .rmd-btn.rmd-status-rmd > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -2718,7 +2729,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-contingencia, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
     document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); document.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda'));
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
@@ -2797,7 +2808,7 @@
     if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarBotonContingencia, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -6746,6 +6757,244 @@
       if (caja.height) s.style.setProperty('--rmd-btn-alto', Math.round(caja.height) + 'px');
       colocarEnBarra(barra, s);
     }
+  }
+
+  // ---- Contingencia a SharePoint ----
+  // Master en PDF de los RMD autorizados ayer (u hoy, u otra fecha) en su carpeta de 04.-RMD/3.-CONTINGENCIA. El destino es la carpeta
+  // de etapa donde está el PDF de una versión anterior del mismo master (mismo material y etapa); esas versiones pasan a OBSOLETO/. Un
+  // producto sin versiones anteriores en la carpeta no se sube: queda en la lista para ubicarlo a mano. El PDF es el de «Descargar»
+  // de la fórmula si el RMD tiene una sola; si tiene varias o ninguna, el de «Descargar master». SharePoint se lee y escribe con la
+  // sesión del navegador a través del cargador (rmd-ui-mejoras-cargador ≥ 1.1.0): esta página no puede llamar a SharePoint directamente.
+  // ==CONTINGENCIA-INICIO==
+  const Contingencia = (() => {
+    const ABREV = { FABRICACION: 'FAB', ENVASE: 'ENV', ACONDICIONADO: 'ACO', RECUBRIMIENTO: 'REC', INSPECCION: 'INS' };
+    const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const esObsoleto = (c) => /^OB?S?OLETOS?\s*\d*$/.test(sinTildes(c));
+    // «código-ETAPA-versión-», «código-versión-», «código-ETAPAversión-» y códigos antiguos; espacios junto a los guiones
+    const NOMBRES = [/^(\d{4,10})\s*-\s*(?:([A-Za-z]{3,4})\d?\s*-\s*)?(\d{1,3})\s*[-_]/, /^(\d{4,10})\s*-\s*([A-Za-z]{3})(\d{1,3})\s*[-_]/];
+    function interpretar(ruta) {
+      const partes = String(ruta).replace(/\\/g, '/').split('/').filter(Boolean), nombre = partes.pop() || '';
+      if (!/\.pdf$/i.test(nombre)) return null;
+      const m = NOMBRES.map((r) => r.exec(nombre)).find(Boolean); if (!m) return null;
+      const obsoleto = partes.some(esObsoleto), carpeta = (partes.length && esObsoleto(partes[partes.length - 1]) ? partes.slice(0, -1) : partes).join('/');
+      return { ruta: partes.concat(nombre).join('/'), codigo: m[1], version: m[3], obsoleto, carpeta };
+    }
+    const familia = (r) => `${r.material || r.agrupador}|${sinTildes(r.etapa)}`;
+    function nombreArchivo(r, descripcion) {
+      const e = sinTildes(r.etapa), etq = ABREV[e] || e.slice(0, 3);
+      const d = String(descripcion || r.descripcion || '').trim().replace(/[\\/:*?"<>|#%]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
+      return `${r.codigo}-${etq}-${r.version}-${d}.pdf`;
+    }
+    // autorizados: RMD Autorizados en la fecha; previos: versiones NO vigentes del mismo material y etapa; rutas: PDF de 3.-CONTINGENCIA
+    function planificar(autorizados, previos, rutas) {
+      const pdfs = rutas.map(interpretar).filter(Boolean);
+      return autorizados.map((r) => {
+        const codPrev = new Set(previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)).map((o) => o.codigo));
+        const propios = pdfs.filter((p) => p.codigo === r.codigo && !p.obsoleto), fam = pdfs.filter((p) => codPrev.has(p.codigo)), activas = fam.filter((p) => !p.obsoleto);
+        const yaEsta = [...new Set(propios.map((p) => p.carpeta))].sort();
+        const carpetas = [...new Set((activas.length ? activas : fam).map((p) => p.carpeta).concat(yaEsta))].sort();
+        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), nota: '' };
+        if (!carpetas.length) paso.nota = 'Sin versiones anteriores en 3.-CONTINGENCIA: ubícalo a mano.';
+        else if (!paso.subir.length && !paso.aObsoleto.length) paso.nota = 'Ya está en la carpeta.';
+        return paso;
+      });
+    }
+    const dd = (n) => String(n).padStart(2, '0');
+    const fechaIsoLocal = (d) => `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+    // fecha de autorización del portal: con hora, el día local; a medianoche UTC, una fecha sin hora
+    const diaDe = (x) => (!(x instanceof Date) || isNaN(x) ? '' : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? x.toISOString().slice(0, 10) : fechaIsoLocal(x));
+    return { interpretar, esObsoleto, nombreArchivo, planificar, fechaIsoLocal, diaDe };
+  })();
+  // ==CONTINGENCIA-FIN==
+  window.__rmdStats.contingencia = { Contingencia, leer: (f) => contLeer(controladorPrincipal().getView().getModel('mainModelv2'), f), pdf: (id) => contPdf(controladorPrincipal().getView().getModel('mainModelv2'), id), buscar: (c) => spBuscar(c) };   // pruebas
+  const CONT_SITIO = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA';
+  const CONT_RAIZ = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA';
+  const ICONO_CONTINGENCIA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/></svg>';
+
+  // Puente con el cargador: { tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras, cuerpo (Uint8Array) } -> { tipo: 'rmd-sp-respuesta', id, estado, texto }
+  let contSec = 0;
+  function spPedir(metodo, url, opciones = {}) {
+    return new Promise((ok, mal) => {
+      const id = `sp${Date.now()}-${++contSec}`;
+      const fin = (e) => { const d = e.data || {}; if (e.origin !== location.origin || d.tipo !== 'rmd-sp-respuesta' || d.id !== id) return; window.removeEventListener('message', fin); clearTimeout(t); ok(d); };
+      const t = setTimeout(() => { window.removeEventListener('message', fin); mal(new Error('el cargador de Tampermonkey no respondió: actualízalo a la versión 1.1.0 o superior (carpeta MEJORAS DE INTERFAZ)')); }, opciones.espera || 90000);
+      window.addEventListener('message', fin);
+      window.postMessage({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras: opciones.cabeceras || {}, cuerpo: opciones.cuerpo || null }, location.origin);
+    });
+  }
+  const spQ = (s) => encodeURIComponent(String(s).replace(/'/g, "''"));
+  async function spJson(metodo, url, opciones = {}) {
+    for (let i = 0; i < 6; i++) {
+      const r = await spPedir(metodo, url, { ...opciones, cabeceras: { Accept: 'application/json;odata=nometadata', ...(opciones.cabeceras || {}) } });
+      if (r.estado >= 200 && r.estado < 300) { try { return r.texto ? JSON.parse(r.texto) : null; } catch (e) { return null; } }
+      if (r.estado === 401 || r.estado === 403) throw new Error('sin permiso o sin sesión de SharePoint en este navegador');
+      if (![406, 429, 503].includes(r.estado)) throw new Error(`SharePoint respondió ${r.estado}: ${String(r.texto || '').slice(0, 200)}`);
+      await esperar(1000 * 2 ** i);
+    }
+    throw new Error('SharePoint no respondió');
+  }
+  async function spBuscar(codigos) {
+    const base = 'https://medifarmape.sharepoint.com' + CONT_RAIZ + '/', rutas = new Set();
+    for (let i = 0; i < codigos.length; i += 20) {
+      const kql = '(' + codigos.slice(i, i + 20).map((c) => `FileName:${c}*`).join(' OR ') + `) AND path:"${base.slice(0, -1)}"`;
+      const d = await spJson('GET', `${CONT_SITIO}/_api/search/query?querytext='${spQ(kql)}'&selectproperties='Path'&rowlimit=500&trimduplicates=false`);
+      ((((d && d.PrimaryQueryResult) || {}).RelevantResults || {}).Table || { Rows: [] }).Rows.forEach((r) => {
+        const c = (r.Cells || []).find((x) => x.Key === 'Path'); if (!c) return; let v = c.Value; try { v = decodeURI(v); } catch (e) { /* ya viene decodificada */ }
+        if (v.startsWith(base)) rutas.add(v.slice(base.length));
+      });
+    }
+    return [...rutas];
+  }
+  const spDigest = async () => (await spJson('POST', `${CONT_SITIO}/_api/contextinfo`)).FormDigestValue;
+  async function spSubir(carpeta, nombre, bytes) {
+    const h = { 'X-RequestDigest': await spDigest(), 'Content-Type': 'application/pdf' };
+    await spJson('POST', `${CONT_SITIO}/_api/web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${spQ(CONT_RAIZ + '/' + carpeta)}'&@n='${spQ(nombre)}'`, { cabeceras: h, cuerpo: bytes });
+  }
+  async function spArchivar(ruta) {
+    const h = { 'X-RequestDigest': await spDigest() }, partes = ruta.split('/'), nombre = partes.pop(), destino = partes.concat('OBSOLETO').join('/');
+    await spJson('POST', `${CONT_SITIO}/_api/web/Folders/AddUsingPath(DecodedUrl=@a,Overwrite=false)?@a='${spQ(CONT_RAIZ + '/' + destino)}'`, { cabeceras: h }).catch((e) => { if (!/ (400|409|500):/.test(e.message)) throw e; });
+    await spJson('POST', `${CONT_SITIO}/_api/web/GetFileByServerRelativePath(DecodedUrl=@a)/MoveToUsingPath(DecodedUrl=@b,moveOperations=1)?@a='${spQ(CONT_RAIZ + '/' + ruta)}'&@b='${spQ(CONT_RAIZ + '/' + destino + '/' + nombre)}'`, { cabeceras: h });
+    return destino + '/' + nombre;
+  }
+
+  // RMD autorizados en la fecha y versiones no vigentes del mismo material (para ubicar la carpeta y lo que pasa a OBSOLETO)
+  const CONT_SELECT = 'mdId,codigo,version,nivelTxt,codAgrupadorReceta,codDefectoReceta,descripcion,fechaAutorizacion,areaRmdTxt,estadoIdRmd/contenido';
+  const contFila = (md) => ({ mdId: md.mdId, codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '', etapa: md.nivelTxt || '', descripcion: md.descripcion || '',
+    material: md.codDefectoReceta || '', agrupador: md.codAgrupadorReceta || '', estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', fecha: Contingencia.diaDe(md.fechaAutorizacion) });
+  async function contLeer(modelo, fecha) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, [a, m, d] = fecha.split('-').map(Number);
+    const ini = new Date(Date.UTC(a, m - 1, d - 1)), fin = new Date(Date.UTC(a, m - 1, d + 2));   // ±1 día por la zona horaria; luego se filtra por el día local
+    const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd', $select: CONT_SELECT })).map(contFila);
+    const autorizados = filas.filter((r) => /^AUTORIZADO$/i.test(r.estado) && r.fecha === fecha && /^\d+$/.test(r.codigo));
+    const materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
+    for (let i = 0; i < materiales.length; i += 15) {
+      const f = new F({ filters: materiales.slice(i, i + 15).map((x) => new F('codDefectoReceta', 'EQ', x)), and: false });
+      previos.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd', $select: CONT_SELECT })).map(contFila).filter((r) => !/^AUTORIZADO$/i.test(r.estado) && /^\d+$/.test(r.codigo)));
+    }
+    return { autorizados, previos };
+  }
+
+  // PDF del RMD con las lecturas y el armado del portal sobre una vista aparte (no toca la lista ni graba nada); devuelve { receta, bytes }
+  async function contPdf(modelo, mdId) {
+    const ctrl = controladorPrincipal(), V = ctrl.getView(), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JM = sap.ui.require('sap/ui/model/json/JSONModel');
+    if ([...TZ_LECTURAS_MASTER, 'onCompletarAsociarDatos', 'tratarInformacion'].some((n) => typeof ctrl[n] !== 'function')) throw new Error('no se encontró «Descargar master» en el portal');
+    const md = (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', mdId)], { $expand: EXPAND_LISTA_MD }))[0]; if (!md) throw new Error('no se encontró el RMD en SAP');
+    const recetas = ((md.aReceta && md.aReceta.results) || []).filter((r) => r.recetaId), rc = recetas.length === 1 ? recetas[0] : null;
+    const locales = new Map([['asociarDatos', new JM(md)]]);
+    const vista = new Proxy(V, { get(t, k) {
+      if (k === 'getModel') return (n) => (locales.has(n) ? locales.get(n) : t.getModel(n));
+      if (k === 'setModel') return (m, n) => { locales.set(n, m); return vista; };
+      const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } });
+    // el botón «Descargar» de la fórmula en «Asociar fórmulas»: tratarInformacion lee la receta de la fila
+    const fila = { getBindingContext: () => ({ getObject: () => ({ mdRecetaId: rc && rc.mdRecetaId, recetaId: rc && rc.recetaId }) }) };
+    const evento = { getSource: () => ({ getProperty: (p) => (p === 'text' ? 'Descargar' : undefined), getParent: () => ({ getParent: () => fila }) }) };
+    const BI = sap.ui.core.BusyIndicator, bi0 = [BI.show, BI.hide], propio = Object.prototype.hasOwnProperty.call(ctrl, 'getView'), gv0 = ctrl.getView;
+    const pm = window.pdfMake, cp0 = pm.createPdf, open0 = window.open, nada = () => {}; let doc = null;
+    TZ_ESC.pausa++;
+    try {
+      ctrl.getView = () => vista; BI.show = nada; BI.hide = nada;
+      const res = await Promise.all(TZ_LECTURAS_MASTER.map((n) => ctrl[n]()));
+      const esFormula = (e) => !!(e.estructuraId && +e.estructuraId.tipoEstructuraId_iMaestraId === 488);
+      const estr = (res[0].results || []).slice().sort((a, b) => (a.orden !== b.orden ? a.orden - b.orden : esFormula(a) ? -1 : esFormula(b) ? 1 : 0));
+      estr.forEach((e, i) => { e.orden = i + 1; });
+      [estr, ...res.slice(1).map((r) => r.results || [])].forEach((datos, i) => { const m = new JM(datos); m.setSizeLimit(999999999); locales.set(TZ_MODELOS_MASTER[i], m); });
+      await ctrl.onCompletarAsociarDatos();
+      window.open = () => ({ document: { write() {}, close() {}, open() {} }, focus() {}, close() {}, print() {}, location: {} });
+      pm.createPdf = function (d) { if (!doc) doc = clonarDoc(d); return { open: nada, print: nada, download: nada, getBlob(cb) { if (cb) cb(new Blob()); return Promise.resolve(new Blob()); }, getDataUrl(cb) { if (cb) cb(''); }, getBase64(cb) { if (cb) cb(''); }, getBuffer(cb) { if (cb) cb(new Uint8Array()); } }; };
+      await (rc ? ctrl.tratarInformacion(evento, false) : ctrl.tratarInformacion(false, false));
+      await hasta(() => doc, 20000, 150);
+    } finally {
+      if (propio) ctrl.getView = gv0; else delete ctrl.getView;
+      [BI.show, BI.hide] = bi0; pm.createPdf = cp0; window.open = open0;
+      setTimeout(() => { TZ_ESC.pausa = Math.max(0, TZ_ESC.pausa - 1); }, 400);
+    }
+    if (!doc) throw new Error('el portal no armó el documento del master');
+    const b64 = await new Promise((ok, mal) => { const v = cp0.call(pm, doc).getBase64(ok); if (v && v.then) v.then(ok, mal); });   // pdfmake 0.3: promesa
+    return { receta: rc ? String(rc.recetaId.Text1 || '').trim() : '', bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)) };
+  }
+
+  function gestionarBotonContingencia() {
+    if (!on('contingencia')) { document.querySelectorAll('.rmd-contingencia').forEach((e) => e.remove()); return; }
+    document.querySelectorAll('.sapMDialog .rmd-contingencia').forEach((e) => e.remove());
+    const btnExportar = botonExportar(); if (!btnExportar) return;
+    const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra || barra.querySelector('.rmd-contingencia')) return;
+    const s = botonIcono(ICONO_CONTINGENCIA, 'Contingencia', 'rmd-status-rmd rmd-contingencia', () => abrirContingencia());
+    s.title = 'Contingencia: el master de los RMD autorizados ayer (u hoy) a su carpeta de 3.-CONTINGENCIA en SharePoint'; s.setAttribute('aria-label', 'Contingencia');
+    const IP = sap.ui.core.IconPool, info = IP && IP.getIconInfo && IP.getIconInfo('sap-icon://pdf-attachment'), svg = s.querySelector('svg');
+    if (info && svg) { const i = document.createElement('i'); i.className = 'rmd-ico-sap'; i.setAttribute('aria-hidden', 'true'); i.style.fontFamily = `'${info.fontFamily}'`; i.textContent = info.content; svg.replaceWith(i); }
+    const ico = btnExportar.querySelector('.sapUiIcon'), caja = (btnExportar.closest('.sapMBtn') || btnExportar).getBoundingClientRect();
+    if (ico) { const cs = getComputedStyle(ico); s.style.setProperty('--rmd-ico-portal', cs.color); s.style.setProperty('--rmd-ico-tam', cs.fontSize); }
+    if (caja.height) s.style.setProperty('--rmd-btn-alto', Math.round(caja.height) + 'px');
+    colocarEnBarra(barra, s);
+  }
+
+  async function abrirContingencia() {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
+    if (!modelo) { toast('Abre la lista «Configuración Manufactura Digital» para usar la contingencia.', true); return; }
+    let cerrado = false, plan = null, ocupadoC = false;
+    const v = ventana('Contingencia a SharePoint', { cancelar: () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } } });
+    const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">El master de cada RMD autorizado en la fecha va a la carpeta de su versión anterior en <b>3.-CONTINGENCIA</b>, y esa versión pasa a <b>OBSOLETO</b>.
+      Con una sola fórmula asociada, el PDF es el de su «Descargar» (master + receta); con varias, el de «Descargar master».</p>
+      <div class="rmd-cont-fecha"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked> Ayer</label><label><input type="radio" name="rmd-cont-dia" value="hoy"> Hoy</label>
+      <label><input type="radio" name="rmd-cont-dia" value="otra"> Otra fecha <input type="date" class="rmd-cont-otra"></label></div>
+      <div class="rmd-cont-plan"></div>`;
+    const caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
+    otra.value = Contingencia.fechaIsoLocal(ayer);
+    const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(new Date()) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
+    const fmt = (iso) => iso.split('-').reverse().join('/');
+    const bRevisar = botonModal('Revisar', 'primario', () => revisar()), bCargar = botonModal('Cargar a SharePoint', '', () => cargar()), bCerrar = botonModal('Cerrar', '', () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } });
+    bCargar.disabled = true; v.pie.append(bCerrar, bRevisar, bCargar);
+    v.cuerpo.addEventListener('change', () => { plan = null; bCargar.disabled = true; caja.innerHTML = ''; });
+    const pintar = (fecha) => {
+      if (!plan.length) { caja.innerHTML = `<p>No hay RMD autorizados el ${esc(fmt(fecha))}.</p>`; return; }
+      const filas = plan.map((p, i) => {
+        const r = p.rmd, est = p.estado ? `<span class="rmd-cont-est ${p.estado.cls}">${esc(p.estado.txt)}</span>` : '';
+        const dest = p.carpetas.map((c) => `<div>${p.yaEsta.includes(c) ? '<span class="rmd-cont-ya">ya está</span> ' : ''}${esc(c)}</div>`).join('') || `<div class="rmd-cont-nota">${esc(p.nota)}</div>`;
+        const obs = p.aObsoleto.map((x) => `<div>${esc(x.split('/').pop())}</div>`).join('');
+        return `<tr data-i="${i}"><td>${esc(r.codigo)}<br><small>v${esc(r.version)} · ${esc(r.etapa)}</small></td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${obs || '—'}</td><td>${est}</td></tr>`;
+      }).join('');
+      const nSubir = plan.filter((p) => p.subir.length).length, nObs = plan.reduce((n, p) => n + p.aObsoleto.length, 0), nMano = plan.filter((p) => !p.carpetas.length).length;
+      caja.innerHTML = `<p><b>${plan.length}</b> RMD autorizados el ${esc(fmt(fecha))}: <b>${nSubir}</b> por cargar, <b>${nObs}</b> PDF anteriores a OBSOLETO${nMano ? `, <b>${nMano}</b> sin carpeta (ubícalos a mano)` : ''}.</p>
+        <div class="rmd-cont-tabla"><table><thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>A OBSOLETO</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`;
+      bCargar.disabled = !(nSubir || nObs);
+    };
+    async function revisar() {
+      const fecha = fechaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { toast('Elige una fecha.', true); return; }
+      ocupadoC = true; bRevisar.disabled = bCargar.disabled = true; caja.innerHTML = '<p>Leyendo SAP…</p>';
+      try {
+        const { autorizados, previos } = await contLeer(modelo, fecha); if (cerrado) return;
+        caja.innerHTML = `<p>Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…</p>`;
+        const codigos = [...new Set(autorizados.map((r) => r.codigo).concat(previos.map((r) => r.codigo)))];
+        const rutas = autorizados.length ? await spBuscar(codigos) : []; if (cerrado) return;
+        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; pintar(fecha);
+      } catch (e) { caja.innerHTML = `<p class="rmd-cont-error">No se pudo revisar: ${esc(e.message)}</p>`; }
+      finally { ocupadoC = false; bRevisar.disabled = false; }
+    }
+    async function cargar() {
+      if (!plan) return;
+      const nSubir = plan.filter((p) => p.subir.length).length, nObs = plan.reduce((n, p) => n + p.aObsoleto.length, 0);
+      if (!confirm(`Se cargarán ${nSubir} PDF a SharePoint y ${nObs} PDF anteriores pasarán a OBSOLETO, en 3.-CONTINGENCIA. ¿Continuar?`)) return;
+      ocupadoC = true; bRevisar.disabled = bCargar.disabled = bCerrar.disabled = true;
+      let hechos = 0, fallos = 0;
+      for (const [i, p] of plan.entries()) {
+        if (cerrado) break;
+        const fila = caja.querySelector(`tr[data-i="${i}"] td:last-child`), marcar = (txt, cls) => { p.estado = { txt, cls }; if (fila) fila.innerHTML = `<span class="rmd-cont-est ${cls}">${esc(txt)}</span>`; };
+        if (!p.subir.length && !p.aObsoleto.length) continue;
+        try {
+          if (p.subir.length) {
+            marcar('Generando PDF…', 'curso');
+            const pdf = await contPdf(modelo, p.rmd.mdId), nombre = Contingencia.nombreArchivo(p.rmd, pdf.receta);
+            for (const c of p.subir) { marcar('Cargando…', 'curso'); await spSubir(c, nombre, pdf.bytes); }
+          }
+          for (const x of p.aObsoleto) { marcar('A OBSOLETO…', 'curso'); await spArchivar(x); }
+          marcar('Hecho', 'ok'); hechos++;
+        } catch (e) { marcar('Error: ' + e.message, 'error'); fallos++; }
+      }
+      ocupadoC = false; bCerrar.disabled = bRevisar.disabled = false;
+      toast(`Contingencia del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
+    }
+    revisar();
   }
 
   // ---- Indicadores ----
@@ -14680,7 +14929,7 @@ td.ult { position: relative; }
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
-    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
+    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'plantillaprod', 'suspension']],
   ];
   const ICONOS_PANEL = {
     flecha: '<path d="M6 3.5 10.5 8 6 12.5"/>', buscar: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>', cerrar: '<path d="M4 4l8 8M12 4l-8 8"/>',
