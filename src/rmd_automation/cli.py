@@ -298,6 +298,30 @@ def contingencia_revisar(maestro: str | None, carpeta: str | None, listado: str 
     click.echo(f"Detalle en {salida}")
 
 
+@contingencia_group.command("diaria")
+@click.option("--fecha", default=None, help="Fecha de autorización AAAA-MM-DD (por defecto, ayer).")
+@click.option("--hoy", is_flag=True, help="Los autorizados hoy, en vez de ayer.")
+@click.option("--aplicar", is_flag=True, help="Sube los PDF a SharePoint y pasa las versiones anteriores a OBSOLETO.")
+@click.option("--local", "carpeta_local", default="data/contingencia", show_default=True,
+              help="Dónde se guarda la copia local de los PDF (por fecha).")
+def contingencia_diaria(fecha: str | None, hoy: bool, aplicar: bool, carpeta_local: str) -> None:
+    """Master en PDF de los RMD autorizados ayer (u hoy) y su lugar en 3.-CONTINGENCIA.
+
+    Sin --aplicar solo muestra el plan y guarda los PDF en local. Usa el Chromium de RMD_CDP_URL con
+    sesión iniciada en el portal RMD (lista «Configuración Manufactura Digital») y en SharePoint.
+    """
+    import os
+
+    from .contingencia_diaria import ejecutar, fecha_objetivo
+
+    if fecha and hoy:
+        raise click.UsageError("Usa --fecha o --hoy, no los dos.")
+    fecha = fecha or fecha_objetivo(del_dia=hoy)
+    cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
+    click.echo(f"Contingencia de los RMD autorizados el {fecha}{'' if aplicar else ' (vista previa: no se sube nada)'}")
+    ejecutar(cdp, CONTINGENCIA_URL, fecha, carpeta_local, aplicar, avisar=click.echo)
+
+
 REVISIONES = [
     "Tren de equipos (TREN DE EQUIPOS PL2.xlsx): los equipos del RMD deben coincidir con la línea/sala de la etapa.",
     'Controles de cambio pendientes (1.-CC-NC-DES Para actualizar RMD.xlsx, hoja "PLANTA 2"): ¿alguno aplica a este RMD?',

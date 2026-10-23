@@ -145,6 +145,21 @@ rmd-automation contingencia revisar --maestro maestro.xlsx --carpeta "C:/Users/.
 rmd-automation contingencia revisar --maestro maestro.xlsx --listado data/contingencia.txt
 ```
 
+### Contingencia del día: subir el master de los RMD autorizados ayer (u hoy)
+
+```bash
+rmd-automation contingencia diaria            # autorizados ayer: plan + PDF en data/contingencia/<fecha>/ (no sube nada)
+rmd-automation contingencia diaria --hoy      # autorizados hoy
+rmd-automation contingencia diaria --fecha 2026-10-22 --aplicar   # sube a SharePoint y archiva la versión anterior
+```
+
+Para cada RMD Autorizado en la fecha busca en 3.-CONTINGENCIA el PDF de sus versiones anteriores (mismo
+material y etapa): esa carpeta es el destino y esas versiones pasan a `OBSOLETO/`. El PDF se arma con el
+mismo código de «Ver master» del portal, sin abrir el RMD, y se nombra `código-ETAPA-versión-descripción.pdf`.
+Un producto nuevo (sin versiones anteriores en la carpeta) no se sube: queda marcado para ubicarlo a mano.
+Necesita el Chromium de `RMD_CDP_URL` con sesión en el portal (lista «Configuración Manufactura Digital»)
+y en SharePoint.
+
 ### Flujo: RMD de referencia y revisiones posteriores
 
 `cambios aplicar` pregunta primero si hay un RMD de referencia (su "Codigo RMD") y, al terminar, si se desean

@@ -75,3 +75,23 @@ def test_url_de_sharepoint():
     assert sitio == "https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA"
     assert carpeta == "/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/04.-RMD/3.-CONTINGENCIA"
     assert partir_url(sitio + "/Documentos compartidos/A")[1] == "/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/A"
+
+
+def test_contingencia_diaria_plan(tmp_path):
+    from datetime import date
+
+    from rmd_automation.contingencia_diaria import fecha_objetivo, nombre_archivo, plan_a_texto, planificar
+
+    assert fecha_objetivo(date(2026, 10, 23)) == "2026-10-22"
+    assert fecha_objetivo(date(2026, 10, 23), del_dia=True) == "2026-10-23"
+    m = _maestro(tmp_path)
+    m[1].fecha_autorizacion = m[3].fecha_autorizacion = "2026-10-22"
+    plan = {p.rmd.codigo: p for p in planificar(m, "2026-10-22", PDFS)}
+    assert set(plan) == {"2202609999", "2202600001"}
+    v6 = plan["2202609999"]
+    assert v6.archivo == "2202609999-FAB-6-GASEOVET_80mg_mL_SUS_1000_L.pdf"
+    assert v6.carpetas == ["1.- PLANTA 1/LIQUIDOS/GASEOVET/FABRICACION"]
+    assert v6.a_obsoleto == [PDFS[0]]
+    assert plan["2202600001"].carpetas == [] and "a mano" in plan["2202600001"].nota
+    assert "OBSOLETO" in plan_a_texto(list(plan.values()), "2026-10-22")
+    assert nombre_archivo(m[2]) == "2202607732-ACO-5-GASEOVET_FCO15mL_CJA_x_25.pdf"

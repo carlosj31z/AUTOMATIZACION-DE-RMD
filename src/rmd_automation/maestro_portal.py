@@ -29,8 +29,11 @@ async () => {
     p.forEach((md) => { if (!vistos.has(md.mdId)) { vistos.add(md.mdId); filas.push(md); } });
     if (p.length < N) break;
   }
-  const f = (x) => (x instanceof Date && !isNaN(x) ? x.toISOString().slice(0, 10) : '');
-  return filas.map((md) => ({ codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '',
+  // Fecha local (Lima); si viene a medianoche UTC es una fecha sin hora y se toma tal cual.
+  const dd = (n) => String(n).padStart(2, '0');
+  const f = (x) => (!(x instanceof Date) || isNaN(x) ? '' : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0
+    ? x.toISOString().slice(0, 10) : `${x.getFullYear()}-${dd(x.getMonth() + 1)}-${dd(x.getDate())}`);
+  return filas.map((md) => ({ md_id: String(md.mdId), codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '',
     estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', descripcion: md.descripcion || '', etapa: md.nivelTxt || '',
     planta: (md.sucursalId && md.sucursalId.contenido) || '', seccion: md.areaRmdTxt || '', agrupador: md.codAgrupadorReceta || '',
     material: md.codDefectoReceta || '', fecha_autorizacion: f(md.fechaAutorizacion) }));

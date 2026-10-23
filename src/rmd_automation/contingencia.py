@@ -47,6 +47,7 @@ class Rmd:
     agrupador: str = ""
     material: str = ""
     fecha_autorizacion: str = ""
+    md_id: str = ""  # id interno del portal (solo cuando se lee del portal)
 
     @property
     def vigente(self) -> bool:
@@ -170,11 +171,12 @@ def _fila(r: Rmd) -> dict:
 def comparar(maestro: Iterable[Rmd], rutas: Iterable[str]) -> Brechas:
     maestro = list(maestro)
     por_codigo: Dict[str, Rmd] = {r.codigo: r for r in maestro}
-    # Las versiones de un mismo RMD comparten agrupador (o, si falta, material) y etapa.
-    familia = lambda r: (r.agrupador or r.material, normalizar(r.etapa))  # noqa: E731
+    # Las versiones de un mismo RMD comparten material (código por defecto) y etapa; el agrupador lo
+    # comparten productos distintos, así que solo se usa si falta el material.
+    familia = lambda r: (r.material or r.agrupador, normalizar(r.etapa))  # noqa: E731
     vigente_de: Dict[tuple, List[Rmd]] = defaultdict(list)
     for r in maestro:
-        if r.vigente and (r.agrupador or r.material):
+        if r.vigente and (r.material or r.agrupador):
             vigente_de[familia(r)].append(r)
 
     b = Brechas()
@@ -237,7 +239,7 @@ def comparar(maestro: Iterable[Rmd], rutas: Iterable[str]) -> Brechas:
             continue
         fila = _fila(r)
         # Dónde guardarlo: junto a otra versión del mismo RMD si alguna ya está en la carpeta.
-        hermano = next((p for o in maestro if familia(o) == familia(r) and (r.agrupador or r.material)
+        hermano = next((p for o in maestro if familia(o) == familia(r) and (r.material or r.agrupador)
                         for p in todos.get(o.codigo, [])), None)
         fila["Carpeta sugerida"] = hermano.carpeta if hermano else ""
         fila["Nota"] = "Solo está en OBSOLETO" if todos.get(r.codigo) else ""
