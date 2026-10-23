@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.82.0
+// @version      1.82.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.82.0';                                                       // mantener igual a @version
+  const VERSION = '1.82.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2284,7 +2284,7 @@
     const h = htmlPendientes(r, { cargando: !d.__rmdPendVs, error: d.__rmdPendError, autorizar, planta, cambios });
     if (!h.valor && !h.detalle) fijarSegmento(d, 'pendientes', null);
     else {
-      const pend = r.ccs.length + r.textos.length + r.propios.length, avisos = r.revision.filter((x) => x.nivel !== 'info').length + r.formato.length;
+      const pend = r.ccs.length + r.textos.length + r.propios.length, avisos = r.revision.filter((x) => x.nivel !== 'info').length + r.formato.length + (r.motivos || []).length;
       const estado = pend || r.bajas.length ? (autorizar ? 'bloquea' : 'aviso') : avisos ? 'aviso' : 'ok';
       fijarSegmento(d, 'pendientes', { estado, valor: h.valor, detalle: h.detalle, abrir: estado === 'bloquea' });
       const av = d.querySelector('#rmd-aviso-pendientes'); if (av && av.__rmdHtml !== h.detalle) { av.__rmdHtml = h.detalle; av.innerHTML = h.detalle; }
@@ -2372,6 +2372,7 @@
     r.ccs.forEach((x) => { const l = listado(x.cc); items.push(`<li>⚠ <b>Falta aplicar ${esc(x.cc)}</b>, pendiente de la ${vTxt(x)}: ${cita(x.linea, 60)}${l ? ` <span class="rmd-pd-lis" title="${esc(l)}">listado: ${esc(Pendientes.delListado(cambios, x.cc, planta).estatus || 'sí')}</span>` : ''}</li>`); });
     r.textos.forEach((x) => items.push(`<li>⚠ Pendiente de la ${vTxt(x)}: ${cita(x.linea)}. Revisa si ya se aplicó.</li>`));
     r.propios.forEach((x) => items.push(`<li>ℹ Pendiente anotado en esta versión: ${cita(x.linea)}</li>`));
+    (r.motivos || []).forEach((x) => items.push(`<li>⚠ La ${vTxt(x)} se suspendió por: ${cita(x.linea)}. Revisa que esta versión lo atienda.</li>`));
     const icono = { aviso: '⚠', formato: '✎', info: 'ℹ' };
     r.revision.filter((x) => x.nivel !== 'info').forEach((x) => items.push(`<li>${icono[x.nivel]} ${esc(x.texto)}${x.linea ? ` ${cita(x.linea, 50)}` : ''}</li>`));
     r.formato.forEach((x) => items.push(`<li>✎ ${cita(x.linea, 50)}: falta ${esc(x.faltan.join(', '))} («26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»).</li>`));
@@ -2382,7 +2383,7 @@
     const cuenta = [pend && `${pend} pendiente${pend > 1 ? 's' : ''}`, (resto || r.bajas.length) && `${resto + r.bajas.length} a revisar`].filter(Boolean).join(' · ');
     if (cargando) cab.push('<span class="rmd-pd-ok">leyendo la versión anterior…</span>');
     else if (error) cab.push('<span class="rmd-pd-ok">no se pudo leer la versión anterior</span>');
-    else if (r.previa && !r.ccs.length && !r.textos.length) cab.push(`<span class="rmd-pd-ok">✓ la ${pv} no dejó pendientes</span>`);
+    else if (r.previa && !r.ccs.length && !r.textos.length && !(r.motivos || []).length) cab.push(`<span class="rmd-pd-ok">✓ la ${pv} no dejó pendientes</span>`);
     if (cuenta) cab.push(`<span class="rmd-ap-cuenta">${cuenta}</span>`);
     return { valor: cab.join(''), detalle: out.join('') };
   }
@@ -6337,6 +6338,8 @@
     const RE_BAJA = /\b(?:DAR(?:SE|LO|LA)?\s+DE\s+BAJA|(?:SE\s+)?DA\s+DE\s+BAJA|DADO\s+DE\s+BAJA|DADA\s+DE\s+BAJA|PARA\s+BAJA|DE\s+BAJA|DESCONTINUAD[OA]S?|DESCONTINUA(?:R|DO|CION)?|DISCONTINUAD[OA]S?|DISCONTINUA(?:R|CION)?|YA\s+NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA|COMERCIALIZA|VENDE)|NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA)\s+MAS|FUERA\s+DE\s+(?:LINEA|PORTAFOLIO|PORTAFOLIO)|RETIRAD[OA]\s+DEL\s+(?:MERCADO|PORTAFOLIO)|PRODUCTO\s+INACTIVO|SIN\s+DEMANDA)\b/;
     const RE_BAJA_NO = /\b(?:EQUIPOS?|BALANZAS?|INSTRUMENTOS?|UTENSILIOS?|TERMOMETROS?|MAQUINAS?|PASOS?|ACCESORIOS?|AGRUPADOR(?:ES)?|PISTOLAS?|TANQUES?|OLLAS?|CODIFICADORAS?|IMPRESORAS?|SENSORE?S?)\b[^.;]*\bBAJA\b|\bBAJA\b[^.;]*\b(?:CODIGO\s+[A-Z]{2,3}\d*-[A-Z]{2,3}\d*-|SEM-|CODIFICADORA|EQUIPO)/;
     const esBaja = (p) => RE_BAJA.test(p) && !(RE_BAJA_NO.test(p) && !/DESCONTINU|DISCONTINU|NO\s+SE\s+(?:FABRICA|PRODUCE)/.test(p));
+    // «no aplica el CC 26-244…», «no corresponde», «sin efecto»: el CC se nombra pero no se aplicó (no es aplicado ni pendiente)
+    const RE_NO_APLICA = /\bNO\s+(?:SE\s+)?APLICA(?:N|RA|RAN)?\b|\bNO\s+CORRESPONDE\b|\bSIN\s+EFECTO\b|\bSE\s+DESCARTA\b|\bDESCARTAD[OA]\b|\bANULAD[OA]\b/;
     const RE_ACTUALIZA = /\bACTUALIZA(?:CION|DO|DA|R)?\b|\bMODIFICACION\b|\bCAMBIO\s+DE\b/;
     // Tipos de línea: baja, pendiente, cc, suspension (motivo), actualizacion, nomenclatura, nota
     function analizar(texto) {
@@ -6347,6 +6350,7 @@
         if (esBaja(p)) { r.bajas.push({ linea: l, i }); poner('baja'); return; }
         const pend = esPendiente(p, ccs);
         if (RE_NOMENCLATURA.test(l) && !ccs.length && !pend) { poner(/^\S+\s+\S/.test(l) && RE_SUSP.test(p) ? 'suspension' : 'nomenclatura'); return; }
+        if (!pend && ccs.length && RE_NO_APLICA.test(p)) { poner('noaplica'); return; }
         const ent = !pend && entradaCC(l);
         if (pend) { r.pendientes.push({ linea: l, ccs, i }); poner('pendiente'); }
         else if (RE_HECHO.test(p) && ccs.length) { r.hechos.push({ linea: l, ccs, i }); poner('cc'); }
@@ -6416,8 +6420,11 @@
       // líneas nuevas frente a la versión anterior (sin la 1.ª línea de nomenclatura, que cambia en cada versión)
       const previa = vs[vs.length - 1] || null;
       const nuevas = anA.tipos.filter((t) => t.tipo !== 'nomenclatura' && !previos.has(plano(t.linea)));
+      // motivo de suspensión de la versión anterior (lo que la llevó a una versión nueva): se recuerda para revisar que esta lo atienda,
+      // salvo «por nueva versión» (no dice qué cambiar) y salvo que esta versión copie la misma línea
+      const motivos = previa ? previa.an.tipos.filter((x) => x.tipo === 'suspension' && !RE_SUSP_MOTIVO.test(plano(x.linea)) && !setA.has(plano(x.linea))).map((x) => ({ version: previa.version, codigo: previa.codigo, estado: previa.estado, linea: x.linea })) : [];
       return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
-        bajas: [...bajas.values()], formato, resueltos, nuevas, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an, observacion: previa.observacion } };
+        bajas: [...bajas.values()], formato, resueltos, nuevas, motivos, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an, observacion: previa.observacion } };
     }
     // ---- Listado de CC / NC / DES para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima) ----
     // Columnas por su encabezado: AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES, ESTATUS (o ESTATUS DE FILE), MOTIVO.
@@ -6500,7 +6507,7 @@
       const p = plano(planta), c = en.find((x) => p && x.planta && p.includes(plano(x.planta))) || en[0];
       return { descripcion: c.descripcion || c.nomenclatura, estatus: c.estatus, planta: c.planta, fecha: c.fecha };
     }
-    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
+    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', noaplica: 'CC que no aplica', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
     return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA, cambiosDeFilas, fechaCambio, fechaDe, revisar, delListado };
   })();
   // ==PENDIENTES-FIN==

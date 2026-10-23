@@ -148,5 +148,17 @@ ok('Revisión con el listado: el que no está (info) y el de la otra planta (avi
   lis.some((x) => x.nivel === 'info' && /26-999-CC no está en el listado/.test(x.texto)) && lis.some((x) => x.nivel === 'aviso' && x.texto === '26-280-CC figura en el listado de Ate, y este RMD es de Lima.') && !lis.some((x) => /26-379-CC/.test(x.texto)), J(lis));
 ok('Revisión: sin estado elegido ni listado, una versión copiada sin cambios no da avisos', rv(base9).length === 0, J(rv(base9)));
 
+// ---- caso real 2202504892 (v5, Suspendido) -> 2202609307 (v6): «no aplica el CC» y el motivo de suspensión ----
+const obsSuc5 = `2025-05-14 YSABEL SIMÓN
+correo/Giannina/2026-04-15/actualizacion Creación de receta para producto SUCRAXOL 1G/5ML SUS 200ML CJA X1 - Bolivia.
+20261023CJ no aplica el CC 26-244 POR RETIRO DE ETIQUETA DE ECUADOR.
+20261023CJ Se suspende por actualización de las LMat solicitada con los nuevos ZMEE con arte humanova.`;
+const anSuc5 = Pendientes.analizar(obsSuc5);
+ok('«No aplica el CC 26-244»: no cuenta como CC aplicado', !anSuc5.aplicados.some((x) => x.codigo === '26-244-CC') && anSuc5.tipos.some((x) => x.tipo === 'noaplica'), J(anSuc5.tipos.map((x) => x.tipo)));
+const herSuc6 = Pendientes.heredados([{ version: 5, codigo: '2202504892', estado: 'Suspendido', observacion: obsSuc5 }], { version: 6, observacion: '20261023CJ-1-C1.0-FI1.0-FA1.0-F1R' });
+ok('El motivo de suspensión de la versión anterior se recuerda en la siguiente', herSuc6.motivos.length === 1 && /LMat/.test(herSuc6.motivos[0].linea), J(herSuc6.motivos));
+ok('«Se suspende por nueva versión» no se recuerda (no dice qué cambiar)', Pendientes.heredados([{ version: 5, estado: 'Suspendido', observacion: '20261023CJ Se suspende por nueva versión' }], { version: 6, observacion: '' }).motivos.length === 0);
+ok('Si la versión nueva copia la misma línea de suspensión, no se repite', Pendientes.heredados([{ version: 5, estado: 'Suspendido', observacion: obsSuc5 }], { version: 6, observacion: obsSuc5 }).motivos.length === 0);
+
 console.log(fallas ? `\n${fallas} prueba(s) fallaron.` : '\nTodas las pruebas pasaron.');
 process.exit(fallas ? 1 : 0);
