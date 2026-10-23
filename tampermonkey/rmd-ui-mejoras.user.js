@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.86.0
+// @version      1.86.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.86.0';                                                       // mantener igual a @version
+  const VERSION = '1.86.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -262,7 +262,7 @@
   .rmd-cmp-resumen .modificado { color: var(--rmd-ambar); } .rmd-cmp-resumen .agregado { color: var(--rmd-verde); } .rmd-cmp-resumen .quitado { color: var(--rmd-rojo); } .rmd-cmp-resumen small { color: var(--rmd-apagado); }
   .rmd-cmp-nav { display: inline-flex; gap: 8px; align-items: center; margin-left: auto; } .rmd-cmp-pos { min-width: 5.5em; text-align: center; font-variant-numeric: tabular-nums; }
   .rmd-cmp-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 10px; }
-  .rmd-cmp-doc { overflow: auto; border: 1px solid var(--rmd-borde); border-radius: 8px; font-size: 12.5px; line-height: 1.4; }
+  .rmd-cmp-doc { position: relative; overflow: auto; border: 1px solid var(--rmd-borde); border-radius: 8px; font-size: 12.5px; line-height: 1.4; }
   .rmd-cmp-f { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .rmd-cmp-c { padding: 3px 10px; white-space: pre-wrap; overflow-wrap: anywhere; border-bottom: 1px solid rgba(128,140,155,.10); }
   .rmd-cmp-c + .rmd-cmp-c { border-left: 1px solid var(--rmd-borde); }
