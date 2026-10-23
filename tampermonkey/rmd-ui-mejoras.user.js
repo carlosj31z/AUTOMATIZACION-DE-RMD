@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.85.0
+// @version      1.86.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.85.0';                                                       // mantener igual a @version
+  const VERSION = '1.86.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -50,6 +50,7 @@
     ['pdfventana', 'Imprimir sin descargar', 'La impresora de «Configurar el RMD» abre el master en otra pestaña, como «Ver master».'],
     ['grupos', 'Ayuda en los títulos de columna', 'Al pasar el ratón sobre un título se explica qué contiene la columna.'],
     ['depende', 'Detalle de «Depende»', 'Al pasar el ratón muestra el paso predecesor.'],
+    ['predanterior', 'Predecesor en el paso anterior', 'La «Lista de Predecesores» muestra todos los pasos y se abre en el paso anterior con tipo de dato, resaltado y listo para elegir (clic o Enter).'],
     ['filtro', 'Filtro en las listas de pasos', 'Busca por texto, código u orden dentro de la lista abierta.'],
     ['vivo', 'RMD en vivo', 'El PDF del RMD a la derecha, actualizado tras cada guardado.'],
     ['pasosvacios', 'Cajas vacías atenuadas', 'En las listas de pasos, los campos vacíos se ven tenues (se encienden al pasar el ratón por la fila o al escribir): se lee mejor lo que sí está configurado.'],
@@ -475,6 +476,8 @@
   .rmd-mat-celda-sel { width: 28px; text-align: center; } .rmd-mat-celda-sel input { width: 16px; height: 16px; margin: 0; cursor: pointer; }
   .rmd-v-pegar .rmd-mm-ayuda { margin: 12px 0 8px; } .rmd-v-pegar .rmd-mm-nota { padding: 8px 12px; border-radius: 10px; background: rgba(118,118,128,.1); }
   .rmd-mm-modo { padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-mm-modo.activo { color: var(--rmd-texto); border-bottom-color: var(--rmd-acento); }
+  .sapMLIB.rmd-pred-anterior { box-shadow: inset 4px 0 0 var(--rmd-acento); background: rgba(27,141,236,.12) !important; }
+  .sapMLIB.rmd-pred-anterior .sapMSLITitle::after { content: 'Paso anterior'; margin-left: 8px; padding: 0 6px; border-radius: 8px; background: var(--rmd-acento); color: #fff; font-size: 11px; font-weight: 600; vertical-align: 1px; }
   .rmd-sel-panel { margin: 6px 16px 8px; padding: 8px 10px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: rgba(27,141,236,.07); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-sel-cab { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; } .rmd-sel-cab span { color: var(--rmd-apagado); font-size: 12px; }
   .rmd-sel-lista { margin: 0; padding: 0; list-style: none; max-height: 190px; overflow: auto; }
@@ -2868,7 +2871,7 @@
     if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarListaPredecesores, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -8884,6 +8887,52 @@
     pintarPanelPasos(d, tabla, m);
   }
   window.__rmdStats.panelPasos = () => { const p = document.querySelector('.rmd-sel-panel'); return p && !p.hidden ? [...p.querySelectorAll('li')].map((li) => li.querySelector('.rmd-sel-cod').textContent + 'x' + li.querySelector('input').value) : []; };   // pruebas
+
+  // ---- Lista de Predecesores («Depende» › ayuda para entradas) ----
+  // El portal la abre en el primer paso y carga de 20 en 20; casi siempre el predecesor es el paso anterior con tipo de dato (la misma regla que
+  // la corrección automática): se carga la lista completa, ese paso se lleva a la vista, se resalta y queda con el foco (clic o Enter lo elige).
+  const SIN_TIPO_DATO = 446;
+  function gestionarListaPredecesores() {
+    if (typeof sap === 'undefined') return;
+    const sd = sap.ui.getCore().byId('frgAddPredecesores--idPredecesorList'), dlg = sd && sd._oDialog; if (!dlg) return;
+    if (!sd.__rmdPred) {
+      sd.__rmdPred = true;
+      dlg.attachAfterOpen(() => aislar('predecesorAnterior', () => predecesorAnterior(sd)));            // el portal pone su foco al terminar de abrir
+      dlg.attachAfterClose(() => { sd.__rmdPredPara = null; });
+      if (dlg.isOpen()) setTimeout(() => aislar('predecesorAnterior', () => predecesorAnterior(sd)), 400);   // primera vez: el fragmento se crea al abrir
+    }
+    if (!on('predanterior') && sd._oList) sd._oList.getItems().forEach((it) => { if (it.hasStyleClass('rmd-pred-anterior')) it.removeStyleClass('rmd-pred-anterior'); });
+  }
+  function predecesorAnterior(sd) {
+    const dlg = sd._oDialog, lst = sd._oList, m = sd.getModel('localModel'), cur = m && m.getProperty('/aPasoSave');
+    if (!on('predanterior') || !dlg.isOpen() || !lst || !cur || sd.__rmdPredPara === cur.mdEstructuraPasoId) return;
+    sd.__rmdPredPara = cur.mdEstructuraPasoId;
+    lst.getItems().forEach((it) => { if (it.hasStyleClass('rmd-pred-anterior')) it.removeStyleClass('rmd-pred-anterior'); });
+    const idDe = (it) => { const c = it.getBindingContext && it.getBindingContext('localModel'), o = c && c.getObject(); return o && o.mdEstructuraPasoId; };
+    const enLista = new Set((m.getProperty('/aListaPasosDynamic') || []).map((x) => x.mdEstructuraPasoId));
+    const previos = m.getProperty('/aListaPasosPrevios') || [], i = previos.findIndex((x) => x.mdEstructuraPasoId === cur.mdEstructuraPasoId);
+    const tipado = (x) => x.tipoDatoId_iMaestraId != null && +x.tipoDatoId_iMaestraId !== SIN_TIPO_DATO;
+    const antes = (i < 0 ? [] : previos.slice(0, i)).filter((x) => enLista.has(x.mdEstructuraPasoId)).reverse(), obj = antes.find(tipado) || antes[0];
+    if (!obj) return;
+    const ir = (intentos, repaso) => {
+      if (!dlg.isOpen() || sd.__rmdPredPara !== cur.mdEstructuraPasoId) return;
+      const it = lst.getItems().find((x) => idDe(x) === obj.mdEstructuraPasoId), dom = it && it.getDomRef();
+      if (!dom) {
+        const sec = !it && dlg.getDomRef() && dlg.getDomRef().querySelector('section');                  // aún no cargado: desplazarse al final carga el resto
+        if (sec) sec.scrollTop = sec.scrollHeight;
+        if (intentos > 0) setTimeout(() => ir(intentos - 1, repaso), 120); return;
+      }
+      if (repaso && document.activeElement && document.activeElement.tagName === 'INPUT') return;   // ya está escribiendo en el buscador
+      it.addStyleClass('rmd-pred-anterior');
+      dom.scrollIntoView({ block: 'center' });
+      try { dom.focus({ preventScroll: true }); } catch (e) { dom.focus(); }
+      if (!repaso) setTimeout(() => ir(5, true), 300);                                              // por si la lista se vuelve a pintar
+    };
+    // lista completa: el portal carga de 20 en 20 al desplazarse y el paso anterior casi nunca está entre los primeros
+    if (lst.getGrowing() && lst.getGrowingThreshold() < 1000) lst.setGrowingThreshold(1000);
+    ir(25);
+  }
+  window.__rmdStats.listaPredecesores = () => { const it = document.querySelector('.rmd-pred-anterior'); return it ? { titulo: norm((it.querySelector('.sapMSLITitle') || {}).textContent), info: norm((it.querySelector('.sapMSLIInfo') || {}).textContent), foco: document.activeElement === it } : null; };   // pruebas
 
   // ---- RMD en vivo (opcional) ----
   // PDF del RMD (pdfMake, como «Ver master») en la mitad derecha, regenerado tras cada guardado.
@@ -15466,7 +15515,7 @@ td.ult { position: relative; }
   const GRUPOS_PANEL = [
     ['Uso diario', 'inicio', ['saludo', 'fiestas', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
     ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios', 'listapausa', 'estadocolor']],
-    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
+    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'predanterior', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
