@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.86.1
+// @version      1.87.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.86.1';                                                       // mantener igual a @version
+  const VERSION = '1.87.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -261,7 +261,7 @@
   .rmd-cmp-barra { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 6px 0; font-size: 13px; }
   .rmd-cmp-resumen .modificado { color: var(--rmd-ambar); } .rmd-cmp-resumen .agregado { color: var(--rmd-verde); } .rmd-cmp-resumen .quitado { color: var(--rmd-rojo); } .rmd-cmp-resumen small { color: var(--rmd-apagado); }
   .rmd-cmp-nav { display: inline-flex; gap: 8px; align-items: center; margin-left: auto; } .rmd-cmp-pos { min-width: 5.5em; text-align: center; font-variant-numeric: tabular-nums; }
-  .rmd-cmp-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 10px; }
+  .rmd-cmp-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 290px; grid-template-rows: minmax(0, 1fr); gap: 10px; }
   .rmd-cmp-doc { position: relative; overflow: auto; border: 1px solid var(--rmd-borde); border-radius: 8px; font-size: 12.5px; line-height: 1.4; }
   .rmd-cmp-f { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .rmd-cmp-c { padding: 3px 10px; white-space: pre-wrap; overflow-wrap: anywhere; border-bottom: 1px solid rgba(128,140,155,.10); }
@@ -284,6 +284,24 @@
   .rmd-cmp-tipo { font-weight: 600; } .rmd-cmp-secc { color: var(--rmd-apagado); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rmd-cmp-cambios del { color: var(--rmd-rojo); overflow-wrap: anywhere; } .rmd-cmp-cambios ins { color: var(--rmd-verde); text-decoration: none; overflow-wrap: anywhere; }
   @media (max-width: 1100px) { .rmd-cmp-main { grid-template-columns: minmax(0, 1fr); } .rmd-cmp-cambios { display: none; } .rmd-cmp-elegir { grid-template-columns: minmax(0, 1fr); } }
+  .rmd-cmp-pdfs { min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .rmd-cmp-pdf { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--rmd-borde); border-radius: 8px; overflow: hidden; }
+  .rmd-cmp-pdf > .rmd-cmp-pdf-cab { flex: 0 0 auto; padding: 6px 10px; font-size: 12.5px; background: var(--rmd-cabecera); border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-cmp-pdf > .rmd-cmp-pdf-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; background: #8a9099; }
+  .rmd-cmp-papel { width: max-content; margin: 0 auto; padding: 18pt; background: #fff; color: #000; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .pdf-hoja { font-family: Roboto, Arial, Helvetica, sans-serif; line-height: 1.17; color: #000; text-align: left; }
+  .pdf-hoja table.pdf-tabla { border-collapse: collapse; border-spacing: 0; }
+  .pdf-hoja td { padding: 2pt 4pt; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pdf-hoja td > table.pdf-tabla { margin: 0; } .pdf-cols { display: flex; } .pdf-cab { margin-bottom: 10pt; } .pdf-t { white-space: pre-wrap; } .pdf-hoja ul, .pdf-hoja ol { margin-top: 0; margin-bottom: 0; }
+  .pdf-hoja mark { color: inherit; border-radius: 2px; }
+  .pdf-hoja tr.pdf-quitado > td, .pdf-hoja .pdf-quitado.pdf-t, .pdf-hoja li.pdf-quitado { background: rgba(255,77,77,.25) !important; }
+  .pdf-hoja tr.pdf-agregado > td, .pdf-hoja .pdf-agregado.pdf-t, .pdf-hoja li.pdf-agregado { background: rgba(46,160,67,.25) !important; }
+  .pdf-hoja tr.pdf-modificado > td, .pdf-hoja .pdf-modificado.pdf-t { background: rgba(240,180,90,.16) !important; }
+  .rmd-cmp-pdf[data-lado="a"] .pdf-hoja mark { background: rgba(255,77,77,.42); text-decoration: line-through; text-decoration-color: #c00; }
+  .rmd-cmp-pdf[data-lado="b"] .pdf-hoja mark { background: rgba(46,160,67,.42); }
+  .pdf-hoja .rmd-cmp-actual, .pdf-hoja tr.rmd-cmp-actual > td { outline: 2px solid #0a6ed1; outline-offset: -1px; }
+  .rmd-cmp-vista { display: inline-flex; border: 1px solid var(--rmd-borde); border-radius: 6px; overflow: hidden; } .rmd-cmp-vista button { padding: 4px 12px; border: 0; background: none; color: var(--rmd-texto); font: 13px var(--rmd-fuente); cursor: pointer; }
+  .rmd-cmp-vista button[aria-pressed="true"] { background: var(--rmd-acento); color: #fff; }
   html.rmd-ui .rmd-cont-ya { font-size: 11px; color: #256f3a; background: #e3f4e4; border-radius: 3px; padding: 0 4px; }
   html.rmd-ui .rmd-cont-nota, html.rmd-ui .rmd-cont-error { color: #b26a00; }
   html.rmd-ui .rmd-cont-est { font-size: 11px; white-space: nowrap; } html.rmd-ui .rmd-cont-est.ok { color: #256f3a; } html.rmd-ui .rmd-cont-est.error { color: #c62828; white-space: normal; } html.rmd-ui .rmd-cont-est.curso { color: #0a6ed1; }
@@ -7067,36 +7085,39 @@
     };
     const anidado = (n) => !!n && typeof n === 'object' && (Array.isArray(n) ? n.some(anidado) : !!(n.table || anidado(n.stack) || anidado(n.columns) || anidado(n.ul) || anidado(n.ol)));
     const esTitulo = (estilo, t) => /header|titulo|title/i.test(estilo || '') || /^\d+(\.\d+)*\s*\.?-\s*\S/.test(t);
-    // [{ zona: 'cabecera' | 'cuerpo', titulo, celdas, texto, seccion }]
+    // [{ zona: 'cabecera' | 'cuerpo', titulo, celdas, texto, seccion }]; además .refs (fila de tabla o nodo -> { l, cols: columna -> celda }) y .cabecera
     function lineas(doc) {
-      const out = []; let seccion = '';
-      const emitir = (celdas, zona, estilo) => {
-        let cs = celdas.map(limpio).filter(Boolean);
-        if (zona === 'cabecera') cs = cs.filter((c) => !/^\d+\s+de\s+\d+$/i.test(c) && !/^P[áa]gina:?$/i.test(c));   // n.º de página
+      const out = [], refs = new Map(); let seccion = '';
+      const emitir = (items, zona, estilo, ref) => {
+        let cs = items.map((x) => ({ ...x, t: limpio(x.t) })).filter((x) => x.t);
+        if (zona === 'cabecera') cs = cs.filter((x) => !/^\d+\s+de\s+\d+$/i.test(x.t) && !/^P[áa]gina:?$/i.test(x.t));   // n.º de página
         if (!cs.length) return;
-        const t = cs.join(SEP), titulo = cs.length <= 2 && esTitulo(estilo, cs[0]);
-        if (titulo && zona === 'cuerpo') seccion = cs[0];
-        out.push({ zona, titulo, celdas: cs, texto: t, seccion: zona === 'cabecera' ? 'Cabecera' : seccion });
+        const t = cs.map((x) => x.t).join(SEP), titulo = cs.length <= 2 && esTitulo(estilo, cs[0].t);
+        if (titulo && zona === 'cuerpo') seccion = cs[0].t;
+        if (ref && typeof ref === 'object') refs.set(ref, { l: out.length, cols: new Map(cs.map((x, k) => [x.col, k])) });
+        out.push({ zona, titulo, celdas: cs.map((x) => x.t), texto: t, seccion: zona === 'cabecera' ? 'Cabecera' : seccion });
       };
       const visitar = (n, zona, estilo) => {
         if (n == null || n === false) return;
         if (Array.isArray(n)) { n.forEach((x) => visitar(x, zona, estilo)); return; }
-        if (typeof n !== 'object') { emitir([n], zona, estilo); return; }
+        if (typeof n !== 'object') { emitir([{ t: n, col: 0 }], zona, estilo, null); return; }
         const st = n.style ? [].concat(n.style).join(' ') : estilo;
         if (n.table) {
           (n.table.body || []).forEach((f) => {
             const cs = [], dentro = [];
-            (f || []).forEach((c) => { if (c && c._span) return; if (anidado(c)) dentro.push(c); else cs.push(texto(c)); });
-            emitir(cs, zona, st); dentro.forEach((c) => visitar(c, zona, st));
+            (f || []).forEach((c, col) => { if (c && c._span) return; if (anidado(c)) dentro.push(c); else cs.push({ t: texto(c), col }); });
+            emitir(cs, zona, st, f); dentro.forEach((c) => visitar(c, zona, st));
           });
           return;
         }
         if (n.columns || n.stack) { visitar(n.columns || n.stack, zona, st); return; }
-        if (n.ul || n.ol) { (n.ul || n.ol).forEach((x) => (anidado(x) ? visitar(x, zona, st) : emitir(['• ' + limpio(texto(x))], zona, st))); return; }
-        emitir([texto(n)], zona, st);
+        if (n.ul || n.ol) { (n.ul || n.ol).forEach((x) => (anidado(x) ? visitar(x, zona, st) : emitir([{ t: '• ' + limpio(texto(x)), col: 0 }], zona, st, x))); return; }
+        emitir([{ t: texto(n), col: 0 }], zona, st, n);
       };
-      if (typeof doc.header === 'function') { try { visitar(doc.header(1, 1, {}), 'cabecera'); } catch (e) { /* sin cabecera */ } } else if (doc.header) visitar(doc.header, 'cabecera');
-      visitar(doc.content, 'cuerpo');
+      let cab = null;
+      if (typeof doc.header === 'function') { try { cab = doc.header(1, 1, {}); } catch (e) { /* sin cabecera */ } } else cab = doc.header || null;
+      visitar(cab, 'cabecera'); visitar(doc.content, 'cuerpo');
+      Object.defineProperties(out, { refs: { value: refs }, cabecera: { value: cab } });
       return out;
     }
     // Pares [i, j] de elementos iguales en orden (LCS; en tramos muy largos, anclas únicas en ambos lados)
@@ -7198,7 +7219,95 @@
       const cuenta = (t) => filas.filter((f) => f.tipo === t).length;
       return { filas, cambios, resumen: { cambios: cambios.length, modificado: cuenta('modificado'), agregado: cuenta('agregado'), quitado: cuenta('quitado') } };
     }
-    return { lineas, emparejar, parecido, palabras, comparar, SEP };
+    // Diferencias por celda de dos líneas: { a: [tramos | null], b: [...] } (null = celda sin cambios)
+    function celdasCambiadas(ca, cb) {
+      const a = ca.map(() => null), b = cb.map(() => null), pares = emparejar(ca.map(clave), cb.map(clave));
+      let i = 0, j = 0;
+      const tramo = (i1, j1) => {
+        while (i < i1 && j < j1) { const p = palabras(ca[i], cb[j]); a[i++] = p.a; b[j++] = p.b; }
+        for (; i < i1; i++) a[i] = [[ca[i], true]]; for (; j < j1; j++) b[j] = [[cb[j], true]];
+      };
+      pares.forEach(([pi, pj]) => { tramo(pi, pj); i = pi + 1; j = pj + 1; });
+      tramo(ca.length, cb.length);
+      return { a, b };
+    }
+    // El master como el PDF (tablas, bordes, casillas y estilos de pdfMake) en HTML. Cada línea de lineas() lleva data-l;
+    // marca(l) -> { tipo, celdas: [tramos | null] | null } | null pinta la diferencia.
+    const escH = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const PT = (n) => `${Math.round((+n || 0) * 100) / 100}pt`;
+    const color = (c) => (typeof c === 'string' && /^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(c.trim()) ? c.trim() : '');
+    const HEREDA = ['fontSize', 'bold', 'italics', 'color', 'alignment', 'decoration'];
+    function anchoHoja(doc) {
+      const m = doc.pageMargins, v = typeof m === 'number' ? [m, m] : Array.isArray(m) ? (m.length === 2 ? [m[0], m[0]] : [m[0], m[2]]) : [40, 40];
+      const tam = { A4: [595.28, 841.89], LETTER: [612, 792], LEGAL: [612, 1008] }, p = doc.pageSize && typeof doc.pageSize === 'object' ? [+doc.pageSize.width, +doc.pageSize.height] : tam[String(doc.pageSize || 'A4').toUpperCase()] || tam.A4;
+      return (doc.pageOrientation === 'landscape' ? Math.max(p[0], p[1]) : p[0]) - v[0] - v[1];
+    }
+    function htmlPdf(doc, L, marca) {
+      const estilos = doc.styles || {}, imagenes = doc.images || {};
+      const resolver = (n, padre) => {
+        const r = {}; let margen;
+        HEREDA.forEach((k) => { if (padre[k] !== undefined) r[k] = padre[k]; });
+        const aplica = (e) => { if (!e) return; HEREDA.forEach((k) => { if (e[k] !== undefined && e[k] !== '') r[k] = e[k]; }); if (e.margin !== undefined) margen = e.margin; if (e.fillColor) r.fillColor = e.fillColor; };
+        [].concat(n.style || []).forEach((s) => aplica(estilos[s])); aplica(n);
+        r.margin = margen; return r;
+      };
+      const marg = (m) => { if (m == null) return ''; const v = typeof m === 'number' ? [m, m, m, m] : m.length === 2 ? [m[0], m[1], m[0], m[1]] : m; return `margin:${PT(v[1])} ${PT(v[2])} ${PT(v[3])} ${PT(v[0])};`; };
+      const css = (r, conMargen) => `font-size:${PT(r.fontSize || 12)};font-weight:${r.bold ? 700 : 400};${r.italics ? 'font-style:italic;' : ''}${color(r.color) ? `color:${color(r.color)};` : ''}${/^(left|right|center|justify)$/.test(r.alignment || '') ? `text-align:${r.alignment};` : ''}${r.decoration === 'underline' ? 'text-decoration:underline;' : ''}${conMargen ? marg(r.margin) : ''}`;
+      const tramos = (ts) => ts.map(([t, c]) => (c ? `<mark>${escH(t)}</mark>` : escH(t))).join('');
+      const inline = (n, r) => {
+        if (n == null || n === false) return '';
+        if (typeof n === 'string' || typeof n === 'number') return escH(String(n));
+        if (Array.isArray(n)) return n.map((x) => inline(x, r)).join('');
+        if (typeof n !== 'object') return '';
+        const q = resolver(n, r); return `<span style="${css(q)}">${inline(n.text, q)}</span>`;
+      };
+      const imagen = (n, q) => {
+        const src = typeof n.image === 'string' ? (/^data:image\//.test(n.image) ? n.image : imagenes[n.image]) : '';
+        return typeof src === 'string' && /^data:image\//.test(src) ? `<img src="${escH(src)}" alt="" style="${n.width ? `width:${PT(n.width)};` : ''}${n.height ? `height:${PT(n.height)};` : ''}${Array.isArray(n.fit) ? `max-width:${PT(n.fit[0])};max-height:${PT(n.fit[1])};` : ''}${marg(q.margin)}">` : '';
+      };
+      const tabla = (n, q) => {
+        const t = n.table, body = t.body || [], ws = Array.isArray(t.widths) ? t.widths : null, sinBordes = n.layout === 'noBorders';
+        const fijo = ws && ws.every((w) => typeof w === 'number'), estrella = ws && ws.some((w) => w === '*');
+        const cols = ws ? `<colgroup>${ws.map((w) => `<col${typeof w === 'number' ? ` style="width:${PT(w + 8)}"` : ''}>`).join('')}</colgroup>` : '';
+        const ancho = fijo ? `width:${PT(ws.reduce((s, w) => s + w + 8, 0))};table-layout:fixed;` : estrella ? 'width:100%;table-layout:fixed;' : '';
+        const ocupado = new Set();
+        const filas = body.map((f, i) => {
+          const ref = L.refs.get(f), m = ref ? marca(ref.l) : null;
+          const tds = (f || []).map((c, j) => {
+            if (ocupado.has(i + ',' + j)) return '';
+            const o = Array.isArray(c) ? { stack: c } : c && typeof c === 'object' ? c : { text: c == null ? '' : c };
+            const cs = Math.max(1, +o.colSpan || 1), rs = Math.max(1, +o.rowSpan || 1);
+            for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) if (a || b) ocupado.add((i + a) + ',' + (j + b));
+            const qc = resolver(o, q), bd = sinBordes ? [0, 0, 0, 0] : Array.isArray(o.border) ? o.border : [1, 1, 1, 1];
+            const borde = ['left', 'top', 'right', 'bottom'].map((lado, k) => `border-${lado}:${bd[k] ? '1px solid #000' : '0'};`).join('');
+            const k = ref ? ref.cols.get(j) : null, tr = m && m.celdas && k != null ? m.celdas[k] : null;
+            const dentro = tr ? tramos(tr) : o.table ? tabla({ table: o.table, layout: o.layout }, qc) : o.stack || o.columns || o.ul || o.ol || o.image ? bloque({ ...o, style: undefined, margin: undefined }, qc) : inline(o.text, qc);
+            return `<td${cs > 1 ? ` colspan="${cs}"` : ''}${rs > 1 ? ` rowspan="${rs}"` : ''}${tr ? ' class="pdf-celda-cambio"' : ''} style="${borde}${css(qc)}${color(o.fillColor) ? `background:${color(o.fillColor)};` : ''}">${dentro}</td>`;
+          }).join('');
+          return `<tr${ref ? ` data-l="${ref.l}"` : ''}${m ? ` class="pdf-${m.tipo}"` : ''}>${tds}</tr>`;
+        }).join('');
+        return `<table class="pdf-tabla" style="${ancho}${css(q)}${marg(q.margin)}">${cols}<tbody>${filas}</tbody></table>`;
+      };
+      const bloque = (n, r) => {
+        if (n == null || n === false) return '';
+        if (Array.isArray(n)) return n.map((x) => bloque(x, r)).join('');
+        if (typeof n !== 'object') return `<div>${escH(String(n))}</div>`;
+        const q = resolver(n, r);
+        if (n.table) return tabla(n, q);
+        if (n.columns) return `<div class="pdf-cols" style="${marg(q.margin)}">${n.columns.map((c) => { const w = c && c.width; return `<div style="${typeof w === 'number' ? `flex:0 0 ${PT(w)}` : w === 'auto' ? 'flex:0 0 auto' : 'flex:1 1 0'};min-width:0">${bloque(c, q)}</div>`; }).join('')}</div>`;
+        if (n.stack) return `<div style="${marg(q.margin)}">${bloque(n.stack, q)}</div>`;
+        if (n.ul || n.ol) {
+          const e = n.ul ? 'ul' : 'ol';
+          return `<${e} style="${css(q, true)}">${(n.ul || n.ol).map((x) => { const ref = x && typeof x === 'object' ? L.refs.get(x) : null, m = ref ? marca(ref.l) : null; return `<li${ref ? ` data-l="${ref.l}"` : ''}${m ? ` class="pdf-${m.tipo}"` : ''}>${bloque(x, q)}</li>`; }).join('')}</${e}>`;
+        }
+        if (n.image) return imagen(n, q);
+        const ref = L.refs.get(n), m = ref ? marca(ref.l) : null, tr = m && m.celdas ? m.celdas[0] : null;
+        return `<div class="pdf-t${m ? ' pdf-' + m.tipo : ''}"${ref ? ` data-l="${ref.l}"` : ''} style="${css(q, true)}">${tr ? tramos(tr) : inline(n.text, q)}</div>`;
+      };
+      const base = { fontSize: 12, ...(doc.defaultStyle || {}) };
+      return `<div class="pdf-hoja" style="width:${PT(anchoHoja(doc))};${css(base)}"><div class="pdf-cab">${bloque(L.cabecera, base)}</div>${bloque(doc.content, base)}</div>`;
+    }
+    return { lineas, emparejar, parecido, palabras, comparar, celdasCambiadas, htmlPdf, SEP };
   })();
   // ==COMPARAR-FIN==
   window.__rmdStats.comparar = Comparar;   // pruebas
@@ -7219,7 +7328,7 @@
   function abrirCompararRmd() {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
     if (!modelo) { toast('Abre la lista «Configuración Manufactura Digital» para comparar RMD.', true); return; }
-    let ocupado = false, R = null, actual = -1, soloCambios = false, abiertos = new Set();
+    let ocupado = false, R = null, actual = -1, soloCambios = false, abiertos = new Set(), vista = 'pdf';
     const lados = { a: null, b: null }, docs = new Map();
     const v = ventana('Comparar dos RMD', { cancelar: () => { if (!ocupado) cerrar(); } });
     const caja = v.fondo.querySelector('.rmd-modal'); caja.classList.add('rmd-cmp-ventana');
@@ -7235,7 +7344,9 @@
     v.pie.append(bCerrar, bComparar);
     const teclas = (e) => { if (!R || !e.altKey || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return; e.preventDefault(); e.stopPropagation(); ir(actual + (e.key === 'ArrowDown' ? 1 : -1)); };
     document.addEventListener('keydown', teclas, true);
-    function cerrar() { document.removeEventListener('keydown', teclas, true); v.cerrar(); }
+    const alCambiarTamano = () => { if (R && vista === 'pdf') ajustarPdf(); };
+    window.addEventListener('resize', alCambiarTamano);
+    function cerrar() { document.removeEventListener('keydown', teclas, true); window.removeEventListener('resize', alCambiarTamano); v.cerrar(); }
     const nombre = (m) => `${m.codigo} · v${m.version}`;
     const estCls = (e) => SIN_ACENTOS(e || '').toLowerCase().replace(/\s+/g, '-');
     const fichaMd = (m) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc(m.etapa)}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>`;
@@ -7274,17 +7385,17 @@
     v.cuerpo.querySelector('.rmd-cmp-elegir').addEventListener('keydown', (e) => { const li = e.target.closest('li[data-k]'); if (li && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); li.click(); } });
     async function docDe(m) {
       const k = `${m.mdId}|${chkReceta.checked}`;
-      if (!docs.has(k)) { const d = await contDoc(modelo, m.mdId, chkReceta.checked); docs.set(k, Comparar.lineas(d.doc)); }
+      if (!docs.has(k)) { const d = await contDoc(modelo, m.mdId, chkReceta.checked); docs.set(k, { doc: d.doc, L: Comparar.lineas(d.doc) }); }
       return docs.get(k);
     }
     async function comparar() {
       if (!lados.a || !lados.b || ocupado) return;
       ocupado = true; pintarLados(); resultado.innerHTML = '';
       try {
-        setProg(`Armando el master de ${nombre(lados.a)}…`); const A = await docDe(lados.a);
-        setProg(`Armando el master de ${nombre(lados.b)}…`); const B = await docDe(lados.b);
+        setProg(`Armando el master de ${nombre(lados.a)}…`); const da = await docDe(lados.a);
+        setProg(`Armando el master de ${nombre(lados.b)}…`); const db = await docDe(lados.b);
         setProg('Comparando…'); await esperar(20);
-        R = { ...Comparar.comparar(A, B), A, B, ma: lados.a, mb: lados.b }; actual = -1; abiertos = new Set(); setProg(''); pintarResultado();
+        R = { ...Comparar.comparar(da.L, db.L), A: da.L, B: db.L, docA: da.doc, docB: db.doc, ma: lados.a, mb: lados.b }; actual = -1; abiertos = new Set(); setProg(''); pintarResultado();
         if (R.cambios.length) ir(0);
       } catch (e) { R = null; setProg('No se pudo comparar: ' + e.message, true); }
       finally { ocupado = false; pintarLados(); }
@@ -7299,7 +7410,7 @@
       };
       // «Solo cambios»: 2 líneas de contexto; el resto se pliega
       let html = '';
-      if (!soloCambios) html = filas.map(linea).join('');
+      if (vista === 'pdf') { /* las hojas las arma hojaPdf */ } else if (!soloCambios) html = filas.map(linea).join('');
       else {
         const ver = new Uint8Array(filas.length);
         filas.forEach((f, k) => { if (f.tipo !== 'igual') for (let d = -2; d <= 2; d++) if (k + d >= 0 && k + d < filas.length) ver[k + d] = 1; });
@@ -7317,17 +7428,67 @@
       };
       resultado.innerHTML = `<div class="rmd-cmp-barra" role="toolbar" aria-label="Diferencias">
           <span class="rmd-cmp-resumen">${resumen.cambios ? `<b>${resumen.cambios}</b> cambio${resumen.cambios === 1 ? '' : 's'}: <span class="modificado">${resumen.modificado} modificada${resumen.modificado === 1 ? '' : 's'}</span> · <span class="agregado">${resumen.agregado} agregada${resumen.agregado === 1 ? '' : 's'}</span> · <span class="quitado">${resumen.quitado} quitada${resumen.quitado === 1 ? '' : 's'}</span> <small>(líneas)</small>` : '<b>Sin diferencias</b> en el texto de los dos master.'}</span>
-          <label><input type="checkbox" class="rmd-cmp-solo" ${soloCambios ? 'checked' : ''}> Solo cambios</label>
+          <span class="rmd-cmp-vista" role="group" aria-label="Vista"><button type="button" data-vista="pdf" aria-pressed="${vista === 'pdf'}">Como el PDF</button><button type="button" data-vista="texto" aria-pressed="${vista === 'texto'}">Solo texto</button></span>
+          ${vista === 'texto' ? `<label><input type="checkbox" class="rmd-cmp-solo" ${soloCambios ? 'checked' : ''}> Solo cambios</label>` : ''}
           <span class="rmd-cmp-nav"><button type="button" class="rmd-btn" data-a="ant" title="Cambio anterior (Alt+↑)" ${resumen.cambios ? '' : 'disabled'}>↑ Anterior</button><span class="rmd-cmp-pos" aria-live="polite"></span><button type="button" class="rmd-btn" data-a="sig" title="Cambio siguiente (Alt+↓)" ${resumen.cambios ? '' : 'disabled'}>Siguiente ↓</button></span>
         </div>
         <div class="rmd-cmp-main">
-          <div class="rmd-cmp-doc" tabindex="0" aria-label="Los dos master lado a lado">
+          ${vista === 'pdf' ? `<div class="rmd-cmp-pdfs">${['a', 'b'].map((l) => `<div class="rmd-cmp-pdf" data-lado="${l}"><div class="rmd-cmp-pdf-cab">${fichaMd(l === 'a' ? ma : mb)}</div><div class="rmd-cmp-pdf-scroll" tabindex="0" aria-label="Master ${l === 'a' ? 'original' : 'modificado'}"><div class="rmd-cmp-papel">${hojaPdf(l)}</div></div></div>`).join('')}</div>`
+          : `<div class="rmd-cmp-doc" tabindex="0" aria-label="Los dos master lado a lado">
             <div class="rmd-cmp-f rmd-cmp-cab"><div class="rmd-cmp-c">${fichaMd(ma)}</div><div class="rmd-cmp-c">${fichaMd(mb)}</div></div>
             ${html}
-          </div>
+          </div>`}
           <aside class="rmd-cmp-cambios" aria-label="Lista de cambios">${cambios.length ? `<ol>${cambios.map(item).join('')}</ol>` : '<p class="rmd-nota">No hay cambios.</p>'}</aside>
         </div>`;
+      if (vista === 'pdf') prepararPdf();
       marcarActual(false);
+    }
+    // ---- Vista «Como el PDF»: cada master con su formato; las diferencias se pintan encima y el desplazamiento va sincronizado ----
+    function hojaPdf(l) {
+      if (!R.html) {
+        const ma = new Map(), mb = new Map();
+        R.filas.forEach((f) => {
+          if (f.tipo === 'igual') return;
+          const c = f.tipo === 'modificado' ? Comparar.celdasCambiadas(R.A[f.a].celdas, R.B[f.b].celdas) : null;
+          if (f.a != null) ma.set(f.a, { tipo: f.tipo, celdas: c ? c.a : null });
+          if (f.b != null) mb.set(f.b, { tipo: f.tipo, celdas: c ? c.b : null });
+        });
+        R.html = { a: Comparar.htmlPdf(R.docA, R.A, (k) => ma.get(k) || null), b: Comparar.htmlPdf(R.docB, R.B, (k) => mb.get(k) || null) };
+      }
+      return R.html[l];
+    }
+    const panel = (l) => resultado.querySelector(`.rmd-cmp-pdf[data-lado="${l}"] .rmd-cmp-pdf-scroll`);
+    let anclas = null, sincronizando = 0;
+    const soltar = () => requestAnimationFrame(() => requestAnimationFrame(() => { sincronizando = Math.max(0, sincronizando - 1); }));
+    function prepararPdf() {
+      const grupoA = new Map(), grupoB = new Map();
+      R.filas.forEach((f) => { if (f.grupo < 0) return; if (f.a != null) grupoA.set(f.a, f.grupo); if (f.b != null) grupoB.set(f.b, f.grupo); });
+      [['a', grupoA], ['b', grupoB]].forEach(([l, g]) => panel(l).querySelectorAll('[data-l]').forEach((x) => { const k = g.get(+x.dataset.l); if (k != null) x.dataset.g = k; }));
+      ['a', 'b'].forEach((l) => panel(l).addEventListener('scroll', () => sincronizar(l), { passive: true }));
+      ajustarPdf();
+    }
+    // La hoja toma el ancho del panel; las anclas son las líneas presentes en los dos lados, en orden
+    function ajustarPdf() {
+      const pa = panel('a'), pb = panel('b'); if (!pa || !pb) return;
+      [pa, pb].forEach((p) => { const h = p.querySelector('.rmd-cmp-papel'); h.style.zoom = 1; h.style.zoom = Math.min(1.4, Math.max(0.4, (p.clientWidth - 24) / h.offsetWidth)); });
+      const y = (p, el) => el.getBoundingClientRect().top - p.getBoundingClientRect().top + p.scrollTop, ea = new Map(), eb = new Map();
+      pa.querySelectorAll('[data-l]').forEach((x) => ea.set(+x.dataset.l, x)); pb.querySelectorAll('[data-l]').forEach((x) => eb.set(+x.dataset.l, x));
+      const ya = [0], yb = [0];
+      R.filas.forEach((f) => {
+        if (f.a == null || f.b == null || !ea.has(f.a) || !eb.has(f.b)) return;
+        const u = y(pa, ea.get(f.a)), w = y(pb, eb.get(f.b));
+        if (u > ya[ya.length - 1] && w > yb[yb.length - 1]) { ya.push(u); yb.push(w); }
+      });
+      ya.push(Math.max(pa.scrollHeight, ya[ya.length - 1] + 1)); yb.push(Math.max(pb.scrollHeight, yb[yb.length - 1] + 1));
+      anclas = { a: ya, b: yb };
+    }
+    function sincronizar(desde) {
+      if (!anclas || sincronizando) return;
+      const hacia = desde === 'a' ? 'b' : 'a', pf = panel(desde), pt = panel(hacia), Y = anclas[desde], Z = anclas[hacia];
+      const ref = pf.scrollTop + pf.clientHeight / 3;
+      let lo = 0, hi = Y.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (Y[m] <= ref) lo = m; else hi = m; }
+      const t = Math.min(1, Math.max(0, (ref - Y[lo]) / (Y[hi] - Y[lo])));
+      sincronizando++; pt.scrollTop = Z[lo] + t * (Z[hi] - Z[lo]) - pt.clientHeight / 3; soltar();
     }
     const docEl = () => resultado.querySelector('.rmd-cmp-doc');
     function marcarActual(desplazar) {
@@ -7335,9 +7496,14 @@
       resultado.querySelectorAll('.rmd-cmp-actual').forEach((x) => x.classList.remove('rmd-cmp-actual'));
       const pos = resultado.querySelector('.rmd-cmp-pos'); if (pos) pos.textContent = R.cambios.length ? `${actual >= 0 ? actual + 1 : '–'} de ${R.cambios.length}` : '';
       if (actual < 0) return;
-      const fs = resultado.querySelectorAll(`.rmd-cmp-doc [data-g="${actual}"]`); fs.forEach((x) => x.classList.add('rmd-cmp-actual'));
+      const fs = resultado.querySelectorAll(`.rmd-cmp-doc [data-g="${actual}"], .rmd-cmp-pdf [data-g="${actual}"]`); fs.forEach((x) => x.classList.add('rmd-cmp-actual'));
       const li = resultado.querySelector(`.rmd-cmp-cambios button[data-g="${actual}"]`); if (li) li.classList.add('rmd-cmp-actual');
-      if (desplazar && fs[0]) {
+      if (desplazar && vista === 'pdf') {
+        const poner = (l) => { const p = panel(l), el = p.querySelector(`[data-g="${actual}"]`); if (!el) return false; sincronizando++; p.scrollTop += el.getBoundingClientRect().top - p.getBoundingClientRect().top - p.clientHeight / 3; soltar(); return true; };
+        const hayA = poner('a'), hayB = poner('b');
+        if (hayA && !hayB) { sincronizando = 0; sincronizar('a'); } else if (hayB && !hayA) { sincronizando = 0; sincronizar('b'); }
+        if (li) li.scrollIntoView({ block: 'nearest' });
+      } else if (desplazar && fs[0]) {
         const d = docEl(), cab = d.querySelector('.rmd-cmp-cab'), y = fs[0].offsetTop - (cab ? cab.offsetHeight : 0) - Math.max(24, (d.clientHeight - fs[0].offsetHeight * fs.length) / 3);
         d.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
         if (li) li.scrollIntoView({ block: 'nearest' });
@@ -7348,6 +7514,7 @@
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.a === 'sig') ir(actual + 1); else if (b.dataset.a === 'ant') ir(actual < 0 ? -1 : actual - 1);
       else if (b.classList.contains('rmd-cmp-pliegue')) { for (let k = +b.dataset.desde; k < +b.dataset.hasta; k++) abiertos.add(k); const y = docEl().scrollTop; pintarResultado(); docEl().scrollTop = y; }
+      else if (b.dataset.vista) { if (vista !== b.dataset.vista) { vista = b.dataset.vista; pintarResultado(); if (actual >= 0) marcarActual(true); } }
       else if (b.dataset.g != null) ir(+b.dataset.g);
     });
     resultado.addEventListener('change', (e) => { if (e.target.classList.contains('rmd-cmp-solo')) { soloCambios = e.target.checked; abiertos = new Set(); pintarResultado(); if (actual >= 0) marcarActual(true); } });
