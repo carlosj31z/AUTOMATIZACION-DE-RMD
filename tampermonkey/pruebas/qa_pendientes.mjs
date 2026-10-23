@@ -160,5 +160,16 @@ ok('El motivo de suspensión de la versión anterior se recuerda en la siguiente
 ok('«Se suspende por nueva versión» no se recuerda (no dice qué cambiar)', Pendientes.heredados([{ version: 5, estado: 'Suspendido', observacion: '20261023CJ Se suspende por nueva versión' }], { version: 6, observacion: '' }).motivos.length === 0);
 ok('Si la versión nueva copia la misma línea de suspensión, no se repite', Pendientes.heredados([{ version: 5, estado: 'Suspendido', observacion: obsSuc5 }], { version: 6, observacion: obsSuc5 }).motivos.length === 0);
 
+// ---- solo cuenta como aplicado la línea que empieza con el CC (pedido de Carlos, 23-oct-2026) ----
+const cc294 = '26-294-CC/F.Aroni/2026-08-25; Cambio de ET y TA del producto TRI AZIT 200 mg/5 mL Polvo para Suspensión Oral;CQA;Moderado.';
+ok('Aplicado: la línea empieza con «26-294-CC/F.Aroni/…»', J(Pendientes.analizar(cc294).aplicados.map((x) => x.codigo)) === '["26-294-CC"]');
+ok('Aplicado: con la fecha e iniciales delante («20261023CJ 26-294-CC/…»)', Pendientes.analizar('20261023CJ ' + cc294).aplicados.length === 1);
+ok('No aplicado: «pendiente 26-294-CC/…» es pendiente', Pendientes.analizar('pendiente ' + cc294).aplicados.length === 0 && Pendientes.analizar('pendiente ' + cc294).pendientes.length === 1);
+ok('No aplicado: un CC nombrado a mitad de línea solo se menciona', Pendientes.analizar('20261023CJ Revisar con calidad el 26-294-CC antes de autorizar').aplicados.length === 0
+  && Pendientes.analizar('20261023CJ Revisar con calidad el 26-294-CC antes de autorizar').tipos[0].tipo === 'mencion');
+ok('No aplicado: «20261023CJ No aplica el 26-244-CC»', Pendientes.analizar('20261023CJ No aplica el 26-244-CC').aplicados.length === 0);
+const h7 = Pendientes.heredados([{ version: 5, estado: 'Suspendido', observacion: '20261023CJ no aplica el CC 26-244 POR RETIRO DE ETIQUETA DE ECUADOR.' }], { version: 6, observacion: '20261023CJ No aplica el 26-244-CC' });
+ok('La v6 no dice «26-244-CC ya figuraba como aplicado en la v5»', !Pendientes.revisar(h7, {}).some((x) => /ya figuraba/.test(x.texto)) && h7.aplicados.length === 0, J(Pendientes.revisar(h7, {})));
+
 console.log(fallas ? `\n${fallas} prueba(s) fallaron.` : '\nTodas las pruebas pasaron.');
 process.exit(fallas ? 1 : 0);

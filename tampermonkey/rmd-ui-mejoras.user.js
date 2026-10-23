@@ -6332,7 +6332,9 @@
     }
     // Una línea por anotación; varias entradas de CC en la misma línea se separan.
     function lineas(texto) {
-      return String(texto || '').split(/\r?\n/).flatMap((l) => l.split(/(?=\b\d{2}\s*-\s*\d{2,4}\s*-\s*CC\s*\/)/i)).map(limpio).filter(Boolean);
+      // lo que va antes del primer CC («pendiente 26-294-CC/…») sigue en su línea: así no se separa del CC
+      const CORTE = /(?=\b\d{2}\s*-\s*\d{2,4}\s*-\s*CC\s*\/)/i, ES_CC = /^\s*\d{2}\s*-\s*\d{2,4}\s*-\s*CC\s*\//i;
+      return String(texto || '').split(/\r?\n/).flatMap((l) => { const ps = l.split(CORTE); if (ps.length > 1 && limpio(ps[0]) && !ES_CC.test(ps[0])) ps.splice(0, 2, ps[0] + ps[1]); return ps; }).map(limpio).filter(Boolean);
     }
     // Producto a dar de baja o descontinuado («dar de baja», «descontinuado», «ya no se fabrica»…); «equipo / balanza … de baja» no cuenta.
     const RE_BAJA = /\b(?:DAR(?:SE|LO|LA)?\s+DE\s+BAJA|(?:SE\s+)?DA\s+DE\s+BAJA|DADO\s+DE\s+BAJA|DADA\s+DE\s+BAJA|PARA\s+BAJA|DE\s+BAJA|DESCONTINUAD[OA]S?|DESCONTINUA(?:R|DO|CION)?|DISCONTINUAD[OA]S?|DISCONTINUA(?:R|CION)?|YA\s+NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA|COMERCIALIZA|VENDE)|NO\s+SE\s+(?:FABRICA|PRODUCE|ELABORA)\s+MAS|FUERA\s+DE\s+(?:LINEA|PORTAFOLIO|PORTAFOLIO)|RETIRAD[OA]\s+DEL\s+(?:MERCADO|PORTAFOLIO)|PRODUCTO\s+INACTIVO|SIN\s+DEMANDA)\b/;
@@ -6355,8 +6357,9 @@
         if (pend) { r.pendientes.push({ linea: l, ccs, i }); poner('pendiente'); }
         else if (RE_HECHO.test(p) && ccs.length) { r.hechos.push({ linea: l, ccs, i }); poner('cc'); }
         else if (ent) { r.aplicados.push({ ...ent, i }); poner('cc'); }
-        // otra mención de un CC sin nada pendiente («… CONTROL DE CAMBIO 24-161-CC INCLUSIÓN DE LOTIZADO»): aplicado, sin sus partes
-        else if (ccs.length) { ccs.forEach((c) => r.aplicados.push({ codigo: c, responsable: '', fecha: '', descripcion: l, tipo: '', nivel: '', linea: l, i })); poner('cc'); }
+        // Solo cuenta como aplicado la línea que EMPIEZA con el CC («26-294-CC/F.Aroni/2026-08-25;…», tras la fecha e iniciales o «CONTROL DE
+        // CAMBIO»). Un CC nombrado a mitad de línea («pendiente 26-294-CC/…», «no aplica el 26-244-CC») solo se menciona (pedido de Carlos).
+        else if (ccs.length) poner('mencion');
         else poner(RE_SUSP.test(p) ? 'suspension' : RE_ACTUALIZA.test(p) ? 'actualizacion' : 'nota');
       });
       return r;
@@ -6507,7 +6510,7 @@
       const p = plano(planta), c = en.find((x) => p && x.planta && p.includes(plano(x.planta))) || en[0];
       return { descripcion: c.descripcion || c.nomenclatura, estatus: c.estatus, planta: c.planta, fecha: c.fecha };
     }
-    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', noaplica: 'CC que no aplica', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
+    const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', noaplica: 'CC que no aplica', mencion: 'CC mencionado', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
     return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA, cambiosDeFilas, fechaCambio, fechaDe, revisar, delListado };
   })();
   // ==PENDIENTES-FIN==
