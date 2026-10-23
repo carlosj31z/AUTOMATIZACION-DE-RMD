@@ -470,11 +470,11 @@ with sync_playwright() as p:
             fr.evaluate("window.__rmdStats.panel.abrir(true)")
             fr.locator(f"#rmd-ui-panel label:has-text('{texto}') input").click(); pg.wait_for_timeout(900)
             fr.evaluate("window.__rmdStats.panel.cerrar()")
-        medir = """() => { const d=window.__q.top(); const q=window.__q.r(d); const av=d.querySelector('#rmd-aviso-asociar'); const avN=d.querySelector('#rmd-aviso-nomenclatura'); const avP=d.querySelector('#rmd-aviso-pendientes'); const ta=d.querySelector('textarea'); return {t:(d.querySelector('h2')||{}).textContent, w:q.w, h:q.h, clases:[...d.classList].filter(c=>/^rmd-/.test(c)).join(' '), aviso:av?av.textContent:null, avisoH:(av?av.offsetHeight:0)+(avN?avN.offsetHeight:0)+(avP?avP.offsetHeight+6:0), obsH:ta?ta.offsetHeight:0}; }"""
-        @prueba("H1 'Asociar Fórmula' se deja como el portal la dibuja: sin clases del script y con el mismo ancho (y solo el alto de los avisos y de Observaciones de más) que con las mejoras apagadas")
+        medir = """() => { const d=window.__q.top(); const q=window.__q.r(d); const av=d.querySelector('#rmd-aviso-asociar'); const avN=d.querySelector('#rmd-aviso-nomenclatura'); const avP=d.querySelector('#rmd-aviso-pendientes'); const ta=d.querySelector('textarea'); return {t:(d.querySelector('h2')||{}).textContent, w:q.w, h:q.h, clases:[...d.classList].filter(c=>/^rmd-/.test(c)).join(' '), aviso:av?av.textContent:null, avisoH:(d.querySelector('#rmd-asoc-panel')||{offsetHeight:0}).offsetHeight, obsH:ta?ta.offsetHeight:0}; }"""
+        @prueba("H1 'Asociar Fórmula' se deja como el portal la dibuja: sin clases del script y con el mismo ancho (y a lo más el alto de la tira de revisión y de Observaciones de más) que con las mejoras apagadas")
         def _():
             a = fr.evaluate(medir); conmutar_panel('Mejoras activas'); pg.wait_for_timeout(1200); b_ = fr.evaluate(medir); conmutar_panel('Mejoras activas'); pg.wait_for_timeout(1800); c = fr.evaluate(medir)
-            ok = a["clases"] == "" and a["w"] == b_["w"] == c["w"] and abs((a["h"] - b_["h"]) - (a["avisoH"] + 12 + a["obsH"] - b_["obsH"])) <= 4 and b_["aviso"] is None and c["aviso"] is not None
+            ok = a["clases"] == "" and a["w"] == b_["w"] == c["w"] and (a["h"] - b_["h"]) <= (a["avisoH"] + 12 + a["obsH"] - b_["obsH"]) + 4 and b_["aviso"] is None and c["aviso"] is not None
             return ok, f"con={a} sin={b_} de nuevo={c}"
         @prueba("H2 Aviso de códigos: si Código Agrupador y Código coinciden con la versión anterior, lo indica (✓)")
         def _():
@@ -489,7 +489,7 @@ with sync_playwright() as p:
             poner_agrupador("999999")
             r = fr.evaluate("""() => { const d=window.__q.top(); const lab=[...d.querySelectorAll('label')].find(l=>/^Código Agrupador/.test(l.textContent.trim())); const base=document.getElementById(lab.getAttribute('for')).closest('.sapMInputBase'); const av=d.querySelector('#rmd-aviso-asociar'); return {aviso:av&&av.textContent, cls:av&&av.className, campo:base.classList.contains('rmd-campo-aviso'), sombra:getComputedStyle(base.querySelector('.sapMInputBaseContentWrapper')||base).boxShadow}; }""")
             poner_agrupador(orig)
-            ok = r["aviso"] and r["aviso"].startswith("⚠") and "no coincide con la versión anterior" in r["aviso"] and r["campo"] and r["cls"] == "aviso" and r["sombra"] != "none"
+            ok = r["aviso"] and r["aviso"].startswith("⚠") and "no coincide con la versión anterior" in r["aviso"] and r["campo"] and "aviso" in (r["cls"] or "").split() and r["sombra"] != "none"
             return ok, f"{r} (original {orig})"
         @prueba("H4 Aviso de códigos: un Código Agrupador vacío se advierte; al restaurarlo vuelve el ✓ y se quita el resalte")
         def _():

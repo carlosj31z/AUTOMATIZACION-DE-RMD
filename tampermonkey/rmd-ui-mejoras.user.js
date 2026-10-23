@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.78.0
+// @version      1.81.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.78.0';                                                       // mantener igual a @version
+  const VERSION = '1.81.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -40,6 +40,8 @@
     ['buscarequipo', 'Filtro «Equipo»', 'Muestra los master que tienen un equipo, instrumento, utensilio o agrupador.'],
     ['revisor', 'Destinatarios de la revisión', 'Nombre del jefe y del gerente en «Producción Estatus».'],
     ['historialcambios', 'Historial en Trazabilidad', 'Qué cambió entre versiones y en cada guardado, con su usuario.'],
+    ['listapausa', 'Refresco de la lista solo a la vista', 'El refresco automático de cada 30 s espera mientras hay una ventana abierta o la pestaña está en segundo plano, y se hace al volver.'],
+    ['estadocolor', 'Estado en color', 'En la lista principal, la columna Estado como etiqueta de color (Ingresado, Autorizado, Suspendido…).'],
     ['ancho', 'Ventanas a medida', 'Las ventanas del RMD toman el tamaño que necesita su contenido.'],
     ['columnas', 'Columnas ordenadas', 'Anchos ajustados en las ventanas del RMD y un orden más claro en la lista principal.'],
     ['ocultar', 'Ocultar columnas poco usadas', 'Estado Mov., Imagen, Formato (salvo en procesos menores), PM OP y Gen PP.'],
@@ -50,6 +52,9 @@
     ['depende', 'Detalle de «Depende»', 'Al pasar el ratón muestra el paso predecesor.'],
     ['filtro', 'Filtro en las listas de pasos', 'Busca por texto, código u orden dentro de la lista abierta.'],
     ['vivo', 'RMD en vivo', 'El PDF del RMD a la derecha, actualizado tras cada guardado.'],
+    ['pasosvacios', 'Cajas vacías atenuadas', 'En las listas de pasos, los campos vacíos se ven tenues (se encienden al pasar el ratón por la fila o al escribir): se lee mejor lo que sí está configurado.'],
+    ['listasutiles', 'Comparar y Copiar de ordenados', '«Comparar versiones» muestra primero las versiones del mismo producto y «Copiar de RMD» los Autorizados e Ingresados más recientes.'],
+    ['textosportal', 'Textos del portal corregidos', 'Títulos de ventana equivocados o con nombres internos, tildes de los avisos y cabeceras de columna partidas a media palabra.'],
     ['copiar', 'Copiar y pegar configuración', 'Copia la configuración de un paso (y sus procesos menores) a uno o varios pasos.'],
     ['repetirpaso', 'Pasos a agregar', 'Al adicionar pasos, elige la cantidad y el orden de cada uno.'],
     ['nuevopaso', 'Botón «Nuevo Paso»', 'Al adicionar pasos, crea uno nuevo sin salir del RMD.'],
@@ -66,6 +71,7 @@
     ['puestoreceta', 'Mismo puesto de trabajo', 'No deja asociar recetas de otro puesto de trabajo.'],
     ['cambiosrecetas', 'Cambios de recetas en SAP', 'Lista los RMD Ingresados y Autorizados cuya receta cambió en SAP.'],
     ['recetasauto', 'Revisar recetas en segundo plano', 'Ingresados cada 3 h y Autorizados cada 24 h, poco a poco.'],
+    ['insumosnoguarda', 'Ver insumos sin guardar de más', 'Al abrir «Ver Insumos» el portal vuelve a guardar la cantidad de cada insumo con tu usuario aunque no cambie; si es la misma, ya no se guarda.'],
     ['reglas', 'Alertas de casillas', 'Marca casillas incoherentes con el tipo de dato y predecesores que faltan.'],
     ['sintipo', '«Sin tipo de dato» resaltado', 'Se muestra en rojo y negrita.'],
     ['puesto', 'Puesto de trabajo faltante', 'La celda parpadea si falta asignarlo.'],
@@ -609,17 +615,52 @@
   .rmd-toast { position: fixed; left: 50%; bottom: 28px; z-index: 100001; max-width: min(640px, 86vw); transform: translateX(-50%); padding: 10px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-verde); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font: 14px/1.4 var(--rmd-fuente); }
   .rmd-toast.error { border-left-color: var(--rmd-rojo); }
 
-  #rmd-aviso-asociar, #rmd-aviso-nomenclatura { white-space: pre-line; margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 600 12.5px/1.4 var(--rmd-fuente); }
-  #rmd-aviso-pendientes { margin: 6px 16px 0; padding: 5px 10px; border-left: 4px solid var(--rmd-ambar); border-radius: 4px; background: rgba(240,180,90,.16); color: var(--rmd-texto); font: 400 12.5px/1.45 var(--rmd-fuente); }
-  #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
-  #rmd-aviso-pendientes .rmd-pd-ok { display: inline-block; margin: 2px 6px 0 0; color: var(--rmd-apagado); font-size: 11.5px; }
-  #rmd-aviso-pendientes .rmd-pd-tipo.t-nueva { background: rgba(143,209,158,.2); }
-  #rmd-aviso-pendientes .rmd-pd-cc.en-listado::after { content: ' ✓'; font-weight: 400; color: var(--rmd-verde); }
-  #rmd-aviso-pendientes .rmd-pd-info, #rmd-aviso-pendientes .rmd-pd-viejos, #rmd-aviso-pendientes .rmd-pd-lis { color: var(--rmd-apagado); }
-  #rmd-aviso-pendientes .rmd-pd-lis { font-size: 11.5px; cursor: help; }
-  #rmd-aviso-pendientes .rmd-pd-tipo { display: inline-block; margin: 2px 4px 0 0; padding: 0 6px; border-radius: 9px; font-size: 11.5px; background: rgba(127,127,127,.14); cursor: help; }
-  #rmd-aviso-pendientes .rmd-pd-tipo.t-baja { background: rgba(230,90,90,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-pendiente { background: rgba(240,180,90,.28); }
-  #rmd-aviso-pendientes .rmd-pd-tipo.t-cc { background: rgba(110,160,240,.22); } #rmd-aviso-pendientes .rmd-pd-tipo.t-suspension { background: rgba(180,140,220,.22); }
+  /* «Asociar fórmulas»: tira de revisión (un segmento por revisión, con su luz) y detalle plegable debajo */
+  #rmd-asoc-panel { --c: var(--rmd-verde); margin: 10px 16px 4px; color: var(--rmd-texto); font: 12.5px/1.35 var(--rmd-fuente); }
+  #rmd-asoc-panel.e-aviso { --c: var(--rmd-ambar); } #rmd-asoc-panel.e-bloquea { --c: var(--rmd-rojo); }
+  .rmd-ap-tira { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; overflow: hidden; border: 1px solid var(--rmd-borde); border-radius: 7px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 13%, transparent), transparent 55%); }
+  .rmd-ap-tira::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); }
+  .rmd-ap-seg { --c: var(--rmd-verde); display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 5px 12px; border-left: 1px solid var(--rmd-borde); box-sizing: border-box; }
+  .rmd-ap-seg:first-child { padding-left: 15px; border-left: 0; } .rmd-ap-seg[hidden] { display: none; }
+  .rmd-ap-seg.e-aviso { --c: var(--rmd-ambar); } .rmd-ap-seg.e-bloquea { --c: var(--rmd-rojo); } .rmd-ap-seg.e-nd { --c: var(--rmd-apagado); }
+  .rmd-ap-seg[data-s="pendientes"] { flex: 1 1 280px; }
+  .rmd-ap-luz { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
+  .rmd-ap-et { flex: 0 0 auto; color: var(--rmd-apagado); font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+  .rmd-ap-val { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rmd-ap-seg.e-aviso .rmd-ap-val, .rmd-ap-seg.e-bloquea .rmd-ap-val { color: var(--c); } .rmd-ap-seg.e-nd .rmd-ap-val { color: var(--rmd-apagado); font-weight: 400; }
+  .rmd-ap-seg.con-det { cursor: pointer; } .rmd-ap-seg.con-det:hover { background: color-mix(in srgb, var(--c) 10%, transparent); }
+  .rmd-ap-seg.con-det::after { content: ''; flex: 0 0 auto; width: 5px; height: 5px; margin: -3px 0 0 2px; border: solid var(--rmd-apagado); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); transition: transform .15s ease-out; }
+  .rmd-ap-seg.con-det[aria-expanded="true"]::after { margin-top: 3px; transform: rotate(-135deg); }
+  .rmd-ap-seg.con-det[data-s="pendientes"]::after { margin-left: auto; }
+  .rmd-ap-seg:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
+  .rmd-ap-det { --c: var(--rmd-ambar); margin-top: 6px; padding: 7px 12px 7px 14px; border-left: 3px solid var(--c); border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--c) 11%, transparent); white-space: pre-line; }
+  .rmd-ap-det.bloquea { --c: var(--rmd-rojo); } .rmd-ap-det.nd { --c: var(--rmd-apagado); color: var(--rmd-apagado); } .rmd-ap-det.ok { --c: var(--rmd-verde); }
+  #rmd-asoc-panel .rmd-nm-ant { color: var(--rmd-apagado); font-size: 11px; font-weight: 400; } #rmd-asoc-panel .rmd-nm-ant.cambia { color: var(--rmd-acento-texto); font-weight: 600; }
+  .rmd-nm-gen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed color-mix(in srgb, var(--c) 45%, transparent); white-space: normal; }
+  .rmd-nm-et { color: var(--rmd-apagado); font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+  .rmd-nm-cod { display: inline-flex; align-items: center; padding: 3px 8px; border: 1px solid var(--rmd-borde); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 600 12.5px/18px ui-monospace, Consolas, monospace; }
+  .rmd-nm-cod input, .rmd-nm-cod select { box-sizing: content-box; height: 18px; margin: 0 1px; padding: 0 2px; border: 0; border-bottom: 1px dashed var(--rmd-acento-texto); border-radius: 0; background: transparent; color: var(--rmd-acento-texto); font: inherit; cursor: pointer; }
+  .rmd-nm-cod input { width: 2.2ch; text-transform: uppercase; cursor: text; } .rmd-nm-cod select option { background: var(--rmd-superficie); color: var(--rmd-texto); }
+  .rmd-nm-cod input:focus, .rmd-nm-cod select:focus { outline: 0; border-bottom-style: solid; }
+  .rmd-nm-pista { color: var(--rmd-apagado); font-size: 11.5px; } .rmd-nm-pista b { color: var(--rmd-texto); font-family: ui-monospace, Consolas, monospace; }
+  .rmd-nm-usar { margin-left: auto; padding: 4px 12px; border: 0; border-radius: 6px; background: var(--rmd-acento); color: #fff; font: 600 12px/16px var(--rmd-fuente); cursor: pointer; }
+  .rmd-nm-usar:hover { filter: brightness(1.1); } .rmd-nm-usar:focus-visible { outline: 2px solid var(--rmd-acento-texto); outline-offset: 2px; }
+  #rmd-aviso-pendientes { white-space: normal; line-height: 1.45; }
+  #rmd-aviso-pendientes ul { margin: 0; padding: 0; list-style: none; } #rmd-aviso-pendientes q { font-style: italic; color: var(--rmd-apagado); }
+  #rmd-aviso-pendientes .rmd-pd-alto { font-weight: 700; color: var(--rmd-rojo); } #rmd-aviso-pendientes .rmd-pd-baja { color: var(--rmd-rojo); }
+  #rmd-aviso-pendientes .rmd-pd-info, #rmd-aviso-pendientes .rmd-pd-lis { color: var(--rmd-apagado); } #rmd-aviso-pendientes .rmd-pd-lis { font-size: 11.5px; cursor: help; }
+  .rmd-ap-cuenta { padding: 0 7px; border-radius: 9px; background: var(--c); color: var(--rmd-superficie); font-size: 11.5px; font-weight: 700; line-height: 17px; }
+  #rmd-asoc-panel .rmd-pd-grupo { display: inline-flex; align-items: center; gap: 3px; }
+  #rmd-asoc-panel .rmd-pd-viejos { opacity: .6; } #rmd-asoc-panel .rmd-pd-viejos small { margin-right: 1px; color: var(--rmd-apagado); font-size: 10.5px; font-weight: 400; }
+  #rmd-asoc-panel .rmd-pd-cc { padding: 0 5px; border: 1px solid color-mix(in srgb, var(--rmd-acento-texto) 55%, transparent); border-radius: 4px; background: color-mix(in srgb, var(--rmd-acento-texto) 12%, transparent);
+    color: var(--rmd-texto); font: 600 11.5px/16px ui-monospace, Consolas, monospace; cursor: help; }
+  #rmd-asoc-panel .rmd-pd-cc.viejo { font-weight: 400; }
+  #rmd-asoc-panel .rmd-pd-cc.en-listado::after { content: ' ✓'; font-weight: 400; color: var(--rmd-verde); }
+  #rmd-asoc-panel .rmd-pd-tipo { padding: 0 6px; border-radius: 9px; background: rgba(127,127,127,.14); color: var(--rmd-texto); font-size: 11.5px; font-weight: 400; line-height: 17px; cursor: help; }
+  #rmd-asoc-panel .rmd-pd-tipo.t-baja { background: rgba(230,90,90,.22); } #rmd-asoc-panel .rmd-pd-tipo.t-pendiente { background: rgba(240,180,90,.28); }
+  #rmd-asoc-panel .rmd-pd-tipo.t-cc { background: rgba(110,160,240,.22); } #rmd-asoc-panel .rmd-pd-tipo.t-suspension { background: rgba(180,140,220,.22); } #rmd-asoc-panel .rmd-pd-tipo.t-nueva { background: rgba(143,209,158,.22); }
+  #rmd-asoc-panel .rmd-pd-ok { color: var(--rmd-apagado); font-size: 11.5px; font-weight: 400; }
   .rmd-obs-barra { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
   .rmd-obs-barra button { padding: 1px 8px; border: 1px solid var(--rmd-borde); border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 12px/1.6 var(--rmd-fuente); cursor: pointer; }
   .rmd-obs-barra button:hover { border-color: var(--rmd-acento-texto); }
@@ -629,12 +670,6 @@
   .rmd-asoc-vbox.sapUiSmallMargin { margin-top: 0 !important; margin-bottom: 0 !important; }
   .rmd-asoc-compacto .sapUiFormTitle:empty { display: none !important; }
   .rmd-asoc-compacto .sapUiFormResGridMain { padding-top: 6px !important; padding-bottom: 6px !important; }
-  #rmd-aviso-pendientes.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); }
-  #rmd-aviso-pendientes.bloquea { border-left-color: var(--rmd-rojo); }
-  #rmd-aviso-pendientes .rmd-pd-cc { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); font-weight: 600; cursor: help; }
-  #rmd-aviso-pendientes .rmd-pd-cc.viejo { opacity: .65; font-weight: 400; }
-  #rmd-aviso-pendientes ul { margin: 2px 0 0; padding-left: 18px; } #rmd-aviso-pendientes q { font-style: italic; color: var(--rmd-apagado); }
-  #rmd-aviso-asociar.ok, #rmd-aviso-nomenclatura.ok { border-left-color: var(--rmd-verde); background: rgba(143,209,158,.08); color: var(--rmd-apagado); font-weight: 400; }
   .rmd-campo-aviso .sapMInputBaseContentWrapper, .rmd-campo-aviso .sapMInputBaseInner { box-shadow: 0 0 0 2px var(--rmd-ambar) !important; border-radius: 2px; }
   /* ── Botón y panel de mejoras: vidrio translúcido; el desenfoque solo se calcula con el panel abierto o el botón activo ── */
   html { --rmd-vidrio: rgba(38,44,52,.72); --rmd-vidrio-borde: rgba(255,255,255,.14); --rmd-vidrio-brillo: rgba(255,255,255,.2); --rmd-vidrio-tarjeta: rgba(255,255,255,.06);
@@ -801,8 +836,20 @@
   @property --beam-hue-base { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
   .rmd-beam[data-beam] { transition: --beam-hue-base .7s var(--rmd-curva); } .rmd-beam[data-fin="ok"] { --beam-hue-base: -110deg; } .rmd-beam[data-fin="mal"] { --beam-hue-base: 165deg; }
 
-  /* Insumos procesados: contraste en tema oscuro */
-  html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.30); }
+  /* Listas de pasos: campos vacíos tenues (sin borde) mientras la fila no tiene el ratón encima ni el foco; Estado de la lista principal en color */
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMInputBase:not(.sapMInputBaseHasFocus):has(input.sapMInputBaseInner[value=""]) .sapMInputBaseContentWrapper,
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMInputBase:not(.sapMInputBaseHasFocus):has(input.sapMInputBaseInner:not([value])) .sapMInputBaseContentWrapper,
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMSlt:has(.sapMSltLabel:empty) { border-color: transparent !important; background: rgba(127,127,127,.07) !important; box-shadow: none !important; }
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMSlt:has(.sapMSltLabel:empty) .sapMSltArrow { opacity: .25; }
+  html.rmd-estcolor span[data-rmd-est] { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 1px 7px; border-radius: 999px; font-size: 12.5px; font-weight: 600; line-height: 1.5; white-space: nowrap !important; word-break: keep-all !important; overflow: hidden; text-overflow: ellipsis; background: color-mix(in srgb, currentColor 13%, transparent); }
+  html.rmd-estcolor span[data-rmd-est="autorizado"] { color: var(--rmd-verde); } html.rmd-estcolor span[data-rmd-est="ingresado"] { color: var(--rmd-acento-texto); }
+  html.rmd-estcolor span[data-rmd-est="suspendido"] { color: var(--rmd-ambar); } html.rmd-estcolor span[data-rmd-est="cancelado"], html.rmd-estcolor span[data-rmd-est="solicitud-rechazada"] { color: var(--rmd-apagado); }
+  html.rmd-estcolor span[data-rmd-est^="solicit"]:not([data-rmd-est="solicitud-rechazada"]) { color: #b58ce6; }
+  /* Cabeceras de columna sin partir palabras («Ite / m») y celdas de «Comparar versiones» sin «ACONDI / CIONAD / O» */
+  html.rmd-textos .sapMDialog .sapMListTbl thead th .sapMText, html.rmd-textos .sapMDialog .sapMListTbl thead th .sapMLabel { word-break: keep-all !important; overflow-wrap: normal !important; hyphens: manual; }
+  html.rmd-textos #frgAdicCompareRM--idTblMdCompare td .sapMText { display: block; word-break: keep-all !important; overflow-wrap: normal !important; overflow: hidden; text-overflow: ellipsis; }
+  /* Insumos procesados: contraste en tema oscuro (el portal pone #ddf4ff con !important, pensado para el tema claro: texto blanco sobre celeste) */
+  html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.22) !important; box-shadow: inset 3px 0 0 var(--rmd-acento-texto); }
   /* ── Vista móvil (html.rmd-movil) ── */
   html.rmd-movil, html.rmd-movil body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
   /* tabla -> tarjetas */
@@ -1328,7 +1375,7 @@
   const html = document.documentElement;
   function aplicarClases() {
     [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['sintipo', 'rmd-sintipo'],
-      ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
+      ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas'], ['pasosvacios', 'rmd-vacios'], ['estadocolor', 'rmd-estcolor'], ['textosportal', 'rmd-textos']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
   }
 
   // ---- 3. Reglas: tipo de dato -> casillas ------------------------------------------------------
@@ -1885,14 +1932,15 @@
     let visibles = 0, total = 0;
     const todas = [...tabla.querySelectorAll('tbody tr')];
     todas.forEach((tr, k) => {
-      if (/SubRow/.test(tr.className)) return;
+      if (/SubRow/.test(tr.className) || tr.classList.contains('sapMListNoData') || /-nodata$/.test(tr.id)) return;   // «Sin datos» no es un paso
       total++;
       const sub = /SubRow/.test((todas[k + 1] || {}).className || '') ? todas[k + 1] : null;
       const ok = !q || NORM(tr.textContent + ' ' + [...tr.querySelectorAll('input')].map((i) => i.value).join(' ')).includes(q);
       tr.style.display = ok ? '' : 'none'; if (sub) sub.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     });
-    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} ${barra.dataset.nombre || (inp ? 'pasos' : 'procesos menores')}`);
+    const nombre = barra.dataset.nombre || (inp ? 'pasos' : 'procesos menores'), uno = { pasos: 'paso', 'procesos menores': 'proceso menor' }[nombre];
+    setTxt(barra.querySelector('.rmd-cuenta'), q ? `${visibles} de ${total} pasos` : `${total} ${total === 1 && uno ? uno : nombre}`);
   }
   function actualizarBarra(d, tabla) {
     const barra = d.querySelector('#rmd-filtro-bar'); if (!barra || !tabla.__rmdAlertas) return;
@@ -2036,15 +2084,55 @@
     const fase = partes.slice(5).join('-'), mFase = /^F(\d)(-?R)?$/.exec(fase);
     if (!mFase) avisos.push(`La fase ("${fase}") debe ser F seguido de un número y, si aplica, "R" (ej. F1, F1R, F2, F2-R).`);
     const ok = avisos.length === 0;
-    return { ok, avisos, resumen: ok ? `fecha ${fechaTxt} · iniciales ${iniciales} · prioridad ${prioridad} · complejidad ${mComp[1]} · fase ${mFase[1]}${mFase[2] ? 'R' : ''}` : null };
+    return { ok, avisos, resumen: ok ? `fecha ${fechaTxt} · iniciales ${iniciales} · prioridad ${prioridad} · complejidad ${mComp[1]} · fase ${mFase[1]}${mFase[2] ? 'R' : ''}` : null,
+      corto: ok ? `${fechaTxt} · ${iniciales} · P${prioridad} · C${mComp[1]} · F${mFase[1]}${mFase[2] ? 'R' : ''}` : null };
+  }
+
+  // Panel de revisión de «Asociar fórmulas»: una tira de una línea con un segmento por revisión (Códigos, 1.ª línea, Observaciones) y, debajo,
+  // el detalle de cada uno, plegado; un clic en el segmento lo abre o lo cierra. Los detalles conservan sus id (#rmd-aviso-…).
+  const SEG_ASOC = [['asociar', 'Códigos'], ['nomenclatura', '1.ª línea'], ['pendientes', 'Observaciones']], GRAVEDAD = { nd: 0, ok: 0, aviso: 1, bloquea: 2 };
+  function panelAsociar(d) {
+    let p = d.querySelector('#rmd-asoc-panel'); if (p) return p;
+    const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return null;
+    p = document.createElement('div'); p.id = 'rmd-asoc-panel';
+    p.innerHTML = `<div class="rmd-ap-tira">${SEG_ASOC.map(([k, t]) => `<div class="rmd-ap-seg" data-s="${k}" hidden><i class="rmd-ap-luz"></i><span class="rmd-ap-et">${t}</span><span class="rmd-ap-val"></span></div>`).join('')}</div>` +
+      SEG_ASOC.map(([k]) => `<div id="rmd-aviso-${k}" class="rmd-ap-det" data-s="${k}" hidden></div>`).join('');
+    p.addEventListener('click', (e) => {
+      const s = e.target.closest('.rmd-ap-seg.con-det'); if (!s) return;
+      const ab = d.__rmdApAb || (d.__rmdApAb = {}); ab[s.dataset.s] = s.getAttribute('aria-expanded') !== 'true'; pintarPanelAsociar(p, d);
+    });
+    p.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.rmd-ap-seg.con-det')) { e.preventDefault(); e.target.click(); } });
+    cont.insertBefore(p, cont.firstChild); return p;
+  }
+  // seg: null quita el segmento; { estado: ok|nd|aviso|bloquea, valor (html), titulo, detalle (html o texto, si hay), abrir (abierto por defecto) }
+  function fijarSegmento(d, k, seg) {
+    const p = seg ? panelAsociar(d) : d.querySelector('#rmd-asoc-panel'); if (!p) return;
+    const s = p.querySelector(`.rmd-ap-seg[data-s="${k}"]`), det = p.querySelector(`.rmd-ap-det[data-s="${k}"]`);
+    if (!seg) { s.hidden = true; det.hidden = true; s.__rmdSeg = null; if (![...p.querySelectorAll('.rmd-ap-seg')].some((x) => !x.hidden)) p.remove(); else pintarPanelAsociar(p, d); return; }
+    s.__rmdSeg = seg; s.hidden = false;
+    const v = s.querySelector('.rmd-ap-val'); if (v.__rmdHtml !== seg.valor) { v.__rmdHtml = seg.valor; v.innerHTML = seg.valor; }
+    if (s.title !== (seg.titulo || '')) s.title = seg.titulo || '';
+    pintarPanelAsociar(p, d);
+  }
+  function pintarPanelAsociar(p, d) {
+    let peor = 'ok';
+    p.querySelectorAll('.rmd-ap-seg').forEach((s) => {
+      const seg = s.__rmdSeg, k = s.dataset.s, det = p.querySelector(`.rmd-ap-det[data-s="${k}"]`); if (!seg) return;
+      if (GRAVEDAD[seg.estado] > GRAVEDAD[peor]) peor = seg.estado;
+      const cls = `rmd-ap-seg e-${seg.estado}${seg.detalle ? ' con-det' : ''}`; if (s.className !== cls) s.className = cls;
+      const ab = !!seg.detalle && ((d.__rmdApAb || {})[k] ?? !!seg.abrir);
+      if (seg.detalle) { s.setAttribute('aria-expanded', String(ab)); s.tabIndex = 0; s.setAttribute('role', 'button'); } else { s.removeAttribute('aria-expanded'); s.removeAttribute('tabindex'); s.removeAttribute('role'); }
+      if (det.hidden === ab) det.hidden = !ab;
+      const dcls = `rmd-ap-det ${seg.estado}`; if (det.className !== dcls) det.className = dcls;
+    });
+    const cls = 'e-' + peor; if (p.className !== cls) p.className = cls;
   }
 
   function revisarAsociar() {
     const d = dialogos().find((x) => /^Asociar F[óo]rmula/i.test(cabecera(x)));
     if (!d) return;
-    let av = d.querySelector('#rmd-aviso-asociar'), avN = d.querySelector('#rmd-aviso-nomenclatura');
     if (!on('asociar')) {
-      if (av) av.remove(); if (avN) avN.remove();
+      if (d.querySelector('#rmd-asoc-panel')) { fijarSegmento(d, 'asociar', null); fijarSegmento(d, 'nomenclatura', null); }
       marcarCampo(d, 'Código Agrupador', false); marcarCampo(d, 'Código', false); marcarCampo(d, 'Observaciones', false);
       return;
     }
@@ -2052,38 +2140,90 @@
     const agr = valorDeCampo(d, 'Código Agrupador'), cod = valorDeCampo(d, 'Código');
     const elObs = campoDe(d, 'Observaciones'), obs = elObs ? elObs.value : null;   // conserva saltos de línea
     if (agr === null || cod === null) return;                                           // aún no está dibujada
-    const avisos = []; let malAgr = false, malCod = false;
-    if (!agr) { avisos.push('El Código Agrupador está vacío.'); malAgr = true; }
-    if (!cod) { avisos.push('El Código está vacío.'); malCod = true; }
+    const avisos = [], cortos = []; let malAgr = false, malCod = false, estado = 'ok', valor = '';
+    if (!agr) { avisos.push('El Código Agrupador está vacío.'); cortos.push('Agrupador vacío'); malAgr = true; }
+    if (!cod) { avisos.push('El Código está vacío.'); cortos.push('Código vacío'); malCod = true; }
     const rel = filaPrincipal(codigoRmd); let nota = '';
     if (rel && rel.anterior) {
       const ant = rel.anterior, etq = `versión anterior v${ant.version} (RMD ${ant.codigo})`;
-      if (agr && String(ant.codAgrupadorReceta || '') !== agr) { avisos.push(`El Código Agrupador (${agr}) no coincide con la ${etq}: ${ant.codAgrupadorReceta || 'vacío'}.`); malAgr = true; }
-      if (cod && String(ant.codDefectoReceta || '') !== cod) { avisos.push(`El Código (${cod}) no coincide con la ${etq}: ${ant.codDefectoReceta || 'vacío'}.`); malCod = true; }
-      if (!avisos.length) nota = `✓ Código Agrupador y Código coinciden con la ${etq}.`;
-    } else if (rel.actual && Number(rel.actual.version) <= 1) nota = 'Es la primera versión: no hay versión anterior con la que comparar.';
-    else nota = 'No se encontró la versión anterior entre los RMD consultados: busca el producto por descripción (sin filtrar por código) para poder compararla.';
+      if (agr && String(ant.codAgrupadorReceta || '') !== agr) { avisos.push(`El Código Agrupador (${agr}) no coincide con la ${etq}: ${ant.codAgrupadorReceta || 'vacío'}.`); cortos.push(`Agrupador ≠ v${ant.version}`); malAgr = true; }
+      if (cod && String(ant.codDefectoReceta || '') !== cod) { avisos.push(`El Código (${cod}) no coincide con la ${etq}: ${ant.codDefectoReceta || 'vacío'}.`); cortos.push(`Código ≠ v${ant.version}`); malCod = true; }
+      if (!avisos.length) { nota = `✓ Código Agrupador y Código coinciden con la ${etq}.`; valor = `= v${esc(ant.version)}`; }
+    } else if (rel.actual && Number(rel.actual.version) <= 1) { nota = 'Es la primera versión: no hay versión anterior con la que comparar.'; valor = '1.ª versión'; estado = 'nd'; }
+    else { nota = 'No se encontró la versión anterior entre los RMD consultados: busca el producto por descripción (sin filtrar por código) para poder compararla.'; valor = 'sin v. anterior'; estado = 'nd'; }
     const texto = avisos.length ? avisos.map((a) => '⚠ ' + a).join('\n') : nota;
-    if (!av) {
-      av = document.createElement('div'); av.id = 'rmd-aviso-asociar';
-      const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return;
-      cont.insertBefore(av, cont.firstChild);
-    }
-    av.className = avisos.length ? 'aviso' : 'ok'; if (av.textContent !== texto) av.textContent = texto;
+    if (avisos.length) { estado = 'aviso'; valor = cortos.map(esc).join(' · '); }
+    fijarSegmento(d, 'asociar', { estado, valor, titulo: texto, detalle: avisos.length || estado === 'nd' ? texto : '' });
+    const av = d.querySelector('#rmd-aviso-asociar'); if (av && av.textContent !== texto) av.textContent = texto;
     marcarCampo(d, 'Código Agrupador', malAgr); marcarCampo(d, 'Código', malCod);
 
-    // Nomenclatura de la 1ª línea de Observaciones
+    // Nomenclatura de la 1ª línea de Observaciones: si falta, está mal o es la misma de la versión anterior (copiada al crear la versión),
+    // el detalle se abre con la nomenclatura sugerida (fecha de hoy, iniciales y la prioridad, complejidad y fase de la versión anterior)
     if (obs !== null) {
-      const res = analizarNomenclatura((obs || '').split(/\r?\n/)[0]);
-      const textoN = res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' : res.avisos.map((a) => '⚠ ' + a).join('\n');
-      if (!avN) {
-        avN = document.createElement('div'); avN.id = 'rmd-aviso-nomenclatura';
-        av.insertAdjacentElement('afterend', avN);
+      const l0 = (obs || '').split(/\r?\n/)[0], res = analizarNomenclatura(l0), act = partesNomenclatura(l0);
+      const pr = d.__rmdPendRes && d.__rmdPendRes.previa, l0Ant = pr ? String(pr.observacion || '').split(/\r?\n/)[0].trim() : '', ant = l0Ant ? partesNomenclatura(l0Ant) : null;
+      const vAnt = pr ? `v${pr.version}` : '', copiada = res.ok && !!l0Ant && l0.trim() === l0Ant;
+      const textoN = copiada ? `⚠ La 1.ª línea es la misma de la ${vAnt} (se copió al crear la versión): pon la fecha de hoy y tus iniciales, y revisa prioridad, complejidad y fase.`
+        : res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' : res.avisos.map((a) => '⚠ ' + a).join('\n');
+      const det = d.querySelector('#rmd-aviso-nomenclatura');
+      if (res.ok && !copiada) {
+        const nota = ant && ant.fase ? (ant.fase === act.fase ? ` <small class="rmd-nm-ant" title="Misma fase que la ${vAnt}">= ${esc(vAnt)}</small>` : ` <small class="rmd-nm-ant cambia" title="La ${vAnt} estaba en ${esc(ant.fase)}">${esc(vAnt)}: ${esc(ant.fase)}</small>`) : '';
+        fijarSegmento(d, 'nomenclatura', { estado: 'ok', valor: esc(res.corto) + nota, titulo: textoN + (ant && ant.fase ? `\nFase de la ${vAnt}: ${ant.fase}` : '') });
+        if (det && det.textContent !== textoN) det.textContent = textoN;
+      } else {
+        fijarSegmento(d, 'nomenclatura', { estado: 'aviso', valor: copiada ? `copiada de la ${esc(vAnt)}` : `${res.avisos.length} por corregir`, detalle: '1', abrir: true,
+          titulo: 'Formato: AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase (p. ej. 20260918CJ-1-C2.0-FI1.0-FA1.0-F2)' });
+        if (det) generadorNomenclatura(d, det, { texto: textoN, act: copiada ? {} : act, ant, vAnt, reemplazar: act.parece });
       }
-      avN.className = res.ok ? 'ok' : 'aviso'; if (avN.textContent !== textoN) avN.textContent = textoN;
-      marcarCampo(d, 'Observaciones', !res.ok);
-    } else if (avN) avN.remove();
+      marcarCampo(d, 'Observaciones', !res.ok || copiada);
+    } else fijarSegmento(d, 'nomenclatura', null);
   }
+  // Partes reconocibles de una 1.ª línea aunque tenga errores (para proponer la corrección)
+  function partesNomenclatura(linea) {
+    const tok = String(linea || '').trim().split(/\s+/)[0] || '', m = /^(\d{8})?([A-ZÑ]{2})?/i.exec(tok), partes = tok.split('-');
+    const c = partes.map((x) => /^C(\d(?:\.\d)?)$/i.exec(x)).find(Boolean), com = c ? 'C' + Number(c[1]).toFixed(1) : '';
+    return { fecha: m[1] || '', ini: (m[2] || '').toUpperCase(), prioridad: partes.find((x, i) => i > 0 && /^[123]$/.test(x)) || '', complejidad: COMPLEJIDADES.includes(com) ? com : '',
+      fase: faseNomenclatura(tok), parece: /^\d{6}/.test(tok) || /(^|-)F[IA]\d/i.test(tok) };
+  }
+  // Nomenclatura sugerida, editable: el botón reemplaza la 1.ª línea (o la agrega arriba si no era una nomenclatura).
+  // Se escribe como al teclear: se guarda con el Guardar del portal.
+  const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R', 'F4', 'F4R', 'F5', 'F5R', 'F6', 'F6R'];
+  function generadorNomenclatura(d, det, { texto, act, ant, vAnt, reemplazar }) {
+    let g = det.querySelector('.rmd-nm-gen');
+    if (!g) {
+      det.innerHTML = '<div class="rmd-nm-avisos"></div><div class="rmd-nm-gen"><span class="rmd-nm-et">Sugerida</span><span class="rmd-nm-cod"><span class="rmd-nm-hoy"></span>' +
+        '<input class="rmd-nm-ini" maxlength="2" spellcheck="false" title="Tus iniciales (nombre + apellido)">-<select class="rmd-nm-pri" title="Prioridad">' + ['1', '2', '3'].map((x) => `<option>${x}</option>`).join('') +
+        '</select>-<select class="rmd-nm-com" title="Complejidad">' + COMPLEJIDADES.map((x) => `<option>${x}</option>`).join('') + '</select>-FI1.0-FA1.0-<select class="rmd-nm-fase" title="Fase"></select></span>' +
+        '<span class="rmd-nm-pista"></span><button type="button" class="rmd-nm-usar"></button></div>';
+      g = det.querySelector('.rmd-nm-gen'); d.__rmdNmClave = null; d.__rmdNmToco = false;
+      g.addEventListener('click', (e) => e.stopPropagation());
+      g.addEventListener('change', () => { d.__rmdNmToco = true; });
+      g.querySelector('.rmd-nm-ini').addEventListener('input', (e) => { d.__rmdNmToco = true; e.target.value = e.target.value.toUpperCase().replace(/[^A-ZÑ]/g, ''); });
+      g.querySelector('.rmd-nm-usar').addEventListener('click', () => {
+        const q = (s) => g.querySelector(s).value, ini = q('.rmd-nm-ini');
+        if (ini.length !== 2) { toast('Escribe tus 2 iniciales (nombre + apellido).', true); g.querySelector('.rmd-nm-ini').focus(); return; }
+        const el = campoDe(d, 'Observaciones'), c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')); if (!c) return;
+        const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), ini, q('.rmd-nm-pri'), q('.rmd-nm-com'), q('.rmd-nm-fase'));
+        const lineas = String(c.getValue() || '').split(/\r?\n/), valor = (g.__rmdReemplazar ? [nueva, ...lineas.slice(1)] : [nueva, ...lineas.filter((x, i) => i || x.trim())]).join('\n');
+        c.setValue(valor); if (c.fireLiveChange) c.fireLiveChange({ value: valor }); c.fireChange({ value: valor }); d.__rmdNmToco = false;
+        toast(`1.ª línea: ${nueva}. Se guarda con el Guardar del portal.`);
+      });
+    }
+    const av = g.previousElementSibling; if (av.textContent !== texto) av.textContent = texto;
+    g.__rmdReemplazar = reemplazar;
+    const b = g.querySelector('.rmd-nm-usar'), tb = reemplazar ? 'Reemplazar la 1.ª línea' : 'Agregar como 1.ª línea'; if (b.textContent !== tb) b.textContent = tb;
+    const hoy = hoyAAAAMMDD(), h = g.querySelector('.rmd-nm-hoy'); if (h.textContent !== hoy) h.textContent = hoy;
+    const pri = act.prioridad || (ant && ant.prioridad) || '2', com = act.complejidad || (ant && ant.complejidad) || 'C1.0', fase = act.fase || (ant && ant.fase) || 'F1';
+    const ini = rsUsuarioIniciales() || act.ini || (ant && ant.ini) || '';
+    const pista = ant && ant.fase ? `fase de la ${esc(vAnt)}: <b>${esc(ant.fase)}</b>${ant.prioridad ? ` · prioridad ${esc(ant.prioridad)}` : ''}${ant.complejidad ? ` · ${esc(ant.complejidad)}` : ''}` : vAnt ? `la ${esc(vAnt)} no tiene nomenclatura` : '';
+    const ps = g.querySelector('.rmd-nm-pista'); if (ps.innerHTML !== pista) ps.innerHTML = pista;
+    const clave = [pri, com, fase, ini].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) return;
+    d.__rmdNmClave = clave;
+    const sf = g.querySelector('.rmd-nm-fase'), fases = FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
+    sf.innerHTML = fases.map((x) => `<option>${esc(x)}</option>`).join('');
+    sf.value = fase; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
+  }
+  const hoyAAAAMMDD = () => { const f = new Date(); return `${f.getFullYear()}${String(f.getMonth() + 1).padStart(2, '0')}${String(f.getDate()).padStart(2, '0')}`; };
 
   // ---- 6b-bis. «Asociar Fórmula»: controles de cambio aplicados y pendientes de versiones anteriores (solo lectura) ----
   // Las versiones del master se leen una vez por ventana (codigoversionprincipal); el texto de Observaciones se toma de la pantalla.
@@ -2092,8 +2232,7 @@
     if (!d) return;
     const elObs = campoDe(d, 'Observaciones');
     agrandarObservaciones(elObs);
-    let av = d.querySelector('#rmd-aviso-pendientes');
-    if (!on('pendientes')) { if (av) av.remove(); d.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); d.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda')); return; }
+    if (!on('pendientes')) { if (d.querySelector('#rmd-asoc-panel')) fijarSegmento(d, 'pendientes', null); d.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); d.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda')); return; }
     const ctrl = controladorPrincipal(); if (!ctrl || !elObs) return;
     const V = ctrl.getView(), asoc = V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(), modelo = V.getModel('mainModelv2');
     if (!asoc || !asoc.mdId || !modelo) return;
@@ -2117,18 +2256,14 @@
       d.__rmdPendRes = r;
     }
     const r = d.__rmdPendRes;
-    const html = htmlPendientes(r, { cargando: !d.__rmdPendVs, error: d.__rmdPendError, autorizar, planta, cambios });
-    if (!html) { if (av) av.remove(); return; }
-    if (!av) {
-      av = document.createElement('div'); av.id = 'rmd-aviso-pendientes';
-      const ref = d.querySelector('#rmd-aviso-nomenclatura') || d.querySelector('#rmd-aviso-asociar');
-      if (ref) ref.insertAdjacentElement('afterend', av);
-      else { const cont = d.querySelector('.sapMDialogScrollCont') || d.querySelector('section'); if (!cont) return; cont.insertBefore(av, cont.firstChild); }
+    const h = htmlPendientes(r, { cargando: !d.__rmdPendVs, error: d.__rmdPendError, autorizar, planta, cambios });
+    if (!h.valor && !h.detalle) fijarSegmento(d, 'pendientes', null);
+    else {
+      const pend = r.ccs.length + r.textos.length + r.propios.length, avisos = r.revision.filter((x) => x.nivel !== 'info').length + r.formato.length;
+      const estado = pend || r.bajas.length ? (autorizar ? 'bloquea' : 'aviso') : avisos ? 'aviso' : 'ok';
+      fijarSegmento(d, 'pendientes', { estado, valor: h.valor, detalle: h.detalle, abrir: estado === 'bloquea' });
+      const av = d.querySelector('#rmd-aviso-pendientes'); if (av && av.__rmdHtml !== h.detalle) { av.__rmdHtml = h.detalle; av.innerHTML = h.detalle; }
     }
-    const pend = r.ccs.length + r.textos.length + r.propios.length, avisos = r.revision.filter((x) => x.nivel !== 'info').length + r.formato.length;
-    const cls = pend || r.bajas.length ? (autorizar ? 'bloquea' : 'aviso') : avisos ? 'aviso' : 'ok';
-    if (av.className !== cls) av.className = cls;
-    if (av.__rmdHtml !== html) { av.__rmdHtml = html; av.innerHTML = html; }
     barraObservaciones(elObs);
     window.__rmdStats.pendientesAsociar = { rmd: asoc.codigo, version, elegido, suspender, autorizar, aplicados: r.aplicados.map((x) => x.codigo), ccs: r.ccs.map((x) => x.cc), textos: r.textos.length, propios: r.propios.length,
       nuevas: r.nuevas.length, resueltos: r.resueltos.map((x) => x.cc), revision: r.revision.map((x) => x.texto) };
@@ -2195,23 +2330,18 @@
     const cita = (t, n = 80) => `<q title="${esc(t)}">${esc(t.length > n ? t.slice(0, n) + '…' : t)}</q>`;
     const chip = (x) => { const l = listado(x.codigo); return `<span class="rmd-pd-cc${x.heredado ? ' viejo' : ''}${l ? ' en-listado' : ''}" title="${esc([[x.responsable, x.fecha, x.descripcion, x.tipo, x.nivel].filter(Boolean).join(' · '), l && `Listado: ${l}`, x.heredado && '(ya estaba en la versión anterior)'].filter(Boolean).join('\n'))}">${esc(x.codigo)}</span>`; };
     const out = [], cab = [], pv = r.previa ? `v${esc(r.previa.version)}` : '';
-    // 1) resumen en una línea: tipos de línea, líneas nuevas frente a la versión anterior y lo resuelto
-    const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
-    Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t) && t !== 'nomenclatura').forEach((t) => cab.push(`<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`));
-    if (r.previa && r.nuevas.length) cab.push(`<span class="rmd-pd-tipo t-nueva" title="${esc(r.nuevas.map((t) => t.linea).join('\n'))}">+${r.nuevas.length} nueva${r.nuevas.length > 1 ? 's' : ''} frente a la ${pv}</span>`);
-    r.resueltos.forEach((x) => cab.push(`<span class="rmd-pd-ok" title="${esc(x.linea)}">✓ Aplicado ${esc(x.cc)}, pendiente de la v${esc(x.version)}</span>`));
-    if (cargando) cab.push('<span class="rmd-pd-ok">Leyendo la versión anterior…</span>');
-    else if (error) cab.push('<span class="rmd-pd-ok">No se pudo leer la versión anterior.</span>');
-    else if (r.previa && !r.ccs.length && !r.textos.length) cab.push(`<span class="rmd-pd-ok">✓ La ${pv} no dejó pendientes</span>`);
-    if (cab.length) out.push(`<span class="rmd-pd-tipos">${cab.join('')}</span>`);
-    // 2) controles de cambio / NC de esta versión (al pasar el ratón: sus partes y lo que dice el listado)
+    // 1) en la tira: CC / NC de esta versión (al pasar el ratón: sus partes y lo que dice el listado), los de la versión anterior atenuados,
+    //    los demás tipos de línea, las líneas nuevas frente a la versión anterior, lo resuelto y el estado de los pendientes
     const nuevos = r.aplicados.filter((x) => !x.heredado), viejos = r.aplicados.filter((x) => x.heredado);
-    if (nuevos.length || viejos.length) {
-      const soloCC = nuevos.every((x) => /-CC$/.test(x.codigo));
-      out.push(`<span>${nuevos.length ? `<b>${soloCC ? 'CC aplicados' : 'CC / NC registrados'}:</b> ${nuevos.map(chip).join('')}` : ''}${viejos.length ? `<span class="rmd-pd-viejos">${nuevos.length ? ' · ' : ''}De la ${pv || 'versión anterior'}: ${viejos.map(chip).join('')}</span>` : ''}</span>`);
-    }
-    // 3) baja / descontinuado
-    if (r.bajas.length) out.push(`<span class="rmd-pd-baja">⛔ <b>Producto para dar de baja / descontinuado</b>: ${r.bajas.map((b) => `${cita(b.linea)}${b.propia ? '' : ` (${vTxt(b)})`}`).join(' · ')}</span>`);
+    if (nuevos.length) cab.push(`<span class="rmd-pd-grupo" title="${nuevos.every((x) => /-CC$/.test(x.codigo)) ? 'CC aplicados en esta versión' : 'CC / NC registrados en esta versión'}">${nuevos.map(chip).join('')}</span>`);
+    if (viejos.length) cab.push(`<span class="rmd-pd-grupo rmd-pd-viejos" title="Ya estaban en la ${pv || 'versión anterior'}"><small>${pv || 'antes'}</small>${viejos.map(chip).join('')}</span>`);
+    const porTipo = new Map(); r.actual.tipos.forEach((x) => { if (!porTipo.has(x.tipo)) porTipo.set(x.tipo, []); porTipo.get(x.tipo).push(x.linea); });
+    Object.keys(Pendientes.TIPOS_LINEA).filter((t) => porTipo.has(t) && t !== 'nomenclatura' && !(t === 'cc' && r.aplicados.length))
+      .forEach((t) => cab.push(`<span class="rmd-pd-tipo t-${t}" title="${esc(porTipo.get(t).join('\n'))}">${esc(Pendientes.TIPOS_LINEA[t])} ${porTipo.get(t).length}</span>`));
+    if (r.previa && r.nuevas.length) cab.push(`<span class="rmd-pd-tipo t-nueva" title="${esc(`Líneas nuevas frente a la ${pv}:\n` + r.nuevas.map((t) => t.linea).join('\n'))}">+${r.nuevas.length} vs ${pv}</span>`);
+    r.resueltos.forEach((x) => cab.push(`<span class="rmd-pd-ok" title="${esc(`Aplicado ${x.cc}, pendiente de la v${x.version}: ${x.linea}`)}">✓ ${esc(x.cc)} de v${esc(x.version)}</span>`));
+    // 2) baja / descontinuado
+    if (r.bajas.length) out.push(`<div class="rmd-pd-baja">⛔ <b>Producto para dar de baja / descontinuado</b>: ${r.bajas.map((b) => `${cita(b.linea)}${b.propia ? '' : ` (${vTxt(b)})`}`).join(' · ')}</div>`);
     // 4) pendientes y puntos para revisar, en una sola lista
     const items = [], pend = r.ccs.length + r.textos.length + r.propios.length;
     r.ccs.forEach((x) => { const l = listado(x.cc); items.push(`<li>⚠ <b>Falta aplicar ${esc(x.cc)}</b>, pendiente de la ${vTxt(x)}: ${cita(x.linea, 60)}${l ? ` <span class="rmd-pd-lis" title="${esc(l)}">listado: ${esc(Pendientes.delListado(cambios, x.cc, planta).estatus || 'sí')}</span>` : ''}</li>`); });
@@ -2222,8 +2352,14 @@
     r.formato.forEach((x) => items.push(`<li>✎ ${cita(x.linea, 50)}: falta ${esc(x.faltan.join(', '))} («26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»).</li>`));
     r.revision.filter((x) => x.nivel === 'info').forEach((x) => items.push(`<li class="rmd-pd-info">${icono.info} ${esc(x.texto)}</li>`));
     const resto = items.length - pend;
-    if (items.length) out.push(`<b>${[pend && `${autorizar ? 'No autorices todavía: ' : ''}${pend} pendiente${pend > 1 ? 's' : ''}`, resto && `${resto} punto${resto > 1 ? 's' : ''} para revisar`].filter(Boolean).join(' · ')}</b><ul>${items.join('')}</ul>`);
-    return out.join('<br>');
+    if (pend && autorizar) out.unshift('<div class="rmd-pd-alto">No autorices todavía: quedan pendientes de la versión anterior.</div>');
+    if (items.length) out.push(`<ul>${items.join('')}</ul>`);
+    const cuenta = [pend && `${pend} pendiente${pend > 1 ? 's' : ''}`, (resto || r.bajas.length) && `${resto + r.bajas.length} a revisar`].filter(Boolean).join(' · ');
+    if (cargando) cab.push('<span class="rmd-pd-ok">leyendo la versión anterior…</span>');
+    else if (error) cab.push('<span class="rmd-pd-ok">no se pudo leer la versión anterior</span>');
+    else if (r.previa && !r.ccs.length && !r.textos.length) cab.push(`<span class="rmd-pd-ok">✓ la ${pv} no dejó pendientes</span>`);
+    if (cuenta) cab.push(`<span class="rmd-ap-cuenta">${cuenta}</span>`);
+    return { valor: cab.join(''), detalle: out.join('') };
   }
   // Observaciones: el portal la pone en la 3.ª columna del SimpleForm (frgAsocArtRM--idForm, ResponsiveGridLayout de 3 columnas: Title + Label/campo)
   // junto a Motivo de Solicitud y RM Digital Paralelo, con alto fijo de 70 px. Se deja sola en la 3.ª columna (etiqueta arriba, ancho completo de la
@@ -2556,7 +2692,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
     document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); document.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda'));
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
@@ -2592,6 +2728,7 @@
         const original = obj.onSearch;
         const envuelto = async function (ev) {
           if (ev) return original.apply(this, arguments);                         // búsqueda manual («Ir»)
+          if (on('listapausa') && (document.hidden || dialogos().length)) { latido.pausado = this; latido.saltados = (latido.saltados || 0) + 1; return undefined; }   // no se ve: al volver
           latido.enCurso++; latido.inicio = Date.now(); latido.esLatido = false;
           try { return await original.apply(this, arguments); } finally { latido.enCurso = Math.max(0, latido.enCurso - 1); latido.fin = Date.now(); }
         };
@@ -2631,7 +2768,7 @@
     // al cerrar un PM se revisan de nuevo los de la lista
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
     const nDlg = dialogos().length; if (nDlg < dialogosAntes) generacionRmd++; dialogosAntes = nDlg;
-    if (on('sesion')) instalarFiltroLatido();
+    if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
     [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
@@ -2665,7 +2802,14 @@
     return a ? `${a.mdId}|${a.estadoIdRmd_iMaestraIdBK}|${el ? el.value : ''}` : '';
   };
   let sinVentanas = 0;
+  // Refresco de la lista que esperó (ventana abierta o pestaña oculta): se hace al volver a verse la lista
+  function reanudarLatido() {
+    const c = latido.pausado; if (!c || document.hidden || dialogos().length) return;
+    latido.pausado = null; latido.reanudados = (latido.reanudados || 0) + 1; aislar('reanudarLatido', () => c.onSearch());
+  }
+  document.addEventListener('visibilitychange', () => setTimeout(reanudarLatido, 300));
   function revisionPeriodica() {
+    reanudarLatido();
     montarPanel();
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
@@ -4789,7 +4933,100 @@
       return r;
     };
   }
-  function parchearControlador() { const c = controladorPrincipal(); if (c) { parchearVerOP(c); parchearImpresora(c); } }
+  function parchearControlador() {
+    const c = controladorPrincipal(); if (c) { parchearVerOP(c); parchearImpresora(c); parchearCantidadRm(c); }
+    const L = definicionRmd(); if (L) { parchearCantidadRm(L); parchearComparar(L); }
+    aislar('ordenarCopiarDe', ordenarCopiarDe); aislar('textosDelPortal', textosDelPortal); aislar('estadoEnColor', estadoEnColor);
+  }
+  // Objeto con los métodos de la ventana del RMD («Configurar el RMD»): es el oListener de sus botones (p. ej. «Comparar versiones»); se recuerda
+  let defRmd = null;
+  function definicionRmd() {
+    if (defRmd) return defRmd;
+    const bt = [...document.querySelectorAll('.sapMDialog button[title="Comparar versiones"]')][0], c = bt && ctlDe(bt), reg = c && ((c.mEventRegistry || {}).press || [])[0];
+    if (reg && reg.oListener && typeof reg.oListener.onRestoreFiltersCompare === 'function') defRmd = reg.oListener;
+    return defRmd;
+  }
+  // «Ver Insumos» (y el guardado de «Asociar fórmulas»): el portal recalcula la cantidad en RMD de cada insumo y la vuelve a guardar con fecha y
+  // usuario aunque no cambie (onSaveCantidadRm). Si la cantidad guardada ya es la misma, ese guardado se omite: así quien solo mira no queda como
+  // el último que actualizó el insumo. Lo que cambia se guarda igual que antes.
+  const CAMPOS_CANT_RM = new Set(['cantidadRm', 'fechaActualiza', 'usuarioActualiza']);
+  window.__rmdStats.cantidadRm = { omitidos: 0, guardados: 0 };
+  function parchearCantidadRm(obj) {
+    const orig = obj && obj.onSaveCantidadRm; if (typeof orig !== 'function' || orig.__rmd) return;
+    const envuelto = async function () {
+      const m = this && this.mainModelv2; if (!on('insumosnoguarda') || !m || typeof m.update !== 'function') return orig.apply(this, arguments);
+      const up0 = m.update, st = window.__rmdStats.cantidadRm;
+      m.update = function (ruta, datos, params) {
+        const k = /^\/MD_ES_RE_INSUMO\('([^']+)'\)$/.exec(ruta || ''), act = k && m.getProperty(`/MD_ES_RE_INSUMO('${k[1]}')/cantidadRm`);
+        if (k && datos && Object.keys(datos).every((x) => CAMPOS_CANT_RM.has(x)) && act != null && act !== '' && Math.abs(parseFloat(act) - Number(datos.cantidadRm)) < 1e-9) {
+          st.omitidos++; setTimeout(() => { if (params && params.success) params.success({}, { statusCode: 204 }); }, 0); return { abort() {} };
+        }
+        if (k) st.guardados++;
+        return up0.apply(this, arguments);
+      };
+      try { return await orig.apply(this, arguments); } finally { m.update = up0; }
+    };
+    envuelto.__rmd = true; obj.onSaveCantidadRm = envuelto;
+  }
+  // «Comparar versiones»: el portal ofrece lo que tenga la lista principal (con un solo código buscado, nada). Arriba van las versiones del mismo
+  // producto, de la más nueva a la más antigua (leídas por codigoversionprincipal); debajo, lo demás. El título deja de decir «Adicionar Estructura».
+  function parchearComparar(L) {
+    const orig = L.onRestoreFiltersCompare; if (orig.__rmd) return;
+    const envuelto = function () {
+      const r = orig.apply(this, arguments), dlg = this.oAddCompareRM;
+      if (on('textosportal') && dlg && dlg.getTitle && /^Adicionar Estructura al RMD\s*:/.test(dlg.getTitle())) dlg.setTitle(dlg.getTitle().replace(/^Adicionar Estructura al RMD\s*:/, 'Comparar versiones:'));
+      if (on('listasutiles')) versionesParaComparar().catch((e) => anotarError('versionesParaComparar', e));
+      return r;
+    };
+    envuelto.__rmd = true; L.onRestoreFiltersCompare = envuelto;
+  }
+  let catComparar = null;
+  async function versionesParaComparar() {
+    const ctrl = controladorPrincipal(); if (!ctrl) return;
+    const V = ctrl.getView(), asoc = V.getModel('asociarDatos').getData(), m = V.getModel('compareRM'); if (!asoc || !asoc.mdId || !m) return;
+    const modelo = V.getModel('mainModelv2');
+    if (!catComparar) catComparar = await tzCatalogos(modelo);
+    const lin = await tzLinaje(modelo, asoc.codigo, catComparar);         // las mismas versiones que «Historia del producto»
+    const vs = lin.versiones.filter((x) => x.mdId !== asoc.mdId && x.activo !== false && !/cancel/i.test(x.estado || '')).sort((a, b) => (+b.version || 0) - (+a.version || 0));
+    if (!vs.length || V.getModel('compareRM') !== m) return;
+    const ids = new Set(vs.map((x) => x.mdId)), resto = (m.getData() || []).filter((x) => !ids.has(x.mdId));
+    m.setData([...vs, ...resto]); m.refresh(true);
+  }
+  // «Copiar de RMD»: 3136 RMD sin orden. Primero Autorizados e Ingresados, luego el resto; dentro, del más reciente al más antiguo; sin código, al final.
+  const RANGO_COPIA = { 'Autorizado': 0, 'Ingresado': 1, 'Solicitud Aprobada': 2, 'Solicitado': 3, 'Suspendido': 4, 'Solicitud Rechazada': 6 };
+  function ordenarCopiarDe() {
+    if (!on('listasutiles')) return;
+    const t = typeof sap !== 'undefined' && sap.ui.getCore().byId('frgCopiarDeRM--idTBCopyDe'); if (!t || !t.getDomRef()) return;
+    const bi = t.getBindingInfo('items'), M = bi && t.getModel(bi.model), datos = M && M.getProperty(bi.path); if (!Array.isArray(datos) || datos.__rmdOrden || !datos.length) return;
+    const est = (x) => (x.estadoIdRmd && x.estadoIdRmd.contenido) || '', rango = (x) => (x.codigo ? (RANGO_COPIA[est(x)] ?? 5) : 7);
+    const fecha = (x) => { const f = x.fechaRegistro; return f instanceof Date ? f.getTime() : +String(f || '').replace(/\D/g, '').slice(0, 13) || 0; };
+    const orden = datos.slice().sort((a, b) => rango(a) - rango(b) || fecha(b) - fecha(a));
+    orden.__rmdOrden = true; M.setProperty(bi.path, orden);
+  }
+  // Textos del portal: id interno en el título de «Copiar a RMD» y tildes que faltan en sus avisos
+  const TILDES_PORTAL = [[/\bconfiguracion\b/g, 'configuración'], [/\bConfiguracion\b/g, 'Configuración'], [/\binformacion\b/g, 'información'], [/\bInformacion\b/g, 'Información']];
+  function textosDelPortal() {
+    if (!on('textosportal')) return;
+    document.querySelectorAll('.sapMDialog').forEach((d) => {                 // (dialogos() deja fuera los avisos del portal)
+      if (!d.getClientRects().length) return;
+      const c = sap.ui.getCore().byId(d.id); if (!c || !c.getTitle) return;
+      const ti = c.getTitle() || '', limpio = ti.replace(/\s+dlg\w+\s*$/, ''); if (limpio !== ti) c.setTitle(limpio);
+      if (d.classList.contains('sapMMessageDialog')) d.querySelectorAll('.sapMMsgBoxText').forEach((s) => {
+        let v = s.textContent; TILDES_PORTAL.forEach(([re, r]) => { v = v.replace(re, r); });
+        if (v !== s.textContent) { const tc = sap.ui.getCore().byId(s.id); if (tc && tc.setText) tc.setText(v); else s.textContent = v; }
+      });
+    });
+  }
+  // Lista principal: el Estado del RMD como etiqueta de color (data-rmd-est; el color lo pone el CSS con html.rmd-estcolor)
+  function estadoEnColor() {
+    if (!on('estadocolor')) return;
+    const ctl = tablaPrincipal(), tabla = ctl && ctl.getDomRef() && ctl.getDomRef().querySelector('table'); if (!tabla) return;
+    const i = [...tabla.querySelectorAll('thead th')].findIndex((th) => norm(th.textContent) === 'Estado'); if (i < 0) return;
+    tabla.querySelectorAll('tbody tr').forEach((tr) => {
+      const s = tr.children[i] && tr.children[i].querySelector('span'); if (!s) return;
+      const k = SIN_ACENTOS(norm(s.textContent)).toLowerCase().replace(/\s+/g, '-'); if (k && s.dataset.rmdEst !== k) s.dataset.rmdEst = k;
+    });
+  }
 
   // ==XLSX-INICIO==
   // Escritor/lector .xlsx sin dependencias: estilos, fórmulas con valor en caché, autofiltro, paneles fijos y tablas dinámicas con caché. Comprime con
@@ -6155,7 +6392,7 @@
       const previa = vs[vs.length - 1] || null;
       const nuevas = anA.tipos.filter((t) => t.tipo !== 'nomenclatura' && !previos.has(plano(t.linea)));
       return { ccs: [...ccs.values()], textos: [...textos.values()], propios, aplicados: anA.aplicados.map((x) => ({ ...x, heredado: previos.has(plano(x.linea)) })), actual: anA, versiones: vs.length,
-        bajas: [...bajas.values()], formato, resueltos, nuevas, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an } };
+        bajas: [...bajas.values()], formato, resueltos, nuevas, previa: previa && { version: previa.version, estado: previa.estado, codigo: previa.codigo, an: previa.an, observacion: previa.observacion } };
     }
     // ---- Listado de CC / NC / DES para actualizar RMD (hojas «PLANTA 1» = Ate y «PLANTA 2» = Lima) ----
     // Columnas por su encabezado: AREA, ETAPA, APLICA, DESCRIPCION DEL CAMBIO, FECHA, NOMENCLATURA PARA OBSERVACIONES, ESTATUS (o ESTATUS DE FILE), MOTIVO.
@@ -14369,10 +14606,10 @@ td.ult { position: relative; }
   // [nombre, ícono, claves de OPC]
   const GRUPOS_PANEL = [
     ['Uso diario', 'inicio', ['saludo', 'fiestas', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
-    ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios']],
-    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo']],
+    ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios', 'listapausa', 'estadocolor']],
+    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
-    ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
+    ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
     ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
   ];
