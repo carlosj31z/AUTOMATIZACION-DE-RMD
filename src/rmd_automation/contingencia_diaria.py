@@ -285,9 +285,13 @@ def ejecutar(cdp_url: str, url_carpeta: str, fecha: str, carpeta_local: str, apl
                 continue
             # Un PDF por fórmula (como «Descargar» de cada receta), con su descripción en el nombre.
             carpeta = pendientes[0] if pendientes else (paso.carpetas[0] if paso.carpetas else "_SIN_CARPETA")
-            for doc in frame.evaluate(_JS_PDF_MASTER, r.md_id):
+            docs = frame.evaluate(_JS_PDF_MASTER, r.md_id)
+            repetidas = {d["receta"] for d in docs if sum(x["receta"] == d["receta"] for x in docs) > 1}
+            for doc in docs:
                 pdf = base64.b64decode(doc["b64"])
-                nombre = nombre_archivo(r, doc["receta"])
+                # Fórmulas con la misma descripción (otra versión de fabricación): se distinguen por la versión.
+                desc = f"{doc['receta']} V{doc['verid']}" if doc["receta"] in repetidas else doc["receta"]
+                nombre = nombre_archivo(r, desc)
                 destino_local = salida / carpeta / nombre
                 destino_local.parent.mkdir(parents=True, exist_ok=True)
                 destino_local.write_bytes(pdf)
