@@ -66,5 +66,24 @@ const t0 = Date.now(), big = (n, f) => Array.from({ length: n }, (_, i) => ({ zo
 const rb = C.comparar(big(2500, (i) => `PASO ${i} TEXTO ${i % 7}`), big(2600, (i) => `PASO ${i} TEXTO ${i % 5}`));
 ok('2500 × 2600 líneas en menos de 4 s', Date.now() - t0 < 4000 && rb.filas.length >= 2600, `${Date.now() - t0} ms`);
 
+// ---- cabecera: se muestra pero no se compara ----
+const conCab = (lote) => { const d = doc(['PESAR.']); const h = d.header; d.header = (p, n) => { const x = h(p, n); x.columns[0].table.body[1][3] = { text: lote }; return x; }; return C.lineas(d); };
+const RC = C.comparar(conCab('L-001'), conCab('L-999'));
+ok('cabecera distinta: sin cambios', RC.resumen.cambios === 0 && RC.filas.filter((f) => f.tipo === 'cabecera').length === 2, J(RC.resumen));
+ok('cabecera: filas presentes a cada lado', RC.filas[1].a === 1 && RC.filas[1].b === 1 && C.sinCambio(RC.filas[1]));
+
+// ---- vista «Como el PDF» ----
+const cc = C.celdasCambiadas(['4.1.2.-', 'PESAR 10 kg', 'Realizado Por'], ['4.1.2.-', 'PESAR 12 kg', 'Realizado Por', 'VB']);
+ok('celdas: solo la cambiada lleva tramos', cc.a[0] === null && cc.a[2] === null && cc.a[1].some(([t, c]) => c && t === '10') && J(cc.b[3]) === J([['VB', true]]), J(cc));
+const dPdf = { ...doc(['VERIFICAR LA ORDEN.', 'LIMPIAR <LA> LINEA.']), styles: { subheader: { bold: true, fontSize: 10 } } }, LP = C.lineas(dPdf);
+const kLimpiar = LP.findIndex((x) => /LIMPIAR/.test(x.texto)), kPrec = LP.findIndex((x) => x.texto === 'PRECAUCIONES');
+const hp = C.htmlPdf(dPdf, LP, (k) => (k === kLimpiar ? { tipo: 'modificado', celdas: [null, [['LIMPIAR ', false], ['<LA>', true], [' LINEA.', false]]] } : k === kPrec ? { tipo: 'agregado', celdas: null } : null));
+ok('html: filas y textos con su línea (data-l)', hp.includes(`<tr data-l="${kLimpiar}" class="pdf-modificado">`) && new RegExp(`class="pdf-t pdf-agregado" data-l="${kPrec}"`).test(hp));
+ok('html: palabras cambiadas marcadas y escapadas', hp.includes('<mark>&lt;LA&gt;</mark>') && !hp.includes('<LA>'));
+ok('html: colSpan sin celdas de relleno', /<td colspan="3"[^>]*>USAR EL UNIFORME COMPLETO\.<\/td><\/tr>/.test(hp), hp.slice(hp.indexOf('USAR') - 200, hp.indexOf('USAR') + 60));
+ok('html: bordes de la celda y estilos (negrita del subtítulo)', /border-left:1px solid #000;/.test(hp) && /font-weight:700;[^"]*"[^>]*>PRECAUCIONES/.test(hp.replace(/data-l="\d+" /g, '')));
+ok('html: cabecera sin función ni n.º de página en las líneas', hp.startsWith('<div class="pdf-hoja"') && hp.includes('REGISTRO DE MANUFACTURA'));
+ok('html: color y alineación peligrosos se descartan', !C.htmlPdf({ content: [{ text: 'x', color: 'red;background:url(x)', alignment: 'left;x' }] }, C.lineas({ content: [{ text: 'x' }] }), () => null).includes('url('));
+
 console.log(fallas ? `\n${fallas} falla(s)` : '\nTodo pasa.');
 process.exit(fallas ? 1 : 0);
