@@ -124,8 +124,29 @@ const cam = Pendientes.cambiosDeFilas(hojasCC);
 ok('Listado: lee las dos plantas por el encabezado (Ate = PLANTA 1, Lima = PLANTA 2)', cam.length === 5 && cam[0].planta === 'Ate' && cam[2].planta === 'Lima', J(cam.map((c) => c.planta)));
 ok('Listado: «26-280/D.Ayala/…» (sin «-CC») da 26-280-CC; etapa ENV-ACO -> Envase y Acondicionado', J(cam[0].codigos) === '["26-280-CC"]' && J(cam[0].etapa) === '["ENVASE","ACONDICIONADO"]', J(cam[0]));
 ok('Listado: fecha serial de Excel (46317) -> 2026-10-22', cam[2].fecha === '2026-10-22', cam[2].fecha);
-const ap = Pendientes.cambiosQueAplican(cam, { planta: 'LIMA', etapa: 'ACONDICIONADO', area: 'SOLIDOS', producto: 'GASEOVET CB', desde: '2026-06-01' });
-ok('Aplican: el del producto (aunque APLICA = NO) y el del área con APLICA = SI; no el antiguo ni el de otra planta o etapa', J(ap.map((c) => [c.codigos[0], c.por])) === '[["26-379-CC","producto"],["26-300-CC","area"]]', J(ap.map((c) => [c.codigos, c.por])));
+ok('Listado: lo que dice de un CC (descripción y estatus), de la planta del RMD', J(Pendientes.delListado(cam, '26-379-CC', 'PLANTA LIMA')) === J({ descripcion: '26-379-CC ACTUALIZACION RMD ACO GASEOVET CB 500mg CAP BLANDA B5 CJA X 30', estatus: 'CUMPLIDO', planta: 'Lima', fecha: '2026-10-22' }), J(Pendientes.delListado(cam, '26-379-CC', 'PLANTA LIMA')));
+ok('Listado: un código que no está da null', Pendientes.delListado(cam, '26-999-CC') === null);
+
+// ---- tarjeta de Observaciones: frente a la versión anterior y revisión (no sugiere CC) ----
+const hoy = new Date(2026, 9, 22);
+const ant = { version: 8, codigo: 'B8', estado: 'Autorizado', observacion: '20260901CJ-1-C1.0-FI1.0-FA1.0-F1\n26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor\n20260901CJ Pendiente aplicar 26-379-CC\n20260901CJ Nota que se quitará' };
+let hv = Pendientes.heredados([ant], { version: 9, observacion: '20261022CJ-1-C1.0-FI1.0-FA1.0-F1\n26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor\n20260901CJ Pendiente aplicar 26-379-CC\n26-379-CC/L.Fernandez/2026-10-22;Actualización;proceso;moderado' });
+ok('Frente a la anterior: 1 línea nueva (sin contar la nomenclatura) y el pendiente 26-379-CC resuelto', hv.nuevas.length === 1 && J(hv.resueltos.map((x) => [x.cc, x.version])) === '[["26-379-CC",8]]' && hv.ccs.length === 0 && hv.previa.version === 8, J({ n: hv.nuevas, r: hv.resueltos }));
+const susp = (obs, guardado) => Pendientes.revisar(Pendientes.heredados([ant], { version: 9, observacion: obs }), { suspender: true, guardado, hoy });
+const base9 = ant.observacion.replace('20260901CJ-1', '20261001CJ-1');
+ok('Revisión: suspender sin motivo avisa', susp(base9, base9).some((x) => x.nivel === 'aviso' && /suspender/.test(x.texto)), J(susp(base9, base9)));
+ok('Revisión: suspender con una línea escrita ahora no avisa', !susp(base9 + '\n20261022CJ Se suspende por nueva versión', base9).some((x) => /suspender/.test(x.texto)));
+ok('Revisión: suspender con el motivo ya guardado en esta versión no avisa', !susp(base9 + '\n20261020CJ SE SUSPENDE POR AUDITORIA', base9 + '\n20261020CJ SE SUSPENDE POR AUDITORIA').some((x) => /suspender/.test(x.texto)));
+const rv = (obs, ctx = {}) => Pendientes.revisar(Pendientes.heredados([ant], { version: 9, observacion: obs }), { hoy, ...ctx });
+ok('Revisión: autorizar con baja / descontinuado avisa', rv(base9 + '\n20261022CJ Producto descontinuado', { autorizar: true }).some((x) => /baja/.test(x.texto)));
+ok('Revisión: fecha no válida y fecha posterior a hoy en líneas nuevas', J(rv(base9 + '\n20261322CJ nota\n26-401-CC/L.Fernandez/2026-11-30;algo;proceso;menor').filter((x) => x.nivel === 'formato').map((x) => x.texto)) === '["La fecha «20261322» no es válida.","La fecha «2026-11-30» es posterior a hoy."]', J(rv(base9 + '\n20261322CJ nota\n26-401-CC/L.Fernandez/2026-11-30;algo;proceso;menor')));
+ok('Revisión: las fechas de líneas copiadas de la anterior no se revisan', !rv(base9).some((x) => x.nivel === 'formato'));
+const dup = rv(base9 + '\n26-402-CC/L.Fernandez/2026-10-22;a;proceso;menor\n26-402-CC/L.Fernandez/2026-10-22;b;proceso;menor\n26-300-CC/X.Y/2026-10-22;Otra vez;material;menor');
+ok('Revisión: CC anotado dos veces y CC que ya estaba aplicado en la anterior', dup.some((x) => x.texto === '26-402-CC está anotado 2 veces en esta versión.') && dup.some((x) => x.texto === '26-300-CC ya figuraba como aplicado en la v8.'), J(dup));
+const lis = rv(base9 + '\n26-379-CC/L.Fernandez/2026-10-22;a;proceso;menor\n26-280-CC/D.Ayala/2026-10-01;b;proceso;mayor\n26-999-CC/X.Y/2026-10-01;c;proceso;menor', { cambios: cam, planta: 'PLANTA LIMA' });
+ok('Revisión con el listado: el que no está (info) y el de la otra planta (aviso); el de la misma planta no avisa',
+  lis.some((x) => x.nivel === 'info' && /26-999-CC no está en el listado/.test(x.texto)) && lis.some((x) => x.nivel === 'aviso' && x.texto === '26-280-CC figura en el listado de Ate, y este RMD es de Lima.') && !lis.some((x) => /26-379-CC/.test(x.texto)), J(lis));
+ok('Revisión: sin estado elegido ni listado, una versión copiada sin cambios no da avisos', rv(base9).length === 0, J(rv(base9)));
 
 console.log(fallas ? `\n${fallas} prueba(s) fallaron.` : '\nTodas las pruebas pasaron.');
 process.exit(fallas ? 1 : 0);
