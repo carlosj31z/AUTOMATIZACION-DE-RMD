@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.80.1
+// @version      1.81.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.80.1';                                                       // mantener igual a @version
+  const VERSION = '1.81.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -40,6 +40,8 @@
     ['buscarequipo', 'Filtro «Equipo»', 'Muestra los master que tienen un equipo, instrumento, utensilio o agrupador.'],
     ['revisor', 'Destinatarios de la revisión', 'Nombre del jefe y del gerente en «Producción Estatus».'],
     ['historialcambios', 'Historial en Trazabilidad', 'Qué cambió entre versiones y en cada guardado, con su usuario.'],
+    ['listapausa', 'Refresco de la lista solo a la vista', 'El refresco automático de cada 30 s espera mientras hay una ventana abierta o la pestaña está en segundo plano, y se hace al volver.'],
+    ['estadocolor', 'Estado en color', 'En la lista principal, la columna Estado como etiqueta de color (Ingresado, Autorizado, Suspendido…).'],
     ['ancho', 'Ventanas a medida', 'Las ventanas del RMD toman el tamaño que necesita su contenido.'],
     ['columnas', 'Columnas ordenadas', 'Anchos ajustados en las ventanas del RMD y un orden más claro en la lista principal.'],
     ['ocultar', 'Ocultar columnas poco usadas', 'Estado Mov., Imagen, Formato (salvo en procesos menores), PM OP y Gen PP.'],
@@ -50,6 +52,9 @@
     ['depende', 'Detalle de «Depende»', 'Al pasar el ratón muestra el paso predecesor.'],
     ['filtro', 'Filtro en las listas de pasos', 'Busca por texto, código u orden dentro de la lista abierta.'],
     ['vivo', 'RMD en vivo', 'El PDF del RMD a la derecha, actualizado tras cada guardado.'],
+    ['pasosvacios', 'Cajas vacías atenuadas', 'En las listas de pasos, los campos vacíos se ven tenues (se encienden al pasar el ratón por la fila o al escribir): se lee mejor lo que sí está configurado.'],
+    ['listasutiles', 'Comparar y Copiar de ordenados', '«Comparar versiones» muestra primero las versiones del mismo producto y «Copiar de RMD» los Autorizados e Ingresados más recientes.'],
+    ['textosportal', 'Textos del portal corregidos', 'Títulos de ventana equivocados o con nombres internos, tildes de los avisos y cabeceras de columna partidas a media palabra.'],
     ['copiar', 'Copiar y pegar configuración', 'Copia la configuración de un paso (y sus procesos menores) a uno o varios pasos.'],
     ['repetirpaso', 'Pasos a agregar', 'Al adicionar pasos, elige la cantidad y el orden de cada uno.'],
     ['nuevopaso', 'Botón «Nuevo Paso»', 'Al adicionar pasos, crea uno nuevo sin salir del RMD.'],
@@ -66,6 +71,7 @@
     ['puestoreceta', 'Mismo puesto de trabajo', 'No deja asociar recetas de otro puesto de trabajo.'],
     ['cambiosrecetas', 'Cambios de recetas en SAP', 'Lista los RMD Ingresados y Autorizados cuya receta cambió en SAP.'],
     ['recetasauto', 'Revisar recetas en segundo plano', 'Ingresados cada 3 h y Autorizados cada 24 h, poco a poco.'],
+    ['insumosnoguarda', 'Ver insumos sin guardar de más', 'Al abrir «Ver Insumos» el portal vuelve a guardar la cantidad de cada insumo con tu usuario aunque no cambie; si es la misma, ya no se guarda.'],
     ['reglas', 'Alertas de casillas', 'Marca casillas incoherentes con el tipo de dato y predecesores que faltan.'],
     ['sintipo', '«Sin tipo de dato» resaltado', 'Se muestra en rojo y negrita.'],
     ['puesto', 'Puesto de trabajo faltante', 'La celda parpadea si falta asignarlo.'],
@@ -830,6 +836,18 @@
   @property --beam-hue-base { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
   .rmd-beam[data-beam] { transition: --beam-hue-base .7s var(--rmd-curva); } .rmd-beam[data-fin="ok"] { --beam-hue-base: -110deg; } .rmd-beam[data-fin="mal"] { --beam-hue-base: 165deg; }
 
+  /* Listas de pasos: campos vacíos tenues (sin borde) mientras la fila no tiene el ratón encima ni el foco; Estado de la lista principal en color */
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMInputBase:not(.sapMInputBaseHasFocus):has(input.sapMInputBaseInner[value=""]) .sapMInputBaseContentWrapper,
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMInputBase:not(.sapMInputBaseHasFocus):has(input.sapMInputBaseInner:not([value])) .sapMInputBaseContentWrapper,
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMSlt:has(.sapMSltLabel:empty) { border-color: transparent !important; background: rgba(127,127,127,.07) !important; box-shadow: none !important; }
+  html.rmd-vacios .sapMDialog .sapMListTbl tbody tr:not(:hover):not(:focus-within) td .sapMSlt:has(.sapMSltLabel:empty) .sapMSltArrow { opacity: .25; }
+  html.rmd-estcolor span[data-rmd-est] { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 1px 7px; border-radius: 999px; font-size: 12.5px; font-weight: 600; line-height: 1.5; white-space: nowrap !important; word-break: keep-all !important; overflow: hidden; text-overflow: ellipsis; background: color-mix(in srgb, currentColor 13%, transparent); }
+  html.rmd-estcolor span[data-rmd-est="autorizado"] { color: var(--rmd-verde); } html.rmd-estcolor span[data-rmd-est="ingresado"] { color: var(--rmd-acento-texto); }
+  html.rmd-estcolor span[data-rmd-est="suspendido"] { color: var(--rmd-ambar); } html.rmd-estcolor span[data-rmd-est="cancelado"], html.rmd-estcolor span[data-rmd-est="solicitud-rechazada"] { color: var(--rmd-apagado); }
+  html.rmd-estcolor span[data-rmd-est^="solicit"]:not([data-rmd-est="solicitud-rechazada"]) { color: #b58ce6; }
+  /* Cabeceras de columna sin partir palabras («Ite / m») y celdas de «Comparar versiones» sin «ACONDI / CIONAD / O» */
+  html.rmd-textos .sapMDialog .sapMListTbl thead th .sapMText, html.rmd-textos .sapMDialog .sapMListTbl thead th .sapMLabel { word-break: keep-all !important; overflow-wrap: normal !important; hyphens: manual; }
+  html.rmd-textos #frgAdicCompareRM--idTblMdCompare td .sapMText { display: block; word-break: keep-all !important; overflow-wrap: normal !important; overflow: hidden; text-overflow: ellipsis; }
   /* Insumos procesados: contraste en tema oscuro (el portal pone #ddf4ff con !important, pensado para el tema claro: texto blanco sobre celeste) */
   html.sapUiTheme-sap_fiori_3_dark tr[data-mydata="PROCESSED"] { background: rgba(30,136,229,.22) !important; box-shadow: inset 3px 0 0 var(--rmd-acento-texto); }
   /* ── Vista móvil (html.rmd-movil) ── */
@@ -1357,7 +1375,7 @@
   const html = document.documentElement;
   function aplicarClases() {
     [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['sintipo', 'rmd-sintipo'],
-      ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
+      ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas'], ['pasosvacios', 'rmd-vacios'], ['estadocolor', 'rmd-estcolor'], ['textosportal', 'rmd-textos']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
   }
 
   // ---- 3. Reglas: tipo de dato -> casillas ------------------------------------------------------
@@ -2710,6 +2728,7 @@
         const original = obj.onSearch;
         const envuelto = async function (ev) {
           if (ev) return original.apply(this, arguments);                         // búsqueda manual («Ir»)
+          if (on('listapausa') && (document.hidden || dialogos().length)) { latido.pausado = this; latido.saltados = (latido.saltados || 0) + 1; return undefined; }   // no se ve: al volver
           latido.enCurso++; latido.inicio = Date.now(); latido.esLatido = false;
           try { return await original.apply(this, arguments); } finally { latido.enCurso = Math.max(0, latido.enCurso - 1); latido.fin = Date.now(); }
         };
@@ -2749,7 +2768,7 @@
     // al cerrar un PM se revisan de nuevo los de la lista
     const hayVentanaPM = dialogos().some(esDialogoPM); if (habiaVentanaPM && !hayVentanaPM) pmSucio = Date.now(); habiaVentanaPM = hayVentanaPM;
     const nDlg = dialogos().length; if (nDlg < dialogosAntes) generacionRmd++; dialogosAntes = nDlg;
-    if (on('sesion')) instalarFiltroLatido();
+    if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
     [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarVivo, gestionarFormulas, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas].forEach((f) => {
@@ -2783,7 +2802,14 @@
     return a ? `${a.mdId}|${a.estadoIdRmd_iMaestraIdBK}|${el ? el.value : ''}` : '';
   };
   let sinVentanas = 0;
+  // Refresco de la lista que esperó (ventana abierta o pestaña oculta): se hace al volver a verse la lista
+  function reanudarLatido() {
+    const c = latido.pausado; if (!c || document.hidden || dialogos().length) return;
+    latido.pausado = null; latido.reanudados = (latido.reanudados || 0) + 1; aislar('reanudarLatido', () => c.onSearch());
+  }
+  document.addEventListener('visibilitychange', () => setTimeout(reanudarLatido, 300));
   function revisionPeriodica() {
+    reanudarLatido();
     montarPanel();
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
@@ -4907,7 +4933,100 @@
       return r;
     };
   }
-  function parchearControlador() { const c = controladorPrincipal(); if (c) { parchearVerOP(c); parchearImpresora(c); } }
+  function parchearControlador() {
+    const c = controladorPrincipal(); if (c) { parchearVerOP(c); parchearImpresora(c); parchearCantidadRm(c); }
+    const L = definicionRmd(); if (L) { parchearCantidadRm(L); parchearComparar(L); }
+    aislar('ordenarCopiarDe', ordenarCopiarDe); aislar('textosDelPortal', textosDelPortal); aislar('estadoEnColor', estadoEnColor);
+  }
+  // Objeto con los métodos de la ventana del RMD («Configurar el RMD»): es el oListener de sus botones (p. ej. «Comparar versiones»); se recuerda
+  let defRmd = null;
+  function definicionRmd() {
+    if (defRmd) return defRmd;
+    const bt = [...document.querySelectorAll('.sapMDialog button[title="Comparar versiones"]')][0], c = bt && ctlDe(bt), reg = c && ((c.mEventRegistry || {}).press || [])[0];
+    if (reg && reg.oListener && typeof reg.oListener.onRestoreFiltersCompare === 'function') defRmd = reg.oListener;
+    return defRmd;
+  }
+  // «Ver Insumos» (y el guardado de «Asociar fórmulas»): el portal recalcula la cantidad en RMD de cada insumo y la vuelve a guardar con fecha y
+  // usuario aunque no cambie (onSaveCantidadRm). Si la cantidad guardada ya es la misma, ese guardado se omite: así quien solo mira no queda como
+  // el último que actualizó el insumo. Lo que cambia se guarda igual que antes.
+  const CAMPOS_CANT_RM = new Set(['cantidadRm', 'fechaActualiza', 'usuarioActualiza']);
+  window.__rmdStats.cantidadRm = { omitidos: 0, guardados: 0 };
+  function parchearCantidadRm(obj) {
+    const orig = obj && obj.onSaveCantidadRm; if (typeof orig !== 'function' || orig.__rmd) return;
+    const envuelto = async function () {
+      const m = this && this.mainModelv2; if (!on('insumosnoguarda') || !m || typeof m.update !== 'function') return orig.apply(this, arguments);
+      const up0 = m.update, st = window.__rmdStats.cantidadRm;
+      m.update = function (ruta, datos, params) {
+        const k = /^\/MD_ES_RE_INSUMO\('([^']+)'\)$/.exec(ruta || ''), act = k && m.getProperty(`/MD_ES_RE_INSUMO('${k[1]}')/cantidadRm`);
+        if (k && datos && Object.keys(datos).every((x) => CAMPOS_CANT_RM.has(x)) && act != null && act !== '' && Math.abs(parseFloat(act) - Number(datos.cantidadRm)) < 1e-9) {
+          st.omitidos++; setTimeout(() => { if (params && params.success) params.success({}, { statusCode: 204 }); }, 0); return { abort() {} };
+        }
+        if (k) st.guardados++;
+        return up0.apply(this, arguments);
+      };
+      try { return await orig.apply(this, arguments); } finally { m.update = up0; }
+    };
+    envuelto.__rmd = true; obj.onSaveCantidadRm = envuelto;
+  }
+  // «Comparar versiones»: el portal ofrece lo que tenga la lista principal (con un solo código buscado, nada). Arriba van las versiones del mismo
+  // producto, de la más nueva a la más antigua (leídas por codigoversionprincipal); debajo, lo demás. El título deja de decir «Adicionar Estructura».
+  function parchearComparar(L) {
+    const orig = L.onRestoreFiltersCompare; if (orig.__rmd) return;
+    const envuelto = function () {
+      const r = orig.apply(this, arguments), dlg = this.oAddCompareRM;
+      if (on('textosportal') && dlg && dlg.getTitle && /^Adicionar Estructura al RMD\s*:/.test(dlg.getTitle())) dlg.setTitle(dlg.getTitle().replace(/^Adicionar Estructura al RMD\s*:/, 'Comparar versiones:'));
+      if (on('listasutiles')) versionesParaComparar().catch((e) => anotarError('versionesParaComparar', e));
+      return r;
+    };
+    envuelto.__rmd = true; L.onRestoreFiltersCompare = envuelto;
+  }
+  let catComparar = null;
+  async function versionesParaComparar() {
+    const ctrl = controladorPrincipal(); if (!ctrl) return;
+    const V = ctrl.getView(), asoc = V.getModel('asociarDatos').getData(), m = V.getModel('compareRM'); if (!asoc || !asoc.mdId || !m) return;
+    const modelo = V.getModel('mainModelv2');
+    if (!catComparar) catComparar = await tzCatalogos(modelo);
+    const lin = await tzLinaje(modelo, asoc.codigo, catComparar);         // las mismas versiones que «Historia del producto»
+    const vs = lin.versiones.filter((x) => x.mdId !== asoc.mdId && x.activo !== false && !/cancel/i.test(x.estado || '')).sort((a, b) => (+b.version || 0) - (+a.version || 0));
+    if (!vs.length || V.getModel('compareRM') !== m) return;
+    const ids = new Set(vs.map((x) => x.mdId)), resto = (m.getData() || []).filter((x) => !ids.has(x.mdId));
+    m.setData([...vs, ...resto]); m.refresh(true);
+  }
+  // «Copiar de RMD»: 3136 RMD sin orden. Primero Autorizados e Ingresados, luego el resto; dentro, del más reciente al más antiguo; sin código, al final.
+  const RANGO_COPIA = { 'Autorizado': 0, 'Ingresado': 1, 'Solicitud Aprobada': 2, 'Solicitado': 3, 'Suspendido': 4, 'Solicitud Rechazada': 6 };
+  function ordenarCopiarDe() {
+    if (!on('listasutiles')) return;
+    const t = typeof sap !== 'undefined' && sap.ui.getCore().byId('frgCopiarDeRM--idTBCopyDe'); if (!t || !t.getDomRef()) return;
+    const bi = t.getBindingInfo('items'), M = bi && t.getModel(bi.model), datos = M && M.getProperty(bi.path); if (!Array.isArray(datos) || datos.__rmdOrden || !datos.length) return;
+    const est = (x) => (x.estadoIdRmd && x.estadoIdRmd.contenido) || '', rango = (x) => (x.codigo ? (RANGO_COPIA[est(x)] ?? 5) : 7);
+    const fecha = (x) => { const f = x.fechaRegistro; return f instanceof Date ? f.getTime() : +String(f || '').replace(/\D/g, '').slice(0, 13) || 0; };
+    const orden = datos.slice().sort((a, b) => rango(a) - rango(b) || fecha(b) - fecha(a));
+    orden.__rmdOrden = true; M.setProperty(bi.path, orden);
+  }
+  // Textos del portal: id interno en el título de «Copiar a RMD» y tildes que faltan en sus avisos
+  const TILDES_PORTAL = [[/\bconfiguracion\b/g, 'configuración'], [/\bConfiguracion\b/g, 'Configuración'], [/\binformacion\b/g, 'información'], [/\bInformacion\b/g, 'Información']];
+  function textosDelPortal() {
+    if (!on('textosportal')) return;
+    document.querySelectorAll('.sapMDialog').forEach((d) => {                 // (dialogos() deja fuera los avisos del portal)
+      if (!d.getClientRects().length) return;
+      const c = sap.ui.getCore().byId(d.id); if (!c || !c.getTitle) return;
+      const ti = c.getTitle() || '', limpio = ti.replace(/\s+dlg\w+\s*$/, ''); if (limpio !== ti) c.setTitle(limpio);
+      if (d.classList.contains('sapMMessageDialog')) d.querySelectorAll('.sapMMsgBoxText').forEach((s) => {
+        let v = s.textContent; TILDES_PORTAL.forEach(([re, r]) => { v = v.replace(re, r); });
+        if (v !== s.textContent) { const tc = sap.ui.getCore().byId(s.id); if (tc && tc.setText) tc.setText(v); else s.textContent = v; }
+      });
+    });
+  }
+  // Lista principal: el Estado del RMD como etiqueta de color (data-rmd-est; el color lo pone el CSS con html.rmd-estcolor)
+  function estadoEnColor() {
+    if (!on('estadocolor')) return;
+    const ctl = tablaPrincipal(), tabla = ctl && ctl.getDomRef() && ctl.getDomRef().querySelector('table'); if (!tabla) return;
+    const i = [...tabla.querySelectorAll('thead th')].findIndex((th) => norm(th.textContent) === 'Estado'); if (i < 0) return;
+    tabla.querySelectorAll('tbody tr').forEach((tr) => {
+      const s = tr.children[i] && tr.children[i].querySelector('span'); if (!s) return;
+      const k = SIN_ACENTOS(norm(s.textContent)).toLowerCase().replace(/\s+/g, '-'); if (k && s.dataset.rmdEst !== k) s.dataset.rmdEst = k;
+    });
+  }
 
   // ==XLSX-INICIO==
   // Escritor/lector .xlsx sin dependencias: estilos, fórmulas con valor en caché, autofiltro, paneles fijos y tablas dinámicas con caché. Comprime con
@@ -14487,10 +14606,10 @@ td.ult { position: relative; }
   // [nombre, ícono, claves de OPC]
   const GRUPOS_PANEL = [
     ['Uso diario', 'inicio', ['saludo', 'fiestas', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
-    ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios']],
-    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo']],
+    ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios', 'listapausa', 'estadocolor']],
+    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
-    ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto']],
+    ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
     ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'plantillaprod', 'suspension']],
   ];
