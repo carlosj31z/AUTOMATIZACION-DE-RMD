@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.87.0
+// @version      1.87.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.87.0';                                                       // mantener igual a @version
+  const VERSION = '1.87.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -291,9 +291,10 @@
   .rmd-cmp-pdf > .rmd-cmp-pdf-cab { flex: 0 0 auto; padding: 6px 10px; font-size: 12.5px; background: var(--rmd-cabecera); border-bottom: 1px solid var(--rmd-borde); }
   .rmd-cmp-pdf > .rmd-cmp-pdf-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; background: #8a9099; }
   .rmd-cmp-papel { width: max-content; margin: 0 auto; padding: 18pt; background: #fff; color: #000; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
-  .pdf-hoja { font-family: Roboto, Arial, Helvetica, sans-serif; line-height: 1.17; color: #000; text-align: left; }
+  .pdf-hoja { font-family: RobotoPdf, Roboto, Arial, Helvetica, sans-serif; line-height: 1.17; color: #000; text-align: left; }
   .pdf-hoja table.pdf-tabla { border-collapse: collapse; border-spacing: 0; }
   .pdf-hoja td { padding: 2pt 4pt; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pdf-hoja td > img { display: block; }
   .pdf-hoja td > table.pdf-tabla { margin: 0; } .pdf-cols { display: flex; } .pdf-cab { margin-bottom: 10pt; } .pdf-t { white-space: pre-wrap; } .pdf-hoja ul, .pdf-hoja ol { margin-top: 0; margin-bottom: 0; }
   .pdf-hoja mark { color: inherit; border-radius: 2px; }
   .pdf-hoja tr.pdf-quitado > td, .pdf-hoja .pdf-quitado.pdf-t, .pdf-hoja li.pdf-quitado { background: rgba(255,77,77,.25) !important; }
@@ -7243,8 +7244,9 @@
     const PT = (n) => `${Math.round((+n || 0) * 100) / 100}pt`;
     const color = (c) => (typeof c === 'string' && /^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(c.trim()) ? c.trim() : '');
     const HEREDA = ['fontSize', 'bold', 'italics', 'color', 'alignment', 'decoration'];
+    const margenesPagina = (doc) => { const m = doc.pageMargins; return typeof m === 'number' ? [m, m] : Array.isArray(m) ? (m.length === 2 ? [m[0], m[0]] : [m[0], m[2]]) : [40, 40]; };
     function anchoHoja(doc) {
-      const m = doc.pageMargins, v = typeof m === 'number' ? [m, m] : Array.isArray(m) ? (m.length === 2 ? [m[0], m[0]] : [m[0], m[2]]) : [40, 40];
+      const v = margenesPagina(doc);
       const tam = { A4: [595.28, 841.89], LETTER: [612, 792], LEGAL: [612, 1008] }, p = doc.pageSize && typeof doc.pageSize === 'object' ? [+doc.pageSize.width, +doc.pageSize.height] : tam[String(doc.pageSize || 'A4').toUpperCase()] || tam.A4;
       return (doc.pageOrientation === 'landscape' ? Math.max(p[0], p[1]) : p[0]) - v[0] - v[1];
     }
@@ -7285,10 +7287,12 @@
             const cs = Math.max(1, +o.colSpan || 1), rs = Math.max(1, +o.rowSpan || 1);
             for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) if (a || b) ocupado.add((i + a) + ',' + (j + b));
             const qc = resolver(o, q), bd = sinBordes ? [0, 0, 0, 0] : Array.isArray(o.border) ? o.border : [1, 1, 1, 1];
-            const borde = ['left', 'top', 'right', 'bottom'].map((lado, k) => `border-${lado}:${bd[k] ? '1px solid #000' : '0'};`).join('');
+            const borde = ['left', 'top', 'right', 'bottom'].map((lado, k) => `border-${lado}:${bd[k] ? '1pt solid #000' : '0'};`).join('');
             const k = ref ? ref.cols.get(j) : null, tr = m && m.celdas && k != null ? m.celdas[k] : null;
             const dentro = tr ? tramos(tr) : o.table ? tabla({ table: o.table, layout: o.layout }, qc) : o.stack || o.columns || o.ul || o.ol || o.image ? bloque({ ...o, style: undefined, margin: undefined }, qc) : inline(o.text, qc);
-            return `<td${cs > 1 ? ` colspan="${cs}"` : ''}${rs > 1 ? ` rowspan="${rs}"` : ''}${tr ? ' class="pdf-celda-cambio"' : ''} style="${borde}${css(qc)}${color(o.fillColor) ? `background:${color(o.fillColor)};` : ''}">${dentro}</td>`;
+            const mc = qc.margin == null ? [0, 0, 0, 0] : typeof qc.margin === 'number' ? [qc.margin, qc.margin, qc.margin, qc.margin] : qc.margin.length === 2 ? [qc.margin[0], qc.margin[1], qc.margin[0], qc.margin[1]] : qc.margin;
+            const relleno = `padding:${PT(2 + (+mc[1] || 0))} ${PT(4 + (+mc[2] || 0))} ${PT(2 + (+mc[3] || 0))} ${PT(4 + (+mc[0] || 0))};`;
+            return `<td${cs > 1 ? ` colspan="${cs}"` : ''}${rs > 1 ? ` rowspan="${rs}"` : ''}${tr ? ' class="pdf-celda-cambio"' : ''} style="${borde}${relleno}${css(qc)}${color(o.fillColor) ? `background:${color(o.fillColor)};` : ''}">${dentro}</td>`;
           }).join('');
           return `<tr${ref ? ` data-l="${ref.l}"` : ''}${m ? ` class="pdf-${m.tipo}"` : ''}>${tds}</tr>`;
         }).join('');
@@ -7311,7 +7315,7 @@
         return `<div class="pdf-t${m ? ' pdf-' + m.tipo : ''}"${ref ? ` data-l="${ref.l}"` : ''} style="${css(q, true)}">${tr ? tramos(tr) : inline(n.text, q)}</div>`;
       };
       const base = { fontSize: 12, ...(doc.defaultStyle || {}) };
-      return `<div class="pdf-hoja" style="width:${PT(anchoHoja(doc))};${css(base)}"><div class="pdf-cab">${bloque(L.cabecera, base)}</div>${bloque(doc.content, base)}</div>`;
+      return `<div class="pdf-hoja" style="width:${PT(anchoHoja(doc))};${css(base)}"><div class="pdf-cab" style="margin-left:-${PT(margenesPagina(doc)[0])}">${bloque(L.cabecera, base)}</div>${bloque(doc.content, base)}</div>`;
     }
     return { lineas, emparejar, parecido, palabras, comparar, sinCambio, celdasCambiadas, htmlPdf, SEP };
   })();
@@ -7364,6 +7368,15 @@
       d.open(); d.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Comparar dos RMD</title></head><body class="rmd-cmp-pagina"><div class="rmd-cmp-resultado"></div></body></html>`); d.close();
       d.documentElement.className = document.documentElement.className;
       const st = d.createElement('style'); st.textContent = CSS; d.head.appendChild(st);
+      // la letra del PDF: la Roboto que pdfMake trae en su sistema de archivos virtual
+      const almacen = (window.pdfMake && pdfMake.virtualfs && pdfMake.virtualfs.storage) || {}, vfs = (window.pdfMake && pdfMake.vfs) || {};
+      [['Roboto-Regular.ttf', '400', 'normal'], ['Roboto-Medium.ttf', '700', 'normal'], ['Roboto-Italic.ttf', '400', 'italic'], ['Roboto-MediumItalic.ttf', '700', 'italic']].forEach(([f, peso, estilo]) => {
+        try {
+          const b = almacen[f] || (typeof vfs[f] === 'string' ? Uint8Array.from(atob(vfs[f]), (c) => c.charCodeAt(0)) : null); if (!b || !b.byteLength) return;
+          const letra = new w.FontFace('RobotoPdf', b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), { weight: peso, style: estilo });
+          d.fonts.add(letra); letra.load().then(() => alCambiarTamano(), () => {});
+        } catch (e) { /* sin la letra del PDF: Arial */ }
+      });
       pagina = w; res = d.querySelector('.rmd-cmp-resultado');
       res.addEventListener('click', alClic); res.addEventListener('change', alCambio);
       d.addEventListener('keydown', teclas, true); w.addEventListener('resize', alCambiarTamano);
