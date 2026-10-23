@@ -11,30 +11,39 @@ from urllib.parse import unquote, urlparse
 from playwright.sync_api import sync_playwright
 
 # Recorre la carpeta en anchura, con pocas peticiones a la vez para no saturar el sitio.
-_JS_LISTAR = """
+_JS_LISTAR = r"""
 async ({ sitio, carpeta }) => {
   const api = (rel) => `${sitio}/_api/web/GetFolderByServerRelativePath(decodedurl=@a)?@a='${encodeURIComponent(rel.replace(/'/g, "''"))}'`
     + '&$expand=Folders,Files';
-  const pdfs = [], cola = [carpeta]; let activos = 0, error = null;
+  const pdfs = [], fallos = [], cola = [carpeta]; let activos = 0;
+  const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+  const lista = (x) => (x && x.results) || x || [];
+  // SharePoint limita las peticiones seguidas (406/429/503): se reintenta, y con odata=verbose si insiste.
+  async function leer(rel) {
+    for (let i = 0; i < 8; i++) {
+      const r = await fetch(api(rel), { headers: { Accept: i < 2 ? 'application/json;odata=nometadata' : 'application/json;odata=verbose' }, credentials: 'include' });
+      if (r.ok) { const d = await r.json(); return d.d || d; }
+      if (![406, 429, 503].includes(r.status)) throw new Error(`${r.status}`);
+      await espera(1000 * (+r.headers.get('Retry-After') || 2 ** i));
+    }
+    throw new Error('sin respuesta tras 8 intentos');
+  }
   async function una(rel) {
-    const r = await fetch(api(rel), { headers: { Accept: 'application/json;odata=nometadata' }, credentials: 'include' });
-    if (!r.ok) throw new Error(`${r.status} al leer ${rel}`);
-    const d = await r.json();
-    (d.Folders || []).forEach((f) => { if (f.Name !== 'Forms') cola.push(f.ServerRelativeUrl); });
-    (d.Files || []).forEach((f) => { if (/\\.pdf$/i.test(f.Name)) pdfs.push({ ruta: f.ServerRelativeUrl, modificado: f.TimeLastModified, bytes: +f.Length }); });
+    const d = await leer(rel);
+    lista(d.Folders).forEach((f) => { if (f.Name !== 'Forms') cola.push(f.ServerRelativeUrl); });
+    lista(d.Files).forEach((f) => { if (/\.pdf$/i.test(f.Name)) pdfs.push({ ruta: f.ServerRelativeUrl, modificado: f.TimeLastModified, bytes: +f.Length }); });
   }
   await new Promise((fin) => {
     const seguir = () => {
-      if (error || (!cola.length && !activos)) return fin();
-      while (cola.length && activos < 6) {
+      if (!cola.length && !activos) return fin();
+      while (cola.length && activos < 3) {
         const rel = cola.shift(); activos++;
-        una(rel).catch((e) => { error = e.message; }).finally(() => { activos--; seguir(); });
+        una(rel).catch((e) => { fallos.push(`${rel}: ${e.message}`); }).finally(() => { activos--; seguir(); });
       }
     };
     seguir();
   });
-  if (error) throw new Error(error);
-  return pdfs;
+  return { pdfs, fallos };
 }
 """
 
@@ -57,18 +66,21 @@ def listar_pdfs(cdp_url: str, url_carpeta: str) -> List[str]:
     with sync_playwright() as playwright:
         browser = playwright.chromium.connect_over_cdp(cdp_url)
         context = browser.contexts[0]
-        page = next((p for p in context.pages if p.url.startswith(sitio)), None)
+        page = next((p for p in context.pages if p.url.startswith(sitio.split("/sites/")[0])), None)
         propia = page is None
         if propia:
             page = context.new_page()
             page.goto(sitio, wait_until="domcontentloaded")
         try:
-            if "login.microsoftonline" in page.url or not page.url.startswith(sitio):
+            if "login.microsoftonline" in page.url or not page.url.startswith(sitio.split("/sites/")[0]):
                 raise RuntimeError("Inicia sesión en SharePoint en ese Chromium y vuelve a correr el comando.")
-            filas = page.evaluate(_JS_LISTAR, {"sitio": sitio, "carpeta": carpeta})
+            res = page.evaluate(_JS_LISTAR, {"sitio": sitio, "carpeta": carpeta})
         finally:
             if propia:
                 page.close()
         # No se llama a browser.close(): cerraría el Chromium de la persona.
+    if res["fallos"]:
+        raise RuntimeError(f"No se pudieron leer {len(res['fallos'])} carpeta(s); el listado quedaría incompleto:\n"
+                           + "\n".join(res["fallos"][:20]))
     base = carpeta + "/"
-    return sorted(f["ruta"][len(base):] if f["ruta"].startswith(base) else f["ruta"] for f in filas)
+    return sorted(f["ruta"][len(base):] if f["ruta"].startswith(base) else f["ruta"] for f in res["pdfs"])

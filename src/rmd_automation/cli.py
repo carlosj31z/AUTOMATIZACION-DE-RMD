@@ -250,8 +250,8 @@ def contingencia_group() -> None:
 
 
 @contingencia_group.command("revisar")
-@click.option("--maestro", type=click.Path(exists=True), required=True,
-              help="Exportación SAPUI5 del maestro (.xlsx/.csv), p. ej. «BD RMD SETIEMBRE 2026 - P1-P2.xlsx».")
+@click.option("--maestro", type=click.Path(exists=True), default=None,
+              help="Exportación SAPUI5 del maestro (.xlsx/.csv). Sin él, se lee del portal abierto en el Chromium de RMD_CDP_URL.")
 @click.option("--carpeta", type=click.Path(exists=True, file_okay=False), default=None,
               help="Copia local de 3.-CONTINGENCIA (sincronizada con OneDrive).")
 @click.option("--listado", type=click.Path(exists=True, dir_okay=False), default=None,
@@ -261,7 +261,7 @@ def contingencia_group() -> None:
 @click.option("--guardar-listado", type=click.Path(dir_okay=False), default=None,
               help="Guarda las rutas leídas para repetir la revisión sin volver a SharePoint.")
 @click.option("--salida", type=click.Path(dir_okay=False), default="brechas_contingencia.xlsx", show_default=True)
-def contingencia_revisar(maestro: str, carpeta: str | None, listado: str | None, url_sp: str | None,
+def contingencia_revisar(maestro: str | None, carpeta: str | None, listado: str | None, url_sp: str | None,
                          guardar_listado: str | None, salida: str) -> None:
     """Compara los RMD Autorizados del maestro con los PDF de la carpeta de contingencia y arma un Excel."""
     from . import contingencia as ct
@@ -269,23 +269,30 @@ def contingencia_revisar(maestro: str, carpeta: str | None, listado: str | None,
     fuentes = [x for x in (carpeta, listado, url_sp) if x]
     if len(fuentes) != 1:
         raise click.UsageError("Indica una sola fuente de PDF: --carpeta, --listado o --sharepoint.")
+    import os
+
+    cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
     if carpeta:
         rutas = ct.listar_carpeta(carpeta)
     elif listado:
         rutas = ct.leer_listado(listado)
     else:
-        import os
-
         from .sharepoint import listar_pdfs
 
-        cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
         click.echo(f"Leyendo SharePoint con el Chromium de {cdp}…")
         rutas = listar_pdfs(cdp, url_sp)
     if guardar_listado:
         from pathlib import Path
 
         Path(guardar_listado).write_text("\n".join(rutas) + "\n", encoding="utf-8")
-    brechas = ct.comparar(ct.leer_maestro(maestro), rutas)
+    if maestro:
+        rmds = ct.leer_maestro(maestro)
+    else:
+        from .maestro_portal import leer_maestro_portal
+
+        click.echo("Leyendo el maestro del portal…")
+        rmds = leer_maestro_portal(cdp)
+    brechas = ct.comparar(rmds, rutas)
     ct.escribir_excel(brechas, salida)
     click.echo(ct.resumen(brechas))
     click.echo(f"Detalle en {salida}")

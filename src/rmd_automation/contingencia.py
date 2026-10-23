@@ -6,6 +6,7 @@ versión, en alguna de estas formas:
 
     2202403301-FAB-5-_GASEOVET_80mg_mL_SUS 1000 L.pdf     código-ETAPA-versión-…
     2202607732-5-GASEOVET_80mg_mL_SUS_….pdf               código-versión-… (nombre de la descarga)
+    2202506416-ENV3-ELECTROLIGHT_….pdf                    código-ETAPAversión-…
     13407-ACO-1-_GASEOVET_….pdf                           código antiguo (pre-migración)
 
 Vigente = estado «Autorizado» en el maestro (exportación SAPUI5 de la lista «Configuración Manufactura
@@ -23,10 +24,14 @@ from typing import Dict, Iterable, List, Optional
 from .snapshot import normalizar
 
 ESTADO_VIGENTE = "AUTORIZADO"
-CARPETA_OBSOLETO = "OBSOLETO"
 ETAPAS = {"FAB": "FABRICACION", "ENV": "ENVASE", "ACO": "ACONDICIONADO", "REC": "RECUBRIMIENTO", "INS": "INSPECCION"}
 
-_NOMBRE = re.compile(r"^(?P<codigo>\d{4,10})-(?:(?P<etapa>[A-Za-z]{3})-)?(?P<version>\d{1,3})-")
+# Se toleran espacios junto a los guiones y «_» tras la versión («2202607906- INS-1-…», «…-INS-2_…», «15443-AACO1-2-…»).
+_NOMBRES = [
+    re.compile(r"^(?P<codigo>\d{4,10})\s*-\s*(?:(?P<etapa>[A-Za-z]{3,4})\d?\s*-\s*)?(?P<version>\d{1,3})\s*[-_]"),
+    re.compile(r"^(?P<codigo>\d{4,10})\s*-\s*(?P<etapa>[A-Za-z]{3})(?P<version>\d{1,3})\s*[-_]"),
+]
+_OBSOLETO = re.compile(r"OB?S?OLETOS?\s*\d*")  # también «OSOLETO», «OBOLETO», «OBSOLETO1»
 _COPIA = re.compile(r"\s\(\d+\)\.pdf$", re.IGNORECASE)
 
 
@@ -61,7 +66,7 @@ class Pdf:
     def carpeta(self) -> str:
         """Carpeta de la etapa (sin OBSOLETO), donde debería estar el vigente."""
         partes = PurePosixPath(self.ruta).parent.parts
-        if partes and normalizar(partes[-1]) == CARPETA_OBSOLETO:
+        if partes and es_obsoleto(partes[-1]):
             partes = partes[:-1]
         return "/".join(partes)
 
@@ -76,6 +81,10 @@ class Brechas:
     al_dia: int = 0
     vigentes: int = 0
     pdfs: int = 0
+
+
+def es_obsoleto(carpeta: str) -> bool:
+    return bool(_OBSOLETO.fullmatch(normalizar(carpeta)))
 
 
 # ---------------------------------------------------------------- maestro
@@ -132,11 +141,11 @@ def interpretar(ruta: str) -> Optional[Pdf]:
     """Código, versión y etapa a partir del nombre; None si el nombre no sigue ninguna convención."""
     ruta = ruta.replace("\\", "/").strip("/")
     p = PurePosixPath(ruta)
-    m = _NOMBRE.match(p.name)
+    m = next((m for r in _NOMBRES for m in [r.match(p.name)] if m), None)
     if not m:
         return None
-    return Pdf(ruta=ruta, codigo=m["codigo"], version=m["version"], etapa=(m["etapa"] or "").upper(),
-               obsoleto=any(normalizar(x) == CARPETA_OBSOLETO for x in p.parts[:-1]), copia=bool(_COPIA.search(p.name)))
+    return Pdf(ruta=ruta, codigo=m["codigo"], version=m["version"], etapa=(m["etapa"] or "").upper()[-3:],
+               obsoleto=any(es_obsoleto(x) for x in p.parts[:-1]), copia=bool(_COPIA.search(p.name)))
 
 
 def listar_carpeta(raiz) -> List[str]:
@@ -174,7 +183,7 @@ def comparar(maestro: Iterable[Rmd], rutas: Iterable[str]) -> Brechas:
         b.pdfs += 1
         p = interpretar(ruta)
         if p is None:
-            if CARPETA_OBSOLETO not in normalizar(ruta):
+            if not any(es_obsoleto(x) for x in PurePosixPath(ruta).parts[:-1]):
                 b.sin_codigo.append({"Archivo": ruta})
             continue
         pdfs.append(p)
@@ -200,17 +209,20 @@ def comparar(maestro: Iterable[Rmd], rutas: Iterable[str]) -> Brechas:
         if r is not None and r.vigente:
             continue
         nuevo = vigente_de.get(familia(r), []) if r is not None else []
+        sin_pdf = [n for n in nuevo if not activos.get(n.codigo)]
         for p in lista:
             fila = {"Archivo": p.ruta, "Código": codigo, "Versión PDF": p.version,
                     "Estado en SAP": r.estado if r else "No está en el maestro",
                     "Descripción": r.descripcion if r else ""}
-            if nuevo:
-                fila["Vigente: código"] = ", ".join(n.codigo for n in nuevo)
-                fila["Vigente: versión"] = ", ".join(n.version for n in nuevo)
-                for n in nuevo:
+            if sin_pdf:  # la versión vigente no tiene PDF: hay que generarlo y pasar este a OBSOLETO
+                fila["Vigente: código"] = ", ".join(n.codigo for n in sin_pdf)
+                fila["Vigente: versión"] = ", ".join(n.version for n in sin_pdf)
+                for n in sin_pdf:
                     reemplazos.setdefault(n.codigo, p)
                 b.desactualizados.append(fila)
-            else:
+            else:  # basta con pasarlo a OBSOLETO
+                if nuevo:
+                    fila["Vigente ya en la carpeta"] = ", ".join(n.codigo for n in nuevo)
                 b.no_vigentes.append(fila)
 
     # RMD Autorizados sin PDF vigente.
@@ -239,10 +251,10 @@ def resumen(b: Brechas) -> str:
     return "\n".join([
         f"RMD vigentes (Autorizados): {b.vigentes}",
         f"  con PDF de contingencia al día: {b.al_dia}",
-        f"  con PDF de una versión anterior (desactualizados): {len({f['Vigente: código'] for f in b.desactualizados})}",
-        f"  sin PDF: {len(b.faltantes)}",
+        f"  con PDF solo de una versión anterior (desactualizados): {b.vigentes - b.al_dia - len(b.faltantes)}",
+        f"  sin ningún PDF: {len(b.faltantes)}",
         f"PDF revisados: {b.pdfs}",
-        f"  de RMD no vigentes fuera de OBSOLETO: {len(b.no_vigentes)}",
+        f"  de RMD no vigentes fuera de OBSOLETO (pasarlos a OBSOLETO): {len(b.no_vigentes) + len(b.desactualizados)}",
         f"  repetidos: {len(b.duplicados)}",
         f"  sin código reconocible en el nombre: {len(b.sin_codigo)}",
     ])
@@ -258,7 +270,7 @@ def escribir_excel(b: Brechas, salida) -> None:
     ws.title = "Resumen"
     for linea in resumen(b).splitlines():
         ws.append([linea])
-    hojas = [("Sin PDF", b.faltantes), ("Desactualizados", b.desactualizados), ("No vigentes", b.no_vigentes),
+    hojas = [("Sin PDF", b.faltantes), ("Desactualizados", b.desactualizados), ("Pasar a OBSOLETO", b.no_vigentes),
              ("Repetidos", b.duplicados), ("Nombre sin código", b.sin_codigo)]
     for titulo, filas in hojas:
         h = wb.create_sheet(titulo)

@@ -133,9 +133,13 @@ con los PDF de `04.-RMD/3.-CONTINGENCIA` y arma un Excel con los RMD sin PDF, lo
 los de RMD ya no vigentes fuera de `OBSOLETO` y los repetidos. Reconoce los nombres `código-ETAPA-versión-…`,
 `código-versión-…` y los códigos antiguos. No escribe en SharePoint.
 
+Sin `--maestro`, lee el maestro de hoy del portal abierto (lista «Configuración Manufactura Digital»). Con
+`--sharepoint` recorre la carpeta con la sesión de SharePoint del mismo Chromium (~8 min para ~10 000 PDF,
+porque SharePoint limita las lecturas seguidas).
+
 ```bash
-# leyendo SharePoint con la sesión del Chromium de RMD_CDP_URL (inicia sesión en SharePoint ahí)
-rmd-automation contingencia revisar --maestro "BD RMD SETIEMBRE 2026 - P1-P2.xlsx" --sharepoint --guardar-listado data/contingencia.txt
+# todo desde el Chromium de RMD_CDP_URL (sesión iniciada en el portal y en SharePoint)
+rmd-automation contingencia revisar --sharepoint --guardar-listado data/contingencia.txt
 # o con una copia sincronizada por OneDrive, o con el listado guardado
 rmd-automation contingencia revisar --maestro maestro.xlsx --carpeta "C:/Users/.../3.-CONTINGENCIA"
 rmd-automation contingencia revisar --maestro maestro.xlsx --listado data/contingencia.txt

@@ -36,6 +36,12 @@ def test_nombres_en_las_tres_convenciones():
     assert b.carpeta == "X/ACONDICIONADO"
     assert interpretar("X/13407-ACO-1-_GASEOVET-N.pdf").codigo == "13407"
     assert interpretar("X/instructivo.pdf") is None
+    c = interpretar("X/ENVASE/OSOLETO/2202506416-ENV3-ELECTROLIGHT.pdf")
+    assert (c.codigo, c.version, c.etapa, c.obsoleto) == ("2202506416", "3", "ENV", True)
+    assert interpretar("X/2202607906- INS -1-IOPAMED.pdf").version == "1"
+    assert interpretar("X/2202506705-INS-2_METOCLOPRAMIDA.pdf").version == "2"
+    d = interpretar("X/15443-AACO1-2-LINCOMICINA.pdf")
+    assert (d.codigo, d.version, d.etapa) == ("15443", "2", "ACO")
 
 
 def test_maestro_ignora_solicitudes_sin_codigo(tmp_path):
@@ -55,6 +61,9 @@ def test_brechas(tmp_path):
     assert falt["2202600002"]["Carpeta sugerida"] == "2.- PLANTA 2/SOLIDOS/OTRO TAB/ENVASE"
     assert {f["Archivo"].endswith("(1).pdf") for f in b.duplicados} == {True, False}
     assert [f["Archivo"] for f in b.sin_codigo] == ["2.- PLANTA 2/SOLIDOS/OTRO TAB/ENVASE/instructivo.pdf"]
+    # Con el PDF de la v6 ya en la carpeta, la v5 solo debe pasarse a OBSOLETO.
+    b2 = comparar(_maestro(tmp_path), PDFS + ["1.- PLANTA 1/LIQUIDOS/GASEOVET/FABRICACION/2202609999-FAB-6-_GASEOVET.pdf"])
+    assert b2.desactualizados == [] and b2.no_vigentes[0]["Vigente ya en la carpeta"] == "2202609999"
     escribir_excel(b, tmp_path / "b.xlsx")
     assert (tmp_path / "b.xlsx").stat().st_size > 0
 
