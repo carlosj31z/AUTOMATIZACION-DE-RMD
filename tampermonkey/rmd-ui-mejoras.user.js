@@ -250,6 +250,21 @@
   .rmd-cont-base { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 7px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); font-size: 12.5px; }
   .rmd-cont-base > span { flex: 1 1 auto; min-width: 0; } .rmd-cont-camino { color: var(--rmd-apagado); } .rmd-cont-base b { white-space: nowrap; } .rmd-cont-base svg, .rmd-cont-ruta svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: var(--rmd-ambar); stroke-width: 1.4; stroke-linejoin: round; }
   .rmd-cont-ruta { display: flex; gap: 6px; align-items: flex-start; } .rmd-cont-ruta svg { margin-top: 1px; } .rmd-cont-abrir { margin-left: 4px; color: var(--rmd-acento-texto) !important; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .rmd-modal.rmd-cont-ventana { width: 96vw; max-width: none; height: 94vh; max-height: none; }
+  .rmd-cont-ventana h3 { margin-bottom: 2px; font-size: 18px; } .rmd-cont-ventana .rmd-modal-cuerpo { display: flex; flex-direction: column; overflow: hidden; }
+  .rmd-cont-ventana .rmd-cont-intro { margin: 0 0 14px !important; }
+  .rmd-cont-ventana .rmd-cont-plan { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; } .rmd-cont-ventana .rmd-cont-tabla { flex: 1 1 auto; max-height: none; }
+  .rmd-cont-ventana .rmd-cont-tabla table { font-size: 13px; } .rmd-cont-ventana .rmd-cont-tabla td { padding: 11px 12px; } .rmd-cont-ventana .rmd-cont-tabla th { padding: 9px 12px; }
+  .rmd-cont-kpis { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rmd-cont-kpi { display: flex; flex-direction: column; align-items: flex-start; min-width: 132px; padding: 8px 14px 7px; border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-cont-c, var(--rmd-borde-campo)); border-radius: 8px; background: var(--rmd-barra); color: var(--rmd-texto); font: 12.5px var(--rmd-fuente); text-align: left; cursor: pointer; }
+  .rmd-cont-kpi b { font-size: 22px; line-height: 1.15; font-weight: 700; } .rmd-cont-kpi span { color: var(--rmd-apagado); }
+  .rmd-cont-kpi:hover:not(:disabled) { border-color: var(--rmd-cont-c, var(--rmd-acento)); } .rmd-cont-kpi:disabled { opacity: .45; cursor: default; }
+  .rmd-cont-kpi.activo { background: color-mix(in srgb, var(--rmd-cont-c, var(--rmd-acento)) 16%, var(--rmd-barra)); border-color: var(--rmd-cont-c, var(--rmd-acento)); } .rmd-cont-kpi.activo span { color: var(--rmd-texto); }
+  .rmd-cont-kpi.todos { --rmd-cont-c: var(--rmd-acento); } .rmd-cont-kpi.subir { --rmd-cont-c: var(--rmd-acento-texto); } .rmd-cont-kpi.ya, .rmd-cont-kpi.ok { --rmd-cont-c: var(--rmd-verde); } .rmd-cont-kpi.mano { --rmd-cont-c: var(--rmd-ambar); } .rmd-cont-kpi.error { --rmd-cont-c: var(--rmd-rojo); }
+  .rmd-cont-datos { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-left: auto; align-self: flex-end; color: var(--rmd-apagado); font-size: 12.5px; } .rmd-cont-datos b { color: var(--rmd-texto); }
+  .rmd-cont-ventana .rmd-cont-res { gap: 10px 16px; margin-bottom: 12px; }
+  .rmd-cont-pie-estado { display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--rmd-apagado); font-size: 13px; white-space: nowrap; } .rmd-cont-pie-estado .rmd-cont-barra { flex: 0 0 220px; }
+  .rmd-cont-nombre { display: block; font-weight: 600; overflow-wrap: anywhere; } .rmd-cont-nombre.apagado { color: var(--rmd-apagado); font-weight: 400; }
   .rmd-cont-res:empty { display: none; }
   .rmd-cont-res { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; min-height: 30px; font-size: 13px; }
   .rmd-cont-res > b { margin-right: 6px; font-size: 14px; } .rmd-cont-res .rmd-cr-chips button:disabled { cursor: default; opacity: .45; }
@@ -278,7 +293,7 @@
   .rmd-cont-a { color: inherit; text-decoration: none; } .rmd-cont-a:hover { color: var(--rmd-acento-texto); text-decoration: underline; } .rmd-cont-a:hover span, .rmd-cont-a:hover i { color: inherit; }
   .rmd-cont-sub { display: block; margin-top: 5px; color: var(--rmd-apagado); font-size: 11.5px; overflow-wrap: anywhere; } .rmd-cont-sub b { color: var(--rmd-texto); font-weight: 600; } .rmd-cont-sub .rmd-cont-a { color: var(--rmd-acento-texto); text-decoration: underline; }
   .rmd-cont-tag { display: table; margin-top: 5px; padding: 0 7px; border: 1px solid var(--rmd-borde); border-radius: 8px; color: var(--rmd-apagado); font: 600 10.5px/17px var(--rmd-fuente); white-space: nowrap; }
-  .rmd-cont-ant { display: block; font-weight: 600; white-space: nowrap; } .rmd-cont-ant small { margin-left: 4px; color: var(--rmd-apagado); font-weight: 400; font-size: 11px; }
+  .rmd-cont-ant { display: block; font-weight: 600; white-space: nowrap; } .rmd-cont-ant small { display: block; margin-top: 2px; color: var(--rmd-apagado); font-weight: 400; font-size: 11px; }
   .rmd-cont-hora { margin-left: auto; color: var(--rmd-apagado); font-size: 12px; }
   .rmd-cont-est { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; font: 600 11.5px/17px var(--rmd-fuente); white-space: nowrap;
     background: color-mix(in srgb, currentColor 14%, transparent); color: var(--rmd-apagado); }
@@ -7160,25 +7175,27 @@
     let cerrado = false, plan = null, ocupadoC = false, preguntando = false, turno = 0, filtro = 'todos', espera = 0;
     const salir = () => { if (!ocupadoC && !preguntando) { cerrado = true; v.cerrar(); } };
     const v = ventana('Contingencia a SharePoint', { cancelar: salir });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-cont-ventana');   // pantalla completa: Carlos lo pidió para esta ventana
     const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
     const fmt = (iso) => iso.split('-').reverse().join('/'), corta = (d) => fmt(Contingencia.fechaIsoLocal(d)).slice(0, 5);
     // planta: la última elegida en este navegador (cada planta carga la suya)
     let idPlanta = '1'; try { idPlanta = localStorage.getItem('rmdUiContPlanta') || '1'; } catch (e) { /* sin almacenamiento */ }
     const plantaElegida = () => Contingencia.PLANTAS.find((x) => x.id === (v.cuerpo.querySelector('input[name=rmd-cont-planta]:checked') || {}).value) || Contingencia.PLANTAS[0];
-    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">Cada planta carga su contingencia: el master de sus RMD autorizados va a la carpeta de su versión anterior y esa versión pasa a <b>OBSOLETO</b>.</p>
-      <div class="rmd-cont-fecha"><div class="rmd-cont-grupo" role="radiogroup" aria-label="Planta"><span class="rmd-cont-rot">Planta</span>
+    v.fondo.querySelector('h3').insertAdjacentHTML('afterend', '<p class="rmd-cont-intro">Cada planta carga su contingencia: el master de sus RMD autorizados va a la carpeta de su versión anterior y esa versión pasa a <b>OBSOLETO</b>.</p>');
+    v.cuerpo.innerHTML = `<div class="rmd-cont-fecha"><div class="rmd-cont-grupo" role="radiogroup" aria-label="Planta"><span class="rmd-cont-rot">Planta</span>
         <div class="rmd-cont-seg">${Contingencia.PLANTAS.map((x) => `<label><input type="radio" name="rmd-cont-planta" value="${x.id}" ${x.id === idPlanta ? 'checked' : ''}>${x.txt} <small>${x.lugar}</small></label>`).join('')}</div></div>
       <div class="rmd-cont-grupo" role="radiogroup" aria-label="Fecha de autorización"><span class="rmd-cont-rot">Autorizados el</span>
         <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
         <input type="date" class="rmd-cont-otra" aria-label="Otra fecha"></div></div>
       <div class="rmd-cont-base"></div><div class="rmd-cont-res" aria-live="polite"></div><div class="rmd-cont-plan"></div>
 `;
+    const pieEstado = document.createElement('div'); pieEstado.className = 'rmd-cont-pie-estado'; pieEstado.setAttribute('aria-live', 'polite');
     const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
     const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input')];
     otra.value = Contingencia.fechaIsoLocal(ayer); otra.max = Contingencia.fechaIsoLocal(hoy);
     const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(hoy) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
     const bActualizar = botonModal('Actualizar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar()), bCerrar = botonModal('Cerrar', '', salir);
-    bCargar.disabled = true; v.pie.append(bCerrar, bActualizar, bCargar);
+    bCargar.disabled = true; v.pie.append(pieEstado, bCerrar, bActualizar, bCargar);
     // cambiar la fecha revisa sola; el campo de fecha solo se ve con «Otra fecha»
     v.cuerpo.querySelector('.rmd-cont-fecha').addEventListener('change', (e) => {
       if (e.target.name === 'rmd-cont-planta') pintarBase();
@@ -7213,14 +7230,14 @@
       tr.className = e.cls; tr.hidden = filtro !== 'todos' && e.cls !== filtro && !(filtro === 'subir' && e.cls === 'curso');
       tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`;
     };
+    // tarjetas: cuántos hay de cada tipo (y filtran la tabla); el avance de la carga va al pie
     const resumen = (progreso) => {
       const n = { subir: 0, ya: 0, mano: 0, ok: 0, error: 0 }; plan.forEach((p) => { const c = estadoDe(p).cls; n[c === 'curso' ? 'subir' : c]++; });
       const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length), 0);
-      const chip = (k, txt, c) => `<button type="button" class="${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'}>${k === 'todos' ? '' : '<i></i>'}${txt}<span>${c}</span></button>`;
-      res.innerHTML = `<b>${plan.length} RMD · ${esc(plan.planta.txt)} · ${esc(fmt(plan.fecha))}</b><div class="rmd-cr-chips">${chip('todos', 'Todos', plan.length)}${chip('subir', 'Por cargar', n.subir)}${chip('ya', 'Ya cargados', n.ya)}${chip('mano', 'Ubicar a mano', n.mano)}${n.ok ? chip('ok', 'Cargados ahora', n.ok) : ''}${n.error ? chip('error', 'Con error', n.error) : ''}</div>`
-        + (progreso ? `<span class="rmd-cont-prog">${giro}${esc(progreso.txt)}<span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span></span>`
-          : (plan.otras ? `<span class="rmd-cont-obs" title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)}</span>` : '')
-          + (plan.sinPlanta ? `<span class="rmd-cont-obs rmd-cont-nota" title="Sin planta en SAP: no se cargan desde aquí">${plan.sinPlanta} sin planta en SAP</span>` : '') + (nObs ? `<span class="rmd-cont-obs">${nObs} PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : '') + `<span class="rmd-cont-hora" title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span>`);
+      const tarjeta = (k, txt, c, ayuda) => `<button type="button" class="rmd-cont-kpi ${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'} title="${esc(ayuda)}"><b>${c}</b><span>${txt}</span></button>`;
+      res.innerHTML = `<div class="rmd-cont-kpis">${tarjeta('todos', `RMD de ${esc(plan.planta.txt)}`, plan.length, 'Ver todos')}${tarjeta('subir', 'Por cargar', n.subir, 'Se suben con «Cargar a SharePoint»')}${tarjeta('ya', 'Ya cargados', n.ya, 'Su PDF ya está en la carpeta')}${tarjeta('mano', 'Ubicar a mano', n.mano, 'Sin carpeta de versión anterior: súbelos a mano')}${n.ok ? tarjeta('ok', 'Cargados ahora', n.ok, 'Cargados en esta sesión') : ''}${n.error ? tarjeta('error', 'Con error', n.error, 'Revisa el motivo en la fila y pulsa «Actualizar»') : ''}</div>
+        <div class="rmd-cont-datos"><span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
+      pieEstado.innerHTML = progreso ? `${giro}<span>${esc(progreso.txt)}</span><span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span>` : '';
       const nSubir = n.subir; bCargar.textContent = nSubir ? `Cargar ${nSubir} a SharePoint` : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
     res.addEventListener('click', (e) => {
@@ -7232,15 +7249,16 @@
       const filas = plan.map((p, i) => {
         const r = p.rmd, a = p.anterior;
         const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
-        const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('') + (p.subir.length ? `<span class="rmd-cont-sub">Se sube como <b>${esc(nombrePrevisto(r))}</b></span>` : '')
-          : `<span class="rmd-cont-nota">${a ? `Ninguna versión anterior tiene PDF en 3.-CONTINGENCIA.` : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano: ${enlace(plan.planta.carpeta, 'abrir ' + esc(plan.planta.carpeta), 'Abrir la carpeta de la planta en SharePoint')}</span>`;
+        const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('')
+          : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}</span>`;
+        const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : ''}`;
         const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>` : '<span class="rmd-cont-vacio">Sin versión anterior</span>';
-        const obs = p.aObsoleto.length ? `<span class="rmd-cont-sub">Pasa a OBSOLETO:</span>${p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}`
-          : a && p.carpetas.length ? '<span class="rmd-cont-sub">Su PDF ya está en OBSOLETO</span>' : '';
-        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${tipoPdf(r)}</td><td>${dest}</td><td>${ant}${obs}</td><td></td></tr>`;
+        const obs = p.aObsoleto.length ? p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')
+          : `<span class="rmd-cont-vacio">${a && p.carpetas.length ? 'Ya está en OBSOLETO' : '—'}</span>`;
+        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${arch}</td><td>${ant}</td><td>${obs}</td><td></td></tr>`;
       }).join('');
-      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:128px"><col style="width:22%"><col><col style="width:23%"><col style="width:142px"></colgroup>
-        <thead><tr><th>RMD</th><th>Descripción</th><th>Se carga en la carpeta</th><th>Versión anterior</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:150px"><col style="width:15%"><col style="width:22%"><col style="width:17%"><col style="width:165px"><col><col style="width:150px"></colgroup>
+        <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Archivo que se sube</th><th>Versión anterior</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
     const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); if (si) bCargar.disabled = true; };
