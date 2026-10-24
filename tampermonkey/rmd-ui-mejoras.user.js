@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.89.0
+// @version      1.90.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.89.0';                                                       // mantener igual a @version
+  const VERSION = '1.90.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -3144,10 +3144,11 @@
   async function aplicarFila(tabla, trId, cfg, nombres, log) {
     const n = columnas(tabla), fila = () => document.getElementById(trId);
     const igual = (a, b) => (typeof b === 'boolean' ? !!a === b : norm(a) === norm(b == null ? '' : String(b)));
+    let hechos = 0;
     const poner = async (nom, valor, etiqueta, espera = 40) => {
       const i = n.indexOf(nom); if (i < 0 || !fila()) return;
       if (igual(leerCelda(fila(), i), valor)) return;
-      const ok = fijarCelda(fila(), i, valor);
+      const ok = fijarCelda(fila(), i, valor); if (ok) hechos++;
       const txt = typeof valor === 'boolean' ? (valor ? 'marcada' : 'desmarcada') : (valor === '' ? '(vacío)' : valor);
       log(ok === null ? `ℹ ${etiqueta}: bloqueado por el tipo de dato (se omite)` : `${ok ? '✔' : '⚠'} ${etiqueta}: ${txt}${ok ? '' : ' — no se pudo aplicar (¿valor inexistente en la lista?)'}`);
       if (espera) await esperar(espera);
@@ -3158,6 +3159,7 @@
     for (const [nom, k, et] of [['VAL. INICIAL', 'vi', 'Val. Inicial'], ['VAL. FINAL', 'vf', 'Val. Final'], ['MARGEN', 'mg', 'Margen'], ['DECIMAL', 'dec', 'Decimal'], ['DECIM.', 'dec', 'Decimal']])
       if (cfg[k] != null && n.indexOf(nom) >= 0) await poner(nom, cfg[k], et);
     for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 0);
+    return hechos;
   }
 
   // Mensajes del portal durante un proceso del script: no se responden por la persona. Se espera su respuesta y se lee qué botón pulsó
@@ -3228,7 +3230,7 @@
   }
   async function cerrarDialogo(d) {
     const b = botonPorTitulo(d, 'Cerrar') || botonPorTitulo(d, 'Cancelar'); if (b) pulsar(b);
-    await hasta(() => !dialogos().includes(d), 8000); await esperar(400);
+    await hasta(() => !dialogos().includes(d), 8000); await esperar(150);
   }
   const filasPMde = (d) => { const t = tablaDe(d); return t ? filasPrincipales(t).filter((tr) => tr.querySelector('input,[role=checkbox]')).slice(0) : []; };
 
@@ -3291,7 +3293,10 @@
     const s = (v) => (v == null ? '' : String(v));
     const codigo = hijo ? hijo.codigo : ins ? ins.Component : x.Component, desc = hijo ? hijo.descripcion : ins ? ins.Maktx : x.Maktx, um = hijo ? '' : ins ? ins.CompUnit : x.CompUnit;
     return { paso: x.pasoId_mdEstructuraPasoId, orden: s(x.orden), codigo: s(codigo), desc: norm(desc), tipo: nombreTipo(x.tipoDatoId_iMaestraId != null ? x.tipoDatoId_iMaestraId : (hijo || {}).tipoDatoId_iMaestraId, tabla), cant: s(x.cantidadInsumo), um: s(um), insumo: !hijo,
-      vi: s(x.valorInicial), vf: s(x.valorFinal), mg: s(x.margen), dec: s(x.decimales), chk: { 'TAB': !!x.tab, 'EDIT': !!x.edit, 'GEN PP': !!x.genpp, 'ESTADO CC': !!x.estadoCC } };
+      vi: s(x.valorInicial), vf: s(x.valorFinal), mg: s(x.margen), dec: s(x.decimales), chk: { 'TAB': !!x.tab, 'EDIT': !!x.edit, 'GEN PP': !!x.genpp, 'ESTADO CC': !!x.estadoCC },
+      // para «Pegar»: el paso del catálogo y los datos con que el Agregar del portal crea el PM (onAsignPasoToPaso los toma de cada entrada)
+      pasoObj: hijo && hijo.pasoId != null ? hijo : null,
+      crear: { tipoDatoId_iMaestraId: x.tipoDatoId_iMaestraId, decimales: x.decimales, margen: x.margen, valorInicial: x.valorInicial, valorFinal: x.valorFinal } };
   }
   const avisosDePM = (q) => reglasDeFila({ esPM: true, tipo: q.tipo, desc: q.desc, chk: { 'EDIT': q.chk.EDIT, 'ESTADO CC': q.chk['ESTADO CC'] }, cant: q.cant, um: q.um, dec: q.dec, vi: q.vi, vf: q.vf }).map((x) => x.msg);
   // PM de la lista de `tabla`, por paso; null si no se pueden leer.
@@ -4690,9 +4695,9 @@
           await hasta(() => !ocupado() && filasPMde(dPM).every(delDestino), 4000);
           const propias = () => filasPMde(dPM).filter(delDestino);
           const codigos = () => new Set(propias().map((tr) => leerPMfila(tPM, tr).codigo));
-          let cambios = 0;
+          let cambios = 0;                                     // (lo agregado ya queda grabado por el Agregar del portal: solo cuenta lo que hay que Guardar)
           const faltan = elegidos.filter((x) => { if (codigos().has(x.codigo)) { log(`= ${x.codigo} ya estaba en el destino`); return false; } return true; });
-          if (faltan.length) cambios += await agregarPMs(dPM, faltan, log, delDestino, auto);
+          if (faltan.length) await agregarPMs(dPM, faltan, log, delDestino, auto);
           const n = columnas(tPM);
           for (const x of elegidos) {
             const previo = dd.pms.find((q) => q.codigo === x.codigo);
@@ -4700,8 +4705,9 @@
             if (previo && !cambiosPM(x, previo).length) { log(`= ${x.codigo} sin cambios`); continue; }
             const fs = propias().filter((tr) => leerPMfila(tPM, tr).codigo === x.codigo); const tr = fs[fs.length - 1];
             if (!tr) { log(`⚠ No encuentro ${x.codigo} para configurarlo`); continue; }
-            log(`Configurando ${x.codigo} · ${x.desc}`);
-            await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log); dPM.__rmdInter = true; cambios++;
+            const k = lineas.length; log(`Configurando ${x.codigo} · ${x.desc}`);
+            const h = await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log);
+            if (h) { dPM.__rmdInter = true; cambios += h; } else if (lineas.length === k + 1) { lineas.pop(); log(`✔ ${x.codigo} ya tiene la configuración del origen`); }
           }
           if (cambios) { await guardarYConfirmar(dPM, log, 'los procesos menores', auto); await esperar(200); }
           else log('ℹ Sin cambios en sus procesos menores.');
@@ -4720,38 +4726,49 @@
   // Agrega varios PM con UNA sola pasada por «Adicionar Pasos RMD»: se busca cada código, se marca y al final un solo Agregar (el portal recorre
   // aSeleccionadoPaso en orden: se deja en el orden del origen). Devuelve cuántos agregó. Sin ese modelo, uno por uno como antes.
   async function agregarPMs(dPM, xs, log, filtro = () => true, auto = false) {
-    if (xs.length === 1) { await agregarPM(dPM, xs[0], log, filtro, auto); return 1; }
+    if (xs.length === 1 && !xs[0].pasoObj) { await agregarPM(dPM, xs[0], log, filtro, auto); return 1; }
     const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
     const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
-    log(`+ Agregando ${xs.length} procesos menores en una sola pasada…`); pulsar(btn);
+    log(xs.length > 1 ? `+ Agregando ${xs.length} procesos menores en una sola pasada…` : `+ Agregando ${xs[0].codigo} · ${xs[0].desc}`); pulsar(btn);
     const picker = await hasta(() => dialogos().find((y) => !previos.has(y) && /^Adicionar Pasos/i.test(cabeceraDe(y))), 25000);
     if (!picker) throw new Error('No se abrió el selector de pasos');
     await hasta(() => !ocupado(), 25000); await esperar(300);
     const t0 = tablaDe(picker), lista = t0 && nucleo().byId(t0.id.replace(/-listUl$/, '')), m = lista && modeloSel(lista);
     const cancelar = async () => { const c = botonPorTitulo(picker, 'Cancelar'); if (c) pulsar(c); await hasta(() => !dialogos().includes(picker), 6000); };
     if (!m) { await cancelar(); for (const x of xs) await agregarPM(dPM, x, log, filtro, auto); return xs.length; }
-    const ctlFiltro = (lab) => { const l = [...picker.querySelectorAll('label')].find((y) => norm(y.textContent).replace(/[*:]$/, '') === lab); const el = l && document.getElementById(l.getAttribute('for')); return el && ctlDe(el); };
-    const buscar = async (codigo) => {
-      const k = ctlFiltro('Código Paso'); if (!k) throw new Error('No encuentro el filtro Código Paso');
-      k.setValue(String(codigo)); k.fireChange({ value: String(codigo) });
-      const ir = [...picker.querySelectorAll('button')].find((b) => norm(b.textContent) === 'Ir'); pulsar(ir);
-      await esperar(250); await hasta(() => !ocupado(), 25000, 80);
-      const fila = () => { const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
-        return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(codigo)); };
-      return hasta(fila, 2500, 80);
-    };
-    let sinFiltros = false; const elegidos = [];
-    for (const x of xs) {
-      let fila = await buscar(x.codigo);
-      if (!fila && !sinFiltros) {                        // se quitan los filtros de estructura/etiqueta del selector
-        for (const lab of ['Estructura', 'Etiqueta']) { const c = ctlFiltro(lab); if (c && c.setSelectedItem) { c.setSelectedItem(null); c.setValue(''); c.fireSelectionChange({ selectedItem: null }); c.fireChange({ value: '' }); } }
-        sinFiltros = true; await esperar(200); fila = await buscar(x.codigo);
+    // Con el paso del catálogo de cada PM (leído al copiar) no hace falta buscar código por código: las entradas se arman directamente, con el tipo,
+    // decimales, rango y margen del origen, y el portal crea los PM ya con esa configuración (solo quedan las casillas para Guardar).
+    let elegidos = [];
+    if (xs.every((x) => x.pasoObj)) {
+      elegidos = xs.map((x) => { const ent = Object.assign({}, x.pasoObj); delete ent.__metadata;
+        if (x.crear && x.crear.tipoDatoId_iMaestraId != null) { Object.assign(ent, x.crear); ent.tipoDatoIdAnterior_iMaestraId = x.crear.tipoDatoId_iMaestraId; }
+        return { x, ent }; });
+    } else elegidos = await buscarEnSelector();
+    async function buscarEnSelector() {
+      const ctlFiltro = (lab) => { const l = [...picker.querySelectorAll('label')].find((y) => norm(y.textContent).replace(/[*:]$/, '') === lab); const el = l && document.getElementById(l.getAttribute('for')); return el && ctlDe(el); };
+      const buscar = async (codigo) => {
+        const k = ctlFiltro('Código Paso'); if (!k) throw new Error('No encuentro el filtro Código Paso');
+        k.setValue(String(codigo)); k.fireChange({ value: String(codigo) });
+        const ir = [...picker.querySelectorAll('button')].find((b) => norm(b.textContent) === 'Ir'); pulsar(ir);
+        await esperar(250); await hasta(() => !ocupado(), 25000, 80);
+        const fila = () => { const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
+          return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(codigo)); };
+        return hasta(fila, 2500, 80);
+      };
+      let sinFiltros = false; const lista2 = [];
+      for (const x of xs) {
+        let fila = await buscar(x.codigo);
+        if (!fila && !sinFiltros) {                        // se quitan los filtros de estructura/etiqueta del selector
+          for (const lab of ['Estructura', 'Etiqueta']) { const c = ctlFiltro(lab); if (c && c.setSelectedItem) { c.setSelectedItem(null); c.setValue(''); c.fireSelectionChange({ selectedItem: null }); c.fireChange({ value: '' }); } }
+          sinFiltros = true; await esperar(200); fila = await buscar(x.codigo);
+        }
+        if (!fila) { log(`⚠ El código ${x.codigo} no aparece en el catálogo de pasos: se omite`); continue; }
+        const item = nucleo().byId(fila.id); lista.setSelectedItem(item, true, true); await esperar(80);
+        const ent = (m.getData() || []).find((e) => String(e.codigo) === String(x.codigo));
+        if (!ent) { log(`⚠ ${x.codigo} no quedó marcado en el selector: se omite`); continue; }
+        lista2.push({ x, ent });
       }
-      if (!fila) { log(`⚠ El código ${x.codigo} no aparece en el catálogo de pasos: se omite`); continue; }
-      const item = nucleo().byId(fila.id); lista.setSelectedItem(item, true, true); await esperar(80);
-      const ent = (m.getData() || []).find((e) => String(e.codigo) === String(x.codigo));
-      if (!ent) { log(`⚠ ${x.codigo} no quedó marcado en el selector: se omite`); continue; }
-      elegidos.push({ x, ent });
+      return lista2;
     }
     if (!elegidos.length) { await cancelar(); return 0; }
     fijarSel(m, elegidos.map((e) => e.ent));                  // exactamente estos, en el orden del origen
