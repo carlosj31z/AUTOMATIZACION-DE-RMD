@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.91.0
+// @version      1.92.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.91.0';                                                       // mantener igual a @version
+  const VERSION = '1.92.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -269,6 +269,7 @@
   .rmd-cont-obsv-rot { display: block; margin-bottom: 2px; color: var(--rmd-apagado); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
   .rmd-cont-obsv-txt { white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; } .rmd-cont-obsv.abierta .rmd-cont-obsv-txt { display: block; }
   .rmd-cont-mas { margin-top: 2px; font-size: 11.5px; }
+  .rmd-btn.rmd-cont-uno { display: flex; margin-top: 8px; height: 26px; padding: 0 10px; font-size: 12.5px; }
   .rmd-cont-res:empty { display: none; }
   .rmd-cont-res { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; min-height: 30px; font-size: 13px; }
   .rmd-cont-res > b { margin-right: 6px; font-size: 14px; } .rmd-cont-res .rmd-cr-chips button:disabled { cursor: default; opacity: .45; }
@@ -7198,7 +7199,7 @@
     const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input')];
     otra.value = Contingencia.fechaIsoLocal(ayer); otra.max = Contingencia.fechaIsoLocal(hoy);
     const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(hoy) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
-    const bActualizar = botonModal('Actualizar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar()), bCerrar = botonModal('Cerrar', '', salir);
+    const bActualizar = botonModal('Actualizar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar(null)), bCerrar = botonModal('Cerrar', '', salir);
     bCargar.disabled = true; v.pie.append(pieEstado, bCerrar, bActualizar, bCargar);
     // cambiar la fecha revisa sola; el campo de fecha solo se ve con «Otra fecha»
     v.cuerpo.querySelector('.rmd-cont-fecha').addEventListener('change', (e) => {
@@ -7235,7 +7236,8 @@
     const pintarEstado = (p, tr) => {
       if (!tr) return; const e = estadoDe(p);
       tr.className = e.cls; tr.hidden = filtro !== 'todos' && e.cls !== filtro && !(filtro === 'subir' && e.cls === 'curso');
-      tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`;
+      tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`
+        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="Cargar solo este master a SharePoint" ${ocupadoC ? 'disabled' : ''}>Cargar este</button>` : '');
     };
     // tarjetas: cuántos hay de cada tipo (y filtran la tabla); el avance de la carga va al pie
     const resumen = (progreso) => {
@@ -7245,7 +7247,7 @@
       res.innerHTML = `<div class="rmd-cont-kpis">${tarjeta('todos', `RMD de ${esc(plan.planta.txt)}`, plan.length, 'Ver todos')}${tarjeta('subir', 'Por cargar', n.subir, 'Se suben con «Cargar a SharePoint»')}${tarjeta('ya', 'Ya cargados', n.ya, 'Su PDF ya está en la carpeta')}${tarjeta('mano', 'Ubicar a mano', n.mano, 'Sin carpeta de versión anterior: súbelos a mano')}${n.ok ? tarjeta('ok', 'Cargados ahora', n.ok, 'Cargados en esta sesión') : ''}${n.error ? tarjeta('error', 'Con error', n.error, 'Revisa el motivo en la fila y pulsa «Actualizar»') : ''}</div>
         <div class="rmd-cont-datos"><span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
       pieEstado.innerHTML = progreso ? `${giro}<span>${esc(progreso.txt)}</span><span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span>` : '';
-      const nSubir = n.subir; bCargar.textContent = nSubir ? `Cargar ${nSubir} a SharePoint` : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
+      const nSubir = n.subir; bCargar.textContent = nSubir > 1 ? `Cargar los ${nSubir} a SharePoint` : nSubir ? 'Cargar 1 a SharePoint' : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
     res.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-f]'); if (!b || !plan) return;
@@ -7268,7 +7270,9 @@
         <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Archivo que se sube</th><th>Versión anterior</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
-    const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); if (si) bCargar.disabled = true; };
+    const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); caja.querySelectorAll('.rmd-cont-uno').forEach((b) => { b.disabled = si; }); if (si) bCargar.disabled = true; };
+    // «Cargar este» en la fila: carga solo ese master
+    caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-uno'); const tr = b && b.closest('tr[data-i]'); if (tr && plan) cargar(plan[+tr.dataset.i]); });
     async function revisar() {
       clearTimeout(espera);
       const fecha = fechaElegida(), planta = plantaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
@@ -7285,13 +7289,16 @@
       } catch (e) { bloquear(false); mensaje(`No se pudo revisar: ${esc(e.message)}`, 'error'); }
       finally { if (t === turno && ocupadoC) bloquear(false); }
     }
-    async function cargar() {
+    // uno: un solo paso del plan («Cargar este»); sin él, todos los que están por cargar
+    async function cargar(uno) {
       if (!plan || ocupadoC) return;
-      const lote = plan.filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return;
+      const lote = (uno ? [uno] : plan).filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return;
       const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length, 0);
+      const obsTxt = nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : '';
       preguntando = true;
-      const si = await confirmar(`¿Cargar la contingencia de ${plan.planta.txt}?`, `Se subirán ${nPdf} PDF a 3.-CONTINGENCIA › ${plan.planta.carpeta}${nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : ''}.`,
-        'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' });
+      const si = uno
+        ? await confirmar(`¿Cargar ${uno.rmd.codigo} v${uno.rmd.version}?`, `${nPdf ? `Se subirá su PDF a ${uno.subir.join(', ')}` : 'No se sube PDF'}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' })
+        : await confirmar(`¿Cargar la contingencia de ${plan.planta.txt}?`, `Se subirán ${nPdf} PDF a 3.-CONTINGENCIA › ${plan.planta.carpeta}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' });
       preguntando = false; if (!si || cerrado) return;
       bloquear(true); bCerrar.disabled = true;
       let hechos = 0, fallos = 0;
@@ -7311,7 +7318,8 @@
         } catch (e) { marcar('Error', 'error', e.message); fallos++; }
       }
       bloquear(false); bCerrar.disabled = false; resumen();
-      toast(`Contingencia de ${plan.planta.txt} del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
+      toast(uno ? (fallos ? `${uno.rmd.codigo}: no se pudo cargar.` : `${uno.rmd.codigo} cargado en SharePoint.`)
+        : `Contingencia de ${plan.planta.txt} del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
     }
     revisar();
   }
