@@ -160,6 +160,18 @@ Un producto nuevo (sin versiones anteriores en la carpeta) no se sube: queda mar
 Necesita el Chromium de `RMD_CDP_URL` con sesión en el portal (lista «Configuración Manufactura Digital»)
 y en SharePoint.
 
+### Publicar el userscript en MEJORAS DE INTERFAZ
+
+```bash
+rmd-automation interfaz publicar           # dice qué subiría (no sube nada)
+rmd-automation interfaz publicar --subir   # sube tampermonkey/rmd-ui-mejoras.user.js como <@version>.js
+```
+
+Con la sesión de SharePoint del Chromium de `RMD_CDP_URL`, sube el script con el nombre de su `@version`
+(p. ej. `1.92.0.js`) a la carpeta de donde el cargador toma la versión más alta, así que **llega a todos los
+usuarios**. Antes comprueba lo mismo que el cargador (cabecera, `VERSION` y cierre del archivo) y que la versión
+sea mayor que la última de la carpeta. Nunca sobrescribe ni borra: si el nombre ya existe, no sube.
+
 ### Flujo: RMD de referencia y revisiones posteriores
 
 `cambios aplicar` pregunta primero si hay un RMD de referencia (su "Codigo RMD") y, al terminar, si se desean
