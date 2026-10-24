@@ -3180,21 +3180,27 @@
     }
     c.setValue(valor == null ? '' : String(valor)); c.fireChange({ value: c.getValue() }); return true;
   }
-  // aplica la configuración a una fila (por id: UI5 la redibuja al cambiar el tipo)
+  // aplica la configuración a una fila (por id: UI5 la redibuja al cambiar el tipo). Lo que ya tiene el valor no se toca; tras cada cambio se espera
+  // solo a que el portal termine (antes, pausas fijas de 0,1 a 0,9 s por campo).
   async function aplicarFila(tabla, trId, cfg, nombres, log) {
     const n = columnas(tabla), fila = () => document.getElementById(trId);
-    const poner = async (nom, valor, etiqueta, espera = 250) => {
+    const igual = (a, b) => (typeof b === 'boolean' ? !!a === b : norm(a) === norm(b == null ? '' : String(b)));
+    let hechos = 0;
+    const poner = async (nom, valor, etiqueta, espera = 40) => {
       const i = n.indexOf(nom); if (i < 0 || !fila()) return;
-      const ok = fijarCelda(fila(), i, valor);
+      if (igual(leerCelda(fila(), i), valor)) return;
+      const ok = fijarCelda(fila(), i, valor); if (ok) hechos++;
       const txt = typeof valor === 'boolean' ? (valor ? 'marcada' : 'desmarcada') : (valor === '' ? '(vacío)' : valor);
       log(ok === null ? `ℹ ${etiqueta}: bloqueado por el tipo de dato (se omite)` : `${ok ? '✔' : '⚠'} ${etiqueta}: ${txt}${ok ? '' : ' — no se pudo aplicar (¿valor inexistente en la lista?)'}`);
-      await esperar(espera);
+      if (espera) await esperar(espera);
+      if (ocupado()) await hasta(() => !ocupado(), 8000, 60);
     };
-    if (cfg.tipo != null) await poner('TIPO DATO', cfg.tipo, 'Tipo Dato', 900);
-    for (const [nom, k, et] of [['CLAVE MODELO', 'clave', 'Clave Modelo'], ['PUESTO TRABAJO', 'puesto', 'Puesto Trabajo']]) if (cfg[k] != null) await poner(nom, cfg[k], et, 500);
+    if (cfg.tipo != null) await poner('TIPO DATO', cfg.tipo, 'Tipo Dato', 300);
+    for (const [nom, k, et] of [['CLAVE MODELO', 'clave', 'Clave Modelo'], ['PUESTO TRABAJO', 'puesto', 'Puesto Trabajo']]) if (cfg[k] != null) await poner(nom, cfg[k], et, 120);
     for (const [nom, k, et] of [['VAL. INICIAL', 'vi', 'Val. Inicial'], ['VAL. FINAL', 'vf', 'Val. Final'], ['MARGEN', 'mg', 'Margen'], ['DECIMAL', 'dec', 'Decimal'], ['DECIM.', 'dec', 'Decimal']])
       if (cfg[k] != null && n.indexOf(nom) >= 0) await poner(nom, cfg[k], et);
-    for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 120);
+    for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 0);
+    return hechos;
   }
 
   // Mensajes del portal durante un proceso del script: no se responden por la persona. Se espera su respuesta y se lee qué botón pulsó
@@ -3209,23 +3215,33 @@
     m.removeEventListener('click', oir, true); m.classList.remove('rmd-espera-respuesta');
     return pulsado;
   }
-  // tras un guardado del script: éxito y confirmaciones las contesta la persona; una confirmación no aceptada, una advertencia o un error detienen
-  async function atenderMensajes(ms = 20000, quietoMs = 1800) {
-    let limite = Date.now() + ms, ultimo = Date.now(); const t0 = Date.now(), vistos = [];
+  // Con el «Sí» de la vista previa (auto) el script pulsa OK / Sí en esos mensajes; si no tienen ese botón, los contesta la persona.
+  async function aceptarMensajePortal(m) {
+    const b = [...m.querySelectorAll('footer button, .sapMDialogFooter button, button')].find((x) => esAceptar(x.textContent));
+    if (!b) return esperarRespuestaPortal(m);
+    const txt = norm(b.textContent); pulsar(b);
+    await hasta(() => !m.isConnected || !m.getClientRects().length, 5000, 60);
+    return txt;
+  }
+  // tras un guardado del script: éxito y confirmaciones las contesta la persona (o el script con auto); una confirmación no aceptada, una advertencia o
+  // un error detienen. Nunca se aceptan solos los mensajes que hablan de eliminar o borrar.
+  async function atenderMensajes(ms = 20000, quietoMs = 1800, { auto = false } = {}) {
+    let limite = Date.now() + ms, ultimo = Date.now(), exito = false; const t0 = Date.now(), vistos = [];
     while (Date.now() < limite) {
       const m = [...document.querySelectorAll('.sapMMessageDialog')].filter((x) => x.getClientRects().length).pop();
       if (m) {
         const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent), texto = norm((m.querySelector('section') || {}).textContent);
         if (/[ÉE]xito|Confirmaci/i.test(titulo) && !/elimin|borrar/i.test(texto)) {
-          const r = await esperarRespuestaPortal(m);
+          const r = auto ? await aceptarMensajePortal(m) : await esperarRespuestaPortal(m);
           if (/Confirmaci/i.test(titulo) && !esAceptar(r)) return { problema: `${titulo}: ${texto} (no se aceptó)`, vistos };
-          vistos.push(`${titulo}: ${texto}`); ultimo = Date.now(); limite = Date.now() + ms; await esperar(400); continue;
+          if (/[ÉE]xito/i.test(titulo)) exito = true;
+          vistos.push(`${titulo}: ${texto}`); ultimo = Date.now(); limite = Date.now() + ms; await esperar(auto ? 120 : 400); continue;
         }
         return { problema: `${titulo}: ${texto}`, vistos };
       }
-      if (vistos.length && Date.now() - ultimo > quietoMs) break;
-      if (!vistos.length && Date.now() - t0 > 6000) break;                    // no hubo mensajes
-      await esperar(250);
+      if (vistos.length && Date.now() - ultimo > (auto && exito ? 450 : quietoMs)) break;   // tras el Éxito aceptado solo, basta un respiro
+      if (!vistos.length && Date.now() - t0 > 6000 && !ocupado()) break;     // no hubo mensajes
+      await esperar(auto ? 100 : 250);
     }
     return { vistos };
   }
@@ -3249,13 +3265,13 @@
     pulsar(b);
     const d = await hasta(() => { const x = dialogos().find((y) => !previos.has(y) && esDialogoPM(y)); return x && !ocupado() ? x : null; }, 25000);
     if (!d) throw new Error('No se abrió la ventana de procesos menores');
-    await esperar(900);
+    await esperar(300);
     await cargarTodo(tablaDe(d));
     return d;
   }
   async function cerrarDialogo(d) {
     const b = botonPorTitulo(d, 'Cerrar') || botonPorTitulo(d, 'Cancelar'); if (b) pulsar(b);
-    await hasta(() => !dialogos().includes(d), 8000); await esperar(400);
+    await hasta(() => !dialogos().includes(d), 8000); await esperar(150);
   }
   const filasPMde = (d) => { const t = tablaDe(d); return t ? filasPrincipales(t).filter((tr) => tr.querySelector('input,[role=checkbox]')).slice(0) : []; };
 
@@ -3318,7 +3334,10 @@
     const s = (v) => (v == null ? '' : String(v));
     const codigo = hijo ? hijo.codigo : ins ? ins.Component : x.Component, desc = hijo ? hijo.descripcion : ins ? ins.Maktx : x.Maktx, um = hijo ? '' : ins ? ins.CompUnit : x.CompUnit;
     return { paso: x.pasoId_mdEstructuraPasoId, orden: s(x.orden), codigo: s(codigo), desc: norm(desc), tipo: nombreTipo(x.tipoDatoId_iMaestraId != null ? x.tipoDatoId_iMaestraId : (hijo || {}).tipoDatoId_iMaestraId, tabla), cant: s(x.cantidadInsumo), um: s(um), insumo: !hijo,
-      vi: s(x.valorInicial), vf: s(x.valorFinal), mg: s(x.margen), dec: s(x.decimales), chk: { 'TAB': !!x.tab, 'EDIT': !!x.edit, 'GEN PP': !!x.genpp, 'ESTADO CC': !!x.estadoCC } };
+      vi: s(x.valorInicial), vf: s(x.valorFinal), mg: s(x.margen), dec: s(x.decimales), chk: { 'TAB': !!x.tab, 'EDIT': !!x.edit, 'GEN PP': !!x.genpp, 'ESTADO CC': !!x.estadoCC },
+      // para «Pegar»: el paso del catálogo y los datos con que el Agregar del portal crea el PM (onAsignPasoToPaso los toma de cada entrada)
+      pasoObj: hijo && hijo.pasoId != null ? hijo : null,
+      crear: { tipoDatoId_iMaestraId: x.tipoDatoId_iMaestraId, decimales: x.decimales, margen: x.margen, valorInicial: x.valorInicial, valorFinal: x.valorFinal } };
   }
   const avisosDePM = (q) => reglasDeFila({ esPM: true, tipo: q.tipo, desc: q.desc, chk: { 'EDIT': q.chk.EDIT, 'ESTADO CC': q.chk['ESTADO CC'] }, cant: q.cant, um: q.um, dec: q.dec, vi: q.vi, vf: q.vf }).map((x) => x.msg);
   // PM de la lista de `tabla`, por paso; null si no se pueden leer.
@@ -4607,6 +4626,9 @@
   }
   const resumenValores = (vals) => { const m = new Map(); vals.forEach((x) => { const k = norm(x) || '—'; m.set(k, (m.get(k) || 0) + 1); }); return [...m].map(([k, n]) => (vals.length > 1 ? `${k} (${n})` : k)).join(' · '); };
 
+  // Preferencias de la vista previa de Pegar, por persona (en este navegador).
+  const leerOpcionPegar = (k) => { try { const o = JSON.parse(localStorage.getItem('rmd-pegar-opciones') || '{}'); return k in o ? !!o[k] : true; } catch (e) { return true; } };
+  const guardarOpcionPegar = (k, v) => { try { const o = JSON.parse(localStorage.getItem('rmd-pegar-opciones') || '{}'); o[k] = !!v; localStorage.setItem('rmd-pegar-opciones', JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   // Vista previa: devuelve las opciones o null si se cancela; PM sin cambios vienen desmarcados.
   function vistaPrevia(destinos) {
     return new Promise((resolver) => {
@@ -4632,24 +4654,33 @@
         <table class="rmd-tabla"><thead><tr><th><input type="checkbox" class="rmd-todos-pm" title="Marcar o desmarcar todos"></th><th>Orden</th><th>Procesos menores del origen</th><th>Qué pasará</th></tr></thead><tbody>${filasPM || '<tr><td colspan="4">El paso de origen no tiene procesos menores.</td></tr>'}</tbody></table>
         <p class="rmd-nota">No se copian Orden, Depende, Código ni Descripción. Solo se tocan los procesos menores marcados${varios ? '; la configuración se aplica a todos los destinos y se guarda una vez' : ''}.</p>
         <label><input type="checkbox" id="rmd-op-guardar" checked> Guardar al terminar de aplicar la configuración</label><br>
-        <label><input type="checkbox" id="rmd-op-actualizar" checked> Actualizar la configuración de los procesos menores que ya existan en el destino</label>`;
+        <label><input type="checkbox" id="rmd-op-actualizar" checked> Actualizar la configuración de los procesos menores que ya existan en el destino</label><br>
+        <label><input type="checkbox" id="rmd-op-auto" ${leerOpcionPegar('auto') ? 'checked' : ''}> Con este «Sí» se aceptan solos los mensajes de Éxito y Confirmación del portal</label>
+        <p class="rmd-nota rmd-op-auto-nota">Una advertencia, un error o un mensaje que hable de eliminar detiene el proceso y te lo muestra.</p>`;
       const todos = v.cuerpo.querySelector('.rmd-todos-pm'), cajas = () => [...v.cuerpo.querySelectorAll('input[data-p]')];
       if (todos) { todos.checked = cajas().length > 0 && cajas().every((i) => i.checked); todos.addEventListener('change', () => cajas().forEach((i) => { i.checked = todos.checked; })); }
-      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal(varios ? `Aplicar en ${destinos.length} pasos` : 'Aplicar', 'primario', () => {
+      const auto = v.cuerpo.querySelector('#rmd-op-auto'), bSi = botonModal('', 'primario', () => {
         const q = (s) => [...v.cuerpo.querySelectorAll(s)];
         const opciones = {
           campos: q('input[data-c]:checked').map((i) => i.dataset.c), casillas: q('input[data-x]:checked').map((i) => i.dataset.x),
           pms: q('input[data-p]:checked').map((i) => +i.dataset.p), guardar: v.cuerpo.querySelector('#rmd-op-guardar').checked, actualizar: v.cuerpo.querySelector('#rmd-op-actualizar').checked,
+          auto: auto.checked,
         };
+        guardarOpcionPegar('auto', auto.checked);
         v.cerrar(); resolver(opciones);
-      }));
+      });
+      const rotular = () => { bSi.textContent = auto.checked ? (varios ? `Sí, aplicar en ${destinos.length} pasos` : 'Sí, aplicar') : (varios ? `Aplicar en ${destinos.length} pasos` : 'Aplicar'); };
+      auto.addEventListener('change', rotular); rotular();
+      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), bSi);
+      setTimeout(() => bSi.focus(), 40);
     });
   }
 
-  async function guardarYConfirmar(dlg, log, que) {
+  async function guardarYConfirmar(dlg, log, que, auto = false) {
     const g = botonPorTitulo(dlg, 'Guardar'); if (!g) throw new Error(`No encuentro el botón Guardar de ${que}`);
     log(`Guardando ${que}…`); pulsar(g); rebase(dlg);
-    const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    const r = await atenderMensajes(20000, 1800, { auto }); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    if (ocupado()) await hasta(() => !ocupado(), 15000, 80);
     if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log(`✔ ${que[0].toUpperCase() + que.slice(1)} guardado(s)${r.vistos.length ? ` (${r.vistos.join(' | ')})` : ''}`);
     else log(`⚠ El portal no mostró el mensaje de éxito: verifica que ${que} se guardaron.`);
   }
@@ -4669,15 +4700,19 @@
         if (!sel.length) { toast('El paso marcado es el mismo que se copió: marca el paso destino.', true); return; }
       }
       toast(sel.length > 1 ? `Leyendo los ${sel.length} pasos destino…` : 'Leyendo el paso destino…');
+      // PM de todos los destinos en una sola lectura (la de la lista); el paso que no se pueda leer así se lee como antes
+      let porPaso = null;
+      if (portapapeles.pms.length) try { porPaso = await pmsDeLista(tabla, filasPrincipales(tabla)); } catch (e) { porPaso = null; }
       const destinos = [];
       for (const tr of sel) {
-        const pms = botonPM(tr) && portapapeles.pms.length ? await leerPMsDe(tabla, tr.id) : [];
-        destinos.push({ trId: tr.id, paso: leerPaso(tabla, tr), pms, id: (objetoDeFila(tr) || {}).mdEstructuraPasoId });
+        const id = (objetoDeFila(tr) || {}).mdEstructuraPasoId, deLista = porPaso && id != null ? porPaso.get(id) || [] : null;
+        const pms = !botonPM(tr) || !portapapeles.pms.length ? [] : deLista && deLista.every((q) => q.tipo || q.insumo) ? deLista : await leerPMsDe(tabla, tr.id);
+        destinos.push({ trId: tr.id, paso: leerPaso(tabla, tr), pms, id });
       }
       const op = await vistaPrevia(destinos);
       if (!op) return;
 
-      const v = ventana('Aplicando…', { cancelar: () => { if (!listo.disabled) v.cerrar(); } }); const lineas = [];
+      const v = ventana('Aplicando…', { cancelar: () => { if (!listo.disabled) v.cerrar(); } }); const lineas = [], t0 = Date.now(), auto = !!op.auto;
       const log = (t) => { lineas.push(t); v.cuerpo.innerHTML = '<pre class="rmd-log">' + esc(lineas.join('\n')) + '</pre>'; v.cuerpo.scrollTop = v.cuerpo.scrollHeight; };
       const listo = botonModal('Cerrar', 'primario', () => v.cerrar()); listo.disabled = true; v.pie.append(listo);
       try {
@@ -4688,7 +4723,7 @@
         if (hayCfg) {
           for (const dd of destinos) { log(`Paso #${dd.paso.orden} · ${dd.paso.desc}`); await aplicarFila(tabla, dd.trId, cfg, columnas(tabla), log); }
           d.__rmdInter = true;
-          if (op.guardar) { await guardarYConfirmar(d, log, destinos.length > 1 ? 'los pasos' : 'el paso'); await esperar(1200); }
+          if (op.guardar) { await guardarYConfirmar(d, log, destinos.length > 1 ? 'los pasos' : 'el paso', auto); await esperar(250); }
           else log('ℹ Configuración aplicada sin guardar: revisa y pulsa Guardar.');
         }
         // 2) PM paso por paso (solo filas de ese paso: el portal puede mostrar toda la etiqueta)
@@ -4701,8 +4736,9 @@
           await hasta(() => !ocupado() && filasPMde(dPM).every(delDestino), 4000);
           const propias = () => filasPMde(dPM).filter(delDestino);
           const codigos = () => new Set(propias().map((tr) => leerPMfila(tPM, tr).codigo));
-          let cambios = 0;
-          for (const x of elegidos) { if (!codigos().has(x.codigo)) { await agregarPM(dPM, x, log, delDestino); cambios++; } else log(`= ${x.codigo} ya estaba en el destino`); }
+          let cambios = 0;                                     // (lo agregado ya queda grabado por el Agregar del portal: solo cuenta lo que hay que Guardar)
+          const faltan = elegidos.filter((x) => { if (codigos().has(x.codigo)) { log(`= ${x.codigo} ya estaba en el destino`); return false; } return true; });
+          if (faltan.length) await agregarPMs(dPM, faltan, log, delDestino, auto);
           const n = columnas(tPM);
           for (const x of elegidos) {
             const previo = dd.pms.find((q) => q.codigo === x.codigo);
@@ -4710,15 +4746,16 @@
             if (previo && !cambiosPM(x, previo).length) { log(`= ${x.codigo} sin cambios`); continue; }
             const fs = propias().filter((tr) => leerPMfila(tPM, tr).codigo === x.codigo); const tr = fs[fs.length - 1];
             if (!tr) { log(`⚠ No encuentro ${x.codigo} para configurarlo`); continue; }
-            log(`Configurando ${x.codigo} · ${x.desc}`);
-            await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log); dPM.__rmdInter = true; cambios++;
+            const k = lineas.length; log(`Configurando ${x.codigo} · ${x.desc}`);
+            const h = await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log);
+            if (h) { dPM.__rmdInter = true; cambios += h; } else if (lineas.length === k + 1) { lineas.pop(); log(`✔ ${x.codigo} ya tiene la configuración del origen`); }
           }
-          if (cambios) { await guardarYConfirmar(dPM, log, 'los procesos menores'); await esperar(1000); }
+          if (cambios) { await guardarYConfirmar(dPM, log, 'los procesos menores', auto); await esperar(200); }
           else log('ℹ Sin cambios en sus procesos menores.');
           await cerrarDialogo(dPM);
         }
-        const conAvisos = lineas.filter((l) => l.startsWith('⚠')).length;
-        log(conAvisos ? `\nTerminado con ${conAvisos} aviso(s) (líneas con ⚠). Revisa el resultado en la tabla.` : '\nListo. Revisa el resultado en la tabla.');
+        const conAvisos = lineas.filter((l) => l.startsWith('⚠')).length, seg = Math.round((Date.now() - t0) / 1000);
+        log(conAvisos ? `\nTerminado en ${seg} s con ${conAvisos} aviso(s) (líneas con ⚠). Revisa el resultado en la tabla.` : `\nListo en ${seg} s. Revisa el resultado en la tabla.`);
         v.fondo.querySelector('h3').textContent = conAvisos ? 'Terminado con avisos' : 'Terminado';
       } catch (e) {
         log('\n✖ Se detuvo: ' + e.message + '\nRevisa el estado del paso antes de reintentar (lo ya aplicado no se deshace solo).');
@@ -4727,22 +4764,84 @@
     } catch (e) { toast('No se pudo pegar: ' + e.message, true); } finally { ocupadoCopia = false; ajustarTodo(); }
   }
 
+  // Agrega varios PM con UNA sola pasada por «Adicionar Pasos RMD»: se busca cada código, se marca y al final un solo Agregar (el portal recorre
+  // aSeleccionadoPaso en orden: se deja en el orden del origen). Devuelve cuántos agregó. Sin ese modelo, uno por uno como antes.
+  async function agregarPMs(dPM, xs, log, filtro = () => true, auto = false) {
+    if (xs.length === 1 && !xs[0].pasoObj) { await agregarPM(dPM, xs[0], log, filtro, auto); return 1; }
+    const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
+    const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
+    log(xs.length > 1 ? `+ Agregando ${xs.length} procesos menores en una sola pasada…` : `+ Agregando ${xs[0].codigo} · ${xs[0].desc}`); pulsar(btn);
+    const picker = await hasta(() => dialogos().find((y) => !previos.has(y) && /^Adicionar Pasos/i.test(cabeceraDe(y))), 25000);
+    if (!picker) throw new Error('No se abrió el selector de pasos');
+    await hasta(() => !ocupado(), 25000); await esperar(300);
+    const t0 = tablaDe(picker), lista = t0 && nucleo().byId(t0.id.replace(/-listUl$/, '')), m = lista && modeloSel(lista);
+    const cancelar = async () => { const c = botonPorTitulo(picker, 'Cancelar'); if (c) pulsar(c); await hasta(() => !dialogos().includes(picker), 6000); };
+    if (!m) { await cancelar(); for (const x of xs) await agregarPM(dPM, x, log, filtro, auto); return xs.length; }
+    // Con el paso del catálogo de cada PM (leído al copiar) no hace falta buscar código por código: las entradas se arman directamente, con el tipo,
+    // decimales, rango y margen del origen, y el portal crea los PM ya con esa configuración (solo quedan las casillas para Guardar).
+    let elegidos = [];
+    if (xs.every((x) => x.pasoObj)) {
+      elegidos = xs.map((x) => { const ent = Object.assign({}, x.pasoObj); delete ent.__metadata;
+        if (x.crear && x.crear.tipoDatoId_iMaestraId != null) { Object.assign(ent, x.crear); ent.tipoDatoIdAnterior_iMaestraId = x.crear.tipoDatoId_iMaestraId; }
+        return { x, ent }; });
+    } else elegidos = await buscarEnSelector();
+    async function buscarEnSelector() {
+      const ctlFiltro = (lab) => { const l = [...picker.querySelectorAll('label')].find((y) => norm(y.textContent).replace(/[*:]$/, '') === lab); const el = l && document.getElementById(l.getAttribute('for')); return el && ctlDe(el); };
+      const buscar = async (codigo) => {
+        const k = ctlFiltro('Código Paso'); if (!k) throw new Error('No encuentro el filtro Código Paso');
+        k.setValue(String(codigo)); k.fireChange({ value: String(codigo) });
+        const ir = [...picker.querySelectorAll('button')].find((b) => norm(b.textContent) === 'Ir'); pulsar(ir);
+        await esperar(250); await hasta(() => !ocupado(), 25000, 80);
+        const fila = () => { const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
+          return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(codigo)); };
+        return hasta(fila, 2500, 80);
+      };
+      let sinFiltros = false; const lista2 = [];
+      for (const x of xs) {
+        let fila = await buscar(x.codigo);
+        if (!fila && !sinFiltros) {                        // se quitan los filtros de estructura/etiqueta del selector
+          for (const lab of ['Estructura', 'Etiqueta']) { const c = ctlFiltro(lab); if (c && c.setSelectedItem) { c.setSelectedItem(null); c.setValue(''); c.fireSelectionChange({ selectedItem: null }); c.fireChange({ value: '' }); } }
+          sinFiltros = true; await esperar(200); fila = await buscar(x.codigo);
+        }
+        if (!fila) { log(`⚠ El código ${x.codigo} no aparece en el catálogo de pasos: se omite`); continue; }
+        const item = nucleo().byId(fila.id); lista.setSelectedItem(item, true, true); await esperar(80);
+        const ent = (m.getData() || []).find((e) => String(e.codigo) === String(x.codigo));
+        if (!ent) { log(`⚠ ${x.codigo} no quedó marcado en el selector: se omite`); continue; }
+        lista2.push({ x, ent });
+      }
+      return lista2;
+    }
+    if (!elegidos.length) { await cancelar(); return 0; }
+    fijarSel(m, elegidos.map((e) => e.ent));                  // exactamente estos, en el orden del origen
+    await esperar(150);
+    const ag = [...picker.querySelectorAll('footer button')].find((b) => norm(b.textContent) === 'Agregar'); if (!ag) throw new Error('No encuentro el botón Agregar');
+    pulsar(ag);
+    const r = await atenderMensajes(20000, 1800, { auto }); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000, 80); await esperar(250);
+    await cargarTodo(tPM);
+    await hasta(() => propias().length >= antes + elegidos.length, 8000, 100);
+    const nuevos = propias().length - antes;
+    if (nuevos < elegidos.length) throw new Error(`Solo aparecieron ${nuevos} de ${elegidos.length} procesos menores en la lista`);
+    elegidos.forEach(({ x }) => log(`✔ ${x.codigo} · ${x.desc} agregado`));
+    return elegidos.length;
+  }
   // agrega un PM por código desde «Adicionar Pasos RMD»
-  async function agregarPM(dPM, x, log, filtro = () => true) {
+  async function agregarPM(dPM, x, log, filtro = () => true, auto = false) {
     const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
     const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
     log(`+ Agregando ${x.codigo} · ${x.desc}`); pulsar(btn);
     const picker = await hasta(() => dialogos().find((y) => !previos.has(y) && /^Adicionar Pasos/i.test(cabeceraDe(y))), 25000);
     if (!picker) throw new Error('No se abrió el selector de pasos');
-    await hasta(() => !ocupado(), 25000); await esperar(600);
+    await hasta(() => !ocupado(), 25000); await esperar(300);
     const ctlFiltro = (lab) => { const l = [...picker.querySelectorAll('label')].find((y) => norm(y.textContent).replace(/[*:]$/, '') === lab); const el = l && document.getElementById(l.getAttribute('for')); return el && ctlDe(el); };
     const buscar = async () => {
       const k = ctlFiltro('Código Paso'); if (!k) throw new Error('No encuentro el filtro Código Paso');
       k.setValue(String(x.codigo)); k.fireChange({ value: String(x.codigo) });
       const ir = [...picker.querySelectorAll('button')].find((b) => norm(b.textContent) === 'Ir'); pulsar(ir);
-      await esperar(1200); await hasta(() => !ocupado(), 25000); await esperar(500);
-      const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
-      return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(x.codigo));
+      await esperar(250); await hasta(() => !ocupado(), 25000, 80);
+      const fila = () => { const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
+        return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(x.codigo)); };
+      return hasta(fila, 2500, 80);
     };
     let fila = await buscar();
     if (!fila) {                                       // se quitan los filtros de estructura/etiqueta del selector
@@ -4755,8 +4854,8 @@
     await esperar(400);
     const ag = [...picker.querySelectorAll('footer button')].find((b) => norm(b.textContent) === 'Agregar'); if (!ag) throw new Error('No encuentro el botón Agregar');
     pulsar(ag);
-    const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
-    await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000); await esperar(800);
+    const r = await atenderMensajes(20000, 1800, { auto }); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000, 80); await esperar(250);
     await cargarTodo(tPM);
     await hasta(() => propias().length > antes, 6000);
     if (propias().length <= antes) throw new Error(`No apareció ${x.codigo} en la lista de procesos menores`);
