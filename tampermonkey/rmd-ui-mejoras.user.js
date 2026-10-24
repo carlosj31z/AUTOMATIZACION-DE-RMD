@@ -265,6 +265,10 @@
   .rmd-cont-ventana .rmd-cont-res { gap: 10px 16px; margin-bottom: 12px; }
   .rmd-cont-pie-estado { display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--rmd-apagado); font-size: 13px; white-space: nowrap; } .rmd-cont-pie-estado .rmd-cont-barra { flex: 0 0 220px; }
   .rmd-cont-nombre { display: block; font-weight: 600; overflow-wrap: anywhere; } .rmd-cont-nombre.apagado { color: var(--rmd-apagado); font-weight: 400; }
+  .rmd-cont-obsv { margin-top: 8px; padding: 6px 8px; border-left: 3px solid var(--rmd-borde-campo); border-radius: 4px; background: color-mix(in srgb, var(--rmd-texto) 4%, transparent); font-size: 12px; }
+  .rmd-cont-obsv-rot { display: block; margin-bottom: 2px; color: var(--rmd-apagado); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .rmd-cont-obsv-txt { white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; } .rmd-cont-obsv.abierta .rmd-cont-obsv-txt { display: block; }
+  .rmd-cont-mas { margin-top: 2px; font-size: 11.5px; }
   .rmd-cont-res:empty { display: none; }
   .rmd-cont-res { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; min-height: 30px; font-size: 13px; }
   .rmd-cont-res > b { margin-right: 6px; font-size: 14px; } .rmd-cont-res .rmd-cr-chips button:disabled { cursor: default; opacity: .45; }
@@ -7104,10 +7108,10 @@
   }
 
   // RMD autorizados en la fecha y versiones no vigentes del mismo material (para ubicar la carpeta y lo que pasa a OBSOLETO)
-  const CONT_SELECT = 'mdId,codigo,version,nivelTxt,codAgrupadorReceta,codDefectoReceta,descripcion,fechaAutorizacion,areaRmdTxt,estadoIdRmd/contenido,sucursalId/contenido';
+  const CONT_SELECT = 'mdId,codigo,version,nivelTxt,codAgrupadorReceta,codDefectoReceta,descripcion,observacion,fechaAutorizacion,areaRmdTxt,estadoIdRmd/contenido,sucursalId/contenido';
   const contFila = (md) => ({ mdId: md.mdId, codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '', etapa: md.nivelTxt || '', descripcion: md.descripcion || '',
     material: md.codDefectoReceta || '', agrupador: md.codAgrupadorReceta || '', estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', fecha: Contingencia.diaDe(md.fechaAutorizacion),
-    planta: (md.sucursalId && md.sucursalId.contenido) || '',
+    planta: (md.sucursalId && md.sucursalId.contenido) || '', observacion: String(md.observacion || '').trim(),
     usuario: md.usuarioAutorizacion || '', hora: contHora(md.fechaAutorizacion),
     recetas: md.aReceta && md.aReceta.results ? md.aReceta.results.filter((x) => x.recetaId).map((x) => String(x.recetaId.Text1 || '').trim()) : null });
   // hora local de la autorización; '' si la fecha viene sin hora (medianoche UTC)
@@ -7223,6 +7227,9 @@
     const tipoPdf = (r) => (!r.recetas ? '' : r.recetas.length === 1 ? '<span class="rmd-cont-tag" title="Con una sola fórmula asociada se sube el PDF de su «Descargar» (master + receta)">Master + receta</span>'
       : `<span class="rmd-cont-tag" title="Con ${r.recetas.length ? 'varias fórmulas' : 'ninguna fórmula'} asociada se sube el de «Descargar master»">Solo master · ${r.recetas.length ? r.recetas.length + ' fórmulas' : 'sin fórmula'}</span>`);
     const nombrePrevisto = (r) => Contingencia.nombreArchivo(r, r.recetas && r.recetas.length === 1 ? r.recetas[0] : '');
+    // Observaciones del RMD (SAP): 3 líneas y «ver más» si es larga
+    const obsRmd = (t) => (t ? `<div class="rmd-cont-obsv"><span class="rmd-cont-obsv-rot">Observaciones</span><div class="rmd-cont-obsv-txt">${esc(t)}</div>${t.length > 140 || t.split('\n').length > 3 ? '<button type="button" class="rmd-link rmd-cont-mas">ver más</button>' : ''}</div>` : '');
+    caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-mas'); if (!b) return; const d = b.parentElement.classList.toggle('abierta'); b.textContent = d ? 'ver menos' : 'ver más'; });
     const mensaje = (html, cls = '') => { caja.innerHTML = `<div class="rmd-cont-msg ${cls}">${html}</div>`; };
     const giro = '<span class="rmd-cont-giro" aria-hidden="true"></span>';
     const pintarEstado = (p, tr) => {
@@ -7252,12 +7259,12 @@
         const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('')
           : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}</span>`;
         const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : ''}`;
-        const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>` : '<span class="rmd-cont-vacio">Sin versión anterior</span>';
+        const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>${obsRmd(a.observacion)}` : '<span class="rmd-cont-vacio">Sin versión anterior</span>';
         const obs = p.aObsoleto.length ? p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')
           : `<span class="rmd-cont-vacio">${a && p.carpetas.length ? 'Ya está en OBSOLETO' : '—'}</span>`;
-        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${arch}</td><td>${ant}</td><td>${obs}</td><td></td></tr>`;
+        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${obsRmd(r.observacion)}</td><td>${dest}</td><td>${arch}</td><td>${ant}</td><td>${obs}</td><td></td></tr>`;
       }).join('');
-      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:150px"><col style="width:15%"><col style="width:22%"><col style="width:17%"><col style="width:165px"><col><col style="width:150px"></colgroup>
+      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:150px"><col style="width:19%"><col style="width:21%"><col style="width:16%"><col style="width:190px"><col><col style="width:150px"></colgroup>
         <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Archivo que se sube</th><th>Versión anterior</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
