@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.92.0
+// @version      1.92.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.92.0';                                                       // mantener igual a @version
+  const VERSION = '1.92.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -251,9 +251,9 @@
   .rmd-cont-base > span { flex: 1 1 auto; min-width: 0; } .rmd-cont-camino { color: var(--rmd-apagado); } .rmd-cont-base b { white-space: nowrap; } .rmd-cont-base svg, .rmd-cont-ruta svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: var(--rmd-ambar); stroke-width: 1.4; stroke-linejoin: round; }
   .rmd-cont-ruta { display: flex; gap: 6px; align-items: flex-start; } .rmd-cont-ruta svg { margin-top: 1px; } .rmd-cont-abrir { margin-left: 4px; color: var(--rmd-acento-texto) !important; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
   .rmd-modal.rmd-cont-ventana { width: 96vw; max-width: none; height: 94vh; max-height: none; }
-  .rmd-cont-ventana h3 { margin-bottom: 2px; font-size: 18px; } .rmd-cont-ventana .rmd-modal-cuerpo { display: flex; flex-direction: column; overflow: hidden; }
+  .rmd-cont-ventana h3 { margin-bottom: 2px; font-size: 18px; } .rmd-cont-ventana .rmd-modal-cuerpo { display: flex; flex-direction: column; overflow: hidden; } .rmd-cont-ventana .rmd-modal-cuerpo > * { flex-shrink: 0; }
   .rmd-cont-ventana .rmd-cont-intro { margin: 0 0 14px !important; }
-  .rmd-cont-ventana .rmd-cont-plan { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; } .rmd-cont-ventana .rmd-cont-tabla { flex: 1 1 auto; max-height: none; }
+  .rmd-cont-ventana .rmd-cont-plan { flex: 1 1 auto !important; min-height: 160px; display: flex; flex-direction: column; } .rmd-cont-ventana .rmd-cont-tabla { flex: 1 1 auto; max-height: none; }
   .rmd-cont-ventana .rmd-cont-tabla table { font-size: 13px; } .rmd-cont-ventana .rmd-cont-tabla td { padding: 11px 12px; } .rmd-cont-ventana .rmd-cont-tabla th { padding: 9px 12px; }
   .rmd-cont-kpis { display: flex; flex-wrap: wrap; gap: 8px; }
   .rmd-cont-kpi { display: flex; flex-direction: column; align-items: flex-start; min-width: 132px; padding: 8px 14px 7px; border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-cont-c, var(--rmd-borde-campo)); border-radius: 8px; background: var(--rmd-barra); color: var(--rmd-texto); font: 12.5px var(--rmd-fuente); text-align: left; cursor: pointer; }
@@ -7266,7 +7266,7 @@
           : `<span class="rmd-cont-vacio">${a && p.carpetas.length ? 'Ya está en OBSOLETO' : '—'}</span>`;
         return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${obsRmd(r.observacion)}</td><td>${dest}</td><td>${arch}</td><td>${ant}</td><td>${obs}</td><td></td></tr>`;
       }).join('');
-      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:150px"><col style="width:19%"><col style="width:21%"><col style="width:16%"><col style="width:190px"><col><col style="width:150px"></colgroup>
+      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:140px"><col style="width:17%"><col style="width:20%"><col style="width:16%"><col style="width:160px"><col><col style="width:140px"></colgroup>
         <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Archivo que se sube</th><th>Versión anterior</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
