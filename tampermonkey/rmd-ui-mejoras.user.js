@@ -268,16 +268,20 @@
   .rmd-cont-tabla tr.curso { --rmd-cont-c: var(--rmd-acento); } .rmd-cont-tabla tr.curso td { background: color-mix(in srgb, var(--rmd-acento) 10%, transparent); }
   .rmd-cont-tabla tr.ok { --rmd-cont-c: var(--rmd-verde); } .rmd-cont-tabla tr.error { --rmd-cont-c: var(--rmd-rojo); } .rmd-cont-tabla tr.error td { background: color-mix(in srgb, var(--rmd-rojo) 8%, transparent); }
   .rmd-cont-cod { display: block; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; } .rmd-cont-meta { display: block; margin-top: 2px; color: var(--rmd-apagado); font-size: 11.5px; white-space: nowrap; }
-  .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; } .rmd-cont-ruta > span:not(.rmd-cont-ya) { color: var(--rmd-apagado); } .rmd-cont-ruta i { color: var(--rmd-apagado); font-style: normal; opacity: .7; } .rmd-cont-ruta b { font-weight: 600; }
+  .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; } .rmd-cont-ruta a > span { color: var(--rmd-apagado); } .rmd-cont-ruta i { color: var(--rmd-apagado); font-style: normal; opacity: .7; } .rmd-cont-ruta b { font-weight: 600; }
   .rmd-cont-arch { display: block; color: var(--rmd-apagado); font-size: 12px; overflow-wrap: anywhere; } .rmd-cont-arch + .rmd-cont-arch { margin-top: 4px; } .rmd-cont-vacio { color: var(--rmd-apagado); opacity: .6; }
   .rmd-cont-nota { color: var(--rmd-ambar); }
+  .rmd-cont-a { color: inherit; text-decoration: none; } .rmd-cont-a:hover { color: var(--rmd-acento-texto); text-decoration: underline; } .rmd-cont-a:hover span, .rmd-cont-a:hover i { color: inherit; }
+  .rmd-cont-sub { display: block; margin-top: 5px; color: var(--rmd-apagado); font-size: 11.5px; overflow-wrap: anywhere; } .rmd-cont-sub b { color: var(--rmd-texto); font-weight: 600; } .rmd-cont-sub .rmd-cont-a { color: var(--rmd-acento-texto); text-decoration: underline; }
+  .rmd-cont-tag { display: table; margin-top: 5px; padding: 0 7px; border: 1px solid var(--rmd-borde); border-radius: 8px; color: var(--rmd-apagado); font: 600 10.5px/17px var(--rmd-fuente); white-space: nowrap; }
+  .rmd-cont-ant { display: block; font-weight: 600; white-space: nowrap; } .rmd-cont-ant small { margin-left: 4px; color: var(--rmd-apagado); font-weight: 400; font-size: 11px; }
+  .rmd-cont-hora { margin-left: auto; color: var(--rmd-apagado); font-size: 12px; }
   .rmd-cont-est { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; font: 600 11.5px/17px var(--rmd-fuente); white-space: nowrap;
     background: color-mix(in srgb, currentColor 14%, transparent); color: var(--rmd-apagado); }
   .rmd-cont-est.subir, .rmd-cont-est.curso { color: var(--rmd-acento-texto); } .rmd-cont-est.ya, .rmd-cont-est.ok { color: var(--rmd-verde); } .rmd-cont-est.mano { color: var(--rmd-ambar); } .rmd-cont-est.error { color: var(--rmd-rojo); }
   .rmd-cont-est.curso::before { content: ''; width: 9px; height: 9px; border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; border-radius: 50%; animation: rmd-cont-giro .8s linear infinite; }
   .rmd-cont-err { display: block; margin-top: 4px; color: var(--rmd-rojo); font-size: 11.5px; }
   .rmd-cont-ya { display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--rmd-verde) 18%, transparent); color: var(--rmd-verde); font: 600 10.5px/16px var(--rmd-fuente); vertical-align: 1px; }
-  .rmd-cont-ayuda { margin: 8px 0 0 !important; color: var(--rmd-apagado); font-size: 12px; }
   /* ── Comparar dos RMD (lado a lado) ── */
   .rmd-modal.rmd-cmp-ventana { width: min(1100px, 96vw); }
   .rmd-cmp-ventana .rmd-modal-cuerpo { overflow: visible; min-height: 300px; }
@@ -6910,7 +6914,10 @@
         const propios = pdfs.filter((p) => p.codigo === r.codigo && !p.obsoleto), fam = pdfs.filter((p) => codPrev.has(p.codigo)), activas = fam.filter((p) => !p.obsoleto);
         const yaEsta = [...new Set(propios.map((p) => p.carpeta))].sort();
         const carpetas = [...new Set((activas.length ? activas : fam).map((p) => p.carpeta).concat(yaEsta))].sort();
-        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), nota: '' };
+        // versión anterior: la más alta de la familia con PDF en la carpeta (si ninguna tiene, la más alta en SAP)
+        const fami = previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)), conPdf = fami.filter((o) => codPrev.has(o.codigo) && fam.some((p) => p.codigo === o.codigo));
+        const anterior = (conPdf.length ? conPdf : fami).slice().sort((a, b) => (+b.version || 0) - (+a.version || 0))[0] || null;
+        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), anterior, nota: '' };
         if (!carpetas.length) paso.nota = 'Sin versiones anteriores en 3.-CONTINGENCIA: ubícalo a mano.';
         else if (!paso.subir.length && !paso.aObsoleto.length) paso.nota = 'Ya está en la carpeta.';
         return paso;
@@ -6976,11 +6983,15 @@
   // RMD autorizados en la fecha y versiones no vigentes del mismo material (para ubicar la carpeta y lo que pasa a OBSOLETO)
   const CONT_SELECT = 'mdId,codigo,version,nivelTxt,codAgrupadorReceta,codDefectoReceta,descripcion,fechaAutorizacion,areaRmdTxt,estadoIdRmd/contenido';
   const contFila = (md) => ({ mdId: md.mdId, codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '', etapa: md.nivelTxt || '', descripcion: md.descripcion || '',
-    material: md.codDefectoReceta || '', agrupador: md.codAgrupadorReceta || '', estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', fecha: Contingencia.diaDe(md.fechaAutorizacion) });
+    material: md.codDefectoReceta || '', agrupador: md.codAgrupadorReceta || '', estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', fecha: Contingencia.diaDe(md.fechaAutorizacion),
+    usuario: md.usuarioAutorizacion || '', hora: contHora(md.fechaAutorizacion),
+    recetas: md.aReceta && md.aReceta.results ? md.aReceta.results.filter((x) => x.recetaId).map((x) => String(x.recetaId.Text1 || '').trim()) : null });
+  // hora local de la autorización; '' si la fecha viene sin hora (medianoche UTC)
+  const contHora = (x) => (!(x instanceof Date) || isNaN(x) || x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? '' : `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`);
   async function contLeer(modelo, fecha) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, [a, m, d] = fecha.split('-').map(Number);
     const ini = new Date(Date.UTC(a, m - 1, d - 1)), fin = new Date(Date.UTC(a, m - 1, d + 2));   // ±1 día por la zona horaria; luego se filtra por el día local
-    const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd', $select: CONT_SELECT })).map(contFila);
+    const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila);
     const autorizados = filas.filter((r) => /^AUTORIZADO$/i.test(r.estado) && r.fecha === fecha && /^\d+$/.test(r.codigo));
     const materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
     for (let i = 0; i < materiales.length; i += 15) {
@@ -7047,7 +7058,7 @@
         <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
         <input type="date" class="rmd-cont-otra" aria-label="Otra fecha"></div>
       <div class="rmd-cont-res" aria-live="polite"></div><div class="rmd-cont-plan"></div>
-      <p class="rmd-cont-ayuda">PDF: con una sola fórmula asociada, master + receta (su «Descargar»); con varias, solo el master («Descargar master»).</p>`;
+`;
     const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
     const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input')];
     otra.value = Contingencia.fechaIsoLocal(ayer); otra.max = Contingencia.fechaIsoLocal(hoy);
@@ -7060,7 +7071,13 @@
     const TIPOS = { subir: 'Por cargar', ya: 'Ya cargado', mano: 'Ubicar a mano' };
     const estadoDe = (p) => p.estado || { txt: TIPOS[tipo(p)], cls: tipo(p) };
     const titulo = (t) => String(t || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
-    const ruta = (c, ya) => { const s = c.split('/'), u = s.pop(); return `<div class="rmd-cont-ruta" title="${esc(c)}">${ya ? '<span class="rmd-cont-ya">ya está</span>' : ''}${s.map((x) => `<span>${esc(x)}</span> <i>›</i> `).join('')}<b>${esc(u)}</b></div>`; };
+    const spUrl = (rel) => 'https://medifarmape.sharepoint.com' + (CONT_RAIZ + (rel ? '/' + rel : '')).split('/').map(encodeURIComponent).join('/');
+    const enlace = (rel, html, tit) => `<a class="rmd-cont-a" href="${esc(spUrl(rel))}" target="_blank" rel="noopener" title="${esc(tit || 'Abrir en SharePoint')}">${html}</a>`;
+    const ruta = (c, ya) => { const s = c.split('/'), u = s.pop(); return `<div class="rmd-cont-ruta">${ya ? '<span class="rmd-cont-ya">ya está</span>' : ''}${enlace(c, `${s.map((x) => `<span>${esc(x)}</span> <i>›</i> `).join('')}<b>${esc(u)}</b>`, `Abrir la carpeta en SharePoint: ${c}`)}</div>`; };
+    const archivo = (x) => enlace(x, esc(x.split('/').pop()), `Abrir el PDF: ${x}`);
+    const tipoPdf = (r) => (!r.recetas ? '' : r.recetas.length === 1 ? '<span class="rmd-cont-tag" title="Con una sola fórmula asociada se sube el PDF de su «Descargar» (master + receta)">Master + receta</span>'
+      : `<span class="rmd-cont-tag" title="Con ${r.recetas.length ? 'varias fórmulas' : 'ninguna fórmula'} asociada se sube el de «Descargar master»">Solo master · ${r.recetas.length ? r.recetas.length + ' fórmulas' : 'sin fórmula'}</span>`);
+    const nombrePrevisto = (r) => Contingencia.nombreArchivo(r, r.recetas && r.recetas.length === 1 ? r.recetas[0] : '');
     const mensaje = (html, cls = '') => { caja.innerHTML = `<div class="rmd-cont-msg ${cls}">${html}</div>`; };
     const giro = '<span class="rmd-cont-giro" aria-hidden="true"></span>';
     const pintarEstado = (p, tr) => {
@@ -7074,7 +7091,7 @@
       const chip = (k, txt, c) => `<button type="button" class="${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'}>${k === 'todos' ? '' : '<i></i>'}${txt}<span>${c}</span></button>`;
       res.innerHTML = `<b>${plan.length} RMD · ${esc(fmt(plan.fecha))}</b><div class="rmd-cr-chips">${chip('todos', 'Todos', plan.length)}${chip('subir', 'Por cargar', n.subir)}${chip('ya', 'Ya cargados', n.ya)}${chip('mano', 'Ubicar a mano', n.mano)}${n.ok ? chip('ok', 'Cargados ahora', n.ok) : ''}${n.error ? chip('error', 'Con error', n.error) : ''}</div>`
         + (progreso ? `<span class="rmd-cont-prog">${giro}${esc(progreso.txt)}<span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span></span>`
-          : nObs ? `<span class="rmd-cont-obs">${nObs} PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : '');
+          : (nObs ? `<span class="rmd-cont-obs">${nObs} PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : '') + `<span class="rmd-cont-hora" title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span>`);
       const nSubir = n.subir; bCargar.textContent = nSubir ? `Cargar ${nSubir} a SharePoint` : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
     res.addEventListener('click', (e) => {
@@ -7084,13 +7101,17 @@
     const pintar = () => {
       if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD autorizados el ${esc(fmt(plan.fecha))}.`); bCargar.disabled = true; return; }
       const filas = plan.map((p, i) => {
-        const r = p.rmd;
-        const dest = p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('') || `<span class="rmd-cont-nota">Sin versión anterior en 3.-CONTINGENCIA</span>`;
-        const obs = p.aObsoleto.map((x) => `<span class="rmd-cont-arch" title="${esc(x)}">${esc(x.split('/').pop())}</span>`).join('') || '<span class="rmd-cont-vacio">—</span>';
-        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span></td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${obs}</td><td></td></tr>`;
+        const r = p.rmd, a = p.anterior;
+        const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
+        const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('') + (p.subir.length ? `<span class="rmd-cont-sub">Se sube como <b>${esc(nombrePrevisto(r))}</b></span>` : '')
+          : `<span class="rmd-cont-nota">${a ? `Ninguna versión anterior tiene PDF en 3.-CONTINGENCIA.` : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano: ${enlace('', 'abrir 3.-CONTINGENCIA', 'Abrir 3.-CONTINGENCIA en SharePoint')}</span>`;
+        const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>` : '<span class="rmd-cont-vacio">Sin versión anterior</span>';
+        const obs = p.aObsoleto.length ? `<span class="rmd-cont-sub">Pasa a OBSOLETO:</span>${p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}`
+          : a && p.carpetas.length ? '<span class="rmd-cont-sub">Su PDF ya está en OBSOLETO</span>' : '';
+        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${tipoPdf(r)}</td><td>${dest}</td><td>${ant}${obs}</td><td></td></tr>`;
       }).join('');
       caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:128px"><col style="width:22%"><col><col style="width:23%"><col style="width:142px"></colgroup>
-        <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+        <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Versión anterior</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
     const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); if (si) bCargar.disabled = true; };
@@ -7104,7 +7125,7 @@
         mensaje(`${giro}Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…`);
         const codigos = [...new Set(autorizados.map((r) => r.codigo).concat(previos.map((r) => r.codigo)))];
         const rutas = autorizados.length ? await spBuscar(codigos) : []; if (cerrado || t !== turno) return;
-        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; bloquear(false); pintar();
+        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; plan.hora = new Date().toTimeString().slice(0, 5); bloquear(false); pintar();
       } catch (e) { bloquear(false); mensaje(`No se pudo revisar: ${esc(e.message)}`, 'error'); }
       finally { if (t === turno && ocupadoC) bloquear(false); }
     }

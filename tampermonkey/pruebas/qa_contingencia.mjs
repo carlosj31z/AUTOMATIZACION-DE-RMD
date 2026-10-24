@@ -37,6 +37,8 @@ const plan = Object.fromEntries(C.planificar(autorizados, previos, rutas).map((p
 const v6 = plan['2202609999'];
 ok('destino: la carpeta de la versión anterior (misma etapa, aunque lleve tilde)', J(v6.subir) === J(['1.- PLANTA 1/LIQUIDOS/GASEOVET/FABRICACION']), J(v6.subir));
 ok('a OBSOLETO: solo la versión anterior que no está archivada', J(v6.aObsoleto) === J(['1.- PLANTA 1/LIQUIDOS/GASEOVET/FABRICACION/2202403301-FAB-5-_GASEOVET.pdf']), J(v6.aObsoleto));
+ok('versión anterior: la más alta con PDF en la carpeta', v6.anterior && v6.anterior.codigo === '2202403301', J(v6.anterior));
+ok('producto nuevo: sin versión anterior', plan['2202600001'].anterior === null);
 ok('producto nuevo: sin carpeta y con nota', plan['2202600001'].carpetas.length === 0 && /a mano/.test(plan['2202600001'].nota));
 ok('ya cargado: nada que hacer', plan['2202600005'].subir.length === 0 && plan['2202600005'].aObsoleto.length === 0 && /Ya está/.test(plan['2202600005'].nota));
 
