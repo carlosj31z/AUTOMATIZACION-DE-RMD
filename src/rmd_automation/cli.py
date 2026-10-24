@@ -322,6 +322,29 @@ def contingencia_diaria(fecha: str | None, hoy: bool, aplicar: bool, carpeta_loc
     ejecutar(cdp, CONTINGENCIA_URL, fecha, carpeta_local, aplicar, avisar=click.echo)
 
 
+@cli.group("interfaz")
+def interfaz_group() -> None:
+    """Userscript «mejoras de interfaz» (Tampermonkey) en la carpeta MEJORAS DE INTERFAZ de SharePoint."""
+
+
+@interfaz_group.command("publicar")
+@click.option("--archivo", type=click.Path(exists=True, dir_okay=False), default="tampermonkey/rmd-ui-mejoras.user.js",
+              show_default=True, help="Userscript a publicar; se sube como <@version>.js.")
+@click.option("--subir", is_flag=True, help="Sube el archivo (sin esto solo muestra qué haría). Llega a todos los usuarios.")
+def interfaz_publicar(archivo: str, subir: bool) -> None:
+    """Sube el userscript como <versión>.js, si es mayor que la última de la carpeta. Nunca sobrescribe ni borra.
+
+    Usa la sesión de SharePoint del Chromium de RMD_CDP_URL.
+    """
+    import os
+
+    from .interfaz import publicar
+
+    cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
+    if not publicar(cdp, archivo, subir, avisar=click.echo):
+        sys.exit(1)
+
+
 REVISIONES = [
     "Tren de equipos (TREN DE EQUIPOS PL2.xlsx): los equipos del RMD deben coincidir con la línea/sala de la etapa.",
     'Controles de cambio pendientes (1.-CC-NC-DES Para actualizar RMD.xlsx, hoja "PLANTA 2"): ¿alguno aplica a este RMD?',
