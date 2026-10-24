@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.87.1
+// @version      1.88.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.87.1';                                                       // mantener igual a @version
+  const VERSION = '1.88.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -235,13 +235,43 @@
   .rmd-menu-item b { grid-column: 2; font-size: 13.5px; font-weight: 600; } .rmd-menu-item span { grid-column: 2; font-size: 12px; color: var(--rmd-apagado); }
   html.rmd-ui .rmd-btn.rmd-status-rmd { width: auto; min-width: var(--rmd-btn-alto, 36px); height: var(--rmd-btn-alto, 36px); padding: 0 8px; gap: 7px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--rmd-ico-portal, var(--rmd-acento-texto)); }
   html.rmd-ui .rmd-status-rmd .rmd-ico-sap { font-style: normal; font-size: var(--rmd-ico-tam, 1rem); line-height: 1; }
-  html.rmd-ui .rmd-cont-intro { margin: 0 0 10px; font-size: 13px; line-height: 1.45; color: #32363a; max-width: 760px; }
-  html.rmd-ui .rmd-cont-fecha { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 12px; font-size: 13px; }
-  html.rmd-ui .rmd-cont-fecha label { display: inline-flex; gap: 6px; align-items: center; }
-  html.rmd-ui .rmd-cont-tabla { max-height: 55vh; overflow: auto; border: 1px solid #e5e5e5; border-radius: 6px; }
-  html.rmd-ui .rmd-cont-tabla table { border-collapse: collapse; width: 100%; font-size: 12px; }
-  html.rmd-ui .rmd-cont-tabla th { position: sticky; top: 0; background: #f7f7f7; text-align: left; padding: 6px 8px; font-weight: 600; }
-  html.rmd-ui .rmd-cont-tabla td { padding: 6px 8px; border-top: 1px solid #eee; vertical-align: top; word-break: break-word; }
+  /* ── Contingencia a SharePoint (colores del tema: se lee igual en claro y oscuro) ── */
+  .rmd-cont-intro { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--rmd-apagado); }
+  .rmd-cont-intro b { color: var(--rmd-texto); font-weight: 600; }
+  .rmd-cont-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .rmd-cont-seg { display: inline-flex; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; overflow: hidden; }
+  .rmd-cont-seg label { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; font-size: 13px; color: var(--rmd-texto); cursor: pointer; user-select: none; }
+  .rmd-cont-seg label + label { border-left: 1px solid var(--rmd-borde-campo); }
+  .rmd-cont-seg input[type=radio] { position: absolute; opacity: 0; pointer-events: none; }
+  .rmd-cont-seg label:has(input:checked) { background: var(--rmd-acento); color: #fff; font-weight: 600; }
+  .rmd-cont-seg label:has(input:focus-visible) { outline: 2px solid var(--rmd-acento); outline-offset: -2px; }
+  .rmd-cont-otra { height: 30px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); color-scheme: light dark; }
+  .rmd-cont-otra:disabled { opacity: .45; }
+  .rmd-cont-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+  .rmd-cont-dato { display: flex; flex-direction: column; min-width: 104px; padding: 6px 12px; border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-barra); }
+  .rmd-cont-dato b { font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--rmd-texto); } .rmd-cont-dato span { font-size: 12px; color: var(--rmd-apagado); }
+  .rmd-cont-dato.acento { border-left-color: var(--rmd-acento); } .rmd-cont-dato.ambar { border-left-color: var(--rmd-ambar); } .rmd-cont-dato.verde { border-left-color: var(--rmd-verde); } .rmd-cont-dato.rojo { border-left-color: var(--rmd-rojo); }
+  .rmd-cont-avance { margin: 0 0 10px; font-size: 12.5px; color: var(--rmd-texto); } .rmd-cont-avance[hidden] { display: none; }
+  .rmd-cont-avance-barra { height: 6px; margin-top: 5px; border-radius: 3px; background: var(--rmd-borde); overflow: hidden; } .rmd-cont-avance-barra i { display: block; height: 100%; width: 0; background: var(--rmd-acento); transition: width .25s ease; }
+  .rmd-cont-tabla { max-height: 52vh; overflow: auto; border: 1px solid var(--rmd-borde); border-radius: 8px; }
+  .rmd-cont-tabla table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 12.5px; line-height: 1.4; color: var(--rmd-texto); }
+  .rmd-cont-tabla th { position: sticky; top: 0; z-index: 1; padding: 7px 10px; background: var(--rmd-cabecera); border-bottom: 1px solid var(--rmd-borde); text-align: left; font: 600 11px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; color: var(--rmd-apagado); }
+  .rmd-cont-tabla td { padding: 8px 10px; border-top: 1px solid var(--rmd-borde); vertical-align: top; overflow-wrap: anywhere; }
+  .rmd-cont-tabla tbody tr:first-child td { border-top: 0; } .rmd-cont-tabla tbody tr:hover td { background: rgba(27,141,236,.06); }
+  .rmd-cont-tabla tr.rmd-cont-mano td:first-child { box-shadow: inset 3px 0 0 var(--rmd-ambar); } .rmd-cont-tabla tr.rmd-cont-fallo td:first-child { box-shadow: inset 3px 0 0 var(--rmd-rojo); }
+  .rmd-cont-cod { font-weight: 600; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; } .rmd-cont-ver { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rmd-apagado); white-space: nowrap; }
+  .rmd-cont-ruta { color: var(--rmd-apagado); font-size: 12px; } .rmd-cont-ruta b { color: var(--rmd-texto); font-weight: 600; } .rmd-cont-ruta .sep { padding: 0 3px; opacity: .6; }
+  .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; }
+  .rmd-cont-arch { color: var(--rmd-apagado); font-size: 12px; } .rmd-cont-arch + .rmd-cont-arch { margin-top: 4px; }
+  .rmd-cont-ya { display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 600; color: var(--rmd-verde); background: color-mix(in srgb, var(--rmd-verde) 16%, transparent); }
+  .rmd-cont-nota { color: var(--rmd-ambar); font-size: 12px; } .rmd-cont-error { color: var(--rmd-rojo); } .rmd-cont-vacio { padding: 18px 4px; color: var(--rmd-apagado); }
+  .rmd-cont-est { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; line-height: 1.35; white-space: nowrap; color: var(--rmd-apagado); background: color-mix(in srgb, var(--rmd-apagado) 14%, transparent); }
+  .rmd-cont-est.pend { color: var(--rmd-acento-texto); background: color-mix(in srgb, var(--rmd-acento) 15%, transparent); }
+  .rmd-cont-est.mano { color: var(--rmd-ambar); background: color-mix(in srgb, var(--rmd-ambar) 16%, transparent); }
+  .rmd-cont-est.ok { color: var(--rmd-verde); background: color-mix(in srgb, var(--rmd-verde) 16%, transparent); }
+  .rmd-cont-est.curso { color: var(--rmd-acento-texto); background: color-mix(in srgb, var(--rmd-acento) 15%, transparent); animation: rmdContLatido 1.2s ease-in-out infinite; }
+  .rmd-cont-est.error { color: var(--rmd-rojo); background: color-mix(in srgb, var(--rmd-rojo) 14%, transparent); white-space: normal; }
+  @keyframes rmdContLatido { 50% { opacity: .55; } } @media (prefers-reduced-motion: reduce) { .rmd-cont-est.curso { animation: none; } }
   /* ── Comparar dos RMD (lado a lado) ── */
   .rmd-modal.rmd-cmp-ventana { width: min(1100px, 96vw); }
   .rmd-cmp-ventana .rmd-modal-cuerpo { overflow: visible; min-height: 300px; }
@@ -305,9 +335,6 @@
   .pdf-hoja .rmd-cmp-actual, .pdf-hoja tr.rmd-cmp-actual > td { outline: 2px solid #0a6ed1; outline-offset: -1px; }
   .rmd-cmp-vista { display: inline-flex; border: 1px solid var(--rmd-borde); border-radius: 6px; overflow: hidden; } .rmd-cmp-vista button { padding: 4px 12px; border: 0; background: none; color: var(--rmd-texto); font: 13px var(--rmd-fuente); cursor: pointer; }
   .rmd-cmp-vista button[aria-pressed="true"] { background: var(--rmd-acento); color: #fff; }
-  html.rmd-ui .rmd-cont-ya { font-size: 11px; color: #256f3a; background: #e3f4e4; border-radius: 3px; padding: 0 4px; }
-  html.rmd-ui .rmd-cont-nota, html.rmd-ui .rmd-cont-error { color: #b26a00; }
-  html.rmd-ui .rmd-cont-est { font-size: 11px; white-space: nowrap; } html.rmd-ui .rmd-cont-est.ok { color: #256f3a; } html.rmd-ui .rmd-cont-est.error { color: #c62828; white-space: normal; } html.rmd-ui .rmd-cont-est.curso { color: #0a6ed1; }
   html.rmd-ui .rmd-btn.rmd-status-rmd svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   html.rmd-ui .rmd-btn.rmd-status-rmd:hover, html.rmd-ui .rmd-btn.rmd-status-rmd:focus-visible { background: color-mix(in srgb, currentColor 12%, transparent); outline: none; }
   html.rmd-ui .rmd-btn.rmd-status-rmd > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -3139,21 +3166,25 @@
     }
     c.setValue(valor == null ? '' : String(valor)); c.fireChange({ value: c.getValue() }); return true;
   }
-  // aplica la configuración a una fila (por id: UI5 la redibuja al cambiar el tipo)
+  // aplica la configuración a una fila (por id: UI5 la redibuja al cambiar el tipo). Lo que ya tiene el valor no se toca; tras cada cambio se espera
+  // solo a que el portal termine (antes, pausas fijas de 0,1 a 0,9 s por campo).
   async function aplicarFila(tabla, trId, cfg, nombres, log) {
     const n = columnas(tabla), fila = () => document.getElementById(trId);
-    const poner = async (nom, valor, etiqueta, espera = 250) => {
+    const igual = (a, b) => (typeof b === 'boolean' ? !!a === b : norm(a) === norm(b == null ? '' : String(b)));
+    const poner = async (nom, valor, etiqueta, espera = 40) => {
       const i = n.indexOf(nom); if (i < 0 || !fila()) return;
+      if (igual(leerCelda(fila(), i), valor)) return;
       const ok = fijarCelda(fila(), i, valor);
       const txt = typeof valor === 'boolean' ? (valor ? 'marcada' : 'desmarcada') : (valor === '' ? '(vacío)' : valor);
       log(ok === null ? `ℹ ${etiqueta}: bloqueado por el tipo de dato (se omite)` : `${ok ? '✔' : '⚠'} ${etiqueta}: ${txt}${ok ? '' : ' — no se pudo aplicar (¿valor inexistente en la lista?)'}`);
-      await esperar(espera);
+      if (espera) await esperar(espera);
+      if (ocupado()) await hasta(() => !ocupado(), 8000, 60);
     };
-    if (cfg.tipo != null) await poner('TIPO DATO', cfg.tipo, 'Tipo Dato', 900);
-    for (const [nom, k, et] of [['CLAVE MODELO', 'clave', 'Clave Modelo'], ['PUESTO TRABAJO', 'puesto', 'Puesto Trabajo']]) if (cfg[k] != null) await poner(nom, cfg[k], et, 500);
+    if (cfg.tipo != null) await poner('TIPO DATO', cfg.tipo, 'Tipo Dato', 300);
+    for (const [nom, k, et] of [['CLAVE MODELO', 'clave', 'Clave Modelo'], ['PUESTO TRABAJO', 'puesto', 'Puesto Trabajo']]) if (cfg[k] != null) await poner(nom, cfg[k], et, 120);
     for (const [nom, k, et] of [['VAL. INICIAL', 'vi', 'Val. Inicial'], ['VAL. FINAL', 'vf', 'Val. Final'], ['MARGEN', 'mg', 'Margen'], ['DECIMAL', 'dec', 'Decimal'], ['DECIM.', 'dec', 'Decimal']])
       if (cfg[k] != null && n.indexOf(nom) >= 0) await poner(nom, cfg[k], et);
-    for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 120);
+    for (const [k, v] of Object.entries(cfg.chk || {})) await poner(k, v, `Casilla ${NOMBRE_CASILLA[k] || k}`, 0);
   }
 
   // Mensajes del portal durante un proceso del script: no se responden por la persona. Se espera su respuesta y se lee qué botón pulsó
@@ -3168,23 +3199,33 @@
     m.removeEventListener('click', oir, true); m.classList.remove('rmd-espera-respuesta');
     return pulsado;
   }
-  // tras un guardado del script: éxito y confirmaciones las contesta la persona; una confirmación no aceptada, una advertencia o un error detienen
-  async function atenderMensajes(ms = 20000, quietoMs = 1800) {
-    let limite = Date.now() + ms, ultimo = Date.now(); const t0 = Date.now(), vistos = [];
+  // Con el «Sí» de la vista previa (auto) el script pulsa OK / Sí en esos mensajes; si no tienen ese botón, los contesta la persona.
+  async function aceptarMensajePortal(m) {
+    const b = [...m.querySelectorAll('footer button, .sapMDialogFooter button, button')].find((x) => esAceptar(x.textContent));
+    if (!b) return esperarRespuestaPortal(m);
+    const txt = norm(b.textContent); pulsar(b);
+    await hasta(() => !m.isConnected || !m.getClientRects().length, 5000, 60);
+    return txt;
+  }
+  // tras un guardado del script: éxito y confirmaciones las contesta la persona (o el script con auto); una confirmación no aceptada, una advertencia o
+  // un error detienen. Nunca se aceptan solos los mensajes que hablan de eliminar o borrar.
+  async function atenderMensajes(ms = 20000, quietoMs = 1800, { auto = false } = {}) {
+    let limite = Date.now() + ms, ultimo = Date.now(), exito = false; const t0 = Date.now(), vistos = [];
     while (Date.now() < limite) {
       const m = [...document.querySelectorAll('.sapMMessageDialog')].filter((x) => x.getClientRects().length).pop();
       if (m) {
         const titulo = norm((m.querySelector('h1,h2,.sapMTitle,header') || {}).textContent), texto = norm((m.querySelector('section') || {}).textContent);
         if (/[ÉE]xito|Confirmaci/i.test(titulo) && !/elimin|borrar/i.test(texto)) {
-          const r = await esperarRespuestaPortal(m);
+          const r = auto ? await aceptarMensajePortal(m) : await esperarRespuestaPortal(m);
           if (/Confirmaci/i.test(titulo) && !esAceptar(r)) return { problema: `${titulo}: ${texto} (no se aceptó)`, vistos };
-          vistos.push(`${titulo}: ${texto}`); ultimo = Date.now(); limite = Date.now() + ms; await esperar(400); continue;
+          if (/[ÉE]xito/i.test(titulo)) exito = true;
+          vistos.push(`${titulo}: ${texto}`); ultimo = Date.now(); limite = Date.now() + ms; await esperar(auto ? 120 : 400); continue;
         }
         return { problema: `${titulo}: ${texto}`, vistos };
       }
-      if (vistos.length && Date.now() - ultimo > quietoMs) break;
-      if (!vistos.length && Date.now() - t0 > 6000) break;                    // no hubo mensajes
-      await esperar(250);
+      if (vistos.length && Date.now() - ultimo > (auto && exito ? 450 : quietoMs)) break;   // tras el Éxito aceptado solo, basta un respiro
+      if (!vistos.length && Date.now() - t0 > 6000 && !ocupado()) break;     // no hubo mensajes
+      await esperar(auto ? 100 : 250);
     }
     return { vistos };
   }
@@ -3208,7 +3249,7 @@
     pulsar(b);
     const d = await hasta(() => { const x = dialogos().find((y) => !previos.has(y) && esDialogoPM(y)); return x && !ocupado() ? x : null; }, 25000);
     if (!d) throw new Error('No se abrió la ventana de procesos menores');
-    await esperar(900);
+    await esperar(300);
     await cargarTodo(tablaDe(d));
     return d;
   }
@@ -4566,6 +4607,9 @@
   }
   const resumenValores = (vals) => { const m = new Map(); vals.forEach((x) => { const k = norm(x) || '—'; m.set(k, (m.get(k) || 0) + 1); }); return [...m].map(([k, n]) => (vals.length > 1 ? `${k} (${n})` : k)).join(' · '); };
 
+  // Preferencias de la vista previa de Pegar, por persona (en este navegador).
+  const leerOpcionPegar = (k) => { try { const o = JSON.parse(localStorage.getItem('rmd-pegar-opciones') || '{}'); return k in o ? !!o[k] : true; } catch (e) { return true; } };
+  const guardarOpcionPegar = (k, v) => { try { const o = JSON.parse(localStorage.getItem('rmd-pegar-opciones') || '{}'); o[k] = !!v; localStorage.setItem('rmd-pegar-opciones', JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } };
   // Vista previa: devuelve las opciones o null si se cancela; PM sin cambios vienen desmarcados.
   function vistaPrevia(destinos) {
     return new Promise((resolver) => {
@@ -4591,24 +4635,33 @@
         <table class="rmd-tabla"><thead><tr><th><input type="checkbox" class="rmd-todos-pm" title="Marcar o desmarcar todos"></th><th>Orden</th><th>Procesos menores del origen</th><th>Qué pasará</th></tr></thead><tbody>${filasPM || '<tr><td colspan="4">El paso de origen no tiene procesos menores.</td></tr>'}</tbody></table>
         <p class="rmd-nota">No se copian Orden, Depende, Código ni Descripción. Solo se tocan los procesos menores marcados${varios ? '; la configuración se aplica a todos los destinos y se guarda una vez' : ''}.</p>
         <label><input type="checkbox" id="rmd-op-guardar" checked> Guardar al terminar de aplicar la configuración</label><br>
-        <label><input type="checkbox" id="rmd-op-actualizar" checked> Actualizar la configuración de los procesos menores que ya existan en el destino</label>`;
+        <label><input type="checkbox" id="rmd-op-actualizar" checked> Actualizar la configuración de los procesos menores que ya existan en el destino</label><br>
+        <label><input type="checkbox" id="rmd-op-auto" ${leerOpcionPegar('auto') ? 'checked' : ''}> Con este «Sí» se aceptan solos los mensajes de Éxito y Confirmación del portal</label>
+        <p class="rmd-nota rmd-op-auto-nota">Una advertencia, un error o un mensaje que hable de eliminar detiene el proceso y te lo muestra.</p>`;
       const todos = v.cuerpo.querySelector('.rmd-todos-pm'), cajas = () => [...v.cuerpo.querySelectorAll('input[data-p]')];
       if (todos) { todos.checked = cajas().length > 0 && cajas().every((i) => i.checked); todos.addEventListener('change', () => cajas().forEach((i) => { i.checked = todos.checked; })); }
-      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), botonModal(varios ? `Aplicar en ${destinos.length} pasos` : 'Aplicar', 'primario', () => {
+      const auto = v.cuerpo.querySelector('#rmd-op-auto'), bSi = botonModal('', 'primario', () => {
         const q = (s) => [...v.cuerpo.querySelectorAll(s)];
         const opciones = {
           campos: q('input[data-c]:checked').map((i) => i.dataset.c), casillas: q('input[data-x]:checked').map((i) => i.dataset.x),
           pms: q('input[data-p]:checked').map((i) => +i.dataset.p), guardar: v.cuerpo.querySelector('#rmd-op-guardar').checked, actualizar: v.cuerpo.querySelector('#rmd-op-actualizar').checked,
+          auto: auto.checked,
         };
+        guardarOpcionPegar('auto', auto.checked);
         v.cerrar(); resolver(opciones);
-      }));
+      });
+      const rotular = () => { bSi.textContent = auto.checked ? (varios ? `Sí, aplicar en ${destinos.length} pasos` : 'Sí, aplicar') : (varios ? `Aplicar en ${destinos.length} pasos` : 'Aplicar'); };
+      auto.addEventListener('change', rotular); rotular();
+      v.pie.append(botonModal('Cancelar', '', () => { v.cerrar(); resolver(null); }), bSi);
+      setTimeout(() => bSi.focus(), 40);
     });
   }
 
-  async function guardarYConfirmar(dlg, log, que) {
+  async function guardarYConfirmar(dlg, log, que, auto = false) {
     const g = botonPorTitulo(dlg, 'Guardar'); if (!g) throw new Error(`No encuentro el botón Guardar de ${que}`);
     log(`Guardando ${que}…`); pulsar(g); rebase(dlg);
-    const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    const r = await atenderMensajes(20000, 1800, { auto }); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    if (ocupado()) await hasta(() => !ocupado(), 15000, 80);
     if (r.vistos.some((x) => /^[ÉE]xito/i.test(x))) log(`✔ ${que[0].toUpperCase() + que.slice(1)} guardado(s)${r.vistos.length ? ` (${r.vistos.join(' | ')})` : ''}`);
     else log(`⚠ El portal no mostró el mensaje de éxito: verifica que ${que} se guardaron.`);
   }
@@ -4628,15 +4681,19 @@
         if (!sel.length) { toast('El paso marcado es el mismo que se copió: marca el paso destino.', true); return; }
       }
       toast(sel.length > 1 ? `Leyendo los ${sel.length} pasos destino…` : 'Leyendo el paso destino…');
+      // PM de todos los destinos en una sola lectura (la de la lista); el paso que no se pueda leer así se lee como antes
+      let porPaso = null;
+      if (portapapeles.pms.length) try { porPaso = await pmsDeLista(tabla, filasPrincipales(tabla)); } catch (e) { porPaso = null; }
       const destinos = [];
       for (const tr of sel) {
-        const pms = botonPM(tr) && portapapeles.pms.length ? await leerPMsDe(tabla, tr.id) : [];
-        destinos.push({ trId: tr.id, paso: leerPaso(tabla, tr), pms, id: (objetoDeFila(tr) || {}).mdEstructuraPasoId });
+        const id = (objetoDeFila(tr) || {}).mdEstructuraPasoId, deLista = porPaso && id != null ? porPaso.get(id) || [] : null;
+        const pms = !botonPM(tr) || !portapapeles.pms.length ? [] : deLista && deLista.every((q) => q.tipo || q.insumo) ? deLista : await leerPMsDe(tabla, tr.id);
+        destinos.push({ trId: tr.id, paso: leerPaso(tabla, tr), pms, id });
       }
       const op = await vistaPrevia(destinos);
       if (!op) return;
 
-      const v = ventana('Aplicando…', { cancelar: () => { if (!listo.disabled) v.cerrar(); } }); const lineas = [];
+      const v = ventana('Aplicando…', { cancelar: () => { if (!listo.disabled) v.cerrar(); } }); const lineas = [], t0 = Date.now(), auto = !!op.auto;
       const log = (t) => { lineas.push(t); v.cuerpo.innerHTML = '<pre class="rmd-log">' + esc(lineas.join('\n')) + '</pre>'; v.cuerpo.scrollTop = v.cuerpo.scrollHeight; };
       const listo = botonModal('Cerrar', 'primario', () => v.cerrar()); listo.disabled = true; v.pie.append(listo);
       try {
@@ -4647,7 +4704,7 @@
         if (hayCfg) {
           for (const dd of destinos) { log(`Paso #${dd.paso.orden} · ${dd.paso.desc}`); await aplicarFila(tabla, dd.trId, cfg, columnas(tabla), log); }
           d.__rmdInter = true;
-          if (op.guardar) { await guardarYConfirmar(d, log, destinos.length > 1 ? 'los pasos' : 'el paso'); await esperar(1200); }
+          if (op.guardar) { await guardarYConfirmar(d, log, destinos.length > 1 ? 'los pasos' : 'el paso', auto); await esperar(250); }
           else log('ℹ Configuración aplicada sin guardar: revisa y pulsa Guardar.');
         }
         // 2) PM paso por paso (solo filas de ese paso: el portal puede mostrar toda la etiqueta)
@@ -4661,7 +4718,8 @@
           const propias = () => filasPMde(dPM).filter(delDestino);
           const codigos = () => new Set(propias().map((tr) => leerPMfila(tPM, tr).codigo));
           let cambios = 0;
-          for (const x of elegidos) { if (!codigos().has(x.codigo)) { await agregarPM(dPM, x, log, delDestino); cambios++; } else log(`= ${x.codigo} ya estaba en el destino`); }
+          const faltan = elegidos.filter((x) => { if (codigos().has(x.codigo)) { log(`= ${x.codigo} ya estaba en el destino`); return false; } return true; });
+          if (faltan.length) cambios += await agregarPMs(dPM, faltan, log, delDestino, auto);
           const n = columnas(tPM);
           for (const x of elegidos) {
             const previo = dd.pms.find((q) => q.codigo === x.codigo);
@@ -4672,12 +4730,12 @@
             log(`Configurando ${x.codigo} · ${x.desc}`);
             await aplicarFila(tPM, tr.id, { tipo: x.tipo, vi: x.vi, vf: x.vf, mg: x.mg, dec: x.dec, chk: x.chk }, n, log); dPM.__rmdInter = true; cambios++;
           }
-          if (cambios) { await guardarYConfirmar(dPM, log, 'los procesos menores'); await esperar(1000); }
+          if (cambios) { await guardarYConfirmar(dPM, log, 'los procesos menores', auto); await esperar(200); }
           else log('ℹ Sin cambios en sus procesos menores.');
           await cerrarDialogo(dPM);
         }
-        const conAvisos = lineas.filter((l) => l.startsWith('⚠')).length;
-        log(conAvisos ? `\nTerminado con ${conAvisos} aviso(s) (líneas con ⚠). Revisa el resultado en la tabla.` : '\nListo. Revisa el resultado en la tabla.');
+        const conAvisos = lineas.filter((l) => l.startsWith('⚠')).length, seg = Math.round((Date.now() - t0) / 1000);
+        log(conAvisos ? `\nTerminado en ${seg} s con ${conAvisos} aviso(s) (líneas con ⚠). Revisa el resultado en la tabla.` : `\nListo en ${seg} s. Revisa el resultado en la tabla.`);
         v.fondo.querySelector('h3').textContent = conAvisos ? 'Terminado con avisos' : 'Terminado';
       } catch (e) {
         log('\n✖ Se detuvo: ' + e.message + '\nRevisa el estado del paso antes de reintentar (lo ya aplicado no se deshace solo).');
@@ -4686,22 +4744,73 @@
     } catch (e) { toast('No se pudo pegar: ' + e.message, true); } finally { ocupadoCopia = false; ajustarTodo(); }
   }
 
+  // Agrega varios PM con UNA sola pasada por «Adicionar Pasos RMD»: se busca cada código, se marca y al final un solo Agregar (el portal recorre
+  // aSeleccionadoPaso en orden: se deja en el orden del origen). Devuelve cuántos agregó. Sin ese modelo, uno por uno como antes.
+  async function agregarPMs(dPM, xs, log, filtro = () => true, auto = false) {
+    if (xs.length === 1) { await agregarPM(dPM, xs[0], log, filtro, auto); return 1; }
+    const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
+    const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
+    log(`+ Agregando ${xs.length} procesos menores en una sola pasada…`); pulsar(btn);
+    const picker = await hasta(() => dialogos().find((y) => !previos.has(y) && /^Adicionar Pasos/i.test(cabeceraDe(y))), 25000);
+    if (!picker) throw new Error('No se abrió el selector de pasos');
+    await hasta(() => !ocupado(), 25000); await esperar(300);
+    const t0 = tablaDe(picker), lista = t0 && nucleo().byId(t0.id.replace(/-listUl$/, '')), m = lista && modeloSel(lista);
+    const cancelar = async () => { const c = botonPorTitulo(picker, 'Cancelar'); if (c) pulsar(c); await hasta(() => !dialogos().includes(picker), 6000); };
+    if (!m) { await cancelar(); for (const x of xs) await agregarPM(dPM, x, log, filtro, auto); return xs.length; }
+    const ctlFiltro = (lab) => { const l = [...picker.querySelectorAll('label')].find((y) => norm(y.textContent).replace(/[*:]$/, '') === lab); const el = l && document.getElementById(l.getAttribute('for')); return el && ctlDe(el); };
+    const buscar = async (codigo) => {
+      const k = ctlFiltro('Código Paso'); if (!k) throw new Error('No encuentro el filtro Código Paso');
+      k.setValue(String(codigo)); k.fireChange({ value: String(codigo) });
+      const ir = [...picker.querySelectorAll('button')].find((b) => norm(b.textContent) === 'Ir'); pulsar(ir);
+      await esperar(250); await hasta(() => !ocupado(), 25000, 80);
+      const fila = () => { const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
+        return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(codigo)); };
+      return hasta(fila, 2500, 80);
+    };
+    let sinFiltros = false; const elegidos = [];
+    for (const x of xs) {
+      let fila = await buscar(x.codigo);
+      if (!fila && !sinFiltros) {                        // se quitan los filtros de estructura/etiqueta del selector
+        for (const lab of ['Estructura', 'Etiqueta']) { const c = ctlFiltro(lab); if (c && c.setSelectedItem) { c.setSelectedItem(null); c.setValue(''); c.fireSelectionChange({ selectedItem: null }); c.fireChange({ value: '' }); } }
+        sinFiltros = true; await esperar(200); fila = await buscar(x.codigo);
+      }
+      if (!fila) { log(`⚠ El código ${x.codigo} no aparece en el catálogo de pasos: se omite`); continue; }
+      const item = nucleo().byId(fila.id); lista.setSelectedItem(item, true, true); await esperar(80);
+      const ent = (m.getData() || []).find((e) => String(e.codigo) === String(x.codigo));
+      if (!ent) { log(`⚠ ${x.codigo} no quedó marcado en el selector: se omite`); continue; }
+      elegidos.push({ x, ent });
+    }
+    if (!elegidos.length) { await cancelar(); return 0; }
+    fijarSel(m, elegidos.map((e) => e.ent));                  // exactamente estos, en el orden del origen
+    await esperar(150);
+    const ag = [...picker.querySelectorAll('footer button')].find((b) => norm(b.textContent) === 'Agregar'); if (!ag) throw new Error('No encuentro el botón Agregar');
+    pulsar(ag);
+    const r = await atenderMensajes(20000, 1800, { auto }); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000, 80); await esperar(250);
+    await cargarTodo(tPM);
+    await hasta(() => propias().length >= antes + elegidos.length, 8000, 100);
+    const nuevos = propias().length - antes;
+    if (nuevos < elegidos.length) throw new Error(`Solo aparecieron ${nuevos} de ${elegidos.length} procesos menores en la lista`);
+    elegidos.forEach(({ x }) => log(`✔ ${x.codigo} · ${x.desc} agregado`));
+    return elegidos.length;
+  }
   // agrega un PM por código desde «Adicionar Pasos RMD»
-  async function agregarPM(dPM, x, log, filtro = () => true) {
+  async function agregarPM(dPM, x, log, filtro = () => true, auto = false) {
     const btn = botonPorTitulo(dPM, 'Adicionar Pasos RMD'); if (!btn) throw new Error('No encuentro el botón Adicionar Pasos RMD');
     const tPM = tablaDe(dPM), propias = () => filasPMde(dPM).filter(filtro), antes = propias().length, previos = new Set(dialogos());
     log(`+ Agregando ${x.codigo} · ${x.desc}`); pulsar(btn);
     const picker = await hasta(() => dialogos().find((y) => !previos.has(y) && /^Adicionar Pasos/i.test(cabeceraDe(y))), 25000);
     if (!picker) throw new Error('No se abrió el selector de pasos');
-    await hasta(() => !ocupado(), 25000); await esperar(600);
+    await hasta(() => !ocupado(), 25000); await esperar(300);
     const ctlFiltro = (lab) => { const l = [...picker.querySelectorAll('label')].find((y) => norm(y.textContent).replace(/[*:]$/, '') === lab); const el = l && document.getElementById(l.getAttribute('for')); return el && ctlDe(el); };
     const buscar = async () => {
       const k = ctlFiltro('Código Paso'); if (!k) throw new Error('No encuentro el filtro Código Paso');
       k.setValue(String(x.codigo)); k.fireChange({ value: String(x.codigo) });
       const ir = [...picker.querySelectorAll('button')].find((b) => norm(b.textContent) === 'Ir'); pulsar(ir);
-      await esperar(1200); await hasta(() => !ocupado(), 25000); await esperar(500);
-      const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
-      return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(x.codigo));
+      await esperar(250); await hasta(() => !ocupado(), 25000, 80);
+      const fila = () => { const t = tablaDe(picker), n = columnas(t), iC = n.indexOf('CÓDIGO') >= 0 ? n.indexOf('CÓDIGO') : n.indexOf('CODIGO');
+        return filasPrincipales(t).find((tr) => celda(tr, iC) && norm(celda(tr, iC).textContent) === String(x.codigo)); };
+      return hasta(fila, 2500, 80);
     };
     let fila = await buscar();
     if (!fila) {                                       // se quitan los filtros de estructura/etiqueta del selector
@@ -4714,8 +4823,8 @@
     await esperar(400);
     const ag = [...picker.querySelectorAll('footer button')].find((b) => norm(b.textContent) === 'Agregar'); if (!ag) throw new Error('No encuentro el botón Agregar');
     pulsar(ag);
-    const r = await atenderMensajes(); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
-    await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000); await esperar(800);
+    const r = await atenderMensajes(20000, 1800, { auto }); if (r.problema) throw new Error('El portal respondió: ' + r.problema);
+    await hasta(() => !dialogos().includes(picker), 15000); await hasta(() => !ocupado(), 15000, 80); await esperar(250);
     await cargarTodo(tPM);
     await hasta(() => propias().length > antes, 6000);
     if (propias().length <= antes) throw new Error(`No apareció ${x.codigo} en la lista de procesos menores`);
@@ -7007,53 +7116,78 @@
     let cerrado = false, plan = null, ocupadoC = false;
     const v = ventana('Contingencia a SharePoint', { cancelar: () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } } });
     const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
-    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">El master de cada RMD autorizado en la fecha va a la carpeta de su versión anterior en <b>3.-CONTINGENCIA</b>, y esa versión pasa a <b>OBSOLETO</b>.
-      Con una sola fórmula asociada, el PDF es el de su «Descargar» (master + receta); con varias, el de «Descargar master».</p>
-      <div class="rmd-cont-fecha"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked> Ayer</label><label><input type="radio" name="rmd-cont-dia" value="hoy"> Hoy</label>
-      <label><input type="radio" name="rmd-cont-dia" value="otra"> Otra fecha <input type="date" class="rmd-cont-otra"></label></div>
+    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">El master de cada RMD autorizado en la fecha se carga en la carpeta de su versión anterior en <b>3.-CONTINGENCIA</b>, y esa versión pasa a <b>OBSOLETO</b>.
+      Con una sola fórmula asociada el PDF lleva master y receta; con varias, solo el master.</p>
+      <div class="rmd-cont-barra"><div class="rmd-cont-seg" role="radiogroup" aria-label="Fecha de autorización">
+        <label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer</label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy</label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
+        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha" disabled></div>
+      <div class="rmd-cont-avance" hidden><span></span><div class="rmd-cont-avance-barra"><i></i></div></div>
       <div class="rmd-cont-plan"></div>`;
-    const caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
+    const caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra'), avance = v.cuerpo.querySelector('.rmd-cont-avance');
     otra.value = Contingencia.fechaIsoLocal(ayer);
-    const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(new Date()) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
+    const dia = () => (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value;
+    const fechaElegida = () => { const t = dia(); return t === 'hoy' ? Contingencia.fechaIsoLocal(new Date()) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
     const fmt = (iso) => iso.split('-').reverse().join('/');
-    const bRevisar = botonModal('Revisar', 'primario', () => revisar()), bCargar = botonModal('Cargar a SharePoint', '', () => cargar()), bCerrar = botonModal('Cerrar', '', () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } });
+    const bRevisar = botonModal('Revisar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar()), bCerrar = botonModal('Cerrar', '', () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } });
     bCargar.disabled = true; v.pie.append(bCerrar, bRevisar, bCargar);
-    v.cuerpo.addEventListener('change', () => { plan = null; bCargar.disabled = true; caja.innerHTML = ''; });
+    // cambiar la fecha vuelve a revisar sola (con «Otra fecha», al elegir el día)
+    let tRev = 0;
+    v.cuerpo.addEventListener('change', (e) => {
+      if (!e.target.closest('.rmd-cont-barra')) return;
+      otra.disabled = dia() !== 'otra'; plan = null; bCargar.disabled = true;
+      if (dia() === 'otra' && e.target !== otra) { otra.focus(); return; }
+      clearTimeout(tRev); tRev = setTimeout(() => { if (!ocupadoC) revisar(); }, 150);
+    });
+    const mostrarAvance = (txt, frac) => { avance.hidden = txt == null; if (txt == null) return; avance.querySelector('span').textContent = txt; avance.querySelector('i').style.width = Math.round(Math.max(0, Math.min(1, frac || 0)) * 100) + '%'; };
+    const ETAPA = (t) => { const x = String(t || '').toLowerCase(); return x.charAt(0).toUpperCase() + x.slice(1); };
+    const ruta = (c, ya) => { const ps = c.split('/').filter(Boolean), ult = ps.pop() || '';
+      return `<div class="rmd-cont-ruta" title="${esc(c)}">${ya ? '<span class="rmd-cont-ya">ya está</span>' : ''}${ps.map((x) => `${esc(x)}<span class="sep">›</span><wbr>`).join('')}<b>${esc(ult)}</b></div>`; };
+    const estadoInicial = (p) => (!p.carpetas.length ? { txt: 'Ubicar a mano', cls: 'mano' } : p.subir.length ? { txt: 'Por cargar', cls: 'pend' } : p.aObsoleto.length ? { txt: 'Solo a OBSOLETO', cls: 'pend' } : { txt: 'Ya está', cls: 'ok' });
+    const pastilla = (e) => `<span class="rmd-cont-est ${e.cls}"${e.cls === 'error' ? '' : ` title="${esc(e.txt)}"`}>${esc(e.txt)}</span>`;
+    const dato = (n, txt, cls) => `<div class="rmd-cont-dato ${cls || ''}"><b>${n}</b><span>${txt}</span></div>`;
     const pintar = (fecha) => {
-      if (!plan.length) { caja.innerHTML = `<p>No hay RMD autorizados el ${esc(fmt(fecha))}.</p>`; return; }
+      if (!plan.length) { caja.innerHTML = `<p class="rmd-cont-vacio">No hay RMD autorizados el ${esc(fmt(fecha))}.</p>`; return; }
       const filas = plan.map((p, i) => {
-        const r = p.rmd, est = p.estado ? `<span class="rmd-cont-est ${p.estado.cls}">${esc(p.estado.txt)}</span>` : '';
-        const dest = p.carpetas.map((c) => `<div>${p.yaEsta.includes(c) ? '<span class="rmd-cont-ya">ya está</span> ' : ''}${esc(c)}</div>`).join('') || `<div class="rmd-cont-nota">${esc(p.nota)}</div>`;
-        const obs = p.aObsoleto.map((x) => `<div>${esc(x.split('/').pop())}</div>`).join('');
-        return `<tr data-i="${i}"><td>${esc(r.codigo)}<br><small>v${esc(r.version)} · ${esc(r.etapa)}</small></td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${obs || '—'}</td><td>${est}</td></tr>`;
+        const r = p.rmd, e = p.estado || estadoInicial(p);
+        const dest = p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('') || `<div class="rmd-cont-nota">${esc(p.nota)}</div>`;
+        const obs = p.aObsoleto.map((x) => `<div class="rmd-cont-arch" title="${esc(x)}">${esc(x.split('/').pop())}</div>`).join('');
+        const cls = !p.carpetas.length ? 'rmd-cont-mano' : e.cls === 'error' ? 'rmd-cont-fallo' : '';
+        return `<tr data-i="${i}" class="${cls}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-ver">v${esc(r.version)} · ${esc(ETAPA(r.etapa))}</span></td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${obs || '<span class="rmd-cont-arch">—</span>'}</td><td class="rmd-cont-col-est">${pastilla(e)}</td></tr>`;
       }).join('');
       const nSubir = plan.filter((p) => p.subir.length).length, nObs = plan.reduce((n, p) => n + p.aObsoleto.length, 0), nMano = plan.filter((p) => !p.carpetas.length).length;
-      caja.innerHTML = `<p><b>${plan.length}</b> RMD autorizados el ${esc(fmt(fecha))}: <b>${nSubir}</b> por cargar, <b>${nObs}</b> PDF anteriores a OBSOLETO${nMano ? `, <b>${nMano}</b> sin carpeta (ubícalos a mano)` : ''}.</p>
-        <div class="rmd-cont-tabla"><table><thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>A OBSOLETO</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`;
+      const nYa = plan.filter((p) => p.carpetas.length && !p.subir.length && !p.aObsoleto.length).length;
+      caja.innerHTML = `<div class="rmd-cont-resumen">${dato(plan.length, `autorizados el ${esc(fmt(fecha))}`)}${dato(nSubir, 'por cargar', 'acento')}${dato(nObs, 'PDF a OBSOLETO', 'ambar')}${nYa ? dato(nYa, 'ya en su carpeta', 'verde') : ''}${nMano ? dato(nMano, 'sin carpeta: a mano', 'rojo') : ''}</div>
+        <div class="rmd-cont-tabla"><table><colgroup><col style="width:118px"><col style="width:24%"><col><col style="width:24%"><col style="width:118px"></colgroup>
+        <thead><tr><th>RMD</th><th>Producto</th><th>Carpeta de destino</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       bCargar.disabled = !(nSubir || nObs);
+      bCargar.textContent = nSubir || nObs ? `Cargar ${nSubir} a SharePoint` : 'Cargar a SharePoint';
     };
     async function revisar() {
       const fecha = fechaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { toast('Elige una fecha.', true); return; }
-      ocupadoC = true; bRevisar.disabled = bCargar.disabled = true; caja.innerHTML = '<p>Leyendo SAP…</p>';
+      ocupadoC = true; bRevisar.disabled = bCargar.disabled = true; caja.innerHTML = ''; mostrarAvance('Leyendo en SAP los RMD autorizados el ' + fmt(fecha) + '…', 0.15);
       try {
         const { autorizados, previos } = await contLeer(modelo, fecha); if (cerrado) return;
-        caja.innerHTML = `<p>Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…</p>`;
+        mostrarAvance(`Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…`, 0.6);
         const codigos = [...new Set(autorizados.map((r) => r.codigo).concat(previos.map((r) => r.codigo)))];
         const rutas = autorizados.length ? await spBuscar(codigos) : []; if (cerrado) return;
-        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; pintar(fecha);
-      } catch (e) { caja.innerHTML = `<p class="rmd-cont-error">No se pudo revisar: ${esc(e.message)}</p>`; }
+        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; mostrarAvance(null); pintar(fecha);
+      } catch (e) { mostrarAvance(null); caja.innerHTML = `<p class="rmd-cont-vacio rmd-cont-error">No se pudo revisar: ${esc(e.message)}</p>`; }
       finally { ocupadoC = false; bRevisar.disabled = false; }
     }
     async function cargar() {
       if (!plan) return;
       const nSubir = plan.filter((p) => p.subir.length).length, nObs = plan.reduce((n, p) => n + p.aObsoleto.length, 0);
-      if (!confirm(`Se cargarán ${nSubir} PDF a SharePoint y ${nObs} PDF anteriores pasarán a OBSOLETO, en 3.-CONTINGENCIA. ¿Continuar?`)) return;
+      if (!(await confirmar('Cargar a SharePoint', `Se cargarán ${nSubir} PDF en 3.-CONTINGENCIA y ${nObs} PDF anteriores pasarán a OBSOLETO.`,
+          'Los RMD sin carpeta no se tocan: ubícalos a mano.', { si: 'Cargar', no: 'Cancelar' }))) return;
       ocupadoC = true; bRevisar.disabled = bCargar.disabled = bCerrar.disabled = true;
-      let hechos = 0, fallos = 0;
-      for (const [i, p] of plan.entries()) {
+      const tareas = plan.map((p, i) => [p, i]).filter(([p]) => p.subir.length || p.aObsoleto.length);
+      let hechos = 0, fallos = 0, k = 0;
+      for (const [p, i] of tareas) {
         if (cerrado) break;
-        const fila = caja.querySelector(`tr[data-i="${i}"] td:last-child`), marcar = (txt, cls) => { p.estado = { txt, cls }; if (fila) fila.innerHTML = `<span class="rmd-cont-est ${cls}">${esc(txt)}</span>`; };
-        if (!p.subir.length && !p.aObsoleto.length) continue;
+        const tr = caja.querySelector(`tr[data-i="${i}"]`), fila = tr && tr.querySelector('.rmd-cont-col-est');
+        const marcar = (txt, cls) => { p.estado = { txt, cls }; if (fila) fila.innerHTML = pastilla(p.estado); if (tr) tr.classList.toggle('rmd-cont-fallo', cls === 'error'); };
+        mostrarAvance(`${k + 1} de ${tareas.length} · ${p.rmd.codigo} ${p.rmd.descripcion}`, k / tareas.length);
+        if (tr) tr.scrollIntoView({ block: 'nearest' });
         try {
           if (p.subir.length) {
             marcar('Generando PDF…', 'curso');
@@ -7063,7 +7197,9 @@
           for (const x of p.aObsoleto) { marcar('A OBSOLETO…', 'curso'); await spArchivar(x); }
           marcar('Hecho', 'ok'); hechos++;
         } catch (e) { marcar('Error: ' + e.message, 'error'); fallos++; }
+        k++;
       }
+      mostrarAvance(`Terminado: ${hechos} cargados${fallos ? `, ${fallos} con error` : ''}.`, 1);
       ocupadoC = false; bCerrar.disabled = bRevisar.disabled = false;
       toast(`Contingencia del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
     }
