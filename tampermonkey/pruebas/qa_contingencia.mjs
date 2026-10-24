@@ -42,6 +42,16 @@ ok('producto nuevo: sin versión anterior', plan['2202600001'].anterior === null
 ok('producto nuevo: sin carpeta y con nota', plan['2202600001'].carpetas.length === 0 && /a mano/.test(plan['2202600001'].nota));
 ok('ya cargado: nada que hacer', plan['2202600005'].subir.length === 0 && plan['2202600005'].aObsoleto.length === 0 && /Ya está/.test(plan['2202600005'].nota));
 
+// ---- por planta: solo sus RMD y solo sus carpetas ----
+const P1 = C.PLANTAS[0], P2 = C.PLANTAS[1];
+ok('carpeta de planta: «1.- PLANTA 1» y «2.- PLANTA 2»', C.plantaDeCarpeta('1.- PLANTA 1/X/a.pdf') === P1 && C.plantaDeCarpeta('2.- PLANTA 2/X') === P2 && C.plantaDeCarpeta('GASEOVET/a.pdf') === null);
+const conPlanta = autorizados.map((r, i) => ({ ...r, planta: i === 2 ? 'PLANTA LIMA' : 'PLANTA ATE' }));
+const plan1 = C.planificar(conPlanta, previos, rutas, P1), plan2 = C.planificar(conPlanta, previos, rutas, P2);
+ok('Planta 1 (Ate): solo sus RMD', J(plan1.map((p) => p.rmd.codigo)) === J(['2202609999', '2202600001']), J(plan1.map((p) => p.rmd.codigo)));
+ok('Planta 2 (Lima): no ve carpetas de Planta 1', plan2.length === 1 && plan2[0].carpetas.every((c) => c.startsWith('2.- PLANTA 2')));
+const cruzado = C.planificar([{ ...autorizados[0], planta: 'PLANTA LIMA' }], previos, rutas, P2)[0];
+ok('Planta 2 no sube ni archiva en carpetas de Planta 1', cruzado.subir.length === 0 && cruzado.aObsoleto.length === 0 && cruzado.carpetas.length === 0, J(cruzado));
+
 // ---- nombre del PDF y fechas ----
 ok('nombre con la descripción de la receta', C.nombreArchivo(rmd('2202609999', '6', 'M1', 'FABRICACION'), 'GASEOVET 80mg/mL SUS') === '2202609999-FAB-6-GASEOVET_80mg_mL_SUS.pdf');
 ok('nombre con la del RMD si no hay receta; INSPECCIÓN → INS', C.nombreArchivo(rmd('1', '2', 'M', 'INSPECCIÓN', 'IOPAMED 300'), '') === '1-INS-2-IOPAMED_300.pdf');

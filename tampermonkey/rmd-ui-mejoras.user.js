@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.90.0
+// @version      1.91.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.90.0';                                                       // mantener igual a @version
+  const VERSION = '1.91.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -87,7 +87,7 @@
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
-    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Necesita el cargador 1.1.0.'],
+    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). Necesita el cargador 1.1.0.'],
     ['compararrmd', 'Comparar dos RMD', 'En el menú Exportar: busca dos RMD cualesquiera y muestra sus master lado a lado, como Draftable: lo quitado en rojo, lo agregado en verde, lo modificado con sus palabras resaltadas, y la lista de cambios para ir de uno a otro.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
@@ -246,6 +246,29 @@
   .rmd-cont-seg label:has(input:focus-visible) { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
   .rmd-cont-otra { height: 32px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 13px var(--rmd-fuente); color-scheme: light dark; }
   .rmd-cont-fecha:has(input:disabled) { opacity: .6; } .rmd-cont-fecha:not(:has(input[value=otra]:checked)) .rmd-cont-otra { display: none; }
+  .rmd-cont-grupo { display: inline-flex; align-items: center; gap: 10px; } .rmd-cont-fecha { column-gap: 22px !important; }
+  .rmd-cont-base { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 7px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); font-size: 12.5px; }
+  .rmd-cont-base > span { flex: 1 1 auto; min-width: 0; } .rmd-cont-camino { color: var(--rmd-apagado); } .rmd-cont-base b { white-space: nowrap; } .rmd-cont-base svg, .rmd-cont-ruta svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: var(--rmd-ambar); stroke-width: 1.4; stroke-linejoin: round; }
+  .rmd-cont-ruta { display: flex; gap: 6px; align-items: flex-start; } .rmd-cont-ruta svg { margin-top: 1px; } .rmd-cont-abrir { margin-left: 4px; color: var(--rmd-acento-texto) !important; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .rmd-modal.rmd-cont-ventana { width: 96vw; max-width: none; height: 94vh; max-height: none; }
+  .rmd-cont-ventana h3 { margin-bottom: 2px; font-size: 18px; } .rmd-cont-ventana .rmd-modal-cuerpo { display: flex; flex-direction: column; overflow: hidden; }
+  .rmd-cont-ventana .rmd-cont-intro { margin: 0 0 14px !important; }
+  .rmd-cont-ventana .rmd-cont-plan { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; } .rmd-cont-ventana .rmd-cont-tabla { flex: 1 1 auto; max-height: none; }
+  .rmd-cont-ventana .rmd-cont-tabla table { font-size: 13px; } .rmd-cont-ventana .rmd-cont-tabla td { padding: 11px 12px; } .rmd-cont-ventana .rmd-cont-tabla th { padding: 9px 12px; }
+  .rmd-cont-kpis { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rmd-cont-kpi { display: flex; flex-direction: column; align-items: flex-start; min-width: 132px; padding: 8px 14px 7px; border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-cont-c, var(--rmd-borde-campo)); border-radius: 8px; background: var(--rmd-barra); color: var(--rmd-texto); font: 12.5px var(--rmd-fuente); text-align: left; cursor: pointer; }
+  .rmd-cont-kpi b { font-size: 22px; line-height: 1.15; font-weight: 700; } .rmd-cont-kpi span { color: var(--rmd-apagado); }
+  .rmd-cont-kpi:hover:not(:disabled) { border-color: var(--rmd-cont-c, var(--rmd-acento)); } .rmd-cont-kpi:disabled { opacity: .45; cursor: default; }
+  .rmd-cont-kpi.activo { background: color-mix(in srgb, var(--rmd-cont-c, var(--rmd-acento)) 16%, var(--rmd-barra)); border-color: var(--rmd-cont-c, var(--rmd-acento)); } .rmd-cont-kpi.activo span { color: var(--rmd-texto); }
+  .rmd-cont-kpi.todos { --rmd-cont-c: var(--rmd-acento); } .rmd-cont-kpi.subir { --rmd-cont-c: var(--rmd-acento-texto); } .rmd-cont-kpi.ya, .rmd-cont-kpi.ok { --rmd-cont-c: var(--rmd-verde); } .rmd-cont-kpi.mano { --rmd-cont-c: var(--rmd-ambar); } .rmd-cont-kpi.error { --rmd-cont-c: var(--rmd-rojo); }
+  .rmd-cont-datos { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-left: auto; align-self: flex-end; color: var(--rmd-apagado); font-size: 12.5px; } .rmd-cont-datos b { color: var(--rmd-texto); }
+  .rmd-cont-ventana .rmd-cont-res { gap: 10px 16px; margin-bottom: 12px; }
+  .rmd-cont-pie-estado { display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--rmd-apagado); font-size: 13px; white-space: nowrap; } .rmd-cont-pie-estado .rmd-cont-barra { flex: 0 0 220px; }
+  .rmd-cont-nombre { display: block; font-weight: 600; overflow-wrap: anywhere; } .rmd-cont-nombre.apagado { color: var(--rmd-apagado); font-weight: 400; }
+  .rmd-cont-obsv { margin-top: 8px; padding: 6px 8px; border-left: 3px solid var(--rmd-borde-campo); border-radius: 4px; background: color-mix(in srgb, var(--rmd-texto) 4%, transparent); font-size: 12px; }
+  .rmd-cont-obsv-rot { display: block; margin-bottom: 2px; color: var(--rmd-apagado); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .rmd-cont-obsv-txt { white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; } .rmd-cont-obsv.abierta .rmd-cont-obsv-txt { display: block; }
+  .rmd-cont-mas { margin-top: 2px; font-size: 11.5px; }
   .rmd-cont-res:empty { display: none; }
   .rmd-cont-res { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; min-height: 30px; font-size: 13px; }
   .rmd-cont-res > b { margin-right: 6px; font-size: 14px; } .rmd-cont-res .rmd-cr-chips button:disabled { cursor: default; opacity: .45; }
@@ -268,13 +291,13 @@
   .rmd-cont-tabla tr.curso { --rmd-cont-c: var(--rmd-acento); } .rmd-cont-tabla tr.curso td { background: color-mix(in srgb, var(--rmd-acento) 10%, transparent); }
   .rmd-cont-tabla tr.ok { --rmd-cont-c: var(--rmd-verde); } .rmd-cont-tabla tr.error { --rmd-cont-c: var(--rmd-rojo); } .rmd-cont-tabla tr.error td { background: color-mix(in srgb, var(--rmd-rojo) 8%, transparent); }
   .rmd-cont-cod { display: block; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; } .rmd-cont-meta { display: block; margin-top: 2px; color: var(--rmd-apagado); font-size: 11.5px; white-space: nowrap; }
-  .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; } .rmd-cont-ruta a > span { color: var(--rmd-apagado); } .rmd-cont-ruta i { color: var(--rmd-apagado); font-style: normal; opacity: .7; } .rmd-cont-ruta b { font-weight: 600; }
+  .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; } .rmd-cont-ruta span:not(.rmd-cont-ya) { color: var(--rmd-apagado); } .rmd-cont-ruta i { color: var(--rmd-apagado); font-style: normal; opacity: .7; } .rmd-cont-ruta b { font-weight: 600; }
   .rmd-cont-arch { display: block; color: var(--rmd-apagado); font-size: 12px; overflow-wrap: anywhere; } .rmd-cont-arch + .rmd-cont-arch { margin-top: 4px; } .rmd-cont-vacio { color: var(--rmd-apagado); opacity: .6; }
   .rmd-cont-nota { color: var(--rmd-ambar); }
   .rmd-cont-a { color: inherit; text-decoration: none; } .rmd-cont-a:hover { color: var(--rmd-acento-texto); text-decoration: underline; } .rmd-cont-a:hover span, .rmd-cont-a:hover i { color: inherit; }
   .rmd-cont-sub { display: block; margin-top: 5px; color: var(--rmd-apagado); font-size: 11.5px; overflow-wrap: anywhere; } .rmd-cont-sub b { color: var(--rmd-texto); font-weight: 600; } .rmd-cont-sub .rmd-cont-a { color: var(--rmd-acento-texto); text-decoration: underline; }
   .rmd-cont-tag { display: table; margin-top: 5px; padding: 0 7px; border: 1px solid var(--rmd-borde); border-radius: 8px; color: var(--rmd-apagado); font: 600 10.5px/17px var(--rmd-fuente); white-space: nowrap; }
-  .rmd-cont-ant { display: block; font-weight: 600; white-space: nowrap; } .rmd-cont-ant small { margin-left: 4px; color: var(--rmd-apagado); font-weight: 400; font-size: 11px; }
+  .rmd-cont-ant { display: block; font-weight: 600; white-space: nowrap; } .rmd-cont-ant small { display: block; margin-top: 2px; color: var(--rmd-apagado); font-weight: 400; font-size: 11px; }
   .rmd-cont-hora { margin-left: auto; color: var(--rmd-apagado); font-size: 12px; }
   .rmd-cont-est { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; font: 600 11.5px/17px var(--rmd-fuente); white-space: nowrap;
     background: color-mix(in srgb, currentColor 14%, transparent); color: var(--rmd-apagado); }
@@ -7005,10 +7028,15 @@
       const d = String(descripcion || r.descripcion || '').trim().replace(/[\\/:*?"<>|#%]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
       return `${r.codigo}-${etq}-${r.version}-${d}.pdf`;
     }
-    // autorizados: RMD Autorizados en la fecha; previos: versiones NO vigentes del mismo material y etapa; rutas: PDF de 3.-CONTINGENCIA
-    function planificar(autorizados, previos, rutas) {
-      const pdfs = rutas.map(interpretar).filter(Boolean);
-      return autorizados.map((r) => {
+    // Plantas: cada una carga solo sus RMD (sucursal de SAP) y solo escribe en su carpeta de 3.-CONTINGENCIA
+    const PLANTAS = [{ id: '1', sap: 'PLANTA ATE', carpeta: '1.- PLANTA 1', txt: 'Planta 1', lugar: 'Ate' }, { id: '2', sap: 'PLANTA LIMA', carpeta: '2.- PLANTA 2', txt: 'Planta 2', lugar: 'Lima' }];
+    const plantaDeCarpeta = (ruta) => { const m = /^\s*(\d+)\s*\.?-?\s*PLANTA\s*(\d+)/.exec(sinTildes(String(ruta).split('/')[0])); return m ? PLANTAS.find((p) => p.id === m[2]) || null : null; };
+    const esDePlanta = (r, planta) => sinTildes(r.planta) === planta.sap;
+    // autorizados: RMD Autorizados en la fecha; previos: versiones NO vigentes del mismo material y etapa; rutas: PDF de 3.-CONTINGENCIA;
+    // planta (opcional): solo los autorizados de esa planta y solo las carpetas de esa planta
+    function planificar(autorizados, previos, rutas, planta) {
+      const pdfs = rutas.map(interpretar).filter((p) => p && (!planta || plantaDeCarpeta(p.ruta) === planta));
+      return autorizados.filter((r) => !planta || esDePlanta(r, planta)).map((r) => {
         const codPrev = new Set(previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)).map((o) => o.codigo));
         const propios = pdfs.filter((p) => p.codigo === r.codigo && !p.obsoleto), fam = pdfs.filter((p) => codPrev.has(p.codigo)), activas = fam.filter((p) => !p.obsoleto);
         const yaEsta = [...new Set(propios.map((p) => p.carpeta))].sort();
@@ -7026,7 +7054,7 @@
     const fechaIsoLocal = (d) => `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
     // fecha de autorización del portal: con hora, el día local; a medianoche UTC, una fecha sin hora
     const diaDe = (x) => (!(x instanceof Date) || isNaN(x) ? '' : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? x.toISOString().slice(0, 10) : fechaIsoLocal(x));
-    return { interpretar, esObsoleto, nombreArchivo, planificar, fechaIsoLocal, diaDe };
+    return { interpretar, esObsoleto, nombreArchivo, planificar, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta };
   })();
   // ==CONTINGENCIA-FIN==
   window.__rmdStats.contingencia = { Contingencia, leer: (f) => contLeer(controladorPrincipal().getView().getModel('mainModelv2'), f), pdf: (id) => contPdf(controladorPrincipal().getView().getModel('mainModelv2'), id), buscar: (c) => spBuscar(c) };   // pruebas
@@ -7080,9 +7108,10 @@
   }
 
   // RMD autorizados en la fecha y versiones no vigentes del mismo material (para ubicar la carpeta y lo que pasa a OBSOLETO)
-  const CONT_SELECT = 'mdId,codigo,version,nivelTxt,codAgrupadorReceta,codDefectoReceta,descripcion,fechaAutorizacion,areaRmdTxt,estadoIdRmd/contenido';
+  const CONT_SELECT = 'mdId,codigo,version,nivelTxt,codAgrupadorReceta,codDefectoReceta,descripcion,observacion,fechaAutorizacion,areaRmdTxt,estadoIdRmd/contenido,sucursalId/contenido';
   const contFila = (md) => ({ mdId: md.mdId, codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '', etapa: md.nivelTxt || '', descripcion: md.descripcion || '',
     material: md.codDefectoReceta || '', agrupador: md.codAgrupadorReceta || '', estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', fecha: Contingencia.diaDe(md.fechaAutorizacion),
+    planta: (md.sucursalId && md.sucursalId.contenido) || '', observacion: String(md.observacion || '').trim(),
     usuario: md.usuarioAutorizacion || '', hora: contHora(md.fechaAutorizacion),
     recetas: md.aReceta && md.aReceta.results ? md.aReceta.results.filter((x) => x.recetaId).map((x) => String(x.recetaId.Text1 || '').trim()) : null });
   // hora local de la autorización; '' si la fecha viene sin hora (medianoche UTC)
@@ -7090,12 +7119,12 @@
   async function contLeer(modelo, fecha) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, [a, m, d] = fecha.split('-').map(Number);
     const ini = new Date(Date.UTC(a, m - 1, d - 1)), fin = new Date(Date.UTC(a, m - 1, d + 2));   // ±1 día por la zona horaria; luego se filtra por el día local
-    const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila);
+    const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd,sucursalId,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila);
     const autorizados = filas.filter((r) => /^AUTORIZADO$/i.test(r.estado) && r.fecha === fecha && /^\d+$/.test(r.codigo));
     const materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
     for (let i = 0; i < materiales.length; i += 15) {
       const f = new F({ filters: materiales.slice(i, i + 15).map((x) => new F('codDefectoReceta', 'EQ', x)), and: false });
-      previos.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd', $select: CONT_SELECT })).map(contFila).filter((r) => !/^AUTORIZADO$/i.test(r.estado) && /^\d+$/.test(r.codigo)));
+      previos.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd,sucursalId', $select: CONT_SELECT })).map(contFila).filter((r) => !/^AUTORIZADO$/i.test(r.estado) && /^\d+$/.test(r.codigo)));
     }
     return { autorizados, previos };
   }
@@ -7150,33 +7179,57 @@
     let cerrado = false, plan = null, ocupadoC = false, preguntando = false, turno = 0, filtro = 'todos', espera = 0;
     const salir = () => { if (!ocupadoC && !preguntando) { cerrado = true; v.cerrar(); } };
     const v = ventana('Contingencia a SharePoint', { cancelar: salir });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-cont-ventana');   // pantalla completa: Carlos lo pidió para esta ventana
     const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
     const fmt = (iso) => iso.split('-').reverse().join('/'), corta = (d) => fmt(Contingencia.fechaIsoLocal(d)).slice(0, 5);
-    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">Sube el master de cada RMD autorizado a la carpeta de su versión anterior en <b>3.-CONTINGENCIA</b> y pasa esa versión a <b>OBSOLETO</b>.</p>
-      <div class="rmd-cont-fecha" role="radiogroup" aria-label="Fecha de autorización"><span class="rmd-cont-rot">Autorizados el</span>
+    // planta: la última elegida en este navegador (cada planta carga la suya)
+    let idPlanta = '1'; try { idPlanta = localStorage.getItem('rmdUiContPlanta') || '1'; } catch (e) { /* sin almacenamiento */ }
+    const plantaElegida = () => Contingencia.PLANTAS.find((x) => x.id === (v.cuerpo.querySelector('input[name=rmd-cont-planta]:checked') || {}).value) || Contingencia.PLANTAS[0];
+    v.fondo.querySelector('h3').insertAdjacentHTML('afterend', '<p class="rmd-cont-intro">Cada planta carga su contingencia: el master de sus RMD autorizados va a la carpeta de su versión anterior y esa versión pasa a <b>OBSOLETO</b>.</p>');
+    v.cuerpo.innerHTML = `<div class="rmd-cont-fecha"><div class="rmd-cont-grupo" role="radiogroup" aria-label="Planta"><span class="rmd-cont-rot">Planta</span>
+        <div class="rmd-cont-seg">${Contingencia.PLANTAS.map((x) => `<label><input type="radio" name="rmd-cont-planta" value="${x.id}" ${x.id === idPlanta ? 'checked' : ''}>${x.txt} <small>${x.lugar}</small></label>`).join('')}</div></div>
+      <div class="rmd-cont-grupo" role="radiogroup" aria-label="Fecha de autorización"><span class="rmd-cont-rot">Autorizados el</span>
         <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
-        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha"></div>
-      <div class="rmd-cont-res" aria-live="polite"></div><div class="rmd-cont-plan"></div>
+        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha"></div></div>
+      <div class="rmd-cont-base"></div><div class="rmd-cont-res" aria-live="polite"></div><div class="rmd-cont-plan"></div>
 `;
+    const pieEstado = document.createElement('div'); pieEstado.className = 'rmd-cont-pie-estado'; pieEstado.setAttribute('aria-live', 'polite');
     const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
     const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input')];
     otra.value = Contingencia.fechaIsoLocal(ayer); otra.max = Contingencia.fechaIsoLocal(hoy);
     const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(hoy) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
     const bActualizar = botonModal('Actualizar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar()), bCerrar = botonModal('Cerrar', '', salir);
-    bCargar.disabled = true; v.pie.append(bCerrar, bActualizar, bCargar);
+    bCargar.disabled = true; v.pie.append(pieEstado, bCerrar, bActualizar, bCargar);
     // cambiar la fecha revisa sola; el campo de fecha solo se ve con «Otra fecha»
-    v.cuerpo.querySelector('.rmd-cont-fecha').addEventListener('change', () => { clearTimeout(espera); espera = setTimeout(revisar, 350); });
+    v.cuerpo.querySelector('.rmd-cont-fecha').addEventListener('change', (e) => {
+      if (e.target.name === 'rmd-cont-planta') pintarBase();
+      if (e.target.name === 'rmd-cont-planta') try { localStorage.setItem('rmdUiContPlanta', e.target.value); } catch (er) { /* sin almacenamiento */ }
+      clearTimeout(espera); espera = setTimeout(revisar, 350);
+    });
     const tipo = (p) => (!p.carpetas.length ? 'mano' : p.subir.length || p.aObsoleto.length ? 'subir' : 'ya');
     const TIPOS = { subir: 'Por cargar', ya: 'Ya cargado', mano: 'Ubicar a mano' };
     const estadoDe = (p) => p.estado || { txt: TIPOS[tipo(p)], cls: tipo(p) };
     const titulo = (t) => String(t || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
     const spUrl = (rel) => 'https://medifarmape.sharepoint.com' + (CONT_RAIZ + (rel ? '/' + rel : '')).split('/').map(encodeURIComponent).join('/');
     const enlace = (rel, html, tit) => `<a class="rmd-cont-a" href="${esc(spUrl(rel))}" target="_blank" rel="noopener" title="${esc(tit || 'Abrir en SharePoint')}">${html}</a>`;
-    const ruta = (c, ya) => { const s = c.split('/'), u = s.pop(); return `<div class="rmd-cont-ruta">${ya ? '<span class="rmd-cont-ya">ya está</span>' : ''}${enlace(c, `${s.map((x) => `<span>${esc(x)}</span> <i>›</i> `).join('')}<b>${esc(u)}</b>`, `Abrir la carpeta en SharePoint: ${c}`)}</div>`; };
+    // carpeta de destino: la ruta dentro de la carpeta de la planta (que se muestra arriba), con la última carpeta resaltada y «Abrir»
+    const ICO_CARPETA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.2l1.5 1.6h7.3v8.4h-13z"/></svg>';
+    const ruta = (c, ya) => {
+      const s = c.split('/'); if (plan && s[0] === plan.planta.carpeta && s.length > 1) s.shift(); const u = s.pop();
+      return `<div class="rmd-cont-ruta" title="${esc(CONT_RAIZ.split('/').slice(3).join(' › ') + ' › ' + c.split('/').join(' › '))}">${ICO_CARPETA}<div>${ya ? '<span class="rmd-cont-ya">ya está</span>' : ''}${s.map((x) => `<span>${esc(x)}</span> <i>›</i> `).join('')}<b>${esc(u)}</b>
+        ${enlace(c, 'Abrir ↗', `Abrir en SharePoint: ${c}`).replace('class="rmd-cont-a"', 'class="rmd-cont-a rmd-cont-abrir"')}</div></div>`;
+    };
+    const base = v.cuerpo.querySelector('.rmd-cont-base');
+    const pintarBase = () => { const pl = plantaElegida(), partes = CONT_RAIZ.split('/').slice(3).concat(pl.carpeta);
+      base.innerHTML = `${ICO_CARPETA}<span>Se carga en <span class="rmd-cont-camino">SharePoint › ${partes.slice(0, -2).map(esc).join(' › ')} › </span><b>${esc(partes[partes.length - 2])} › ${esc(pl.carpeta)}</b></span>${enlace(pl.carpeta, 'Abrir ↗', 'Abrir la carpeta de la planta en SharePoint').replace('class="rmd-cont-a"', 'class="rmd-cont-a rmd-cont-abrir"')}`; };
+    pintarBase();
     const archivo = (x) => enlace(x, esc(x.split('/').pop()), `Abrir el PDF: ${x}`);
     const tipoPdf = (r) => (!r.recetas ? '' : r.recetas.length === 1 ? '<span class="rmd-cont-tag" title="Con una sola fórmula asociada se sube el PDF de su «Descargar» (master + receta)">Master + receta</span>'
       : `<span class="rmd-cont-tag" title="Con ${r.recetas.length ? 'varias fórmulas' : 'ninguna fórmula'} asociada se sube el de «Descargar master»">Solo master · ${r.recetas.length ? r.recetas.length + ' fórmulas' : 'sin fórmula'}</span>`);
     const nombrePrevisto = (r) => Contingencia.nombreArchivo(r, r.recetas && r.recetas.length === 1 ? r.recetas[0] : '');
+    // Observaciones del RMD (SAP): 3 líneas y «ver más» si es larga
+    const obsRmd = (t) => (t ? `<div class="rmd-cont-obsv"><span class="rmd-cont-obsv-rot">Observaciones</span><div class="rmd-cont-obsv-txt">${esc(t)}</div>${t.length > 140 || t.split('\n').length > 3 ? '<button type="button" class="rmd-link rmd-cont-mas">ver más</button>' : ''}</div>` : '');
+    caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-mas'); if (!b) return; const d = b.parentElement.classList.toggle('abierta'); b.textContent = d ? 'ver menos' : 'ver más'; });
     const mensaje = (html, cls = '') => { caja.innerHTML = `<div class="rmd-cont-msg ${cls}">${html}</div>`; };
     const giro = '<span class="rmd-cont-giro" aria-hidden="true"></span>';
     const pintarEstado = (p, tr) => {
@@ -7184,13 +7237,14 @@
       tr.className = e.cls; tr.hidden = filtro !== 'todos' && e.cls !== filtro && !(filtro === 'subir' && e.cls === 'curso');
       tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`;
     };
+    // tarjetas: cuántos hay de cada tipo (y filtran la tabla); el avance de la carga va al pie
     const resumen = (progreso) => {
       const n = { subir: 0, ya: 0, mano: 0, ok: 0, error: 0 }; plan.forEach((p) => { const c = estadoDe(p).cls; n[c === 'curso' ? 'subir' : c]++; });
       const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length), 0);
-      const chip = (k, txt, c) => `<button type="button" class="${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'}>${k === 'todos' ? '' : '<i></i>'}${txt}<span>${c}</span></button>`;
-      res.innerHTML = `<b>${plan.length} RMD · ${esc(fmt(plan.fecha))}</b><div class="rmd-cr-chips">${chip('todos', 'Todos', plan.length)}${chip('subir', 'Por cargar', n.subir)}${chip('ya', 'Ya cargados', n.ya)}${chip('mano', 'Ubicar a mano', n.mano)}${n.ok ? chip('ok', 'Cargados ahora', n.ok) : ''}${n.error ? chip('error', 'Con error', n.error) : ''}</div>`
-        + (progreso ? `<span class="rmd-cont-prog">${giro}${esc(progreso.txt)}<span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span></span>`
-          : (nObs ? `<span class="rmd-cont-obs">${nObs} PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : '') + `<span class="rmd-cont-hora" title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span>`);
+      const tarjeta = (k, txt, c, ayuda) => `<button type="button" class="rmd-cont-kpi ${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'} title="${esc(ayuda)}"><b>${c}</b><span>${txt}</span></button>`;
+      res.innerHTML = `<div class="rmd-cont-kpis">${tarjeta('todos', `RMD de ${esc(plan.planta.txt)}`, plan.length, 'Ver todos')}${tarjeta('subir', 'Por cargar', n.subir, 'Se suben con «Cargar a SharePoint»')}${tarjeta('ya', 'Ya cargados', n.ya, 'Su PDF ya está en la carpeta')}${tarjeta('mano', 'Ubicar a mano', n.mano, 'Sin carpeta de versión anterior: súbelos a mano')}${n.ok ? tarjeta('ok', 'Cargados ahora', n.ok, 'Cargados en esta sesión') : ''}${n.error ? tarjeta('error', 'Con error', n.error, 'Revisa el motivo en la fila y pulsa «Actualizar»') : ''}</div>
+        <div class="rmd-cont-datos"><span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
+      pieEstado.innerHTML = progreso ? `${giro}<span>${esc(progreso.txt)}</span><span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span>` : '';
       const nSubir = n.subir; bCargar.textContent = nSubir ? `Cargar ${nSubir} a SharePoint` : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
     res.addEventListener('click', (e) => {
@@ -7198,33 +7252,36 @@
       filtro = b.dataset.f === filtro ? 'todos' : b.dataset.f; resumen(); plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`)));
     });
     const pintar = () => {
-      if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD autorizados el ${esc(fmt(plan.fecha))}.`); bCargar.disabled = true; return; }
+      if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD de ${esc(plan.planta.txt)} (${esc(plan.planta.lugar)}) autorizados el ${esc(fmt(plan.fecha))}.${plan.otras ? ` Hay ${plan.otras} de ${esc(plan.otraPlanta)}: los carga esa planta.` : ''}${plan.sinPlanta ? ` ${plan.sinPlanta} no tienen planta en SAP.` : ''}`); bCargar.disabled = true; return; }
       const filas = plan.map((p, i) => {
         const r = p.rmd, a = p.anterior;
         const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
-        const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('') + (p.subir.length ? `<span class="rmd-cont-sub">Se sube como <b>${esc(nombrePrevisto(r))}</b></span>` : '')
-          : `<span class="rmd-cont-nota">${a ? `Ninguna versión anterior tiene PDF en 3.-CONTINGENCIA.` : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano: ${enlace('', 'abrir 3.-CONTINGENCIA', 'Abrir 3.-CONTINGENCIA en SharePoint')}</span>`;
-        const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>` : '<span class="rmd-cont-vacio">Sin versión anterior</span>';
-        const obs = p.aObsoleto.length ? `<span class="rmd-cont-sub">Pasa a OBSOLETO:</span>${p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}`
-          : a && p.carpetas.length ? '<span class="rmd-cont-sub">Su PDF ya está en OBSOLETO</span>' : '';
-        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${tipoPdf(r)}</td><td>${dest}</td><td>${ant}${obs}</td><td></td></tr>`;
+        const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('')
+          : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}</span>`;
+        const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : ''}`;
+        const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>${obsRmd(a.observacion)}` : '<span class="rmd-cont-vacio">Sin versión anterior</span>';
+        const obs = p.aObsoleto.length ? p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')
+          : `<span class="rmd-cont-vacio">${a && p.carpetas.length ? 'Ya está en OBSOLETO' : '—'}</span>`;
+        return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${obsRmd(r.observacion)}</td><td>${dest}</td><td>${arch}</td><td>${ant}</td><td>${obs}</td><td></td></tr>`;
       }).join('');
-      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:128px"><col style="width:22%"><col><col style="width:23%"><col style="width:142px"></colgroup>
-        <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Versión anterior</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+      caja.innerHTML = `<div class="rmd-cont-tabla"><table><colgroup><col style="width:150px"><col style="width:19%"><col style="width:21%"><col style="width:16%"><col style="width:190px"><col><col style="width:150px"></colgroup>
+        <thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>Archivo que se sube</th><th>Versión anterior</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
     const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); if (si) bCargar.disabled = true; };
     async function revisar() {
       clearTimeout(espera);
-      const fecha = fechaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
+      const fecha = fechaElegida(), planta = plantaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
       if (ocupadoC) return; const t = ++turno; plan = null; filtro = 'todos'; res.innerHTML = ''; bloquear(true);
-      mensaje(`${giro}Leyendo en SAP los RMD autorizados el ${esc(fmt(fecha))}…`);
+      mensaje(`${giro}Leyendo en SAP los RMD de ${esc(planta.txt)} autorizados el ${esc(fmt(fecha))}…`);
       try {
         const { autorizados, previos } = await contLeer(modelo, fecha); if (cerrado || t !== turno) return;
-        mensaje(`${giro}Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…`);
-        const codigos = [...new Set(autorizados.map((r) => r.codigo).concat(previos.map((r) => r.codigo)))];
-        const rutas = autorizados.length ? await spBuscar(codigos) : []; if (cerrado || t !== turno) return;
-        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; plan.hora = new Date().toTimeString().slice(0, 5); bloquear(false); pintar();
+        const propios = autorizados.filter((r) => Contingencia.esDePlanta(r, planta)), mats = new Set(propios.map((r) => r.material));
+        mensaje(`${giro}Buscando en ${esc(planta.carpeta)} las versiones anteriores de ${propios.length} RMD…`);
+        const codigos = [...new Set(propios.map((r) => r.codigo).concat(previos.filter((r) => mats.has(r.material)).map((r) => r.codigo)))];
+        const rutas = propios.length ? await spBuscar(codigos) : []; if (cerrado || t !== turno) return;
+        plan = Contingencia.planificar(propios, previos, rutas, planta); plan.fecha = fecha; plan.planta = planta;
+        plan.otras = autorizados.filter((r) => r.planta && !Contingencia.esDePlanta(r, planta)).length; plan.sinPlanta = autorizados.filter((r) => !r.planta).length; plan.otraPlanta = Contingencia.PLANTAS.filter((x) => x !== planta).map((x) => x.txt).join(' o ') || 'otra planta'; plan.hora = new Date().toTimeString().slice(0, 5); bloquear(false); pintar();
       } catch (e) { bloquear(false); mensaje(`No se pudo revisar: ${esc(e.message)}`, 'error'); }
       finally { if (t === turno && ocupadoC) bloquear(false); }
     }
@@ -7233,7 +7290,7 @@
       const lote = plan.filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return;
       const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length, 0);
       preguntando = true;
-      const si = await confirmar('¿Cargar a SharePoint?', `Se subirán ${nPdf} PDF a 3.-CONTINGENCIA${nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : ''}.`,
+      const si = await confirmar(`¿Cargar la contingencia de ${plan.planta.txt}?`, `Se subirán ${nPdf} PDF a 3.-CONTINGENCIA › ${plan.planta.carpeta}${nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : ''}.`,
         'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' });
       preguntando = false; if (!si || cerrado) return;
       bloquear(true); bCerrar.disabled = true;
@@ -7254,7 +7311,7 @@
         } catch (e) { marcar('Error', 'error', e.message); fallos++; }
       }
       bloquear(false); bCerrar.disabled = false; resumen();
-      toast(`Contingencia del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
+      toast(`Contingencia de ${plan.planta.txt} del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
     }
     revisar();
   }
