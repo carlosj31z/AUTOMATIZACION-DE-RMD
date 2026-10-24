@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.88.0
+// @version      1.89.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.88.0';                                                       // mantener igual a @version
+  const VERSION = '1.89.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -235,43 +235,13 @@
   .rmd-menu-item b { grid-column: 2; font-size: 13.5px; font-weight: 600; } .rmd-menu-item span { grid-column: 2; font-size: 12px; color: var(--rmd-apagado); }
   html.rmd-ui .rmd-btn.rmd-status-rmd { width: auto; min-width: var(--rmd-btn-alto, 36px); height: var(--rmd-btn-alto, 36px); padding: 0 8px; gap: 7px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--rmd-ico-portal, var(--rmd-acento-texto)); }
   html.rmd-ui .rmd-status-rmd .rmd-ico-sap { font-style: normal; font-size: var(--rmd-ico-tam, 1rem); line-height: 1; }
-  /* ── Contingencia a SharePoint (colores del tema: se lee igual en claro y oscuro) ── */
-  .rmd-cont-intro { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--rmd-apagado); }
-  .rmd-cont-intro b { color: var(--rmd-texto); font-weight: 600; }
-  .rmd-cont-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .rmd-cont-seg { display: inline-flex; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; overflow: hidden; }
-  .rmd-cont-seg label { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; font-size: 13px; color: var(--rmd-texto); cursor: pointer; user-select: none; }
-  .rmd-cont-seg label + label { border-left: 1px solid var(--rmd-borde-campo); }
-  .rmd-cont-seg input[type=radio] { position: absolute; opacity: 0; pointer-events: none; }
-  .rmd-cont-seg label:has(input:checked) { background: var(--rmd-acento); color: #fff; font-weight: 600; }
-  .rmd-cont-seg label:has(input:focus-visible) { outline: 2px solid var(--rmd-acento); outline-offset: -2px; }
-  .rmd-cont-otra { height: 30px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); color-scheme: light dark; }
-  .rmd-cont-otra:disabled { opacity: .45; }
-  .rmd-cont-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
-  .rmd-cont-dato { display: flex; flex-direction: column; min-width: 104px; padding: 6px 12px; border: 1px solid var(--rmd-borde); border-left: 3px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-barra); }
-  .rmd-cont-dato b { font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--rmd-texto); } .rmd-cont-dato span { font-size: 12px; color: var(--rmd-apagado); }
-  .rmd-cont-dato.acento { border-left-color: var(--rmd-acento); } .rmd-cont-dato.ambar { border-left-color: var(--rmd-ambar); } .rmd-cont-dato.verde { border-left-color: var(--rmd-verde); } .rmd-cont-dato.rojo { border-left-color: var(--rmd-rojo); }
-  .rmd-cont-avance { margin: 0 0 10px; font-size: 12.5px; color: var(--rmd-texto); } .rmd-cont-avance[hidden] { display: none; }
-  .rmd-cont-avance-barra { height: 6px; margin-top: 5px; border-radius: 3px; background: var(--rmd-borde); overflow: hidden; } .rmd-cont-avance-barra i { display: block; height: 100%; width: 0; background: var(--rmd-acento); transition: width .25s ease; }
-  .rmd-cont-tabla { max-height: 52vh; overflow: auto; border: 1px solid var(--rmd-borde); border-radius: 8px; }
-  .rmd-cont-tabla table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 12.5px; line-height: 1.4; color: var(--rmd-texto); }
-  .rmd-cont-tabla th { position: sticky; top: 0; z-index: 1; padding: 7px 10px; background: var(--rmd-cabecera); border-bottom: 1px solid var(--rmd-borde); text-align: left; font: 600 11px var(--rmd-fuente); letter-spacing: .4px; text-transform: uppercase; color: var(--rmd-apagado); }
-  .rmd-cont-tabla td { padding: 8px 10px; border-top: 1px solid var(--rmd-borde); vertical-align: top; overflow-wrap: anywhere; }
-  .rmd-cont-tabla tbody tr:first-child td { border-top: 0; } .rmd-cont-tabla tbody tr:hover td { background: rgba(27,141,236,.06); }
-  .rmd-cont-tabla tr.rmd-cont-mano td:first-child { box-shadow: inset 3px 0 0 var(--rmd-ambar); } .rmd-cont-tabla tr.rmd-cont-fallo td:first-child { box-shadow: inset 3px 0 0 var(--rmd-rojo); }
-  .rmd-cont-cod { font-weight: 600; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; } .rmd-cont-ver { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rmd-apagado); white-space: nowrap; }
-  .rmd-cont-ruta { color: var(--rmd-apagado); font-size: 12px; } .rmd-cont-ruta b { color: var(--rmd-texto); font-weight: 600; } .rmd-cont-ruta .sep { padding: 0 3px; opacity: .6; }
-  .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; }
-  .rmd-cont-arch { color: var(--rmd-apagado); font-size: 12px; } .rmd-cont-arch + .rmd-cont-arch { margin-top: 4px; }
-  .rmd-cont-ya { display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 600; color: var(--rmd-verde); background: color-mix(in srgb, var(--rmd-verde) 16%, transparent); }
-  .rmd-cont-nota { color: var(--rmd-ambar); font-size: 12px; } .rmd-cont-error { color: var(--rmd-rojo); } .rmd-cont-vacio { padding: 18px 4px; color: var(--rmd-apagado); }
-  .rmd-cont-est { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; line-height: 1.35; white-space: nowrap; color: var(--rmd-apagado); background: color-mix(in srgb, var(--rmd-apagado) 14%, transparent); }
-  .rmd-cont-est.pend { color: var(--rmd-acento-texto); background: color-mix(in srgb, var(--rmd-acento) 15%, transparent); }
-  .rmd-cont-est.mano { color: var(--rmd-ambar); background: color-mix(in srgb, var(--rmd-ambar) 16%, transparent); }
-  .rmd-cont-est.ok { color: var(--rmd-verde); background: color-mix(in srgb, var(--rmd-verde) 16%, transparent); }
-  .rmd-cont-est.curso { color: var(--rmd-acento-texto); background: color-mix(in srgb, var(--rmd-acento) 15%, transparent); animation: rmdContLatido 1.2s ease-in-out infinite; }
-  .rmd-cont-est.error { color: var(--rmd-rojo); background: color-mix(in srgb, var(--rmd-rojo) 14%, transparent); white-space: normal; }
-  @keyframes rmdContLatido { 50% { opacity: .55; } } @media (prefers-reduced-motion: reduce) { .rmd-cont-est.curso { animation: none; } }
+  html.rmd-ui .rmd-cont-intro { margin: 0 0 10px; font-size: 13px; line-height: 1.45; color: #32363a; max-width: 760px; }
+  html.rmd-ui .rmd-cont-fecha { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 12px; font-size: 13px; }
+  html.rmd-ui .rmd-cont-fecha label { display: inline-flex; gap: 6px; align-items: center; }
+  html.rmd-ui .rmd-cont-tabla { max-height: 55vh; overflow: auto; border: 1px solid #e5e5e5; border-radius: 6px; }
+  html.rmd-ui .rmd-cont-tabla table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  html.rmd-ui .rmd-cont-tabla th { position: sticky; top: 0; background: #f7f7f7; text-align: left; padding: 6px 8px; font-weight: 600; }
+  html.rmd-ui .rmd-cont-tabla td { padding: 6px 8px; border-top: 1px solid #eee; vertical-align: top; word-break: break-word; }
   /* ── Comparar dos RMD (lado a lado) ── */
   .rmd-modal.rmd-cmp-ventana { width: min(1100px, 96vw); }
   .rmd-cmp-ventana .rmd-modal-cuerpo { overflow: visible; min-height: 300px; }
@@ -335,6 +305,9 @@
   .pdf-hoja .rmd-cmp-actual, .pdf-hoja tr.rmd-cmp-actual > td { outline: 2px solid #0a6ed1; outline-offset: -1px; }
   .rmd-cmp-vista { display: inline-flex; border: 1px solid var(--rmd-borde); border-radius: 6px; overflow: hidden; } .rmd-cmp-vista button { padding: 4px 12px; border: 0; background: none; color: var(--rmd-texto); font: 13px var(--rmd-fuente); cursor: pointer; }
   .rmd-cmp-vista button[aria-pressed="true"] { background: var(--rmd-acento); color: #fff; }
+  html.rmd-ui .rmd-cont-ya { font-size: 11px; color: #256f3a; background: #e3f4e4; border-radius: 3px; padding: 0 4px; }
+  html.rmd-ui .rmd-cont-nota, html.rmd-ui .rmd-cont-error { color: #b26a00; }
+  html.rmd-ui .rmd-cont-est { font-size: 11px; white-space: nowrap; } html.rmd-ui .rmd-cont-est.ok { color: #256f3a; } html.rmd-ui .rmd-cont-est.error { color: #c62828; white-space: normal; } html.rmd-ui .rmd-cont-est.curso { color: #0a6ed1; }
   html.rmd-ui .rmd-btn.rmd-status-rmd svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   html.rmd-ui .rmd-btn.rmd-status-rmd:hover, html.rmd-ui .rmd-btn.rmd-status-rmd:focus-visible { background: color-mix(in srgb, currentColor 12%, transparent); outline: none; }
   html.rmd-ui .rmd-btn.rmd-status-rmd > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -7116,78 +7089,53 @@
     let cerrado = false, plan = null, ocupadoC = false;
     const v = ventana('Contingencia a SharePoint', { cancelar: () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } } });
     const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
-    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">El master de cada RMD autorizado en la fecha se carga en la carpeta de su versión anterior en <b>3.-CONTINGENCIA</b>, y esa versión pasa a <b>OBSOLETO</b>.
-      Con una sola fórmula asociada el PDF lleva master y receta; con varias, solo el master.</p>
-      <div class="rmd-cont-barra"><div class="rmd-cont-seg" role="radiogroup" aria-label="Fecha de autorización">
-        <label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer</label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy</label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
-        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha" disabled></div>
-      <div class="rmd-cont-avance" hidden><span></span><div class="rmd-cont-avance-barra"><i></i></div></div>
+    v.cuerpo.innerHTML = `<p class="rmd-cont-intro">El master de cada RMD autorizado en la fecha va a la carpeta de su versión anterior en <b>3.-CONTINGENCIA</b>, y esa versión pasa a <b>OBSOLETO</b>.
+      Con una sola fórmula asociada, el PDF es el de su «Descargar» (master + receta); con varias, el de «Descargar master».</p>
+      <div class="rmd-cont-fecha"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked> Ayer</label><label><input type="radio" name="rmd-cont-dia" value="hoy"> Hoy</label>
+      <label><input type="radio" name="rmd-cont-dia" value="otra"> Otra fecha <input type="date" class="rmd-cont-otra"></label></div>
       <div class="rmd-cont-plan"></div>`;
-    const caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra'), avance = v.cuerpo.querySelector('.rmd-cont-avance');
+    const caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
     otra.value = Contingencia.fechaIsoLocal(ayer);
-    const dia = () => (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value;
-    const fechaElegida = () => { const t = dia(); return t === 'hoy' ? Contingencia.fechaIsoLocal(new Date()) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
+    const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(new Date()) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
     const fmt = (iso) => iso.split('-').reverse().join('/');
-    const bRevisar = botonModal('Revisar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar()), bCerrar = botonModal('Cerrar', '', () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } });
+    const bRevisar = botonModal('Revisar', 'primario', () => revisar()), bCargar = botonModal('Cargar a SharePoint', '', () => cargar()), bCerrar = botonModal('Cerrar', '', () => { if (!ocupadoC) { cerrado = true; v.cerrar(); } });
     bCargar.disabled = true; v.pie.append(bCerrar, bRevisar, bCargar);
-    // cambiar la fecha vuelve a revisar sola (con «Otra fecha», al elegir el día)
-    let tRev = 0;
-    v.cuerpo.addEventListener('change', (e) => {
-      if (!e.target.closest('.rmd-cont-barra')) return;
-      otra.disabled = dia() !== 'otra'; plan = null; bCargar.disabled = true;
-      if (dia() === 'otra' && e.target !== otra) { otra.focus(); return; }
-      clearTimeout(tRev); tRev = setTimeout(() => { if (!ocupadoC) revisar(); }, 150);
-    });
-    const mostrarAvance = (txt, frac) => { avance.hidden = txt == null; if (txt == null) return; avance.querySelector('span').textContent = txt; avance.querySelector('i').style.width = Math.round(Math.max(0, Math.min(1, frac || 0)) * 100) + '%'; };
-    const ETAPA = (t) => { const x = String(t || '').toLowerCase(); return x.charAt(0).toUpperCase() + x.slice(1); };
-    const ruta = (c, ya) => { const ps = c.split('/').filter(Boolean), ult = ps.pop() || '';
-      return `<div class="rmd-cont-ruta" title="${esc(c)}">${ya ? '<span class="rmd-cont-ya">ya está</span>' : ''}${ps.map((x) => `${esc(x)}<span class="sep">›</span><wbr>`).join('')}<b>${esc(ult)}</b></div>`; };
-    const estadoInicial = (p) => (!p.carpetas.length ? { txt: 'Ubicar a mano', cls: 'mano' } : p.subir.length ? { txt: 'Por cargar', cls: 'pend' } : p.aObsoleto.length ? { txt: 'Solo a OBSOLETO', cls: 'pend' } : { txt: 'Ya está', cls: 'ok' });
-    const pastilla = (e) => `<span class="rmd-cont-est ${e.cls}"${e.cls === 'error' ? '' : ` title="${esc(e.txt)}"`}>${esc(e.txt)}</span>`;
-    const dato = (n, txt, cls) => `<div class="rmd-cont-dato ${cls || ''}"><b>${n}</b><span>${txt}</span></div>`;
+    v.cuerpo.addEventListener('change', () => { plan = null; bCargar.disabled = true; caja.innerHTML = ''; });
     const pintar = (fecha) => {
-      if (!plan.length) { caja.innerHTML = `<p class="rmd-cont-vacio">No hay RMD autorizados el ${esc(fmt(fecha))}.</p>`; return; }
+      if (!plan.length) { caja.innerHTML = `<p>No hay RMD autorizados el ${esc(fmt(fecha))}.</p>`; return; }
       const filas = plan.map((p, i) => {
-        const r = p.rmd, e = p.estado || estadoInicial(p);
-        const dest = p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('') || `<div class="rmd-cont-nota">${esc(p.nota)}</div>`;
-        const obs = p.aObsoleto.map((x) => `<div class="rmd-cont-arch" title="${esc(x)}">${esc(x.split('/').pop())}</div>`).join('');
-        const cls = !p.carpetas.length ? 'rmd-cont-mano' : e.cls === 'error' ? 'rmd-cont-fallo' : '';
-        return `<tr data-i="${i}" class="${cls}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-ver">v${esc(r.version)} · ${esc(ETAPA(r.etapa))}</span></td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${obs || '<span class="rmd-cont-arch">—</span>'}</td><td class="rmd-cont-col-est">${pastilla(e)}</td></tr>`;
+        const r = p.rmd, est = p.estado ? `<span class="rmd-cont-est ${p.estado.cls}">${esc(p.estado.txt)}</span>` : '';
+        const dest = p.carpetas.map((c) => `<div>${p.yaEsta.includes(c) ? '<span class="rmd-cont-ya">ya está</span> ' : ''}${esc(c)}</div>`).join('') || `<div class="rmd-cont-nota">${esc(p.nota)}</div>`;
+        const obs = p.aObsoleto.map((x) => `<div>${esc(x.split('/').pop())}</div>`).join('');
+        return `<tr data-i="${i}"><td>${esc(r.codigo)}<br><small>v${esc(r.version)} · ${esc(r.etapa)}</small></td><td>${esc(r.descripcion)}</td><td>${dest}</td><td>${obs || '—'}</td><td>${est}</td></tr>`;
       }).join('');
       const nSubir = plan.filter((p) => p.subir.length).length, nObs = plan.reduce((n, p) => n + p.aObsoleto.length, 0), nMano = plan.filter((p) => !p.carpetas.length).length;
-      const nYa = plan.filter((p) => p.carpetas.length && !p.subir.length && !p.aObsoleto.length).length;
-      caja.innerHTML = `<div class="rmd-cont-resumen">${dato(plan.length, `autorizados el ${esc(fmt(fecha))}`)}${dato(nSubir, 'por cargar', 'acento')}${dato(nObs, 'PDF a OBSOLETO', 'ambar')}${nYa ? dato(nYa, 'ya en su carpeta', 'verde') : ''}${nMano ? dato(nMano, 'sin carpeta: a mano', 'rojo') : ''}</div>
-        <div class="rmd-cont-tabla"><table><colgroup><col style="width:118px"><col style="width:24%"><col><col style="width:24%"><col style="width:118px"></colgroup>
-        <thead><tr><th>RMD</th><th>Producto</th><th>Carpeta de destino</th><th>Pasa a OBSOLETO</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+      caja.innerHTML = `<p><b>${plan.length}</b> RMD autorizados el ${esc(fmt(fecha))}: <b>${nSubir}</b> por cargar, <b>${nObs}</b> PDF anteriores a OBSOLETO${nMano ? `, <b>${nMano}</b> sin carpeta (ubícalos a mano)` : ''}.</p>
+        <div class="rmd-cont-tabla"><table><thead><tr><th>RMD</th><th>Descripción</th><th>Carpeta de destino</th><th>A OBSOLETO</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`;
       bCargar.disabled = !(nSubir || nObs);
-      bCargar.textContent = nSubir || nObs ? `Cargar ${nSubir} a SharePoint` : 'Cargar a SharePoint';
     };
     async function revisar() {
       const fecha = fechaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { toast('Elige una fecha.', true); return; }
-      ocupadoC = true; bRevisar.disabled = bCargar.disabled = true; caja.innerHTML = ''; mostrarAvance('Leyendo en SAP los RMD autorizados el ' + fmt(fecha) + '…', 0.15);
+      ocupadoC = true; bRevisar.disabled = bCargar.disabled = true; caja.innerHTML = '<p>Leyendo SAP…</p>';
       try {
         const { autorizados, previos } = await contLeer(modelo, fecha); if (cerrado) return;
-        mostrarAvance(`Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…`, 0.6);
+        caja.innerHTML = `<p>Buscando en SharePoint las versiones anteriores de ${autorizados.length} RMD…</p>`;
         const codigos = [...new Set(autorizados.map((r) => r.codigo).concat(previos.map((r) => r.codigo)))];
         const rutas = autorizados.length ? await spBuscar(codigos) : []; if (cerrado) return;
-        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; mostrarAvance(null); pintar(fecha);
-      } catch (e) { mostrarAvance(null); caja.innerHTML = `<p class="rmd-cont-vacio rmd-cont-error">No se pudo revisar: ${esc(e.message)}</p>`; }
+        plan = Contingencia.planificar(autorizados, previos, rutas); plan.fecha = fecha; pintar(fecha);
+      } catch (e) { caja.innerHTML = `<p class="rmd-cont-error">No se pudo revisar: ${esc(e.message)}</p>`; }
       finally { ocupadoC = false; bRevisar.disabled = false; }
     }
     async function cargar() {
       if (!plan) return;
       const nSubir = plan.filter((p) => p.subir.length).length, nObs = plan.reduce((n, p) => n + p.aObsoleto.length, 0);
-      if (!(await confirmar('Cargar a SharePoint', `Se cargarán ${nSubir} PDF en 3.-CONTINGENCIA y ${nObs} PDF anteriores pasarán a OBSOLETO.`,
-          'Los RMD sin carpeta no se tocan: ubícalos a mano.', { si: 'Cargar', no: 'Cancelar' }))) return;
+      if (!confirm(`Se cargarán ${nSubir} PDF a SharePoint y ${nObs} PDF anteriores pasarán a OBSOLETO, en 3.-CONTINGENCIA. ¿Continuar?`)) return;
       ocupadoC = true; bRevisar.disabled = bCargar.disabled = bCerrar.disabled = true;
-      const tareas = plan.map((p, i) => [p, i]).filter(([p]) => p.subir.length || p.aObsoleto.length);
-      let hechos = 0, fallos = 0, k = 0;
-      for (const [p, i] of tareas) {
+      let hechos = 0, fallos = 0;
+      for (const [i, p] of plan.entries()) {
         if (cerrado) break;
-        const tr = caja.querySelector(`tr[data-i="${i}"]`), fila = tr && tr.querySelector('.rmd-cont-col-est');
-        const marcar = (txt, cls) => { p.estado = { txt, cls }; if (fila) fila.innerHTML = pastilla(p.estado); if (tr) tr.classList.toggle('rmd-cont-fallo', cls === 'error'); };
-        mostrarAvance(`${k + 1} de ${tareas.length} · ${p.rmd.codigo} ${p.rmd.descripcion}`, k / tareas.length);
-        if (tr) tr.scrollIntoView({ block: 'nearest' });
+        const fila = caja.querySelector(`tr[data-i="${i}"] td:last-child`), marcar = (txt, cls) => { p.estado = { txt, cls }; if (fila) fila.innerHTML = `<span class="rmd-cont-est ${cls}">${esc(txt)}</span>`; };
+        if (!p.subir.length && !p.aObsoleto.length) continue;
         try {
           if (p.subir.length) {
             marcar('Generando PDF…', 'curso');
@@ -7197,9 +7145,7 @@
           for (const x of p.aObsoleto) { marcar('A OBSOLETO…', 'curso'); await spArchivar(x); }
           marcar('Hecho', 'ok'); hechos++;
         } catch (e) { marcar('Error: ' + e.message, 'error'); fallos++; }
-        k++;
       }
-      mostrarAvance(`Terminado: ${hechos} cargados${fallos ? `, ${fallos} con error` : ''}.`, 1);
       ocupadoC = false; bCerrar.disabled = bRevisar.disabled = false;
       toast(`Contingencia del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
     }
