@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.92.3
+// @version      1.94.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.92.3';                                                       // mantener igual a @version
+  const VERSION = '1.94.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -309,6 +309,9 @@
   /* ── Comparar dos RMD (lado a lado) ── */
   .rmd-modal.rmd-cmp-ventana { width: min(1100px, 96vw); }
   .rmd-cmp-ventana .rmd-modal-cuerpo { overflow: visible; min-height: 300px; }
+  .rmd-cmp-filtros { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: end; margin: 0 0 10px; font-size: 12.5px; }
+  .rmd-cmp-filtros label { display: flex; flex-direction: column; gap: 3px; color: var(--rmd-apagado); } .rmd-cmp-filtros label.rmd-cmp-chk { flex-direction: row; align-items: center; gap: 6px; color: var(--rmd-texto); padding-bottom: 6px; }
+  .rmd-cmp-filtros select { min-width: 150px; max-width: 240px; min-height: 30px; padding: 3px 6px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-cmp-elegir { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: start; flex: 0 0 auto; }
   .rmd-cmp-lado { position: relative; padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); min-width: 0; }
   .rmd-cmp-rot { font-weight: 600; font-size: 13px; margin-bottom: 6px; } .rmd-cmp-rot small { font-weight: 400; color: var(--rmd-apagado); }
@@ -7577,18 +7580,34 @@
   // ==COMPARAR-FIN==
   window.__rmdStats.comparar = Comparar;   // pruebas
 
-  const CMP_SELECT = 'mdId,codigo,version,descripcion,nivelTxt,areaRmdTxt,fechaRegistro,fechaAutorizacion,estadoIdRmd/contenido';
-  const cmpFila = (m) => ({ mdId: m.mdId, codigo: String(m.codigo || ''), version: m.version != null ? String(m.version) : '', descripcion: m.descripcion || '', etapa: m.nivelTxt || '', area: m.areaRmdTxt || '', estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '' });
-  // Búsqueda por código (o parte) o por palabras de la descripción; hasta 100, por código y versión
-  async function cmpBuscar(modelo, q) {
-    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.model.FilterOperator, t = norm(q);
-    const leer = (filtros) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read('/MD', { filters: [new F({ filters: filtros, and: true })], urlParameters: { $expand: 'estadoIdRmd', $select: CMP_SELECT, $top: '100', $orderby: 'codigo desc' },
+  const CMP_SELECT = 'mdId,codigo,version,descripcion,nivelTxt,areaRmdTxt,fechaRegistro,fechaAutorizacion,estadoIdRmd_iMaestraId,sucursalId_iMaestraId,estadoIdRmd/contenido,sucursalId/contenido';
+  const cmpFila = (m) => ({ mdId: m.mdId, codigo: String(m.codigo || ''), version: m.version != null ? String(m.version) : '', descripcion: m.descripcion || '', etapa: m.nivelTxt || '', area: m.areaRmdTxt || '',
+    estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '', estadoId: m.estadoIdRmd_iMaestraId, planta: (m.sucursalId && m.sucursalId.contenido) || '', plantaId: m.sucursalId_iMaestraId });
+  const cmpCancelado = (m) => /cancel/i.test(SIN_ACENTOS(m.estado || ''));
+  // Opciones de los filtros (etapa, planta, sección, estado) con lo que ya cargó la lista principal; los cancelados no se ofrecen
+  function cmpOpciones(ctrl) {
+    const V = ctrl.getView(), filas = [].concat((V.getModel('listMD') && V.getModel('listMD').getData()) || [], (ctrl.localModel && ctrl.localModel.getProperty('/listMDTemp')) || []).map(cmpFila);
+    const unicos = (f) => { const m = new Map(); filas.forEach((x) => { const [k, t] = f(x); if (k != null && k !== '' && t && !m.has(String(k))) m.set(String(k), t); }); return [...m].sort((a, b) => a[1].localeCompare(b[1], 'es')); };
+    return { etapa: unicos((x) => [x.etapa, x.etapa]), planta: unicos((x) => [x.plantaId, x.planta]), area: unicos((x) => [x.area, x.area]), estado: unicos((x) => (cmpCancelado(x) ? [null] : [x.estadoId, x.estado])),
+      cancelados: [...new Set(filas.filter(cmpCancelado).map((x) => x.estadoId).filter((x) => x != null))] };
+  }
+  // Búsqueda por código (o parte) o por palabras de la descripción, con los filtros { etapa, planta, area, estado, cancelados } (texto vacío: solo filtros); hasta 100
+  async function cmpBuscar(modelo, q, f = {}) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.model.FilterOperator, t = norm(q), num = (x) => (isNaN(+x) ? x : +x);
+    const extra = [];
+    if (f.etapa) extra.push(new F('nivelTxt', 'EQ', f.etapa));
+    if (f.planta) extra.push(new F('sucursalId_iMaestraId', 'EQ', num(f.planta)));
+    if (f.area) extra.push(new F('areaRmdTxt', 'EQ', f.area));
+    if (f.estado) extra.push(new F('estadoIdRmd_iMaestraId', 'EQ', num(f.estado)));
+    else if (!f.cancelados) (f.idsCancelado || []).forEach((id) => extra.push(new F('estadoIdRmd_iMaestraId', 'NE', num(id))));
+    const leer = (filtros) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read('/MD', { filters: [new F({ filters: filtros.concat(extra), and: true })], urlParameters: { $expand: 'estadoIdRmd,sucursalId', $select: CMP_SELECT, $top: '100', $orderby: 'codigo desc' },
       success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`el servidor no respondió (${(e && e.statusCode) || 'sin código'})`)) })));
     let filas;
-    if (/^\d+$/.test(t)) filas = await leer([new F({ path: 'codigo', operator: FO.Contains, value1: t })]).catch(() => leer([new F('codigo', 'EQ', t)]));
+    if (!t) filas = await leer([]);
+    else if (/^\d+$/.test(t)) filas = await leer([new F({ path: 'codigo', operator: FO.Contains, value1: t })]).catch(() => leer([new F('codigo', 'EQ', t)]));
     else filas = await leer(t.split(/\s+/).filter(Boolean).map((w) => new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
     const nat = (a, b) => String(b).localeCompare(String(a), 'es', { numeric: true });
-    return filas.map(cmpFila).sort((a, b) => nat(a.codigo, b.codigo) || nat(a.version, b.version));
+    return filas.map(cmpFila).filter((m) => f.cancelados || f.estado || !cmpCancelado(m)).sort((a, b) => nat(a.codigo, b.codigo) || nat(a.version, b.version));
   }
   function abrirCompararRmd() {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
@@ -7598,9 +7617,12 @@
     const v = ventana('Comparar dos RMD', { cancelar: () => { if (!ocupado) cerrar(); } });
     const caja = v.fondo.querySelector('.rmd-modal'); caja.classList.add('rmd-cmp-ventana');
     const lado = (l) => `<div class="rmd-cmp-lado" data-l="${l}"><div class="rmd-cmp-rot">${l === 'a' ? 'Original <small>(izquierda)</small>' : 'Modificado <small>(derecha)</small>'}</div>
-      <form class="rmd-cmp-buscar"><input type="search" placeholder="Código o palabras de la descripción" aria-label="Buscar el RMD ${l === 'a' ? 'original' : 'modificado'}" autocomplete="off"><button type="submit" class="rmd-btn">Buscar</button></form>
+      <form class="rmd-cmp-buscar"><input type="search" placeholder="Código o descripción (vacío: solo los filtros)" aria-label="Buscar el RMD ${l === 'a' ? 'original' : 'modificado'}" autocomplete="off"><button type="submit" class="rmd-btn">Buscar</button></form>
       <div class="rmd-cmp-elegido"></div><div class="rmd-cmp-lista-res" hidden></div></div>`;
-    v.cuerpo.innerHTML = `<div class="rmd-cmp-elegir">${lado('a')}<button type="button" class="rmd-btn rmd-cmp-cambiar" title="Intercambiar original y modificado" aria-label="Intercambiar original y modificado">⇄</button>${lado('b')}</div>
+    const opc = cmpOpciones(ctrl), sel = (k, rot, todos) => `<label>${rot}<select data-f="${k}"><option value="">${todos}</option>${opc[k].map(([val, t]) => `<option value="${esc(val)}">${esc(t)}</option>`).join('')}</select></label>`;
+    v.cuerpo.innerHTML = `<div class="rmd-cmp-filtros" role="group" aria-label="Filtros de la búsqueda">${sel('etapa', 'Etapa', 'Todas')}${sel('planta', 'Planta', 'Todas')}${sel('area', 'Sección', 'Todas')}${sel('estado', 'Estado', 'Todos menos cancelados')}
+        <label class="rmd-cmp-chk"><input type="checkbox" data-f="mismaEtapa" checked> Los dos de la misma etapa</label><label class="rmd-cmp-chk"><input type="checkbox" data-f="cancelados"> Incluir cancelados</label></div>
+      <div class="rmd-cmp-elegir">${lado('a')}<button type="button" class="rmd-btn rmd-cmp-cambiar" title="Intercambiar original y modificado" aria-label="Intercambiar original y modificado">⇄</button>${lado('b')}</div>
       <div class="rmd-cmp-opc"><label><input type="checkbox" class="rmd-cmp-receta"> Incluir la receta (si el RMD tiene una sola fórmula)</label><span class="rmd-progreso"></span></div>
       <div class="rmd-cmp-resultado"></div>`;
     const prog = v.cuerpo.querySelector('.rmd-progreso'), aviso = v.cuerpo.querySelector('.rmd-cmp-resultado'), chkReceta = v.cuerpo.querySelector('.rmd-cmp-receta');
@@ -7639,24 +7661,35 @@
     }
     const nombre = (m) => `${m.codigo} · v${m.version}`;
     const estCls = (e) => SIN_ACENTOS(e || '').toLowerCase().replace(/\s+/g, '-');
-    const fichaMd = (m) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc(m.etapa)}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>`;
+    const fichaMd = (m) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc([m.etapa, m.area, m.planta].filter(Boolean).join(' · '))}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>`;
     const pintarLados = () => {
       ['a', 'b'].forEach((l) => {
         const el = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-elegido`), m = lados[l];
         el.innerHTML = m ? fichaMd(m) : `<span class="rmd-nota">${l === 'a' ? 'Elige el RMD de partida.' : 'Elige el RMD con el que compararlo.'}</span>${l === 'a' && lados.b ? ' <button type="button" class="rmd-link" data-a="anterior">Usar la versión anterior del de la derecha</button>' : ''}`;
       });
       bComparar.disabled = ocupado || !lados.a || !lados.b || lados.a.mdId === lados.b.mdId;
+      if (lados.a && lados.b && lados.a.etapa && lados.b.etapa && lados.a.etapa !== lados.b.etapa) setProg(`Ojo: son de etapas distintas (${lados.a.etapa} y ${lados.b.etapa}).`, true);
+      else if (prog.classList.contains('error') && /etapas distintas/.test(prog.textContent)) setProg('');
+    };
+    const valorF = (k) => { const x = v.cuerpo.querySelector(`.rmd-cmp-filtros [data-f="${k}"]`); return x.type === 'checkbox' ? x.checked : x.value; };
+    const filtrosDe = (l) => {
+      const otro = lados[l === 'a' ? 'b' : 'a'], f = { etapa: valorF('etapa'), planta: valorF('planta'), area: valorF('area'), estado: valorF('estado'), cancelados: valorF('cancelados'), idsCancelado: opc.cancelados };
+      if (valorF('mismaEtapa') && otro && otro.etapa) f.etapa = otro.etapa;
+      return f;
     };
     async function buscar(l, q) {
-      const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`);
-      if (!norm(q)) { res.hidden = true; return; }
+      const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`), f = filtrosDe(l);
+      if (!norm(q) && !f.etapa && !f.planta && !f.area && !f.estado) { res.hidden = false; res.innerHTML = '<p class="rmd-nota">Escribe un código o parte de la descripción, o elige al menos un filtro.</p>'; return; }
       res.hidden = false; res.innerHTML = '<p class="rmd-nota">Buscando…</p>';
       try {
-        const xs = await cmpBuscar(modelo, q); res.__xs = xs;
-        res.innerHTML = xs.length ? `${xs.length >= 100 ? '<p class="rmd-nota">Primeros 100: afina la búsqueda.</p>' : ''}<ul role="listbox">${xs.map((m, k) => `<li role="option" tabindex="0" data-k="${k}">${fichaMd(m)}</li>`).join('')}</ul>` : '<p class="rmd-nota">Ningún RMD coincide.</p>';
+        const xs = await cmpBuscar(modelo, q, f); res.__xs = xs;
+        const donde = [f.etapa, f.planta && (opc.planta.find(([k]) => k === String(f.planta)) || [])[1], f.area, f.estado && (opc.estado.find(([k]) => k === String(f.estado)) || [])[1]].filter(Boolean).join(' · ');
+        const pie = `${donde ? `<p class="rmd-nota">Filtros: ${esc(donde)}${f.cancelados || f.estado ? '' : ' · sin cancelados'}</p>` : f.cancelados ? '' : '<p class="rmd-nota">Sin cancelados</p>'}`;
+        res.innerHTML = xs.length ? `${pie}${xs.length >= 100 ? '<p class="rmd-nota">Primeros 100: afina la búsqueda.</p>' : ''}<ul role="listbox">${xs.map((m, k) => `<li role="option" tabindex="0" data-k="${k}">${fichaMd(m)}</li>`).join('')}</ul>` : `${pie}<p class="rmd-nota">Ningún RMD coincide.</p>`;
       } catch (e) { res.innerHTML = `<p class="rmd-progreso error">No se pudo buscar: ${esc(e.message)}</p>`; }
     }
     const elegir = (l, m) => { lados[l] = m; const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`); res.hidden = true; pintarLados(); };
+    v.cuerpo.querySelector('.rmd-cmp-filtros').addEventListener('change', () => ['a', 'b'].forEach((l) => { const L = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"]`); if (!L.querySelector('.rmd-cmp-lista-res').hidden) buscar(l, L.querySelector('input').value); }));
     v.cuerpo.querySelectorAll('.rmd-cmp-buscar').forEach((f) => f.addEventListener('submit', (e) => { e.preventDefault(); buscar(f.closest('.rmd-cmp-lado').dataset.l, f.querySelector('input').value); }));
     v.cuerpo.querySelector('.rmd-cmp-elegir').addEventListener('click', async (e) => {
       const li = e.target.closest('li[data-k]');
