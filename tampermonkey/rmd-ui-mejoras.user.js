@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.93.0
+// @version      1.95.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.93.0';                                                       // mantener igual a @version
+  const VERSION = '1.95.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -309,6 +309,9 @@
   /* ── Comparar dos RMD (lado a lado) ── */
   .rmd-modal.rmd-cmp-ventana { width: min(1100px, 96vw); }
   .rmd-cmp-ventana .rmd-modal-cuerpo { overflow: visible; min-height: 300px; }
+  .rmd-cmp-filtros { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: end; margin: 0 0 10px; font-size: 12.5px; }
+  .rmd-cmp-filtros label { display: flex; flex-direction: column; gap: 3px; color: var(--rmd-apagado); } .rmd-cmp-filtros label.rmd-cmp-chk { flex-direction: row; align-items: center; gap: 6px; color: var(--rmd-texto); padding-bottom: 6px; }
+  .rmd-cmp-filtros select { min-width: 150px; max-width: 240px; min-height: 30px; padding: 3px 6px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
   .rmd-cmp-elegir { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: start; flex: 0 0 auto; }
   .rmd-cmp-lado { position: relative; padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); min-width: 0; }
   .rmd-cmp-rot { font-weight: 600; font-size: 13px; margin-bottom: 6px; } .rmd-cmp-rot small { font-weight: 400; color: var(--rmd-apagado); }
@@ -821,6 +824,17 @@
   .rmd-obs-barra { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
   .rmd-obs-barra button { padding: 1px 8px; border: 1px solid var(--rmd-borde); border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 12px/1.6 var(--rmd-fuente); cursor: pointer; }
   .rmd-obs-barra button:hover { border-color: var(--rmd-acento-texto); }
+  .rmd-cc-elegir { position: fixed; z-index: 100002; display: flex; flex-direction: column; width: min(520px, calc(100vw - 16px)); max-height: min(420px, calc(100vh - 16px)); padding: 8px; box-sizing: border-box; border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); box-shadow: 0 10px 30px rgba(0,0,0,.35); font: 13px/1.4 var(--rmd-fuente); }
+  .rmd-cc-elegir .rmd-cc-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 6px; } .rmd-cc-elegir .rmd-cc-cab small { color: var(--rmd-apagado); font-size: 11.5px; }
+  .rmd-cc-elegir .rmd-cc-q { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-texto); font: inherit; }
+  .rmd-cc-elegir .rmd-cc-lista { flex: 1 1 auto; min-height: 0; overflow: auto; margin: 6px 0; padding: 0; list-style: none; }
+  .rmd-cc-elegir .rmd-cc-lista li[data-i] { display: grid; grid-template-columns: 82px 1fr; column-gap: 8px; padding: 5px 6px; border-radius: 5px; cursor: pointer; }
+  .rmd-cc-elegir .rmd-cc-lista li b { font-weight: 600; white-space: nowrap; } .rmd-cc-elegir .rmd-cc-lista li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rmd-cc-elegir .rmd-cc-lista li small { grid-column: 2; color: var(--rmd-apagado); font-size: 11.5px; }
+  .rmd-cc-elegir .rmd-cc-lista li.activa, .rmd-cc-elegir .rmd-cc-lista li[data-i]:hover { background: color-mix(in srgb, var(--rmd-acento) 14%, transparent); }
+  .rmd-cc-elegir .rmd-cc-lista li.anotado, .rmd-cc-elegir .rmd-cc-lista li.no-aplica { opacity: .62; } .rmd-cc-elegir .rmd-cc-vacio { padding: 8px 6px; color: var(--rmd-apagado); }
+  .rmd-cc-elegir .rmd-cc-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .rmd-cc-elegir .rmd-cc-pie span { color: var(--rmd-apagado); font-size: 11.5px; }
+  .rmd-cc-elegir .rmd-cc-pie button { padding: 3px 10px; border: 1px solid var(--rmd-borde); border-radius: 12px; background: var(--rmd-superficie); color: var(--rmd-texto); font: inherit; cursor: pointer; } .rmd-cc-elegir .rmd-cc-pie button:hover { border-color: var(--rmd-acento-texto); }
   .rmd-obs-celda { display: flex !important; flex-wrap: wrap; align-items: center; gap: 2px 8px; } .rmd-obs-celda > .sapMLabel { width: auto !important; }
   .rmd-obs-celda .rmd-obs-barra { margin: 0 0 0 auto; gap: 3px; } .rmd-obs-celda .rmd-obs-barra button { padding: 0 6px; font-size: 11.5px; line-height: 1.5; }
   /* «Asociar fórmulas» con «Observaciones más alto»: sin los títulos vacíos de las columnas ni el margen y relleno de sobra arriba y abajo del formulario */
@@ -2429,6 +2443,7 @@
     const elegido = +asoc.estadoIdRmd_iMaestraIdBK, guardado = +asoc.estadoIdRmd_iMaestraId;
     const autorizar = elegido === 465 && guardado !== 465, suspender = elegido === 468 && guardado !== 468;
     const planta = ((vs.find((m) => m.mdId === asoc.mdId) || {}).planta) || '', cambios = RR.cambios && RR.cambios.cambios;
+    asocPlanta = planta;
     const clave = `${vs.length}|${version}|${elegido}|${RR.cambiosVer || 0}|${elObs.value}`;
     if (d.__rmdPendClave !== clave) {
       d.__rmdPendClave = clave;
@@ -2471,7 +2486,7 @@
   // Botones de Observaciones: agregan al final una línea con el formato acordado (fecha + iniciales) y dejan seleccionada la parte a escribir.
   // Se escribe con setValue + change del TextArea, como al teclear: se guarda con el Guardar del portal. Con «Observaciones más alto» van en la fila
   // de la etiqueta (no alargan la columna); si no, debajo del cuadro.
-  const BOTONES_OBS = [['cc', '+ CC', 'Control de cambio aplicado: 26-###-CC/Responsable/fecha;descripción;proceso;moderado'], ['pendiente', '+ Pendiente', 'Lo que falta aplicar en la siguiente versión'],
+  const BOTONES_OBS = [['cc', '+ CC', 'Control de cambio aplicado: 26-###-CC/Responsable/fecha;descripción;proceso;moderado. Con el listado de controles de cambio cargado, se elige de la lista de la planta del RMD'], ['pendiente', '+ Pendiente', 'Lo que falta aplicar en la siguiente versión'],
     ['suspension', '+ Suspensión', 'Motivo por el que se suspende esta versión'], ['baja', '+ Baja', 'El producto se dará de baja o está descontinuado'], ['nota', '+ Nota', 'Otra anotación con fecha e iniciales']];
   function barraObservaciones(el) {
     const c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')), dom = c && c.getDomRef(); if (!dom) return;
@@ -2482,7 +2497,7 @@
     if (ya) return;
     const b = document.createElement('div'); b.className = 'rmd-obs-barra';
     b.innerHTML = BOTONES_OBS.map(([k, t, ay]) => `<button type="button" data-t="${k}" title="${esc(ay)}">${esc(t)}</button>`).join('');
-    b.addEventListener('click', (e) => { const bt = e.target.closest('button'); if (bt) agregarLineaObs(c, bt.dataset.t); });
+    b.addEventListener('click', (e) => { const bt = e.target.closest('button'); if (!bt) return; if (bt.dataset.t === 'cc' && RR.cambios) elegirCCListado(c, bt); else agregarLineaObs(c, bt.dataset.t); });
     if (celda) { celda.classList.add('rmd-obs-celda'); celda.appendChild(b); } else dom.insertAdjacentElement('afterend', b);
   }
   // «L.Fernandez»: inicial del nombre y primer apellido según SAP (como en las líneas de CC)
@@ -2497,11 +2512,55 @@
     }
     return '';
   }
-  function agregarLineaObs(c, tipo) {
-    const p = Pendientes.plantilla(tipo, { iniciales: rsUsuarioIniciales(), responsable: responsableSap() }); if (!p) return;
+  function agregarLineaObs(c, tipo, linea) {
+    const p = linea || Pendientes.plantilla(tipo, { iniciales: rsUsuarioIniciales(), responsable: responsableSap() }); if (!p) return;
     const v = String(c.getValue() || ''), base = v && !/\n$/.test(v) ? v + '\n' : v, nuevo = base + p.texto;
     c.setValue(nuevo); c.fireLiveChange && c.fireLiveChange({ value: nuevo }); c.fireChange({ value: nuevo });
     setTimeout(() => { const i = c.getFocusDomRef(); if (!i) return; i.focus(); i.setSelectionRange(base.length + p.sel[0], base.length + p.sel[1]); i.scrollTop = i.scrollHeight; }, 50);
+  }
+  // «+ CC» con el listado de controles de cambio cargado (Reglas de revisión > Controles de cambio): se elige el CC de la planta del RMD y se
+  // agrega su línea armada con la nomenclatura del listado; «Escribir otro» deja la plantilla de siempre para un CC que no está.
+  let asocPlanta = '';
+  function cerrarElegirCC() { document.querySelectorAll('.rmd-cc-elegir').forEach((m) => (m.__cerrar ? m.__cerrar() : m.remove())); }
+  function elegirCCListado(c, bt) {
+    if (document.querySelector('.rmd-cc-elegir')) { cerrarElegirCC(); return; }
+    const lugar = /\bATE\b/i.test(asocPlanta) ? 'Ate' : /\bLIMA\b/i.test(asocPlanta) ? 'Lima' : '';
+    const m = document.createElement('div'); m.className = 'rmd-cc-elegir'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Elegir control de cambio del listado');
+    m.innerHTML = `<div class="rmd-cc-cab"><b>Controles de cambio${lugar ? ` de ${lugar}` : ''}</b><small title="${esc(RR.cambios.archivo)}">listado cargado el ${esc(fechaHoraCorta(RR.cambios.cargado))}</small></div>
+      <input type="search" class="rmd-cc-q" placeholder="Buscar por código, producto o descripción" aria-label="Buscar en el listado de controles de cambio">
+      <ul class="rmd-cc-lista" role="listbox" aria-label="Controles de cambio"></ul>
+      <div class="rmd-cc-pie"><span></span><button type="button" data-a="libre" title="Agrega la plantilla 26-###-CC/… para escribir un CC que no está en el listado">Escribir otro</button></div>`;
+    const inp = m.querySelector('.rmd-cc-q'), ul = m.querySelector('.rmd-cc-lista'), pie = m.querySelector('.rmd-cc-pie span');
+    let ops = [], act = 0;
+    const marcar = () => ul.querySelectorAll('li').forEach((li, i) => { li.classList.toggle('activa', i === act); li.setAttribute('aria-selected', String(i === act)); if (i === act) li.scrollIntoView({ block: 'nearest' }); });
+    const pintar = () => {
+      const todas = Pendientes.opcionesListado(RR.cambios.cambios, { planta: asocPlanta, texto: c.getValue(), q: inp.value });
+      ops = todas.slice(0, 80); act = 0;
+      ul.innerHTML = ops.length ? ops.map((o, i) => `<li role="option" data-i="${i}" class="${o.anotado ? 'anotado' : ''}${o.aplica ? '' : ' no-aplica'}" title="${esc([o.nomenclatura, o.area.length && 'Área: ' + o.area.join(', '), o.etapa.length && 'Etapa: ' + o.etapa.join(', ')].filter(Boolean).join('\n'))}">`
+        + `<b>${esc(o.codigo)}</b><span>${esc(o.descripcion || o.nomenclatura)}</span><small>${[o.fecha, o.estatus, !o.aplica && 'no aplica', o.anotado && 'ya anotado'].filter(Boolean).map(esc).join(' · ')}</small></li>`).join('')
+        : `<li class="rmd-cc-vacio">${inp.value ? 'Ningún CC del listado coincide.' : `El listado no tiene CC${lugar ? ` de ${lugar}` : ''}.`} Usa «Escribir otro».</li>`;
+      pie.textContent = todas.length > ops.length ? `${ops.length} de ${todas.length}: escribe para filtrar` : `${todas.length} CC`;
+      marcar();
+    };
+    const elegir = (o) => { cerrarElegirCC(); agregarLineaObs(c, 'cc', Pendientes.lineaListado(o, { responsable: responsableSap() })); };
+    ul.addEventListener('mousedown', (e) => e.preventDefault());
+    ul.addEventListener('click', (e) => { const li = e.target.closest('li[data-i]'); if (li) elegir(ops[+li.dataset.i]); });
+    m.querySelector('[data-a=libre]').addEventListener('click', () => { cerrarElegirCC(); agregarLineaObs(c, 'cc'); });
+    inp.addEventListener('input', pintar);
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (ops.length) { act = (act + (e.key === 'ArrowDown' ? 1 : ops.length - 1)) % ops.length; marcar(); } }
+      else if (e.key === 'Enter') { e.preventDefault(); if (ops[act]) elegir(ops[act]); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarElegirCC(); bt.focus(); }
+    });
+    const fuera = (e) => { if (!m.contains(e.target) && e.target !== bt) cerrarElegirCC(); };
+    m.__cerrar = () => { document.removeEventListener('mousedown', fuera, true); m.remove(); };
+    document.addEventListener('mousedown', fuera, true);
+    document.body.appendChild(m); pintar();
+    // debajo del botón (o encima si no cabe), sin salirse de la ventana
+    const r = bt.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = `${Math.max(8, Math.min(r.right - w, innerWidth - w - 8))}px`;
+    m.style.top = `${innerHeight - r.bottom - 8 >= h || r.top < h ? Math.min(r.bottom + 4, innerHeight - h - 8) : r.top - h - 4}px`;
+    inp.focus();
   }
   // Tarjeta de Observaciones: qué dice esta versión y qué trae de nuevo frente a la anterior (una línea), lo pendiente y lo que conviene revisar.
   // Solo informa: no propone ni agrega controles de cambio.
@@ -2866,7 +2925,7 @@
   }
 
   let pendiente = false;
-  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec } };   // pruebas
+  window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec }, ponerCambios };   // pruebas
   // Al desactivar las mejoras se retira todo lo añadido
   function limpiezaTotal() {
     quitarHojasTabla(); document.querySelectorAll('details.rmd-agr').forEach((x) => x.remove());
@@ -6765,8 +6824,44 @@
       const p = plano(planta), c = en.find((x) => p && x.planta && p.includes(plano(x.planta))) || en[0];
       return { descripcion: c.descripcion || c.nomenclatura, estatus: c.estatus, planta: c.planta, fecha: c.fecha };
     }
+    // «+ CC» con listado: los CC / NC de la planta del RMD («PLANTA ATE» -> hoja Ate), uno por código. Los que aplican y los más recientes
+    // arriba; los ya anotados en Observaciones, al final. q filtra por código, descripción, área, etapa o estatus.
+    // -> [{ codigo, descripcion, fecha, estatus, aplica, area, etapa, nomenclatura, planta, anotado }]
+    function opcionesListado(cambios, { planta = '', texto = '', q = '' } = {}) {
+      const p = plano(planta), lugar = /\bATE\b|PLANTA\s*1\b/.test(p) ? 'Ate' : /\bLIMA\b|PLANTA\s*2\b/.test(p) ? 'Lima' : '';
+      const ya = ccsAplicados(analizar(texto)), qs = plano(q).split(/\s+/).filter(Boolean), porCodigo = new Map();
+      (cambios || []).filter((c) => c.codigos && c.codigos.length && (!lugar || !c.planta || c.planta === lugar)).forEach((c) => c.codigos.forEach((codigo) => {
+        const o = { codigo, descripcion: c.descripcion, fecha: c.fecha, estatus: c.estatus, aplica: c.aplica, area: c.area, etapa: c.etapa, nomenclatura: c.nomenclatura, planta: c.planta, anotado: ya.has(codigo) };
+        const prev = porCodigo.get(codigo); if (!prev || (o.fecha || '') > (prev.fecha || '')) porCodigo.set(codigo, o);
+      }));
+      return [...porCodigo.values()].filter((o) => { const t = plano(`${o.codigo} ${o.descripcion} ${o.nomenclatura} ${o.area.join(' ')} ${o.etapa.join(' ')} ${o.estatus}`); return qs.every((x) => t.includes(x)); })
+        .sort((a, b) => a.anotado - b.anotado || b.aplica - a.aplica || (b.fecha || '').localeCompare(a.fecha || '') || a.codigo.localeCompare(b.codigo));
+    }
+    // Línea de Observaciones de un CC del listado, armada desde su NOMENCLATURA PARA OBSERVACIONES: «26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado».
+    // Acepta la forma de Planta 1 («26-280/D.Ayala /2026-08-17/descripción/Proceso/Mayor.») y el nivel tras una coma. Lo que falta se completa
+    // como en la plantilla (responsable, fecha del listado, descripción del listado, proceso, moderado) y lo primero completado queda seleccionado.
+    function lineaListado(o, { responsable = '', fecha = new Date() } = {}) {
+      const p2 = (n) => String(n).padStart(2, '0'), hoy = `${fecha.getFullYear()}-${p2(fecha.getMonth() + 1)}-${p2(fecha.getDate())}`;
+      const CODIGO = /^\s*(?:(?:N\.?C|DES|C\.?C)\.?\s*[-–:]?\s*)?(?:20)?\d{2}\s*[-–]\s*\d{2,4}(?:\s*[-–]?\s*(?:CC|DES|D)\b)?/i;
+      const nom = limpio(o.nomenclatura).replace(/[\s.]+$/, ''), m = CODIGO.exec(nom.replace(PREFIJO_CC, ''));
+      const ps = m ? nom.replace(PREFIJO_CC, '').slice(m[0].length).split(/[/;]/).map(limpio).filter(Boolean) : [];
+      if (ps.length) { const u = ps[ps.length - 1].split(','); if (u.length > 1 && NIVELES.test(plano(limpio(u[u.length - 1])))) ps.splice(ps.length - 1, 1, limpio(u.slice(0, -1).join(',')), limpio(u[u.length - 1])); }
+      const iF = ps.findIndex((t) => !!fechaCambio(t) || (fechaDe(t) && fechaDe(t).d)), x = {};
+      if (iF >= 0) { const f = fechaCambio(ps[iF]) || ((d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`)(fechaDe(ps[iF]).d); x.fecha = f; ps.splice(iF, 1); }
+      // responsable: lo que va antes de la fecha («D.Ayala»); sin fecha, solo si parece «L.Fernandez»
+      if (ps.length && !/\d/.test(ps[0]) && ps[0].split(' ').length <= 3 && (iF > 0 || (iF < 0 && /^[A-ZÑ]{1,3}\.\s?\S/i.test(ps[0])))) x.responsable = ps.shift();
+      if (ps.length > 1 && NIVELES.test(plano(ps[ps.length - 1]))) x.nivel = ps.pop();
+      if (ps.length > 1 && ps[ps.length - 1].split(' ').length <= 2) x.tipo = ps.pop();
+      if (ps.length) x.descripcion = ps.join('; ');
+      const desc = limpio(String(o.descripcion || '').replace(CODIGO, '').replace(/^[\s:;,.-]+/, ''));
+      const partes = [['responsable', responsable || 'Responsable'], ['fecha', o.fecha || hoy], ['descripcion', desc || 'descripción'], ['tipo', 'proceso'], ['nivel', 'moderado']]
+        .map(([k, def]) => ({ v: x[k] || def, completado: !x[k] && !(k === 'fecha' && o.fecha) && !(k === 'descripcion' && desc) }));
+      let texto = o.codigo, sel = null;
+      partes.forEach((q, i) => { texto += i < 2 ? '/' : ';'; if (q.completado && !sel) sel = [texto.length, texto.length + q.v.length]; texto += q.v; });
+      return { texto, sel: sel || [texto.length, texto.length] };
+    }
     const TIPOS_LINEA = { baja: 'Baja / descontinuado', pendiente: 'Pendiente', cc: 'Control de cambio / NC', noaplica: 'CC que no aplica', mencion: 'CC mencionado', suspension: 'Motivo de suspensión', actualizacion: 'Actualización', nomenclatura: 'Nomenclatura', nota: 'Nota' };
-    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA, cambiosDeFilas, fechaCambio, fechaDe, revisar, delListado };
+    return { ccsDe, entradaCC, analizar, heredados, ccsAplicados, lineas, faltantesCC, plantilla, TIPOS_LINEA, cambiosDeFilas, fechaCambio, fechaDe, revisar, delListado, opcionesListado, lineaListado };
   })();
   // ==PENDIENTES-FIN==
 
@@ -7602,18 +7697,34 @@
   // ==COMPARAR-FIN==
   window.__rmdStats.comparar = Comparar;   // pruebas
 
-  const CMP_SELECT = 'mdId,codigo,version,descripcion,nivelTxt,areaRmdTxt,fechaRegistro,fechaAutorizacion,estadoIdRmd/contenido';
-  const cmpFila = (m) => ({ mdId: m.mdId, codigo: String(m.codigo || ''), version: m.version != null ? String(m.version) : '', descripcion: m.descripcion || '', etapa: m.nivelTxt || '', area: m.areaRmdTxt || '', estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '' });
-  // Búsqueda por código (o parte) o por palabras de la descripción; hasta 100, por código y versión
-  async function cmpBuscar(modelo, q) {
-    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.model.FilterOperator, t = norm(q);
-    const leer = (filtros) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read('/MD', { filters: [new F({ filters: filtros, and: true })], urlParameters: { $expand: 'estadoIdRmd', $select: CMP_SELECT, $top: '100', $orderby: 'codigo desc' },
+  const CMP_SELECT = 'mdId,codigo,version,descripcion,nivelTxt,areaRmdTxt,fechaRegistro,fechaAutorizacion,estadoIdRmd_iMaestraId,sucursalId_iMaestraId,estadoIdRmd/contenido,sucursalId/contenido';
+  const cmpFila = (m) => ({ mdId: m.mdId, codigo: String(m.codigo || ''), version: m.version != null ? String(m.version) : '', descripcion: m.descripcion || '', etapa: m.nivelTxt || '', area: m.areaRmdTxt || '',
+    estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '', estadoId: m.estadoIdRmd_iMaestraId, planta: (m.sucursalId && m.sucursalId.contenido) || '', plantaId: m.sucursalId_iMaestraId });
+  const cmpCancelado = (m) => /cancel/i.test(SIN_ACENTOS(m.estado || ''));
+  // Opciones de los filtros (etapa, planta, sección, estado) con lo que ya cargó la lista principal; los cancelados no se ofrecen
+  function cmpOpciones(ctrl) {
+    const V = ctrl.getView(), filas = [].concat((V.getModel('listMD') && V.getModel('listMD').getData()) || [], (ctrl.localModel && ctrl.localModel.getProperty('/listMDTemp')) || []).map(cmpFila);
+    const unicos = (f) => { const m = new Map(); filas.forEach((x) => { const [k, t] = f(x); if (k != null && k !== '' && t && !m.has(String(k))) m.set(String(k), t); }); return [...m].sort((a, b) => a[1].localeCompare(b[1], 'es')); };
+    return { etapa: unicos((x) => [x.etapa, x.etapa]), planta: unicos((x) => [x.plantaId, x.planta]), area: unicos((x) => [x.area, x.area]), estado: unicos((x) => (cmpCancelado(x) ? [null] : [x.estadoId, x.estado])),
+      cancelados: [...new Set(filas.filter(cmpCancelado).map((x) => x.estadoId).filter((x) => x != null))] };
+  }
+  // Búsqueda por código (o parte) o por palabras de la descripción, con los filtros { etapa, planta, area, estado, cancelados } (texto vacío: solo filtros); hasta 100
+  async function cmpBuscar(modelo, q, f = {}) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.model.FilterOperator, t = norm(q), num = (x) => (isNaN(+x) ? x : +x);
+    const extra = [];
+    if (f.etapa) extra.push(new F('nivelTxt', 'EQ', f.etapa));
+    if (f.planta) extra.push(new F('sucursalId_iMaestraId', 'EQ', num(f.planta)));
+    if (f.area) extra.push(new F('areaRmdTxt', 'EQ', f.area));
+    if (f.estado) extra.push(new F('estadoIdRmd_iMaestraId', 'EQ', num(f.estado)));
+    else if (!f.cancelados) (f.idsCancelado || []).forEach((id) => extra.push(new F('estadoIdRmd_iMaestraId', 'NE', num(id))));
+    const leer = (filtros) => conLectura(modelo, (m) => new Promise((ok, mal) => m.read('/MD', { filters: [new F({ filters: filtros.concat(extra), and: true })], urlParameters: { $expand: 'estadoIdRmd,sucursalId', $select: CMP_SELECT, $top: '100', $orderby: 'codigo desc' },
       success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`el servidor no respondió (${(e && e.statusCode) || 'sin código'})`)) })));
     let filas;
-    if (/^\d+$/.test(t)) filas = await leer([new F({ path: 'codigo', operator: FO.Contains, value1: t })]).catch(() => leer([new F('codigo', 'EQ', t)]));
+    if (!t) filas = await leer([]);
+    else if (/^\d+$/.test(t)) filas = await leer([new F({ path: 'codigo', operator: FO.Contains, value1: t })]).catch(() => leer([new F('codigo', 'EQ', t)]));
     else filas = await leer(t.split(/\s+/).filter(Boolean).map((w) => new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
     const nat = (a, b) => String(b).localeCompare(String(a), 'es', { numeric: true });
-    return filas.map(cmpFila).sort((a, b) => nat(a.codigo, b.codigo) || nat(a.version, b.version));
+    return filas.map(cmpFila).filter((m) => f.cancelados || f.estado || !cmpCancelado(m)).sort((a, b) => nat(a.codigo, b.codigo) || nat(a.version, b.version));
   }
   function abrirCompararRmd() {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
@@ -7623,9 +7734,12 @@
     const v = ventana('Comparar dos RMD', { cancelar: () => { if (!ocupado) cerrar(); } });
     const caja = v.fondo.querySelector('.rmd-modal'); caja.classList.add('rmd-cmp-ventana');
     const lado = (l) => `<div class="rmd-cmp-lado" data-l="${l}"><div class="rmd-cmp-rot">${l === 'a' ? 'Original <small>(izquierda)</small>' : 'Modificado <small>(derecha)</small>'}</div>
-      <form class="rmd-cmp-buscar"><input type="search" placeholder="Código o palabras de la descripción" aria-label="Buscar el RMD ${l === 'a' ? 'original' : 'modificado'}" autocomplete="off"><button type="submit" class="rmd-btn">Buscar</button></form>
+      <form class="rmd-cmp-buscar"><input type="search" placeholder="Código o descripción (vacío: solo los filtros)" aria-label="Buscar el RMD ${l === 'a' ? 'original' : 'modificado'}" autocomplete="off"><button type="submit" class="rmd-btn">Buscar</button></form>
       <div class="rmd-cmp-elegido"></div><div class="rmd-cmp-lista-res" hidden></div></div>`;
-    v.cuerpo.innerHTML = `<div class="rmd-cmp-elegir">${lado('a')}<button type="button" class="rmd-btn rmd-cmp-cambiar" title="Intercambiar original y modificado" aria-label="Intercambiar original y modificado">⇄</button>${lado('b')}</div>
+    const opc = cmpOpciones(ctrl), sel = (k, rot, todos) => `<label>${rot}<select data-f="${k}"><option value="">${todos}</option>${opc[k].map(([val, t]) => `<option value="${esc(val)}">${esc(t)}</option>`).join('')}</select></label>`;
+    v.cuerpo.innerHTML = `<div class="rmd-cmp-filtros" role="group" aria-label="Filtros de la búsqueda">${sel('etapa', 'Etapa', 'Todas')}${sel('planta', 'Planta', 'Todas')}${sel('area', 'Sección', 'Todas')}${sel('estado', 'Estado', 'Todos menos cancelados')}
+        <label class="rmd-cmp-chk"><input type="checkbox" data-f="mismaEtapa" checked> Los dos de la misma etapa</label><label class="rmd-cmp-chk"><input type="checkbox" data-f="cancelados"> Incluir cancelados</label></div>
+      <div class="rmd-cmp-elegir">${lado('a')}<button type="button" class="rmd-btn rmd-cmp-cambiar" title="Intercambiar original y modificado" aria-label="Intercambiar original y modificado">⇄</button>${lado('b')}</div>
       <div class="rmd-cmp-opc"><label><input type="checkbox" class="rmd-cmp-receta"> Incluir la receta (si el RMD tiene una sola fórmula)</label><span class="rmd-progreso"></span></div>
       <div class="rmd-cmp-resultado"></div>`;
     const prog = v.cuerpo.querySelector('.rmd-progreso'), aviso = v.cuerpo.querySelector('.rmd-cmp-resultado'), chkReceta = v.cuerpo.querySelector('.rmd-cmp-receta');
@@ -7664,24 +7778,35 @@
     }
     const nombre = (m) => `${m.codigo} · v${m.version}`;
     const estCls = (e) => SIN_ACENTOS(e || '').toLowerCase().replace(/\s+/g, '-');
-    const fichaMd = (m) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc(m.etapa)}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>`;
+    const fichaMd = (m) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc([m.etapa, m.area, m.planta].filter(Boolean).join(' · '))}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>`;
     const pintarLados = () => {
       ['a', 'b'].forEach((l) => {
         const el = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-elegido`), m = lados[l];
         el.innerHTML = m ? fichaMd(m) : `<span class="rmd-nota">${l === 'a' ? 'Elige el RMD de partida.' : 'Elige el RMD con el que compararlo.'}</span>${l === 'a' && lados.b ? ' <button type="button" class="rmd-link" data-a="anterior">Usar la versión anterior del de la derecha</button>' : ''}`;
       });
       bComparar.disabled = ocupado || !lados.a || !lados.b || lados.a.mdId === lados.b.mdId;
+      if (lados.a && lados.b && lados.a.etapa && lados.b.etapa && lados.a.etapa !== lados.b.etapa) setProg(`Ojo: son de etapas distintas (${lados.a.etapa} y ${lados.b.etapa}).`, true);
+      else if (prog.classList.contains('error') && /etapas distintas/.test(prog.textContent)) setProg('');
+    };
+    const valorF = (k) => { const x = v.cuerpo.querySelector(`.rmd-cmp-filtros [data-f="${k}"]`); return x.type === 'checkbox' ? x.checked : x.value; };
+    const filtrosDe = (l) => {
+      const otro = lados[l === 'a' ? 'b' : 'a'], f = { etapa: valorF('etapa'), planta: valorF('planta'), area: valorF('area'), estado: valorF('estado'), cancelados: valorF('cancelados'), idsCancelado: opc.cancelados };
+      if (valorF('mismaEtapa') && otro && otro.etapa) f.etapa = otro.etapa;
+      return f;
     };
     async function buscar(l, q) {
-      const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`);
-      if (!norm(q)) { res.hidden = true; return; }
+      const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`), f = filtrosDe(l);
+      if (!norm(q) && !f.etapa && !f.planta && !f.area && !f.estado) { res.hidden = false; res.innerHTML = '<p class="rmd-nota">Escribe un código o parte de la descripción, o elige al menos un filtro.</p>'; return; }
       res.hidden = false; res.innerHTML = '<p class="rmd-nota">Buscando…</p>';
       try {
-        const xs = await cmpBuscar(modelo, q); res.__xs = xs;
-        res.innerHTML = xs.length ? `${xs.length >= 100 ? '<p class="rmd-nota">Primeros 100: afina la búsqueda.</p>' : ''}<ul role="listbox">${xs.map((m, k) => `<li role="option" tabindex="0" data-k="${k}">${fichaMd(m)}</li>`).join('')}</ul>` : '<p class="rmd-nota">Ningún RMD coincide.</p>';
+        const xs = await cmpBuscar(modelo, q, f); res.__xs = xs;
+        const donde = [f.etapa, f.planta && (opc.planta.find(([k]) => k === String(f.planta)) || [])[1], f.area, f.estado && (opc.estado.find(([k]) => k === String(f.estado)) || [])[1]].filter(Boolean).join(' · ');
+        const pie = `${donde ? `<p class="rmd-nota">Filtros: ${esc(donde)}${f.cancelados || f.estado ? '' : ' · sin cancelados'}</p>` : f.cancelados ? '' : '<p class="rmd-nota">Sin cancelados</p>'}`;
+        res.innerHTML = xs.length ? `${pie}${xs.length >= 100 ? '<p class="rmd-nota">Primeros 100: afina la búsqueda.</p>' : ''}<ul role="listbox">${xs.map((m, k) => `<li role="option" tabindex="0" data-k="${k}">${fichaMd(m)}</li>`).join('')}</ul>` : `${pie}<p class="rmd-nota">Ningún RMD coincide.</p>`;
       } catch (e) { res.innerHTML = `<p class="rmd-progreso error">No se pudo buscar: ${esc(e.message)}</p>`; }
     }
     const elegir = (l, m) => { lados[l] = m; const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`); res.hidden = true; pintarLados(); };
+    v.cuerpo.querySelector('.rmd-cmp-filtros').addEventListener('change', () => ['a', 'b'].forEach((l) => { const L = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"]`); if (!L.querySelector('.rmd-cmp-lista-res').hidden) buscar(l, L.querySelector('input').value); }));
     v.cuerpo.querySelectorAll('.rmd-cmp-buscar').forEach((f) => f.addEventListener('submit', (e) => { e.preventDefault(); buscar(f.closest('.rmd-cmp-lado').dataset.l, f.querySelector('input').value); }));
     v.cuerpo.querySelector('.rmd-cmp-elegir').addEventListener('click', async (e) => {
       const li = e.target.closest('li[data-k]');
@@ -10563,7 +10688,7 @@
   let externosUI5 = false;
   function registrarExternosUI5() {
     if (externosUI5 || typeof sap === 'undefined') return;
-    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-pn-aviso', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado'], true); externosUI5 = true; } } catch (e) { }
+    try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) { P.addExternalContent(['.rmd-paleta-fondo', '.rmd-modal-fondo', '#rmd-ui-panel', '.rmd-pn-aviso', '#rmd-ui-buscar', '.rmd-menu', '.rmd-saludo', '.rmd-rec-detalle', '.rmd-creado', '.rmd-cc-elegir'], true); externosUI5 = true; } } catch (e) { }
   }
   function abrirPaleta() {
     if (document.querySelector('.rmd-paleta-fondo')) return;
