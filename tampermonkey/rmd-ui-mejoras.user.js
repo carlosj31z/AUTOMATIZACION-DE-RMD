@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.92.3
+// @version      1.93.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.92.3';                                                       // mantener igual a @version
+  const VERSION = '1.93.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -6950,6 +6950,26 @@
     }
     return null;
   }
+  // Órdenes de producción de Planta ATE (1020) y LIMA (1021) que inician hoy y en los 14 días siguientes, como el engranaje
+  // «OP sin RMD» (sin las cerradas técnicamente, CTEC), con su versión de fabricación y, si ya lo tiene, el RMD de la orden.
+  // Status RMD decide con el maestro cuáles no tienen RMD autorizado para esa versión y las muestra en Producción.
+  const CENTROS_STATUS_RMD = new Set(['1020', '1021']);
+  async function leerOrdenesParaStatusRmd(ctrl, modelo) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const h = new Date(), desde = new Date(Date.UTC(h.getFullYear(), h.getMonth(), h.getDate())), hasta = new Date(desde.getTime() + 14 * 864e5);   // Gstrp viene a las 00:00 UTC
+    const dia = (d) => (d instanceof Date && !isNaN(d) ? d.toISOString().slice(0, 10) : '');
+    const ordenes = (await leerErp(ctrl.oModelErpNec, 'OrdenSet', [new F('Gstrp', 'BT', desde, hasta)]))
+      .filter((o) => CENTROS_STATUS_RMD.has(String(o.Pwerk)) && !String(o.Stats || '').includes('CTEC'));
+    // RMD ya abiertos para esas órdenes (con estado), en bloques de 40 órdenes
+    const rmds = ordenes.length ? await leerPorIds(modelo, 'RMD', 'ordenSAP', [...new Set(ordenes.map((o) => o.Aufnr))], { $select: 'ordenSAP,productoId,codigo,estadoIdRmd_iMaestraId' }) : [];
+    const conRmd = new Map();
+    rmds.forEach((r) => { if (r.estadoIdRmd_iMaestraId != null) conRmd.set(`${r.ordenSAP}|${r.productoId}`, r.codigo || 'sí'); });
+    return {
+      generado: new Date().toISOString(), desde: dia(desde), hasta: dia(hasta),
+      ops: ordenes.map((o) => ({ orden: o.Aufnr, centro: o.Pwerk, material: o.Matnr, desc: (o.Maktx || o.Text1 || '').trim(), verid: o.Verid || '', clase: o.Dauat || '',
+        inicio: dia(o.Gstrp), fin: dia(o.Gltrp), lote: o.Charg || '', rmd: conRmd.get(`${o.Aufnr}|${o.Matnr}`) || '' })),
+    };
+  }
   const ICONO_ENVIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5h11"/><path d="M4.5 11V8.5M7.5 11V6.5"/><path d="M10 6.5 13.5 3M10.8 3h2.7v2.7"/></svg>';
   async function enviarAStatusRmd(btn) {
     if (window.__rmdEnviandoStatus) return;
@@ -6970,8 +6990,13 @@
     try {
       const modelo = modeloListaPrincipal(); if (!modelo) throw new Error('abre la lista "Configuración Manufactura Digital" para poder leer el maestro');
       const datos = await leerMDPaginado(modelo, [], (h, t) => setTxt(span, `Leyendo SAP… ${h}/${t}`));
+      // Si no se pueden leer las órdenes, el maestro se envía igual (Status RMD conserva las de la sincronización anterior).
+      setTxt(span, 'Leyendo órdenes de producción…');
+      let opSap = null, avisoOps = '';
+      try { const ctrl = controladorPrincipal(); if (!ctrl || !ctrl.oModelErpNec) throw new Error('no se encontró el servicio de órdenes'); opSap = await leerOrdenesParaStatusRmd(ctrl, modelo); }
+      catch (e) { avisoOps = ` No se pudieron leer las órdenes de producción (${e.message}).`; }
       const usuarioSap = usuarioSapActual();
-      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente), usuarioSap };
+      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente), usuarioSap, opSap };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
@@ -6982,7 +7007,7 @@
       await hasta(() => respuesta || win.closed, 300000, 300);
       if (!respuesta) throw new Error(usuarioSap ? 'no llegó la confirmación de Status RMD (¿se cerró la pestaña?)' : 'no llegó la confirmación de Status RMD (¿se canceló el DNI o se cerró la pestaña?)');
       if (!respuesta.ok) throw new Error(respuesta.motivo || 'Status RMD no aceptó los datos');
-      toast(`Enviado a Status RMD: ${datos.length} RMD leídos de SAP. ${respuesta.resumen || ''}`.trim());
+      toast(`Enviado a Status RMD: ${datos.length} RMD${opSap ? ` y ${opSap.ops.length} órdenes de producción` : ''} leídos de SAP. ${respuesta.resumen || ''}${avisoOps}`.trim(), !!avisoOps);
     } catch (e) { toast('No se pudo enviar a Status RMD: ' + e.message, true); }
     finally { clearInterval(ping); window.removeEventListener('message', alMensaje); btn.disabled = false; setTxt(span, texto0); window.__rmdEnviandoStatus = false; btn.classList.remove('rmd-enviando'); btn.querySelectorAll('canvas.rmd-orbe').forEach((x) => x.remove()); }
   }
@@ -6993,7 +7018,7 @@
     const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra) return;
     if (!barra.querySelector('.rmd-status-rmd')) {
       const s = botonIcono(ICONO_ENVIAR, 'Status RMD', 'rmd-status-rmd', () => enviarAStatusRmd(s));
-      s.title = 'Enviar a Status RMD: el maestro completo con sus recetas, en otra pestaña y con tu usuario de SAP'; s.setAttribute('aria-label', 'Enviar a Status RMD');
+      s.title = 'Enviar a Status RMD: el maestro completo con sus recetas y las órdenes de producción de ATE y LIMA de los próximos 15 días, en otra pestaña y con tu usuario de SAP'; s.setAttribute('aria-label', 'Enviar a Status RMD');
       const IP = sap.ui.core.IconPool, info = IP && IP.getIconInfo && IP.getIconInfo('sap-icon://paper-plane'), svg = s.querySelector('svg');   // icono de SAP, como los vecinos
       if (info && svg) { const i = document.createElement('i'); i.className = 'rmd-ico-sap'; i.setAttribute('aria-hidden', 'true'); i.style.fontFamily = `'${info.fontFamily}'`; i.textContent = info.content; svg.replaceWith(i); }
       const ico = btnExportar.querySelector('.sapUiIcon'), caja = (btnExportar.closest('.sapMBtn') || btnExportar).getBoundingClientRect();
