@@ -127,6 +127,25 @@ ok('Listado: fecha serial de Excel (46317) -> 2026-10-22', cam[2].fecha === '202
 ok('Listado: lo que dice de un CC (descripción y estatus), de la planta del RMD', J(Pendientes.delListado(cam, '26-379-CC', 'PLANTA LIMA')) === J({ descripcion: '26-379-CC ACTUALIZACION RMD ACO GASEOVET CB 500mg CAP BLANDA B5 CJA X 30', estatus: 'CUMPLIDO', planta: 'Lima', fecha: '2026-10-22' }), J(Pendientes.delListado(cam, '26-379-CC', 'PLANTA LIMA')));
 ok('Listado: un código que no está da null', Pendientes.delListado(cam, '26-999-CC') === null);
 
+// ---- «+ CC» eligiendo del listado (v1.93) ----
+let op = Pendientes.opcionesListado(cam, { planta: 'PLANTA LIMA' });
+ok('Elegir CC: solo la planta del RMD (Lima), los que aplican primero y los recientes arriba', J(op.map((o) => o.codigo)) === '["26-300-CC","25-100-CC","26-379-CC"]', J(op.map((o) => o.codigo)));
+op = Pendientes.opcionesListado(cam, { planta: 'PLANTA ATE' });
+ok('Elegir CC: Ate solo trae los de PLANTA 1 con código', J(op.map((o) => o.codigo)) === '["26-280-CC"]', J(op.map((o) => o.codigo)));
+op = Pendientes.opcionesListado(cam, { planta: 'PLANTA LIMA', texto: '26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor' });
+ok('Elegir CC: el ya anotado en Observaciones va al final y marcado', op[op.length - 1].codigo === '26-300-CC' && op[op.length - 1].anotado, J(op.map((o) => [o.codigo, o.anotado])));
+op = Pendientes.opcionesListado(cam, { planta: 'PLANTA LIMA', q: 'gaseovet' });
+ok('Elegir CC: buscar filtra por descripción (sin tildes ni mayúsculas)', J(op.map((o) => o.codigo)) === '["26-379-CC"]', J(op.map((o) => o.codigo)));
+ok('Elegir CC: sin planta conocida trae las dos', Pendientes.opcionesListado(cam).length === 4);
+const opL = (codigo) => Pendientes.opcionesListado(cam).find((o) => o.codigo === codigo);
+let ln = Pendientes.lineaListado(opL('26-379-CC'), { responsable: 'C.Jesus' });
+ok('Línea del listado: «…;proceso,moderado.» -> 26-379-CC/L.Fernandez/2026-10-22;ACTUALIZACION…;proceso;moderado', ln.texto === '26-379-CC/L.Fernandez/2026-10-22;ACTUALIZACION RMD ACO GASEOVET CB 500mg;proceso;moderado' && ln.sel[0] === ln.sel[1] && Pendientes.faltantesCC(ln.texto).length === 0, J(ln));
+ok('Línea del listado: se lee como CC aplicado', J(Pendientes.analizar(ln.texto).aplicados.map((x) => x.codigo)) === '["26-379-CC"]');
+ln = Pendientes.lineaListado(opL('26-280-CC'), { responsable: 'C.Jesus' });
+ok('Línea del listado: forma de Planta 1 «26-280/D.Ayala /2026-08-17/…/Proceso/Mayor.»', ln.texto === '26-280-CC/D.Ayala/2026-08-17;ACTUALIZACIÓN DE RMDS ENV, ACO GV2;Proceso;Mayor', J(ln));
+ln = Pendientes.lineaListado({ codigo: '26-410-CC', nomenclatura: '', descripcion: '26-410-CC Cambio de proveedor de envase', fecha: '2026-10-20' }, { responsable: 'C.Jesus' });
+ok('Línea del listado: sin nomenclatura usa la descripción y la fecha del listado, y deja el responsable seleccionado', ln.texto === '26-410-CC/C.Jesus/2026-10-20;Cambio de proveedor de envase;proceso;moderado' && ln.texto.slice(...ln.sel) === 'C.Jesus', J(ln));
+
 // ---- tarjeta de Observaciones: frente a la versión anterior y revisión (no sugiere CC) ----
 const hoy = new Date(2026, 9, 22);
 const ant = { version: 8, codigo: 'B8', estado: 'Autorizado', observacion: '20260901CJ-1-C1.0-FI1.0-FA1.0-F1\n26-300-CC/X.Y/2026-09-01;Cambio de estuche;material;menor\n20260901CJ Pendiente aplicar 26-379-CC\n20260901CJ Nota que se quitará' };
