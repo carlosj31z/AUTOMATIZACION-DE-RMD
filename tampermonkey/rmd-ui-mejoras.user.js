@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.96.0
+// @version      1.98.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.96.0';                                                       // mantener igual a @version
+  const VERSION = '1.98.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -87,7 +87,7 @@
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
-    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). Necesita el cargador 1.1.0.'],
+    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). «Por código» carga o reemplaza masters en específico aunque ya esté la misma versión. Necesita el cargador 1.1.0.'],
     ['compararrmd', 'Comparar dos RMD', 'En el menú Exportar: busca dos RMD cualesquiera y muestra sus master lado a lado, como Draftable: lo quitado en rojo, lo agregado en verde, lo modificado con sus palabras resaltadas, y la lista de cambios para ir de uno a otro.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
@@ -246,6 +246,8 @@
   .rmd-cont-seg label:has(input:focus-visible) { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
   .rmd-cont-otra { height: 32px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 13px var(--rmd-fuente); color-scheme: light dark; }
   .rmd-cont-fecha:has(input:disabled) { opacity: .6; } .rmd-cont-fecha:not(:has(input[value=otra]:checked)) .rmd-cont-otra { display: none; }
+  .rmd-cont-codigos { width: 320px; max-width: 100%; min-height: 32px; max-height: 96px; padding: 6px 8px; box-sizing: border-box; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 13px var(--rmd-fuente); resize: none; vertical-align: middle; }
+  .rmd-cont-fecha:not(:has(input[value=codigos]:checked)) :is(.rmd-cont-codigos, .rmd-cont-buscar) { display: none; }
   .rmd-cont-grupo { display: inline-flex; align-items: center; gap: 10px; } .rmd-cont-fecha { column-gap: 22px !important; }
   .rmd-cont-base { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 7px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); font-size: 12.5px; }
   .rmd-cont-base > span { flex: 1 1 auto; min-width: 0; } .rmd-cont-camino { color: var(--rmd-apagado); } .rmd-cont-base b { white-space: nowrap; } .rmd-cont-base svg, .rmd-cont-ruta svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: var(--rmd-ambar); stroke-width: 1.4; stroke-linejoin: round; }
@@ -7158,8 +7160,9 @@
     const plantaDeCarpeta = (ruta) => { const m = /^\s*(\d+)\s*\.?-?\s*PLANTA\s*(\d+)/.exec(sinTildes(String(ruta).split('/')[0])); return m ? PLANTAS.find((p) => p.id === m[2]) || null : null; };
     const esDePlanta = (r, planta) => sinTildes(r.planta) === planta.sap;
     // autorizados: RMD Autorizados en la fecha; previos: versiones NO vigentes del mismo material y etapa; rutas: PDF de 3.-CONTINGENCIA;
-    // planta (opcional): solo los autorizados de esa planta y solo las carpetas de esa planta
-    function planificar(autorizados, previos, rutas, planta) {
+    // planta (opcional): solo los autorizados de esa planta y solo las carpetas de esa planta; forzar: si su PDF ya está, se vuelve a
+    // subir igual (aunque sea la misma versión) y el que estaba pasa antes a OBSOLETO (reemplazar)
+    function planificar(autorizados, previos, rutas, planta, forzar = false) {
       const pdfs = rutas.map(interpretar).filter((p) => p && (!planta || plantaDeCarpeta(p.ruta) === planta));
       return autorizados.filter((r) => !planta || esDePlanta(r, planta)).map((r) => {
         const codPrev = new Set(previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)).map((o) => o.codigo));
@@ -7169,7 +7172,8 @@
         // versión anterior: la más alta de la familia con PDF en la carpeta (si ninguna tiene, la más alta en SAP)
         const fami = previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)), conPdf = fami.filter((o) => codPrev.has(o.codigo) && fam.some((p) => p.codigo === o.codigo));
         const anterior = (conPdf.length ? conPdf : fami).slice().sort((a, b) => (+b.version || 0) - (+a.version || 0))[0] || null;
-        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), anterior, nota: '' };
+        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), reemplazar: [], anterior, nota: '' };
+        if (forzar && yaEsta.length) { paso.subir = carpetas.slice(); paso.reemplazar = propios.map((p) => p.ruta).sort(); }
         if (!carpetas.length) paso.nota = 'Sin versiones anteriores en 3.-CONTINGENCIA: ubícalo a mano.';
         else if (!paso.subir.length && !paso.aObsoleto.length) paso.nota = 'Ya está en la carpeta.';
         return paso;
@@ -7179,7 +7183,9 @@
     const fechaIsoLocal = (d) => `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
     // fecha de autorización del portal: con hora, el día local; a medianoche UTC, una fecha sin hora
     const diaDe = (x) => (!(x instanceof Date) || isNaN(x) ? '' : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? x.toISOString().slice(0, 10) : fechaIsoLocal(x));
-    return { interpretar, esObsoleto, nombreArchivo, planificar, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta };
+    // códigos pegados (de Excel, separados por espacios, comas o saltos de línea), sin repetir
+    const codigosDe = (t) => [...new Set(String(t || '').match(/\d{4,12}/g) || [])];
+    return { interpretar, esObsoleto, nombreArchivo, planificar, codigosDe, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta };
   })();
   // ==CONTINGENCIA-FIN==
   window.__rmdStats.contingencia = { Contingencia, leer: (f) => contLeer(controladorPrincipal().getView().getModel('mainModelv2'), f), pdf: (id) => contPdf(controladorPrincipal().getView().getModel('mainModelv2'), id), buscar: (c) => spBuscar(c) };   // pruebas
@@ -7246,12 +7252,28 @@
     const ini = new Date(Date.UTC(a, m - 1, d - 1)), fin = new Date(Date.UTC(a, m - 1, d + 2));   // ±1 día por la zona horaria; luego se filtra por el día local
     const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd,sucursalId,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila);
     const autorizados = filas.filter((r) => /^AUTORIZADO$/i.test(r.estado) && r.fecha === fecha && /^\d+$/.test(r.codigo));
-    const materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
+    return { autorizados, previos: await contPrevios(modelo, autorizados) };
+  }
+  async function contPrevios(modelo, autorizados) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
     for (let i = 0; i < materiales.length; i += 15) {
       const f = new F({ filters: materiales.slice(i, i + 15).map((x) => new F('codDefectoReceta', 'EQ', x)), and: false });
       previos.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd,sucursalId', $select: CONT_SELECT })).map(contFila).filter((r) => !/^AUTORIZADO$/i.test(r.estado) && /^\d+$/.test(r.codigo)));
     }
-    return { autorizados, previos };
+    return previos;
+  }
+  // RMD Autorizados de los códigos de master pegados (cualquier fecha de autorización); faltan: códigos sin versión Autorizada en SAP
+  async function contLeerCodigos(modelo, codigos) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, filas = [];
+    for (let i = 0; i < codigos.length; i += 25) {
+      const f = new F({ filters: codigos.slice(i, i + 25).map((c) => new F('codigo', 'EQ', c)), and: false });
+      filas.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd,sucursalId,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila));
+    }
+    const porCodigo = new Map();
+    filas.filter((r) => /^AUTORIZADO$/i.test(r.estado)).forEach((r) => { const y = porCodigo.get(r.codigo); if (!y || (+r.version || 0) > (+y.version || 0)) porCodigo.set(r.codigo, r); });
+    const autorizados = codigos.filter((c) => porCodigo.has(c)).map((c) => porCodigo.get(c));
+    const faltan = codigos.filter((c) => !porCodigo.has(c)).map((c) => { const x = filas.filter((r) => r.codigo === c).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0]; return { codigo: c, estado: x ? x.estado : '' }; });
+    return { autorizados, previos: await contPrevios(modelo, autorizados), faltan };
   }
 
   // PDF del RMD con las lecturas y el armado del portal sobre una vista aparte (no toca la lista ni graba nada); devuelve { receta, bytes }
@@ -7314,26 +7336,35 @@
     v.cuerpo.innerHTML = `<div class="rmd-cont-fecha"><div class="rmd-cont-grupo" role="radiogroup" aria-label="Planta"><span class="rmd-cont-rot">Planta</span>
         <div class="rmd-cont-seg">${Contingencia.PLANTAS.map((x) => `<label><input type="radio" name="rmd-cont-planta" value="${x.id}" ${x.id === idPlanta ? 'checked' : ''}>${x.txt} <small>${x.lugar}</small></label>`).join('')}</div></div>
       <div class="rmd-cont-grupo" role="radiogroup" aria-label="Fecha de autorización"><span class="rmd-cont-rot">Autorizados el</span>
-        <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
-        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha"></div></div>
+        <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label><label title="Para cargar o reemplazar el PDF de masters en específico, aunque ya esté la misma versión"><input type="radio" name="rmd-cont-dia" value="codigos">Por código</label></div>
+        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha">
+        <textarea class="rmd-cont-codigos" rows="1" spellcheck="false" aria-label="Códigos de master" placeholder="Pega los códigos de master (de Excel, o separados por espacios o comas)"></textarea><button type="button" class="rmd-btn rmd-cont-buscar">Buscar</button></div></div>
       <div class="rmd-cont-base"></div><div class="rmd-cont-res" aria-live="polite"></div><div class="rmd-cont-plan"></div>
 `;
     const pieEstado = document.createElement('div'); pieEstado.className = 'rmd-cont-pie-estado'; pieEstado.setAttribute('aria-live', 'polite');
-    const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
-    const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input')];
+    const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra'), cajaCod = v.cuerpo.querySelector('.rmd-cont-codigos');
+    const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input, .rmd-cont-fecha textarea, .rmd-cont-buscar')];
     otra.value = Contingencia.fechaIsoLocal(ayer); otra.max = Contingencia.fechaIsoLocal(hoy);
     const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(hoy) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
+    // «Por código»: los masters pegados se cargan aunque su PDF ya esté (el que estaba pasa a OBSOLETO)
+    const porCodigo = () => (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value === 'codigos';
+    v.cuerpo.querySelector('.rmd-cont-buscar').addEventListener('click', () => revisar());
+    cajaCod.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); revisar(); } });
+    cajaCod.addEventListener('input', () => { cajaCod.style.height = ''; cajaCod.style.height = Math.min(cajaCod.scrollHeight, 96) + 'px'; });
     const bActualizar = botonModal('Actualizar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar(null)), bCerrar = botonModal('Cerrar', '', salir);
     bCargar.disabled = true; v.pie.append(pieEstado, bCerrar, bActualizar, bCargar);
     // cambiar la fecha revisa sola; el campo de fecha solo se ve con «Otra fecha»
     v.cuerpo.querySelector('.rmd-cont-fecha').addEventListener('change', (e) => {
+      if (e.target === cajaCod) return;   // los códigos se buscan con «Buscar» o Enter
+      if (e.target.value === 'codigos') { cajaCod.focus(); if (!Contingencia.codigosDe(cajaCod.value).length) { clearTimeout(espera); turno++; plan = null; res.innerHTML = ''; pieEstado.innerHTML = ''; bCargar.disabled = true; mensaje('Pega los códigos de master y pulsa «Buscar». Se cargan aunque su PDF ya esté en la carpeta: el que estaba pasa a OBSOLETO.'); return; } }
       if (e.target.name === 'rmd-cont-planta') pintarBase();
       if (e.target.name === 'rmd-cont-planta') try { localStorage.setItem('rmdUiContPlanta', e.target.value); } catch (er) { /* sin almacenamiento */ }
       clearTimeout(espera); espera = setTimeout(revisar, 350);
     });
     const tipo = (p) => (!p.carpetas.length ? 'mano' : p.subir.length || p.aObsoleto.length ? 'subir' : 'ya');
     const TIPOS = { subir: 'Por cargar', ya: 'Ya cargado', mano: 'Ubicar a mano' };
-    const estadoDe = (p) => p.estado || { txt: TIPOS[tipo(p)], cls: tipo(p) };
+    const estadoDe = (p) => p.estado || { txt: p.reemplazar.length ? 'Por reemplazar' : TIPOS[tipo(p)], cls: tipo(p) };
+    const deCuando = () => (plan.fecha ? `autorizados el ${fmt(plan.fecha)}` : 'de los códigos pegados');
     const titulo = (t) => String(t || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
     const spUrl = (rel) => 'https://medifarmape.sharepoint.com' + (CONT_RAIZ + (rel ? '/' + rel : '')).split('/').map(encodeURIComponent).join('/');
     const enlace = (rel, html, tit) => `<a class="rmd-cont-a" href="${esc(spUrl(rel))}" target="_blank" rel="noopener" title="${esc(tit || 'Abrir en SharePoint')}">${html}</a>`;
@@ -7361,15 +7392,15 @@
       if (!tr) return; const e = estadoDe(p);
       tr.className = e.cls; tr.hidden = filtro !== 'todos' && e.cls !== filtro && !(filtro === 'subir' && e.cls === 'curso');
       tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`
-        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="Cargar solo este master a SharePoint" ${ocupadoC ? 'disabled' : ''}>Cargar este</button>` : '');
+        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="${p.reemplazar.length ? 'Volver a subir este master: el PDF que ya está pasa a OBSOLETO' : 'Cargar solo este master a SharePoint'}" ${ocupadoC ? 'disabled' : ''}>${p.reemplazar.length ? 'Reemplazar este' : 'Cargar este'}</button>` : '');
     };
     // tarjetas: cuántos hay de cada tipo (y filtran la tabla); el avance de la carga va al pie
     const resumen = (progreso) => {
       const n = { subir: 0, ya: 0, mano: 0, ok: 0, error: 0 }; plan.forEach((p) => { const c = estadoDe(p).cls; n[c === 'curso' ? 'subir' : c]++; });
-      const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length), 0);
+      const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length + p.reemplazar.length), 0);
       const tarjeta = (k, txt, c, ayuda) => `<button type="button" class="rmd-cont-kpi ${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'} title="${esc(ayuda)}"><b>${c}</b><span>${txt}</span></button>`;
       res.innerHTML = `<div class="rmd-cont-kpis">${tarjeta('todos', `RMD de ${esc(plan.planta.txt)}`, plan.length, 'Ver todos')}${tarjeta('subir', 'Por cargar', n.subir, 'Se suben con «Cargar a SharePoint»')}${tarjeta('ya', 'Ya cargados', n.ya, 'Su PDF ya está en la carpeta')}${tarjeta('mano', 'Ubicar a mano', n.mano, 'Sin carpeta de versión anterior: súbelos a mano')}${n.ok ? tarjeta('ok', 'Cargados ahora', n.ok, 'Cargados en esta sesión') : ''}${n.error ? tarjeta('error', 'Con error', n.error, 'Revisa el motivo en la fila y pulsa «Actualizar»') : ''}</div>
-        <div class="rmd-cont-datos"><span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
+        <div class="rmd-cont-datos">${plan.fecha ? `<span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>` : `<span>Por código: <b>${plan.codigos.length}</b> pegado${plan.codigos.length > 1 ? 's' : ''}</span>`}${plan.faltan && plan.faltan.length ? `<span class="rmd-cont-nota" title="${esc(plan.faltan.map((f) => f.codigo + (f.estado ? ' (' + titulo(f.estado) + ')' : ' (no está en SAP)')).join(', '))}">${plan.faltan.length} sin versión Autorizada: ${esc(plan.faltan.slice(0, 4).map((f) => f.codigo).join(', '))}${plan.faltan.length > 4 ? '…' : ''}</span>` : ''}${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
       pieEstado.innerHTML = progreso ? `${giro}<span>${esc(progreso.txt)}</span><span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span>` : '';
       const nSubir = n.subir; bCargar.textContent = nSubir > 1 ? `Cargar los ${nSubir} a SharePoint` : nSubir ? 'Cargar 1 a SharePoint' : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
@@ -7378,15 +7409,16 @@
       filtro = b.dataset.f === filtro ? 'todos' : b.dataset.f; resumen(); plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`)));
     });
     const pintar = () => {
-      if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD de ${esc(plan.planta.txt)} (${esc(plan.planta.lugar)}) autorizados el ${esc(fmt(plan.fecha))}.${plan.otras ? ` Hay ${plan.otras} de ${esc(plan.otraPlanta)}: los carga esa planta.` : ''}${plan.sinPlanta ? ` ${plan.sinPlanta} no tienen planta en SAP.` : ''}`); bCargar.disabled = true; return; }
+      if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD de ${esc(plan.planta.txt)} (${esc(plan.planta.lugar)}) ${esc(deCuando())}.${plan.faltan && plan.faltan.length ? ` Sin versión Autorizada en SAP: ${esc(plan.faltan.map((f) => f.codigo + (f.estado ? ' (' + titulo(f.estado) + ')' : '')).join(', '))}.` : ''}${plan.otras ? ` Hay ${plan.otras} de ${esc(plan.otraPlanta)}: los carga esa planta.` : ''}${plan.sinPlanta ? ` ${plan.sinPlanta} no tienen planta en SAP.` : ''}`); bCargar.disabled = true; return; }
       const filas = plan.map((p, i) => {
         const r = p.rmd, a = p.anterior;
-        const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
+        const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha || ''))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
         const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('')
           : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}</span>`;
-        const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : ''}`;
+        const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : p.reemplazar.length ? '<span class="rmd-cont-sub">Reemplaza al que ya está</span>' : ''}`;
         // versión anterior y, debajo, su PDF que pasa a OBSOLETO (una sola columna)
-        const obs = p.aObsoleto.length ? `<div class="rmd-cont-obsoleto"><span class="rmd-cont-rot2">Pasa a OBSOLETO</span>${p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}</div>`
+        const aObs = p.reemplazar.concat(p.aObsoleto);
+        const obs = aObs.length ? `<div class="rmd-cont-obsoleto"><span class="rmd-cont-rot2">Pasa a OBSOLETO</span>${aObs.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}</div>`
           : a && p.carpetas.length ? '<span class="rmd-cont-sub">Su PDF ya está en OBSOLETO</span>' : '';
         const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>${obs}${obsRmd(a.observacion)}` : `<span class="rmd-cont-vacio">Sin versión anterior</span>${obs}`;
         return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${obsRmd(r.observacion)}</td><td>${arch}</td><td>${ant}</td><td>${dest}</td><td></td></tr>`;
@@ -7400,16 +7432,18 @@
     caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-uno'); const tr = b && b.closest('tr[data-i]'); if (tr && plan) cargar(plan[+tr.dataset.i]); });
     async function revisar() {
       clearTimeout(espera);
-      const fecha = fechaElegida(), planta = plantaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
+      const cod = porCodigo(), codigos = cod ? Contingencia.codigosDe(cajaCod.value) : [], fecha = cod ? null : fechaElegida(), planta = plantaElegida();
+      if (cod && !codigos.length) { mensaje('Pega los códigos de master y pulsa «Buscar».'); cajaCod.focus(); return; }
+      if (!cod && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
       if (ocupadoC) return; const t = ++turno; plan = null; filtro = 'todos'; res.innerHTML = ''; bloquear(true);
-      mensaje(`${giro}Leyendo en SAP los RMD de ${esc(planta.txt)} autorizados el ${esc(fmt(fecha))}…`);
+      mensaje(cod ? `${giro}Leyendo en SAP ${codigos.length} código${codigos.length > 1 ? 's' : ''} de master…` : `${giro}Leyendo en SAP los RMD de ${esc(planta.txt)} autorizados el ${esc(fmt(fecha))}…`);
       try {
-        const { autorizados, previos } = await contLeer(modelo, fecha); if (cerrado || t !== turno) return;
+        const { autorizados, previos, faltan } = await (cod ? contLeerCodigos(modelo, codigos) : contLeer(modelo, fecha)); if (cerrado || t !== turno) return;
         const propios = autorizados.filter((r) => Contingencia.esDePlanta(r, planta)), mats = new Set(propios.map((r) => r.material));
         mensaje(`${giro}Buscando en ${esc(planta.carpeta)} las versiones anteriores de ${propios.length} RMD…`);
         const codigos = [...new Set(propios.map((r) => r.codigo).concat(previos.filter((r) => mats.has(r.material)).map((r) => r.codigo)))];
         const rutas = propios.length ? await spBuscar(codigos) : []; if (cerrado || t !== turno) return;
-        plan = Contingencia.planificar(propios, previos, rutas, planta); plan.fecha = fecha; plan.planta = planta;
+        plan = Contingencia.planificar(propios, previos, rutas, planta, cod); plan.fecha = fecha; plan.codigos = codigos; plan.faltan = faltan || []; plan.planta = planta;
         plan.otras = autorizados.filter((r) => r.planta && !Contingencia.esDePlanta(r, planta)).length; plan.sinPlanta = autorizados.filter((r) => !r.planta).length; plan.otraPlanta = Contingencia.PLANTAS.filter((x) => x !== planta).map((x) => x.txt).join(' o ') || 'otra planta'; plan.hora = new Date().toTimeString().slice(0, 5); bloquear(false); pintar();
       } catch (e) { bloquear(false); mensaje(`No se pudo revisar: ${esc(e.message)}`, 'error'); }
       finally { if (t === turno && ocupadoC) bloquear(false); }
@@ -7418,8 +7452,8 @@
     async function cargar(uno) {
       if (!plan || ocupadoC) return;
       const lote = (uno ? [uno] : plan).filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return;
-      const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length, 0);
-      const obsTxt = nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : '';
+      const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length + p.reemplazar.length, 0), nRe = lote.filter((p) => p.reemplazar.length).length;
+      const obsTxt = (nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : '') + (nRe ? ` (${nRe === 1 && uno ? 'ya estaba en la carpeta: se reemplaza' : `${nRe} ya estaba${nRe > 1 ? 'n' : ''} en la carpeta: se reemplaza${nRe > 1 ? 'n' : ''}`})` : '');
       preguntando = true;
       const si = uno
         ? await confirmar(`¿Cargar ${uno.rmd.codigo} v${uno.rmd.version}?`, `${nPdf ? `Se subirá su PDF a ${uno.subir.join(', ')}` : 'No se sube PDF'}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' })
@@ -7436,6 +7470,8 @@
           if (p.subir.length) {
             marcar('Generando PDF', 'curso');
             const pdf = await contPdf(modelo, p.rmd.mdId), nombre = Contingencia.nombreArchivo(p.rmd, pdf.receta);
+            // reemplazar: el PDF que ya estaba pasa primero a OBSOLETO (puede tener el mismo nombre que el nuevo)
+            for (const x of p.reemplazar) { marcar('A OBSOLETO', 'curso'); await spArchivar(x); }
             for (const c of p.subir) { marcar('Subiendo', 'curso'); await spSubir(c, nombre, pdf.bytes); }
           }
           for (const x of p.aObsoleto) { marcar('A OBSOLETO', 'curso'); await spArchivar(x); }
@@ -7444,7 +7480,7 @@
       }
       bloquear(false); bCerrar.disabled = false; resumen();
       toast(uno ? (fallos ? `${uno.rmd.codigo}: no se pudo cargar.` : `${uno.rmd.codigo} cargado en SharePoint.`)
-        : `Contingencia de ${plan.planta.txt} del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
+        : `Contingencia de ${plan.planta.txt} ${plan.fecha ? `del ${fmt(plan.fecha)}` : 'por código'}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
     }
     revisar();
   }
@@ -8654,7 +8690,7 @@
   };
   // Modifica un master con el Guardar del portal -> { obs, mensajes }; lanza error si falla.
   // previo(d): se ejecuta con «Asociar fórmulas» abierto, antes del Guardar; reemplazar: Observaciones completas en lugar de agregar una línea
-  async function modificarUno(ctrl, codigo, { suspender, linea, reemplazar, previo }) {
+  async function modificarUno(ctrl, codigo, { suspender, linea, reemplazar, previo, sinLinea }) {
     const d = await abrirAsociarFormulas(ctrl, codigo), vista = ctrl.getView();
     let asoc = vista.getModel('asociarDatos');
     const previos = new Set(dialogos());
@@ -8673,9 +8709,10 @@
         combo.setSelectedKey(sus.getKey()); combo.fireSelectionChange({ selectedItem: sus }); combo.fireChange({ value: sus.getText(), newValue: sus.getText(), itemPressed: true });
         asoc.setProperty('/estadoIdRmd_iMaestraIdBK', isNaN(+sus.getKey()) ? sus.getKey() : +sus.getKey());
         if (ctrl.localModel) ctrl.localModel.setProperty('/flagEstadoFormula', true);
-      } else if (!linea && reemplazar == null) throw new Error('falta el texto de la observación');
+      } else if (!linea && reemplazar == null && !sinLinea) throw new Error('falta el texto de la observación');
       const antes = String(a.observacionBK != null ? a.observacionBK : a.observacion || '').replace(/\s+$/, '');
       const obs = reemplazar != null ? reemplazar : linea ? (antes ? antes + '\n' : '') + linea : antes;
+      if (sinLinea && !suspender && !linea && reemplazar == null) return { obs, mensajes: [] };   // sin nota: no hace falta el Guardar
       asoc.setProperty('/observacionBK', obs);
       // mismo manejador del botón Guardar (espera guardado, trazabilidad y DMS)
       const bGuardar = ctls.find((c) => c.getMetadata().getName() === 'sap.m.Button' && c.getText && c.getText() === 'Guardar' && c.getDomRef() && visible(c.getDomRef()));
@@ -8707,10 +8744,12 @@
   // ---- Cambio de material en la receta ----
   // Última versión (Ingresada o Autorizada) de cada master cuya copia de la receta tiene el material anterior; solo aplica si en SAP
   // TODAS esas recetas ya tienen el nuevo y ya no el anterior. Autorizado: versión nueva; Ingresado: se reasocia en esa misma versión.
+  // Solo cuenta la lista cuya única diferencia con la copia del RMD es ese reemplazo (v1.97): otro material agregado o quitado,
+  // otra cantidad o unidad la deja fuera (no se lista, salvo que se pida verlos).
   const COMPLEJIDADES = ['C0.5', 'C1.0', 'C1.5', 'C2.0', 'C2.5', 'C3.0'];
   const faseNomenclatura = (obs) => { const t = String(obs || '').split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)(F\d{1,2}(?:-?R)?)$/i.exec(t); return m ? m[1].toUpperCase() : ''; };
   const nomenclaturaMaterial = (fecha, ini, prioridad, complejidad, fase) => `${fecha}${ini}-${prioridad}-${complejidad}-FI1.0-FA1.0-${fase}`;
-  async function detectarCambioMaterial(modelo, erp, { anterior, nuevo, codigos, basta }, avance = () => {}) {
+  async function detectarCambioMaterial(modelo, erp, { anterior, nuevo, codigos, basta, misma }, avance = () => {}) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
     avance('Leyendo los RMD Ingresados y Autorizados…');
     let cand = await rsCandidatos(modelo);
@@ -8732,11 +8771,16 @@
         try {
           const bom = await leerErp(erp, 'MaterialSet', [new F('Matnr', 'EQ', matnr), new F('Werks', 'EQ', werks), new F('Stlal', 'EQ', stlal)]);
           const n = bom.find((x) => norm(x.Component) === nuevo); if (n && !material) material = norm(n.Maktx);
-          listas.set(k, { nuevo: !!n, anterior: bom.some((x) => norm(x.Component) === anterior), cambio: n ? norm(n.ChangeNo) : '', desde: n ? norm(n.ValidFrom) : '' });
+          listas.set(k, { nuevo: !!n, anterior: bom.some((x) => norm(x.Component) === anterior), cambio: n ? norm(n.ChangeNo) : '', desde: n ? norm(n.ValidFrom) : '', bom });
         } catch (e) { listas.set(k, { error: e.message }); }
         if (++hechas % 10 === 0 || hechas === claves.length) avance(`Revisando en SAP las listas de materiales… ${hechas} de ${claves.length}`);
       }
     }));
+    // copia de la lista en el RMD, para ver que lo único distinto en SAP sea el reemplazo
+    const copias = new Map(), conNuevo = recs.filter((r) => { const s = listas.get(rsClave3(r.recetaId)); return s && s.nuevo && !s.anterior; }).map((r) => r.mdRecetaId);
+    if (conNuevo.length) (await leerPorIds(modelo, 'MD_ES_RE_INSUMO', 'mdRecetaId_mdRecetaId', conNuevo, { $select: 'estructuraRecetaInsumoId,mdRecetaId_mdRecetaId,Component,CompQty,CompUnit,Maktx,activo' }, null,
+      (h, n) => avance(`Comparando las listas copiadas en los RMD con SAP (${h} de ${n})…`))).forEach((x) => { if (x.activo === false) return; const a = copias.get(x.mdRecetaId_mdRecetaId) || []; a.push(x); copias.set(x.mdRecetaId_mdRecetaId, a); });
+    const soloReemplazo = (d) => (d.tipo === 'quitado' && d.comp === anterior) || (d.tipo === 'nuevo' && d.comp === nuevo) || (d.tipo === 'reemplazo' && d.compAntes === anterior && d.comp === nuevo);
     // procesos menores que usan el material anterior como insumo de la receta (al reasociar, el portal los enlaza por código de componente)
     const idsIns = filas.filter((x) => recs.some((r) => r.mdRecetaId === x.mdRecetaId_mdRecetaId)).map((x) => x.estructuraRecetaInsumoId), pmPorMd = new Map();
     if (idsIns.length) (await leerPorIds(modelo, 'MD_ES_PASO_INSUMO_PASO', 'estructuraRecetaInsumoId_estructuraRecetaInsumoId', idsIns, { $select: 'mdEstructuraPasoInsumoPasoId,mdId_mdId,activo' }).catch(() => []))
@@ -8746,28 +8790,35 @@
     const out = mdIds.map((id) => {
       const md = porMd.get(id), rs = recs.filter((r) => r.mdId_mdId === id).map((r) => {
         const s = listas.get(rsClave3(r.recetaId)) || {};
-        return { mdRecetaId: r.mdRecetaId, matnr: norm(r.recetaId.Matnr), verid: norm(r.recetaId.Verid), texto: norm(r.recetaId.Text1 || ''), sap: s.error ? 'error' : s.nuevo && !s.anterior ? 'nuevo' : s.nuevo ? 'ambos' : s.anterior ? 'anterior' : 'ninguno', cambio: s.cambio || '', desde: s.desde || '' };
+        let sap = s.error ? 'error' : s.nuevo && !s.anterior ? 'nuevo' : s.nuevo ? 'ambos' : s.anterior ? 'anterior' : 'ninguno', otros = [];
+        if (sap === 'nuevo') { otros = diferenciasBom(s.bom, copias.get(r.mdRecetaId) || []).filter((d) => !soloReemplazo(d)).map((d) => d.texto); if (otros.length) sap = 'otros'; }
+        return { mdRecetaId: r.mdRecetaId, matnr: norm(r.recetaId.Matnr), verid: norm(r.recetaId.Verid), texto: norm(r.recetaId.Text1 || ''), sap, otros, cambio: s.cambio || '', desde: s.desde || '' };
       });
-      const version = md.estado === 'Autorizado';
       return reglaCambioMaterial({ md, mdId: id, codigo: md.codigo, version: md.version, estado: md.estado, descripcion: md.descripcion, etapa: md.etapa, planta: md.planta, linaje: md.linaje,
-        recetas: rs, fase: faseNomenclatura(obs.get(id)), observacion: obs.get(id) || '', pm: pmPorMd.get(id) || 0, accion: version ? 'version' : 'reasociar' }, basta);
+        recetas: rs, fase: faseNomenclatura(obs.get(id)), observacion: obs.get(id) || '', pm: pmPorMd.get(id) || 0 }, basta, misma);
     }).sort((a, b) => (+b.aplica - +a.aplica) || nat(a.codigo, b.codigo));
     return { filas: out, material, buscados: cand.length };
   }
   // basta: con una receta ya cambiada en SAP es suficiente (se reasocian solo las cambiadas); si no, deben estar cambiadas todas
-  function reglaCambioMaterial(x, basta) {
-    const rs = x.recetas, listas = rs.filter((r) => r.sap === 'nuevo'), faltan = rs.length - listas.length;
+  // misma: los Autorizados también se sacan y meten en su misma versión (sin «Nueva Versión»)
+  function reglaCambioMaterial(x, basta, misma) {
+    x.accion = x.estado === 'Autorizado' && !misma ? 'version' : 'reasociar';
+    const rs = x.recetas, listas = rs.filter((r) => r.sap === 'nuevo'), faltan = rs.length - listas.length, noSolo = !!rs.length && (basta ? !listas.length : faltan > 0);
+    const otros = rs.filter((r) => r.sap === 'otros');
     const motivoNo = !rs.length ? 'La receta con el material ya no está activa'
-      : (basta ? !listas.length : faltan) ? `En SAP ${rs.length === 1 ? 'la lista' : `${basta ? rs.length : faltan} de ${rs.length} listas`} ${rs.some((r) => r.sap === 'error') ? 'no se pudo leer' : rs.some((r) => r.sap === 'ambos') ? 'tiene los dos materiales' : 'todavía tiene el material anterior'}`
+      : noSolo ? `En SAP ${rs.length === 1 ? 'la lista' : `${basta ? rs.length : faltan} de ${rs.length} listas`} ${rs.some((r) => r.sap === 'error') ? 'no se pudo leer' : otros.length ? 'tiene otros cambios además del reemplazo' : rs.some((r) => r.sap === 'ambos') ? 'tiene los dos materiales' : 'todavía tiene el material anterior'}`
       : x.accion === 'version' && !x.fase ? 'La 1.ª línea de Observaciones no tiene la fase (F1, F2…)' : '';
-    return Object.assign(x, { aplica: !motivoNo, motivoNo, reasociar: listas, pendientes: faltan });
+    // oculto: la lista de SAP no es solo el reemplazo (no se lista salvo que se pida)
+    return Object.assign(x, { aplica: !motivoNo, motivoNo, oculto: noSolo, reasociar: listas, pendientes: faltan });
   }
   // Con «Asociar fórmulas» abierto: quita cada receta (Eliminar Receta) y la vuelve a asociar con la función de «Agregar Producto» del portal,
-  // que copia la lista actual de SAP. No pasa por la lista filtrada (oculta las recetas que usa una versión Autorizada). Solo en Ingresados.
-  async function reasociarRecetas(ctrl, recetas, avance = () => {}) {
+  // que copia la lista actual de SAP. No pasa por la lista filtrada (oculta las recetas que usa una versión Autorizada).
+  // conAutorizado: también en un Autorizado (misma versión), con el DMS como lo hace el portal: Eliminar Receta anula el documento
+  // (onDeleteAsocReceta) y Agregar lo vuelve a enviar con ACTUALIZAR (onConfirmAgregarRecetas → onTratarInformacionDMS).
+  async function reasociarRecetas(ctrl, recetas, avance = () => {}, { conAutorizado } = {}) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JSONModel = sap.ui.require('sap/ui/model/json/JSONModel') || sap.ui.model.json.JSONModel;
-    const vista = ctrl.getView(), a = vista.getModel('asociarDatos').getData();
-    if (+a.estadoIdRmd_iMaestraId !== 467) throw new Error('solo se reasocia la receta en un RMD Ingresado');
+    const vista = ctrl.getView(), a = vista.getModel('asociarDatos').getData(), autorizado = +a.estadoIdRmd_iMaestraId === 465;
+    if (+a.estadoIdRmd_iMaestraId !== 467 && !(conAutorizado && autorizado)) throw new Error(conAutorizado ? 'solo se saca y mete la receta en un RMD Ingresado o Autorizado' : 'solo se reasocia la receta en un RMD Ingresado');
     for (const rc of recetas) {
       const fila = (vista.getModel('listMdReceta').getData() || []).find((x) => x.activo !== false && x.recetaId && norm(x.recetaId.Matnr) === rc.matnr && norm(x.recetaId.Verid) === rc.verid);
       if (!fila) throw new Error(`la receta ${rc.matnr} / ${rc.verid} no está asociada en ${a.codigo}`);
@@ -8776,6 +8827,8 @@
       if (!pv) throw new Error(`SAP no devolvió la versión de fabricación ${rc.matnr} / ${rc.verid}`);
       avance(`quitando la receta ${rc.matnr} / ${rc.verid}…`);
       await ctrl.onBorrarRecetasAsignada(fila);
+      if (autorizado) { avance(`anulando en el DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.sendDMS(ctrl.generarNombre(fila), '', 'ANULAR'); }
+      let nuevas = [];
       try {
         await ctrl._updateModelRest(); await ctrl.onGetMdRecetaGeneral();
         avance(`volviendo a asociar la receta ${rc.matnr} / ${rc.verid} (lista actual de SAP)…`);
@@ -8783,17 +8836,24 @@
         vista.setModel(new JSONModel([pv]), 'aListReceta');
         const tabla = sap.ui.getCore().byId('frgAsocRecetas--idTblRecetas'); if (!tabla) throw new Error('no se encontró la tabla de «Agregar Producto»');
         tabla._aSelectedPaths = ['/0'];
-        try { await ctrl.onAgregarRecetas(); } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
+        if (ctrl.localModel) ctrl.localModel.setProperty('/aListMdRecetaId', []);
+        try { await ctrl.onAgregarRecetas(); nuevas = (ctrl.localModel && ctrl.localModel.getProperty('/aListMdRecetaId')) || []; } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
       } catch (e) { throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó quitada y no se pudo volver a asociar (${e.message || e}): asóciala a mano`); }
       finally { sap.ui.core.BusyIndicator.hide(); }
       // la lista principal se vuelve a leer solo con este código para que «Asociar fórmulas» tome el RMD actualizado
       await soloCodigoEnLista(ctrl, a.codigo);
       if (!await hasta(() => (vista.getModel('listMD').getData() || []).some((x) => x.mdId === a.mdId), 30000)) throw new Error('la receta quedó asociada, pero el RMD no volvió a aparecer en la lista: guarda las Observaciones a mano');
       await ctrl.actualizarCabeceraAsociarDatos(); await ctrl.onGetMdRecetaGeneral();
+      if (autorizado) {
+        if (ctrl.onGetDataEstructuraMD) await ctrl.onGetDataEstructuraMD();
+        const ids = nuevas.filter((id) => ((vista.getModel('asociarDatos').getData().aReceta || {}).results || []).some((x) => x.mdRecetaId === id));
+        if (!ids.length) throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó asociada, pero no se pudo enviar su documento al DMS: guarda el RMD en el portal o avisa a TI`);
+        for (const id of ids) { avance(`enviando al DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.onTratarInformacionDMS(id, 'ACTUALIZAR'); }
+      }
       sap.ui.core.BusyIndicator.hide(); await esperar(400);
     }
   }
-  window.__rmdStats.detectarCambioMaterial = (anterior, nuevo, codigos) => { const c = controladorPrincipal(); return detectarCambioMaterial(c.getView().getModel('mainModelv2'), c.oModelErpNec, { anterior, nuevo, codigos }, (t) => console.log(t)); };   // pruebas
+  window.__rmdStats.detectarCambioMaterial = (anterior, nuevo, codigos, misma) => { const c = controladorPrincipal(); return detectarCambioMaterial(c.getView().getModel('mainModelv2'), c.oModelErpNec, { anterior, nuevo, codigos, misma }, (t) => console.log(t)); };   // pruebas
   function abrirModificacionesMasivas(modoInicial = 'suspender') {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
     if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para las modificaciones masivas.', true); return; }
@@ -8807,9 +8867,11 @@
       <input type="text" class="rmd-susp-motivo" maxlength="400">
       <div class="rmd-mm-mat" style="display:none">
         <div class="rmd-mm-mat-fila"><label>Material anterior<input class="rmd-mat-ant" inputmode="numeric" placeholder="ej. 1100002760"></label><label>Material nuevo<input class="rmd-mat-nue" inputmode="numeric" placeholder="ej. 1100011265"></label>
+          <label>Autorizados<select class="rmd-mat-modo"><option value="version">Versión nueva</option><option value="misma">Misma versión</option></select></label>
           <label>Prioridad<select class="rmd-mat-pri"><option>1</option><option selected>2</option><option>3</option></select></label><label>Complejidad<select class="rmd-mat-com">${COMPLEJIDADES.map((c) => `<option${c === 'C1.0' ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
         <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-basta"><span>Basta con que <b>una</b> de las recetas asociadas tenga el cambio en SAP (se reasocian solo las que lo tienen; si no se marca, deben tenerlo todas)</span></label>
-        <label class="rmd-mm-mat-txt">Texto debajo de la nomenclatura<input class="rmd-mat-txt" maxlength="400"></label>
+        <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-ver"><span>Mostrar también los master cuya lista en SAP <b>no es solo el reemplazo</b> (otros cambios, aún tiene el anterior o los dos); no se pueden actualizar</span></label>
+        <label class="rmd-mm-mat-txt">Nota para Observaciones<input class="rmd-mat-txt" maxlength="400"></label>
         <p class="rmd-nota rmd-mat-ej"></p>
       </div>
       <p class="rmd-nota rmd-mm-nota"></p>
@@ -8824,14 +8886,18 @@
     ta.addEventListener('input', pintarChips);
     const puede = (est) => MODOS_MASIVOS[modo].estados.includes(est);
     // Cambio de material: campos propios y el ejemplo de Observaciones
-    const q = (c) => v.cuerpo.querySelector(c), mAnt = q('.rmd-mat-ant'), mNue = q('.rmd-mat-nue'), mPri = q('.rmd-mat-pri'), mCom = q('.rmd-mat-com'), mTxt = q('.rmd-mat-txt'), mEj = q('.rmd-mat-ej'), mBasta = q('.rmd-mat-basta');
+    const q = (c) => v.cuerpo.querySelector(c), mAnt = q('.rmd-mat-ant'), mNue = q('.rmd-mat-nue'), mPri = q('.rmd-mat-pri'), mCom = q('.rmd-mat-com'), mTxt = q('.rmd-mat-txt'), mEj = q('.rmd-mat-ej'), mBasta = q('.rmd-mat-basta'), mVer = q('.rmd-mat-ver'), mModo = q('.rmd-mat-modo');
+    const misma = () => mModo.value === 'misma';
     const hoyTxt = (() => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; })(), ini = rsUsuarioIniciales() || 'XX';
     let detectado = null; const elegidos = new Set();                     // códigos marcados en la tabla
     mTxt.value = `${hoyTxt}${ini} Actualización de `;
-    const pintarEjemplo = () => { mEj.innerHTML = `Observaciones de la versión nueva: <b>${esc(nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…'))}</b> (fase de la versión anterior)<br>${esc(norm(mTxt.value) || '(texto)')}`; };
+    const notaMaterial = () => { const t = norm(mTxt.value); return /Actualización de\s*$/.test(t) ? '' : t; };   // sin completar = sin nota
+    const pintarEjemplo = () => { mEj.innerHTML = misma() ? '<b>Ingresados y Autorizados</b> se sacan y meten las recetas en su <b>misma versión</b> (sin versión nueva; el Estado no cambia). La nota se agrega como línea nueva al final de sus Observaciones; vacía, no se tocan.'
+      : `<b>Ingresados</b> (se sacan y meten las recetas en la misma versión): la nota se agrega como línea nueva al final de sus Observaciones; vacía, no se tocan.<br><b>Autorizados</b> (versión nueva): <b>${esc(nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…'))}</b> (fase de la versión anterior)<br>${esc(notaMaterial() || '(nota, obligatoria)')}`; };
     [mPri, mCom, mTxt].forEach((x) => x.addEventListener('input', pintarEjemplo));
-    const resumenMaterial = () => { const n = plan.filter((x) => x.aplica), nv = n.filter((x) => x.accion === 'version').length;
-      setTxt(prog, plan.length ? `${plan.length} master tienen el ${detectado.anterior} en su receta copiada${detectado.material ? `; el nuevo es «${detectado.material}»` : ''}. Listos para actualizar: ${n.length} (${nv} versiones nuevas desde Autorizados y ${n.length - nv} Ingresados a reasociar)${mBasta.checked ? ', con una receta cambiada como mínimo' : ''}. Los demás dicen por qué no.` : '');
+    const resumenMaterial = () => { const n = plan.filter((x) => x.aplica), nv = n.filter((x) => x.accion === 'version').length, oc = plan.filter((x) => x.oculto), ot = oc.filter((x) => x.recetas.some((r) => r.sap === 'otros')).length;
+      const ocTxt = oc.length ? ` ${mVer.checked ? 'Se muestran' : 'No se listan'} ${oc.length} cuya lista en SAP no es solo el reemplazo${ot ? ` (${ot} con otros cambios)` : ''}.` : '';
+      setTxt(prog, plan.length ? `${plan.length} master tienen el ${detectado.anterior} en su receta copiada${detectado.material ? `; el nuevo es «${detectado.material}»` : ''}. Listos para actualizar: ${n.length} (${nv} versiones nuevas desde Autorizados y ${n.length - nv} a sacar y meter en su misma versión)${mBasta.checked ? ', con una receta cambiada como mínimo' : ''}: en SAP solo se quitó el ${detectado.anterior} y se agregó el ${detectado.nuevo}.${ocTxt}${plan.some((x) => !x.aplica && !x.oculto) ? ' Los demás dicen por qué no.' : ''}` : '');
       pintarElegidos(); };
     const marcables = () => plan.filter((x) => x.aplica && !resultados.some((y) => y.codigo === x.codigo));
     const pintarElegidos = () => { [...elegidos].forEach((c) => { if (!marcables().some((x) => x.codigo === c)) elegidos.delete(c); });
@@ -8841,16 +8907,19 @@
       if (e.target.classList.contains('rmd-mat-todos')) { elegidos.clear(); if (e.target.checked) marcables().forEach((x) => elegidos.add(x.codigo)); res.querySelectorAll('.rmd-mat-sel').forEach((c) => { c.checked = elegidos.has(c.dataset.codigo); }); }
       else if (e.target.classList.contains('rmd-mat-sel')) { if (e.target.checked) elegidos.add(e.target.dataset.codigo); else elegidos.delete(e.target.dataset.codigo); }
       pintarElegidos(); });
-    mBasta.addEventListener('change', () => { if (!detectado || trabajando || resultados.length) return; plan.forEach((x) => reglaCambioMaterial(x, mBasta.checked)); plan.sort((a, b) => (+b.aplica - +a.aplica) || String(a.codigo).localeCompare(String(b.codigo), 'es', { numeric: true })); resumenMaterial(); tablaMaterial(); });
-    [mAnt, mNue].forEach((x) => x.addEventListener('input', () => { detectado = null; plan = []; elegidos.clear(); res.innerHTML = ''; bEje.disabled = true; }));
+    mVer.addEventListener('change', () => { if (!detectado) return; resumenMaterial(); tablaMaterial(); });
+    mModo.addEventListener('change', () => { const v2 = misma(); mPri.disabled = v2; mCom.disabled = v2; pintarEjemplo(); q('.rmd-mm-nota').textContent = notaModoMaterial(); mBasta.dispatchEvent(new Event('change')); });
+    mBasta.addEventListener('change', () => { if (!detectado || trabajando || resultados.length) return; plan.forEach((x) => reglaCambioMaterial(x, mBasta.checked, misma())); plan.sort((a, b) => (+b.aplica - +a.aplica) || String(a.codigo).localeCompare(String(b.codigo), 'es', { numeric: true })); resumenMaterial(); tablaMaterial(); });
+    [mAnt, mNue].forEach((x) => x.addEventListener('input', () => { detectado = null; plan = []; elegidos.clear(); res.innerHTML = ''; bEje.disabled = true; bX.disabled = true; }));
+    const notaModoMaterial = () => (misma() ? 'Ingresados y Autorizados: se quita y se vuelve a asociar la receta en su misma versión para traer la lista actual de SAP; el Estado no cambia. En los Autorizados, como al hacerlo a mano, se anula el documento de la receta en el DMS y se vuelve a enviar. Si escribes una nota, se agrega al final de las Observaciones.' : 'Autorizados: se crea una versión nueva con «Nueva Versión» del portal (queda Ingresada), se quita y se vuelve a asociar la receta para traer la lista actual de SAP, y sus Observaciones quedan con la nomenclatura (prioridad y complejidad que elijas, fase de la versión anterior) y tu texto debajo. Ingresados: se sacan y meten las recetas en la misma versión (sin versión nueva) y, si escribes una nota, se agrega al final de sus Observaciones.');
     const pintarModo = () => {
       v.cuerpo.querySelectorAll('.rmd-mm-modo').forEach((b) => { const s = b.dataset.modo === modo; b.classList.toggle('activo', s); b.setAttribute('aria-selected', String(s)); });
       const mat = modo === 'material'; q('.rmd-mm-mat').style.display = mat ? '' : 'none'; mot.style.display = mat ? 'none' : ''; q('.rmd-pegar').style.display = mat ? 'none' : '';   // en material los master se buscan solos
       if (mat) {
-        q('.rmd-mm-ayuda').innerHTML = 'Indica el material que se <b>retiró</b> y el que <b>entró</b> en las recetas de SAP. «Revisar» busca los master (última versión Ingresada o Autorizada) cuya receta copiada aún tiene el anterior y cuya lista de materiales en SAP ya tiene el nuevo y ya no el anterior. <b>Revisar no crea ni cambia nada.</b>';
+        q('.rmd-mm-ayuda').innerHTML = 'Indica el material que se <b>retiró</b> y el que <b>entró</b> en las recetas de SAP. «Revisar» busca los master (última versión Ingresada o Autorizada) cuya receta copiada aún tiene el anterior y cuya lista de materiales en SAP tiene <b>solo ese cambio</b>: se quitó el anterior y se agregó el nuevo, sin otros materiales agregados o quitados ni otras cantidades. <b>Revisar no crea ni cambia nada.</b>';
         q('.rmd-mm-rotulo').innerHTML = '';
-        q('.rmd-mm-nota').textContent = 'Autorizados: se crea una versión nueva con «Nueva Versión» del portal (queda Ingresada), se quita y se vuelve a asociar la receta para traer la lista actual de SAP, y sus Observaciones quedan con la nomenclatura (prioridad y complejidad que elijas, fase de la versión anterior) y tu texto debajo. Ingresados: solo se reasocia la receta y se agrega tu texto al final.';
-        pintarEjemplo(); plan = []; resultados = []; detectado = null; elegidos.clear(); res.innerHTML = ''; setTxt(prog, ''); bEje.disabled = true; setTxt(bEje, MODOS_MASIVOS[modo].verbo); return;
+        q('.rmd-mm-nota').textContent = notaModoMaterial();
+        pintarEjemplo(); plan = []; resultados = []; detectado = null; elegidos.clear(); res.innerHTML = ''; setTxt(prog, ''); bEje.disabled = true; bX.disabled = true; setTxt(bEje, MODOS_MASIVOS[modo].verbo); return;
       }
       const sus = modo === 'suspender'; bEje.title = '';
       v.cuerpo.querySelector('.rmd-mm-ayuda').innerHTML = sus ? 'Pega los códigos de los master <b>Autorizados o Ingresados</b> que quieres suspender (uno por línea o separados por espacios o comas).'
@@ -8870,34 +8939,34 @@
     };
     const tablaMaterial = () => {
       const fila = (x) => { const r = resultados.find((y) => y.codigo === x.codigo);
-        const recs = x.recetas.map((y) => `${esc(y.matnr)} / ${esc(y.verid)}${y.sap === 'nuevo' ? '' : ` <span class="rmd-dif">(${esc({ ambos: 'SAP tiene los dos', anterior: 'SAP aún tiene el anterior', ninguno: 'SAP no tiene ninguno', error: 'SAP no respondió' }[y.sap])})</span>`}${y.cambio ? ` <span class="rmd-nota">cambio ${esc(y.cambio)} del ${esc(y.desde)}</span>` : ''}`).join('<br>');
-        const que = r ? r.resultado : x.aplica ? (x.accion === 'version' ? `Versión ${+x.version + 1} Ingresada · ${x.fase}` : 'Reasociar la receta en esta versión') + (x.pendientes ? ` (se reasocian ${x.reasociar.length} de ${x.recetas.length} recetas; las demás siguen con el material anterior)` : '') : x.motivoNo;
+        const recs = x.recetas.map((y) => `${esc(y.matnr)} / ${esc(y.verid)}${y.sap === 'nuevo' ? '' : ` <span class="rmd-dif">(${esc({ ambos: 'SAP tiene los dos', anterior: 'SAP aún tiene el anterior', ninguno: 'SAP no tiene ninguno', error: 'SAP no respondió', otros: 'SAP tiene además otros cambios' }[y.sap])})</span>${y.otros && y.otros.length ? `<br><span class="rmd-nota">${y.otros.slice(0, 6).map(esc).join('<br>')}${y.otros.length > 6 ? `<br>+${y.otros.length - 6} más` : ''}</span>` : ''}`}${y.cambio ? ` <span class="rmd-nota">cambio ${esc(y.cambio)} del ${esc(y.desde)}</span>` : ''}`).join('<br>');
+        const que = r ? r.resultado : x.aplica ? (x.accion === 'version' ? `Versión ${+x.version + 1} Ingresada · ${x.fase}` : 'Sacar y meter la receta en esta versión') + (x.pendientes ? ` (se reasocian ${x.reasociar.length} de ${x.recetas.length} recetas; las demás siguen con el material anterior)` : '') : x.motivoNo;
         const marca = x.aplica && !r ? `<input type="checkbox" class="rmd-mat-sel" data-codigo="${esc(x.codigo)}"${elegidos.has(x.codigo) ? ' checked' : ''}${trabajando ? ' disabled' : ''} aria-label="Actualizar ${esc(x.codigo)}">` : '';
         return `<tr><td class="rmd-mat-celda-sel">${marca}</td><td>${esc(x.codigo)}</td><td>${esc(x.version)}</td><td>${esc(x.descripcion)}</td><td>${esc(x.estado)}</td><td>${esc(x.etapa)}</td><td>${esc(x.planta)}</td><td>${recs}</td><td class="${(r && !r.ok) || !x.aplica ? 'rmd-dif' : ''}">${esc(que)}${x.aplica && x.pm ? `<br><span class="rmd-nota">⚠ ${x.pm} proceso(s) menor(es) usan el material anterior: revísalos tras reasociar</span>` : ''}</td></tr>`; };
-      res.innerHTML = `<table class="rmd-tabla"><thead><tr><th class="rmd-mat-celda-sel"><input type="checkbox" class="rmd-mat-todos" title="Marcar todos los listos" aria-label="Marcar todos los listos"${trabajando ? ' disabled' : ''}></th><th>Código</th><th>Versión</th><th>Descripción</th><th>Estado</th><th>Etapa</th><th>Planta</th><th>Receta (material / versión)</th><th>Qué se hará</th></tr></thead><tbody>${plan.map(fila).join('')}</tbody></table>`;
+      res.innerHTML = `<table class="rmd-tabla"><thead><tr><th class="rmd-mat-celda-sel"><input type="checkbox" class="rmd-mat-todos" title="Marcar todos los listos" aria-label="Marcar todos los listos"${trabajando ? ' disabled' : ''}></th><th>Código</th><th>Versión</th><th>Descripción</th><th>Estado</th><th>Etapa</th><th>Planta</th><th>Receta (material / versión)</th><th>Qué se hará</th></tr></thead><tbody>${plan.filter((x) => !x.oculto || mVer.checked || resultados.some((y) => y.codigo === x.codigo)).map(fila).join('')}</tbody></table>`;
       pintarElegidos();
     };
     const revisarMaterial = async () => {
       const ant = norm(mAnt.value).replace(/\s/g, ''), nue = norm(mNue.value).replace(/\s/g, '');
       if (!/^\d{6,}$/.test(ant) || !/^\d{6,}$/.test(nue) || ant === nue) { setTxt(prog, 'Escribe el código del material anterior y el del nuevo (distintos).'); return; }
       const codigos = [];                                                  // todos los master: no se pegan códigos
-      bRev.disabled = true; resultados = []; plan = []; res.innerHTML = '';
+      bRev.disabled = true; bX.disabled = true; resultados = []; plan = []; res.innerHTML = '';
       try {
-        detectado = await detectarCambioMaterial(modelo, ctrl.oModelErpNec, { anterior: ant, nuevo: nue, codigos, basta: mBasta.checked }, (t) => setTxt(prog, t));
+        detectado = await detectarCambioMaterial(modelo, ctrl.oModelErpNec, { anterior: ant, nuevo: nue, codigos, basta: mBasta.checked, misma: misma() }, (t) => setTxt(prog, t));
         detectado.anterior = ant; detectado.nuevo = nue; plan = detectado.filas;
-        resumenMaterial(); if (!plan.length) setTxt(prog, `Ningún master Ingresado o Autorizado tiene el ${ant} en su receta copiada${codigos.length ? ' (entre los códigos pegados)' : ''}.`);
+        resumenMaterial(); bX.disabled = !plan.length; if (!plan.length) setTxt(prog, `Ningún master Ingresado o Autorizado tiene el ${ant} en su receta copiada${codigos.length ? ' (entre los códigos pegados)' : ''}.`);
         tablaMaterial();
       } catch (e) { setTxt(prog, 'No se pudo revisar: ' + e.message); } finally { bRev.disabled = false; }
     };
     const ejecutarMaterial = async () => {
-      const lista = marcables().filter((x) => elegidos.has(x.codigo)), texto = norm(mTxt.value), nv = lista.filter((x) => x.accion === 'version').length;
+      const lista = marcables().filter((x) => elegidos.has(x.codigo)), texto = notaMaterial(), nv = lista.filter((x) => x.accion === 'version').length;
       if (!lista.length || !detectado) return;
-      if (!texto || /Actualización de\s*$/.test(texto)) { setTxt(prog, 'Completa el texto que va debajo de la nomenclatura.'); mTxt.focus(); return; }
+      if (nv && !texto) { setTxt(prog, 'Completa la nota: en los Autorizados va debajo de la nomenclatura de la versión nueva.'); mTxt.focus(); return; }
       const ok = await confirmar(`¿Actualizar ${lista.length} RMD?`,
-        `${nv ? `Se creará con «Nueva Versión» del portal una versión Ingresada de ${nv} RMD Autorizado(s), con sus Observaciones: «${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…')}» y «${texto}». ` : ''}${lista.length - nv ? `En ${lista.length - nv} RMD Ingresado(s) se agrega «${texto}» al final de las Observaciones. ` : ''}En todos se quita la receta y se vuelve a asociar para traer la lista actual de SAP (${detectado.nuevo} en lugar de ${detectado.anterior}). Quedan Ingresados.`,
-        `${nv ? 'En cada versión nueva el portal pide aceptar su mensaje de «Nueva Versión». ' : ''}No uses el portal mientras tanto. Una versión creada no se borra desde aquí (habría que cancelarla en el portal).`, { si: `Actualizar ${lista.length}`, no: 'Cancelar', peligro: true });
+        `${nv ? `Se creará con «Nueva Versión» del portal una versión Ingresada de ${nv} RMD Autorizado(s), con sus Observaciones: «${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…')}» y «${texto}». ` : ''}${lista.length - nv ? `En ${lista.length - nv} RMD (${lista.length - nv - lista.filter((x) => x.accion !== 'version' && x.estado === 'Autorizado').length} Ingresado(s), ${lista.filter((x) => x.accion !== 'version' && x.estado === 'Autorizado').length} Autorizado(s)) se sacan y meten las recetas en la misma versión${texto ? ` y se agrega «${texto}» al final de las Observaciones` : ' (sin nota: las Observaciones no cambian)'}. ` : ''}En todos se quita la receta y se vuelve a asociar para traer la lista actual de SAP (${detectado.nuevo} en lugar de ${detectado.anterior}). ${nv ? 'Las versiones nuevas quedan Ingresadas; en la misma versión el Estado no cambia.' : 'El Estado no cambia.'}`,
+        `${nv ? 'En cada versión nueva el portal pide aceptar su mensaje de «Nueva Versión». ' : ''}${lista.some((x) => x.accion !== 'version' && x.estado === 'Autorizado') ? 'En los Autorizados en su misma versión, como al hacerlo a mano, se anula el documento de cada receta en el DMS y se vuelve a enviar con la lista nueva (ACTUALIZAR). ' : ''}No uses el portal mientras tanto. Una versión creada no se borra desde aquí (habría que cancelarla en el portal).`, { si: `Actualizar ${lista.length}`, no: 'Cancelar', peligro: true });
       if (!ok) return;
-      trabajando = true; detenido = false; bEje.disabled = true; bRev.disabled = true; ta.readOnly = true; [mAnt, mNue, mPri, mCom, mTxt, mBasta].forEach((x) => { x.disabled = true; }); tablaMaterial();
+      trabajando = true; detenido = false; bEje.disabled = true; bRev.disabled = true; ta.readOnly = true; [mAnt, mNue, mPri, mCom, mTxt, mBasta, mVer, mModo].forEach((x) => { x.disabled = true; }); tablaMaterial();
       const bDet = botonModal('Detener', '', () => { detenido = true; bDet.disabled = true; setTxt(bDet, 'Se detiene tras el actual…'); }); v.pie.prepend(bDet);
       const filtrosAntes = guardarFiltrosLista(ctrl), usuario = usuarioSapActual(), quien = usuario ? (usuario.nombre || usuario.id) : '', F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
       resultados = [];
@@ -8912,15 +8981,16 @@
               destino = String(nueva.codigo); r.versionNueva = `${destino} v${nueva.version}`; await esperar(1500);
             }
             const s = await modificarUno(ctrl, destino, { linea: x.accion === 'version' ? '' : texto, reemplazar: x.accion === 'version' ? `${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, x.fase)}\n${texto}` : null,
-              previo: () => reasociarRecetas(ctrl, x.reasociar, paso) });
+              sinLinea: true, previo: () => reasociarRecetas(ctrl, x.reasociar, paso, { conAutorizado: x.estado === 'Autorizado' }) });
             paso('comprobando en SAP…');
             const md2 = (await leerMDPorCodigos(modelo, [destino])).sort((p2, q2) => q2.version - p2.version)[0];
             const ins = md2 ? await leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('mdId_mdId', 'EQ', md2.mdId), new F('activo', 'EQ', true)], { $select: 'Component' }) : [];
             const tieneNuevo = ins.some((y) => norm(y.Component) === detectado.nuevo), tieneAnt = ins.some((y) => norm(y.Component) === detectado.anterior);
             r.estadoDespues = md2 && md2.estadoIdRmd ? md2.estadoIdRmd.contenido : ''; r.obs = md2 ? md2.observacion || '' : s.obs;
-            r.ok = r.estadoDespues === 'Ingresado' && tieneNuevo && (!tieneAnt || x.pendientes > 0) && String(r.obs).includes(texto);
-            r.resultado = r.ok ? `${r.versionNueva ? `Versión nueva ${r.versionNueva}` : 'Receta reasociada'} · Ingresado con el ${detectado.nuevo}`
-              : `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}revisar: ${[r.estadoDespues !== 'Ingresado' && `quedó ${r.estadoDespues || 'sin estado'}`, !tieneNuevo && `no tiene el ${detectado.nuevo}`, tieneAnt && !x.pendientes && `aún tiene el ${detectado.anterior}`, !String(r.obs).includes(texto) && 'las Observaciones no quedaron', ...s.mensajes].filter(Boolean).join(' · ')}`;
+            const estadoEsperado = x.accion === 'version' ? 'Ingresado' : x.estado;   // en la misma versión el Estado no cambia
+            r.ok = r.estadoDespues === estadoEsperado && tieneNuevo && (!tieneAnt || x.pendientes > 0) && String(r.obs).includes(texto);
+            r.resultado = r.ok ? `${r.versionNueva ? `Versión nueva ${r.versionNueva}` : 'Receta sacada y metida en la misma versión'} · ${estadoEsperado} con el ${detectado.nuevo}`
+              : `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}revisar: ${[r.estadoDespues !== estadoEsperado && `quedó ${r.estadoDespues || 'sin estado'}`, !tieneNuevo && `no tiene el ${detectado.nuevo}`, tieneAnt && !x.pendientes && `aún tiene el ${detectado.anterior}`, !String(r.obs).includes(texto) && 'las Observaciones no quedaron', ...s.mensajes].filter(Boolean).join(' · ')}`;
           } catch (e) { r.resultado = `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}no se completó: ${e.message}`; ppCerrarDialogosSap(); }
           resultados.push(r); tablaMaterial();
           if (!r.ok) { detenido = true; setTxt(prog, `Se detuvo en ${x.codigo}: ${r.resultado}`); break; }
@@ -8928,7 +8998,7 @@
         const hechos = resultados.filter((y) => y.ok).length;
         if (resultados.every((y) => y.ok)) setTxt(prog, `${detenido ? 'Detenido. ' : ''}Actualizados: ${hechos} de ${lista.length}. Descarga el detalle con «Exportar Excel».`);
       } finally {
-        trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; [mAnt, mNue, mPri, mCom, mTxt, mBasta].forEach((x) => { x.disabled = false; }); bX.disabled = !resultados.length; elegidos.clear(); tablaMaterial();
+        trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; [mAnt, mNue, mPri, mCom, mTxt, mBasta, mVer, mModo].forEach((x) => { x.disabled = false; }); mPri.disabled = mCom.disabled = misma(); bX.disabled = !plan.length; elegidos.clear(); tablaMaterial();
         try { await restaurarFiltrosLista(ctrl, filtrosAntes); } catch (e) { }
       }
     };
@@ -8984,7 +9054,22 @@
         try { await restaurarFiltrosLista(ctrl, filtrosAntes); } catch (e) { }
       }
     });
+    const exportarMaterial = async () => {                                // lo listado en Cambio de material (con el resultado si ya se actualizó)
+      const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
+      const filas = plan.filter((x) => !x.oculto || mVer.checked || resultados.some((y) => y.codigo === x.codigo));
+      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Planta', 'Recetas (material / versión)', 'Lista en SAP', 'Otros cambios en SAP', 'Cambio en SAP', 'Se puede actualizar', 'Qué se hará', 'Resultado', 'Observaciones'];
+      const SAP_TXT = { nuevo: 'Solo el reemplazo', otros: 'Reemplazo y otros cambios', ambos: 'Tiene los dos materiales', anterior: 'Aún tiene el anterior', ninguno: 'No tiene ninguno', error: 'No se pudo leer' };
+      const h = libro.hoja('Cambio de material', { activa: true, congelar: 'B2', cols: [13, 9, 44, 12, 16, 14, 26, 24, 50, 24, 12, 50, 50, 70].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'CambioMaterial', ref: `A1:N${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
+      filas.forEach((x, i) => { const r = resultados.find((y) => y.codigo === x.codigo), rs = x.recetas;
+        const que = x.aplica ? (x.accion === 'version' ? `Versión ${+x.version + 1} Ingresada · ${x.fase}` : 'Sacar y meter la receta en esta versión') : x.motivoNo;
+        [x.codigo, x.version, x.descripcion, x.estado, x.etapa, x.planta, rs.map((y) => `${y.matnr} / ${y.verid}`).join('\n'), rs.map((y) => SAP_TXT[y.sap] || y.sap).join('\n'),
+          rs.map((y) => (y.otros || []).join('; ')).filter(Boolean).join('\n'), rs.map((y) => (y.cambio ? `${y.cambio} del ${y.desde}` : '')).filter(Boolean).join('\n'), x.aplica ? 'Sí' : 'No', que, r ? r.resultado : '', r && r.obs ? r.obs : x.observacion]
+          .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, val, [6, 7, 8, 9, 13].includes(c) ? 'envuelto' : 'normal'); }); });
+      descargarArchivo(`Cambio de material ${detectado.anterior} a ${detectado.nuevo} ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())} ${dd(hoy.getHours())}${dd(hoy.getMinutes())}.xlsx`, await libro.generar(), TIPO_XLSX);
+    };
     const bX = botonModal('Exportar Excel', '', async () => {
+      if (modo === 'material') { if (detectado) await exportarMaterial().catch((e) => toast('No se pudo armar el Excel: ' + e.message, true)); return; }
       const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
       const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Etapa', 'Área (sección)', 'Planta', 'Modificación', 'Estado anterior', 'Estado actual', 'Resultado', 'Línea agregada', 'Observaciones', 'Fecha y hora', 'Usuario'];
       const h = libro.hoja('Modificaciones masivas', { activa: true, congelar: 'B2', cols: [13, 9, 44, 17, 16, 24, 14, 20, 14, 14, 40, 40, 70, 18, 28].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'ModificacionesMasivas', ref: `A1:O${Math.max(2, resultados.length + 1)}`, estilo: 'TableStyleMedium2' } });
