@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.97.0
+// @version      1.98.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.97.0';                                                       // mantener igual a @version
+  const VERSION = '1.98.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -87,7 +87,7 @@
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
-    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). Necesita el cargador 1.1.0.'],
+    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). «Por código» carga o reemplaza masters en específico aunque ya esté la misma versión. Necesita el cargador 1.1.0.'],
     ['compararrmd', 'Comparar dos RMD', 'En el menú Exportar: busca dos RMD cualesquiera y muestra sus master lado a lado, como Draftable: lo quitado en rojo, lo agregado en verde, lo modificado con sus palabras resaltadas, y la lista de cambios para ir de uno a otro.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
@@ -246,6 +246,8 @@
   .rmd-cont-seg label:has(input:focus-visible) { outline: 2px solid var(--rmd-acento-texto); outline-offset: -2px; }
   .rmd-cont-otra { height: 32px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 13px var(--rmd-fuente); color-scheme: light dark; }
   .rmd-cont-fecha:has(input:disabled) { opacity: .6; } .rmd-cont-fecha:not(:has(input[value=otra]:checked)) .rmd-cont-otra { display: none; }
+  .rmd-cont-codigos { width: 320px; max-width: 100%; min-height: 32px; max-height: 96px; padding: 6px 8px; box-sizing: border-box; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 13px var(--rmd-fuente); resize: none; vertical-align: middle; }
+  .rmd-cont-fecha:not(:has(input[value=codigos]:checked)) :is(.rmd-cont-codigos, .rmd-cont-buscar) { display: none; }
   .rmd-cont-grupo { display: inline-flex; align-items: center; gap: 10px; } .rmd-cont-fecha { column-gap: 22px !important; }
   .rmd-cont-base { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 7px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; background: var(--rmd-barra); font-size: 12.5px; }
   .rmd-cont-base > span { flex: 1 1 auto; min-width: 0; } .rmd-cont-camino { color: var(--rmd-apagado); } .rmd-cont-base b { white-space: nowrap; } .rmd-cont-base svg, .rmd-cont-ruta svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: var(--rmd-ambar); stroke-width: 1.4; stroke-linejoin: round; }
@@ -7158,8 +7160,9 @@
     const plantaDeCarpeta = (ruta) => { const m = /^\s*(\d+)\s*\.?-?\s*PLANTA\s*(\d+)/.exec(sinTildes(String(ruta).split('/')[0])); return m ? PLANTAS.find((p) => p.id === m[2]) || null : null; };
     const esDePlanta = (r, planta) => sinTildes(r.planta) === planta.sap;
     // autorizados: RMD Autorizados en la fecha; previos: versiones NO vigentes del mismo material y etapa; rutas: PDF de 3.-CONTINGENCIA;
-    // planta (opcional): solo los autorizados de esa planta y solo las carpetas de esa planta
-    function planificar(autorizados, previos, rutas, planta) {
+    // planta (opcional): solo los autorizados de esa planta y solo las carpetas de esa planta; forzar: si su PDF ya está, se vuelve a
+    // subir igual (aunque sea la misma versión) y el que estaba pasa antes a OBSOLETO (reemplazar)
+    function planificar(autorizados, previos, rutas, planta, forzar = false) {
       const pdfs = rutas.map(interpretar).filter((p) => p && (!planta || plantaDeCarpeta(p.ruta) === planta));
       return autorizados.filter((r) => !planta || esDePlanta(r, planta)).map((r) => {
         const codPrev = new Set(previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)).map((o) => o.codigo));
@@ -7169,7 +7172,8 @@
         // versión anterior: la más alta de la familia con PDF en la carpeta (si ninguna tiene, la más alta en SAP)
         const fami = previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)), conPdf = fami.filter((o) => codPrev.has(o.codigo) && fam.some((p) => p.codigo === o.codigo));
         const anterior = (conPdf.length ? conPdf : fami).slice().sort((a, b) => (+b.version || 0) - (+a.version || 0))[0] || null;
-        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), anterior, nota: '' };
+        const paso = { rmd: r, carpetas, yaEsta, subir: carpetas.filter((c) => !yaEsta.includes(c)), aObsoleto: activas.map((p) => p.ruta).sort(), reemplazar: [], anterior, nota: '' };
+        if (forzar && yaEsta.length) { paso.subir = carpetas.slice(); paso.reemplazar = propios.map((p) => p.ruta).sort(); }
         if (!carpetas.length) paso.nota = 'Sin versiones anteriores en 3.-CONTINGENCIA: ubícalo a mano.';
         else if (!paso.subir.length && !paso.aObsoleto.length) paso.nota = 'Ya está en la carpeta.';
         return paso;
@@ -7179,7 +7183,9 @@
     const fechaIsoLocal = (d) => `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
     // fecha de autorización del portal: con hora, el día local; a medianoche UTC, una fecha sin hora
     const diaDe = (x) => (!(x instanceof Date) || isNaN(x) ? '' : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? x.toISOString().slice(0, 10) : fechaIsoLocal(x));
-    return { interpretar, esObsoleto, nombreArchivo, planificar, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta };
+    // códigos pegados (de Excel, separados por espacios, comas o saltos de línea), sin repetir
+    const codigosDe = (t) => [...new Set(String(t || '').match(/\d{4,12}/g) || [])];
+    return { interpretar, esObsoleto, nombreArchivo, planificar, codigosDe, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta };
   })();
   // ==CONTINGENCIA-FIN==
   window.__rmdStats.contingencia = { Contingencia, leer: (f) => contLeer(controladorPrincipal().getView().getModel('mainModelv2'), f), pdf: (id) => contPdf(controladorPrincipal().getView().getModel('mainModelv2'), id), buscar: (c) => spBuscar(c) };   // pruebas
@@ -7246,12 +7252,28 @@
     const ini = new Date(Date.UTC(a, m - 1, d - 1)), fin = new Date(Date.UTC(a, m - 1, d + 2));   // ±1 día por la zona horaria; luego se filtra por el día local
     const filas = (await leerTodoDe(modelo, 'MD', [new F('fechaAutorizacion', 'BT', ini, fin)], { $expand: 'estadoIdRmd,sucursalId,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila);
     const autorizados = filas.filter((r) => /^AUTORIZADO$/i.test(r.estado) && r.fecha === fecha && /^\d+$/.test(r.codigo));
-    const materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
+    return { autorizados, previos: await contPrevios(modelo, autorizados) };
+  }
+  async function contPrevios(modelo, autorizados) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, materiales = [...new Set(autorizados.map((r) => r.material).filter(Boolean))], previos = [];
     for (let i = 0; i < materiales.length; i += 15) {
       const f = new F({ filters: materiales.slice(i, i + 15).map((x) => new F('codDefectoReceta', 'EQ', x)), and: false });
       previos.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd,sucursalId', $select: CONT_SELECT })).map(contFila).filter((r) => !/^AUTORIZADO$/i.test(r.estado) && /^\d+$/.test(r.codigo)));
     }
-    return { autorizados, previos };
+    return previos;
+  }
+  // RMD Autorizados de los códigos de master pegados (cualquier fecha de autorización); faltan: códigos sin versión Autorizada en SAP
+  async function contLeerCodigos(modelo, codigos) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, filas = [];
+    for (let i = 0; i < codigos.length; i += 25) {
+      const f = new F({ filters: codigos.slice(i, i + 25).map((c) => new F('codigo', 'EQ', c)), and: false });
+      filas.push(...(await leerTodoDe(modelo, 'MD', [f], { $expand: 'estadoIdRmd,sucursalId,aReceta/recetaId', $select: CONT_SELECT + ',usuarioAutorizacion,aReceta/recetaId/Text1' })).map(contFila));
+    }
+    const porCodigo = new Map();
+    filas.filter((r) => /^AUTORIZADO$/i.test(r.estado)).forEach((r) => { const y = porCodigo.get(r.codigo); if (!y || (+r.version || 0) > (+y.version || 0)) porCodigo.set(r.codigo, r); });
+    const autorizados = codigos.filter((c) => porCodigo.has(c)).map((c) => porCodigo.get(c));
+    const faltan = codigos.filter((c) => !porCodigo.has(c)).map((c) => { const x = filas.filter((r) => r.codigo === c).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0]; return { codigo: c, estado: x ? x.estado : '' }; });
+    return { autorizados, previos: await contPrevios(modelo, autorizados), faltan };
   }
 
   // PDF del RMD con las lecturas y el armado del portal sobre una vista aparte (no toca la lista ni graba nada); devuelve { receta, bytes }
@@ -7314,26 +7336,35 @@
     v.cuerpo.innerHTML = `<div class="rmd-cont-fecha"><div class="rmd-cont-grupo" role="radiogroup" aria-label="Planta"><span class="rmd-cont-rot">Planta</span>
         <div class="rmd-cont-seg">${Contingencia.PLANTAS.map((x) => `<label><input type="radio" name="rmd-cont-planta" value="${x.id}" ${x.id === idPlanta ? 'checked' : ''}>${x.txt} <small>${x.lugar}</small></label>`).join('')}</div></div>
       <div class="rmd-cont-grupo" role="radiogroup" aria-label="Fecha de autorización"><span class="rmd-cont-rot">Autorizados el</span>
-        <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label></div>
-        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha"></div></div>
+        <div class="rmd-cont-seg"><label><input type="radio" name="rmd-cont-dia" value="ayer" checked>Ayer <small>${corta(ayer)}</small></label><label><input type="radio" name="rmd-cont-dia" value="hoy">Hoy <small>${corta(hoy)}</small></label><label><input type="radio" name="rmd-cont-dia" value="otra">Otra fecha</label><label title="Para cargar o reemplazar el PDF de masters en específico, aunque ya esté la misma versión"><input type="radio" name="rmd-cont-dia" value="codigos">Por código</label></div>
+        <input type="date" class="rmd-cont-otra" aria-label="Otra fecha">
+        <textarea class="rmd-cont-codigos" rows="1" spellcheck="false" aria-label="Códigos de master" placeholder="Pega los códigos de master (de Excel, o separados por espacios o comas)"></textarea><button type="button" class="rmd-btn rmd-cont-buscar">Buscar</button></div></div>
       <div class="rmd-cont-base"></div><div class="rmd-cont-res" aria-live="polite"></div><div class="rmd-cont-plan"></div>
 `;
     const pieEstado = document.createElement('div'); pieEstado.className = 'rmd-cont-pie-estado'; pieEstado.setAttribute('aria-live', 'polite');
-    const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra');
-    const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input')];
+    const res = v.cuerpo.querySelector('.rmd-cont-res'), caja = v.cuerpo.querySelector('.rmd-cont-plan'), otra = v.cuerpo.querySelector('.rmd-cont-otra'), cajaCod = v.cuerpo.querySelector('.rmd-cont-codigos');
+    const entradas = [...v.cuerpo.querySelectorAll('.rmd-cont-fecha input, .rmd-cont-fecha textarea, .rmd-cont-buscar')];
     otra.value = Contingencia.fechaIsoLocal(ayer); otra.max = Contingencia.fechaIsoLocal(hoy);
     const fechaElegida = () => { const t = (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value; return t === 'hoy' ? Contingencia.fechaIsoLocal(hoy) : t === 'otra' ? otra.value : Contingencia.fechaIsoLocal(ayer); };
+    // «Por código»: los masters pegados se cargan aunque su PDF ya esté (el que estaba pasa a OBSOLETO)
+    const porCodigo = () => (v.cuerpo.querySelector('input[name=rmd-cont-dia]:checked') || {}).value === 'codigos';
+    v.cuerpo.querySelector('.rmd-cont-buscar').addEventListener('click', () => revisar());
+    cajaCod.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); revisar(); } });
+    cajaCod.addEventListener('input', () => { cajaCod.style.height = ''; cajaCod.style.height = Math.min(cajaCod.scrollHeight, 96) + 'px'; });
     const bActualizar = botonModal('Actualizar', '', () => revisar()), bCargar = botonModal('Cargar a SharePoint', 'primario', () => cargar(null)), bCerrar = botonModal('Cerrar', '', salir);
     bCargar.disabled = true; v.pie.append(pieEstado, bCerrar, bActualizar, bCargar);
     // cambiar la fecha revisa sola; el campo de fecha solo se ve con «Otra fecha»
     v.cuerpo.querySelector('.rmd-cont-fecha').addEventListener('change', (e) => {
+      if (e.target === cajaCod) return;   // los códigos se buscan con «Buscar» o Enter
+      if (e.target.value === 'codigos') { cajaCod.focus(); if (!Contingencia.codigosDe(cajaCod.value).length) { clearTimeout(espera); turno++; plan = null; res.innerHTML = ''; pieEstado.innerHTML = ''; bCargar.disabled = true; mensaje('Pega los códigos de master y pulsa «Buscar». Se cargan aunque su PDF ya esté en la carpeta: el que estaba pasa a OBSOLETO.'); return; } }
       if (e.target.name === 'rmd-cont-planta') pintarBase();
       if (e.target.name === 'rmd-cont-planta') try { localStorage.setItem('rmdUiContPlanta', e.target.value); } catch (er) { /* sin almacenamiento */ }
       clearTimeout(espera); espera = setTimeout(revisar, 350);
     });
     const tipo = (p) => (!p.carpetas.length ? 'mano' : p.subir.length || p.aObsoleto.length ? 'subir' : 'ya');
     const TIPOS = { subir: 'Por cargar', ya: 'Ya cargado', mano: 'Ubicar a mano' };
-    const estadoDe = (p) => p.estado || { txt: TIPOS[tipo(p)], cls: tipo(p) };
+    const estadoDe = (p) => p.estado || { txt: p.reemplazar.length ? 'Por reemplazar' : TIPOS[tipo(p)], cls: tipo(p) };
+    const deCuando = () => (plan.fecha ? `autorizados el ${fmt(plan.fecha)}` : 'de los códigos pegados');
     const titulo = (t) => String(t || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
     const spUrl = (rel) => 'https://medifarmape.sharepoint.com' + (CONT_RAIZ + (rel ? '/' + rel : '')).split('/').map(encodeURIComponent).join('/');
     const enlace = (rel, html, tit) => `<a class="rmd-cont-a" href="${esc(spUrl(rel))}" target="_blank" rel="noopener" title="${esc(tit || 'Abrir en SharePoint')}">${html}</a>`;
@@ -7361,15 +7392,15 @@
       if (!tr) return; const e = estadoDe(p);
       tr.className = e.cls; tr.hidden = filtro !== 'todos' && e.cls !== filtro && !(filtro === 'subir' && e.cls === 'curso');
       tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`
-        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="Cargar solo este master a SharePoint" ${ocupadoC ? 'disabled' : ''}>Cargar este</button>` : '');
+        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="${p.reemplazar.length ? 'Volver a subir este master: el PDF que ya está pasa a OBSOLETO' : 'Cargar solo este master a SharePoint'}" ${ocupadoC ? 'disabled' : ''}>${p.reemplazar.length ? 'Reemplazar este' : 'Cargar este'}</button>` : '');
     };
     // tarjetas: cuántos hay de cada tipo (y filtran la tabla); el avance de la carga va al pie
     const resumen = (progreso) => {
       const n = { subir: 0, ya: 0, mano: 0, ok: 0, error: 0 }; plan.forEach((p) => { const c = estadoDe(p).cls; n[c === 'curso' ? 'subir' : c]++; });
-      const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length), 0);
+      const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length + p.reemplazar.length), 0);
       const tarjeta = (k, txt, c, ayuda) => `<button type="button" class="rmd-cont-kpi ${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'} title="${esc(ayuda)}"><b>${c}</b><span>${txt}</span></button>`;
       res.innerHTML = `<div class="rmd-cont-kpis">${tarjeta('todos', `RMD de ${esc(plan.planta.txt)}`, plan.length, 'Ver todos')}${tarjeta('subir', 'Por cargar', n.subir, 'Se suben con «Cargar a SharePoint»')}${tarjeta('ya', 'Ya cargados', n.ya, 'Su PDF ya está en la carpeta')}${tarjeta('mano', 'Ubicar a mano', n.mano, 'Sin carpeta de versión anterior: súbelos a mano')}${n.ok ? tarjeta('ok', 'Cargados ahora', n.ok, 'Cargados en esta sesión') : ''}${n.error ? tarjeta('error', 'Con error', n.error, 'Revisa el motivo en la fila y pulsa «Actualizar»') : ''}</div>
-        <div class="rmd-cont-datos"><span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
+        <div class="rmd-cont-datos">${plan.fecha ? `<span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>` : `<span>Por código: <b>${plan.codigos.length}</b> pegado${plan.codigos.length > 1 ? 's' : ''}</span>`}${plan.faltan && plan.faltan.length ? `<span class="rmd-cont-nota" title="${esc(plan.faltan.map((f) => f.codigo + (f.estado ? ' (' + titulo(f.estado) + ')' : ' (no está en SAP)')).join(', '))}">${plan.faltan.length} sin versión Autorizada: ${esc(plan.faltan.slice(0, 4).map((f) => f.codigo).join(', '))}${plan.faltan.length > 4 ? '…' : ''}</span>` : ''}${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
       pieEstado.innerHTML = progreso ? `${giro}<span>${esc(progreso.txt)}</span><span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span>` : '';
       const nSubir = n.subir; bCargar.textContent = nSubir > 1 ? `Cargar los ${nSubir} a SharePoint` : nSubir ? 'Cargar 1 a SharePoint' : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
@@ -7378,15 +7409,16 @@
       filtro = b.dataset.f === filtro ? 'todos' : b.dataset.f; resumen(); plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`)));
     });
     const pintar = () => {
-      if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD de ${esc(plan.planta.txt)} (${esc(plan.planta.lugar)}) autorizados el ${esc(fmt(plan.fecha))}.${plan.otras ? ` Hay ${plan.otras} de ${esc(plan.otraPlanta)}: los carga esa planta.` : ''}${plan.sinPlanta ? ` ${plan.sinPlanta} no tienen planta en SAP.` : ''}`); bCargar.disabled = true; return; }
+      if (!plan.length) { res.innerHTML = ''; mensaje(`No hay RMD de ${esc(plan.planta.txt)} (${esc(plan.planta.lugar)}) ${esc(deCuando())}.${plan.faltan && plan.faltan.length ? ` Sin versión Autorizada en SAP: ${esc(plan.faltan.map((f) => f.codigo + (f.estado ? ' (' + titulo(f.estado) + ')' : '')).join(', '))}.` : ''}${plan.otras ? ` Hay ${plan.otras} de ${esc(plan.otraPlanta)}: los carga esa planta.` : ''}${plan.sinPlanta ? ` ${plan.sinPlanta} no tienen planta en SAP.` : ''}`); bCargar.disabled = true; return; }
       const filas = plan.map((p, i) => {
         const r = p.rmd, a = p.anterior;
-        const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
+        const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha || ''))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
         const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('')
           : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}</span>`;
-        const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : ''}`;
+        const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : p.reemplazar.length ? '<span class="rmd-cont-sub">Reemplaza al que ya está</span>' : ''}`;
         // versión anterior y, debajo, su PDF que pasa a OBSOLETO (una sola columna)
-        const obs = p.aObsoleto.length ? `<div class="rmd-cont-obsoleto"><span class="rmd-cont-rot2">Pasa a OBSOLETO</span>${p.aObsoleto.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}</div>`
+        const aObs = p.reemplazar.concat(p.aObsoleto);
+        const obs = aObs.length ? `<div class="rmd-cont-obsoleto"><span class="rmd-cont-rot2">Pasa a OBSOLETO</span>${aObs.map((x) => `<span class="rmd-cont-arch">${archivo(x)}</span>`).join('')}</div>`
           : a && p.carpetas.length ? '<span class="rmd-cont-sub">Su PDF ya está en OBSOLETO</span>' : '';
         const ant = a ? `<span class="rmd-cont-ant">v${esc(a.version)} · ${esc(a.codigo)}${a.estado ? ` <small>${esc(titulo(a.estado))}</small>` : ''}</span>${obs}${obsRmd(a.observacion)}` : `<span class="rmd-cont-vacio">Sin versión anterior</span>${obs}`;
         return `<tr data-i="${i}"><td><span class="rmd-cont-cod">${esc(r.codigo)}</span><span class="rmd-cont-meta">v${esc(r.version)} · ${esc(titulo(r.etapa))}</span>${aut}</td><td>${esc(r.descripcion)}${obsRmd(r.observacion)}</td><td>${arch}</td><td>${ant}</td><td>${dest}</td><td></td></tr>`;
@@ -7400,16 +7432,18 @@
     caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-uno'); const tr = b && b.closest('tr[data-i]'); if (tr && plan) cargar(plan[+tr.dataset.i]); });
     async function revisar() {
       clearTimeout(espera);
-      const fecha = fechaElegida(), planta = plantaElegida(); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
+      const cod = porCodigo(), codigos = cod ? Contingencia.codigosDe(cajaCod.value) : [], fecha = cod ? null : fechaElegida(), planta = plantaElegida();
+      if (cod && !codigos.length) { mensaje('Pega los códigos de master y pulsa «Buscar».'); cajaCod.focus(); return; }
+      if (!cod && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { mensaje('Elige una fecha.'); return; }
       if (ocupadoC) return; const t = ++turno; plan = null; filtro = 'todos'; res.innerHTML = ''; bloquear(true);
-      mensaje(`${giro}Leyendo en SAP los RMD de ${esc(planta.txt)} autorizados el ${esc(fmt(fecha))}…`);
+      mensaje(cod ? `${giro}Leyendo en SAP ${codigos.length} código${codigos.length > 1 ? 's' : ''} de master…` : `${giro}Leyendo en SAP los RMD de ${esc(planta.txt)} autorizados el ${esc(fmt(fecha))}…`);
       try {
-        const { autorizados, previos } = await contLeer(modelo, fecha); if (cerrado || t !== turno) return;
+        const { autorizados, previos, faltan } = await (cod ? contLeerCodigos(modelo, codigos) : contLeer(modelo, fecha)); if (cerrado || t !== turno) return;
         const propios = autorizados.filter((r) => Contingencia.esDePlanta(r, planta)), mats = new Set(propios.map((r) => r.material));
         mensaje(`${giro}Buscando en ${esc(planta.carpeta)} las versiones anteriores de ${propios.length} RMD…`);
         const codigos = [...new Set(propios.map((r) => r.codigo).concat(previos.filter((r) => mats.has(r.material)).map((r) => r.codigo)))];
         const rutas = propios.length ? await spBuscar(codigos) : []; if (cerrado || t !== turno) return;
-        plan = Contingencia.planificar(propios, previos, rutas, planta); plan.fecha = fecha; plan.planta = planta;
+        plan = Contingencia.planificar(propios, previos, rutas, planta, cod); plan.fecha = fecha; plan.codigos = codigos; plan.faltan = faltan || []; plan.planta = planta;
         plan.otras = autorizados.filter((r) => r.planta && !Contingencia.esDePlanta(r, planta)).length; plan.sinPlanta = autorizados.filter((r) => !r.planta).length; plan.otraPlanta = Contingencia.PLANTAS.filter((x) => x !== planta).map((x) => x.txt).join(' o ') || 'otra planta'; plan.hora = new Date().toTimeString().slice(0, 5); bloquear(false); pintar();
       } catch (e) { bloquear(false); mensaje(`No se pudo revisar: ${esc(e.message)}`, 'error'); }
       finally { if (t === turno && ocupadoC) bloquear(false); }
@@ -7418,8 +7452,8 @@
     async function cargar(uno) {
       if (!plan || ocupadoC) return;
       const lote = (uno ? [uno] : plan).filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return;
-      const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length, 0);
-      const obsTxt = nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : '';
+      const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length + p.reemplazar.length, 0), nRe = lote.filter((p) => p.reemplazar.length).length;
+      const obsTxt = (nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : '') + (nRe ? ` (${nRe === 1 && uno ? 'ya estaba en la carpeta: se reemplaza' : `${nRe} ya estaba${nRe > 1 ? 'n' : ''} en la carpeta: se reemplaza${nRe > 1 ? 'n' : ''}`})` : '');
       preguntando = true;
       const si = uno
         ? await confirmar(`¿Cargar ${uno.rmd.codigo} v${uno.rmd.version}?`, `${nPdf ? `Se subirá su PDF a ${uno.subir.join(', ')}` : 'No se sube PDF'}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' })
@@ -7436,6 +7470,8 @@
           if (p.subir.length) {
             marcar('Generando PDF', 'curso');
             const pdf = await contPdf(modelo, p.rmd.mdId), nombre = Contingencia.nombreArchivo(p.rmd, pdf.receta);
+            // reemplazar: el PDF que ya estaba pasa primero a OBSOLETO (puede tener el mismo nombre que el nuevo)
+            for (const x of p.reemplazar) { marcar('A OBSOLETO', 'curso'); await spArchivar(x); }
             for (const c of p.subir) { marcar('Subiendo', 'curso'); await spSubir(c, nombre, pdf.bytes); }
           }
           for (const x of p.aObsoleto) { marcar('A OBSOLETO', 'curso'); await spArchivar(x); }
@@ -7444,7 +7480,7 @@
       }
       bloquear(false); bCerrar.disabled = false; resumen();
       toast(uno ? (fallos ? `${uno.rmd.codigo}: no se pudo cargar.` : `${uno.rmd.codigo} cargado en SharePoint.`)
-        : `Contingencia de ${plan.planta.txt} del ${fmt(plan.fecha)}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
+        : `Contingencia de ${plan.planta.txt} ${plan.fecha ? `del ${fmt(plan.fecha)}` : 'por código'}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
     }
     revisar();
   }

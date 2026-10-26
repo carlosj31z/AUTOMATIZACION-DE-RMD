@@ -42,6 +42,15 @@ ok('producto nuevo: sin versión anterior', plan['2202600001'].anterior === null
 ok('producto nuevo: sin carpeta y con nota', plan['2202600001'].carpetas.length === 0 && /a mano/.test(plan['2202600001'].nota));
 ok('ya cargado: nada que hacer', plan['2202600005'].subir.length === 0 && plan['2202600005'].aObsoleto.length === 0 && /Ya está/.test(plan['2202600005'].nota));
 
+// ---- por código: forzar la carga aunque ya esté la misma versión ----
+const forz = Object.fromEntries(C.planificar(autorizados, previos, rutas, null, true).map((p) => [p.rmd.codigo, p]));
+ok('forzar, ya cargado: se vuelve a subir a su carpeta', J(forz['2202600005'].subir) === J(['2.- PLANTA 2/SOLIDOS/YA/ACONDICIONADO']), J(forz['2202600005'].subir));
+ok('forzar, ya cargado: el PDF que estaba pasa a OBSOLETO', J(forz['2202600005'].reemplazar) === J(['2.- PLANTA 2/SOLIDOS/YA/ACONDICIONADO/2202600005-ACO-3-YA.pdf']) && forz['2202600005'].nota === '', J(forz['2202600005']));
+ok('forzar, no cargado: igual que siempre', J(forz['2202609999'].subir) === J(v6.subir) && J(forz['2202609999'].aObsoleto) === J(v6.aObsoleto) && forz['2202609999'].reemplazar.length === 0);
+ok('forzar, producto nuevo: sigue para ubicar a mano', forz['2202600001'].carpetas.length === 0 && forz['2202600001'].subir.length === 0);
+ok('sin forzar no reemplaza', plan['2202600005'].reemplazar.length === 0);
+ok('códigos pegados de Excel, con comas y repetidos', J(C.codigosDe('2202609999\r\n2202600005, 2202609999;  x 12\t2202600001')) === J(['2202609999', '2202600005', '2202600001']));
+
 // ---- por planta: solo sus RMD y solo sus carpetas ----
 const P1 = C.PLANTAS[0], P2 = C.PLANTAS[1];
 ok('carpeta de planta: «1.- PLANTA 1» y «2.- PLANTA 2»', C.plantaDeCarpeta('1.- PLANTA 1/X/a.pdf') === P1 && C.plantaDeCarpeta('2.- PLANTA 2/X') === P2 && C.plantaDeCarpeta('GASEOVET/a.pdf') === null);
