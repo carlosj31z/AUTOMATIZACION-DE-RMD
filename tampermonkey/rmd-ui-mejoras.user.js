@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.98.0
+// @version      1.98.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.98.0';                                                       // mantener igual a @version
+  const VERSION = '1.98.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -8867,7 +8867,7 @@
       <input type="text" class="rmd-susp-motivo" maxlength="400">
       <div class="rmd-mm-mat" style="display:none">
         <div class="rmd-mm-mat-fila"><label>Material anterior<input class="rmd-mat-ant" inputmode="numeric" placeholder="ej. 1100002760"></label><label>Material nuevo<input class="rmd-mat-nue" inputmode="numeric" placeholder="ej. 1100011265"></label>
-          <label>Autorizados<select class="rmd-mat-modo"><option value="version">Versión nueva</option><option value="misma">Misma versión</option></select></label>
+          <label>Autorizados<select class="rmd-mat-modo"><option value="misma" selected>Misma versión</option><option value="version">Versión nueva</option></select></label>
           <label>Prioridad<select class="rmd-mat-pri"><option>1</option><option selected>2</option><option>3</option></select></label><label>Complejidad<select class="rmd-mat-com">${COMPLEJIDADES.map((c) => `<option${c === 'C1.0' ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
         <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-basta"><span>Basta con que <b>una</b> de las recetas asociadas tenga el cambio en SAP (se reasocian solo las que lo tienen; si no se marca, deben tenerlo todas)</span></label>
         <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-ver"><span>Mostrar también los master cuya lista en SAP <b>no es solo el reemplazo</b> (otros cambios, aún tiene el anterior o los dos); no se pueden actualizar</span></label>
@@ -8888,6 +8888,7 @@
     // Cambio de material: campos propios y el ejemplo de Observaciones
     const q = (c) => v.cuerpo.querySelector(c), mAnt = q('.rmd-mat-ant'), mNue = q('.rmd-mat-nue'), mPri = q('.rmd-mat-pri'), mCom = q('.rmd-mat-com'), mTxt = q('.rmd-mat-txt'), mEj = q('.rmd-mat-ej'), mBasta = q('.rmd-mat-basta'), mVer = q('.rmd-mat-ver'), mModo = q('.rmd-mat-modo');
     const misma = () => mModo.value === 'misma';
+    mPri.disabled = mCom.disabled = misma();
     const hoyTxt = (() => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; })(), ini = rsUsuarioIniciales() || 'XX';
     let detectado = null; const elegidos = new Set();                     // códigos marcados en la tabla
     mTxt.value = `${hoyTxt}${ini} Actualización de `;
@@ -8959,8 +8960,10 @@
       } catch (e) { setTxt(prog, 'No se pudo revisar: ' + e.message); } finally { bRev.disabled = false; }
     };
     const ejecutarMaterial = async () => {
+      plan.forEach((x) => { if (!resultados.some((y) => y.codigo === x.codigo)) reglaCambioMaterial(x, mBasta.checked, misma()); });
       const lista = marcables().filter((x) => elegidos.has(x.codigo)), texto = notaMaterial(), nv = lista.filter((x) => x.accion === 'version').length;
       if (!lista.length || !detectado) return;
+      if (misma() && nv) { setTxt(prog, 'Error interno: con «Misma versión» no se crea ninguna versión nueva. No se hizo nada.'); return; }
       if (nv && !texto) { setTxt(prog, 'Completa la nota: en los Autorizados va debajo de la nomenclatura de la versión nueva.'); mTxt.focus(); return; }
       const ok = await confirmar(`¿Actualizar ${lista.length} RMD?`,
         `${nv ? `Se creará con «Nueva Versión» del portal una versión Ingresada de ${nv} RMD Autorizado(s), con sus Observaciones: «${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…')}» y «${texto}». ` : ''}${lista.length - nv ? `En ${lista.length - nv} RMD (${lista.length - nv - lista.filter((x) => x.accion !== 'version' && x.estado === 'Autorizado').length} Ingresado(s), ${lista.filter((x) => x.accion !== 'version' && x.estado === 'Autorizado').length} Autorizado(s)) se sacan y meten las recetas en la misma versión${texto ? ` y se agrega «${texto}» al final de las Observaciones` : ' (sin nota: las Observaciones no cambian)'}. ` : ''}En todos se quita la receta y se vuelve a asociar para traer la lista actual de SAP (${detectado.nuevo} en lugar de ${detectado.anterior}). ${nv ? 'Las versiones nuevas quedan Ingresadas; en la misma versión el Estado no cambia.' : 'El Estado no cambia.'}`,
@@ -8976,7 +8979,7 @@
           const r = { codigo: x.codigo, md: { version: x.version, descripcion: x.descripcion, nivelTxt: x.etapa, sucursalId: { contenido: x.planta } }, modo: 'Cambio de material', estadoAntes: x.estado, motivo: texto, fecha: new Date(), usuario: quien, ok: false, obs: '', estadoDespues: '', resultado: '' };
           let destino = x.codigo;
           try {
-            if (x.accion === 'version') {
+            if (x.accion === 'version' && !misma()) {
               const nueva = await ppCrearVersionNueva(modelo, { ...x.md, codigoversionprincipal: x.linaje }, (sg, t) => paso(`${t} (${Math.floor(sg / 60)}:${String(sg % 60).padStart(2, '0')})`));
               destino = String(nueva.codigo); r.versionNueva = `${destino} v${nueva.version}`; await esperar(1500);
             }
