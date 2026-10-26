@@ -574,6 +574,7 @@
   .rmd-sel-lista input[type=checkbox] { margin: 0; cursor: pointer; } .rmd-sel-lista li.rmd-sel-rep .rmd-sel-cod { color: var(--rmd-acento-texto); }
   .rmd-sel-donde { flex: 0 0 auto; color: var(--rmd-apagado); font-size: 12px; white-space: nowrap; }
   .rmd-sel-cab .rmd-sel-repetir { flex: 0 0 auto; margin-left: auto; font-size: 12px; font-weight: 600; }
+  .rmd-sel-orden { -moz-appearance: textfield; } .rmd-sel-orden::-webkit-inner-spin-button, .rmd-sel-orden::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .rmd-sel-orden, .rmd-sel-cant input { width: 44px; height: 22px; text-align: center; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: inherit; font: 600 13px var(--rmd-fuente); }
   .rmd-ep-aviso { margin: 8px 16px 0; padding: 7px 10px; border-left: 3px solid var(--rmd-acento); border-radius: 3px; background: rgba(27,141,236,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-ep-cambio { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; } .rmd-ep-cambio div { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; }
@@ -9534,7 +9535,7 @@
       if (y.x) { nuevos[xs.indexOf(y.x)].orden = k + 1; return; }
       if (+y.g.orden === k + 1) return;
       const id = esPM ? y.g.mdEstructuraPasoInsumoPasoId : y.g.mdEstructuraPasoId; if (!id) return;
-      cambios.push({ ruta: `/${esPM ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO'}('${id}')`, datos: Object.assign({ orden: k + 1, fechaActualiza: ahora }, usuario ? { usuarioActualiza: usuario } : {}) });
+      cambios.push({ ruta: `/${esPM ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO'}('${id}')`, antes: +y.g.orden, datos: Object.assign({ orden: k + 1, fechaActualiza: ahora }, usuario ? { usuarioActualiza: usuario } : {}) });
     });
     return cambios;
   }
@@ -9546,10 +9547,14 @@
       m.update = function (ruta, datos, params) {
         let plan = null; try { plan = planOrdenAgregar(ruta, datos); } catch (e) { plan = null; }
         if (!plan || !plan.length) return up0.apply(this, arguments);
-        const self = this, enviar = (c) => new Promise((ok, ko) => up0.call(self, c.ruta, c.datos, { success: ok, error: ko }));
-        Promise.all(plan.map(enviar)).then(() => { antesSel.clear(); up0.call(self, ruta, datos, params); }, (e) => {
+        // si alguno falla, los que sí se corrieron vuelven a su orden y no se agrega nada
+        const self = this, enviar = (r, d) => new Promise((ok, ko) => up0.call(self, r, d, { success: ok, error: ko }));
+        Promise.allSettled(plan.map((c) => enviar(c.ruta, c.datos))).then(async (rs) => {
+          const mal = rs.find((r) => r.status === 'rejected');
+          if (!mal) { antesSel.clear(); up0.call(self, ruta, datos, params); return; }
+          await Promise.allSettled(plan.filter((c, i) => rs[i].status === 'fulfilled').map((c) => enviar(c.ruta, Object.assign({}, c.datos, { orden: c.antes }))));
           toast('No se pudo correr el orden de los pasos guardados, así que no se agregó nada. Revisa la lista e inténtalo de nuevo.', true);
-          if (params && params.error) params.error(e);
+          if (params && params.error) params.error(mal.reason);
         });
         return { abort() {} };
       };
