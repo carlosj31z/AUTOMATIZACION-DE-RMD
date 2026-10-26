@@ -8676,6 +8676,7 @@
       } else if (!linea && reemplazar == null && !sinLinea) throw new Error('falta el texto de la observación');
       const antes = String(a.observacionBK != null ? a.observacionBK : a.observacion || '').replace(/\s+$/, '');
       const obs = reemplazar != null ? reemplazar : linea ? (antes ? antes + '\n' : '') + linea : antes;
+      if (sinLinea && !suspender && !linea && reemplazar == null) return { obs, mensajes: [] };   // sin nota: no hace falta el Guardar
       asoc.setProperty('/observacionBK', obs);
       // mismo manejador del botón Guardar (espera guardado, trazabilidad y DMS)
       const bGuardar = ctls.find((c) => c.getMetadata().getName() === 'sap.m.Button' && c.getText && c.getText() === 'Guardar' && c.getDomRef() && visible(c.getDomRef()));
@@ -8712,7 +8713,7 @@
   const COMPLEJIDADES = ['C0.5', 'C1.0', 'C1.5', 'C2.0', 'C2.5', 'C3.0'];
   const faseNomenclatura = (obs) => { const t = String(obs || '').split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)(F\d{1,2}(?:-?R)?)$/i.exec(t); return m ? m[1].toUpperCase() : ''; };
   const nomenclaturaMaterial = (fecha, ini, prioridad, complejidad, fase) => `${fecha}${ini}-${prioridad}-${complejidad}-FI1.0-FA1.0-${fase}`;
-  async function detectarCambioMaterial(modelo, erp, { anterior, nuevo, codigos, basta }, avance = () => {}) {
+  async function detectarCambioMaterial(modelo, erp, { anterior, nuevo, codigos, basta, misma }, avance = () => {}) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
     avance('Leyendo los RMD Ingresados y Autorizados…');
     let cand = await rsCandidatos(modelo);
@@ -8757,14 +8758,15 @@
         if (sap === 'nuevo') { otros = diferenciasBom(s.bom, copias.get(r.mdRecetaId) || []).filter((d) => !soloReemplazo(d)).map((d) => d.texto); if (otros.length) sap = 'otros'; }
         return { mdRecetaId: r.mdRecetaId, matnr: norm(r.recetaId.Matnr), verid: norm(r.recetaId.Verid), texto: norm(r.recetaId.Text1 || ''), sap, otros, cambio: s.cambio || '', desde: s.desde || '' };
       });
-      const version = md.estado === 'Autorizado';
       return reglaCambioMaterial({ md, mdId: id, codigo: md.codigo, version: md.version, estado: md.estado, descripcion: md.descripcion, etapa: md.etapa, planta: md.planta, linaje: md.linaje,
-        recetas: rs, fase: faseNomenclatura(obs.get(id)), observacion: obs.get(id) || '', pm: pmPorMd.get(id) || 0, accion: version ? 'version' : 'reasociar' }, basta);
+        recetas: rs, fase: faseNomenclatura(obs.get(id)), observacion: obs.get(id) || '', pm: pmPorMd.get(id) || 0 }, basta, misma);
     }).sort((a, b) => (+b.aplica - +a.aplica) || nat(a.codigo, b.codigo));
     return { filas: out, material, buscados: cand.length };
   }
   // basta: con una receta ya cambiada en SAP es suficiente (se reasocian solo las cambiadas); si no, deben estar cambiadas todas
-  function reglaCambioMaterial(x, basta) {
+  // misma: los Autorizados también se sacan y meten en su misma versión (sin «Nueva Versión»)
+  function reglaCambioMaterial(x, basta, misma) {
+    x.accion = x.estado === 'Autorizado' && !misma ? 'version' : 'reasociar';
     const rs = x.recetas, listas = rs.filter((r) => r.sap === 'nuevo'), faltan = rs.length - listas.length, noSolo = !!rs.length && (basta ? !listas.length : faltan > 0);
     const otros = rs.filter((r) => r.sap === 'otros');
     const motivoNo = !rs.length ? 'La receta con el material ya no está activa'
@@ -8774,11 +8776,13 @@
     return Object.assign(x, { aplica: !motivoNo, motivoNo, oculto: noSolo, reasociar: listas, pendientes: faltan });
   }
   // Con «Asociar fórmulas» abierto: quita cada receta (Eliminar Receta) y la vuelve a asociar con la función de «Agregar Producto» del portal,
-  // que copia la lista actual de SAP. No pasa por la lista filtrada (oculta las recetas que usa una versión Autorizada). Solo en Ingresados.
-  async function reasociarRecetas(ctrl, recetas, avance = () => {}) {
+  // que copia la lista actual de SAP. No pasa por la lista filtrada (oculta las recetas que usa una versión Autorizada).
+  // conAutorizado: también en un Autorizado (misma versión), con el DMS como lo hace el portal: Eliminar Receta anula el documento
+  // (onDeleteAsocReceta) y Agregar lo vuelve a enviar con ACTUALIZAR (onConfirmAgregarRecetas → onTratarInformacionDMS).
+  async function reasociarRecetas(ctrl, recetas, avance = () => {}, { conAutorizado } = {}) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JSONModel = sap.ui.require('sap/ui/model/json/JSONModel') || sap.ui.model.json.JSONModel;
-    const vista = ctrl.getView(), a = vista.getModel('asociarDatos').getData();
-    if (+a.estadoIdRmd_iMaestraId !== 467) throw new Error('solo se reasocia la receta en un RMD Ingresado');
+    const vista = ctrl.getView(), a = vista.getModel('asociarDatos').getData(), autorizado = +a.estadoIdRmd_iMaestraId === 465;
+    if (+a.estadoIdRmd_iMaestraId !== 467 && !(conAutorizado && autorizado)) throw new Error(conAutorizado ? 'solo se saca y mete la receta en un RMD Ingresado o Autorizado' : 'solo se reasocia la receta en un RMD Ingresado');
     for (const rc of recetas) {
       const fila = (vista.getModel('listMdReceta').getData() || []).find((x) => x.activo !== false && x.recetaId && norm(x.recetaId.Matnr) === rc.matnr && norm(x.recetaId.Verid) === rc.verid);
       if (!fila) throw new Error(`la receta ${rc.matnr} / ${rc.verid} no está asociada en ${a.codigo}`);
@@ -8787,6 +8791,8 @@
       if (!pv) throw new Error(`SAP no devolvió la versión de fabricación ${rc.matnr} / ${rc.verid}`);
       avance(`quitando la receta ${rc.matnr} / ${rc.verid}…`);
       await ctrl.onBorrarRecetasAsignada(fila);
+      if (autorizado) { avance(`anulando en el DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.sendDMS(ctrl.generarNombre(fila), '', 'ANULAR'); }
+      let nuevas = [];
       try {
         await ctrl._updateModelRest(); await ctrl.onGetMdRecetaGeneral();
         avance(`volviendo a asociar la receta ${rc.matnr} / ${rc.verid} (lista actual de SAP)…`);
@@ -8794,17 +8800,24 @@
         vista.setModel(new JSONModel([pv]), 'aListReceta');
         const tabla = sap.ui.getCore().byId('frgAsocRecetas--idTblRecetas'); if (!tabla) throw new Error('no se encontró la tabla de «Agregar Producto»');
         tabla._aSelectedPaths = ['/0'];
-        try { await ctrl.onAgregarRecetas(); } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
+        if (ctrl.localModel) ctrl.localModel.setProperty('/aListMdRecetaId', []);
+        try { await ctrl.onAgregarRecetas(); nuevas = (ctrl.localModel && ctrl.localModel.getProperty('/aListMdRecetaId')) || []; } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
       } catch (e) { throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó quitada y no se pudo volver a asociar (${e.message || e}): asóciala a mano`); }
       finally { sap.ui.core.BusyIndicator.hide(); }
       // la lista principal se vuelve a leer solo con este código para que «Asociar fórmulas» tome el RMD actualizado
       await soloCodigoEnLista(ctrl, a.codigo);
       if (!await hasta(() => (vista.getModel('listMD').getData() || []).some((x) => x.mdId === a.mdId), 30000)) throw new Error('la receta quedó asociada, pero el RMD no volvió a aparecer en la lista: guarda las Observaciones a mano');
       await ctrl.actualizarCabeceraAsociarDatos(); await ctrl.onGetMdRecetaGeneral();
+      if (autorizado) {
+        if (ctrl.onGetDataEstructuraMD) await ctrl.onGetDataEstructuraMD();
+        const ids = nuevas.filter((id) => ((vista.getModel('asociarDatos').getData().aReceta || {}).results || []).some((x) => x.mdRecetaId === id));
+        if (!ids.length) throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó asociada, pero no se pudo enviar su documento al DMS: guarda el RMD en el portal o avisa a TI`);
+        for (const id of ids) { avance(`enviando al DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.onTratarInformacionDMS(id, 'ACTUALIZAR'); }
+      }
       sap.ui.core.BusyIndicator.hide(); await esperar(400);
     }
   }
-  window.__rmdStats.detectarCambioMaterial = (anterior, nuevo, codigos) => { const c = controladorPrincipal(); return detectarCambioMaterial(c.getView().getModel('mainModelv2'), c.oModelErpNec, { anterior, nuevo, codigos }, (t) => console.log(t)); };   // pruebas
+  window.__rmdStats.detectarCambioMaterial = (anterior, nuevo, codigos, misma) => { const c = controladorPrincipal(); return detectarCambioMaterial(c.getView().getModel('mainModelv2'), c.oModelErpNec, { anterior, nuevo, codigos, misma }, (t) => console.log(t)); };   // pruebas
   function abrirModificacionesMasivas(modoInicial = 'suspender') {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
     if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para las modificaciones masivas.', true); return; }
@@ -8818,6 +8831,7 @@
       <input type="text" class="rmd-susp-motivo" maxlength="400">
       <div class="rmd-mm-mat" style="display:none">
         <div class="rmd-mm-mat-fila"><label>Material anterior<input class="rmd-mat-ant" inputmode="numeric" placeholder="ej. 1100002760"></label><label>Material nuevo<input class="rmd-mat-nue" inputmode="numeric" placeholder="ej. 1100011265"></label>
+          <label>Autorizados<select class="rmd-mat-modo"><option value="version">Versión nueva</option><option value="misma">Misma versión</option></select></label>
           <label>Prioridad<select class="rmd-mat-pri"><option>1</option><option selected>2</option><option>3</option></select></label><label>Complejidad<select class="rmd-mat-com">${COMPLEJIDADES.map((c) => `<option${c === 'C1.0' ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
         <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-basta"><span>Basta con que <b>una</b> de las recetas asociadas tenga el cambio en SAP (se reasocian solo las que lo tienen; si no se marca, deben tenerlo todas)</span></label>
         <label class="rmd-fila rmd-mm-mat-basta"><input type="checkbox" class="rmd-mat-ver"><span>Mostrar también los master cuya lista en SAP <b>no es solo el reemplazo</b> (otros cambios, aún tiene el anterior o los dos); no se pueden actualizar</span></label>
@@ -8836,16 +8850,18 @@
     ta.addEventListener('input', pintarChips);
     const puede = (est) => MODOS_MASIVOS[modo].estados.includes(est);
     // Cambio de material: campos propios y el ejemplo de Observaciones
-    const q = (c) => v.cuerpo.querySelector(c), mAnt = q('.rmd-mat-ant'), mNue = q('.rmd-mat-nue'), mPri = q('.rmd-mat-pri'), mCom = q('.rmd-mat-com'), mTxt = q('.rmd-mat-txt'), mEj = q('.rmd-mat-ej'), mBasta = q('.rmd-mat-basta'), mVer = q('.rmd-mat-ver');
+    const q = (c) => v.cuerpo.querySelector(c), mAnt = q('.rmd-mat-ant'), mNue = q('.rmd-mat-nue'), mPri = q('.rmd-mat-pri'), mCom = q('.rmd-mat-com'), mTxt = q('.rmd-mat-txt'), mEj = q('.rmd-mat-ej'), mBasta = q('.rmd-mat-basta'), mVer = q('.rmd-mat-ver'), mModo = q('.rmd-mat-modo');
+    const misma = () => mModo.value === 'misma';
     const hoyTxt = (() => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; })(), ini = rsUsuarioIniciales() || 'XX';
     let detectado = null; const elegidos = new Set();                     // códigos marcados en la tabla
     mTxt.value = `${hoyTxt}${ini} Actualización de `;
     const notaMaterial = () => { const t = norm(mTxt.value); return /Actualización de\s*$/.test(t) ? '' : t; };   // sin completar = sin nota
-    const pintarEjemplo = () => { mEj.innerHTML = `<b>Ingresados</b> (se sacan y meten las recetas en la misma versión): la nota se agrega como línea nueva al final de sus Observaciones; vacía, no se tocan.<br><b>Autorizados</b> (versión nueva): <b>${esc(nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…'))}</b> (fase de la versión anterior)<br>${esc(notaMaterial() || '(nota, obligatoria)')}`; };
+    const pintarEjemplo = () => { mEj.innerHTML = misma() ? '<b>Ingresados y Autorizados</b> se sacan y meten las recetas en su <b>misma versión</b> (sin versión nueva; el Estado no cambia). La nota se agrega como línea nueva al final de sus Observaciones; vacía, no se tocan.'
+      : `<b>Ingresados</b> (se sacan y meten las recetas en la misma versión): la nota se agrega como línea nueva al final de sus Observaciones; vacía, no se tocan.<br><b>Autorizados</b> (versión nueva): <b>${esc(nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…'))}</b> (fase de la versión anterior)<br>${esc(notaMaterial() || '(nota, obligatoria)')}`; };
     [mPri, mCom, mTxt].forEach((x) => x.addEventListener('input', pintarEjemplo));
     const resumenMaterial = () => { const n = plan.filter((x) => x.aplica), nv = n.filter((x) => x.accion === 'version').length, oc = plan.filter((x) => x.oculto), ot = oc.filter((x) => x.recetas.some((r) => r.sap === 'otros')).length;
       const ocTxt = oc.length ? ` ${mVer.checked ? 'Se muestran' : 'No se listan'} ${oc.length} cuya lista en SAP no es solo el reemplazo${ot ? ` (${ot} con otros cambios)` : ''}.` : '';
-      setTxt(prog, plan.length ? `${plan.length} master tienen el ${detectado.anterior} en su receta copiada${detectado.material ? `; el nuevo es «${detectado.material}»` : ''}. Listos para actualizar: ${n.length} (${nv} versiones nuevas desde Autorizados y ${n.length - nv} Ingresados a reasociar)${mBasta.checked ? ', con una receta cambiada como mínimo' : ''}: en SAP solo se quitó el ${detectado.anterior} y se agregó el ${detectado.nuevo}.${ocTxt}${plan.some((x) => !x.aplica && !x.oculto) ? ' Los demás dicen por qué no.' : ''}` : '');
+      setTxt(prog, plan.length ? `${plan.length} master tienen el ${detectado.anterior} en su receta copiada${detectado.material ? `; el nuevo es «${detectado.material}»` : ''}. Listos para actualizar: ${n.length} (${nv} versiones nuevas desde Autorizados y ${n.length - nv} a sacar y meter en su misma versión)${mBasta.checked ? ', con una receta cambiada como mínimo' : ''}: en SAP solo se quitó el ${detectado.anterior} y se agregó el ${detectado.nuevo}.${ocTxt}${plan.some((x) => !x.aplica && !x.oculto) ? ' Los demás dicen por qué no.' : ''}` : '');
       pintarElegidos(); };
     const marcables = () => plan.filter((x) => x.aplica && !resultados.some((y) => y.codigo === x.codigo));
     const pintarElegidos = () => { [...elegidos].forEach((c) => { if (!marcables().some((x) => x.codigo === c)) elegidos.delete(c); });
@@ -8856,7 +8872,8 @@
       else if (e.target.classList.contains('rmd-mat-sel')) { if (e.target.checked) elegidos.add(e.target.dataset.codigo); else elegidos.delete(e.target.dataset.codigo); }
       pintarElegidos(); });
     mVer.addEventListener('change', () => { if (!detectado) return; resumenMaterial(); tablaMaterial(); });
-    mBasta.addEventListener('change', () => { if (!detectado || trabajando || resultados.length) return; plan.forEach((x) => reglaCambioMaterial(x, mBasta.checked)); plan.sort((a, b) => (+b.aplica - +a.aplica) || String(a.codigo).localeCompare(String(b.codigo), 'es', { numeric: true })); resumenMaterial(); tablaMaterial(); });
+    mModo.addEventListener('change', () => { const v2 = misma(); mPri.disabled = v2; mCom.disabled = v2; pintarEjemplo(); mBasta.dispatchEvent(new Event('change')); });
+    mBasta.addEventListener('change', () => { if (!detectado || trabajando || resultados.length) return; plan.forEach((x) => reglaCambioMaterial(x, mBasta.checked, misma())); plan.sort((a, b) => (+b.aplica - +a.aplica) || String(a.codigo).localeCompare(String(b.codigo), 'es', { numeric: true })); resumenMaterial(); tablaMaterial(); });
     [mAnt, mNue].forEach((x) => x.addEventListener('input', () => { detectado = null; plan = []; elegidos.clear(); res.innerHTML = ''; bEje.disabled = true; bX.disabled = true; }));
     const pintarModo = () => {
       v.cuerpo.querySelectorAll('.rmd-mm-modo').forEach((b) => { const s = b.dataset.modo === modo; b.classList.toggle('activo', s); b.setAttribute('aria-selected', String(s)); });
@@ -8898,7 +8915,7 @@
       const codigos = [];                                                  // todos los master: no se pegan códigos
       bRev.disabled = true; bX.disabled = true; resultados = []; plan = []; res.innerHTML = '';
       try {
-        detectado = await detectarCambioMaterial(modelo, ctrl.oModelErpNec, { anterior: ant, nuevo: nue, codigos, basta: mBasta.checked }, (t) => setTxt(prog, t));
+        detectado = await detectarCambioMaterial(modelo, ctrl.oModelErpNec, { anterior: ant, nuevo: nue, codigos, basta: mBasta.checked, misma: misma() }, (t) => setTxt(prog, t));
         detectado.anterior = ant; detectado.nuevo = nue; plan = detectado.filas;
         resumenMaterial(); bX.disabled = !plan.length; if (!plan.length) setTxt(prog, `Ningún master Ingresado o Autorizado tiene el ${ant} en su receta copiada${codigos.length ? ' (entre los códigos pegados)' : ''}.`);
         tablaMaterial();
@@ -8909,10 +8926,10 @@
       if (!lista.length || !detectado) return;
       if (nv && !texto) { setTxt(prog, 'Completa la nota: en los Autorizados va debajo de la nomenclatura de la versión nueva.'); mTxt.focus(); return; }
       const ok = await confirmar(`¿Actualizar ${lista.length} RMD?`,
-        `${nv ? `Se creará con «Nueva Versión» del portal una versión Ingresada de ${nv} RMD Autorizado(s), con sus Observaciones: «${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…')}» y «${texto}». ` : ''}${lista.length - nv ? `En ${lista.length - nv} RMD Ingresado(s) se sacan y meten las recetas en la misma versión${texto ? ` y se agrega «${texto}» al final de las Observaciones` : ' (sin nota: las Observaciones no cambian)'}. ` : ''}En todos se quita la receta y se vuelve a asociar para traer la lista actual de SAP (${detectado.nuevo} en lugar de ${detectado.anterior}). Quedan Ingresados.`,
-        `${nv ? 'En cada versión nueva el portal pide aceptar su mensaje de «Nueva Versión». ' : ''}No uses el portal mientras tanto. Una versión creada no se borra desde aquí (habría que cancelarla en el portal).`, { si: `Actualizar ${lista.length}`, no: 'Cancelar', peligro: true });
+        `${nv ? `Se creará con «Nueva Versión» del portal una versión Ingresada de ${nv} RMD Autorizado(s), con sus Observaciones: «${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, 'F…')}» y «${texto}». ` : ''}${lista.length - nv ? `En ${lista.length - nv} RMD (${lista.length - nv - lista.filter((x) => x.accion !== 'version' && x.estado === 'Autorizado').length} Ingresado(s), ${lista.filter((x) => x.accion !== 'version' && x.estado === 'Autorizado').length} Autorizado(s)) se sacan y meten las recetas en la misma versión${texto ? ` y se agrega «${texto}» al final de las Observaciones` : ' (sin nota: las Observaciones no cambian)'}. ` : ''}En todos se quita la receta y se vuelve a asociar para traer la lista actual de SAP (${detectado.nuevo} en lugar de ${detectado.anterior}). ${nv ? 'Las versiones nuevas quedan Ingresadas; en la misma versión el Estado no cambia.' : 'El Estado no cambia.'}`,
+        `${nv ? 'En cada versión nueva el portal pide aceptar su mensaje de «Nueva Versión». ' : ''}${lista.some((x) => x.accion !== 'version' && x.estado === 'Autorizado') ? 'En los Autorizados en su misma versión, como al hacerlo a mano, se anula el documento de cada receta en el DMS y se vuelve a enviar con la lista nueva (ACTUALIZAR). ' : ''}No uses el portal mientras tanto. Una versión creada no se borra desde aquí (habría que cancelarla en el portal).`, { si: `Actualizar ${lista.length}`, no: 'Cancelar', peligro: true });
       if (!ok) return;
-      trabajando = true; detenido = false; bEje.disabled = true; bRev.disabled = true; ta.readOnly = true; [mAnt, mNue, mPri, mCom, mTxt, mBasta, mVer].forEach((x) => { x.disabled = true; }); tablaMaterial();
+      trabajando = true; detenido = false; bEje.disabled = true; bRev.disabled = true; ta.readOnly = true; [mAnt, mNue, mPri, mCom, mTxt, mBasta, mVer, mModo].forEach((x) => { x.disabled = true; }); tablaMaterial();
       const bDet = botonModal('Detener', '', () => { detenido = true; bDet.disabled = true; setTxt(bDet, 'Se detiene tras el actual…'); }); v.pie.prepend(bDet);
       const filtrosAntes = guardarFiltrosLista(ctrl), usuario = usuarioSapActual(), quien = usuario ? (usuario.nombre || usuario.id) : '', F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
       resultados = [];
@@ -8927,15 +8944,16 @@
               destino = String(nueva.codigo); r.versionNueva = `${destino} v${nueva.version}`; await esperar(1500);
             }
             const s = await modificarUno(ctrl, destino, { linea: x.accion === 'version' ? '' : texto, reemplazar: x.accion === 'version' ? `${nomenclaturaMaterial(hoyTxt, ini, mPri.value, mCom.value, x.fase)}\n${texto}` : null,
-              sinLinea: true, previo: () => reasociarRecetas(ctrl, x.reasociar, paso) });
+              sinLinea: true, previo: () => reasociarRecetas(ctrl, x.reasociar, paso, { conAutorizado: x.estado === 'Autorizado' }) });
             paso('comprobando en SAP…');
             const md2 = (await leerMDPorCodigos(modelo, [destino])).sort((p2, q2) => q2.version - p2.version)[0];
             const ins = md2 ? await leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('mdId_mdId', 'EQ', md2.mdId), new F('activo', 'EQ', true)], { $select: 'Component' }) : [];
             const tieneNuevo = ins.some((y) => norm(y.Component) === detectado.nuevo), tieneAnt = ins.some((y) => norm(y.Component) === detectado.anterior);
             r.estadoDespues = md2 && md2.estadoIdRmd ? md2.estadoIdRmd.contenido : ''; r.obs = md2 ? md2.observacion || '' : s.obs;
-            r.ok = r.estadoDespues === 'Ingresado' && tieneNuevo && (!tieneAnt || x.pendientes > 0) && String(r.obs).includes(texto);
-            r.resultado = r.ok ? `${r.versionNueva ? `Versión nueva ${r.versionNueva}` : 'Receta reasociada'} · Ingresado con el ${detectado.nuevo}`
-              : `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}revisar: ${[r.estadoDespues !== 'Ingresado' && `quedó ${r.estadoDespues || 'sin estado'}`, !tieneNuevo && `no tiene el ${detectado.nuevo}`, tieneAnt && !x.pendientes && `aún tiene el ${detectado.anterior}`, !String(r.obs).includes(texto) && 'las Observaciones no quedaron', ...s.mensajes].filter(Boolean).join(' · ')}`;
+            const estadoEsperado = x.accion === 'version' ? 'Ingresado' : x.estado;   // en la misma versión el Estado no cambia
+            r.ok = r.estadoDespues === estadoEsperado && tieneNuevo && (!tieneAnt || x.pendientes > 0) && String(r.obs).includes(texto);
+            r.resultado = r.ok ? `${r.versionNueva ? `Versión nueva ${r.versionNueva}` : 'Receta sacada y metida en la misma versión'} · ${estadoEsperado} con el ${detectado.nuevo}`
+              : `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}revisar: ${[r.estadoDespues !== estadoEsperado && `quedó ${r.estadoDespues || 'sin estado'}`, !tieneNuevo && `no tiene el ${detectado.nuevo}`, tieneAnt && !x.pendientes && `aún tiene el ${detectado.anterior}`, !String(r.obs).includes(texto) && 'las Observaciones no quedaron', ...s.mensajes].filter(Boolean).join(' · ')}`;
           } catch (e) { r.resultado = `${r.versionNueva ? `Se creó ${r.versionNueva}, pero ` : ''}no se completó: ${e.message}`; ppCerrarDialogosSap(); }
           resultados.push(r); tablaMaterial();
           if (!r.ok) { detenido = true; setTxt(prog, `Se detuvo en ${x.codigo}: ${r.resultado}`); break; }
@@ -8943,7 +8961,7 @@
         const hechos = resultados.filter((y) => y.ok).length;
         if (resultados.every((y) => y.ok)) setTxt(prog, `${detenido ? 'Detenido. ' : ''}Actualizados: ${hechos} de ${lista.length}. Descarga el detalle con «Exportar Excel».`);
       } finally {
-        trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; [mAnt, mNue, mPri, mCom, mTxt, mBasta, mVer].forEach((x) => { x.disabled = false; }); bX.disabled = !plan.length; elegidos.clear(); tablaMaterial();
+        trabajando = false; bDet.remove(); bRev.disabled = false; ta.readOnly = false; [mAnt, mNue, mPri, mCom, mTxt, mBasta, mVer, mModo].forEach((x) => { x.disabled = false; }); mPri.disabled = mCom.disabled = misma(); bX.disabled = !plan.length; elegidos.clear(); tablaMaterial();
         try { await restaurarFiltrosLista(ctrl, filtrosAntes); } catch (e) { }
       }
     };
