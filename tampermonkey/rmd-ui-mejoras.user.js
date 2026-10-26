@@ -8872,16 +8872,17 @@
       else if (e.target.classList.contains('rmd-mat-sel')) { if (e.target.checked) elegidos.add(e.target.dataset.codigo); else elegidos.delete(e.target.dataset.codigo); }
       pintarElegidos(); });
     mVer.addEventListener('change', () => { if (!detectado) return; resumenMaterial(); tablaMaterial(); });
-    mModo.addEventListener('change', () => { const v2 = misma(); mPri.disabled = v2; mCom.disabled = v2; pintarEjemplo(); mBasta.dispatchEvent(new Event('change')); });
+    mModo.addEventListener('change', () => { const v2 = misma(); mPri.disabled = v2; mCom.disabled = v2; pintarEjemplo(); q('.rmd-mm-nota').textContent = notaModoMaterial(); mBasta.dispatchEvent(new Event('change')); });
     mBasta.addEventListener('change', () => { if (!detectado || trabajando || resultados.length) return; plan.forEach((x) => reglaCambioMaterial(x, mBasta.checked, misma())); plan.sort((a, b) => (+b.aplica - +a.aplica) || String(a.codigo).localeCompare(String(b.codigo), 'es', { numeric: true })); resumenMaterial(); tablaMaterial(); });
     [mAnt, mNue].forEach((x) => x.addEventListener('input', () => { detectado = null; plan = []; elegidos.clear(); res.innerHTML = ''; bEje.disabled = true; bX.disabled = true; }));
+    const notaModoMaterial = () => (misma() ? 'Ingresados y Autorizados: se quita y se vuelve a asociar la receta en su misma versión para traer la lista actual de SAP; el Estado no cambia. En los Autorizados, como al hacerlo a mano, se anula el documento de la receta en el DMS y se vuelve a enviar. Si escribes una nota, se agrega al final de las Observaciones.' : 'Autorizados: se crea una versión nueva con «Nueva Versión» del portal (queda Ingresada), se quita y se vuelve a asociar la receta para traer la lista actual de SAP, y sus Observaciones quedan con la nomenclatura (prioridad y complejidad que elijas, fase de la versión anterior) y tu texto debajo. Ingresados: se sacan y meten las recetas en la misma versión (sin versión nueva) y, si escribes una nota, se agrega al final de sus Observaciones.');
     const pintarModo = () => {
       v.cuerpo.querySelectorAll('.rmd-mm-modo').forEach((b) => { const s = b.dataset.modo === modo; b.classList.toggle('activo', s); b.setAttribute('aria-selected', String(s)); });
       const mat = modo === 'material'; q('.rmd-mm-mat').style.display = mat ? '' : 'none'; mot.style.display = mat ? 'none' : ''; q('.rmd-pegar').style.display = mat ? 'none' : '';   // en material los master se buscan solos
       if (mat) {
         q('.rmd-mm-ayuda').innerHTML = 'Indica el material que se <b>retiró</b> y el que <b>entró</b> en las recetas de SAP. «Revisar» busca los master (última versión Ingresada o Autorizada) cuya receta copiada aún tiene el anterior y cuya lista de materiales en SAP tiene <b>solo ese cambio</b>: se quitó el anterior y se agregó el nuevo, sin otros materiales agregados o quitados ni otras cantidades. <b>Revisar no crea ni cambia nada.</b>';
         q('.rmd-mm-rotulo').innerHTML = '';
-        q('.rmd-mm-nota').textContent = 'Autorizados: se crea una versión nueva con «Nueva Versión» del portal (queda Ingresada), se quita y se vuelve a asociar la receta para traer la lista actual de SAP, y sus Observaciones quedan con la nomenclatura (prioridad y complejidad que elijas, fase de la versión anterior) y tu texto debajo. Ingresados: se sacan y meten las recetas en la misma versión (sin versión nueva) y, si escribes una nota, se agrega al final de sus Observaciones.';
+        q('.rmd-mm-nota').textContent = notaModoMaterial();
         pintarEjemplo(); plan = []; resultados = []; detectado = null; elegidos.clear(); res.innerHTML = ''; setTxt(prog, ''); bEje.disabled = true; bX.disabled = true; setTxt(bEje, MODOS_MASIVOS[modo].verbo); return;
       }
       const sus = modo === 'suspender'; bEje.title = '';
