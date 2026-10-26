@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.95.0
+// @version      1.96.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.95.0';                                                       // mantener igual a @version
+  const VERSION = '1.96.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -57,7 +57,7 @@
     ['listasutiles', 'Comparar y Copiar de ordenados', '«Comparar versiones» muestra primero las versiones del mismo producto y «Copiar de RMD» los Autorizados e Ingresados más recientes.'],
     ['textosportal', 'Textos del portal corregidos', 'Títulos de ventana equivocados o con nombres internos, tildes de los avisos y cabeceras de columna partidas a media palabra.'],
     ['copiar', 'Copiar y pegar configuración', 'Copia la configuración de un paso (y sus procesos menores) a uno o varios pasos.'],
-    ['repetirpaso', 'Pasos a agregar', 'Al adicionar pasos, elige la cantidad y el orden de cada uno.'],
+    ['repetirpaso', 'Pasos a agregar', 'Al adicionar pasos (mayores o menores), muestra el orden con el que se guardará cada uno y deja cambiarlo, también entre los ya guardados; las copias de un mismo código tienen cada una su orden.'],
     ['nuevopaso', 'Botón «Nuevo Paso»', 'Al adicionar pasos, crea uno nuevo sin salir del RMD.'],
     ['editarpaso', 'Editar paso con aviso', 'Avisa si otros RMD usan el paso y deja elegir dónde aplicar el cambio.'],
     ['cambiarpaso', 'Cambiar paso', 'Cambia un paso por otro código sin perder su configuración.'],
@@ -564,14 +564,18 @@
   .sapMLIB.rmd-pred-anterior { box-shadow: inset 4px 0 0 var(--rmd-acento); background: rgba(27,141,236,.12) !important; }
   .sapMLIB.rmd-pred-anterior .sapMSLITitle::after { content: 'Paso anterior'; margin-left: 8px; padding: 0 6px; border-radius: 8px; background: var(--rmd-acento); color: #fff; font-size: 11px; font-weight: 600; vertical-align: 1px; }
   .rmd-sel-panel { margin: 6px 16px 8px; padding: 8px 10px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: rgba(27,141,236,.07); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
-  .rmd-sel-cab { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; } .rmd-sel-cab span { color: var(--rmd-apagado); font-size: 12px; }
+  .rmd-sel-cab { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; } .rmd-sel-cab b { white-space: nowrap; } .rmd-sel-cab span { color: var(--rmd-apagado); font-size: 12px; }
   .rmd-sel-lista { margin: 0; padding: 0; list-style: none; max-height: 190px; overflow: auto; }
   .rmd-sel-lista li { display: flex; align-items: center; gap: 10px; padding: 3px 4px; border-bottom: 1px solid rgba(128,128,128,.18); }
   .rmd-sel-pos { min-width: 44px; color: var(--rmd-apagado); font-size: 12px; } .rmd-sel-cod { min-width: 70px; font-weight: 600; } .rmd-sel-desc { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .rmd-sel-cant, .rmd-sel-mov { display: inline-flex; align-items: center; gap: 3px; }
   .rmd-sel-panel button { min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid var(--rmd-borde); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-acento-texto); font: 700 14px var(--rmd-fuente); cursor: pointer; }
   .rmd-sel-panel button:hover:not(:disabled) { background: var(--rmd-acento); color: #fff; } .rmd-sel-panel button:disabled { opacity: .35; cursor: default; } .rmd-sel-panel .rmd-sel-quitar { color: var(--rmd-rojo); }
-  .rmd-sel-cant input { width: 44px; height: 22px; text-align: center; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: inherit; font: 600 13px var(--rmd-fuente); }
+  .rmd-sel-lista input[type=checkbox] { margin: 0; cursor: pointer; } .rmd-sel-lista li.rmd-sel-rep .rmd-sel-cod { color: var(--rmd-acento-texto); }
+  .rmd-sel-donde { flex: 0 0 auto; color: var(--rmd-apagado); font-size: 12px; white-space: nowrap; }
+  .rmd-sel-cab .rmd-sel-repetir { flex: 0 0 auto; margin-left: auto; font-size: 12px; font-weight: 600; }
+  .rmd-sel-orden { -moz-appearance: textfield; } .rmd-sel-orden::-webkit-inner-spin-button, .rmd-sel-orden::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .rmd-sel-orden, .rmd-sel-cant input { width: 44px; height: 22px; text-align: center; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: inherit; font: 600 13px var(--rmd-fuente); }
   .rmd-ep-aviso { margin: 8px 16px 0; padding: 7px 10px; border-left: 3px solid var(--rmd-acento); border-radius: 3px; background: rgba(27,141,236,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-ep-cambio { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; } .rmd-ep-cambio div { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; }
   .rmd-ep-cambio span { color: var(--rmd-apagado); font-size: 12px; } .rmd-ep-cambio p { margin: 4px 0 0; } .rmd-ep-cambio div:first-child p { color: var(--rmd-apagado); }
@@ -9421,44 +9425,142 @@
     const g = []; arr.forEach((x) => { const u = g[g.length - 1]; if (u && u.codigo === x.codigo) { u.n++; u.items.push(x); } else g.push({ codigo: x.codigo, desc: x.descripcion || '', n: 1, items: [x] }); });
     return g;
   }
-  function pintarPanelPasos(d, tabla, m) {
-    const arr = (m.getData() || []), grupos = gruposSel(arr);
+  // Una fila por paso a agregar (también las copias del mismo código), cada una con su propio orden. El orden mostrado es el que tendrá en la lista:
+  // el portal pone los nuevos al final (pasos guardados + posición, onAsignPasoToEstructura / onAsignPasoToPaso); si se elige un orden dentro de los
+  // guardados, al Agregar se corren los guardados (MD_ES_PASO / MD_ES_PASO_INSUMO_PASO, como al cambiar el Orden en la tabla) y el nuevo entra ahí.
+  const marcasSel = new WeakSet();                                    // filas marcadas en el panel (para «Repetir marcados»)
+  const antesSel = new Map();                                         // paso nuevo -> cuántos pasos guardados quedan antes (sin dato: al final)
+  function moverSel(arr, i, destino) { const [x] = arr.splice(i, 1); arr.splice(Math.max(0, Math.min(arr.length, destino)), 0, x); return arr; }
+  const esSelectorPM = (tabla) => /frgAddPasoPM/.test(tabla.getId());
+  // pasos ya guardados de la lista destino (la etiqueta abierta, o los PM del paso), por orden; null si no se pueden leer
+  function pasosGuardados(esPM) {
+    const ctrl = controladorPrincipal(), m = ctrl && ctrl.getView().getModel(esPM ? 'listMdEsPasoInsumoPaso' : 'aListPasoAssignResponsive'), arr = m && m.getData();
+    return Array.isArray(arr) ? arr.slice().sort((a, b) => (+a.orden || 0) - (+b.orden || 0)) : null;
+  }
+  // con OP asociadas el portal no deja cambiar el orden de los guardados: los nuevos solo pueden ir al final
+  function mdConOps() { try { return !!controladorPrincipal().getView().getModel('localModel').getProperty('/mdTieneOpsAsociadas'); } catch (e) { return false; } }
+  // lista completa en el orden final: { g: paso guardado } y { x: paso nuevo }
+  function mezclaSel(guardados, xs) {
+    const n = guardados.length, out = []; let k = 0;
+    xs.forEach((x) => { const a = Math.min(n, antesSel.has(x) ? antesSel.get(x) : n); while (k < a) out.push({ g: guardados[k++] }); out.push({ x }); });
+    while (k < n) out.push({ g: guardados[k++] });
+    return out;
+  }
+  function separarSel(mezcla) { let k = 0; const xs = []; mezcla.forEach((e) => { if (e.g) k++; else { antesSel.set(e.x, k); xs.push(e.x); } }); return xs; }
+  function pintarPanelPasos(d, tabla, m, forzar) {
+    const arr = (m.getData() || []);
     let p = d.querySelector('.rmd-sel-panel');
     const lista = tabla.getDomRef(); if (!lista) return;
     if (!p) {
       p = document.createElement('div'); p.className = 'rmd-sel-panel'; lista.insertAdjacentElement('beforebegin', p);
       ['pointerdown', 'mousedown', 'click', 'keydown'].forEach((ev) => p.addEventListener(ev, (e) => e.stopPropagation()));
+      p.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input[data-i]')) { e.preventDefault(); e.target.blur(); } });
+      const aplicar = (cambiar) => {
+        const mm = p.__modelo, xs = (mm.getData() || []).slice(), g = p.__guardados || [], mz = mezclaSel(g, xs);
+        if (cambiar(mz, xs) === false) return;
+        fijarSel(mm, separarSel(mz)); pintarPanelPasos(p.__d, p.__tabla, mm, true);
+      };
       p.addEventListener('click', (e) => {
         const b = e.target.closest('button[data-a]'); if (!b) return; e.preventDefault();
-        const mm = p.__modelo, gs = gruposSel(mm.getData() || []), gi = +b.dataset.g, g = gs[gi]; if (!g) return;
-        const a = b.dataset.a;
-        if (a === 'mas') g.items.push(Object.assign({}, g.items[0]));
-        else if (a === 'menos') { if (g.items.length > 1) g.items.pop(); else return; }
-        else if (a === 'quitar') { gs.splice(gi, 1); desmarcarFila(p.__tabla, g.codigo, gs); }
-        else if (a === 'subir' && gi > 0) gs.splice(gi - 1, 2, gs[gi], gs[gi - 1]);
-        else if (a === 'bajar' && gi < gs.length - 1) gs.splice(gi, 2, gs[gi + 1], gs[gi]);
-        if (a !== 'quitar' && !['mas', 'menos', 'subir', 'bajar'].includes(a)) return;
-        fijarSel(mm, gs.flatMap((x) => x.items)); pintarPanelPasos(p.__d, p.__tabla, mm);
+        const a = b.dataset.a, i = +b.dataset.i;
+        aplicar((mz, xs) => {
+          if (a === 'repetir') {
+            const marcados = mz.map((y, k) => (y.x && marcasSel.has(y.x) ? k : -1)).filter((k) => k >= 0); if (!marcados.length) return false;
+            mz.splice(marcados[marcados.length - 1] + 1, 0, ...marcados.map((k) => ({ x: Object.assign({}, mz[k].x) })));
+            xs.forEach((x) => marcasSel.delete(x)); return true;
+          }
+          const x = xs[i], k = mz.findIndex((y) => y.x === x); if (!x || k < 0) return false;
+          const min = p.__min - 1;                                     // primera posición permitida (con OP: después de los guardados)
+          if (a === 'dup') mz.splice(k + 1, 0, { x: Object.assign({}, x) });
+          else if (a === 'quitar') { mz.splice(k, 1); antesSel.delete(x); desmarcarFila(p.__tabla, x.codigo, xs.filter((y) => y !== x)); }
+          else if (a === 'subir' && k > min) moverSel(mz, k, k - 1);
+          else if (a === 'bajar' && k < mz.length - 1) moverSel(mz, k, k + 1);
+          else return false;
+          return true;
+        });
       });
       p.addEventListener('change', (e) => {
-        const inp = e.target.closest('input[data-g]'); if (!inp) return;
-        const mm = p.__modelo, gs = gruposSel(mm.getData() || []), g = gs[+inp.dataset.g]; if (!g) return;
-        const n = Math.max(1, Math.min(50, parseInt(inp.value, 10) || 1));
-        while (g.items.length < n) g.items.push(Object.assign({}, g.items[0])); g.items.length = n;
-        fijarSel(mm, gs.flatMap((x) => x.items)); pintarPanelPasos(p.__d, p.__tabla, mm);
+        const ck = e.target.closest('input[data-m]');
+        if (ck) { const x = (p.__modelo.getData() || [])[+ck.dataset.m]; if (x) { if (ck.checked) marcasSel.add(x); else marcasSel.delete(x); } actualizarRepetir(p, p.__modelo.getData() || []); return; }
+        const inp = e.target.closest('input[data-i]'); if (!inp) return;
+        const n = parseInt(inp.value, 10);
+        aplicar((mz, xs) => {
+          const k = mz.findIndex((y) => y.x === xs[+inp.dataset.i]);
+          if (k < 0 || !Number.isFinite(n) || n === k + 1) { inp.value = k + 1; return false; }
+          moverSel(mz, k, Math.max(p.__min, Math.min(mz.length, n)) - 1); return true;
+        });
       });
     } else if (p.nextElementSibling !== lista) lista.insertAdjacentElement('beforebegin', p);
     p.__modelo = m; p.__tabla = tabla; p.__d = d;
-    const firma = JSON.stringify(grupos.map((g) => [g.codigo, g.n]));
-    if (p.dataset.firma === firma) return; p.dataset.firma = firma;
-    p.hidden = !grupos.length;
-    const total = arr.length;
-    p.innerHTML = `<div class="rmd-sel-cab"><b>Pasos a agregar (${total})</b><span>Se agregan en este orden. Cambia la cantidad para repetir un paso; marca más filas en la tabla para sumar otros.</span></div>` +
-      `<ol class="rmd-sel-lista">${grupos.map((g, gi) => `<li><span class="rmd-sel-pos">${grupos.slice(0, gi).reduce((a, x) => a + x.n, 0) + 1}${g.n > 1 ? '–' + (grupos.slice(0, gi).reduce((a, x) => a + x.n, 0) + g.n) : ''}</span>` +
-        `<span class="rmd-sel-cod">${esc(g.codigo)}</span><span class="rmd-sel-desc" title="${esc(g.desc)}">${esc(g.desc)}</span>` +
-        `<span class="rmd-sel-cant"><button type="button" data-a="menos" data-g="${gi}" title="Una vez menos" ${g.n <= 1 ? 'disabled' : ''}>−</button><input type="number" min="1" max="50" value="${g.n}" data-g="${gi}" aria-label="Veces que se agrega"><button type="button" data-a="mas" data-g="${gi}" title="Una vez más">+</button></span>` +
-        `<span class="rmd-sel-mov"><button type="button" data-a="subir" data-g="${gi}" title="Subir" ${gi === 0 ? 'disabled' : ''}>↑</button><button type="button" data-a="bajar" data-g="${gi}" title="Bajar" ${gi === grupos.length - 1 ? 'disabled' : ''}>↓</button><button type="button" data-a="quitar" data-g="${gi}" title="Quitar de la lista" class="rmd-sel-quitar">×</button></span></li>`).join('')}</ol>`;
+    if (!arr.length) antesSel.clear(); else [...antesSel.keys()].forEach((x) => { if (!arr.includes(x)) antesSel.delete(x); });
+    const esPM = esSelectorPM(tabla), leidos = pasosGuardados(esPM), guardados = leidos || [], base = guardados.length, ops = !!leidos && base > 0 && mdConOps();
+    p.__guardados = guardados; p.__min = ops ? base + 1 : 1;
+    const mz = mezclaSel(guardados, arr), pos = new Map(mz.map((y, k) => [y.x || y.g, k]));
+    const firma = JSON.stringify([base, ops, mz.map((y) => (y.x ? [y.x.codigo, marcasSel.has(y.x)] : 0))]);
+    if (!forzar && (p.dataset.firma === firma || (p.contains(document.activeElement) && document.activeElement.matches('input[data-i]')))) return;   // igual, o escribiendo un orden
+    p.dataset.firma = firma;
+    p.hidden = !arr.length;
+    const total = mz.length, rep = arr.reduce((o, x) => o.set(x.codigo, (o.get(x.codigo) || 0) + 1), new Map()), que = esPM ? 'procesos menores' : 'pasos';
+    const ayuda = !leidos ? 'Se agregan en este orden.'
+      : !base ? `La lista no tiene ${que} guardados: se agregan en este orden.`
+      : ops ? `Hay ${base} ${que} guardados y el RMD tiene OP asociadas: los nuevos van al final (orden ${base + 1} en adelante).`
+      : `Hay ${base} ${que} guardados: los nuevos van al final (orden ${base + 1} en adelante). Escribe un orden menor para ponerlo entre los guardados: esos se corren al agregar.`;
+    // guardado que queda justo después de un paso nuevo (para decir dónde entra)
+    const siguiente = (x) => { const k = pos.get(x); for (let j = k + 1; j < mz.length; j++) if (mz[j].g) return mz[j].g; return null; };
+    const nombreG = (g) => { const h = esPM ? g.pasoHijoId : g.pasoId; return { cod: String((h && h.codigo) || ''), desc: norm((h && h.descripcion) || '') }; };
+    p.innerHTML = `<div class="rmd-sel-cab"><b>Pasos a agregar (${arr.length})</b><span>${esc(ayuda)} Las copias de un mismo código se mueven por separado; ⧉ repite ese paso.</span>` +
+      `<button type="button" data-a="repetir" class="rmd-sel-repetir" title="Agrega una copia de las filas marcadas, en su orden, justo después de la última marcada" disabled>Repetir marcados</button></div>` +
+      `<ol class="rmd-sel-lista">${arr.map((x, i) => {
+        const k = pos.get(x), sg = base && k < total - 1 ? siguiente(x) : null, ng = sg && nombreG(sg);
+        const donde = ng ? `<span class="rmd-sel-donde" title="Entra antes del ${esPM ? 'proceso menor' : 'paso'} guardado ${esc(ng.cod)} ${esc(ng.desc)} (hoy orden ${esc(sg.orden)}), que se corre un lugar">antes ${ng.cod ? `de ${esc(ng.cod)} (hoy ${esc(sg.orden)})` : `del orden ${esc(sg.orden)} actual`}</span>` : '';
+        return `<li${rep.get(x.codigo) > 1 ? ' class="rmd-sel-rep"' : ''}><input type="checkbox" data-m="${i}" title="Marcar para «Repetir marcados»"${marcasSel.has(x) ? ' checked' : ''}>` +
+          `<input type="number" class="rmd-sel-orden" min="${p.__min}" max="${total}" value="${k + 1}" data-i="${i}" aria-label="Orden" title="Orden con el que se guardará: escribe otro número para mover solo esta fila">` +
+          `<span class="rmd-sel-cod">${esc(x.codigo)}</span><span class="rmd-sel-desc" title="${esc(x.descripcion || '')}">${esc(x.descripcion || '')}</span>${donde}` +
+          `<span class="rmd-sel-mov"><button type="button" data-a="dup" data-i="${i}" title="Repetir este paso (la copia queda justo debajo)">⧉</button><button type="button" data-a="subir" data-i="${i}" title="Subir" ${k <= p.__min - 1 ? 'disabled' : ''}>↑</button><button type="button" data-a="bajar" data-i="${i}" title="Bajar" ${k === total - 1 ? 'disabled' : ''}>↓</button><button type="button" data-a="quitar" data-i="${i}" title="Quitar de la lista" class="rmd-sel-quitar">×</button></span></li>`;
+      }).join('')}</ol>`;
+    actualizarRepetir(p, arr);
   }
+  function actualizarRepetir(p, arr) { const b = p.querySelector('.rmd-sel-repetir'), n = arr.filter((x) => marcasSel.has(x)).length; if (!b) return; b.disabled = !n; b.textContent = n ? `Repetir marcados (${n})` : 'Repetir marcados'; }
+  // Al Agregar: el portal envía los nuevos con orden guardados + posición (MD_ESTRUCTURA con aPaso / aPasoInsumoPaso). Si alguno va entre los
+  // guardados, antes se corren esos (uno por fila, como el cambio de Orden de la tabla) y el envío del portal sale con el orden elegido.
+  function planOrdenAgregar(ruta, datos) {
+    if (!on('repetirpaso') || !/^\/MD_ESTRUCTURA\('[^']+'\)$/.test(String(ruta)) || !datos) return null;
+    const esPM = Array.isArray(datos.aPasoInsumoPaso), nuevos = esPM ? datos.aPasoInsumoPaso : datos.aPaso; if (!Array.isArray(nuevos) || !nuevos.length) return null;
+    const ctrl = controladorPrincipal(), sm = ctrl && ctrl.getView().getModel('aSeleccionadoPaso'), xs = (sm && sm.getData()) || [], guardados = pasosGuardados(esPM);
+    if (!guardados || xs.length !== nuevos.length || +nuevos[0].orden !== guardados.length + 1) return null;
+    if (xs.some((x, i) => String(x.pasoId) !== String(esPM ? nuevos[i].pasoHijoId_pasoId : nuevos[i].pasoId_pasoId))) return null;
+    if (!xs.some((x) => antesSel.has(x) && antesSel.get(x) < guardados.length) || mdConOps()) return null;   // todos al final: como el portal
+    const lm = ctrl.getView().getModel('localModel'), usuario = lm && ((lm.getProperty('/oInfoUsuario') || {}).data || {}).usuario, ahora = new Date(), cambios = [];
+    mezclaSel(guardados, xs).forEach((y, k) => {
+      if (y.x) { nuevos[xs.indexOf(y.x)].orden = k + 1; return; }
+      if (+y.g.orden === k + 1) return;
+      const id = esPM ? y.g.mdEstructuraPasoInsumoPasoId : y.g.mdEstructuraPasoId; if (!id) return;
+      cambios.push({ ruta: `/${esPM ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO'}('${id}')`, antes: +y.g.orden, datos: Object.assign({ orden: k + 1, fechaActualiza: ahora }, usuario ? { usuarioActualiza: usuario } : {}) });
+    });
+    return cambios;
+  }
+  function engancharOrdenAgregar() {
+    const ctrl = controladorPrincipal(); if (!ctrl) return;
+    [ctrl.getView().getModel('mainModelv2'), ctrl.mainModelv2].forEach((m) => {
+      if (!m || m.__rmdOrdenAgregar || typeof m.update !== 'function') return;
+      m.__rmdOrdenAgregar = true; const up0 = m.update;
+      m.update = function (ruta, datos, params) {
+        let plan = null; try { plan = planOrdenAgregar(ruta, datos); } catch (e) { plan = null; }
+        if (!plan || !plan.length) return up0.apply(this, arguments);
+        // si alguno falla, los que sí se corrieron vuelven a su orden y no se agrega nada
+        const self = this, enviar = (r, d) => new Promise((ok, ko) => up0.call(self, r, d, { success: ok, error: ko }));
+        Promise.allSettled(plan.map((c) => enviar(c.ruta, c.datos))).then(async (rs) => {
+          const mal = rs.find((r) => r.status === 'rejected');
+          if (!mal) { antesSel.clear(); up0.call(self, ruta, datos, params); return; }
+          await Promise.allSettled(plan.filter((c, i) => rs[i].status === 'fulfilled').map((c) => enviar(c.ruta, Object.assign({}, c.datos, { orden: c.antes }))));
+          toast('No se pudo correr el orden de los pasos guardados, así que no se agregó nada. Revisa la lista e inténtalo de nuevo.', true);
+          if (params && params.error) params.error(mal.reason);
+        });
+        return { abort() {} };
+      };
+    });
+  }
+  window.__rmdStats.ordenAgregar = { mezclaSel, separarSel, antesSel, planOrdenAgregar };   // pruebas
   function desmarcarFila(tabla, codigo, quedan) {
     if (!tabla || quedan.some((g) => g.codigo === codigo)) return;
     const bi = tabla.getBindingInfo('items'), mod = bi && bi.model;
@@ -9496,9 +9598,10 @@
       fijarSel(mm, arr); return r;
     });
     if (!on('repetirpaso')) { d.querySelectorAll('.rmd-sel-panel').forEach((x) => x.remove()); return; }
+    engancharOrdenAgregar();
     pintarPanelPasos(d, tabla, m);
   }
-  window.__rmdStats.panelPasos = () => { const p = document.querySelector('.rmd-sel-panel'); return p && !p.hidden ? [...p.querySelectorAll('li')].map((li) => li.querySelector('.rmd-sel-cod').textContent + 'x' + li.querySelector('input').value) : []; };   // pruebas
+  window.__rmdStats.panelPasos = () => { const p = document.querySelector('.rmd-sel-panel'); return p && !p.hidden ? gruposSel([...p.querySelectorAll('li .rmd-sel-cod')].map((c) => ({ codigo: c.textContent }))).map((g) => g.codigo + 'x' + g.n) : []; };   // pruebas: códigos seguidos agrupados («cód x veces»)
 
   // ---- Lista de Predecesores («Depende» › ayuda para entradas) ----
   // El portal la abre en el primer paso y carga de 20 en 20; casi siempre el predecesor es el paso anterior con tipo de dato (la misma regla que

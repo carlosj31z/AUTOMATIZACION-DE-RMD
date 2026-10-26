@@ -1384,7 +1384,7 @@ with sync_playwright() as p:
             for k in orden: fr.locator(f"[id='{ids[k]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700)
             return ids
         PANEL = "window.__rmdStats.panelPasos()"
-        @prueba("V3 'Adicionar Pasos' (guardado SIMULADO + cortafuegos): panel 'Pasos a agregar' con cantidad (− n +, también escrita), ↑ ↓ y ×; marcar/desmarcar filas lo actualiza; Agregar envía exactamente ese orden y el pie cabe en la pantalla")
+        @prueba("V3 'Adicionar Pasos' (guardado SIMULADO + cortafuegos): panel 'Pasos a agregar' con una fila por copia (⧉ repetir), ↑ ↓ y ×; marcar/desmarcar filas lo actualiza; Agregar envía exactamente ese orden y el pie cabe en la pantalla")
         def _():
             bloq = []
             def guardia(route):
@@ -1393,13 +1393,13 @@ with sync_playwright() as p:
             pg.route("**/*", guardia)
             try:
                 ids = marcar_v(4, [1, 0, 2]); a1 = fr.evaluate(PANEL)
-                for _i in range(3): fr.locator(".rmd-sel-panel li").nth(1).locator("button[data-a='mas']").click(); pg.wait_for_timeout(300)
+                for _i in range(3): fr.locator(".rmd-sel-panel li").nth(1).locator("button[data-a='dup']").click(); pg.wait_for_timeout(300)
                 a2 = fr.evaluate(PANEL)
-                c = fr.locator(".rmd-sel-panel li").nth(0).locator("input"); c.fill("2"); c.press("Enter"); pg.wait_for_timeout(500)
-                fr.locator(".rmd-sel-panel li").nth(2).locator("button[data-a='subir']").click(); pg.wait_for_timeout(400)
+                fr.locator(".rmd-sel-panel li").nth(0).locator("button[data-a='dup']").click(); pg.wait_for_timeout(400)
+                for _i in range(4): fr.locator(".rmd-sel-panel li").last.locator("button[data-a='subir']").click(); pg.wait_for_timeout(300)
                 a3 = fr.evaluate(PANEL); marcadas = fr.evaluate("() => sap.ui.getCore().byId('frgAdicNewMdPasos--idTblPaso').getSelectedItems().length")
                 fr.locator(f"[id='{ids[3]}'] td.sapMListTblSelCol").click(); pg.wait_for_timeout(700); a4 = fr.evaluate(PANEL)
-                fr.locator(".rmd-sel-panel li").nth(3).locator("button[data-a='quitar']").click(); pg.wait_for_timeout(500); a5 = fr.evaluate(PANEL)
+                fr.locator(".rmd-sel-panel li").last.locator("button[data-a='quitar']").click(); pg.wait_for_timeout(500); a5 = fr.evaluate(PANEL)
                 pie = fr.evaluate("() => { const d=" + TOPV + "; return [...d.querySelectorAll('footer button')].filter(x => x.getClientRects().length).every(x => x.getBoundingClientRect().bottom <= innerHeight); }")
                 modelo = fr.evaluate("() => sap.ui.getCore().byId('frgAdicNewMdPasos--idTblPaso').getModel('aSeleccionadoPaso').getData().map(x => String(x.codigo))")
                 env = agregar_simulado_v("aPaso")
