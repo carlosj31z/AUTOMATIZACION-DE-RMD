@@ -1010,7 +1010,7 @@
   .rmd-beam[data-beam] { position: absolute; inset: -1px; z-index: 4; pointer-events: none; } .rmd-paleta-caja { position: relative; }
   /* ── Entrada y salida del orbe ── */
   .rmd-cc-pestana { padding: 0 0 8px; } .rmd-cc-barra { gap: 0 16px; padding: 4px 0 12px; } .rmd-cc-filtro { width: 13rem; } .rmd-cc-restablecer { margin: 0 0 8px auto; }
-  .rmd-cc-info { color: var(--rmd-apagado); font-size: 12.5px; margin-right: 8px; } .rmd-cc-desc { display: block; margin: 0 0 6px; white-space: pre-line; } .rmd-cc-dlg .sapMDialogScrollCont { padding: 12px 16px; }
+  .rmd-cc-info { color: var(--rmd-apagado); font-size: 12.5px; margin-right: 8px; } .rmd-cc-desc { display: block; margin: 0 0 6px; white-space: pre-line; } .rmd-cc-dlg .sapMDialogScrollCont { padding: 12px 16px; } .rmd-cc-oculto { display: none !important; }
   html { --rmd-curva: cubic-bezier(.22, 1, .36, 1); --rmd-brillo-txt: #ffffff; } html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-brillo-txt: #0d0d0d; }
   canvas.rmd-orbe { animation: rmd-orbe-entra .32s var(--rmd-curva) both; } canvas.rmd-orbe.rmd-sin-entrada { animation: none; }
   @keyframes rmd-orbe-entra { from { opacity: 0; scale: .25; filter: blur(4px); } }
@@ -14538,9 +14538,15 @@
   }
   function quitarPestanaCC(itb) {
     const items = itb.getItems(), i = items.findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_CC); if (i < 0) return;
-    if (itb.getSelectedKey() === CLAVE_PESTANA_CC) { const prim = items.find((x) => x.getKey && x.getKey() !== CLAVE_PESTANA_CC && x.getText); if (prim) itb.setSelectedKey(prim.getKey()); }
+    if (itb.getSelectedKey() === CLAVE_PESTANA_CC) { if (ACC.vista && ACC.vista.itb === itb) ACC.vista.mostrar(false); const prim = items.find((x) => x.getKey && x.getKey() !== CLAVE_PESTANA_CC && x.getText); if (prim) itb.setSelectedKey(prim.getKey()); }
     const sep = items[i - 1]; itb.removeItem(items[i]).destroy(); if (sep && sep.__rmd) itb.removeItem(sep).destroy();
-    if (ACC.vista && ACC.vista.itb === itb) { ACC.vista.archivo.remove(); ACC.vista = null; }
+    const v = ACC.vista;
+    if (v && v.itb === itb) {
+      v.archivo.remove(); v.ajenos().forEach((c) => c.removeStyleClass('rmd-cc-oculto'));
+      if (v.agr) v.cuerpo.removeAggregation(v.agr, v.cont); v.cont.destroy();
+      if (v.dp && v.conservar0 !== null) v.dp.setPreserveHeaderStateOnScroll(v.conservar0);
+      ACC.vista = null;
+    }
   }
   function quitarPestanasCC() {
     document.querySelectorAll('.sapMITB').forEach((el) => { const itb = window.sap && sap.ui.getCore().byId(el.id); if (itb && itb.getItems) aislar('quitarPestanaCC', () => quitarPestanaCC(itb)); });
@@ -14583,10 +14589,30 @@
     const cont = new VBox({ items: [barra, tabla], width: '100%' }).addStyleClass('rmd-cc-pestana');
     cont.setModel(modelo, 'cc');
     const sep = new ITS(); sep.__rmd = true;
-    const pestana = new ITF({ key: CLAVE_PESTANA_CC, text: 'Controles de Cambios', icon: 'sap-icon://approvals', iconColor: 'Critical', tooltip: 'Acciones abiertas de DOC del registro de controles de cambio con sus RMD asociados', content: [cont] });
+    // En el portal la IconTabBar va en la cabecera de un DynamicPage y cada pestaña muestra su tabla en el contenido de la página: la
+    // nuestra va en ese mismo contenedor y, mientras está elegida, se ocultan (por clase) las tablas y filtros del portal; así la cabecera
+    // no crece ni se pliega. Sin DynamicPage (o con un contenido de un solo control) va como contenido de la pestaña.
+    let dp = itb.getParent(); while (dp && !(dp.getHeaderExpanded && dp.getContent)) dp = dp.getParent && dp.getParent();
+    const cuerpo = dp && dp.getContent(), agr = cuerpo && cuerpo.getMetadata && cuerpo.getMetadata().getDefaultAggregation && cuerpo.getMetadata().getDefaultAggregation();
+    const enCuerpo = !!(agr && agr.multiple);
+    const pestana = new ITF({ key: CLAVE_PESTANA_CC, text: 'Controles de Cambios', icon: 'sap-icon://approvals', iconColor: 'Critical', tooltip: 'Acciones abiertas de DOC del registro de controles de cambio con sus RMD asociados', content: enCuerpo ? [] : [cont] });
+    if (enCuerpo) { cont.setVisible(false); cuerpo.addAggregation(agr.name, cont); }
     itb.addItem(sep); itb.addItem(pestana);
-    ACC.vista = { itb, modelo, tabla, archivo, pestana };
-    itb.attachSelect((e) => { if (e.getParameter('key') === CLAVE_PESTANA_CC) { if (!ACC.datos) leerAccionesGuardadas(); if (ACC.datos) leerRmdParaCC(false).catch((er) => toast('No se pudieron leer los RMD: ' + er.message, true)); } });
+    const cab = dp && dp.getHeader && dp.getHeader(), conservar0 = dp && dp.getPreserveHeaderStateOnScroll ? dp.getPreserveHeaderStateOnScroll() : null;
+    const ajenos = () => (enCuerpo ? cuerpo.getAggregation(agr.name) || [] : []).concat(cab && cab.getContent ? cab.getContent() : []).filter((c) => c !== cont && c !== itb && c.addStyleClass);
+    const mostrar = (nuestra) => {
+      if (enCuerpo) cont.setVisible(nuestra);
+      if (enCuerpo) ajenos().forEach((c) => (nuestra ? c.addStyleClass('rmd-cc-oculto') : c.removeStyleClass('rmd-cc-oculto')));
+      if (!dp) return;
+      if (conservar0 !== null) dp.setPreserveHeaderStateOnScroll(nuestra ? true : conservar0);
+      dp.setHeaderExpanded(true);
+      const w = dp.getDomRef && dp.getDomRef('contentWrapper'); if (w) w.scrollTop = 0;
+    };
+    ACC.vista = { itb, modelo, tabla, archivo, pestana, cont, dp, cuerpo, agr: enCuerpo ? agr.name : '', ajenos, conservar0, mostrar };
+    itb.attachSelect((e) => {
+      const nuestra = e.getParameter('key') === CLAVE_PESTANA_CC; mostrar(nuestra);
+      if (nuestra) { if (!ACC.datos) leerAccionesGuardadas(); if (ACC.datos) leerRmdParaCC(false).catch((er) => toast('No se pudieron leer los RMD: ' + er.message, true)); }
+    });
     if (!ACC.datos) leerAccionesGuardadas(); else refrescarPestanaCC();
   }
   const ccFecha = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
@@ -14610,7 +14636,7 @@
   }
   function refrescarPestanaCC() {
     const v = ACC.vista; if (!v) return;
-    if (v.itb.bIsDestroyed || !v.pestana.getParent()) { ACC.vista = null; return; }
+    if (v.itb.bIsDestroyed || !v.pestana.getParent()) { v.archivo.remove(); ACC.vista = null; return; }
     const d = ACC.datos;
     v.modelo.setProperty('/info', !d ? 'Sin Excel cargado' : `${d.archivo} · cargado el ${fechaHoraCorta(d.cargado)}${ACC.leyendo ? ` · leyendo RMD ${ACC.avance || ''}` : ''}`);
     v.modelo.setProperty('/ocupado', !!ACC.leyendo && !ACC.ind);

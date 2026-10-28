@@ -1,9 +1,10 @@
 """Pruebas de la pestaña «Controles de Cambios» (v1.100) sobre una Configuración Maestra hecha con OpenUI5 real (sin portal ni sesión).
 
-Preparación, una vez (OpenUI5 1.120 desde npm y su tema sap_fiori_3 compilado con less-openui5):
-    mkdir ui5 && cd ui5 && npm pack @openui5/sap.ui.core@1.120.0 @openui5/sap.m@1.120.0 @openui5/sap.ui.layout@1.120.0 @openui5/sap.ui.unified@1.120.0 @openui5/themelib_sap_fiori_3@1.120.0
+Preparación, una vez (OpenUI5 1.120 desde npm, con sap.f, y su tema sap_fiori_3 compilado con less-openui5). La maqueta imita el portal: IconTabBar en la
+cabecera de un DynamicPage y las tablas de cada pestaña en su contenido:
+    mkdir ui5 && cd ui5 && npm pack @openui5/sap.ui.core@1.120.0 @openui5/sap.m@1.120.0 @openui5/sap.ui.layout@1.120.0 @openui5/sap.ui.unified@1.120.0 @openui5/sap.f@1.120.0 @openui5/themelib_sap_fiori_3@1.120.0
     for f in *.tgz; do mkdir -p x && tar xzf $f -C x && cp -rn x/package/src/* res/ ; rm -rf x; done   (res/ = carpeta de recursos)
-    npm i less-openui5@0.11  y compilar sap/ui/core, sap/m, sap/ui/layout, sap/ui/unified (themes/sap_fiori_3/library.source.less -> library.css)
+    npm i less-openui5@0.11  y compilar sap/ui/core, sap/m, sap/f, sap/ui/layout, sap/ui/unified (themes/sap_fiori_3/library.source.less -> library.css)
 Luego:
     RMD_UI5_RES=/ruta/a/res python tampermonkey/pruebas/qa_controles_cambio.py [Excel del REGISTRO DE CONTROLES DE CAMBIO]
 Sin Excel se arma uno de ejemplo con openpyxl. SharePoint se simula con el puente del cargador (postMessage): no escribe nada.
@@ -12,17 +13,20 @@ import os, sys, pathlib, json, tempfile
 from playwright.sync_api import sync_playwright
 RES = pathlib.Path(os.environ.get('RMD_UI5_RES', 'ui5/res'))
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8"><title>maestra</title>
-<script id="sap-ui-bootstrap" src="/resources/sap-ui-core.js" data-sap-ui-theme="sap_fiori_3" data-sap-ui-libs="sap.m" data-sap-ui-async="true" data-sap-ui-compatVersion="edge"></script>
+<script id="sap-ui-bootstrap" src="/resources/sap-ui-core.js" data-sap-ui-theme="sap_fiori_3" data-sap-ui-libs="sap.m,sap.f" data-sap-ui-async="true" data-sap-ui-compatVersion="edge"></script>
 <script>
 sap.ui.getCore().attachInit(function () {
-  sap.ui.require(['sap/m/Dialog','sap/m/IconTabBar','sap/m/IconTabFilter','sap/m/IconTabSeparator','sap/m/Table','sap/m/Column','sap/m/Text','sap/m/Button','sap/m/ColumnListItem','sap/m/Label','sap/m/Input'], function (Dialog, ITB, ITF, ITS, Table, Column, Text, Button, CLI, Label, Input) {
-    var mk = function (k, t, ic) { var tb = new Table({ headerText: t, columns: [new Column({ header: new Text({ text: 'Código' }) }), new Column({ header: new Text({ text: 'Descripción' }) })] });
-      for (var i = 1; i < 4; i++) tb.addItem(new CLI({ cells: [new Text({ text: String(i) }), new Text({ text: t + ' ' + i })] }));
-      return new ITF({ key: k, text: t, icon: ic, content: [new Label({ text: 'Descripción:' }), new Input({ placeholder: 'Ingrese Descripción' }), tb] }); };
-    var itb = new ITB('itbMaestra', { expandable: false, select: function (e) { window.__sel = e.getParameter('key'); }, items: [mk('1', 'Estructura', 'sap-icon://building'), new ITS(), mk('2', 'Etiqueta', 'sap-icon://tag'), new ITS(), mk('3', 'Paso', 'sap-icon://process'), new ITS(), mk('4', 'Motivo', 'sap-icon://undo'), new ITS(), mk('5', 'Utensilios', 'sap-icon://laptop'), new ITS(), mk('6', 'Motivo de lapsos', 'sap-icon://journey-arrive')] });
-    var d = new Dialog({ title: 'Configuracion Maestra', contentWidth: '95%', contentHeight: '90%', content: [itb], endButton: new Button({ text: 'Cerrar', press: function () { d.close(); } }) });
+  sap.ui.require(['sap/m/Dialog','sap/m/IconTabBar','sap/m/IconTabFilter','sap/m/IconTabSeparator','sap/m/Table','sap/m/Column','sap/m/Text','sap/m/Button','sap/m/ColumnListItem','sap/m/Label','sap/m/Input','sap/m/VBox','sap/f/DynamicPage','sap/f/DynamicPageHeader'], function (Dialog, ITB, ITF, ITS, Table, Column, Text, Button, CLI, Label, Input, VBox, DP, DPH) {
+    var tablas = {};
+    var mk = function (k, t, ic) { var tb = new Table({ headerText: t, visible: k === '1', columns: [new Column({ header: new Text({ text: 'Código' }) }), new Column({ header: new Text({ text: 'Descripción' }) })] });
+      for (var i = 1; i < 40; i++) tb.addItem(new CLI({ cells: [new Text({ text: String(i) }), new Text({ text: t + ' ' + i })] }));
+      tablas[k] = tb; return new ITF({ key: k, text: t, icon: ic }); };
+    var itb = new ITB('itbMaestra', { expandable: false, select: function (e) { var k = e.getParameter('key'); window.__sel = k; Object.keys(tablas).forEach(function (x) { tablas[x].setVisible(x === k); }); }, items: [mk('1', 'Estructura', 'sap-icon://building'), new ITS(), mk('2', 'Etiqueta', 'sap-icon://tag'), new ITS(), mk('3', 'Paso', 'sap-icon://process'), new ITS(), mk('4', 'Motivo', 'sap-icon://undo'), new ITS(), mk('5', 'Utensilios', 'sap-icon://laptop'), new ITS(), mk('6', 'Motivo de lapsos', 'sap-icon://journey-arrive')] });
+    var cuerpo = new VBox({ items: Object.keys(tablas).map(function (k) { return tablas[k]; }) });
+    var dp = new DP('frgConfiguration--dynamicPageId', { header: new DPH({ pinnable: false, content: [itb, new Label({ text: 'Descripción:' }), new Input({ placeholder: 'Ingrese Descripción' })] }), content: cuerpo });
+    var d = new Dialog({ title: 'Configuracion Maestra', contentWidth: '95%', contentHeight: '90%', verticalScrolling: false, content: [dp], endButton: new Button({ text: 'Cerrar', press: function () { d.close(); } }) });
     window.__abrir = function () { d.open(); }; d.open(); window.__listo = true;
-  });
+});
 });
 </script></head><body class="sapUiBody"></body></html>
 """
@@ -91,6 +95,20 @@ with sync_playwright() as pw:
     pg.evaluate("(m) => window.__rmdStats.controlesCambio.ponerMds(m)", MDS); pg.wait_for_timeout(800)
     titulo = pg.locator('.rmd-cc-tabla .sapMTitle').first.inner_text(); ok('título con total', str(n) in titulo, titulo)
     pg.screenshot(path=str(OUT / '2-lista.png'))
+    if pg.evaluate("!!sap.ui.getCore().byId('frgConfiguration--dynamicPageId')"):
+        VIS = "(t) => [...document.querySelectorAll('.sapMListTbl')].some((x) => x.getClientRects().length && x.closest('.sapMList,.sapMTable') && (x.closest('.sapMList').textContent || '').includes(t + ' 1'))"
+        ok('DP: sin la tabla del portal debajo', not pg.evaluate("(" + VIS + ")('Estructura')"))
+        ok('DP: sin los filtros del portal', not pg.evaluate("[...document.querySelectorAll('.sapFDynamicPageHeader input')].some((i) => !i.closest('.rmd-cc-pestana') && i.getClientRects().length)"))
+        ok('DP: la cabecera no crece (CC va en el contenido)', pg.evaluate("!document.querySelector('.sapFDynamicPageHeader .rmd-cc-pestana')"))
+        pg.locator('[role=tab]', has_text='Paso').click(); pg.wait_for_timeout(700)
+        ok('DP: Paso se ve al volver', pg.evaluate("(" + VIS + ")('Paso')") and not pg.locator('.rmd-cc-pestana').is_visible())
+        ok('DP: filtros del portal vuelven', pg.evaluate("[...document.querySelectorAll('.sapFDynamicPageHeader input')].some((i) => !i.closest('.rmd-cc-pestana') && i.getClientRects().length)"))
+        pg.evaluate("document.getElementById('frgConfiguration--dynamicPageId-contentWrapper').scrollTop = 99999"); pg.wait_for_timeout(500)
+        pg.evaluate("sap.ui.getCore().byId('frgConfiguration--dynamicPageId').setHeaderExpanded(false)"); pg.wait_for_timeout(300)
+        pg.evaluate("sap.ui.getCore().byId('itbMaestra').setSelectedKey('rmdControlesCambio'); sap.ui.getCore().byId('itbMaestra').fireSelect({ key: 'rmdControlesCambio', selectedKey: 'rmdControlesCambio' })"); pg.wait_for_timeout(700)
+        st = pg.evaluate("[document.getElementById('frgConfiguration--dynamicPageId-contentWrapper').scrollTop, sap.ui.getCore().byId('frgConfiguration--dynamicPageId').getHeaderExpanded()]")
+        ok('DP: al entrar a CC arriba y con cabecera abierta', st[0] == 0 and st[1] is True, st)
+        pg.screenshot(path=str(OUT / '2b-dp.png'))
     # filtro código
     pg.locator('.rmd-cc-filtro input').first.fill('25-426'); pg.wait_for_timeout(600)
     filas = pg.evaluate("window.__rmdStats.controlesCambio.ACC.vista.modelo.getProperty('/filas')")
