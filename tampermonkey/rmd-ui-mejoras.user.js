@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.98.1
+// @version      1.99.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.98.1';                                                       // mantener igual a @version
+  const VERSION = '1.99.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -429,6 +429,14 @@
   .rmd-pp-crea { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 9px; background: rgba(122,63,191,.16); color: #b48cf0; font: 700 11px/18px var(--rmd-fuente); }
   html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-pp-crea { color: #7a3fbf; } .rmd-pp-av { margin-top: 3px; font-size: 12px; } .rmd-pp-av.error { color: var(--rmd-rojo); } .rmd-pp-av.aviso { color: var(--rmd-ambar); }
   .rmd-modal.rmd-pp-ing { width: min(1100px, 96vw); height: min(860px, 94vh); }
+  .rmd-pp-editar { margin-left: 6px; padding: 0 8px; height: 20px; border: 1px solid var(--rmd-borde-campo); border-radius: 10px; background: transparent; color: var(--rmd-acento-texto); font: 600 11.5px var(--rmd-fuente); cursor: pointer; vertical-align: 1px; } .rmd-pp-editar:hover { border-color: var(--rmd-acento); }
+  .rmd-pp-ed { display: flex; flex-direction: column; gap: 6px; } .rmd-pp-ed-tx { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--rmd-acento); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 13px var(--rmd-fuente); resize: vertical; color-scheme: light dark; }
+  .rmd-pp-ed-sug { max-height: 240px; overflow: auto; } .rmd-pp-ed-sug mark { background: rgba(255,200,0,.38); color: inherit; border-radius: 2px; padding: 0 1px; }
+  .rmd-pp-sug-it { display: flex; gap: 8px; align-items: baseline; width: 100%; margin: 2px 0; padding: 5px 8px; border: 1px solid var(--rmd-borde); border-radius: 6px; background: transparent; color: var(--rmd-texto); text-align: left; font: 12.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-pp-sug-it:hover { border-color: var(--rmd-acento); } .rmd-pp-sug-it.igual { border-color: var(--rmd-verde); } .rmd-pp-sug-it.elegido { outline: 2px solid var(--rmd-verde); }
+  .rmd-pp-sug-it .pct { flex: 0 0 42px; color: var(--rmd-apagado); font-size: 11.5px; } .rmd-pp-sug-it .cod { flex: 0 0 60px; font-weight: 600; } .rmd-pp-sug-it .tx { flex: 1 1 auto; } .rmd-pp-sug-it .otra { flex: 0 0 auto; color: var(--rmd-ambar); font-size: 11px; }
+  .rmd-pp-sug-mas { display: block; width: 100%; margin: 4px 0; padding: 5px; border: 1px dashed var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-acento-texto); cursor: pointer; font: 12px var(--rmd-fuente); }
+  .rmd-pp-ed-pie { display: flex; justify-content: flex-end; gap: 6px; } .rmd-pp-ed-pie .rmd-btn { height: 28px; padding: 0 12px; } .rmd-pp-corr { margin-top: 2px; font-style: italic; }
   /* Ingreso automático del borrador y marcas */
   .rmd-ing-pasos { display: flex; gap: 8px; list-style: none; margin: 0 0 12px; padding: 0; } .rmd-ing-pasos li { display: flex; align-items: center; gap: 8px; padding: 5px 14px 5px 6px; border-radius: 16px; background: rgba(128,128,128,.14); color: var(--rmd-texto-tenue, #8a94a0); font-size: 12.5px; }
   .rmd-ing-pasos li b { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; background: rgba(128,128,128,.3); color: #fff; font-size: 12px; }
@@ -14462,7 +14470,7 @@
           if (!b0) {
             const prev = anterior(i);
             out.push({ ...base0, accion: 'agregar', despues: x.texto, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo, tipo: x.tipo || null, registro: x.registro || null, valores: CAMPOS_RANGO.filter(([k]) => txtValor(x[k])).map(([k, n]) => ({ campo: n, despues: txtValor(x[k]) })),
-              casillas: clase === 'paso' && (x.rpor || x.vb) ? { rpor: !!x.rpor, vb: !!x.vb } : null, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
+              casillas: clase === 'paso' && (x.rpor || x.vb) ? { rpor: !!x.rpor, vb: !!x.vb } : null, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ id: m.id, texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
             return;
           }
           if (x.quitado) { out.push({ ...base0, accion: 'quitar', antes: b0.texto, codigoAntes: b0.codigo || null }); return; }
@@ -14608,7 +14616,13 @@
       const E = cat.estr.map((x) => x[0]), T = cat.etq.map((x) => x[0]);
       return cat.pasos.split('\n').filter(Boolean).map((l) => { const [c, e, t, ti, ...tx] = l.split('\t'); return { codigo: c, estr: E[+e] || null, etq: t === '' ? null : (T[+t] || null), tipo: ti === '' ? null : +ti, texto: tx.join('\t') }; });
     }
-    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num };
+    // Nombre de archivo con etapa y producto: «Borrador RMD 2202609243 v10 - FABRICACION - ANDREWS TRIPLE ACCION … 2026-10-28.html»
+    function nombreArchivo(prefijo, rmd, fecha, ext) {
+      const d = fecha || new Date(), dd = (n) => String(n).padStart(2, '0'), cortar = (t, n) => (t.length > n ? t.slice(0, n).replace(/\s+\S*$/, '') : t);
+      const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
+      return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
+    }
+    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -14720,7 +14734,7 @@
         <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${CMB.length}</b>`}</button>`;
       window.scrollTo(0, y);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
-      document.title = `${sucio ? '● ' : ''}Borrador RMD ${PQ.rmd.codigo} v${PQ.rmd.version}`;
+      document.title = `${sucio ? '● ' : ''}${PPN.nombreArchivo('Borrador', PQ.rmd, new Date()).replace(/ \d{4}-\d\d-\d\d$/, '')}`;   // también nombre sugerido del PDF
     }
     function contar() {
       const errores = [...AV.values()].flat().filter((a) => a.nivel === 'error').length, avisosN = [...AV.values()].flat().filter((a) => a.nivel === 'aviso').length;
@@ -14949,9 +14963,9 @@
         <div id="m-estado" class="pp-estado"></div><div id="m-sug" class="pp-sug"></div>
         <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label><span id="m-rango-av" class="pp-rango-av"></span></div>
         <label id="m-reg-l" class="pp-campo" hidden>¿Qué anota Producción en este paso nuevo? (opcional)<select id="m-reg"><option value="">Sin indicar: lo decide el equipo RMD</option>${Object.entries(REGISTRO).map(([k, t]) => `<option value="${k}"${x.registro === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
-        ${clase === 'paso' ? `<fieldset class="pp-cas"><legend>Quién firma este paso</legend><label><input type="checkbox" id="m-rpor"${x.rpor ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Realizado por»</label><label><input type="checkbox" id="m-vb"${x.vb ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Visto bueno»</label>${x.edit ? '<span class="pp-nota">Este paso pide un dato: lleva su caja de dato.</span>' : '<span class="pp-nota">Márcalo solo cuando el paso lo amerite.</span>'}</fieldset>` : ''}
         <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
-        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
+        <div class="pp-fijo">${clase === 'paso' ? `<fieldset class="pp-cas"><legend>Quién firma este paso</legend><label><input type="checkbox" id="m-rpor"${x.rpor ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Realizado por»</label><label><input type="checkbox" id="m-vb"${x.vb ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Visto bueno»</label>${x.edit ? '<span class="pp-nota">Este paso pide un dato: lleva su caja de dato.</span>' : '<span class="pp-nota">Márcalo solo cuando el paso lo amerite.</span>'}</fieldset>` : ''}
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
         const ta = $('#m-texto', m), est = $('#m-estado', m), sug = $('#m-sug', m), rango = $('#m-rango', m);
         const pintarEstado = () => {
           const t = ta.value.trim(), igualBase = b && PPN.normalizar(t) === PPN.normalizar(b.texto);
@@ -15154,7 +15168,7 @@
         resumen: { cambios: n.total, nuevos: n.nuevos, errores: n.errores, avisos: n.avisos } };
       const json = JSON.stringify(prop).replace(/</g, '\\u003c');
       const html = ORIGINAL.replace(/(<script id="rmd-(?:borrador|propuesta)" type="application\/json">)[\s\S]*?(<\/script>)/, (m0, a, b) => a + json + b);
-      const nombreArchivo = `Borrador RMD ${r.codigo} v${r.version} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}.html`.replace(/[\\/:*?"<>|]/g, '-'); ULTIMO = { html, nombre: nombreArchivo };
+      const nombreArchivo = PPN.nombreArchivo('Borrador', r, d, 'html'); ULTIMO = { html, nombre: nombreArchivo };
       descargar(html, nombreArchivo);
       sucio = false; guardadoUna = true; try { localStorage.removeItem(CLAVE()); } catch (e) { } pintarTodo(); window.__ppUltimo = { prop, html }; mostrarEnvio(nombreArchivo, n);                                                // pruebas
     }
@@ -15277,6 +15291,7 @@ td.ult { position: relative; }
 .pp-sug-it .pct { flex: 0 0 46px; color: var(--ap); font-size: 11.5px; } .pp-sug-it .cod { flex: 0 0 64px; font-weight: 600; } .pp-sug-it .tx { flex: 1 1 auto; } .pp-sug-it .otra { flex: 0 0 auto; color: var(--cam); font-size: 11px; }
 .pp-rango-ed { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; font-size: 12.5px; font-weight: 600; } .pp-rango-ed input { display: block; width: 120px; margin-top: 3px; padding: 5px 8px; border: 1px solid var(--bd); border-radius: 6px; font: inherit; font-weight: 400; }
 .pp-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--bd2); }
+.pp-fijo { position: sticky; bottom: -14px; z-index: 2; margin: 8px -20px -14px; padding: 0 20px 14px; background: #fff; box-shadow: 0 -8px 10px -10px rgba(0,0,0,.35); } .pp-fijo .pp-cas { margin-top: 0; } .pp-fijo .pp-pie { margin-top: 8px; }
 .pp-pie button { height: 32px; padding: 0 16px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; } .pp-pie button.primario { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; }
 .pp-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); padding: 10px 16px; background: #1f2328; color: #fff; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
 .pp-recuperar { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); z-index: 40; padding: 10px 14px; background: var(--cam-f); border: 1px solid var(--cam); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
@@ -15451,8 +15466,8 @@ td.ult { position: relative; }
     const def = norm(md.codDefectoReceta); if (def) arbol.estructuras.forEach((e) => { if (e.insumos.some((i) => i.matnr === def)) e.insumos = e.insumos.filter((i) => i.matnr === def); });
     avisar('Armando el archivo…');
     const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
-    const nombre = `Plantilla RMD ${paq.rmd.codigo} v${paq.rmd.version} ${d.getFullYear()}-${dd2(d.getMonth() + 1)}-${dd2(d.getDate())}.html`;
-    const html = ppHtml(b64, null, `Borrador RMD ${paq.rmd.codigo} v${paq.rmd.version} · ${paq.rmd.descripcion}`);
+    const nombre = PPN.nombreArchivo('Plantilla', paq.rmd, d, 'html');
+    const html = ppHtml(b64, null, PPN.nombreArchivo('Borrador', paq.rmd, d).replace(/ \d{4}-\d\d-\d\d$/, ''));
     const cuenta = (f) => arbol.estructuras.reduce((s, e) => s + f(e), 0);
     return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length } };
   }
@@ -15617,7 +15632,7 @@ td.ult { position: relative; }
     [['Descripción', datos.rmd.descripcion], ['Solicitado por', s.nombre || ''], ['Área', s.area || ''], ['Motivo', s.motivo || ''], ['Control de cambio', s.cc || ''], ['Observación', s.observacion || ''],
       ['Borrador guardado el', fechaHoraCorta(prop.guardado)], ['Plantilla generada', `${fechaHoraCorta(datos.generado)} por ${datos.por || '—'}`], ['Se ingresa en', an.destino ? `v${an.destino.version} · ${an.destino.codigo} (${an.destino.estado})` : 'falta crear una versión Ingresada del RMD'],
       ['Generado', `${dd2(hoy.getDate())}/${dd2(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd2(hoy.getHours())}:${dd2(hoy.getMinutes())}`]].forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
-    return { libro, nombre: `Borrador RMD ${datos.rmd.codigo} - plan de ingreso ${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}.xlsx` };
+    return { libro, nombre: PPN.nombreArchivo('Borrador', datos.rmd, hoy, 'xlsx').replace(/ (\d{4}-\d\d-\d\d)\.xlsx$/, ' - plan de ingreso $1.xlsx') };
   }
   // ---- Nueva versión Ingresada con «Nueva Versión» del portal ----
   async function ppVersiones(modelo, principal) {
@@ -15696,9 +15711,12 @@ td.ult { position: relative; }
     const errores = []; for (const f of lista) { const r = await ppArchivoValido(f); if (r.texto || r.pdf) { abrirImportarBorrador(r.texto, f.name, r.pdf); return; } errores.push(`${f.name}: ${r.error}`); }
     toast(`No se abrió ningún borrador. ${errores.slice(0, 2).join(' · ')}`, true);
   }
+  function ppVentanaBorrador() {
+    const v = ventana('Borrador de Producción', { cancelar: () => { const ed = v.cuerpo.querySelector('.rmd-pp-ed [data-x="cancelar"]'); if (ed) ed.click(); else v.cerrar(); } });   // Escape cierra primero la edición de un paso
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-pp-imp'); return v;
+  }
   async function abrirImportarBorrador(texto, nombreArchivo, pdf) {
-    const v = ventana('Borrador de Producción', { cancelar: () => v.cerrar() });
-    v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-pp-imp');
+    const v = ppVentanaBorrador();
     v.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">Leyendo el borrador…</p>';
     let datos, prop, an;
     try {
@@ -15742,9 +15760,11 @@ td.ult { position: relative; }
       errores ? `<li>✕ ${errores} dato(s) por corregir que Producción dejó marcados</li>` : ''];
     const avisoDe = (id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info').map((a) => `<div class="rmd-pp-av ${a.nivel}">${a.nivel === 'error' ? '✕' : '⚠'} ${esc(a.texto)}</div>`).join('');
     const nuevoDe = new Map(an.nuevos.filter((n) => !n.pm).map((n) => [n.c, n]));
+    const editable = (c) => (c.accion === 'agregar' || c.accion === 'cambiar') && (c.clase === 'paso' || c.clase === 'pm');
+    const corregido = (id) => { const f = ppItemDe(prop.trabajo, id), e = f && f.item.editadoRmd; return e ? `<div class="rmd-nota rmd-pp-corr">✎ Corregido aquí · Producción escribió: «${esc(e.antes)}»</div>` : ''; };
     const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
       return `<tr class="rmd-pp-${c.accion}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
-        <td>${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => esc(m.texto) + (m.nuevo ? ' ★' : '')).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
+        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''} <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
         <td>${esc(ppComentario(c))}</td></tr>`; }).join('');
     const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
@@ -15755,6 +15775,7 @@ td.ult { position: relative; }
       <p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>`;
     const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length ? 'El borrador no trae cambios.' : '';
     const bIngresar = botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an)); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
+    v.__ppEd = { datos, prop, extra, bIngresar }; if (!v.__ppEdOn) { v.__ppEdOn = true; v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-ed]'); if (b) ppEditarNuevo(v, b.dataset.ed); }); }
     // RMD cambiado desde la plantilla: opción de rehacer el borrador
     const bRehacer = botonModal('Rehacer sobre el RMD actual', 'primario', async () => {
       bRehacer.disabled = true; const aviso = document.createElement('p'); aviso.className = 'rmd-progreso'; aviso.textContent = 'Rehaciendo el borrador sobre el RMD actual…'; v.cuerpo.prepend(aviso);
@@ -15771,6 +15792,67 @@ td.ult { position: relative; }
     v.__pp = { datos, prop, an };
     window.__rmdStats.plantilla.ultimo = { datos, prop, an };
   }
+  // paso del borrador por id (también procesos menores)
+  function ppItemDe(arbol, id) {
+    for (const e of (arbol && arbol.estructuras) || []) for (const [t, l] of [[null, e.pasos || []], ...(e.etiquetas || []).map((t) => [t, t.pasos || []])]) for (const p of l) {
+      if (p.id === id) return { item: p, estr: e.estructuraId, etq: t ? t.etiquetaId : null, pm: false };
+      const m = (p.pm || []).find((y) => y.id === id); if (m) return { item: m, estr: e.estructuraId, etq: null, pm: true };
+    }
+    return null;
+  }
+  const ppBuscadores = new WeakMap();
+  // Corregir en la revisión un paso agregado o cambiado: otro texto o un paso que ya existe en SAP (buscador del catálogo de la plantilla)
+  function ppEditarNuevo(v, id) {
+    const { datos, prop, extra, bIngresar } = v.__ppEd || {}, f = datos && ppItemDe(prop.trabajo, id), celda = [...v.cuerpo.querySelectorAll('[data-celda]')].find((y) => y.dataset.celda === id);
+    if (!f || !celda || v.cuerpo.querySelector('.rmd-pp-ed')) return;
+    let bus = ppBuscadores.get(datos); if (!bus) { bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo)); ppBuscadores.set(datos, bus); }
+    const x = f.item, b0 = (ppItemDe(datos.arbol, id) || {}).item || null, etqNom = new Map(datos.catalogo.etq), coincide = (y) => y.estr === f.estr && (f.pm || !f.etq || y.etq === f.etq);
+    let elegido = x.codigo && !x.nuevo ? bus.porCodigo(x.codigo) || null : null, lim = 12;
+    const ed = document.createElement('div'); ed.className = 'rmd-pp-ed';
+    ed.innerHTML = `<textarea class="rmd-pp-ed-tx" rows="2" spellcheck="true" placeholder="Texto del paso, palabras para buscar o código">${esc(x.texto || '')}</textarea><div class="rmd-pp-ed-est"></div><div class="rmd-pp-ed-sug"></div>
+      <div class="rmd-pp-ed-pie"><button type="button" class="rmd-btn" data-x="cancelar">Cancelar</button><button type="button" class="rmd-btn primario" data-x="aplicar">Aplicar</button></div>`;
+    const antes = [...celda.childNodes]; celda.replaceChildren(ed); if (bIngresar) bIngresar.disabled = true;
+    const ta = ed.querySelector('.rmd-pp-ed-tx'), est = ed.querySelector('.rmd-pp-ed-est'), sug = ed.querySelector('.rmd-pp-ed-sug');
+    const marcado = (t, tk) => PPN.resaltar(t, tk).map(([y, m]) => (m ? `<mark>${esc(y)}</mark>` : esc(y))).join('');
+    const pintarEstado = () => {
+      const t = ta.value.trim();
+      if (elegido && PPN.normalizar(t) !== PPN.normalizar(elegido.texto)) elegido = null;
+      if (!elegido && t) { const ex = bus.exactos(t).filter(coincide); if (ex.length) elegido = ex[0]; }
+      est.innerHTML = !t ? '<span class="rmd-rec-rojo">Escribe el texto del paso o elige uno de la lista.</span>'
+        : elegido ? `<span class="rmd-rec-nuevo">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${f.etq && elegido.etq && elegido.etq !== f.etq && !f.pm ? ` <span class="rmd-pp-av aviso">⚠ En el catálogo es de ${esc(etqNom.get(elegido.etq) || 'otra etiqueta')}.</span>` : ''}`
+        : b0 && b0.codigo && PPN.normalizar(t) === PPN.normalizar(b0.texto) ? `<span class="rmd-nota">Queda como está en SAP (paso ${esc(b0.codigo)}).</span>`
+        : '<span class="rmd-pp-crea">★ Paso nuevo: se creará en SAP con este texto</span>';
+    };
+    const pintarSug = (mas) => {
+      lim = mas ? lim + 20 : 12; const t = ta.value.trim();
+      if (/^\d{3,}$/.test(t)) { const y = bus.porCodigo(t); sug.innerHTML = y ? `<button type="button" class="rmd-pp-sug-it${elegido && String(elegido.codigo) === String(y.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.codigo)}"><span class="cod">${esc(y.codigo)}</span><span class="tx">${esc(y.texto)}</span>${coincide(y) ? '' : `<span class="otra">${y.estr !== f.estr ? 'otra estructura' : esc(etqNom.get(y.etq) || 'otra etiqueta')}</span>`}</button>` : '<div class="rmd-nota">No hay un paso con ese código en el catálogo de la plantilla.</div>'; return; }
+      if (t.length < 2) { sug.innerHTML = '<div class="rmd-nota">Escribe parte de una palabra (limp, agit, balanz…) o el código del paso.</div>'; return; }
+      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true });
+      sug.innerHTML = r.length ? `<div class="rmd-nota">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="rmd-pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${f.etq && y.f.etq && y.f.etq !== f.etq && !f.pm ? `<span class="otra">${esc(etqNom.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="rmd-pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="rmd-nota">Ningún paso de esta estructura coincide: si lo dejas así, se creará.</div>';
+    };
+    const cerrar = () => { celda.replaceChildren(...antes); if (bIngresar) bIngresar.disabled = !!bIngresar.title; };
+    const aplicar = async () => {
+      const t = ta.value.trim(); if (!t) { ta.focus(); return; }
+      const previo = { texto: x.texto, codigo: x.codigo, nuevo: x.nuevo };
+      if (elegido) { x.texto = elegido.texto; x.codigo = String(elegido.codigo); x.pasoId = null; x.nuevo = false; x.etqCat = elegido.etq; x.tipo = elegido.tipo; delete x.registro; }
+      else if (b0 && b0.codigo && PPN.normalizar(t) === PPN.normalizar(b0.texto)) { x.texto = b0.texto; x.codigo = b0.codigo; x.pasoId = b0.pasoId; x.nuevo = false; x.etqCat = b0.etqCat; x.tipo = b0.tipo; delete x.registro; }
+      else { x.texto = t; x.codigo = null; x.pasoId = null; x.nuevo = true; x.etqCat = null; x.tipo = b0 ? b0.tipo : (x.tipo || null); }
+      if (previo.texto === x.texto && String(previo.codigo || '') === String(x.codigo || '') && !!previo.nuevo === !!x.nuevo) { cerrar(); return; }
+      if (!x.editadoRmd) x.editadoRmd = { antes: previo.texto || '' }; else if (PPN.normalizar(x.editadoRmd.antes) === PPN.normalizar(x.texto)) delete x.editadoRmd;   // volvió a lo de Producción
+      ed.innerHTML = '<p class="rmd-progreso rmd-espera">Revisando el borrador corregido…</p>';
+      try { pintarImportacion(v, datos, prop, await (v.__ppAnalizar || ppAnalizar)(datos, prop), extra || {}); }   // __ppAnalizar: pruebas
+      catch (e) { Object.assign(x, previo); toast('No se pudo revisar el cambio: ' + e.message, true); cerrar(); }
+    };
+    let tm = 0; ta.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { pintarEstado(); pintarSug(); }, 140); });
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); aplicar(); } });
+    ed.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.target.closest('[data-mas]')) { pintarSug(true); return; }
+      const s2 = e.target.closest('[data-codigo]'); if (s2) { elegido = bus.porCodigo(s2.dataset.codigo); ta.value = elegido.texto; pintarEstado(); pintarSug(); ta.focus(); return; }
+      const a = e.target.closest('[data-x]'); if (a) { if (a.dataset.x === 'cancelar') cerrar(); else aplicar(); }
+    });
+    pintarEstado(); pintarSug(); setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 20);
+  }
   // soltar el archivo sobre la lista principal
   document.addEventListener('dragover', (e) => { if (on('plantillaprod') && e.dataTransfer && [...(e.dataTransfer.items || [])].some((i) => i.kind === 'file') && controladorPrincipal() && !dialogos().length) e.preventDefault(); });
   document.addEventListener('drop', async (e) => {
@@ -15779,7 +15861,8 @@ td.ult { position: relative; }
     e.preventDefault(); abrirArchivos(fs);
   });
   window.__rmdStats.plantillaPdf = { leer: ppLeerPdf, trozos: ppTrozosPdf };   // pruebas
-  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN };
+  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN,
+    revisar: (datos, prop, an, analizar) => { const v = ppVentanaBorrador(); v.__ppAnalizar = analizar; pintarImportacion(v, datos, prop, an, {}); return v; } };   // pruebas
   // ---- Ingreso automático del borrador ----
   // Mismas escrituras que el portal: aPaso / aPasoInsumoPaso en MD_ESTRUCTURA, catálogo de equipos (TABLAS_ARRAY_MD_SKIP) + aEquipo, aUtensilio,
   // activo:false, pasoId_pasoId, valorInicial / valorFinal / margen, orden, PASO nuevo, «Depende».

@@ -910,6 +910,40 @@ with sync_playwright() as p:
         ok = (not errs and not rango and cas == ["m-rpor", "m-vb"] and cambios == ["Realizado por:Sí,Visto bueno:Sí"] and anchos and anchos[0] == anchos[1] and area["tag"] == "SELECT" and area["ops"][1:] == ["SOLIDOS", "LIQUIDOS"]
               and envio["nombre"].startswith("Borrador RMD 2202600001 v3 ") and envio["correo"])
         return ok, json.dumps({ "rango": rango, "cas": cas, "cambios": cambios, "anchos": anchos, "area": area, "envio": envio, "errores": errs[:3] }, ensure_ascii=False)
+    @prueba("LN49 Borrador de Producción (v1.99): en el diálogo del paso, Aceptar / Cancelar y «Realizado por» / «Visto bueno» quedan siempre a la vista aunque la lista de pasos parecidos sea larga; el archivo, el título (nombre del PDF) y el Excel llevan la etapa y el producto; en la revisión del portal un paso «★ crear» se corrige con el buscador por uno que ya existe y deja la nota de lo que escribió Producción")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { estadoFechaPor: 'Autorizado/ 2026-09-24 /NCUELLARL', areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 420}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        titulo = e.title()
+        e.evaluate("() => window.__pp.editar({ id: 'P11' })"); e.wait_for_selector("#m-texto"); e.fill("#m-texto", "verificar"); e.wait_for_timeout(500)
+        vista = e.evaluate("""() => { const m = document.querySelector('.pp-modal'), r = m.getBoundingClientRect(), dentro = (s) => { const b = document.querySelector(s).getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2, h = document.elementFromPoint(x, y); return b.top >= r.top && b.bottom <= r.bottom + 1 && !!h && (h === document.querySelector(s) || document.querySelector(s).contains(h)); };
+          return { desborda: m.scrollHeight > m.clientHeight + 20, aceptar: dentro('.pp-modal [data-a=aceptar]'), cancelar: dentro('.pp-modal [data-a=cancelar]'), rpor: dentro('#m-rpor'), vb: dentro('#m-vb') }; }""")
+        e.evaluate("() => { document.querySelector('.pp-modal').scrollTop = 0; }"); e.wait_for_timeout(100)
+        arriba = e.evaluate("() => { const b = document.querySelector('.pp-modal [data-a=aceptar]').getBoundingClientRect(), h = document.elementFromPoint(b.left + 5, b.top + 5); return h && h.dataset.a === 'aceptar'; }")
+        e.click(".pp-modal [data-a=cancelar]"); e.close()
+        nombres = pg.evaluate("(d) => { const N = window.__rmdStats.plantilla.nucleo, f = new Date(2026, 9, 28); return [N.nombreArchivo('Borrador', { codigo: '2202609243', version: 10, etapa: 'FABRICACION', descripcion: 'ANDREWS TRIPLE ACCION PVO GRANULADO - SALA 2' }, f, 'html'), N.nombreArchivo('Plantilla', { codigo: '1', version: 1, etapa: '', descripcion: 'A/B: C*' }, f, 'html')]; }", d0)
+        # revisión en el portal: P12 cambiado a un texto que no existe (★ crear) -> se corrige por el 2010 con el buscador
+        r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, N = P.nucleo, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA'), W = JSON.parse(JSON.stringify(d.arbol));
+          Object.assign(W.estructuras[2].etiquetas[0].pasos[2], { texto: 'AGITAR 15 MIN.', codigo: null, pasoId: null, nuevo: true, etqCat: null });
+          const an = (dt, pr) => { const c = N.cambios(dt.arbol, pr.trabajo); return { destino: { mdId: 'MD1', codigo: '2202600001', version: 3, estado: 'Ingresado' }, base: { estado: 'Ingresado' }, lin: { versiones: [] }, cambios: c, avisos: N.avisos(pr.trabajo, {}), enSap: [], conflictos: [], nuevos: c.filter((x) => x.nuevo).map((x) => ({ c: x, texto: x.despues })) }; };
+          const prop = { solicitud: { nombre: 'Ana' }, guardado: new Date().toISOString(), trabajo: W }, v = P.revisar(paq, prop, an(paq, prop), async (dt, pr) => an(dt, pr));
+          const fila = () => v.cuerpo.querySelector('[data-celda="P12"]').textContent;
+          const antes = fila(); v.cuerpo.querySelector('[data-ed="P12"]').click();
+          const ing = [...v.pie.querySelectorAll('button')].find((b) => /Ingresar/.test(b.textContent)), bloqueado = ing.disabled;
+          const ta = v.cuerpo.querySelector('.rmd-pp-ed-tx'); ta.value = 'agitar 15'; ta.dispatchEvent(new Event('input')); await new Promise((ok) => setTimeout(ok, 400));
+          const sug = [...v.cuerpo.querySelectorAll('.rmd-pp-sug-it')].map((b) => b.dataset.codigo); v.cuerpo.querySelector('.rmd-pp-sug-it[data-codigo="2010"]').click();
+          const estado = v.cuerpo.querySelector('.rmd-pp-ed-est').textContent; v.cuerpo.querySelector('.rmd-pp-ed [data-x=aplicar]').click(); await new Promise((ok) => setTimeout(ok, 300));
+          const despues = fila(), item = W.estructuras[2].etiquetas[0].pasos[2], ing2 = [...v.pie.querySelectorAll('button')].find((b) => /Ingresar/.test(b.textContent));
+          v.cuerpo.querySelector('[data-ed="P12"]').click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); const sigue = document.body.contains(v.fondo) && !v.cuerpo.querySelector('.rmd-pp-ed');
+          v.cerrar(); return { antes, bloqueado, sug, estado, despues, item: { codigo: item.codigo, nuevo: item.nuevo, texto: item.texto, ed: item.editadoRmd }, ingresar: !ing2.disabled, sigue }; }""", d0)
+        ok = (not errs and vista["desborda"] and vista["aceptar"] and vista["cancelar"] and vista["rpor"] and vista["vb"] and arriba
+              and titulo == "Borrador RMD 2202600001 v3 - FABRICACION - PRODUCTO DE PRUEBA 10 mg"
+              and nombres == ["Borrador RMD 2202609243 v10 - FABRICACION - ANDREWS TRIPLE ACCION PVO GRANULADO - SALA 2 2026-10-28.html", "Plantilla RMD 1 v1 - A-B- C- 2026-10-28.html"]
+              and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
+              and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
+        return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
     @prueba("LN32 Importar el borrador a prueba de errores (v1.45): se reconoce por su contenido (da igual el nombre o la extensión del archivo), aguanta BOM, saltos de línea y atributos distintos, y cada daño (cortado, dañado, sin borrador, de otra plantilla, no es un borrador) se explica con su mensaje")
     def _():
         if not PP_GUARDADO: return False, "LN28 no dejó archivo"
