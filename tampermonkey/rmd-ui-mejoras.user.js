@@ -6207,6 +6207,8 @@
     const CASILLAS = { rPor: 'R. Por', vb: 'V°B°', estadoCC: 'Estado CC' };
     const plano = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
     const etapaDe = (t) => { const x = plano(t); return Object.keys(ETAPAS).find((e) => x === e || x.startsWith(e + ' ')) || ''; };
+    // Etapa del RMD tal cual (RECUBRIMIENTO, INSPECCION…): un acuerdo de otras etapas no le aplica aunque no sea una de las tres de los acuerdos.
+    const etapaRmd = (t) => etapaDe(t) || plano(t);
     const plantaDe = (t) => { const x = plano(t); return /\bATE\b|PLANTA 1\b/.test(x) ? 'planta1' : /\bLIMA\b|PLANTA 2\b/.test(x) ? 'planta2' : ''; };
     // Fase de la 1.ª línea de Observaciones (…-F2, F2R, F2-R): solo el número; la R es una revisión de la misma fase.
     const faseDe = (obs) => { const tok = String(obs == null ? '' : obs).split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)F(\d{1,2})(?:-?R)?$/i.exec(tok); return m ? +m[1] : 0; };
@@ -6274,11 +6276,11 @@
         });
         const fallas = pasos.filter((p) => p.estado === 'falla').length;
         return { acuerdo: a, pasos, fallas, sinDato, estado: a.tipo === 'nota' || !pasos.some((p) => p.estado !== 'info') ? 'info' : fallas ? 'falla' : 'ok' };
-      });
+      }).filter((x) => !x.acuerdo.pasos.length || x.pasos.length);      // todos sus pasos son de otras etapas: no aplica
       return { items, fallas: items.filter((x) => x.estado === 'falla').length, ok: items.filter((x) => x.estado === 'ok').length, info: items.filter((x) => x.estado === 'info').length };
     }
 
-    return { PLANTAS, ETAPAS, TIPOS, CASILLAS, normalizar, deHojas, aplica, evaluar, etapaDe, plantaDe, faseDe };
+    return { PLANTAS, ETAPAS, TIPOS, CASILLAS, normalizar, deHojas, aplica, evaluar, etapaDe, etapaRmd, plantaDe, faseDe };
   })();
   // ==ACUERDOS-FIN==
   // ==REGLAS-INICIO==
@@ -12604,14 +12606,15 @@
     i.addEventListener('change', () => { const a = i.files && i.files[0]; if (a) importarExcelAcuerdos(a).then(alTerminar, (e) => toast('No se pudo leer el Excel de acuerdos: ' + e.message, true)); });
     i.click();
   }
+  // Planta, etapa y Observaciones del modelo de la ventana; lo que no venga ahí se lee del MD en SAP.
   async function contextoAcuerdos(modelo, md) {
-    let planta = AcuerdosRmd.plantaDe((md.sucursalId && (md.sucursalId.contenido || md.sucursalId.descripcion)) || '');
-    if (!planta) {
+    let suc = (md.sucursalId && (md.sucursalId.contenido || md.sucursalId.descripcion)) || '', nivel = md.nivelTxt, obs = md.observacion;
+    if (!AcuerdosRmd.plantaDe(suc) || !nivel || obs == null) {
       const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
-      const r = await leerTodoDe(modelo, 'MD', [new Filtro('mdId', 'EQ', md.mdId)], { $expand: 'sucursalId', $select: 'mdId,sucursalId/contenido' }).catch(() => []);
-      planta = AcuerdosRmd.plantaDe(((r[0] || {}).sucursalId || {}).contenido || '');
+      const r = (await leerTodoDe(modelo, 'MD', [new Filtro('mdId', 'EQ', md.mdId)], { $expand: 'sucursalId', $select: 'mdId,nivelTxt,observacion,sucursalId/contenido' }).catch(() => []))[0] || {};
+      suc = suc || (r.sucursalId || {}).contenido || ''; nivel = nivel || r.nivelTxt || ''; if (obs == null) obs = r.observacion || '';
     }
-    return { planta, etapa: AcuerdosRmd.etapaDe(md.nivelTxt), fase: AcuerdosRmd.faseDe(md.observacion) };
+    return { planta: AcuerdosRmd.plantaDe(suc), etapa: AcuerdosRmd.etapaRmd(nivel), fase: AcuerdosRmd.faseDe(obs) };
   }
   function avisoAcuerdosRaiz(d, tabla) {
     const quitar = () => { d.querySelectorAll('.rmd-acu-aviso').forEach((x) => x.remove()); d.__rmdAcuFirma = ''; d.__rmdAcuRes = null; };
@@ -12657,7 +12660,7 @@
     const ico = { ok: '✓', falla: '✕', info: 'ℹ' }, color = { ok: 'var(--rmd-verde)', falla: 'var(--rmd-rojo)', info: 'var(--rmd-apagado)' };
     const pintar = () => {
       const { ctx, res, lista } = d.__rmdAcuRes;
-      const desc = [ctx.planta ? A.PLANTAS[ctx.planta] : 'planta sin identificar', ctx.etapa ? A.ETAPAS[ctx.etapa] : 'etapa sin identificar', ctx.fase ? `fase ${ctx.fase}` : 'sin fase en Observaciones'].join(' · ');
+      const desc = [ctx.planta ? A.PLANTAS[ctx.planta] : 'planta sin identificar', ctx.etapa ? A.ETAPAS[ctx.etapa] || ctx.etapa : 'etapa sin identificar', ctx.fase ? `fase ${ctx.fase}` : 'sin fase en Observaciones'].join(' · ');
       const items = res ? res.items.slice().sort((p, q) => ({ falla: 0, info: 1, ok: 2 }[p.estado] - { falla: 0, info: 1, ok: 2 }[q.estado])) : [];
       const noAplican = todos && lista ? lista.filter((a) => a.estado === 'vigente' && !items.some((y) => y.acuerdo.id === a.id)) : [];
       const fila = (y) => { const a = y.acuerdo;

@@ -51,6 +51,8 @@ ok('sin planta/etapa/fase: el acuerdo aplica y avisa qué no se pudo leer', J(rs
 ok('sin etapa: se exigen los pasos de todas las etapas', rs.items.find((x) => x.acuerdo.id === 'desp').pasos.length === 4);
 const rLima = A.evaluar(acuerdos, [paso('999001', 'PROCEDIMIENTO')], { planta: 'planta2', etapa: 'FABRICACION', fase: 3 });
 ok('LIMA: aplica el suyo y se cumple; despejes exige 184004 (fabricación)', rLima.items.find((x) => x.acuerdo.id === 'solo-lima').estado === 'ok' && J(rLima.items.find((x) => x.acuerdo.id === 'desp').pasos.map((p) => p.codigo)) === J(['184004']));
+const rRec = A.evaluar(acuerdos, rmdAcond, { planta: 'planta2', etapa: A.etapaRmd('RECUBRIMIENTO'), fase: 2 });
+ok('RECUBRIMIENTO: no le aplica un acuerdo solo de acondicionado ni le exige pasos de despeje de otras etapas', A.etapaRmd('Recubrimiento') === 'RECUBRIMIENTO' && !rRec.items.some((x) => x.acuerdo.id === 'co-acond') && !rRec.items.some((x) => x.acuerdo.id === 'desp'), J(rRec.items.map((x) => [x.acuerdo.id, x.estado])));
 ok('código con ceros a la izquierda en SAP', A.evaluar([acuerdos[0]], [paso('0180998', 'PRECAUCIONES')], {}).items[0].estado === 'ok');
 
 // ---- Excel de «Exportar» de status-rmd (filas como las devuelve filasDeArchivo) ----
