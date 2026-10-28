@@ -13070,10 +13070,11 @@
     const mostrar = (nuestra) => {
       if (enCuerpo) { cont.setVisible(nuestra); ajenos().forEach((x) => (nuestra ? x.addStyleClass('rmd-acu-oculto') : x.removeStyleClass('rmd-acu-oculto'))); }
       if (!dp) return;
-      if (!nuestra) { if (conservar0 !== null && itb.getSelectedKey() !== CLAVE_PESTANA_CC) dp.setPreserveHeaderStateOnScroll(conservar0); return; }
+      if (!nuestra) { if (conservar0 !== null && itb.getSelectedKey() !== CLAVE_PESTANA_CC) dp.setPreserveHeaderStateOnScroll(conservar0); reposicionarDP(dp); return; }
       if (conservar0 !== null) dp.setPreserveHeaderStateOnScroll(true);
       dp.setHeaderExpanded(true);
       const w = dp.getDomRef && dp.getDomRef('contentWrapper'); if (w) w.scrollTop = 0;
+      reposicionarDP(dp);
     };
     ACUV.vista = { itb, pestana, cont, html, dp, cuerpo, agr: enCuerpo ? agr.name : '', ajenos, mostrar };
     // después de los demás manejadores de la IconTabBar (el de «Controles de Cambios» también muestra/oculta y restaura la cabecera)
@@ -15153,6 +15154,9 @@
     document.querySelectorAll('.sapMITB').forEach((el) => { const itb = window.sap && sap.ui.getCore().byId(el.id); if (itb && itb.getItems) aislar('quitarPestanaCC', () => quitarPestanaCC(itb)); });
     if (ACC.dlg) ACC.dlg.dlg.close();
   }
+  // Al ocultar/mostrar contenidos cambia la altura de la cabecera del DynamicPage, pero con preserveHeaderStateOnScroll el contenido conserva
+  // el padding-top calculado para la cabecera anterior (franja vacía): se le pide recalcularlo cuando ya cambió el DOM.
+  const reposicionarDP = (dp) => { const f = () => { try { if (dp && !dp.bIsDestroyed && dp._updateTitlePositioning) dp._updateTitlePositioning(); } catch (e) { /* API interna */ } }; requestAnimationFrame(f); setTimeout(f, 120); setTimeout(f, 400); };
   function montarPestanaCC(itb) {
     const [ITF, ITS, VBox, HBox, Table, Column, CLI, Text, Title, Label, Input, Select, Item, Button, Toolbar, Spacer, ObjectStatus, Link, JSONModel] =
       ['m/IconTabFilter', 'm/IconTabSeparator', 'm/VBox', 'm/HBox', 'm/Table', 'm/Column', 'm/ColumnListItem', 'm/Text', 'm/Title', 'm/Label', 'm/Input', 'm/Select', 'ui/core/Item', 'm/Button', 'm/Toolbar', 'm/ToolbarSpacer', 'm/ObjectStatus', 'm/Link', 'ui/model/json/JSONModel'].map(ui5);
@@ -15211,6 +15215,7 @@
       if (conservar0 !== null) dp.setPreserveHeaderStateOnScroll(nuestra ? true : conservar0);
       dp.setHeaderExpanded(true);
       const w = dp.getDomRef && dp.getDomRef('contentWrapper'); if (w) w.scrollTop = 0;
+      reposicionarDP(dp);
     };
     ACC.vista = { itb, modelo, tabla, archivo, pestana, cont, dp, cuerpo, agr: enCuerpo ? agr.name : '', ajenos, conservar0, mostrar };
     itb.attachSelect((e) => {

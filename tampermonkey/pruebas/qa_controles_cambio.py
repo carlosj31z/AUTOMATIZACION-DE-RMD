@@ -116,6 +116,11 @@ with sync_playwright() as pw:
         st = pg.evaluate("[document.getElementById('frgConfiguration--dynamicPageId-contentWrapper').scrollTop, sap.ui.getCore().byId('frgConfiguration--dynamicPageId').getHeaderExpanded()]")
         ok('DP: al entrar a CC arriba y con cabecera abierta', st[0] == 0 and st[1] is True, st)
         pg.screenshot(path=str(OUT / '2b-dp.png'))
+        PAD = "(() => { const dp = sap.ui.getCore().byId('frgConfiguration--dynamicPageId'), w = dp.getDomRef('contentWrapper'), t = dp.getDomRef('header') && dp.$titleArea && dp.$titleArea.get(0); return [parseFloat(w.style.paddingTop) || 0, t ? Math.round(t.getBoundingClientRect().height) : -1]; })()"
+        for k in ['Paso', 'rmdControlesCambio']:
+            pg.evaluate("(k) => { const itb = sap.ui.getCore().byId('itbMaestra'), it = itb.getItems().find((x) => x.getKey && (x.getKey() === k || (x.getText && x.getText() === k))); itb.setSelectedKey(it.getKey()); itb.fireSelect({ key: it.getKey(), selectedKey: it.getKey(), item: it }); }", k); pg.wait_for_timeout(700)
+        pad = pg.evaluate(PAD)
+        ok('DP: sin franja vacía al volver de otra pestaña', abs(pad[0] - pad[1]) <= 1, pad)
     # filtros por columna (lista de valores con búsqueda, como en Excel)
     M = "window.__rmdStats.controlesCambio.ACC.vista.modelo"
     nbot = pg.locator('.rmd-cc-tabla .rmd-cc-colfiltro').count(); ok('filtro en cada columna con datos', nbot == 12, nbot)
