@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.103.0
+// @version      1.103.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.103.0';                                                       // mantener igual a @version
+  const VERSION = '1.103.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1030,7 +1030,7 @@
   .rmd-acu-zona { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding: 10px; border: 1px dashed var(--rmd-borde-campo); border-radius: 8px; } .rmd-acu-zona.rmd-sobre { border-color: var(--rmd-acento); background: rgba(10,110,209,.08); }
   .rmd-acu-imgs-ed { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 100%; } .rmd-acu-imgs-ed figure { margin: 0; display: flex; flex-direction: column; gap: 3px; width: 180px; } .rmd-acu-imgs-ed img { height: 100px; width: 100%; }
   .rmd-acu-imgs-ed figcaption { display: flex; gap: 3px; } .rmd-acu-imgs-ed figcaption input { flex: 1 1 auto; min-width: 0; font-size: 12px !important; } .rmd-acu-error { margin: 0; grid-column: 1 / -1; } .rmd-acu-campo > .rmd-btn { align-self: flex-start; }
-  .rmd-cc-info { color: var(--rmd-apagado); font-size: 12.5px; margin-right: 8px; } .rmd-cc-desc { display: block; margin: 0 0 6px; white-space: pre-line; } .rmd-cc-dlg .sapMDialogScrollCont { padding: 12px 16px; } .rmd-cc-oculto { display: none !important; }
+  .rmd-cc-info { color: var(--rmd-apagado); font-size: 12.5px; margin-right: 8px; } .rmd-cc-desc { display: block; margin: 0 0 6px; white-space: pre-line; } .rmd-cc-dlg .sapMDialogScrollCont { padding: 12px 16px; } .rmd-cc-oculto { display: none !important; } .rmd-cc-colfiltro { margin-left: 2px; flex: none; } .rmd-cc-colfiltro .sapMBtnInner { min-width: 1.5rem; height: 1.5rem; padding: 0; } .rmd-cc-coltodo { padding-left: 4px; }
   html { --rmd-curva: cubic-bezier(.22, 1, .36, 1); --rmd-brillo-txt: #ffffff; } html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-brillo-txt: #0d0d0d; }
   canvas.rmd-orbe { animation: rmd-orbe-entra .32s var(--rmd-curva) both; } canvas.rmd-orbe.rmd-sin-entrada { animation: none; }
   @keyframes rmd-orbe-entra { from { opacity: 0; scale: .25; filter: blur(4px); } }
@@ -15103,7 +15103,7 @@
   const ui5 = (n) => sap.ui.require('sap/' + n);
   // los módulos UI5 que usa la pestaña se cargan una vez (sap.ui.require asíncrono) y luego se piden sin esperar
   const MODULOS_CC = ['m/IconTabFilter', 'm/IconTabSeparator', 'm/VBox', 'm/HBox', 'm/Table', 'm/Column', 'm/ColumnListItem', 'm/Text', 'm/Title', 'm/Label', 'm/Input', 'm/Select', 'ui/core/Item', 'm/Button',
-    'm/Toolbar', 'm/ToolbarSpacer', 'm/ObjectStatus', 'm/Link', 'm/CheckBox', 'm/Dialog', 'ui/model/json/JSONModel'];
+    'm/Toolbar', 'm/ToolbarSpacer', 'm/ObjectStatus', 'm/Link', 'm/CheckBox', 'm/Dialog', 'm/ResponsivePopover', 'm/List', 'm/StandardListItem', 'm/SearchField', 'ui/model/json/JSONModel'];
   let modulosCC = 0;   // 0 sin pedir, 1 cargando, 2 listos
   function modulosCCListos() {
     if (modulosCC === 2 || MODULOS_CC.every((n) => ui5(n))) return (modulosCC = 2) === 2;
@@ -15141,7 +15141,7 @@
     const [ITF, ITS, VBox, HBox, Table, Column, CLI, Text, Title, Label, Input, Select, Item, Button, Toolbar, Spacer, ObjectStatus, Link, JSONModel] =
       ['m/IconTabFilter', 'm/IconTabSeparator', 'm/VBox', 'm/HBox', 'm/Table', 'm/Column', 'm/ColumnListItem', 'm/Text', 'm/Title', 'm/Label', 'm/Input', 'm/Select', 'ui/core/Item', 'm/Button', 'm/Toolbar', 'm/ToolbarSpacer', 'm/ObjectStatus', 'm/Link', 'ui/model/json/JSONModel'].map(ui5);
     if (![ITF, ITS, VBox, HBox, Table, Column, CLI, Text, Title, Label, Input, Select, Item, Button, Toolbar, Spacer, ObjectStatus, Link, JSONModel].every(Boolean)) return;
-    const modelo = new JSONModel({ filas: [], total: 0, info: '', ocupado: false, f: { codigo: '', descripcion: '', planta: '', estado: '', analista: '' }, analistas: [] });
+    const modelo = new JSONModel({ filas: [], total: 0, info: '', ocupado: false, f: { codigo: '', descripcion: '', planta: '', estado: '', analista: '' }, analistas: [], fc: {}, fa: {} });
     const filtro = (prop, etiqueta, ctl) => new VBox({ items: [new Label({ text: etiqueta + ':' }), ctl] }).addStyleClass('rmd-cc-filtro');
     const sel = (prop, opciones) => new Select({ width: '100%', selectedKey: `{cc>/f/${prop}}`, change: () => pintarFilasCC(), items: opciones.map(([k, t]) => new Item({ key: k, text: t })) });
     const selAnalista = new Select({ width: '100%', selectedKey: '{cc>/f/analista}', change: () => pintarFilasCC(), items: { path: 'cc>/analistas', template: new Item({ key: '{cc>k}', text: '{cc>t}' }), templateShareable: false } });
@@ -15150,7 +15150,7 @@
       filtro('codigo', 'Código', entrada('codigo', 'Ingrese Código')), filtro('descripcion', 'Descripción', entrada('descripcion', 'Ingrese Descripción')),
       filtro('planta', 'Planta', sel('planta', [['', 'Todas'], ['P1', 'Planta 1 (Ate)'], ['P2', 'Planta 2 (Lima)']])),
       filtro('estado', 'Estado', sel('estado', [['', 'Todos'], ['En plazo', 'En plazo'], ['Vencido', 'Vencido']])), filtro('analista', 'Analista', selAnalista),
-      new Link({ text: 'Restablecer', press: () => { modelo.setProperty('/f', { codigo: '', descripcion: '', planta: '', estado: '', analista: '' }); pintarFilasCC(); } }).addStyleClass('rmd-cc-restablecer')] }).addStyleClass('rmd-cc-barra');
+      new Link({ text: 'Restablecer', press: () => { modelo.setProperty('/f', { codigo: '', descripcion: '', planta: '', estado: '', analista: '' }); modelo.setProperty('/fc', {}); pintarFilasCC(); } }).addStyleClass('rmd-cc-restablecer')] }).addStyleClass('rmd-cc-barra');
     const archivo = document.createElement('input'); archivo.type = 'file'; archivo.accept = '.xlsx,.xlsm,.xls'; archivo.hidden = true; archivo.className = 'rmd-cc-archivo'; document.body.appendChild(archivo);
     archivo.addEventListener('change', async () => {
       const f = archivo.files && archivo.files[0]; archivo.value = ''; if (!f) return;
@@ -15164,8 +15164,9 @@
       headerToolbar: new Toolbar({ content: [new Title({ text: 'Controles de Cambios ({cc>/total})' }), new Spacer(), new Text({ text: '{cc>/info}' }).addStyleClass('rmd-cc-info'),
         new Button({ icon: 'sap-icon://excel-attachment', text: 'Cargar Excel', type: 'Transparent', tooltip: 'Excel del REGISTRO DE CONTROLES DE CAMBIO P1-P2 (hoja «ACCIONES CC»): se toman las acciones de DOC abiertas, en plazo o vencidas, que tocan un RMD', press: () => archivo.click() }),
         new Button({ icon: 'sap-icon://refresh', type: 'Transparent', tooltip: 'Volver a leer las Observaciones de los RMD', press: () => leerRmdParaCC(true).catch((e) => toast('No se pudieron leer los RMD: ' + e.message, true)) })] }),
-      columns: [['Código', '7rem'], ['Acción', '4rem'], ['Descripción', ''], ['Etapa', '7rem'], ['Planta', '4rem'], ['Estado', '6rem'], ['Plazo', '6rem'], ['Fecha de ingreso', '6.5rem'], ['Fecha de autorización', '7rem'], ['Analista', '7rem'], ['RMD', '5.5rem'], ['Acción', '4.5rem']]
-        .map(([t, w]) => new Column({ width: w || undefined, header: new Text({ text: t, wrapping: true }) })),
+      columns: COLS_CC.map(({ t, w, c }) => new Column({ width: w || undefined, header: !c ? new Text({ text: t, wrapping: true }) : new HBox({ alignItems: 'Center', items: [
+        new Text({ text: t, wrapping: true }), new Button({ icon: 'sap-icon://filter', type: `{= \${cc>/fa/${c}} ? 'Emphasized' : 'Transparent' }`, tooltip: `Filtrar ${t}`,
+          press: (e) => abrirFiltroColumnaCC(c, t, e.getSource()) }).addStyleClass('rmd-cc-colfiltro')] }) })),
       items: { path: 'cc>/filas', templateShareable: false, template: new CLI({ cells: [
         new Text({ text: '{cc>codigoTxt}' }), new Text({ text: '{cc>accion}' }), new Text({ text: '{cc>descripcion}', maxLines: 3, tooltip: '{cc>descripcion}' }), new Text({ text: '{cc>etapaTxt}' }), new Text({ text: '{cc>planta}' }),
         estado(), new Text({ text: '{cc>plazoTxt}' }), new Text({ text: '{cc>ingresoTxt}' }), new Text({ text: '{cc>autorizacionTxt}' }), new Text({ text: '{cc>analista}' }),
@@ -15203,6 +15204,43 @@
     if (!ACC.datos) leerAccionesGuardadas(); else refrescarPestanaCC();
   }
   const ccFecha = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
+  // Columnas de la tabla; con «c» la cabecera lleva un filtro de valores (como el de Excel) sobre ese campo de filasPestanaCC
+  const COLS_CC = [{ t: 'Código', w: '7rem', c: 'codigoTxt' }, { t: 'Acción', w: '5rem', c: 'accion' }, { t: 'Descripción', c: 'descripcion' }, { t: 'Etapa', w: '7rem', c: 'etapas' },
+    { t: 'Planta', w: '5rem', c: 'planta' }, { t: 'Estado', w: '6rem', c: 'estado' }, { t: 'Plazo', w: '6rem', c: 'plazoTxt' }, { t: 'Fecha de ingreso', w: '6.5rem', c: 'ingresoTxt' },
+    { t: 'Fecha de autorización', w: '7rem', c: 'autorizacionTxt' }, { t: 'Analista', w: '7rem', c: 'analista' }, { t: 'RMD', w: '5.5rem', c: 'rmdTxt' }, { t: 'Acción', w: '4.5rem' }];
+  const VACIAS_CC = '(Vacías)';
+  const valoresColCC = (x, c) => { const v = Array.isArray(x[c]) ? x[c].map(String) : [x[c] == null ? '' : String(x[c])]; return v.length ? v : ['']; };
+  const claveOrdenCC = (v) => (/^\d\d\/\d\d\/\d{4}$/.test(v) ? v.slice(6) + v.slice(3, 5) + v.slice(0, 2) : v);
+  const pasaColumnasCC = (x, fc, salvo) => Object.keys(fc).every((c) => c === salvo || !fc[c] || valoresColCC(x, c).some((v) => fc[c].includes(v)));
+  function abrirFiltroColumnaCC(c, titulo, boton) {
+    const v = ACC.vista; if (!v) return;
+    const [RP, List, SLI, SearchField, CheckBox, Button, Toolbar, JSONModel] = ['m/ResponsivePopover', 'm/List', 'm/StandardListItem', 'm/SearchField', 'm/CheckBox', 'm/Button', 'm/Toolbar', 'ui/model/json/JSONModel'].map(ui5);
+    if (![RP, List, SLI, SearchField, CheckBox, Button, Toolbar, JSONModel].every(Boolean)) return;
+    // Valores de la columna entre las filas que dejan pasar los demás filtros (barra y otras columnas), con cuántas filas tiene cada uno
+    const fc = v.modelo.getProperty('/fc') || {}, actual = fc[c], cuenta = new Map();
+    for (const x of v.filasBase || []) if (pasaColumnasCC(x, fc, c)) for (const val of new Set(valoresColCC(x, c))) cuenta.set(val, (cuenta.get(val) || 0) + 1);
+    if (actual) for (const val of actual) if (!cuenta.has(val)) cuenta.set(val, 0);
+    const todos = [...cuenta].sort(([a], [b]) => (!a ? 1 : !b ? -1 : claveOrdenCC(a).localeCompare(claveOrdenCC(b), 'es', { numeric: true })))
+      .map(([val, n]) => ({ v: val, t: val || VACIAS_CC, n: String(n), sel: !!actual && actual.includes(val) }));
+    const m = new JSONModel({ vista: todos, todo: false });
+    const marcarTodo = () => m.setProperty('/todo', m.getProperty('/vista').length > 0 && m.getProperty('/vista').every((o) => o.sel));
+    const lista = new List({ mode: 'MultiSelect', includeItemInSelection: true, rememberSelections: false, noDataText: 'Sin valores',
+      selectionChange: marcarTodo, items: { path: 'p>/vista', templateShareable: false, template: new SLI({ title: '{p>t}', info: '{p>n}', selected: '{p>sel}' }) } });
+    const aplicar = (sel) => {
+      const nuevo = { ...(v.modelo.getProperty('/fc') || {}) };
+      if (sel && sel.length && sel.length < todos.length) nuevo[c] = sel; else delete nuevo[c];
+      v.modelo.setProperty('/fc', nuevo); pintarFilasCC(); pop.close();
+    };
+    const pop = new RP({ title: `Filtrar ${titulo}`, placement: 'Bottom', contentWidth: '20rem', contentHeight: '24rem',
+      subHeader: new Toolbar({ content: [new SearchField({ width: '100%', placeholder: 'Buscar', liveChange: (e) => {
+        const q = SIN_ACENTOS(e.getParameter('newValue') || ''); m.setProperty('/vista', todos.filter((o) => SIN_ACENTOS(o.t).includes(q))); marcarTodo(); } })] }),
+      content: [new CheckBox({ text: 'Seleccionar todo', selected: '{p>/todo}', select: (e) => { const s = e.getParameter('selected'); m.getProperty('/vista').forEach((o) => { o.sel = s; }); m.refresh(true); } })
+        .addStyleClass('rmd-cc-coltodo'), lista],
+      beginButton: new Button({ text: 'Aceptar', type: 'Emphasized', press: () => aplicar(todos.filter((o) => o.sel).map((o) => o.v)) }),
+      endButton: new Button({ text: 'Limpiar', press: () => aplicar(null) }),
+      afterClose: () => pop.destroy() }).addStyleClass('rmd-cc-colpop');
+    pop.setModel(m, 'p'); marcarTodo(); pop.openBy(boton);
+  }
   function filasPestanaCC() {
     const acciones = (ACC.datos && ACC.datos.acciones) || [];
     return acciones.map((a) => {
@@ -15215,9 +15253,11 @@
   }
   function pintarFilasCC() {
     const v = ACC.vista; if (!v) return;
-    const f = v.modelo.getProperty('/f'), P = (t) => SIN_ACENTOS(t), todas = filasPestanaCC();
-    const filas = todas.filter((x) => (!f.codigo || P(x.codigoTxt).includes(P(f.codigo))) && (!f.descripcion || P(x.descripcion).includes(P(f.descripcion)))
+    const f = v.modelo.getProperty('/f'), fc = v.modelo.getProperty('/fc') || {}, P = (t) => SIN_ACENTOS(t), todas = filasPestanaCC();
+    const base = todas.filter((x) => (!f.codigo || P(x.codigoTxt).includes(P(f.codigo))) && (!f.descripcion || P(x.descripcion).includes(P(f.descripcion)))
       && (!f.planta || AccionesCC.mismaPlanta(x.planta, f.planta === 'P1' ? 'PLANTA ATE' : 'PLANTA LIMA')) && (!f.estado || x.estado === f.estado) && (!f.analista || x.analista === f.analista));
+    const filas = base.filter((x) => pasaColumnasCC(x, fc)); v.filasBase = base;
+    v.modelo.setProperty('/fa', Object.fromEntries(Object.keys(fc).filter((c) => fc[c]).map((c) => [c, true])));
     v.modelo.setProperty('/filas', filas); v.modelo.setProperty('/total', filas.length === todas.length ? String(todas.length) : `${filas.length} de ${todas.length}`);
     v.modelo.setProperty('/analistas', [{ k: '', t: 'Todos' }].concat([...new Set(todas.map((x) => x.analista).filter(Boolean))].sort().map((a) => ({ k: a, t: a }))));
   }
