@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.104.1
+// @version      1.104.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.104.1';                                                       // mantener igual a @version
+  const VERSION = '1.104.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -15487,6 +15487,8 @@
     const textoInsumo = (x) => `${x.mat || x.texto || ''} (${x.comp || ''}) ${fmtCant(x.cant)} ${x.um || ''}`.trim();
     // la cantidad de un insumo ya puesto no se edita en el RMD: se cambia en la Lista de Materiales
     const AVISO_CANT_LM = 'El cambio en la cantidad de los insumos se debe realizar en la Lista de Materiales: en el RMD no se puede editar.';
+    const insClave = (x) => `ins:${x.id || x.comp}`;                      // insumo de la receta (tabla de Insumos)
+    const cantRecetaCambiada = (x) => x.cantNueva != null && x.cantNueva !== '' && fmtCant(x.cantNueva) !== fmtCant(x.cant);
     const CAMPOS_RANGO = [['vi', 'Valor inicial'], ['vf', 'Valor final'], ['margen', 'Margen']];
     // Cambios base -> trabajo: { clase, accion, lugar, numero, antes, despues, codigos, nuevo, ids }.
     function cambios(base, trabajo) {
@@ -15537,6 +15539,9 @@
             else if (x.comentario) out.push({ clase, accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: nombre, comentario: x.comentario });
           });
         });
+        (e.insumos || []).forEach((x) => { if (!cantRecetaCambiada(x)) return;          // cantidad de la receta: va a la Lista de Materiales
+          out.push({ clase: 'insumo', accion: 'cantidad', insumo: true, receta: true, lugar: e.nombre, numero: nW.get(e.id) || '', id: insClave(x), estructura: e.id, texto: `${x.desc || ''} (${x.comp || ''})`, comentario: x.comentario || '',
+            campos: [{ campo: 'Cantidad en la receta', antes: `${fmtCant(x.cant)} ${x.um || ''}`.trim(), despues: `${fmtCant(x.cantNueva)} ${x.um || ''}`.trim() }] }); });
         (e.espec || []).forEach((x) => { if (x.comentario) out.push({ clase: 'especificacion', accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: [x.ensayo, x.especificacion].filter(Boolean).join(': '), comentario: x.comentario }); });
       });
       return out;
@@ -15572,6 +15577,8 @@
         }
       };
       const vivos = (l) => (l || []).filter((x) => !x.quitado);
+      trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (x.cantNueva == null || x.cantNueva === '') return; const c = num(x.cantNueva);
+        if (c == null || Number.isNaN(c) || c <= 0) add(insClave(x), 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); else if (cantRecetaCambiada(x)) add(insClave(x), 'aviso', AVISO_CANT_LM); }));
       // insumos: cantidad válida y lo repartido en los pasos frente a la receta
       const receta = new Map(), asignado = new Map(), insumosPm = [];
       trabajo.estructuras.forEach((e) => { (e.insumos || []).forEach((i) => { if (i.comp && !receta.has(i.comp)) receta.set(i.comp, i); });
@@ -15646,6 +15653,8 @@
             lista.push(clon(x)); aplicados++;
           });
         });
+        (e.insumos || []).forEach((x) => { if (!cantRecetaCambiada(x) && !x.comentario) return; const ra = (ae.insumos || []).find((y) => y.comp === x.comp); if (!ra) { conflictos.push(`${e.nombre}: el insumo ${x.comp} ya no está en la receta; se omite su cantidad.`); return; }
+          if (cantRecetaCambiada(x)) { ra.cantNueva = x.cantNueva; aplicados++; } if (x.comentario) ra.comentario = x.comentario; });
         (e.espec || []).forEach((x) => { if (x.comentario) { const ra = (ae.espec || []).find((y) => y.id === M(x.id)); if (ra) ra.comentario = x.comentario; } });
       });
       return { trabajo: R, conflictos, aplicados };
@@ -15667,7 +15676,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM };
+    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -15765,6 +15774,7 @@
         }
         for (const k of ['equipos', 'utensilios']) for (const x of e[k] || []) if (x.id === id) return { item: x, lista: e[k], e, clase: k === 'equipos' ? 'equipo' : 'utensilio' };
         for (const x of e.espec || []) if (x.id === id) return { item: x, lista: e.espec, e, clase: 'especificacion' };
+        for (const x of e.insumos || []) if (PPN.insClave(x) === id) return { item: x, lista: e.insumos, e, clase: 'insumo' };
       }
       return null;
     }
@@ -15840,6 +15850,8 @@
       const cuerpo = validacion + [...W.estructuras].sort(PPN.porOrden).map((e) => htmlEstructura(e, num)).join('');
       return `<table class="pp-pagina"><thead><tr><td>${htmlEncabezadoPdf()}</td></tr></thead><tbody><tr><td class="pp-hoja">${cuerpo}</td></tr></tbody></table>`;
     }
+    // botón ✎ siempre visible junto a una cantidad de insumo
+    const btCant = (a, id) => `<button type="button" class="pp-cant-ed" data-a="${a}" data-id="${esc(id)}" title="Cambiar la cantidad. El cambio se realiza en la Lista de Materiales (en el RMD no se edita)">✎</button>`;
     const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
     const acciones = (clase, quitado, soloComentario, conPm, id) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario === 'insumo' ? bt('editar-ins', '✎ Cantidad', 'Cambiar la cantidad del insumo en este paso', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') + bt('quitar', '✕ Quitar', 'Quitar este insumo del paso', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
       bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w')
@@ -15900,7 +15912,7 @@
       const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo ? 'insumo' : false);
       const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`, true) + (b && cantCambiada(m, b) ? `<div class="pp-antes">Antes: ${esc(fmtDec(b.cant))} ${esc(b.um || '')}</div>` : '') : celdaTexto(m, b, esc(m.texto), true);
       const celdas = ['<td></td>'];
-      if (m.insumo) celdas.push(`<td class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`, `<td class="pp-c-cant">${esc(fmtDec(m.cant))} ${esc(m.um || '')}</td>`);
+      if (m.insumo) celdas.push(`<td class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`, `<td class="pp-c-cant">${esc(fmtDec(m.cant))} ${esc(m.um || '')}${m.quitado ? '' : btCant('editar-ins', m.id)}</td>`);
       else celdas.push(`<td colspan="2" class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`);
       celdas.push(r === 'I' ? `<td class="pp-c-caja">${CAJA}</td>` : r === 'C' ? `<td class="pp-c-chk">${CHECK}</td>` : '<td></td>', '<td></td>', '<td></td>');
       if (conforme) celdas.push('<td></td>');
@@ -15940,10 +15952,12 @@
     }
     function htmlInsumos(e) {
       const lista = (e.insumos || []).filter((x) => x.aiPrio === '00' || x.aiPrio === '01');          // prioridad 00 y 01
-      const filas = lista.map((x) => `<tr><td>${esc(x.desc)}${x.txtadic ? ' ' + esc(x.txtadic) : ''}</td><td class="c">${esc(x.comp)}</td><td class="d">${esc(fmtDec(x.cant))}</td><td class="c">${esc(x.um)}</td><td></td><td></td><td></td><td></td></tr>`).join('');
+      const filas = lista.map((x) => { const k = PPN.insClave(x), cam = PPN.cantRecetaCambiada(x);
+        const cant = cam ? `<s class="pp-cant-antes">${esc(fmtDec(x.cant))}</s> <b class="pp-cant-nueva">${esc(fmtDec(x.cantNueva))}</b>` : esc(fmtDec(x.cant));
+        return `<tr class="${cam ? 'cam' : ''}" data-id="${esc(k)}"><td>${esc(x.desc)}${x.txtadic ? ' ' + esc(x.txtadic) : ''}${cam ? '<span class="pp-tags"><span class="pp-tag cam">Cantidad</span></span>' : ''}${htmlAvisos(k)}${htmlComentario(x)}</td><td class="c">${esc(x.comp)}</td><td class="d">${cant}${btCant('cant-receta', k)}</td><td class="c">${esc(x.um)}</td><td></td><td></td><td></td><td></td></tr>`; }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="4">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
       return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid pp-ins">${cols([172, 55, 68, 28, 68, 34, 30, 22])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Cantidad</th><th>UM</th><th>Cant. Recib.</th><th>UM (CP)</th><th>Bulto</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
-        <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para ponerlos en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso (eliges el insumo y su cantidad); en un insumo ya puesto, <b>✎ Cantidad</b> la ajusta para el pedido, pero ese cambio se realiza en la <b>Lista de Materiales</b>, porque en el RMD no se edita. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
+        <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para cambiar una cantidad, pulsa <b>✎</b> junto a ella (aquí o en el insumo dentro de un paso): queda en el pedido, pero <b>ese cambio se realiza en la Lista de Materiales</b>, porque en el RMD no se edita. Para poner un insumo en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
     }
     function htmlEspec(e) {
       const grupos = []; (e.espec || []).forEach((x) => { const k = x.grupoId == null ? x.grupo || '' : x.grupoId; let g = grupos.find((y) => y.k === k); if (!g) grupos.push((g = { k, nombre: x.grupo || '', filas: [] })); g.filas.push(x); });
@@ -16096,7 +16110,7 @@
       modal(`<h3>${x ? 'Insumo' : 'Agregar insumo'}<span>${esc(e.nombre)}${t ? ' › ' + esc(t.nombre) : ''} › ${esc(String(padre.texto || '').slice(0, 60))}</span></h3>
         ${x ? '' : '<label class="pp-campo">Buscar en los insumos de la receta<input id="m-q" placeholder="código o descripción (p. ej. CAFEINA, 1100002760)"></label>'}<div id="m-res" class="pp-sug"></div>
         <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc((x && x.comentario) || '')}</textarea></label>
-        <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>${x && BI.has(x.id) ? `<div class="pp-aviso aviso">⚠ ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}
+        <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>${x && BI.has(x.id) ? `<div class="pp-aviso-lm">⚠ ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
         const q = $('#m-q', m), res = $('#m-res', m), cant = $('#m-cant', m), av = $('#m-ins-av', m);
         const pintar = () => {
@@ -16126,6 +16140,26 @@
         m.addEventListener('click', (ev) => { const a = ev.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') aceptar(); });
         cant.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); aceptar(); } });
         pintar(); setTimeout(() => { (q || cant).focus(); if (!q) cant.select(); }, 20);
+      });
+    }
+    // Cantidad de un insumo de la receta (tabla de Insumos): queda en el pedido; se cambia en la Lista de Materiales
+    function cantidadReceta(clave) {
+      const f = encontrar(clave); if (!f) return; const x = f.item, cam = PPN.cantRecetaCambiada(x);
+      const numero = (v) => { v = String(v == null ? '' : v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
+      modal(`<h3>Cantidad del insumo<span>${esc(x.desc)} (${esc(x.comp)}) · receta del RMD</span></h3>
+        <div class="pp-aviso-lm">⚠ ${esc(PPN.AVISO_CANT_LM)} Lo que pongas aquí queda en el pedido para que el equipo RMD lo gestione.</div>
+        <p class="pp-nota">Cantidad en SAP: <b>${esc(fmtDec(x.cant))} ${esc(x.um || '')}</b></p>
+        <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
+        <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad nueva<input id="m-cant" inputmode="decimal" value="${esc(cam ? x.cantNueva : x.cant == null ? '' : x.cant)}"></label><span class="pp-ins-um">${esc(x.um || '')}</span><span id="m-ins-av" class="pp-rango-av"></span></div>
+        <div class="pp-pie">${cam ? '<button type="button" data-a="sap">Dejar la de SAP</button>' : ''}<button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
+        const cant = $('#m-cant', m), av = $('#m-ins-av', m);
+        const validar = () => { const n = numero(cant.value), ok = n != null && !Number.isNaN(n) && n > 0; av.textContent = ok ? '' : 'Escribe una cantidad mayor que cero (punto o coma para los decimales).'; return ok; };
+        cant.addEventListener('input', validar);
+        const aceptar = () => { if (!validar()) { cant.focus(); return; } const n = String(+numero(cant.value).toFixed(6)), com = $('#m-com', m).value.trim();
+          cambio(() => { const v = encontrar(clave).item; if (PPN.cantRecetaCambiada({ cant: v.cant, cantNueva: n })) v.cantNueva = n; else delete v.cantNueva; v.comentario = com; }); cerrar(); setTimeout(() => irA(clave), 30); };
+        m.addEventListener('click', (ev) => { const a = ev.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') aceptar(); else if (a === 'sap') { cambio(() => { delete encontrar(clave).item.cantNueva; }); cerrar(); } });
+        cant.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); aceptar(); } });
+        setTimeout(() => { cant.focus(); cant.select(); }, 20);
       });
     }
     function comentar(id) {
@@ -16372,6 +16406,7 @@
         if (a === 'm-duplicar') duplicar(ids); else if (a === 'm-copiar') copiar(ids); else if (a === 'm-subir' || a === 'm-bajar') moverGrupo(ids, a === 'm-subir' ? -1 : 1);
         else if (a === 'm-mover') moverGrupoA(ids); else if (a === 'm-quitar') quitarGrupo(ids); else if (a === 'm-limpiar') limpiarMarcados(); }
       else if (a === 'editar-ins') editarInsumo({ id });
+      else if (a === 'cant-receta') cantidadReceta(id);
       else if (a === 'agregar-ins') { const f = encontrar(id); if (!f.item.pm) f.item.pm = []; editarInsumo({ nuevo: true, padre: f.item, e: f.e, t: f.t }); }
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
@@ -16506,6 +16541,10 @@ td.ult { position: relative; }
 .pp-mas { display: block; margin: -4px 0 12px; padding: 4px 12px; border: 1px dashed rgba(10,102,194,.5); border-radius: 6px; background: rgba(10,102,194,.04); color: var(--acento); font: 600 12px "Segoe UI", Arial, sans-serif; cursor: pointer; }
 .pp-mas:hover { border-style: solid; background: rgba(10,102,194,.09); }
 .pp-nota { color: var(--ap); font: 12px "Segoe UI", Arial, sans-serif; margin: 4px 0; }
+/* cantidad de insumos: botón ✎ siempre visible y aviso de la Lista de Materiales */
+.pp-cant-ed { margin-left: 4px; padding: 0 5px; height: 18px; border: 1px solid rgba(10,102,194,.45); border-radius: 4px; background: #eef5fc; color: var(--acento); font: 600 11px/16px "Segoe UI", Arial, sans-serif; vertical-align: 1px; cursor: pointer; }
+.pp-cant-ed:hover { background: var(--acento); color: #fff; } .pp-cant-antes { color: var(--ap); font-size: 11px; } .pp-cant-nueva { color: var(--cam); }
+.pp-aviso-lm { margin: 8px 0; padding: 8px 12px; border-radius: 8px; background: var(--cam-f); border-left: 4px solid var(--cam); color: #5c3d00; font-size: 13px; font-weight: 600; }
 /* varios pasos: marcados, arrastre y barra */
 .pp-doc.multi tr.pp-paso:not(.qui) > td:first-child { position: relative; } .pp-doc.multi tr.pp-paso:not(.qui) > td:first-child::before { content: '☐'; position: absolute; left: -22px; top: 2px; color: var(--acento); font: 15px/1 "Segoe UI Symbol", "Segoe UI", Arial, sans-serif; }
 .pp-doc.multi tr.pp-paso.marc > td:first-child::before { content: '☑'; } .pp-doc tr.marc > td { background: #e3eefc !important; } .pp-doc tr.marc > td:first-child { box-shadow: inset 4px 0 0 var(--acento); }
@@ -16578,7 +16617,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 @media (pointer: coarse) { .pp-acc { width: 168px; } .pp-acc button { height: 34px; font-size: 13px; } .pp-flujo li > button { min-height: 40px; } }
 @media print {
   @page { size: A4; margin: 10mm 9mm 12mm; }
-  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon, .pp-multi { display: none !important; }
+  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon, .pp-multi, .pp-cant-ed { display: none !important; }
   .pp-t tr.sel { outline: 0 !important; } .pp-t tr[data-id] { cursor: default; }
   .pp-datos-pdf { display: block; line-height: 1px; }   /* sin recortar: Chrome no guarda los enlaces de un contenedor con overflow: hidden */ .pp-datos-pdf a { display: inline-block; width: 2px; height: 2px; overflow: hidden; color: #fff; font-size: 1px; line-height: 1px; text-decoration: none; }
   .pp-t tr[data-id] { outline: 0 !important; }
@@ -17146,6 +17185,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   }
   async function ppPlanEscritura(datos, prop0, an, modelo, usuario) {
     const manual = [], prop = { ...prop0, trabajo: ppSinInsumosNuevos(prop0.trabajo, manual) };
+    prop.trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (PPN.cantRecetaCambiada(x)) manual.push(`Cambiar en la Lista de Materiales la cantidad del insumo ${x.comp || ''} — ${String(x.desc || '').slice(0, 50)}: ${x.cant == null ? '(vacía)' : x.cant} → ${x.cantNueva} ${x.um || ''} (receta del RMD). En el RMD no se puede editar.`); }));
     const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);

@@ -952,7 +952,7 @@ with sync_playwright() as p:
         html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
         e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
         e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
-        botones = e.evaluate("() => ({ paso: !!document.querySelector('tr[data-id=\"P20\"] [data-a=agregar-ins]'), cuadro: !!document.querySelector('tr[data-id=\"P1\"] [data-a=agregar-ins]'), ins: [...document.querySelectorAll('tr[data-id=\"MI1\"] [data-a]')].map((b) => b.dataset.a) })")
+        botones = e.evaluate("() => ({ paso: !!document.querySelector('tr[data-id=\"P20\"] [data-a=agregar-ins]'), cuadro: !!document.querySelector('tr[data-id=\"P1\"] [data-a=agregar-ins]'), ins: [...document.querySelectorAll('tr[data-id=\"MI1\"] .pp-acc [data-a]')].map((b) => b.dataset.a) })")
         e.evaluate("() => document.querySelector('tr[data-id=\"P20\"] [data-a=agregar-ins]').click()"); e.wait_for_selector("#m-q")
         todos = e.evaluate("() => [...document.querySelectorAll('#m-res [data-comp]')].map((b) => b.dataset.comp)")
         e.fill("#m-q", "agua inyec"); e.wait_for_timeout(100); filtro = e.evaluate("() => [...document.querySelectorAll('#m-res [data-comp]')].map((b) => b.dataset.comp)")
@@ -969,6 +969,30 @@ with sync_playwright() as p:
               and st["cmb"] == [["agregar", "AGUA PARA INYECCION CSP (2500000010) 20 L"], ["cantidad", "10 L>12.5 L"]] and "Cantidad" in st["tags"] and lm and st["lmAv"]
               and r["pm"] == [[], ["MI1"]] and len(r["man"]) == 1 and "2500000010" in r["man"][0])
         return ok, json.dumps({"botones": botones, "todos": todos, "filtro": filtro, "propuesta": propuesta, "pasa": pasa, "sigue": sigue, "lm": lm, "st": {k: v for k, v in st.items() if k != "W"}, "plan": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN52 Borrador de Producción · cantidad de insumos visible (v1.104.2): junto a cada cantidad (tabla de Insumos y el insumo dentro de un paso) hay un ✎ siempre visible; en la tabla de Insumos cambia la cantidad de la receta con el aviso de la Lista de Materiales (cambio «Cantidad (insumo)», fila marcada, antes tachado), «Dejar la de SAP» lo deshace y el rehacer sobre SAP conserva la cantidad")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        d0["arbol"]["estructuras"][2]["etiquetas"][1]["pasos"][1]["pm"] = [{"id": "MI1", "pasoId": None, "codigo": None, "texto": "AGUA PARA INYECCION CSP", "orden": 1, "tipo": 433, "insumo": True, "comp": "2500000010", "mat": "AGUA PARA INYECCION CSP", "cant": "10", "um": "L", "insId": "RI2"}]
+        for i, x in enumerate(d0["arbol"]["estructuras"][3]["insumos"]): x["id"] = "RI" + str(i + 1)
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        vis = e.evaluate("""() => { const v = (s) => { const b = document.querySelector(s); return !!b && getComputedStyle(b).display !== 'none' && getComputedStyle(b).opacity !== '0' && b.getBoundingClientRect().width > 0; };
+          return { receta: v('tr[data-id="ins:RI2"] .pp-cant-ed'), paso: v('tr[data-id="MI1"] .pp-cant-ed'), filas: document.querySelectorAll('.pp-ins tr[data-id^="ins:"]').length }; }""")
+        e.click('tr[data-id="ins:RI2"] .pp-cant-ed'); e.wait_for_selector("#m-cant"); dlg = e.inner_text(".pp-modal"); propuesta = e.input_value("#m-cant")
+        e.fill("#m-cant", "0"); e.click(".pp-modal [data-a=aceptar]"); sigue = e.evaluate("() => !!document.querySelector('#m-cant')")
+        e.fill("#m-cant", "32,5"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(250)
+        st = e.evaluate("""() => { const s = window.__pp.estado(), tr = document.querySelector('tr[data-id="ins:RI2"]');
+          return { cmb: s.CMB.filter((c) => c.receta).map((c) => [c.accion, c.clase, c.campos.map((x) => x.antes + '>' + x.despues).join()]), av: (s.AV.find(([id]) => id === 'ins:RI2') || [, []])[1].map((a) => a.nivel + ':' + a.texto.slice(0, 40)),
+            cam: tr.classList.contains('cam'), antes: (tr.querySelector('.pp-cant-antes') || {}).textContent, nueva: (tr.querySelector('.pp-cant-nueva') || {}).textContent, panel: [...document.querySelectorAll('.pp-cmb.cantidad b')].map((x) => x.textContent), W: s.W }; }""")
+        rb = pg.evaluate("""([b, W]) => { const N = window.__rmdStats.plantilla.nucleo, r = N.rebase(b, W, JSON.parse(JSON.stringify(b))); return { cant: r.trabajo.estructuras[3].insumos[1].cantNueva, apl: r.aplicados }; }""", [d0["arbol"], st["W"]])
+        e.click('tr[data-id="ins:RI2"] .pp-cant-ed'); e.wait_for_selector("#m-cant"); e.click(".pp-modal [data-a=sap]"); e.wait_for_timeout(200)
+        fin = e.evaluate("() => window.__pp.estado().CMB.filter((c) => c.receta).length")
+        e.close()
+        ok = (not errs and vis == {"receta": True, "paso": True, "filas": 2} and "Lista de Materiales" in dlg and propuesta == "30" and sigue
+              and st["cmb"] == [["cantidad", "insumo", "30 L>32.5 L"]] and any(a.startswith("aviso:El cambio en la cantidad") for a in st["av"]) and st["cam"] and st["antes"] == "30.000" and st["nueva"] == "32.500"
+              and st["panel"] == ["Cantidad (insumo)"] and rb == {"cant": "32.5", "apl": 1} and fin == 0)
+        return ok, json.dumps({"vis": vis, "dlg": dlg[:200], "propuesta": propuesta, "sigue": sigue, "st": {k: v for k, v in st.items() if k != "W"}, "rb": rb, "fin": fin, "errores": errs[:3]}, ensure_ascii=False)[:1800]
     @prueba("LN51 Borrador de Producción · varios pasos (v1.104): «⧉ Duplicar» copia el paso con sus procesos menores (ids nuevos, mismo código, el repetido es solo info); Ctrl+clic y Shift+clic marcan pasos; la barra los baja y sube juntos, los copia y «Pegar aquí al final» los pega en otra lista; arrastrar un paso de SAP a otra lista lo deja «Quitado» y agrega su copia; «Mover a…» lleva los marcados a otra lista; quitar en conjunto borra los nuevos")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
