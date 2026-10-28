@@ -83,7 +83,7 @@ with sync_playwright() as pw:
     pg.wait_for_function('window.__listo', timeout=60000); pg.wait_for_timeout(800)
     pg.evaluate(SP); pg.add_script_tag(content=SCRIPT); pg.wait_for_timeout(1500)
     tabs = pg.evaluate("[...document.querySelectorAll('[role=tab]')].map(t=>t.textContent.trim())")
-    ok('pestaña agregada al final', tabs[-1].endswith('Controles de Cambios'), tabs)
+    ok('pestaña agregada al final (antes de la de Acuerdos)', [t for t in tabs if not t.endswith('Acuerdos')][-1].endswith('Controles de Cambios'), tabs)
     dlg0 = pg.evaluate("(() => { const r = document.querySelector('.sapMDialog').getBoundingClientRect(); return [r.width, r.height]; })()")
     pg.locator('[role=tab]', has_text='Controles de Cambios').click(); pg.wait_for_timeout(800)
     ok('contenido visible', pg.locator('.rmd-cc-pestana').is_visible())
@@ -92,6 +92,13 @@ with sync_playwright() as pw:
     pg.set_input_files('.rmd-cc-archivo', XLSX); pg.wait_for_function("window.__rmdStats.controlesCambio.ACC.datos", timeout=60000); pg.wait_for_timeout(500)
     n = pg.evaluate("window.__rmdStats.controlesCambio.ACC.datos.acciones.length")
     ok('acciones leídas (DOC, abiertas, que tocan un RMD)', n > 150, n)
+    # DOC compartida con otras áreas y acciones de RMD de otras áreas en un CC donde DOC participa
+    sel = pg.evaluate("""(() => { const E = ['CÓDIGO CC', 'Nº DE ACCIÓN', 'DESCRIPCIÓN DE LA ACCIÓN', 'ÁREAS INVOLUCRADAS', 'STATUS DE ACCIONES'];
+      const f = [E, ['26-280-CC', 1, 'Actualizar el procedimiento PCPR-202-09', 'DOC', 'CERRADO EN PLAZO'], ['26-280-CC', 3, 'Actualizar los RMDs de la etapa de Envase', 'GV2', 'ABIERTO VENCIDO'],
+        ['26-280-CC ADENDA', 1, 'Actualizar el registro de manufactura digital (RMD) de envase', 'DOC', 'ABIERTO VENCIDO'], ['26-300-CC', 1, 'Actualizar el RMD de fabricación', 'DOC - CPR', 'ABIERTO EN PLAZO'],
+        ['26-301-CC', 1, 'Actualizar los RMD de envase', 'PRO-DOC', 'ABIERTO EN PLAZO'], ['26-302-CC', 1, 'Actualizar el RMD de envase', 'GV2', 'ABIERTO EN PLAZO']];
+      return window.__rmdStats.controlesCambio.AccionesCC.deHojas([{ hoja: 'ACCIONES CC', filas: f }], '2026-10-28').acciones.map((a) => a.carpeta + '#' + a.accion + '#' + a.area); })()""")
+    ok('DOC compartida y RMD de otras áreas del mismo CC', sel == ['26-280-CC#3#GV2', '26-280-CC ADENDA#1#DOC', '26-300-CC#1#DOC - CPR', '26-301-CC#1#PRO-DOC'], sel)
     pg.evaluate("(m) => window.__rmdStats.controlesCambio.ponerMds(m)", MDS); pg.wait_for_timeout(800)
     titulo = pg.locator('.rmd-cc-tabla .sapMTitle').first.inner_text(); ok('título con total', str(n) in titulo, titulo)
     pg.screenshot(path=str(OUT / '2-lista.png'))
@@ -109,6 +116,34 @@ with sync_playwright() as pw:
         st = pg.evaluate("[document.getElementById('frgConfiguration--dynamicPageId-contentWrapper').scrollTop, sap.ui.getCore().byId('frgConfiguration--dynamicPageId').getHeaderExpanded()]")
         ok('DP: al entrar a CC arriba y con cabecera abierta', st[0] == 0 and st[1] is True, st)
         pg.screenshot(path=str(OUT / '2b-dp.png'))
+        PAD = "(() => { const dp = sap.ui.getCore().byId('frgConfiguration--dynamicPageId'), w = dp.getDomRef('contentWrapper'), t = dp.getDomRef('header') && dp.$titleArea && dp.$titleArea.get(0); return [parseFloat(w.style.paddingTop) || 0, t ? Math.round(t.getBoundingClientRect().height) : -1]; })()"
+        for k in ['Paso', 'rmdControlesCambio']:
+            pg.evaluate("(k) => { const itb = sap.ui.getCore().byId('itbMaestra'), it = itb.getItems().find((x) => x.getKey && (x.getKey() === k || (x.getText && x.getText() === k))); itb.setSelectedKey(it.getKey()); itb.fireSelect({ key: it.getKey(), selectedKey: it.getKey(), item: it }); }", k); pg.wait_for_timeout(700)
+        pad = pg.evaluate(PAD)
+        ok('DP: sin franja vacía al volver de otra pestaña', abs(pad[0] - pad[1]) <= 1, pad)
+    # filtros por columna (lista de valores con búsqueda, como en Excel)
+    M = "window.__rmdStats.controlesCambio.ACC.vista.modelo"
+    nbot = pg.locator('.rmd-cc-tabla .rmd-cc-colfiltro').count(); ok('filtro en cada columna con datos', nbot == 12, nbot)
+    todas = pg.evaluate(M + ".getProperty('/filas').length")
+    def colfiltro(i): pg.locator('.rmd-cc-tabla .rmd-cc-colfiltro').nth(i).click(); pg.wait_for_timeout(700); return pg.locator('.rmd-cc-colpop')
+    pop = colfiltro(6); vals = pop.locator('.sapMLIB').all_inner_texts()
+    ok('popover de Estado con sus valores', pop.is_visible() and any('Vencido' in v for v in vals) and any('En plazo' in v for v in vals), vals)
+    pop.locator('.sapMLIB', has_text='Vencido').click(); pop.locator('button', has_text='Aceptar').click(); pg.wait_for_timeout(600)
+    filas = pg.evaluate(M + ".getProperty('/filas')")
+    ok('columna Estado = Vencido', filas and len(filas) < todas and all(f['estado'] == 'Vencido' for f in filas), (len(filas), todas))
+    ok('botón del filtro activo resaltado', 'sapMBtnEmphasized' in (pg.locator('.rmd-cc-tabla .rmd-cc-colfiltro').nth(6).locator('.sapMBtnInner').get_attribute('class') or ''))
+    an = sorted({f['analista'] or '(Vacías)' for f in filas})
+    pop = colfiltro(10); vals = [v.split('\n')[0] for v in pop.locator('.sapMLIB').all_inner_texts()]
+    ok('Analista solo ofrece valores de las filas filtradas', sorted(vals) == an, (vals, an))
+    pop.locator('input[type=search]').fill(an[0][:4]); pg.wait_for_timeout(400)
+    vis = pop.locator('.sapMLIB').count(); ok('búsqueda dentro del filtro', 0 < vis <= len(an), vis)
+    pop.locator('.rmd-cc-coltodo').click(); pop.locator('button', has_text='Aceptar').click(); pg.wait_for_timeout(600)
+    filas2 = pg.evaluate(M + ".getProperty('/filas')")
+    ok('dos filtros de columna a la vez', filas2 and all(f['estado'] == 'Vencido' and (f['analista'] or '(Vacías)')[:4].lower() == an[0][:4].lower() for f in filas2), len(filas2))
+    pg.screenshot(path=str(OUT / '2c-filtro-columna.png'))
+    pop = colfiltro(6); pop.locator('button', has_text='Limpiar').click(); pg.wait_for_timeout(400)
+    pg.locator('.rmd-cc-restablecer').click(); pg.wait_for_timeout(500)
+    ok('Restablecer quita los filtros de columna', pg.evaluate(M + ".getProperty('/filas').length") == todas and pg.locator('.rmd-cc-tabla .sapMBtnEmphasized').count() == 0)
     # filtro código
     pg.locator('.rmd-cc-filtro input').first.fill('25-426'); pg.wait_for_timeout(600)
     filas = pg.evaluate("window.__rmdStats.controlesCambio.ACC.vista.modelo.getProperty('/filas')")
@@ -155,7 +190,7 @@ with sync_playwright() as pw:
     ok('al apagar se quita la pestaña', not any('Controles de Cambios' in t for t in tabs2) and pg.locator('.rmd-cc-pestana').count() == 0, tabs2)
     pg.locator("#rmd-ui-panel input[data-k=controlescambio]").click(force=True); pg.wait_for_timeout(900)
     tabs3 = pg.evaluate("[...document.querySelectorAll('[role=tab]')].map(t=>t.textContent.trim())")
-    ok('al encender vuelve, con el Excel guardado', tabs3[-1].endswith('Controles de Cambios'), tabs3)
+    ok('al encender vuelve en su lugar, con el Excel guardado', [t for t in tabs3 if not t.endswith('Acuerdos')][-1].endswith('Controles de Cambios') and (not tabs3[-1].endswith('Acuerdos') or tabs3[-2].endswith('Controles de Cambios')), tabs3)
     pg.screenshot(path=str(OUT / '6-reencendida.png'))
     ok('sin errores de página', not errs, errs[:3])
     b.close()
