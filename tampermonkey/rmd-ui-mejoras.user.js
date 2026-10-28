@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.103.2
+// @version      1.103.3
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.103.2';                                                       // mantener igual a @version
+  const VERSION = '1.103.3';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -14942,7 +14942,7 @@
     const COLUMNAS = { planta: /^PLANTA$/, codigo: /^CODIGO CC$/, accion: /^N\W{0,2}\s*(?:DE )?ACCION$/, descripcion: /^DESCRIPCION DE LA ACCION$/, responsable: /^RESPONSABLE$/,
       areas: /^AREAS INVOLUCRADAS$/, sinEspacios: /^SIN ESPACIOS$/, fecha: /^FECHA$/, nuevaFecha: /^NUEVA FECHA$/, status: /^STATUS DE ACCIONES$/, analista: /^ANALISTA$/, observacion: /^OBSERVACION$/ };
     // toca un RMD: registro de manufactura, RMD, listas de materiales (LMat), hojas de ruta o puestos de trabajo
-    const RE_RMD = /\bREGISTROS? DE MANUFACTURA\b|\bRMD\b|\bLISTAS? DE MATERIAL(?:ES)?\b|\bLMAT\b|\bHOJAS? DE RUTA\b|\bPUESTOS? DE TRABAJO\b/;
+    const RE_RMD = /\bREGISTROS? DE MANUFACTURA\b|\bRMDS?\b|\bLISTAS? DE MATERIAL(?:ES)?\b|\bLMAT\b|\bHOJAS? DE RUTA\b|\bPUESTOS? DE TRABAJO\b/;
     const ETAPAS = [['FABRICACION', 'Fabricación'], ['ENVASADO', 'Envase'], ['ENVASE', 'Envase'], ['ACONDICIONADO', 'Acondicionado'], ['INSPECCION', 'Inspección'], ['EMPAQUE', 'Empaque']];
     const fechaIso = (v) => {
       if (v instanceof Date) return isNaN(v) ? '' : v.toISOString().slice(0, 10);
@@ -14973,17 +14973,20 @@
       for (const h of orden) {
         const enc = encabezados(h.filas || []); if (!enc) continue;
         const { col } = enc, val = (f, k) => (col[k] == null ? null : f[col[k]]);
-        let total = 0, abiertasDoc = 0; const acciones = [];
-        (h.filas || []).slice(enc.fila + 1).forEach((f, i) => {
+        let total = 0, abiertasDoc = 0; const acciones = [], filas = (h.filas || []).slice(enc.fila + 1);
+        const areasDe = (f) => plano(val(f, 'sinEspacios') || val(f, 'areas')), conDoc = (f) => /DOC/.test(areasDe(f));
+        // CC en los que DOC tiene alguna acción (sola o compartida: DOC, DOC-PRO, DOC - CPR...): de ellos también entran las acciones de RMD de las otras áreas
+        const ccConDoc = new Set(filas.filter((f) => f && limpio(val(f, 'codigo')) && conDoc(f)).map((f) => codigoDe(val(f, 'codigo')).codigo));
+        filas.forEach((f, i) => {
           if (!f || !limpio(val(f, 'codigo'))) return; total++;
-          const areas = plano(val(f, 'sinEspacios') || val(f, 'areas')), status = plano(val(f, 'status'));
-          if (!/\bDOC\b/.test(areas) || !/^ABIERTO\b/.test(status)) return; abiertasDoc++;
+          const status = plano(val(f, 'status')), cod = codigoDe(val(f, 'codigo')), doc = conDoc(f);
+          if (!/^ABIERTO\b/.test(status) || !(doc || ccConDoc.has(cod.codigo))) return; abiertasDoc++;
           const descripcion = limpio(val(f, 'descripcion')); if (!RE_RMD.test(plano(descripcion))) return;
-          const cod = codigoDe(val(f, 'codigo')), fecha = fechaIso(val(f, 'fecha')), nueva = fechaIso(val(f, 'nuevaFecha')), plazo = nueva || fecha;
+          const fecha = fechaIso(val(f, 'fecha')), nueva = fechaIso(val(f, 'nuevaFecha')), plazo = nueva || fecha;
           const vencido = /VENCIDO/.test(status) || (!!plazo && !!hoy && plazo < hoy);
           const accion = limpio(val(f, 'accion')).replace(/\.0$/, '');
           acciones.push({ id: `${cod.carpeta}|${accion}|${enc.fila + 2 + i}`, codigo: cod.codigo, adenda: cod.adenda, carpeta: cod.carpeta, accion, descripcion, etapas: etapasDe(descripcion),
-            planta: limpio(val(f, 'planta')).toUpperCase(), responsable: limpio(val(f, 'responsable')), plazo, fecha, nuevaFecha: nueva, vencido,
+            area: limpio(val(f, 'areas') || val(f, 'sinEspacios')).toUpperCase(), doc, planta: limpio(val(f, 'planta')).toUpperCase(), responsable: limpio(val(f, 'responsable')), plazo, fecha, nuevaFecha: nueva, vencido,
             estado: vencido ? 'Vencido' : 'En plazo', analista: limpio(val(f, 'analista')), observacion: limpio(val(f, 'observacion')), fila: enc.fila + 2 + i });
         });
         return { hoja: h.hoja, total, abiertasDoc, acciones };
@@ -15078,7 +15081,7 @@
     const r = AccionesCC.deHojas(hojas, Contingencia.fechaIsoLocal(new Date()));
     if (!r) throw new Error('no se encontró la hoja «ACCIONES CC» (columnas «CÓDIGO CC», «DESCRIPCIÓN DE LA ACCIÓN» y «STATUS DE ACCIONES»)');
     await guardarAcciones({ archivo: archivo.name, cargado: new Date().toISOString(), ...r });
-    toast(`${r.acciones.length} acciones de DOC abiertas que tocan un RMD (de ${r.abiertasDoc} abiertas de DOC en «${r.hoja}»).`);
+    toast(`${r.acciones.length} acciones abiertas que tocan un RMD (de ${r.abiertasDoc} abiertas de DOC o de CC con DOC en «${r.hoja}»).`);
   }
   // Masters con Observaciones (lectura ligera; 10 min en memoria)
   const SELECT_CC_MD = 'mdId,codigo,version,nivelTxt,descripcion,observacion,fechaRegistro,fechaAutorizacion,codigoversionprincipal,codDefectoReceta,codAgrupadorReceta,estadoIdRmd/contenido,sucursalId/contenido';
@@ -15170,7 +15173,7 @@
         new Text({ text: t, wrapping: true }), new Button({ icon: 'sap-icon://filter', type: `{= \${cc>/fa/${c}} ? 'Emphasized' : 'Transparent' }`, tooltip: `Filtrar ${t}`,
           press: (e) => abrirFiltroColumnaCC(c, t, e.getSource()) }).addStyleClass('rmd-cc-colfiltro')] }) })),
       items: { path: 'cc>/filas', templateShareable: false, template: new CLI({ cells: [
-        new Text({ text: '{cc>codigoTxt}' }), new Text({ text: '{cc>accion}' }), new Text({ text: '{cc>descripcion}', maxLines: 3, tooltip: '{cc>descripcion}' }), new Text({ text: '{cc>etapaTxt}' }), new Text({ text: '{cc>planta}' }),
+        new Text({ text: '{cc>codigoTxt}' }), new Text({ text: '{cc>accion}' }), new Text({ text: '{cc>descripcion}', maxLines: 3, tooltip: '{cc>descripcion}' }), new Text({ text: '{cc>etapaTxt}' }), new Text({ text: '{cc>area}' }), new Text({ text: '{cc>planta}' }),
         estado(), new Text({ text: '{cc>plazoTxt}' }), new Text({ text: '{cc>ingresoTxt}' }), new Text({ text: '{cc>autorizacionTxt}' }), new Text({ text: '{cc>analista}' }),
         new ObjectStatus({ text: '{cc>rmdTxt}', state: '{cc>rmdEstado}', tooltip: '{cc>rmdTip}' }),
         new Button({ icon: 'sap-icon://documents', type: 'Transparent', tooltip: 'RMD asociados y envío de evidencia', press: (e) => abrirRmdAsociados(e.getSource().getBindingContext('cc').getObject()) })] }) } }).addStyleClass('rmd-cc-tabla');
@@ -15207,9 +15210,9 @@
   }
   const ccFecha = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
   // Columnas de la tabla; con «c» la cabecera lleva un filtro de valores (como el de Excel) sobre ese campo de filasPestanaCC
-  const COLS_CC = [{ t: 'Código', w: '7rem', c: 'codigoTxt' }, { t: 'Acción', w: '5rem', c: 'accion' }, { t: 'Descripción', c: 'descripcion' }, { t: 'Etapa', w: '7rem', c: 'etapas' },
-    { t: 'Planta', w: '5rem', c: 'planta' }, { t: 'Estado', w: '6rem', c: 'estado' }, { t: 'Plazo', w: '6rem', c: 'plazoTxt' }, { t: 'Fecha de ingreso', w: '6.5rem', c: 'ingresoTxt' },
-    { t: 'Fecha de autorización', w: '7rem', c: 'autorizacionTxt' }, { t: 'Analista', w: '7rem', c: 'analista' }, { t: 'RMD', w: '5.5rem', c: 'rmdTxt' }, { t: 'Acción', w: '4.5rem' }];
+  const COLS_CC = [{ t: 'Código', w: '6.5rem', c: 'codigoTxt' }, { t: 'Acción', w: '5rem', c: 'accion' }, { t: 'Descripción', c: 'descripcion' }, { t: 'Etapa', w: '6rem', c: 'etapas' }, { t: 'Área', w: '4.5rem', c: 'area' },
+    { t: 'Planta', w: '5rem', c: 'planta' }, { t: 'Estado', w: '6rem', c: 'estado' }, { t: 'Plazo', w: '6rem', c: 'plazoTxt' }, { t: 'Fecha de ingreso', w: '6rem', c: 'ingresoTxt' },
+    { t: 'Fecha de autorización', w: '6.5rem', c: 'autorizacionTxt' }, { t: 'Analista', w: '6.5rem', c: 'analista' }, { t: 'RMD', w: '5rem', c: 'rmdTxt' }, { t: 'Acción', w: '3.5rem' }];
   const VACIAS_CC = '(Vacías)';
   const valoresColCC = (x, c) => { const v = Array.isArray(x[c]) ? x[c].map(String) : [x[c] == null ? '' : String(x[c])]; return v.length ? v : ['']; };
   const claveOrdenCC = (v) => (/^\d\d\/\d\d\/\d{4}$/.test(v) ? v.slice(6) + v.slice(3, 5) + v.slice(0, 2) : v);
