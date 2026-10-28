@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.103.1
+// @version      1.103.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.103.1';                                                       // mantener igual a @version
+  const VERSION = '1.103.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -6239,7 +6239,8 @@
       const etapas = (Array.isArray(a.etapas) ? a.etapas : s(a.etapas).split(/[,;]/)).map(etapaDe).filter(Boolean);
       return {
         id: s(a.id), titulo: s(a.titulo), planta: PLANTAS[a.planta] ? a.planta : 'ambas', etapas: [...new Set(etapas)], seccion: plano(a.seccion), condicion: s(a.condicion),
-        faseDesde: Math.max(0, Math.min(9, parseInt(a.faseDesde, 10) || 0)), tipo: TIPOS[a.tipo] ? a.tipo : 'agregar', detalle: s(a.detalle), area: s(a.area),
+        faseDesde: Math.max(0, Math.min(2, parseInt(a.faseDesde, 10) || 0)),   // 0 cualquier fase, 1 solo fase 1, 2 fase 2 (con 2R y siguientes)
+        tipo: TIPOS[a.tipo] ? a.tipo : 'agregar', detalle: s(a.detalle), area: s(a.area),
         vigenteDesde: s(a.vigenteDesde).slice(0, 10), estado: a.estado === 'anulado' ? 'anulado' : 'vigente', actualizadoEn: s(a.actualizadoEn), actualizadoPor: s(a.actualizadoPor),
         creadoEn: s(a.creadoEn), creadoPor: s(a.creadoPor), historial: (Array.isArray(a.historial) ? a.historial : []).filter((h) => h && typeof h === 'object').map((h) => ({ fecha: s(h.fecha), por: s(h.por), accion: s(h.accion) })),
         // imágenes pegadas en el acuerdo: data URL (comprimidas al guardarlas) dentro de la misma fila de Supabase
@@ -6294,7 +6295,7 @@
       if (a.estado !== 'vigente') return false;
       if (a.planta !== 'ambas' && ctx.planta && a.planta !== ctx.planta) return false;
       if (a.etapas.length && ctx.etapa && !a.etapas.includes(ctx.etapa)) return false;
-      if (a.faseDesde && ctx.fase && ctx.fase < a.faseDesde) return false;
+      if (a.faseDesde && ctx.fase && (a.faseDesde === 1 ? ctx.fase !== 1 : ctx.fase < a.faseDesde)) return false;
       return true;
     }
 
@@ -12716,7 +12717,7 @@
       const items = res ? res.items.slice().sort((p, q) => ({ falla: 0, info: 1, ok: 2 }[p.estado] - { falla: 0, info: 1, ok: 2 }[q.estado])) : [];
       const noAplican = todos && lista ? lista.filter((a) => a.estado === 'vigente' && !items.some((y) => y.acuerdo.id === a.id)) : [];
       const fila = (y) => { const a = y.acuerdo;
-        const chips = [A.PLANTAS[a.planta], a.etapas.length ? a.etapas.map((e) => A.ETAPAS[e]).join(', ') : 'Todas las etapas', a.seccion, A.TIPOS[a.tipo], a.faseDesde ? `desde fase ${a.faseDesde} (incluye ${a.faseDesde}R)` : '', a.condicion].filter(Boolean).map(esc).join(' · ');
+        const chips = [A.PLANTAS[a.planta], a.etapas.length ? a.etapas.map((e) => A.ETAPAS[e]).join(', ') : 'Todas las etapas', a.seccion, A.TIPOS[a.tipo], FASE_TXT[a.faseDesde] || '', a.condicion].filter(Boolean).map(esc).join(' · ');
         const pasos = (y.pasos || a.pasos).map((p) => `<div><span style="color:${color[p.estado] || 'inherit'}">${p.estado ? ico[p.estado] : '·'}</span> <b>${esc(p.codigo)}</b> ${esc(p.descripcion.slice(0, 110))}${p.descripcion.length > 110 ? '…' : ''}${p.texto ? ` <small class="${p.estado === 'falla' ? 'rmd-dif' : 'rmd-nota'}">— ${esc(p.texto)}</small>` : ''}${p.nota ? ` <small class="rmd-nota">(${esc(p.nota)})</small>` : ''}</div>`).join('');
         const sd = y.sinDato && y.sinDato.length ? `<div class="rmd-nota">No se pudo leer ${y.sinDato.join(' ni ')} del RMD: revisa si aplica.</div>` : '';
         return `<tr><td style="color:${color[y.estado] || 'var(--rmd-apagado)'};font-weight:700">${y.estado ? ico[y.estado] : 'no aplica'}</td><td><b>${esc(a.titulo || a.seccion)}</b><div class="rmd-nota">${chips}</div>${a.detalle ? `<div class="rmd-acu-texto">${esc(a.detalle)}</div>` : ''}${acuMiniaturas(a)}${sd}</td><td>${pasos}</td></tr>`; };
@@ -12745,6 +12746,7 @@
   // en Supabase como en status-rmd, así que lo que uno escribe lo ven todos; Exportar/Importar Excel para pasarlos a mano a otra PC.
   const CLAVE_PESTANA_ACU = 'rmdAcuerdos';
   const ACU_IMG_MAX = 8, ACU_IMG_LADO = 1600;
+  const FASE_TXT = { 1: 'Solo fase 1', 2: 'Fase 2 (incluye 2R)' };
   const ACU_SECCIONES = ['PRECAUCIONES', 'NOTAS IMPORTANTES', 'PROCEDIMIENTO', 'CONTROL DE PROCESO', 'ENTREGA'];
   const ACU_TIPOS_DATO = ['', 'Múltiple', 'Realizado por', 'Visto bueno', 'Texto', 'Numérico', 'Fecha'];
   const ACUV = { vista: null, f: { planta: '', etapa: '', estado: 'vigente', q: '' } };
@@ -12815,7 +12817,7 @@
       <label>Planta <select data-c="planta">${opt(A.PLANTAS, a.planta)}</select></label>
       <div class="rmd-acu-campo"><span>Etapas <small class="rmd-nota">(ninguna = todas)</small></span><div class="rmd-acu-checks">${Object.entries(A.ETAPAS).map(([k, t]) => `<label><input type="checkbox" data-etapa="${k}"${a.etapas.includes(k) ? ' checked' : ''}> ${esc(t)}</label>`).join('')}</div></div>
       <label>Sección del RMD <input data-c="seccion" list="rmd-acu-secciones" placeholder="Cualquiera" value="${esc(a.seccion)}"><datalist id="rmd-acu-secciones">${ACU_SECCIONES.map((x) => `<option value="${x}">`).join('')}</datalist></label>
-      <label>Desde la fase <select data-c="faseDesde"><option value="0">Cualquier fase</option>${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<option value="${n}"${a.faseDesde === n ? ' selected' : ''}>Fase ${n} y siguientes (con ${n}R)</option>`).join('')}</select></label>
+      <label>Fase <select data-c="faseDesde">${[[0, 'Cualquier fase'], [1, 'Fase 1'], [2, 'Fase 2 (incluye 2R)']].map(([n, t]) => `<option value="${n}"${a.faseDesde === n ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Qué se hace <select data-c="tipo">${opt(A.TIPOS, a.tipo)}</select></label>
       <label>Pedido por <input data-c="area" placeholder="Área o persona" value="${esc(a.area)}"></label>
       <label>Vigente desde <input type="date" data-c="vigenteDesde" value="${esc(a.vigenteDesde)}"></label>
@@ -12952,7 +12954,7 @@
   }
   function htmlAcuerdo(a) {
     const A = AcuerdosRmd, sel = (v, t) => (v ? `<span class="rmd-acu-si" title="${t}: sí">✓</span>` : '<span class="rmd-nota">—</span>');
-    const chips = [A.PLANTAS[a.planta], a.etapas.length ? a.etapas.map((e) => A.ETAPAS[e]).join(', ') : 'Todas las etapas', a.seccion, A.TIPOS[a.tipo], a.faseDesde ? `Desde la fase ${a.faseDesde} (incluye ${a.faseDesde}R)` : '']
+    const chips = [A.PLANTAS[a.planta], a.etapas.length ? a.etapas.map((e) => A.ETAPAS[e]).join(', ') : 'Todas las etapas', a.seccion, A.TIPOS[a.tipo], FASE_TXT[a.faseDesde] || '']
       .filter(Boolean).map((t, i) => `<span class="rmd-acu-chip${i === 0 ? ' planta' : ''}">${esc(t)}</span>`).join('');
     const conEtapa = a.pasos.some((p) => p.etapa);
     const pasos = a.pasos.length ? `<table class="rmd-tabla rmd-acu-tpasos"><thead><tr><th>Código</th><th>Descripción del paso</th>${conEtapa ? '<th>Etapa</th>' : ''}<th>Tipo dato</th><th>R. Por</th><th>V°B°</th><th>Estado CC</th></tr></thead><tbody>${a.pasos.map((p) =>

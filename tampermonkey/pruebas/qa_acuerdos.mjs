@@ -47,6 +47,9 @@ ok('totales', r.fallas === 3 && r.ok === 1 && r.info === 1, J([r.fallas, r.ok, r
 const r1 = A.evaluar(acuerdos, rmdAcond, { planta: 'planta1', etapa: 'ACONDICIONADO', fase: 1 });
 ok('fase 1: el acuerdo «desde fase 2» no aplica', !r1.items.some((x) => x.acuerdo.id === 'desp'));
 const rs = A.evaluar(acuerdos, rmdAcond, { planta: '', etapa: '', fase: 0 });
+const soloF1 = A.normalizar({ id: 'f1', titulo: 'Solo fase 1', faseDesde: 1, tipo: 'nota' });
+ok('fase 1: aplica solo a RMD de fase 1 (no a F2 ni F2R)', A.aplica(soloF1, { fase: 1 }) && !A.aplica(soloF1, { fase: 2 }) && A.aplica(soloF1, { fase: 0 }));
+ok('fase: solo 0, 1 o 2', A.normalizar({ faseDesde: 5 }).faseDesde === 2 && A.normalizar({ faseDesde: 'x' }).faseDesde === 0);
 ok('sin planta/etapa/fase: el acuerdo aplica y avisa qué no se pudo leer', J(rs.items.find((x) => x.acuerdo.id === 'desp').sinDato) === J(['fase']) && J(rs.items.find((x) => x.acuerdo.id === 'solo-lima').sinDato) === J(['planta']));
 ok('sin etapa: se exigen los pasos de todas las etapas', rs.items.find((x) => x.acuerdo.id === 'desp').pasos.length === 4);
 const rLima = A.evaluar(acuerdos, [paso('999001', 'PROCEDIMIENTO')], { planta: 'planta2', etapa: 'FABRICACION', fase: 3 });
