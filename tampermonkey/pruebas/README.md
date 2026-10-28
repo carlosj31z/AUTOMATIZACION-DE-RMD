@@ -53,6 +53,7 @@ python tampermonkey/pruebas/qa_local_sesion.py    # aviso de sesión por inactiv
 RMD_UI5_RES=ui5/res python tampermonkey/pruebas/qa_controles_cambio.py [Excel]   # pestaña «Controles de Cambios» (v1.100) sobre OpenUI5 real: carga del Excel ACCIONES CC, filtros, RMD asociados, envío de evidencia con SharePoint simulado (carpeta CC/Acción, sin sobrescribir), ventana sin cambio de tamaño y apagar/encender en el panel
 node tampermonkey/pruebas/qa_indicadores.mjs      # libro de indicadores y Excel propio (fórmulas con la semántica de Excel, A/F, "No contar", 7 tablas dinámicas, lectura de vuelta)
 node tampermonkey/pruebas/qa_reglas.mjs           # motor de reglas de revisión (frases, documentos, equipos, patrones, excepciones, alcance, "debe estar presente", exportar/importar) lector de la lista de vigentes (.xls BIFF8, .xlsx, CSV; con VIGENTES_XLS la lista real del DMS), la lista de equipos calificados (hoja Cronograma, ESTADO GENERAL; con CALIFICADOS_XLSX el registro real), la estructura de equipos la fase de la 1ª línea de Observaciones y la línea de observación «AAAAMMDD<iniciales> Actualización de …» de un cambio de receta
+node tampermonkey/pruebas/qa_acuerdos.mjs          # acuerdos de status-rmd: cuáles aplican a un RMD (planta, etapa, fase desde F2 con la R), pasos que faltan, en otra sección o sin sus casillas, «quitar» e indicaciones, y lectura del Excel de «Exportar» de la pestaña Acuerdos
 ```
 Complementan a `qa_estricto.py`, que sigue siendo la referencia contra el portal real.
 

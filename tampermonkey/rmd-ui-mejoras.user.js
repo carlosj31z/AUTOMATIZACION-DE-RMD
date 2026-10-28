@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.100.0
+// @version      1.101.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.100.0';                                                       // mantener igual a @version
+  const VERSION = '1.101.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -78,6 +78,7 @@
     ['puesto', 'Puesto de trabajo faltante', 'La celda parpadea si falta asignarlo.'],
     ['bajas', 'Elementos de baja', 'En un RMD Ingresado avisa pasos, utensilios y equipos de baja en SAP.'],
     ['reglasrev', 'Reglas de revisión', 'Resalta lo que definas y los documentos citados que no están vigentes.'],
+    ['acuerdos', 'Acuerdos de status-rmd', 'En la ventana del RMD avisa si no cumple los acuerdos de configuración (pestaña Acuerdos de status-rmd) que aplican a su planta, etapa y fase: pasos que faltan, en otra sección o sin sus casillas.'],
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
@@ -1899,6 +1900,7 @@
       try { avisoDependenciasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoDependenciasRaiz: ' + e.message); }
       try { avisoEtiquetasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoEtiquetasRaiz: ' + e.message); }
       try { avisoReglasRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoReglasRaiz: ' + e.message); }
+      try { avisoAcuerdosRaiz(d, tabla); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('avisoAcuerdosRaiz: ' + e.message); }
       return;
     }
     anchoOriginal(d);
@@ -2950,7 +2952,7 @@
     try { const c = ctlExportar(); if (c && c.__rmdMenu) { const m = c.__rmdMenu; c.detachPress(m.nuestro, m.ctrl); c.attachPress(m.fnOrig, m.ctrl); delete c.__rmdMenu; } } catch (e) { /* sin UI5 */ }
     document.querySelectorAll('.rmd-exportar-menu').forEach((b) => b.classList.remove('rmd-exportar-menu'));
     html.classList.remove('rmd-vivo'); document.querySelectorAll('.rmd-selector-ancho, .rmd-raiz').forEach((d) => d.classList.remove('rmd-selector-ancho', 'rmd-raiz'));
-    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
+    document.querySelectorAll('.rmd-copia-grupo, .rmd-minusculas, .rmd-nuevo-paso-grupo, .rmd-exportar-op, .rmd-cuenta-verop, .rmd-documentos-citados, .rmd-status-rmd, .rmd-indicadores, .rmd-equipos-master, .rmd-buscar-equipo, .rmd-suspension, .rmd-menu, .rmd-orden-aviso, .rmd-receta-aviso, .rmd-reglas-aviso, .rmd-acu-aviso, .rmd-dep-aviso, .rmd-etq-aviso, .rmd-revisar-recetas, .rmd-nota-repetir, .rmd-token-mas, .rmd-cambiar-paso, .rmd-sel-panel, .rmd-ep-aviso, .rmd-rec-icono, .rmd-rec-detalle, .rmd-saludo, .rmd-paleta-fondo, .rmd-vivo-panel, .rmd-formula-orden, .rmd-grip-f, .rmd-revisor, .rmd-alerta-rec, .rmd-tz, .rmd-borrar-recetas, .rmd-reasociar-recetas, .rmd-aa, #rmd-filtro-bar, .rmd-estado, #rmd-asoc-panel, #rmd-aviso-asociar, #rmd-aviso-nomenclatura, #rmd-aviso-pendientes').forEach((e) => e.remove());
     try { restaurarObservaciones(); } catch (e) { /* ventana ya cerrada */ }
     document.querySelectorAll('.rmd-obs-barra').forEach((e) => e.remove()); document.querySelectorAll('.rmd-obs-celda').forEach((e) => e.classList.remove('rmd-obs-celda'));
     document.querySelectorAll('.rmd-th-filtro, .rmd-menu-filtro-col').forEach((e) => e.remove());
@@ -6195,6 +6197,92 @@
   })();
   // ==INDICADORES-FIN==
 
+  // ==ACUERDOS-INICIO==
+  // Acuerdos de configuración de RMD (pestaña «Acuerdos» de status-rmd, en Supabase: una fila «acuerdo:<id>» por acuerdo). Sin DOM ni SAP:
+  // normaliza, lee el Excel exportado y evalúa qué acuerdos aplican a un RMD (planta, etapa y fase) y si tiene sus pasos y casillas.
+  const AcuerdosRmd = (() => {
+    const PLANTAS = { ambas: 'Ambas plantas', planta1: 'Planta 1 ATE', planta2: 'Planta 2 LIMA' };
+    const ETAPAS = { FABRICACION: 'Fabricación', ENVASE: 'Envase', ACONDICIONADO: 'Acondicionado' };
+    const TIPOS = { agregar: 'Agregar paso', reemplazar: 'Reemplazar paso', configurar: 'Configurar paso', quitar: 'Quitar paso', nota: 'Indicación' };
+    const CASILLAS = { rPor: 'R. Por', vb: 'V°B°', estadoCC: 'Estado CC' };
+    const plano = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const etapaDe = (t) => { const x = plano(t); return Object.keys(ETAPAS).find((e) => x === e || x.startsWith(e + ' ')) || ''; };
+    // Etapa del RMD tal cual (RECUBRIMIENTO, INSPECCION…): un acuerdo de otras etapas no le aplica aunque no sea una de las tres de los acuerdos.
+    const etapaRmd = (t) => etapaDe(t) || plano(t);
+    const plantaDe = (t) => { const x = plano(t); return /\bATE\b|PLANTA 1\b/.test(x) ? 'planta1' : /\bLIMA\b|PLANTA 2\b/.test(x) ? 'planta2' : ''; };
+    // Fase de la 1.ª línea de Observaciones (…-F2, F2R, F2-R): solo el número; la R es una revisión de la misma fase.
+    const faseDe = (obs) => { const tok = String(obs == null ? '' : obs).split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)F(\d{1,2})(?:-?R)?$/i.exec(tok); return m ? +m[1] : 0; };
+    const si = (v) => v === true || /^(si|sí|x|true|1|✓)$/i.test(String(v == null ? '' : v).trim());
+
+    function normalizar(a) {
+      a = a && typeof a === 'object' ? a : {};
+      const s = (v) => String(v == null ? '' : v).trim();
+      const etapas = (Array.isArray(a.etapas) ? a.etapas : s(a.etapas).split(/[,;]/)).map(etapaDe).filter(Boolean);
+      return {
+        id: s(a.id), titulo: s(a.titulo), planta: PLANTAS[a.planta] ? a.planta : 'ambas', etapas: [...new Set(etapas)], seccion: plano(a.seccion), condicion: s(a.condicion),
+        faseDesde: Math.max(0, Math.min(9, parseInt(a.faseDesde, 10) || 0)), tipo: TIPOS[a.tipo] ? a.tipo : 'agregar', detalle: s(a.detalle), area: s(a.area),
+        vigenteDesde: s(a.vigenteDesde).slice(0, 10), estado: a.estado === 'anulado' ? 'anulado' : 'vigente', actualizadoEn: s(a.actualizadoEn), actualizadoPor: s(a.actualizadoPor),
+        pasos: (Array.isArray(a.pasos) ? a.pasos : []).map((p) => ({ codigo: s(p.codigo).replace(/^0+(?=\d)/, ''), descripcion: s(p.descripcion), etapa: etapaDe(p.etapa), tipoDato: s(p.tipoDato),
+          rPor: si(p.rPor), vb: si(p.vb), estadoCC: si(p.estadoCC), nota: s(p.nota) })).filter((p) => p.codigo || p.descripcion),
+      };
+    }
+
+    // Excel de «Exportar» de status-rmd: hojas Acuerdos y Pasos (filas = arreglos; la 1.ª es el encabezado).
+    function deHojas(hojas) {
+      const hoja = (n) => (hojas.find((h) => plano(h.hoja) === plano(n)) || {}).filas;
+      const objetos = (filas) => { if (!filas || !filas.length) return []; const cab = filas[0].map(plano); return filas.slice(1).map((f) => Object.fromEntries(cab.map((c, i) => [c, f[i] == null ? '' : f[i]]))); };
+      const acu = objetos(hoja('Acuerdos')), pas = objetos(hoja('Pasos'));
+      if (!acu.length || !('ID' in acu[0])) return null;
+      const C = { 'TITULO': 'titulo', 'PLANTA': 'planta', 'ETAPAS': 'etapas', 'SECCION': 'seccion', 'QUE SE HACE': 'tipo', 'DESDE LA FASE': 'faseDesde', 'CONDICION': 'condicion',
+        'EXPLICACION': 'detalle', 'PEDIDO POR': 'area', 'VIGENTE DESDE': 'vigenteDesde', 'ESTADO': 'estado', 'ACTUALIZADO POR': 'actualizadoPor', 'ACTUALIZADO': 'actualizadoEn' };
+      const P = { 'CODIGO': 'codigo', 'DESCRIPCION': 'descripcion', 'ETAPA': 'etapa', 'TIPO DATO': 'tipoDato', 'R. POR': 'rPor', 'V°B°': 'vb', 'ESTADO CC': 'estadoCC', 'NOTA': 'nota' };
+      return acu.filter((f) => String(f.ID).trim()).map((f) => {
+        const a = { id: String(f.ID).trim() }; Object.entries(C).forEach(([k, v]) => { a[v] = f[k]; });
+        a.pasos = pas.filter((p) => String(p['ID ACUERDO']).trim() === a.id).sort((x, y) => (+x.ORDEN || 0) - (+y.ORDEN || 0))
+          .map((p) => Object.fromEntries(Object.entries(P).map(([k, v]) => [v, p[k]])));
+        return normalizar(a);
+      });
+    }
+
+    // ¿Aplica a este RMD? planta/etapa/fase desconocidas no descartan el acuerdo (se avisa en «sinDato»).
+    function aplica(a, ctx) {
+      if (a.estado !== 'vigente') return false;
+      if (a.planta !== 'ambas' && ctx.planta && a.planta !== ctx.planta) return false;
+      if (a.etapas.length && ctx.etapa && !a.etapas.includes(ctx.etapa)) return false;
+      if (a.faseDesde && ctx.fase && ctx.fase < a.faseDesde) return false;
+      return true;
+    }
+
+    // pasosRmd: [{ codigo, lista, rpor, vb, estadoCC }] (lista = «ESTRUCTURA › ETIQUETA»). ctx: { planta, etapa, fase } ya normalizados.
+    function evaluar(acuerdos, pasosRmd, ctx) {
+      const porCodigo = new Map();
+      pasosRmd.forEach((p) => { const k = String(p.codigo || '').replace(/^0+(?=\d)/, ''); if (!porCodigo.has(k)) porCodigo.set(k, []); porCodigo.get(k).push(p); });
+      const items = acuerdos.filter((a) => aplica(a, ctx)).map((a) => {
+        const sinDato = [];
+        if (a.planta !== 'ambas' && !ctx.planta) sinDato.push('planta');
+        if (a.etapas.length && !ctx.etapa) sinDato.push('etapa');
+        if (a.faseDesde && !ctx.fase) sinDato.push('fase');
+        const pasos = a.pasos.filter((p) => !p.etapa || !ctx.etapa || p.etapa === ctx.etapa).map((p) => {
+          if (a.tipo === 'nota' || !p.codigo) return { ...p, estado: 'info', texto: '' };
+          const en = porCodigo.get(p.codigo) || [];
+          if (a.tipo === 'quitar') return { ...p, estado: en.length ? 'falla' : 'ok', texto: en.length ? `sigue en ${[...new Set(en.map((x) => x.lista))].join(', ')}` : 'no está' };
+          if (!en.length) return { ...p, estado: 'falla', texto: a.seccion ? `falta en ${a.seccion}` : 'falta en el RMD' };
+          const enSeccion = a.seccion ? en.filter((x) => plano(x.lista).includes(a.seccion)) : en, donde = enSeccion.length ? enSeccion : en;
+          const faltan = Object.keys(CASILLAS).filter((c) => p[c] && !donde.some((x) => x[c === 'rPor' ? 'rpor' : c]));
+          const fuera = a.seccion && !enSeccion.length;
+          const texto = [fuera ? `está en ${[...new Set(en.map((x) => x.lista))].join(', ')}, no en ${a.seccion}` : `en ${[...new Set(donde.map((x) => x.lista))].join(', ')}`,
+            faltan.length ? `sin marcar: ${faltan.map((c) => CASILLAS[c]).join(', ')}` : ''].filter(Boolean).join(' · ');
+          return { ...p, estado: faltan.length || fuera ? 'falla' : 'ok', texto };
+        });
+        const fallas = pasos.filter((p) => p.estado === 'falla').length;
+        return { acuerdo: a, pasos, fallas, sinDato, estado: a.tipo === 'nota' || !pasos.some((p) => p.estado !== 'info') ? 'info' : fallas ? 'falla' : 'ok' };
+      }).filter((x) => !x.acuerdo.pasos.length || x.pasos.length);      // todos sus pasos son de otras etapas: no aplica
+      return { items, fallas: items.filter((x) => x.estado === 'falla').length, ok: items.filter((x) => x.estado === 'ok').length, info: items.filter((x) => x.estado === 'info').length };
+    }
+
+    return { PLANTAS, ETAPAS, TIPOS, CASILLAS, normalizar, deHojas, aplica, evaluar, etapaDe, etapaRmd, plantaDe, faseDe };
+  })();
+  // ==ACUERDOS-FIN==
   // ==REGLAS-INICIO==
   // Motor de reglas de revisión (sin DOM ni SAP): palabras, códigos de documento, equipos o patrones; marcar, prohibir o exigir presencia.
   // Vigencia por lista del DMS; calificación por hoja «Cronograma» (ESTADO GENERAL).
@@ -11949,12 +12037,13 @@
         o1: +est.orden || 0, o2: e ? +e.orden || 0 : 0, pasos: [] });
       listas.get(clave).pasos.push(p);
     });
-    const r = { rmd: md.codigo, mdId: md.mdId, listas: [], textos: [], pasos: 0, pms: 0, bajas: [], equiposRaw: [] };
+    const r = { rmd: md.codigo, mdId: md.mdId, listas: [], textos: [], pasosCfg: [], pasos: 0, pms: 0, bajas: [], equiposRaw: [] };
     [...listas.values()].sort((a, b) => a.o1 - b.o1 || a.o2 - b.o2 || a.lista.localeCompare(b.lista)).forEach((l, il) => {
       const info = { lista: l.lista, pasos: l.pasos.length, pms: 0 };
       l.pasos.sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((p, k) => {
         const pp = obj(p.pasoId), lugar = { lista: l.lista, paso: String(p.orden != null ? p.orden : k + 1), codigoPaso: String(pp.codigo || ''), descPaso: norm(pp.descripcion), pm: '', codigoPM: '', descPM: '' };
         r.textos.push({ texto: lugar.descPaso, esPM: false, lista: l.lista, lugar, il });
+        r.pasosCfg.push({ codigo: lugar.codigoPaso, lista: l.lista, rpor: !!p.rpor, vb: !!p.vb, estadoCC: !!p.estadoCC });   // acuerdos de status-rmd
         if (+pp.estadoId_iMaestraId === 1) r.bajas.push({ tipo: 'Paso', donde: l.lista, codigo: lugar.codigoPaso, desc: lugar.descPaso, motivo: 'DE BAJA' });
         (pmsDe.get(p.mdEstructuraPasoId) || []).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).forEach((q) => {
           const h = obj(q.pasoHijoId), lq = { ...lugar, pm: String(q.orden != null ? q.orden : ''), codigoPM: String(h.codigo || ''), descPM: norm(h.descripcion) };
@@ -12482,6 +12571,123 @@
     return { nombre, texto: txt };
   }
 
+  // ---- 9 quater. Acuerdos de configuración (status-rmd) ----
+  // Se leen de Supabase, donde los guarda la pestaña «Acuerdos» de status-rmd (lectura con la clave pública de la página). Si no hay conexión
+  // se usa la última copia de este navegador o un Excel exportado desde esa pestaña. Es solo un aviso en la ventana raíz del RMD.
+  const ACU_SUPABASE = 'https://mlmsympewmxfcqoyowxs.supabase.co/rest/v1/rmd_dashboard_kv';
+  const ACU_CLAVE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbXN5bXBld214ZmNxb3lvd3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3Njk0MDEsImV4cCI6MjEwNTM0NTQwMX0.G4D-QkugQ5rMP_rXj4WGf2SaE8mv305QHjPe-171Srg';
+  const ACU = { lista: null, fuente: '', leidoEn: 0, error: '', leyendo: null, ver: 0 };
+  function guardarCopiaAcuerdos(lista, fuente) {
+    ACU.lista = lista; ACU.fuente = fuente; ACU.leidoEn = Date.now(); ACU.ver++;
+    Almacen.guardar('acuerdosRmd', { lista, fuente, guardado: new Date().toISOString() }).catch(() => { /* la copia es opcional */ });
+  }
+  function leerAcuerdos(forzar) {
+    if (ACU.leyendo) return ACU.leyendo;
+    if (!forzar && ACU.lista && Date.now() - ACU.leidoEn < 300000) return Promise.resolve(ACU.lista);
+    ACU.leyendo = fetch(`${ACU_SUPABASE}?key=like.${encodeURIComponent('acuerdo:*')}&select=value`, { headers: { apikey: ACU_CLAVE_ANON, Authorization: 'Bearer ' + ACU_CLAVE_ANON, Accept: 'application/json' } })
+      .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then((filas) => { ACU.error = ''; guardarCopiaAcuerdos(filas.map((f) => AcuerdosRmd.normalizar(f.value)).filter((a) => a.id), 'status-rmd'); return ACU.lista; })
+      .catch(async (e) => {
+        ACU.error = e.message || String(e); ACU.leidoEn = Date.now();
+        if (!ACU.lista) { const c = await Almacen.leer('acuerdosRmd').catch(() => null); if (c && Array.isArray(c.lista)) { ACU.lista = c.lista.map(AcuerdosRmd.normalizar); ACU.fuente = `${c.fuente || 'copia'} (copia del ${fechaHoraCorta(c.guardado)})`; } }
+        ACU.ver++; return ACU.lista;
+      })
+      .finally(() => { ACU.leyendo = null; });
+    return ACU.leyendo;
+  }
+  async function importarExcelAcuerdos(archivo) {
+    const lista = AcuerdosRmd.deHojas(await filasDeArchivo(new Uint8Array(await archivo.arrayBuffer()), archivo.name));
+    if (!lista) throw new Error('el archivo no tiene la hoja «Acuerdos»: usa el Excel de «Exportar» de la pestaña Acuerdos de status-rmd');
+    guardarCopiaAcuerdos(lista, `Excel «${archivo.name}»`);
+    toast(`${lista.length} acuerdos cargados de «${archivo.name}». Se usan mientras no haya conexión con status-rmd.`);
+  }
+  function elegirExcelAcuerdos(alTerminar) {
+    const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls';
+    i.addEventListener('change', () => { const a = i.files && i.files[0]; if (a) importarExcelAcuerdos(a).then(alTerminar, (e) => toast('No se pudo leer el Excel de acuerdos: ' + e.message, true)); });
+    i.click();
+  }
+  // Planta, etapa y Observaciones del modelo de la ventana; lo que no venga ahí se lee del MD en SAP.
+  async function contextoAcuerdos(modelo, md) {
+    let suc = (md.sucursalId && (md.sucursalId.contenido || md.sucursalId.descripcion)) || '', nivel = md.nivelTxt, obs = md.observacion;
+    if (!AcuerdosRmd.plantaDe(suc) || !nivel || obs == null) {
+      const Filtro = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+      const r = (await leerTodoDe(modelo, 'MD', [new Filtro('mdId', 'EQ', md.mdId)], { $expand: 'sucursalId', $select: 'mdId,nivelTxt,observacion,sucursalId/contenido' }).catch(() => []))[0] || {};
+      suc = suc || (r.sucursalId || {}).contenido || ''; nivel = nivel || r.nivelTxt || ''; if (obs == null) obs = r.observacion || '';
+    }
+    return { planta: AcuerdosRmd.plantaDe(suc), etapa: AcuerdosRmd.etapaRmd(nivel), fase: AcuerdosRmd.faseDe(obs) };
+  }
+  function avisoAcuerdosRaiz(d, tabla) {
+    const quitar = () => { d.querySelectorAll('.rmd-acu-aviso').forEach((x) => x.remove()); d.__rmdAcuFirma = ''; d.__rmdAcuRes = null; };
+    if (typeof sap === 'undefined' || !on('acuerdos')) { if (d.__rmdAcuFirma || d.querySelector('.rmd-acu-aviso')) quitar(); return; }
+    const vista = vistaDeTabla(tabla), asoc = vista && vista.getModel('asociarDatos'), md = asoc && asoc.getData(), modelo = vista && vista.getModel('mainModelv2');
+    if (!md || !md.mdId || !modelo) return;
+    const firma = `${md.mdId}|${ACU.ver}|${generacionRmd}`;
+    if (d.__rmdAcuFirma !== firma && dialogos().pop() === d) {
+      d.__rmdAcuFirma = firma;
+      Promise.all([leerAcuerdos(false), textosDelRmd(modelo, md, 60000), contextoAcuerdos(modelo, md)]).then(([lista, base, ctx]) => {
+        if (!d.isConnected || d.__rmdAcuFirma !== firma) return;
+        d.__rmdAcuFirma = `${md.mdId}|${ACU.ver}|${generacionRmd}`;               // leerAcuerdos pudo subir ACU.ver: no volver a evaluar por eso
+        d.__rmdAcuRes = { lista, ctx, md, res: lista ? AcuerdosRmd.evaluar(lista, base.pasosCfg || [], ctx) : null };
+        const r = d.__rmdAcuRes.res;
+        window.__rmdStats.acuerdosRaiz = { rmd: md.codigo, ctx, fuente: ACU.fuente, error: ACU.error, aplican: r ? r.items.length : null, fallas: r ? r.items.filter((x) => x.estado === 'falla').map((x) => x.acuerdo.titulo) : null };
+        pintarAvisoAcuerdos(d, tabla);
+      }, () => { /* sin lectura del RMD: sin aviso */ });
+    } else if (d.__rmdAcuRes && !d.querySelector('.rmd-acu-aviso')) pintarAvisoAcuerdos(d, tabla);
+  }
+  function pintarAvisoAcuerdos(d, tabla) {
+    const x = d.__rmdAcuRes; if (!x) return;
+    let a = d.querySelector('.rmd-acu-aviso');
+    if (!a) {
+      a = document.createElement('div'); a.className = 'rmd-reglas-aviso rmd-acu-aviso'; (d.querySelector('.rmd-reglas-aviso') || tabla).insertAdjacentElement('beforebegin', a);
+      a.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-a]'); if (!b) return; e.stopPropagation();
+        if (b.dataset.a === 'ver') abrirDetalleAcuerdos(d); else elegirExcelAcuerdos(() => { d.__rmdAcuFirma = ''; avisoAcuerdosRaiz(d, tabla); });
+      });
+    }
+    const r = x.res, fallan = r ? r.items.filter((y) => y.estado === 'falla') : [];
+    let h;
+    if (!r) h = `Acuerdos: no se pudo conectar con status-rmd (${esc(ACU.error || 'sin red')}) y no hay copia en este navegador.<button type="button" data-a="excel">Cargar Excel de acuerdos</button>`;
+    else if (fallan.length) h = `⚠ Acuerdos · ${fallan.length} de ${r.items.length} no se cumple${fallan.length > 1 ? 'n' : ''}: ${fallan.slice(0, 3).map((y) => `<b>${esc(y.acuerdo.titulo || y.acuerdo.seccion)}</b> (${esc(y.pasos.filter((p) => p.estado === 'falla').map((p) => p.codigo).join(', '))})`).join(' · ')}${fallan.length > 3 ? ' …' : ''}<button type="button" data-a="ver">Ver detalle</button>`;
+    else h = `✓ Acuerdos: ${r.items.length ? `${r.ok ? `${r.ok} se cumple${r.ok > 1 ? 'n' : ''}` : ''}${r.ok && r.info ? ' · ' : ''}${r.info ? `${r.info} indicación${r.info > 1 ? 'es' : ''} para revisar` : ''}` : 'ninguno aplica a este RMD'}<button type="button" data-a="ver">Ver detalle</button>`;
+    a.classList.toggle('ok', !!r && !fallan.length);
+    if (a.dataset.html !== h) { a.dataset.html = h; a.innerHTML = h; }
+    a.title = `Acuerdos de la pestaña Acuerdos de status-rmd${ACU.fuente ? ` (fuente: ${ACU.fuente})` : ''}. Es solo un aviso: no cambia nada ni impide autorizar.`;
+  }
+  function abrirDetalleAcuerdos(d) {
+    const x = d.__rmdAcuRes; if (!x) return;
+    const v = ventana(`Acuerdos — ${cabecera(d)}`, { cancelar: () => v.cerrar() }), A = AcuerdosRmd;
+    let todos = false;
+    const ico = { ok: '✓', falla: '✕', info: 'ℹ' }, color = { ok: 'var(--rmd-verde)', falla: 'var(--rmd-rojo)', info: 'var(--rmd-apagado)' };
+    const pintar = () => {
+      const { ctx, res, lista } = d.__rmdAcuRes;
+      const desc = [ctx.planta ? A.PLANTAS[ctx.planta] : 'planta sin identificar', ctx.etapa ? A.ETAPAS[ctx.etapa] || ctx.etapa : 'etapa sin identificar', ctx.fase ? `fase ${ctx.fase}` : 'sin fase en Observaciones'].join(' · ');
+      const items = res ? res.items.slice().sort((p, q) => ({ falla: 0, info: 1, ok: 2 }[p.estado] - { falla: 0, info: 1, ok: 2 }[q.estado])) : [];
+      const noAplican = todos && lista ? lista.filter((a) => a.estado === 'vigente' && !items.some((y) => y.acuerdo.id === a.id)) : [];
+      const fila = (y) => { const a = y.acuerdo;
+        const chips = [A.PLANTAS[a.planta], a.etapas.length ? a.etapas.map((e) => A.ETAPAS[e]).join(', ') : 'Todas las etapas', a.seccion, A.TIPOS[a.tipo], a.faseDesde ? `desde fase ${a.faseDesde} (incluye ${a.faseDesde}R)` : '', a.condicion].filter(Boolean).map(esc).join(' · ');
+        const pasos = (y.pasos || a.pasos).map((p) => `<div><span style="color:${color[p.estado] || 'inherit'}">${p.estado ? ico[p.estado] : '·'}</span> <b>${esc(p.codigo)}</b> ${esc(p.descripcion.slice(0, 110))}${p.descripcion.length > 110 ? '…' : ''}${p.texto ? ` <small class="${p.estado === 'falla' ? 'rmd-dif' : 'rmd-nota'}">— ${esc(p.texto)}</small>` : ''}${p.nota ? ` <small class="rmd-nota">(${esc(p.nota)})</small>` : ''}</div>`).join('');
+        const sd = y.sinDato && y.sinDato.length ? `<div class="rmd-nota">No se pudo leer ${y.sinDato.join(' ni ')} del RMD: revisa si aplica.</div>` : '';
+        return `<tr><td style="color:${color[y.estado] || 'var(--rmd-apagado)'};font-weight:700">${y.estado ? ico[y.estado] : 'no aplica'}</td><td><b>${esc(a.titulo || a.seccion)}</b><div class="rmd-nota">${chips}</div>${a.detalle ? `<div>${esc(a.detalle)}</div>` : ''}${sd}</td><td>${pasos}</td></tr>`; };
+      v.cuerpo.innerHTML = `<p>RMD: ${esc(desc)}. Fuente: ${esc(ACU.fuente || 'sin datos')}${ACU.error ? ` <span class="rmd-dif">(sin conexión con status-rmd: ${esc(ACU.error)})</span>` : ''}.</p>
+        ${items.length || noAplican.length ? `<table class="rmd-tabla"><thead><tr><th></th><th>Acuerdo</th><th>Pasos en este RMD</th></tr></thead><tbody>${items.map(fila).join('')}${noAplican.map((a) => fila({ acuerdo: a, pasos: a.pasos, estado: '' })).join('')}</tbody></table>`
+        : `<p>${res ? 'Ningún acuerdo vigente aplica a este RMD.' : 'No hay acuerdos cargados.'}</p>`}
+        <p class="rmd-nota">Se revisa que cada paso esté en el RMD (en su sección, si el acuerdo la indica) con las casillas marcadas en el acuerdo. Las condiciones escritas a mano se revisan a ojo. Los acuerdos se editan en status-rmd › Acuerdos.</p>
+        <label class="rmd-nota"><input type="checkbox" data-a="todos"${todos ? ' checked' : ''}> Mostrar también los acuerdos vigentes que no aplican a este RMD</label>`;
+    };
+    v.cuerpo.addEventListener('change', (e) => { if (e.target.dataset.a === 'todos') { todos = e.target.checked; pintar(); } });
+    const recargar = async () => {
+      await leerAcuerdos(true); const { md, ctx } = d.__rmdAcuRes, vista = controladorPrincipal(), modelo = vista && vista.getView().getModel('mainModelv2');
+      const base = modelo ? await textosDelRmd(modelo, md, 0).catch(() => null) : null;
+      d.__rmdAcuRes = { ...d.__rmdAcuRes, lista: ACU.lista, res: ACU.lista && base ? AcuerdosRmd.evaluar(ACU.lista, base.pasosCfg || [], ctx) : d.__rmdAcuRes.res };
+      d.__rmdAcuFirma = `${md.mdId}|${ACU.ver}|${generacionRmd}`; pintar(); const a = d.querySelector('.rmd-acu-aviso'); if (a) pintarAvisoAcuerdos(d, a);
+    };
+    v.pie.append(botonModal('Actualizar', '', () => recargar().catch((e) => toast('No se pudieron actualizar los acuerdos: ' + e.message, true))),
+      botonModal('Cargar Excel de acuerdos', '', () => elegirExcelAcuerdos(() => recargar())),
+      botonModal('Abrir status-rmd', '', () => window.open('https://status-rmd.vercel.app/', '_blank', 'noopener')),
+      botonModal('Cerrar', 'primario', () => v.cerrar()));
+    pintar();
+  }
+  window.__rmdStats.acuerdos = { AcuerdosRmd, ACU, leer: leerAcuerdos, importar: importarExcelAcuerdos, pintar: pintarAvisoAcuerdos, detalle: abrirDetalleAcuerdos };   // pruebas
   // ---- Ventana «Reglas de revisión» ----
   let ventanaReglas = null;
   function refrescarVentanaReglas() { if (ventanaReglas && ventanaReglas.fondo.isConnected) ventanaReglas.refrescar(); }
@@ -16787,7 +16993,7 @@ td.ult { position: relative; }
     ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'predanterior', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
-    ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'ordenest']],
+    ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'acuerdos', 'ordenest']],
     ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio']],
   ];
   const ICONOS_PANEL = {
