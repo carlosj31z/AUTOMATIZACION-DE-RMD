@@ -12747,7 +12747,17 @@
   const CLAVE_PESTANA_ACU = 'rmdAcuerdos';
   const ACU_IMG_MAX = 8, ACU_IMG_LADO = 1600;
   const FASE_TXT = { 1: 'Solo fase 1', 2: 'Fase 2 (incluye 2R)' };
-  const ACU_SECCIONES = ['PRECAUCIONES', 'NOTAS IMPORTANTES', 'PROCEDIMIENTO', 'CONTROL DE PROCESO', 'ENTREGA'];
+  // estructuras del RMD; al abrir el editor se suman las del catálogo ESTRUCTURA de SAP
+  const ACU_SECCIONES = ['PRECAUCIONES', 'NOTAS IMPORTANTES', 'CONDICIONES AMBIENTALES', 'PROCEDIMIENTO', 'RENDIMIENTO'];
+  let acuEstructurasSap = null;
+  function estructurasSapAcu() {
+    if (!acuEstructurasSap) {
+      const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
+      acuEstructurasSap = !modelo ? Promise.resolve([]) : leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' })
+        .then((r) => [...new Set(r.map((x) => String(x.descripcion || '').trim().toUpperCase()).filter(Boolean))], () => { acuEstructurasSap = null; return []; });
+    }
+    return acuEstructurasSap;
+  }
   const ACU_TIPOS_DATO = ['', 'Múltiple', 'Realizado por', 'Visto bueno', 'Texto', 'Numérico', 'Fecha'];
   const ACUV = { vista: null, f: { planta: '', etapa: '', estado: 'vigente', q: '' } };
   const acuQuien = () => { const u = usuarioSapActual(); return (u && (u.nombre || u.email || u.id)) || 'Portal SAP'; };
@@ -12828,6 +12838,7 @@
       <div class="rmd-acu-ancho rmd-acu-campo"><span>Imágenes <small class="rmd-nota">(pega con Ctrl+V una captura, arrástrala aquí o elígela; hasta ${ACU_IMG_MAX})</small></span>
         <div class="rmd-acu-zona" tabindex="0"><div class="rmd-acu-imgs-ed"></div><button type="button" class="rmd-btn" data-a="img">Elegir imagen…</button></div></div>
       <p class="rmd-acu-error rmd-dif" hidden></p></div>`;
+    estructurasSapAcu().then((l) => { const dl = v.cuerpo.querySelector('#rmd-acu-secciones'); if (dl) l.filter((x) => !ACU_SECCIONES.includes(x)).forEach((x) => { const o = document.createElement('option'); o.value = x; dl.appendChild(o); }); });
     const $ = (q) => v.cuerpo.querySelector(q), tb = $('.rmd-acu-pasos tbody'), zona = $('.rmd-acu-zona'), error = $('.rmd-acu-error');
     const filaPaso = (p) => {
       const tr = document.createElement('tr');
