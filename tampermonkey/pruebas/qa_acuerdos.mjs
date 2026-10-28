@@ -69,6 +69,16 @@ const lx = A.deHojas(hojas);
 ok('Excel: lee los 2 acuerdos', lx && lx.length === 2);
 ok('Excel: fase, sección y pasos en orden', lx[0].faseDesde === 2 && lx[0].seccion === 'PROCEDIMIENTO' && J(lx[0].pasos.map((p) => p.codigo)) === J(['184004', '184008']) && lx[0].pasos[1].etapa === 'ENVASE');
 ok('Excel: planta, etapas, estado y casillas', lx[1].planta === 'planta1' && J(lx[1].etapas) === J(['ENVASE']) && lx[1].estado === 'anulado' && lx[1].pasos[0].rPor && lx[1].pasos[0].estadoCC && !lx[1].pasos[0].vb);
+// ---- Exportar de la pestaña del portal (con imágenes partidas en trozos) y volver a leerlo ----
+const img = 'data:image/webp;base64,' + 'A'.repeat(65000);
+const conImg = A.normalizar({ id: 'i1', titulo: 'Con imagen', tipo: 'nota', detalle: 'Línea 1\nLínea 2', imagenes: [{ id: 'x', nombre: 'Captura', src: img }, { id: 'y', src: 'javascript:alert(1)' }],
+  historial: [{ fecha: '2026-10-28T19:00:00Z', por: 'Carlos', accion: 'Creado' }], creadoPor: 'Carlos', pasos: [{ codigo: '0184004', rPor: true }] });
+ok('normalizar: solo imágenes data:image', conImg.imagenes.length === 1 && conImg.imagenes[0].nombre === 'Captura');
+const hx = A.aHojas([conImg, lx[0]]);
+ok('aHojas: 4 hojas; la imagen en 3 trozos de ≤ 30 000', J(Object.keys(hx)) === J(['Acuerdos', 'Pasos', 'Historial', 'Imagenes']) && hx.Imagenes.length === 4 && hx.Imagenes.slice(1).every((f) => f[4].length <= 30000));
+const ida = A.deHojas(Object.entries(hx).map(([hoja, filas]) => ({ hoja, filas })));
+ok('ida y vuelta: imagen, historial, creador, texto y casillas', ida[0].imagenes[0].src === img && ida[0].historial[0].por === 'Carlos' && ida[0].creadoPor === 'Carlos' && ida[0].detalle === 'Línea 1\nLínea 2' && ida[0].pasos[0].codigo === '184004' && ida[0].pasos[0].rPor);
+ok('ida y vuelta: el acuerdo sin imágenes queda igual', J(ida[1]) === J(lx[0]), J(ida[1]));
 ok('Excel sin hoja «Acuerdos» → null', A.deHojas([{ hoja: 'ACCIONES CC', filas: [['A']] }]) === null);
 
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodas las pruebas pasan');
