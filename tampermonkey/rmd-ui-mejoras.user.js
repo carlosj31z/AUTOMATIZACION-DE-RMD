@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.103.3
+// @version      1.104.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.103.3';                                                       // mantener igual a @version
+  const VERSION = '1.104.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -15579,8 +15579,8 @@
         const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`);
       });
       const revisarLista = (l, estr, etq) => {
-        const vistos = new Map();
-        vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) add(x.id, 'aviso', `El paso ${x.codigo} ya está en esta lista (${numeros.get(otro) || 'más arriba'}).`); else if (!otro) vistos.set(String(x.codigo), x.id); }
+        const vistos = new Map(), copias = new Set(vivos(l).filter((y) => y.copiaDe).map((y) => y.id));   // copias de pasos (duplicar un lote): repetir el código es lo esperado
+        vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) { const copia = copias.has(x.id) || copias.has(otro); add(x.id, copia ? 'info' : 'aviso', `${copia ? 'Copia: e' : 'E'}l paso ${x.codigo} ${copia ? 'también' : 'ya'} está en esta lista (${numeros.get(otro) || 'más arriba'}).`); } else if (!otro) vistos.set(String(x.codigo), x.id); }
           vivos(x.pm).filter((m) => !m.insumo).forEach((m) => revisar(m, estr, etq, true)); });
         // paso quitado con dependientes
         (l || []).filter((x) => x.quitado && x.codigo).forEach((x) => { const dep = vivos(l).filter((y) => String(y.depende || '') === String(x.codigo)); if (dep.length) add(x.id, 'aviso', `${dep.map((y) => numeros.get(y.id) || y.texto.slice(0, 30)).join(', ')} depende${dep.length > 1 ? 'n' : ''} de este paso: el equipo RMD revisará los predecesores.`); });
@@ -15685,6 +15685,7 @@
     let PQ, BASE, W, SOL, BUS, EQ = [], MIEMBROS = new Map(), ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), NUM_BASE = new Map(), sucio = false, seq = 1, filtro = 'todos';
     const deshacer = [];
     let avisoInicial = '', pdfHecho = false, guardadoUna = false, imprimiendo = false, SELECCION = null, panelAbierto = false;
+    let MARCADOS = new Set(), ANCLA = null, PORTA = null;               // varios pasos marcados (Ctrl/Shift+clic) y pasos copiados para pegar
     const CLAVE_PERSONA = 'rmdPlantillaPersona';                       // nombre y área de la última solicitud (este navegador)
     const REGISTRO = { leer: 'Solo leerlo (instrucción)', dato: 'Anotar un dato (número o texto)', check: 'Marcar un check de conformidad', rango: 'Anotar un rango (valor inicial y final)', fecha: 'Anotar fecha y hora' };
     const CLAVE = () => `rmdPlantilla:${PQ.rmd.codigo}:${PQ.huella}`;
@@ -15775,9 +15776,9 @@
     // ---------- dibujo ----------
     function pintarTodo() {
       CMB = PPN.cambios(BASE, W); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras }); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
-      const y = window.scrollY;
-      app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc${SELECCION ? ' con-sel' : ''}" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel${panelAbierto ? ' abierto' : ''}" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>
-        <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${CMB.length}</b>`}</button>`;
+      const y = window.scrollY; podarMarcados();
+      app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc${SELECCION ? ' con-sel' : ''}${MARCADOS.size ? ' multi' : ''}" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel${panelAbierto ? ' abierto' : ''}" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>
+        <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${CMB.length}</b>`}</button>${htmlMulti()}`;
       window.scrollTo(0, y);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
       document.title = `${sucio ? '● ' : ''}${PPN.nombreArchivo('Borrador', PQ.rmd, new Date()).replace(/ \d{4}-\d\d-\d\d$/, '')}`;   // también nombre sugerido del PDF
@@ -15792,7 +15793,7 @@
       const partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
-      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>: ingrésalo por solicitud o envíalo por correo a <b>Documentación Técnica</b>; lleva los datos para importar tus cambios, así que es el único archivo que hay que enviar. <b>Guardar borrador</b> es opcional: descarga un archivo para seguir editando otro día.</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> (o <b>☑ Seleccionar</b>) marca pasos y <b>Shift+clic</b> marca un tramo. Abajo aparece una barra para <b>duplicarlos</b> (p. ej. para otro lote), <b>copiarlos</b> y pegarlos en otra parte, <b>subirlos</b>, <b>bajarlos</b>, <b>moverlos</b> o <b>quitarlos</b> juntos. También puedes <b>arrastrarlos</b>; si mantienes <b>Ctrl</b> al soltar, se copian. Una copia lleva el paso con sus procesos menores e insumos.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>: ingrésalo por solicitud o envíalo por correo a <b>Documentación Técnica</b>; lleva los datos para importar tus cambios, así que es el único archivo que hay que enviar. <b>Guardar borrador</b> es opcional: descarga un archivo para seguir editando otro día.</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
     let ayudaAbierta = false;
@@ -15837,9 +15838,12 @@
       return `<table class="pp-pagina"><thead><tr><td>${htmlEncabezadoPdf()}</td></tr></thead><tbody><tr><td class="pp-hoja">${cuerpo}</td></tr></tbody></table>`;
     }
     const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
-    const acciones = (clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario === 'insumo' ? bt('editar-ins', '✎ Cantidad', 'Cambiar la cantidad del insumo en este paso', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') + bt('quitar', '✕ Quitar', 'Quitar este insumo del paso', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
+    const acciones = (clase, quitado, soloComentario, conPm, id) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario === 'insumo' ? bt('editar-ins', '✎ Cantidad', 'Cambiar la cantidad del insumo en este paso', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') + bt('quitar', '✕ Quitar', 'Quitar este insumo del paso', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
       bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w')
         + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') + (insumosReceta().length ? bt('agregar-ins', '＋ Insumo', 'Agregar dentro de este paso un insumo de la receta, con su cantidad', 'w') : '') : '') + bt('mover-a', '⇅ Mover a…', 'Elegir en qué posición de la lista va', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
+      + (clase === 'paso' ? bt('duplicar', '⧉ Duplicar', 'Copia este paso, con sus procesos menores e insumos, justo debajo') + bt('copiar', '📋 Copiar', 'Copiar este paso para pegarlo en otra parte')
+        + bt('marcar', MARCADOS.has(id) ? '☐ Desmarcar' : '☑ Seleccionar', MARCADOS.has(id) ? 'Quitarlo de los pasos marcados' : 'Marcar varios pasos para moverlos, copiarlos o quitarlos juntos (también Ctrl+clic)', 'w')
+        + (PORTA ? bt('pegar', `📋 Pegar debajo (${PORTA.length})`, 'Pegar debajo de esta fila los pasos copiados', 'w') : '') : '')
       + bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
     function marcasDe(x, b) {
       const out = [];
@@ -15877,7 +15881,7 @@
     // ---- procedimiento: una etiqueta ----
     function filaPaso(p, numero, conforme, conPm) {
       const b = BI.get(p.id), r = tipoFila(p, false, conforme), num = p.quitado ? `<s>${esc(NUM_BASE.get(p.id) || '')}${NUM_BASE.get(p.id) ? '.-' : ''}</s>` : `${esc(numero || '')}${numero ? '.-' : ''}`;
-      const tx = celdaTexto(p, b, esc(p.texto)), acc = acciones('paso', p.quitado, false, conPm);
+      const tx = celdaTexto(p, b, esc(p.texto)), acc = acciones('paso', p.quitado, false, conPm, p.id);
       let celdas;
       if (r === 'T') celdas = [`<td colspan="5" class="pp-c-tx">${tx}</td>`];
       else if (r === 'I') celdas = [`<td colspan="3" class="pp-c-tx">${tx}</td>`, `<td colspan="2" class="pp-c-caja">${CAJA}</td>`];
@@ -15887,7 +15891,7 @@
       else celdas = [`<td colspan="3" class="pp-c-tx">${tx}</td>`, `<td colspan="2" class="pp-c-mini">${mini(['Realizado Por', 'VB'], 2)}</td>`];
       if (conforme) celdas.push(`<td class="pp-c-chk">${CHECK}</td>`);
       celdas[celdas.length - 1] = celdas[celdas.length - 1].replace(/^<td([^>]*)>/, (m0, a) => `<td${a.includes('class="') ? a.replace('class="', 'class="ult ') : a + ' class="ult"'}>`).replace(/<\/td>$/, `${acc}</td>`);
-      return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}" tabindex="0"><td class="pp-c-num">${num}</td>${celdas.join('')}</tr>`;
+      return `<tr class="pp-paso ${estadoCl(p, b)}${MARCADOS.has(p.id) ? ' marc' : ''}" data-id="${esc(p.id)}" tabindex="0"${p.quitado ? '' : ' draggable="true"'}><td class="pp-c-num">${num}</td>${celdas.join('')}</tr>`;
     }
     function filaPm(m, conforme) {
       const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo ? 'insumo' : false);
@@ -15906,15 +15910,15 @@
       const ver = conf && pasos.length ? '<tr class="pp-ver"><td colspan="3">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
       return `<div class="pp-etq" data-id="${esc(t.id)}"><table class="pp-etq-cab"><tr><td class="pp-etq-tit">${nt ? esc(nt) + '.-' : ''}${esc(t.nombre)} <button type="button" class="pp-com-tit" data-a="comentar" data-id="${esc(t.id)}" title="Comentario sobre esta etiqueta">💬</button></td>${conf ? '<td class="pp-nota-der">(Colocar check en caso de conformidad)</td>' : ''}</tr></table>
         ${htmlAvisos(t.id)}${htmlComentario(t)}<table class="pp-t pp-proc${conf ? ' conf' : ''}">${cols(conf ? [40, 243, 35, 50, 35, 50, 25] : [40, 233, 55, 50, 50, 60])}${filas}${ver}</table>
-        <button type="button" class="pp-mas" data-a="agregar-final" data-lista="etq:${esc(t.id)}">＋ Agregar paso al final de «${esc(t.nombre)}»</button></div>`;
+        <button type="button" class="pp-mas" data-a="agregar-final" data-lista="etq:${esc(t.id)}">＋ Agregar paso al final de «${esc(t.nombre)}»</button>${htmlPegarFinal(`etq:${t.id}`)}</div>`;
     }
     // ---- cuadros (Precauciones, Notas, Condiciones) ----
     function htmlCuadro(e, lista) {
-      const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false);
-        return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}" tabindex="0"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
+      const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false, p.id);
+        return `<tr class="pp-paso ${estadoCl(p, b)}${MARCADOS.has(p.id) ? ' marc' : ''}" data-id="${esc(p.id)}" tabindex="0"${p.quitado ? '' : ' draggable="true"'}><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
           + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo ? 'insumo' : false)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
-      return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>`;
+      return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>${htmlPegarFinal(`est:${e.id}`)}`;
     }
     // miembros de un agrupador
     function htmlMiembros(x) {
@@ -15968,6 +15972,19 @@
       if (filtro === 'avisos') cuerpo = conAviso.length ? conAviso.map(([id, l]) => { const f = encontrar(id); return `<button type="button" class="pp-cmb" data-ir="${esc(id)}"><b>${esc(f ? (f.item.texto || f.item.nombre || f.item.desc || '') : '').slice(0, 70)}</b>${l.filter((a) => a.nivel !== 'info').map((a) => `<span class="pp-cmb-av ${a.nivel}">${esc(a.texto)}</span>`).join('')}</button>`; }).join('') : '<p class="pp-nota">Sin avisos.</p>';
       else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ' <span class="pp-tag crea">★ se creará</span>' : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
       return `<div class="pp-panel-cab"><b>Cambios del borrador</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
+    }
+    const htmlPegarFinal = (ref) => (PORTA ? `<button type="button" class="pp-mas pp-pegar" data-a="pegar-final" data-lista="${esc(ref)}">📋 Pegar aquí al final ${PORTA.length === 1 ? 'el paso copiado' : `los ${PORTA.length} pasos copiados`}</button>` : '');
+    // Barra de varios pasos: aparece con pasos marcados o copiados
+    function htmlMulti() {
+      const n = MARCADOS.size, gr = n ? gruposDe([...MARCADOS]).length : 0;
+      if (!n && !PORTA) return '';
+      const porta = PORTA ? `<span class="pp-multi-porta">📋 ${PORTA.length} paso${PORTA.length === 1 ? '' : 's'} copiado${PORTA.length === 1 ? '' : 's'}: usa «Pegar debajo» en un paso o «Pegar aquí al final» en una lista <button type="button" data-a="porta-vaciar" title="Olvidar los pasos copiados">Vaciar</button></span>` : '';
+      if (!n) return `<div class="pp-multi" role="toolbar" aria-label="Pasos copiados">${porta}</div>`;
+      return `<div class="pp-multi" role="toolbar" aria-label="Pasos marcados"><b>${n} paso${n === 1 ? '' : 's'} marcado${n === 1 ? '' : 's'}</b>
+        ${bt('m-duplicar', '⧉ Duplicar', 'Copia los pasos marcados, con sus procesos menores e insumos, debajo del último (p. ej. para otro lote)')}${bt('m-copiar', '📋 Copiar', 'Copiar los pasos marcados para pegarlos en otra parte')}
+        ${bt('m-subir', '↑ Subir', 'Subir los pasos marcados una posición')}${bt('m-bajar', '↓ Bajar', 'Bajar los pasos marcados una posición')}${bt('m-mover', '⇅ Mover a…', 'Elegir a qué lista y en qué posición van')}
+        ${bt('m-quitar', '✕ Quitar', 'Quitar los pasos marcados', 'qui')}${bt('m-limpiar', 'Desmarcar', 'Desmarcar todos (Esc)')}
+        <span class="pp-nota">${gr > 1 ? `En ${gr} listas · ` : ''}Arrástralos para moverlos; con Ctrl al soltar se copian.</span>${porta}</div>`;
     }
     function htmlImpresion() {
       const r = PQ.rmd, s = SOL || {};
@@ -16204,6 +16221,116 @@
     function quitar(id) {
       cambio(() => { const f = encontrar(id); if (!BI.has(id)) { f.lista.splice(f.lista.findIndex((y) => y.id === id), 1); return; } f.item.quitado = true; });
     }
+    // ---------- varios pasos: marcar, duplicar, copiar y pegar, mover y quitar en conjunto ----------
+    // Copia de un paso con su estructura (procesos menores e insumos): ids nuevos; el comentario no se copia.
+    function copiaPaso(p) {
+      const c = clon(p); c.id = `n:${seq++}`; c.copiaDe = p.copiaDe || p.id; ['quitado', 'comentario', 'editadoRmd'].forEach((k) => delete c[k]);
+      if (c.pm) c.pm = c.pm.filter((m) => !m.quitado).map((m) => { const y = { ...m, id: `n:${seq++}` }; delete y.comentario; delete y.editadoRmd; return y; });
+      return c;
+    }
+    // listas de pasos que se ven en la hoja (como en htmlEstructura)
+    const listaVisible = (g) => !!g.t || (![TIPO.EQUIPOS, TIPO.FORMULA, TIPO.ESPEC, TIPO.FIRMAS].includes(g.e.tipo) && !(g.e.tipo === TIPO.PROCESOS && (g.e.etiquetas || []).length && !g.lista.length));
+    const listasDoc = () => [...W.estructuras].sort(PPN.porOrden).flatMap((e) => [{ lista: e.pasos || (e.pasos = []), e, t: null }, ...[...(e.etiquetas || [])].sort(PPN.porOrden).map((t) => ({ lista: t.pasos || (t.pasos = []), e, t }))]);
+    const gruposDe = (ids) => { const s = new Set(ids); return listasDoc().map((g) => ({ ...g, items: g.lista.filter((p) => s.has(p.id)) })).filter((g) => g.items.length); };
+    const marcados = () => gruposDe([...MARCADOS]).flatMap((g) => g.items.map((p) => p.id));       // en el orden de la hoja
+    function podarMarcados() { [...MARCADOS].forEach((id) => { const f = encontrar(id); if (!f || f.clase !== 'paso' || f.item.quitado) MARCADOS.delete(id); }); }
+    function marcar(id, tramo) {
+      const f = encontrar(id); if (!f || f.clase !== 'paso' || f.item.quitado) return;
+      const fa = tramo && ANCLA && ANCLA !== id ? encontrar(ANCLA) : null;
+      if (fa && fa.lista === f.lista) { const vivos = f.lista.filter((p) => !p.quitado), i = vivos.indexOf(fa.item), j = vivos.indexOf(f.item); vivos.slice(Math.min(i, j), Math.max(i, j) + 1).forEach((p) => MARCADOS.add(p.id)); }
+      else { if (MARCADOS.has(id)) MARCADOS.delete(id); else MARCADOS.add(id); ANCLA = id; }
+      pintarTodo();
+    }
+    function limpiarMarcados() { MARCADOS = new Set(); ANCLA = null; pintarTodo(); }
+    const cuantos = (n) => `${n} paso${n === 1 ? '' : 's'}`;
+    // Coloca los pasos `ids` en `destino` tras `trasId` (null: al inicio; undefined: al final). En su misma lista se mueven;
+    // a otra lista, un paso nuevo se mueve y uno de SAP queda «Quitado» en la suya y se agrega su copia (en SAP es otro registro). `copiar`: se copian.
+    function colocar(ids, destino, trasId, copiar) {
+      const puestos = [];
+      cambio(() => {
+        const mov = [];
+        gruposDe(ids).forEach((g) => g.items.forEach((p) => {
+          if (copiar) mov.push(copiaPaso(p));
+          else if (g.lista === destino || !BI.has(p.id)) { g.lista.splice(g.lista.indexOf(p), 1); mov.push(p); }
+          else { p.quitado = true; mov.push(copiaPaso(p)); }
+        }));
+        const i = trasId === undefined ? destino.length : trasId === null ? 0 : destino.findIndex((y) => y.id === trasId) + 1;
+        destino.splice(i, 0, ...mov); puestos.push(...mov.map((p) => p.id)); MARCADOS = new Set(puestos); ANCLA = null;
+      });
+      if (puestos.length) setTimeout(() => irA(puestos[0]), 30);
+      return puestos;
+    }
+    function duplicar(ids) {
+      const puestos = [];
+      cambio(() => { gruposDe(ids).forEach((g) => { const ult = g.items[g.items.length - 1], copias = g.items.map(copiaPaso); g.lista.splice(g.lista.indexOf(ult) + 1, 0, ...copias); puestos.push(...copias.map((c) => c.id)); }); MARCADOS = new Set(puestos); ANCLA = null; });
+      aviso(`${puestos.length === 1 ? 'Se duplicó 1 paso' : `Se duplicaron ${puestos.length} pasos`} con sus procesos menores e insumos: ${puestos.length === 1 ? 'la copia queda marcada' : 'las copias quedan marcadas'}, para moverlas o cambiarlas.`);
+      if (puestos.length) setTimeout(() => irA(puestos[0]), 30);
+    }
+    function copiar(ids) { const l = gruposDe(ids).flatMap((g) => g.items.map((p) => clon(p))); if (!l.length) return; PORTA = l; pintarTodo(); aviso(`${cuantos(l.length)} copiado${l.length === 1 ? '' : 's'}: usa «📋 Pegar debajo» en un paso o «Pegar aquí al final» en una lista.`); }
+    function pegar(trasId, refLista) {
+      if (!PORTA) return; const puestos = [];
+      cambio(() => { let lista, i; if (trasId) { const f = encontrar(trasId); lista = f.lista; i = lista.indexOf(f.item) + 1; } else { lista = listaDe(refLista).lista; i = lista.length; }
+        const copias = PORTA.map(copiaPaso); lista.splice(i, 0, ...copias); puestos.push(...copias.map((c) => c.id)); MARCADOS = new Set(puestos); ANCLA = null; });
+      if (puestos.length) setTimeout(() => irA(puestos[0]), 30);
+    }
+    function moverGrupo(ids, dir) {
+      const s = new Set(ids);
+      cambio(() => gruposDe(ids).forEach((g) => {
+        const slots = [], vivos = []; g.lista.forEach((p, k) => { if (!p.quitado) { slots.push(k); vivos.push(p); } });           // los quitados quedan en su sitio
+        if (dir < 0) { for (let k = 1; k < vivos.length; k++) if (s.has(vivos[k].id) && !s.has(vivos[k - 1].id)) [vivos[k - 1], vivos[k]] = [vivos[k], vivos[k - 1]]; }
+        else for (let k = vivos.length - 2; k >= 0; k--) if (s.has(vivos[k].id) && !s.has(vivos[k + 1].id)) [vivos[k], vivos[k + 1]] = [vivos[k + 1], vivos[k]];
+        slots.forEach((k, j) => { g.lista[k] = vivos[j]; });
+      }));
+      const ord = gruposDe(ids); if (ord.length) setTimeout(() => irA(ord[0].items[0].id), 30);
+    }
+    function quitarGrupo(ids) {
+      const n = ids.length;
+      cambio(() => { ids.forEach((id) => { const f = encontrar(id); if (!f || f.clase !== 'paso') return; if (!BI.has(id)) f.lista.splice(f.lista.indexOf(f.item), 1); else f.item.quitado = true; }); MARCADOS = new Set(); ANCLA = null; });
+      aviso(`${n === 1 ? 'Se quitó 1 paso' : `Se quitaron ${n} pasos`}. Con «Deshacer» (Ctrl+Z) vuelven.`);
+    }
+    // Mover a…: lista de destino y posición
+    function moverGrupoA(ids) {
+      const s = new Set(ids), num = PPN.numerar(W.estructuras, BASE.estructuras), destinos = listasDoc().filter(listaVisible);
+      const gr = gruposDe(ids), propia = gr.length === 1 ? destinos.indexOf(destinos.find((g) => g.lista === gr[0].lista)) : 0;
+      const nombre = (g) => `${num.get((g.t || g.e).id) ? num.get((g.t || g.e).id) + '.- ' : ''}${g.e.nombre}${g.t ? ' › ' + g.t.nombre : ''}`;
+      const opciones = (g) => { const vivos = g.lista.filter((y) => !y.quitado && !s.has(y.id)), ult = gr.length === 1 && g.lista === gr[0].lista ? (() => { const k = g.lista.indexOf(gr[0].items[0]); for (let j = k - 1; j >= 0; j--) if (!g.lista[j].quitado && !s.has(g.lista[j].id)) return g.lista[j].id; return ''; })() : vivos.length ? vivos[vivos.length - 1].id : '';
+        return `<option value="">— Al inicio de la lista —</option>${vivos.map((y) => `<option value="${esc(y.id)}"${y.id === ult ? ' selected' : ''}>${esc(`${num.get(y.id) ? num.get(y.id) + '.-' : '-'} ${String(y.texto || '').slice(0, 100)}`)}</option>`).join('')}`; };
+      modal(`<h3>Mover ${cuantos(ids.length)}<span>${esc(gr.flatMap((g) => g.items).slice(0, 3).map((p) => String(p.texto || '').slice(0, 50)).join(' · '))}${ids.length > 3 ? ' …' : ''}</span></h3>
+        <label class="pp-campo">Lista<select id="m-lista">${destinos.map((g, k) => `<option value="${k}"${k === propia ? ' selected' : ''}>${esc(nombre(g))}</option>`).join('')}</select></label>
+        <label class="pp-campo">Colocarlos después de<select id="m-pos"></select></label>
+        <p class="pp-nota" id="m-nota"></p>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Mover</button></div>`, (m, cerrar) => {
+        const selL = $('#m-lista', m), selP = $('#m-pos', m);
+        const pintarPos = () => { const g = destinos[+selL.value]; selP.innerHTML = opciones(g); const otra = gr.some((x) => x.lista !== g.lista), deSap = otra && gr.some((x) => x.lista !== g.lista && x.items.some((p) => BI.has(p.id)));
+          $('#m-nota', m).textContent = deSap ? 'A otra lista: los pasos que ya están en SAP quedan «Quitados» en su lista y se agregan como pasos nuevos en esta (en SAP es otro registro).' : 'Se mueven en el orden en que están en la hoja.'; };
+        selL.addEventListener('change', pintarPos); pintarPos(); setTimeout(() => selP.focus(), 20);
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') { const g = destinos[+selL.value]; cerrar(); colocar(ids, g.lista, selP.value || null, false); } });
+      });
+    }
+    // Arrastrar pasos (los marcados, si el arrastrado está marcado) sobre otro paso o sobre «Agregar paso al final»
+    let ARRASTRE = null;
+    const limpiarSoltar = () => $$('.pp-soltar-antes, .pp-soltar-despues, .pp-mas.pp-soltar').forEach((x) => x.classList.remove('pp-soltar-antes', 'pp-soltar-despues', 'pp-soltar'));
+    function destinoSoltar(ev) {
+      const mas = ev.target.closest && ev.target.closest('.pp-doc .pp-mas[data-lista]'); if (mas) return { el: mas, lista: listaDe(mas.dataset.lista).lista, tras: undefined };
+      const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (!tr) return null;
+      const f = encontrar(tr.dataset.id); if (!f || (f.clase !== 'paso' && f.clase !== 'pm')) return null;
+      const p = f.clase === 'pm' ? f.padre : f.item, lista = f.clase === 'pm' ? encontrar(p.id).lista : f.lista, s = new Set(ARRASTRE);
+      if (s.has(p.id)) return null;
+      const r = tr.getBoundingClientRect(), antes = f.clase === 'paso' && ev.clientY < r.top + r.height / 2;
+      if (!antes) { const filaP = $(`.pp-doc tr[data-id="${CSS.escape(p.id)}"]`), ultPm = (p.pm || []).length && !p.quitado ? $(`.pp-doc tr[data-id="${CSS.escape(p.pm[p.pm.length - 1].id)}"]`) : null; return { el: ultPm || filaP, clase: 'pp-soltar-despues', lista, tras: p.id }; }
+      const k = lista.indexOf(p); let tras = null; for (let j = k - 1; j >= 0; j--) if (!s.has(lista[j].id)) { tras = lista[j].id; break; }
+      return { el: tr, clase: 'pp-soltar-antes', lista, tras };
+    }
+    app.addEventListener('dragstart', (ev) => {
+      const tr = ev.target.closest && ev.target.closest('.pp-doc tr.pp-paso[draggable="true"]'); if (!tr) return;
+      const id = tr.dataset.id; ARRASTRE = MARCADOS.has(id) ? marcados() : [id];
+      ev.dataTransfer.effectAllowed = 'copyMove'; try { ev.dataTransfer.setData('text/plain', `${ARRASTRE.length} paso(s)`); } catch (x) { }
+      setTimeout(() => ARRASTRE && ARRASTRE.forEach((i) => { const r = $(`.pp-doc tr[data-id="${CSS.escape(i)}"]`); if (r) r.classList.add('pp-arrastrando'); }), 0);
+    });
+    app.addEventListener('dragover', (ev) => { if (!ARRASTRE) return; const d = destinoSoltar(ev); limpiarSoltar(); if (!d) return; ev.preventDefault(); ev.dataTransfer.dropEffect = ev.ctrlKey || ev.metaKey || ev.altKey ? 'copy' : 'move'; d.el.classList.add(d.clase || 'pp-soltar'); });
+    app.addEventListener('drop', (ev) => { if (!ARRASTRE) return; const d = destinoSoltar(ev), ids = ARRASTRE; ARRASTRE = null; limpiarSoltar(); if (!d) return; ev.preventDefault(); colocar(ids, d.lista, d.tras, ev.ctrlKey || ev.metaKey || ev.altKey); });
+    app.addEventListener('dragend', () => { ARRASTRE = null; limpiarSoltar(); $$('.pp-arrastrando').forEach((x) => x.classList.remove('pp-arrastrando')); });
+    app.addEventListener('mousedown', (ev) => { if (ev.shiftKey && ev.target.closest('.pp-doc tr.pp-paso')) ev.preventDefault(); });   // Shift+clic marca un tramo sin seleccionar texto
     function listaDe(ref) {
       const [tipo, id] = ref.split(/:(.+)/); const f = encontrar(id);
       return tipo === 'est' ? { lista: f.item.pasos || (f.item.pasos = []), e: f.item, t: null } : { lista: f.item.pasos || (f.item.pasos = []), e: f.e, t: f.item };
@@ -16212,7 +16339,9 @@
       const fb = ev.target.closest('[data-filtro]'); if (fb) { filtro = fb.dataset.filtro; $('#pp-panel').innerHTML = htmlPanel(); return; }
       const ir = ev.target.closest('[data-ir]'); if (ir) { if (panelAbierto && window.matchMedia('(max-width: 1340px)').matches) { panelAbierto = false; pintarTodo(); } irA(ir.dataset.ir); seleccionar(ir.dataset.ir); return; }
       const b = ev.target.closest('button[data-a]');
-      if (!b) { if (ev.target.closest('select, input, textarea, a')) return; const tr = ev.target.closest('.pp-doc tr[data-id]'); seleccionar(tr ? tr.dataset.id : null); return; }
+      if (!b) { if (ev.target.closest('select, input, textarea, a')) return; const tr = ev.target.closest('.pp-doc tr[data-id]');
+        if (tr && tr.matches('.pp-paso:not(.qui)') && (ev.ctrlKey || ev.metaKey || ev.shiftKey || MARCADOS.size)) { marcar(tr.dataset.id, ev.shiftKey); seleccionar(tr.dataset.id); return; }
+        seleccionar(tr ? tr.dataset.id : null); return; }
       const a = b.dataset.a, fila = b.closest('[data-id]'), id = b.dataset.id || (fila && fila.dataset.id);
       if (fila && fila.matches('.pp-doc tr[data-id]')) seleccionar(fila.dataset.id);
       if (a === 'guardar') guardar(); else if (a === 'pdf') generarPdf();
@@ -16230,17 +16359,31 @@
       else if (a === 'agregar-final') { const l = listaDe(b.dataset.lista); editar({ nuevo: true, lista: l.lista, despuesDe: null, clase: 'paso', e: l.e, t: l.t }); }
       else if (a === 'agregar-pm') { const f = encontrar(b.dataset.padre || id); if (!f.item.pm) f.item.pm = []; editar({ nuevo: true, lista: f.item.pm, despuesDe: null, clase: 'pm', e: f.e, t: f.t, padre: f.item }); }
       else if (a === 'agregar-equipo') agregarEquipo(b.dataset.est);
+      else if (a === 'duplicar') duplicar([id]);
+      else if (a === 'copiar') copiar(MARCADOS.has(id) ? marcados() : [id]);
+      else if (a === 'marcar') marcar(id, false);
+      else if (a === 'pegar') pegar(id, null);
+      else if (a === 'pegar-final') pegar(null, b.dataset.lista);
+      else if (a === 'porta-vaciar') { PORTA = null; pintarTodo(); }
+      else if (a.startsWith('m-')) { const ids = marcados(); if (!ids.length) return;
+        if (a === 'm-duplicar') duplicar(ids); else if (a === 'm-copiar') copiar(ids); else if (a === 'm-subir' || a === 'm-bajar') moverGrupo(ids, a === 'm-subir' ? -1 : 1);
+        else if (a === 'm-mover') moverGrupoA(ids); else if (a === 'm-quitar') quitarGrupo(ids); else if (a === 'm-limpiar') limpiarMarcados(); }
       else if (a === 'editar-ins') editarInsumo({ id });
       else if (a === 'agregar-ins') { const f = encontrar(id); if (!f.item.pm) f.item.pm = []; editarInsumo({ nuevo: true, padre: f.item, e: f.e, t: f.t }); }
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
     app.addEventListener('change', (ev) => { const sel = ev.target.closest('select.pp-ir'); if (!sel || !sel.value) return; const id = sel.value; sel.value = ''; irA(id); });
-    app.addEventListener('dblclick', (ev) => { const tr = ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target.closest('button')) return; const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { const s2 = window.getSelection && window.getSelection(); if (s2) s2.removeAllRanges(); editar({ id: tr.dataset.id }); } });
+    app.addEventListener('dblclick', (ev) => { const tr = ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target.closest('button') || MARCADOS.size) return; const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { const s2 = window.getSelection && window.getSelection(); if (s2) s2.removeAllRanges(); editar({ id: tr.dataset.id }); } });
     app.addEventListener('focusin', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (tr && ev.target === tr) seleccionar(tr.dataset.id); });
     app.addEventListener('keydown', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target !== tr) return;
       if (ev.key === 'Enter') { const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { ev.preventDefault(); editar({ id: tr.dataset.id }); } } });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.defaultPrevented && SELECCION && !document.querySelector('.pp-modal-fondo')) seleccionar(null); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.pp-modal-fondo')) { if (MARCADOS.size) limpiarMarcados(); else if (SELECCION) seleccionar(null); } });
+    // Ctrl+C copia los pasos marcados (o el elegido) y Ctrl+V los pega debajo del paso elegido
+    document.addEventListener('keydown', (e) => { if (!(e.ctrlKey || e.metaKey) || document.querySelector('.pp-modal-fondo') || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') || (window.getSelection && String(window.getSelection()))) return;
+      const k = e.key.toLowerCase(), f = SELECCION ? encontrar(SELECCION) : null, elegido = f && f.clase === 'paso' && !f.item.quitado ? SELECCION : null;
+      if (k === 'c' && (MARCADOS.size || elegido)) { e.preventDefault(); copiar(MARCADOS.size ? marcados() : [elegido]); }
+      else if (k === 'v' && PORTA && elegido) { e.preventDefault(); pegar(elegido, null); } });
     window.addEventListener('afterprint', () => { if (imprimiendo) { imprimiendo = false; pdfHecho = true; pintarTodo(); } });
     function deshacerUno() { const s = deshacer.pop(); if (!s) return; W = s.W; SOL = s.SOL; sucio = true; guardarLocal(); pintarTodo(); }
     document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !document.querySelector('.pp-modal-fondo') && !/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); deshacerUno(); } });
@@ -16277,8 +16420,9 @@
       });
     }
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
-    window.addEventListener('beforeprint', () => { const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion() + htmlDatosPdf(); });
-    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar(), seleccion: SELECCION, pdfHecho, guardadoUna }), editar, quitar, mover, moverA, comentar, guardar, encontrar, buscador: () => BUS, irA, seleccionar };   // pruebas
+    window.addEventListener('beforeprint', () => { if (MARCADOS.size) { MARCADOS = new Set(); ANCLA = null; pintarTodo(); } const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion() + htmlDatosPdf(); });
+    window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar(), seleccion: SELECCION, pdfHecho, guardadoUna, marcados: marcados(), porta: PORTA }), editar, quitar, mover, moverA, comentar, guardar, encontrar, buscador: () => BUS, irA, seleccionar,
+      marcar, duplicar, copiar, pegar, colocar, moverGrupo, quitarGrupo, listasDoc };   // pruebas
     iniciar();
   }
   // Estilos de la plantilla (pdfMake, Roboto 9 pt; 1 pt ≈ 1,4 px en pantalla).
@@ -16359,6 +16503,16 @@ td.ult { position: relative; }
 .pp-mas { display: block; margin: -4px 0 12px; padding: 4px 12px; border: 1px dashed rgba(10,102,194,.5); border-radius: 6px; background: rgba(10,102,194,.04); color: var(--acento); font: 600 12px "Segoe UI", Arial, sans-serif; cursor: pointer; }
 .pp-mas:hover { border-style: solid; background: rgba(10,102,194,.09); }
 .pp-nota { color: var(--ap); font: 12px "Segoe UI", Arial, sans-serif; margin: 4px 0; }
+/* varios pasos: marcados, arrastre y barra */
+.pp-doc.multi tr.pp-paso:not(.qui) > td:first-child { position: relative; } .pp-doc.multi tr.pp-paso:not(.qui) > td:first-child::before { content: '☐'; position: absolute; left: -22px; top: 2px; color: var(--acento); font: 15px/1 "Segoe UI Symbol", "Segoe UI", Arial, sans-serif; }
+.pp-doc.multi tr.pp-paso.marc > td:first-child::before { content: '☑'; } .pp-doc tr.marc > td { background: #e3eefc !important; } .pp-doc tr.marc > td:first-child { box-shadow: inset 4px 0 0 var(--acento); }
+.pp-doc.multi tr.pp-paso:not(.qui) { cursor: pointer; } .pp-doc tr.pp-paso[draggable="true"] { cursor: grab; } tr.pp-arrastrando > td { opacity: .45; }
+tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } tr.pp-soltar-despues > td { box-shadow: inset 0 -3px 0 var(--acento) !important; } .pp-mas.pp-soltar { border-style: solid; background: rgba(10,102,194,.16); }
+.pp-mas.pp-pegar { border-color: rgba(122,63,191,.5); background: var(--crea-f); color: var(--crea); } .pp-mas.pp-pegar:hover { background: #ead9fb; }
+.pp-multi { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 35; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; max-width: min(980px, calc(100vw - 32px)); padding: 8px 12px; background: #fff; border: 1px solid var(--acento); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 12.5px; }
+.pp-multi > b { margin-right: 4px; } .pp-multi button { height: 28px; padding: 0 10px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; color: var(--tx); font-size: 12.5px; }
+.pp-multi button:hover { border-color: var(--acento); color: var(--acento); background: #eef5fc; } .pp-multi button.qui:hover { border-color: var(--qui); color: var(--qui); background: var(--qui-f); }
+.pp-multi .pp-nota { margin: 0; } .pp-multi-porta { display: inline-flex; align-items: center; gap: 6px; color: var(--crea); } .pp-multi-porta button { height: 24px; padding: 0 8px; }
 .pp-destello { animation: pp-destello 1.6s ease-out; } @keyframes pp-destello { 0% { outline: 3px solid var(--acento); outline-offset: 1px; } 100% { outline: 3px solid transparent; outline-offset: 1px; } }
 /* modales */
 .pp-modal-fondo { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; background: rgba(20, 24, 28, .38); }
@@ -16421,7 +16575,7 @@ td.ult { position: relative; }
 @media (pointer: coarse) { .pp-acc { width: 168px; } .pp-acc button { height: 34px; font-size: 13px; } .pp-flujo li > button { min-height: 40px; } }
 @media print {
   @page { size: A4; margin: 10mm 9mm 12mm; }
-  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon { display: none !important; }
+  html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon, .pp-multi { display: none !important; }
   .pp-t tr.sel { outline: 0 !important; } .pp-t tr[data-id] { cursor: default; }
   .pp-datos-pdf { display: block; line-height: 1px; }   /* sin recortar: Chrome no guarda los enlaces de un contenedor con overflow: hidden */ .pp-datos-pdf a { display: inline-block; width: 2px; height: 2px; overflow: hidden; color: #fff; font-size: 1px; line-height: 1px; text-decoration: none; }
   .pp-t tr[data-id] { outline: 0 !important; }
@@ -17113,8 +17267,9 @@ td.ult { position: relative; }
         if (bId.has(x.id)) return;
         const p = catDe(x), id = D(x.id), mdE = D(L.e.id), mdT = L.t ? D(L.t.id) : null, padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x)); locNuevo.set(id, { estr: mdE, etq: mdT, padre: padreId }); revisar.push({ x, p, esPm, L, que: 'nuevo' });
         const ini = x.vi != null && x.vi !== '' ? ppNum(x.vi) : p.valorInicial, fin = x.vf != null && x.vf !== '' ? ppNum(x.vf) : p.valorFinal, mar = x.margen != null && x.margen !== '' ? ppNum(x.margen) : p.margen;
+        const vDe = (v, cat) => (v != null && v !== '' ? ppNum(v) : cat);                 // rango del borrador (p. ej. de un paso copiado) o el del catálogo
         const filaPm = (m, pm, ord, padre) => ({ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, activo: true, mdEstructuraPasoInsumoPasoId: D(m.id), mdEstructuraPasoInsumoPasoIdAct: D(m.id), estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdId_mdId: dest.mdId, tipoDatoId_iMaestraId: pm.tipoDatoId_iMaestraId,
-          pasoId_mdEstructuraPasoId: padre, pasoHijoId_pasoId: pm.pasoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, orden: ord, decimales: pm.decimales, margen: pm.margen, valorInicial: pm.valorInicial, valorFinal: pm.valorFinal, tipoDatoIdAnterior_iMaestraId: pm.tipoDatoId_iMaestraId });
+          pasoId_mdEstructuraPasoId: padre, pasoHijoId_pasoId: pm.pasoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, orden: ord, decimales: pm.decimales, margen: vDe(m.margen, pm.margen), valorInicial: vDe(m.vi, pm.valorInicial), valorFinal: vDe(m.vf, pm.valorFinal), tipoDatoIdAnterior_iMaestraId: pm.tipoDatoId_iMaestraId });
         if (!esPm) {
           op(3, { lugar: lugar(L), accion: 'Agregar', clase: 'paso', desc: `agregar paso ${codVer(x)} — ${String(x.texto || '').slice(0, 60)} (posición ${i + 1})`, ruta: `/MD_ESTRUCTURA('${mdE}')`,
             datos: { mdEstructuraId: mdE, aPaso: [{ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, fechaActualiza: ahora, usuarioActualiza: null, activo: true, mdEstructuraPasoId: id, estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdEsEtiquetaId_mdEsEtiquetaId: mdT,
