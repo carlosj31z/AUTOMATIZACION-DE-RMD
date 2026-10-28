@@ -969,6 +969,47 @@ with sync_playwright() as p:
               and st["cmb"] == [["agregar", "AGUA PARA INYECCION CSP (2500000010) 20 L"], ["cantidad", "10 L>12.5 L"]] and "Cantidad" in st["tags"]
               and r["pm"] == [[], ["MI1"]] and len(r["man"]) == 1 and "2500000010" in r["man"][0])
         return ok, json.dumps({"botones": botones, "todos": todos, "filtro": filtro, "propuesta": propuesta, "pasa": pasa, "sigue": sigue, "st": {k: v for k, v in st.items() if k != "W"}, "plan": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN51 Borrador de Producción · varios pasos (v1.104): «⧉ Duplicar» copia el paso con sus procesos menores (ids nuevos, mismo código, el repetido es solo info); Ctrl+clic y Shift+clic marcan pasos; la barra los baja y sube juntos, los copia y «Pegar aquí al final» los pega en otra lista; arrastrar un paso de SAP a otra lista lo deja «Quitado» y agrega su copia; «Mover a…» lleva los marcados a otra lista; quitar en conjunto borra los nuevos")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        LISTAS = "() => { const s = window.__pp.estado(), t = s.W.estructuras[2].etiquetas; return { t1: t[0].pasos.map((p) => p.id + (p.quitado ? '(q)' : '')), t2: t[1].pasos.map((p) => p.id + (p.quitado ? '(q)' : '')), marc: s.marcados, porta: s.porta ? s.porta.length : 0 }; }"
+        clic = lambda sel, **k: e.click(sel, position={"x": 60, "y": 6}, **k)
+        e.evaluate("() => document.querySelector('tr[data-id=\"P11\"] [data-a=duplicar]').click()"); e.wait_for_timeout(150)
+        dup = e.evaluate("""() => { const s = window.__pp.estado(), l = s.W.estructuras[2].etiquetas[0].pasos, c = l[2]; return { ids: l.map((p) => p.id), copia: { codigo: c.codigo, copiaDe: c.copiaDe, pm: c.pm.map((m) => [m.id.startsWith('n:'), m.codigo, m.texto]) }, marc: s.marcados,
+          av: (s.AV.find(([id]) => id === c.id) || [, []])[1].map((a) => a.nivel + ':' + a.texto), cmb: s.CMB.filter((x) => x.id === c.id).map((x) => [x.accion, (x.pm || []).map((m) => m.codigo)]), barra: !!document.querySelector('.pp-multi') }; }""")
+        e.keyboard.press("Escape"); e.wait_for_timeout(80); trasEsc = e.evaluate(LISTAS)["marc"]
+        clic("tr[data-id='P10']", modifiers=["Control"]); clic("tr[data-id='P12']", modifiers=["Shift"]); marc = e.evaluate(LISTAS)
+        cajas = e.evaluate("() => document.querySelectorAll('.pp-doc.multi tr.marc').length")
+        e.click(".pp-multi [data-a=m-bajar]"); bajado = e.evaluate(LISTAS)["t1"]
+        e.click(".pp-multi [data-a=m-subir]"); subido = e.evaluate(LISTAS)["t1"]
+        e.click(".pp-multi [data-a=m-copiar]"); e.wait_for_timeout(50); porta = e.evaluate(LISTAS)["porta"]
+        e.click(".pp-pegar[data-lista='etq:T2']"); e.wait_for_timeout(100); pegado = e.evaluate(LISTAS)
+        e.keyboard.press("Escape"); e.wait_for_timeout(50)
+        # arrastre con eventos del DOM (el drag_and_drop de Playwright deja colgado el Chrome sin pantalla)
+        e.evaluate("""([a, b]) => { const src = document.querySelector(a), dst = document.querySelector(b), dt = new DataTransfer(), r = dst.getBoundingClientRect(), o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 60, clientY: r.top + 3 };
+          src.dispatchEvent(new DragEvent('dragstart', o)); dst.dispatchEvent(new DragEvent('dragover', o)); dst.dispatchEvent(new DragEvent('drop', o)); document.querySelector('#app').dispatchEvent(new DragEvent('dragend', o)); }""", ["tr[data-id='P20']", "tr[data-id='P10']"])
+        e.wait_for_timeout(150); arrastre = e.evaluate(LISTAS)
+        e.click(".pp-multi [data-a=m-limpiar]"); clic("tr[data-id='P12']", modifiers=["Control"])
+        e.click(".pp-multi [data-a=m-mover]"); e.wait_for_selector("#m-lista")
+        opciones = e.evaluate("() => [...document.querySelectorAll('#m-lista option')].map((o) => o.textContent)")
+        e.select_option("#m-lista", index=[i for i, t in enumerate(opciones) if "FABRICACION" in t][0]); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(150); movido = e.evaluate(LISTAS)
+        e.click(".pp-multi [data-a=m-quitar]"); e.wait_for_timeout(100); quitado = e.evaluate(LISTAS)
+        e.keyboard.press("Control+z"); e.wait_for_timeout(100); deshecho = e.evaluate(LISTAS)
+        e.close()
+        n = lambda l: [x for x in l if not x.startswith("n:")]
+        c = dup["ids"][2] if len(dup["ids"]) > 2 else ""
+        ok = (not errs and dup["ids"][:2] == ["P10", "P11"] and c.startswith("n:") and dup["ids"][3:] == ["P12", "P13"] and dup["copia"]["codigo"] == "2002" and dup["copia"]["copiaDe"] == "P11"
+              and dup["copia"]["pm"] == [[True, "3001", "N° DE REPORTE:"]] and dup["marc"] == [c] and dup["barra"] and any(a.startswith("info:Copia") for a in dup["av"]) and dup["cmb"] == [["agregar", ["3001"]]]
+              and trasEsc == [] and marc["marc"] == ["P10", "P11", c, "P12"] and cajas == 4
+              and bajado == ["P13", "P10", "P11", c, "P12"] and subido == ["P10", "P11", c, "P12", "P13"] and porta == 4
+              and pegado["t2"][:2] == ["P20", "P21"] and len(pegado["t2"]) == 6 and all(x.startswith("n:") for x in pegado["t2"][2:]) and len(pegado["marc"]) == 4
+              and arrastre["t1"][0].startswith("n:") and arrastre["t1"][1:] == ["P10", "P11", c, "P12", "P13"] and arrastre["t2"][:2] == ["P20(q)", "P21"] and arrastre["marc"] == [arrastre["t1"][0]]
+              and any("FABRICACION" in t for t in opciones) and "P12(q)" in movido["t1"] and movido["t2"][-1].startswith("n:") and movido["marc"] == [movido["t2"][-1]]
+              and quitado["t2"] == movido["t2"][:-1] and quitado["marc"] == [] and deshecho["t2"] == movido["t2"])
+        return ok, json.dumps({"dup": dup, "esc": trasEsc, "marc": marc, "cajas": cajas, "bajado": bajado, "subido": subido, "porta": porta, "pegado": pegado, "arrastre": arrastre, "opciones": opciones, "movido": movido, "quitado": quitado, "deshecho": deshecho, "errores": errs[:3]}, ensure_ascii=False)[:2400]
     @prueba("LN32 Importar el borrador a prueba de errores (v1.45): se reconoce por su contenido (da igual el nombre o la extensión del archivo), aguanta BOM, saltos de línea y atributos distintos, y cada daño (cortado, dañado, sin borrador, de otra plantilla, no es un borrador) se explica con su mensaje")
     def _():
         if not PP_GUARDADO: return False, "LN28 no dejó archivo"
