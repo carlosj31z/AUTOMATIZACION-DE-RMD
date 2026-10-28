@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.101.0
+// @version      1.102.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.101.0';                                                       // mantener igual a @version
+  const VERSION = '1.102.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -15037,6 +15037,9 @@
     }
     const num = (v) => { if (v == null || v === '') return null; const x = Number(String(v).replace(',', '.')); return isNaN(x) ? NaN : x; };
     const txtValor = (v) => (v == null || v === '' ? '' : String(v));
+    // insumo de la receta como proceso menor: «DESCRIPCIÓN (código) cantidad UM»
+    const fmtCant = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? txtValor(v) : String(+n.toFixed(6)); };
+    const textoInsumo = (x) => `${x.mat || x.texto || ''} (${x.comp || ''}) ${fmtCant(x.cant)} ${x.um || ''}`.trim();
     const CAMPOS_RANGO = [['vi', 'Valor inicial'], ['vf', 'Valor final'], ['margen', 'Margen']];
     // Cambios base -> trabajo: { clase, accion, lugar, numero, antes, despues, codigos, nuevo, ids }.
     function cambios(base, trabajo) {
@@ -15053,11 +15056,13 @@
           if (!x.quitado) iv++;
           if (!b0) {
             const prev = anterior(i);
+            if (x.insumo) { out.push({ ...base0, accion: 'agregar', insumo: { comp: x.comp || '', mat: x.mat || x.texto || '', cant: txtValor(x.cant), um: x.um || '', insId: x.insId || null }, despues: textoInsumo(x), codigo: null, nuevo: false, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null }); return; }
             out.push({ ...base0, accion: 'agregar', despues: x.texto, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo, tipo: x.tipo || null, registro: x.registro || null, valores: CAMPOS_RANGO.filter(([k]) => txtValor(x[k])).map(([k, n]) => ({ campo: n, despues: txtValor(x[k]) })),
-              casillas: clase === 'paso' && (x.rpor || x.vb) ? { rpor: !!x.rpor, vb: !!x.vb } : null, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ id: m.id, texto: m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo })) : undefined });
+              casillas: clase === 'paso' && (x.rpor || x.vb) ? { rpor: !!x.rpor, vb: !!x.vb } : null, trasDe: prev ? { id: prev.id, texto: prev.texto, codigo: prev.codigo || null } : null, pm: clase === 'paso' ? (x.pm || []).filter((m) => !m.quitado).map((m) => ({ id: m.id, texto: m.insumo ? textoInsumo(m) : m.texto, codigo: m.codigo || null, nuevo: !!m.nuevo, insumo: !!m.insumo })) : undefined });
             return;
           }
-          if (x.quitado) { out.push({ ...base0, accion: 'quitar', antes: b0.texto, codigoAntes: b0.codigo || null }); return; }
+          if (x.quitado) { out.push({ ...base0, accion: 'quitar', antes: b0.insumo ? textoInsumo(b0) : b0.texto, codigoAntes: b0.codigo || null, ...(b0.insumo ? { insumo: true } : {}) }); return; }
+          if (x.insumo && fmtCant(x.cant) !== fmtCant(b0.cant)) out.push({ ...base0, comentario: '', accion: 'cantidad', insumo: true, texto: textoInsumo(x), campos: [{ campo: 'Cantidad', antes: `${fmtCant(b0.cant)} ${b0.um || ''}`.trim(), despues: `${fmtCant(x.cant)} ${x.um || ''}`.trim() }] });
           if (String(x.codigo || '') !== String(b0.codigo || '') || normalizar(x.texto) !== normalizar(b0.texto)) out.push({ ...base0, comentario: '', accion: 'cambiar', registro: x.registro || null, antes: b0.texto, despues: x.texto, codigoAntes: b0.codigo || null, codigo: x.codigo || null, pasoId: x.pasoId || null, nuevo: !!x.nuevo });
           const vals = CAMPOS_RANGO.filter(([k]) => txtValor(x[k]) !== txtValor(b0[k])).map(([k, n]) => ({ campo: n, antes: txtValor(b0[k]), despues: txtValor(x[k]) }));
           if (vals.length) out.push({ ...base0, comentario: '', accion: 'valores', texto: x.texto, campos: vals });
@@ -15120,10 +15125,18 @@
         }
       };
       const vivos = (l) => (l || []).filter((x) => !x.quitado);
+      // insumos: cantidad válida y lo repartido en los pasos frente a la receta
+      const receta = new Map(), asignado = new Map(), insumosPm = [];
+      trabajo.estructuras.forEach((e) => { (e.insumos || []).forEach((i) => { if (i.comp && !receta.has(i.comp)) receta.set(i.comp, i); });
+        [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => vivos(l).forEach((p) => vivos(p.pm).forEach((m) => { if (!m.insumo) return; insumosPm.push(m); asignado.set(m.comp, (asignado.get(m.comp) || 0) + (num(m.cant) || 0)); }))); });
+      insumosPm.forEach((m) => {
+        const c = num(m.cant); if (c == null || Number.isNaN(c) || c <= 0) { add(m.id, 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); return; }
+        const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`);
+      });
       const revisarLista = (l, estr, etq) => {
         const vistos = new Map();
         vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) add(x.id, 'aviso', `El paso ${x.codigo} ya está en esta lista (${numeros.get(otro) || 'más arriba'}).`); else if (!otro) vistos.set(String(x.codigo), x.id); }
-          vivos(x.pm).forEach((m) => revisar(m, estr, etq, true)); });
+          vivos(x.pm).filter((m) => !m.insumo).forEach((m) => revisar(m, estr, etq, true)); });
         // paso quitado con dependientes
         (l || []).filter((x) => x.quitado && x.codigo).forEach((x) => { const dep = vivos(l).filter((y) => String(y.depende || '') === String(x.codigo)); if (dep.length) add(x.id, 'aviso', `${dep.map((y) => numeros.get(y.id) || y.texto.slice(0, 30)).join(', ')} depende${dep.length > 1 ? 'n' : ''} de este paso: el equipo RMD revisará los predecesores.`); });
       };
@@ -15140,8 +15153,8 @@
       const clon = (x) => JSON.parse(JSON.stringify(x)), R = clon(actual), conflictos = [], M = (id) => (mapa ? mapa.get(id) : id) || null;
       let aplicados = 0;
       const nombre = (x) => String((x && (x.texto || x.nombre || x.desc)) || '').slice(0, 60);
-      const grupos = { texto: (x) => normalizar(x.texto) + '|' + String(x.codigo || ''), rango: (x) => ['vi', 'vf', 'margen'].map((k) => txtValor(x[k])).join('|'), firma: (x) => (x.rpor ? 1 : 0) + '|' + (x.vb ? 1 : 0) };
-      const campos = { texto: ['texto', 'codigo', 'pasoId', 'nuevo', 'etqCat', 'tipo'], rango: ['vi', 'vf', 'margen'], firma: ['rpor', 'vb'] };
+      const grupos = { texto: (x) => normalizar(x.texto) + '|' + String(x.codigo || ''), rango: (x) => ['vi', 'vf', 'margen'].map((k) => txtValor(x[k])).join('|'), firma: (x) => (x.rpor ? 1 : 0) + '|' + (x.vb ? 1 : 0), cant: (x) => fmtCant(x.cant) };
+      const campos = { texto: ['texto', 'codigo', 'pasoId', 'nuevo', 'etqCat', 'tipo'], rango: ['vi', 'vf', 'margen'], firma: ['rpor', 'vb'], cant: ['cant'] };
       const mezclar = (b, w, r, donde) => {
         const bId = new Map(b.map((x) => [x.id, x])), mapR = new Map(r.map((x) => [x.id, x])), nuevoClon = new Map(), vivos = w.filter((x) => !x.quitado), posB = new Map(b.map((x, i) => [x.id, i]));
         const delActual = (x) => mapR.get(M(x.id)) || null;
@@ -15152,7 +15165,7 @@
           Object.keys(grupos).forEach((g) => {
             if (grupos[g](x) === grupos[g](b0)) return;
             if (grupos[g](ra) === grupos[g](x)) return;
-            if (grupos[g](ra) !== grupos[g](b0)) { conflictos.push(`${donde}: «${nombre(b0)}» (${g === 'texto' ? 'texto' : g === 'rango' ? 'rango' : 'firmas'}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
+            if (grupos[g](ra) !== grupos[g](b0)) { conflictos.push(`${donde}: «${nombre(b0)}» (${g === 'texto' ? 'texto' : g === 'rango' ? 'rango' : g === 'cant' ? 'cantidad' : 'firmas'}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
             campos[g].forEach((k) => { if (x[k] === undefined) delete ra[k]; else ra[k] = x[k]; }); aplicados++;
           });
           if ((x.comentario || '') !== (ra.comentario || '')) ra.comentario = x.comentario || '';
@@ -15206,7 +15219,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo };
+    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -15309,6 +15322,10 @@
     const cambiado = (x, b) => b && (String(x.codigo || '') !== String(b.codigo || '') || PPN.normalizar(x.texto) !== PPN.normalizar(b.texto));
     const casillasCambiadas = (x, b) => b && (!!x.rpor !== !!b.rpor || !!x.vb !== !!b.vb);
     const valoresCambiados = (x, b) => b && ['vi', 'vf', 'margen'].some((k) => String(x[k] == null ? '' : x[k]) !== String(b[k] == null ? '' : b[k]));
+    const cantCambiada = (x, b) => b && x.insumo && parseFloat(String(x.cant).replace(',', '.')) !== parseFloat(String(b.cant).replace(',', '.'));
+    // insumos de la receta del RMD (uno por componente)
+    let INSUMOS = null;
+    const insumosReceta = () => { if (INSUMOS) return INSUMOS; const m = new Map(); BASE.estructuras.forEach((e) => (e.insumos || []).forEach((i) => { if (i.comp && !m.has(i.comp)) m.set(i.comp, i); })); return (INSUMOS = [...m.values()]); };
 
     // ---------- dibujo ----------
     function pintarTodo() {
@@ -15375,19 +15392,20 @@
       return `<table class="pp-pagina"><thead><tr><td>${htmlEncabezadoPdf()}</td></tr></thead><tbody><tr><td class="pp-hoja">${cuerpo}</td></tr></tbody></table>`;
     }
     const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
-    const acciones = (clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
+    const acciones = (clase, quitado, soloComentario, conPm) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario === 'insumo' ? bt('editar-ins', '✎ Cantidad', 'Cambiar la cantidad del insumo en este paso', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') + bt('quitar', '✕ Quitar', 'Quitar este insumo del paso', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
       bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w')
-        + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') : '') + bt('mover-a', '⇅ Mover a…', 'Elegir en qué posición de la lista va', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
+        + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') + (insumosReceta().length ? bt('agregar-ins', '＋ Insumo', 'Agregar dentro de este paso un insumo de la receta, con su cantidad', 'w') : '') : '') + bt('mover-a', '⇅ Mover a…', 'Elegir en qué posición de la lista va', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
       + bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
     function marcasDe(x, b) {
       const out = [];
       if (!b) out.push('<span class="pp-tag agr">Nuevo</span>'); else if (x.quitado) out.push('<span class="pp-tag qui">Quitado</span>');
-      else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (casillasCambiadas(x, b)) out.push('<span class="pp-tag cam">Casillas</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
+      else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (cantCambiada(x, b)) out.push('<span class="pp-tag cam">Cantidad</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (casillasCambiadas(x, b)) out.push('<span class="pp-tag cam">Casillas</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
       if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}</span>${x.registro && REGISTRO[x.registro] ? `<span class="pp-tag reg" title="Qué anota Producción en este paso (lo indica quien pide el cambio)">${esc(REGISTRO[x.registro])}</span>` : ''}`);
+      else if (!x.quitado && x.insumo && !b) out.push('<span class="pp-tag ok" title="Insumo de la receta del RMD">Insumo de la receta</span>');
       else if (!x.quitado && x.codigo && x.texto != null && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
       return out.length ? `<span class="pp-tags">${out.join('')}</span>` : '';
     }
-    const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
+    const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || cantCambiada(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
     const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
     const htmlAntes = (x, b) => (b && !x.quitado && cambiado(x, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '');
@@ -15427,8 +15445,8 @@
       return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}" tabindex="0"><td class="pp-c-num">${num}</td>${celdas.join('')}</tr>`;
     }
     function filaPm(m, conforme) {
-      const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo);
-      const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`, true) : celdaTexto(m, b, esc(m.texto), true);
+      const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo ? 'insumo' : false);
+      const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`, true) + (b && cantCambiada(m, b) ? `<div class="pp-antes">Antes: ${esc(fmtDec(b.cant))} ${esc(b.um || '')}</div>` : '') : celdaTexto(m, b, esc(m.texto), true);
       const celdas = ['<td></td>'];
       if (m.insumo) celdas.push(`<td class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`, `<td class="pp-c-cant">${esc(fmtDec(m.cant))} ${esc(m.um || '')}</td>`);
       else celdas.push(`<td colspan="2" class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`);
@@ -15449,7 +15467,7 @@
     function htmlCuadro(e, lista) {
       const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false);
         return `<tr class="pp-paso ${estadoCl(p, b)}" data-id="${esc(p.id)}" tabindex="0"><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
-          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo)}</td></tr>`; }).join('')); }).join('');
+          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo ? 'insumo' : false)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
       return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>`;
     }
@@ -15473,7 +15491,7 @@
       const filas = lista.map((x) => `<tr><td>${esc(x.desc)}${x.txtadic ? ' ' + esc(x.txtadic) : ''}</td><td class="c">${esc(x.comp)}</td><td class="d">${esc(fmtDec(x.cant))}</td><td class="c">${esc(x.um)}</td><td></td><td></td><td></td><td></td></tr>`).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="4">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
       return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid pp-ins">${cols([172, 55, 68, 28, 68, 34, 30, 22])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Cantidad</th><th>UM</th><th>Cant. Recib.</th><th>UM (CP)</th><th>Bulto</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
-        <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiarlos se actualiza la receta. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
+        <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para ponerlos en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso (eliges el insumo y su cantidad); en un insumo ya puesto, <b>✎ Cantidad</b> la ajusta. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
     }
     function htmlEspec(e) {
       const grupos = []; (e.espec || []).forEach((x) => { const k = x.grupoId == null ? x.grupo || '' : x.grupoId; let g = grupos.find((y) => y.k === k); if (!g) grupos.push((g = { k, nombre: x.grupo || '', filas: [] })); g.filas.push(x); });
@@ -15495,7 +15513,7 @@
       else cuerpo = htmlCuadro(e, e.pasos || []);
       return `<section class="pp-est" data-id="${esc(e.id)}"><div class="pp-sub">${n ? esc(n) + '.-' : ''}${esc(e.nombre)} ${com}</div>${htmlAvisos(e.id)}${htmlComentario(e)}${cuerpo}</section>`;
     }
-    const ETQ_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario' };
+    const ETQ_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario', cantidad: 'Cantidad' };
     function htmlPanel() {
       const n = contar(), conAviso = [...AV.entries()].filter(([, l]) => l.some((a) => a.nivel !== 'info'));
       const lista = filtro === 'nuevos' ? CMB.filter((c) => c.nuevo || (c.pm && c.pm.some((m) => m.nuevo))) : filtro === 'avisos' ? [] : CMB;
@@ -15503,7 +15521,7 @@
       const corto = (t) => { t = String(t || ''); return t.length > 90 ? t.slice(0, 90) + '…' : t; };
       let cuerpo;
       if (filtro === 'avisos') cuerpo = conAviso.length ? conAviso.map(([id, l]) => { const f = encontrar(id); return `<button type="button" class="pp-cmb" data-ir="${esc(id)}"><b>${esc(f ? (f.item.texto || f.item.nombre || f.item.desc || '') : '').slice(0, 70)}</b>${l.filter((a) => a.nivel !== 'info').map((a) => `<span class="pp-cmb-av ${a.nivel}">${esc(a.texto)}</span>`).join('')}</button>`; }).join('') : '<p class="pp-nota">Sin avisos.</p>';
-      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ' <span class="pp-tag crea">★ se creará</span>' : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
+      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ' <span class="pp-tag crea">★ se creará</span>' : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
       return `<div class="pp-panel-cab"><b>Cambios del borrador</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
     }
     function htmlImpresion() {
@@ -15600,6 +15618,49 @@
         m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') aceptar(); });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); aceptar(); } });
         pintarEstado(); pintarSug(); setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 20);
+      });
+    }
+    // Insumo de la receta dentro de un paso: elegirlo (nuevo) y su cantidad
+    function editarInsumo(ref) {
+      const f = ref.id ? encontrar(ref.id) : null, x = f ? f.item : null, padre = f ? f.padre : ref.padre, e = f ? f.e : ref.e, t = f ? f.t : ref.t, lista = insumosReceta();
+      const numero = (v) => { v = String(v == null ? '' : v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
+      const enPasos = (comp) => { let s = 0; W.estructuras.forEach((e2) => [e2.pasos || [], ...(e2.etiquetas || []).map((t2) => t2.pasos || [])].forEach((l) => l.forEach((p) => { if (p.quitado) return; (p.pm || []).forEach((m) => { if (m.insumo && !m.quitado && m.comp === comp && (!x || m.id !== x.id)) s += numero(m.cant) || 0; }); }))); return s; };
+      const deReceta = (comp) => lista.find((i) => i.comp === comp) || null;
+      let elegido = x ? deReceta(x.comp) || { comp: x.comp, desc: x.mat || x.texto, cant: null, um: x.um, id: x.insId } : null;
+      const filaIns = (i) => { const usado = enPasos(i.comp); return `<button type="button" class="pp-sug-it${elegido && elegido.comp === i.comp ? ' elegido' : ''}" data-comp="${esc(i.comp)}"><span class="cod">${esc(i.comp)}</span><span class="tx">${esc(i.desc)}${i.txtadic ? ' ' + esc(i.txtadic) : ''}</span><span class="otra">receta ${esc(fmtDec(i.cant))} ${esc(i.um || '')}${usado ? ` · en pasos ${esc(fmtDec(usado))}` : ''}</span></button>`; };
+      modal(`<h3>${x ? 'Insumo' : 'Agregar insumo'}<span>${esc(e.nombre)}${t ? ' › ' + esc(t.nombre) : ''} › ${esc(String(padre.texto || '').slice(0, 60))}</span></h3>
+        ${x ? '' : '<label class="pp-campo">Buscar en los insumos de la receta<input id="m-q" placeholder="código o descripción (p. ej. CAFEINA, 1100002760)"></label>'}<div id="m-res" class="pp-sug"></div>
+        <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc((x && x.comentario) || '')}</textarea></label>
+        <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
+        const q = $('#m-q', m), res = $('#m-res', m), cant = $('#m-cant', m), av = $('#m-ins-av', m);
+        const pintar = () => {
+          if (x) { res.innerHTML = elegido ? filaIns(elegido.cant != null ? elegido : { ...elegido, cant: '' }) : ''; }
+          else { const ps = PPN.normalizar(q.value).split(' ').filter(Boolean), r = lista.filter((i) => { const n = PPN.normalizar(`${i.comp} ${i.desc} ${i.txtadic || ''}`); return ps.every((w) => n.includes(w)); });
+            res.innerHTML = r.length ? r.slice(0, 60).map(filaIns).join('') : `<div class="pp-sug-tit">${lista.length ? 'Ningún insumo de la receta coincide.' : 'El RMD no tiene receta asociada: no hay insumos que agregar.'}</div>`; }
+          $('#m-um', m).textContent = elegido ? elegido.um || '' : ''; validar();
+        };
+        const validar = () => { const n = numero(cant.value); let t2 = '';
+          if (!elegido) t2 = x ? '' : 'Elige un insumo de la lista.'; else if (n == null || Number.isNaN(n) || n <= 0) t2 = 'Escribe una cantidad mayor que cero (punto o coma para los decimales).';
+          else { const r = numero(elegido.cant), total = enPasos(elegido.comp) + n; if (r != null && !Number.isNaN(r) && total > r * 1.0001) t2 = `⚠ Con esta cantidad los pasos suman ${fmtDec(total)} y la receta tiene ${fmtDec(r)} ${elegido.um || ''}.`; }
+          av.textContent = t2; return !!elegido && n != null && !Number.isNaN(n) && n > 0; };
+        if (q) q.addEventListener('input', pintar); cant.addEventListener('input', validar);
+        res.addEventListener('click', (ev) => { const b2 = ev.target.closest('[data-comp]'); if (!b2 || x) return; elegido = deReceta(b2.dataset.comp);
+          if (!cant.value.trim() && elegido) { const r = numero(elegido.cant), resto = r != null && !Number.isNaN(r) ? r - enPasos(elegido.comp) : null; cant.value = resto != null && resto > 1e-9 ? String(+resto.toFixed(6)) : elegido.cant == null ? '' : String(elegido.cant); }
+          pintar(); cant.focus(); cant.select(); });
+        const aceptar = () => {
+          if (!validar()) { (elegido ? cant : q || cant).focus(); return; }
+          const n = String(+numero(cant.value).toFixed(6)), com = $('#m-com', m).value.trim(); let nuevoId = null;
+          cambio(() => {
+            if (x) { const viva = encontrar(x.id).item; viva.cant = n; viva.comentario = com; return; }
+            const p = encontrar(padre.id).item; if (!p.pm) p.pm = [];
+            nuevoId = `n:${seq++}`; p.pm.push({ id: nuevoId, insumo: true, comp: elegido.comp, mat: elegido.desc, texto: elegido.desc, cant: n, um: elegido.um || '', insId: elegido.id || null, codigo: null, pasoId: null, nuevo: false, tipo: null, comentario: com });
+          });
+          cerrar(); setTimeout(() => irA(x ? x.id : nuevoId), 30);
+        };
+        m.addEventListener('click', (ev) => { const a = ev.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') aceptar(); });
+        cant.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); aceptar(); } });
+        pintar(); setTimeout(() => { (q || cant).focus(); if (!q) cant.select(); }, 20);
       });
     }
     function comentar(id) {
@@ -15724,6 +15785,8 @@
       else if (a === 'agregar-final') { const l = listaDe(b.dataset.lista); editar({ nuevo: true, lista: l.lista, despuesDe: null, clase: 'paso', e: l.e, t: l.t }); }
       else if (a === 'agregar-pm') { const f = encontrar(b.dataset.padre || id); if (!f.item.pm) f.item.pm = []; editar({ nuevo: true, lista: f.item.pm, despuesDe: null, clase: 'pm', e: f.e, t: f.t, padre: f.item }); }
       else if (a === 'agregar-equipo') agregarEquipo(b.dataset.est);
+      else if (a === 'editar-ins') editarInsumo({ id });
+      else if (a === 'agregar-ins') { const f = encontrar(id); if (!f.item.pm) f.item.pm = []; editarInsumo({ nuevo: true, padre: f.item, e: f.e, t: f.t }); }
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
@@ -15875,6 +15938,7 @@ td.ult { position: relative; }
 .pp-sug-it .pct { flex: 0 0 46px; color: var(--ap); font-size: 11.5px; } .pp-sug-it .cod { flex: 0 0 64px; font-weight: 600; } .pp-sug-it .tx { flex: 1 1 auto; } .pp-sug-it .otra { flex: 0 0 auto; color: var(--cam); font-size: 11px; }
 .pp-rango-ed { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; font-size: 12.5px; font-weight: 600; } .pp-rango-ed input { display: block; width: 120px; margin-top: 3px; padding: 5px 8px; border: 1px solid var(--bd); border-radius: 6px; font: inherit; font-weight: 400; }
 .pp-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--bd2); }
+.pp-ins-ed { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; } .pp-ins-ed .pp-campo { margin-bottom: 0; } .pp-ins-ed input { width: 140px; } .pp-ins-um { padding-bottom: 8px; font-weight: 600; } .pp-ins-ed .pp-rango-av { padding-bottom: 8px; }
 .pp-fijo { position: sticky; bottom: -14px; z-index: 2; margin: 8px -20px -14px; padding: 0 20px 14px; background: #fff; box-shadow: 0 -8px 10px -10px rgba(0,0,0,.35); } .pp-fijo .pp-cas { margin-top: 0; } .pp-fijo .pp-pie { margin-top: 8px; }
 .pp-pie button { height: 32px; padding: 0 16px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; } .pp-pie button.primario { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; }
 .pp-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); padding: 10px 16px; background: #1f2328; color: #fff; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
@@ -15959,12 +16023,12 @@ td.ult { position: relative; }
     pms.filter(act).sort(orden).forEach((m) => {
       const padre = P.get(m.pasoId_mdEstructuraPasoId); if (!padre) return; const c = m.pasoHijoId || {}, insumo = !!(m.estructuraRecetaInsumoId_estructuraRecetaInsumoId || m.Component);
       padre.pm.push({ id: m.mdEstructuraPasoInsumoPasoId, pasoId: m.pasoHijoId_pasoId, codigo: c.codigo != null ? String(c.codigo) : null, texto: ppLimpio(c.descripcion || m.Maktx), orden: m.orden, tipo: m.tipoDatoId_iMaestraId,
-        vi: ppNulo(m.valorInicial), vf: ppNulo(m.valorFinal), margen: ppNulo(m.margen), insumo, comp: ppNulo(m.Component), mat: ppLimpio(m.Maktx), cant: ppNulo(m.cantidadInsumo), um: ppNulo(m.CompUnit), edit: !!m.edit, tab: !!m.tab, formato: !!m.formato, colorHex: ppNulo(m.colorHex), etqCat: c.etiquetaId_etiquetaId || null });
+        vi: ppNulo(m.valorInicial), vf: ppNulo(m.valorFinal), margen: ppNulo(m.margen), insumo, comp: ppNulo(m.Component), mat: ppLimpio(m.Maktx), cant: ppNulo(m.cantidadInsumo), um: ppNulo(m.CompUnit), insId: ppNulo(m.estructuraRecetaInsumoId_estructuraRecetaInsumoId), edit: !!m.edit, tab: !!m.tab, formato: !!m.formato, colorHex: ppNulo(m.colorHex), etqCat: c.etiquetaId_etiquetaId || null });
     });
     equipos.filter(act).sort(orden).forEach((q) => { const e = E.get(q.mdEstructuraId_mdEstructuraId), c = q.equipoId || {}; if (e) e.equipos.push({ id: q.mdEstructuraEquipoId, equipoId: q.equipoId_equipoId, codigo: ppLimpio(c.equnr), ref: ppLimpio(c.CodigoGaci), desc: ppLimpio(c.eqktx), orden: q.orden }); });
     utens.filter(act).sort(orden).forEach((u) => { const e = E.get(u.mdEstructuraId_mdEstructuraId), c = u.utensilioId || {}, g = u.agrupadorId || {}; if (e) e.utensilios.push({ id: u.mdEstructuraUtensilioId, utensilioId: u.utensilioId_utensilioId || null, agrupadorId: u.agrupadorId_clasificacionUtensilioId || null, codigo: ppLimpio(c.codigo), desc: ppLimpio(c.descripcion || g.descripcion), orden: u.orden }); });
     const recPorId = new Map(recetas.filter(act).map((r) => [r.mdRecetaId, r.recetaId ? `${norm(r.recetaId.Matnr)} / ${norm(r.recetaId.Verid)}` : ''])), recMat = new Map(recetas.filter(act).map((r) => [r.mdRecetaId, r.recetaId ? norm(r.recetaId.Matnr) : '']));
-    insumos.filter(act).sort((a, b) => (+a.ItemNo || 0) - (+b.ItemNo || 0)).forEach((i) => { const e = E.get(i.mdEstructuraId_mdEstructuraId); if (e) e.insumos.push({ receta: recPorId.get(i.mdRecetaId_mdRecetaId) || '', matnr: recMat.get(i.mdRecetaId_mdRecetaId) || '', comp: ppLimpio(i.Component), desc: ppLimpio(i.Maktx), txtadic: ppLimpio(i.Txtadic), aiPrio: ppNulo(i.AiPrio), cant: ppNulo(i.CompQty), um: ppNulo(i.CompUnit) }); });
+    insumos.filter(act).sort((a, b) => (+a.ItemNo || 0) - (+b.ItemNo || 0)).forEach((i) => { const e = E.get(i.mdEstructuraId_mdEstructuraId); if (e) e.insumos.push({ id: i.estructuraRecetaInsumoId, receta: recPorId.get(i.mdRecetaId_mdRecetaId) || '', matnr: recMat.get(i.mdRecetaId_mdRecetaId) || '', comp: ppLimpio(i.Component), desc: ppLimpio(i.Maktx), txtadic: ppLimpio(i.Txtadic), aiPrio: ppNulo(i.AiPrio), cant: ppNulo(i.CompQty), um: ppNulo(i.CompUnit) }); });
     espec.filter(act).sort((a, b) => (+a.Merknr || +a.orden || 0) - (+b.Merknr || +b.orden || 0)).forEach((s) => { const e = E.get(s.mdEstructuraId_mdEstructuraId); if (e) e.espec.push({ id: s.mdEstructuraEspecificacionId, ensayo: ppLimpio(s.ensayoHijo), padre: ppLimpio(s.ensayoPadreSAP), grupoId: s.ensayoPadreId_iMaestraId == null ? null : s.ensayoPadreId_iMaestraId, grupo: ppLimpio(s.ensayoPadreId && s.ensayoPadreId.contenido) || ppLimpio(s.ensayoPadreSAP), especificacion: ppLimpio(s.especificacion), vi: ppNulo(s.valorInicial), vf: ppNulo(s.valorFinal), orden: s.orden }); });
     const out = { estructuras: [...E.values()].sort(orden) };
     out.estructuras.forEach((e) => e.etiquetas.sort(orden));
@@ -16195,8 +16259,8 @@ td.ult { position: relative; }
   }
   const PP_REGISTRO = { leer: 'Solo leerlo (instrucción)', dato: 'Anotar un dato (número o texto)', check: 'Marcar un check de conformidad', rango: 'Anotar un rango (valor inicial y final)', fecha: 'Anotar fecha y hora' };   // igual que REGISTRO del editor
   const ppComentario = (c) => [c.comentario, c.registro ? 'Anota: ' + (PP_REGISTRO[c.registro] || c.registro) : ''].filter(Boolean).join(' · ');
-  const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario' };
-  const ppQue = (c) => `${PP_ACCION[c.accion]}${c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ` (${c.clase})` : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}`;
+  const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario', cantidad: 'Cantidad' };
+  const ppQue = (c) => `${PP_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ` (${c.clase})` : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}`;
   const ppDespues = (c) => c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? `después de: ${(c.trasDe && c.trasDe.texto) || '(al inicio)'}` : c.texto || '');
   function ppExcel(datos, prop, an) {
     const libro = Xlsx.crearLibro(), hoy = new Date(), dd2 = (n) => String(n).padStart(2, '0'), s = prop.solicitud || {};
@@ -16344,11 +16408,11 @@ td.ult { position: relative; }
       errores ? `<li>✕ ${errores} dato(s) por corregir que Producción dejó marcados</li>` : ''];
     const avisoDe = (id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info').map((a) => `<div class="rmd-pp-av ${a.nivel}">${a.nivel === 'error' ? '✕' : '⚠'} ${esc(a.texto)}</div>`).join('');
     const nuevoDe = new Map(an.nuevos.filter((n) => !n.pm).map((n) => [n.c, n]));
-    const editable = (c) => (c.accion === 'agregar' || c.accion === 'cambiar') && (c.clase === 'paso' || c.clase === 'pm');
+    const editable = (c) => (c.accion === 'agregar' || c.accion === 'cambiar') && (c.clase === 'paso' || c.clase === 'pm') && !c.insumo;
     const corregido = (id) => { const f = ppItemDe(prop.trabajo, id), e = f && f.item.editadoRmd; return e ? `<div class="rmd-nota rmd-pp-corr">✎ Corregido aquí · Producción escribió: «${esc(e.antes)}»</div>` : ''; };
     const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
       return `<tr class="rmd-pp-${c.accion}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
-        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''} <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
+        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av aviso">⚠ Se agrega a mano en el portal: «Agregar Insumo» del paso, con esta cantidad.</div>' : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av aviso">insumo: se agrega a mano</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
         <td>${esc(ppComentario(c))}</td></tr>`; }).join('');
     const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
@@ -16445,7 +16509,7 @@ td.ult { position: relative; }
     e.preventDefault(); abrirArchivos(fs);
   });
   window.__rmdStats.plantillaPdf = { leer: ppLeerPdf, trozos: ppTrozosPdf };   // pruebas
-  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN,
+  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN, sinInsumosNuevos: ppSinInsumosNuevos,
     revisar: (datos, prop, an, analizar) => { const v = ppVentanaBorrador(); v.__ppAnalizar = analizar; pintarImportacion(v, datos, prop, an, {}); return v; } };   // pruebas
   // ---- Ingreso automático del borrador ----
   // Mismas escrituras que el portal: aPaso / aPasoInsumoPaso en MD_ESTRUCTURA, catálogo de equipos (TABLAS_ARRAY_MD_SKIP) + aEquipo, aUtensilio,
@@ -16469,8 +16533,18 @@ td.ult { position: relative; }
     return new Promise((ok) => modelo.read('/' + entidad, { filters: filtros, urlParameters: { $top: '1', ...(select ? { $select: select } : {}) }, success: (r) => ok((r.results || [])[0] || null), error: () => ok(null) }));
   }
   // Arma las escrituras sin ejecutarlas: { ops, bloqueos, avisos, manual, nuevos, finales, resumen, D, … }
-  async function ppPlanEscritura(datos, prop, an, modelo, usuario) {
-    const plan0 = {}, bloqueos = [], avisos = [], manual = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
+  // insumos agregados en el borrador: todavía a mano («Agregar Insumo» del portal); se sacan de la copia que se planifica
+  function ppSinInsumosNuevos(trabajo, manual) {
+    const t = JSON.parse(JSON.stringify(trabajo));
+    t.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((x) => x.pasos || [])].forEach((l, k) => l.forEach((p) => {
+      if (!p.pm) return; const lugar = `${e.nombre}${k ? ' › ' + ((e.etiquetas || [])[k - 1] || {}).nombre : ''}`;
+      p.pm = p.pm.filter((m) => { if (!(m.insumo && String(m.id).startsWith('n:'))) return true; if (!m.quitado && !p.quitado) manual.push(`Agregar a mano el insumo ${PPN.textoInsumo(m)} en el paso ${p.codigo || '(nuevo)'} «${String(p.texto || '').slice(0, 50)}» (${lugar}): «Agregar Insumo» del portal.`); return false; });
+    })));
+    return t;
+  }
+  async function ppPlanEscritura(datos, prop0, an, modelo, usuario) {
+    const manual = [], prop = { ...prop0, trabajo: ppSinInsumosNuevos(prop0.trabajo, manual) };
+    const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);
     if (an.enSap.length) { bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
@@ -16581,6 +16655,8 @@ td.ult { position: relative; }
           if (cambiaTipo === PP_SIN_TIPO) avisos.push(`El paso ${b0.codigo} queda «Sin tipo de dato» al quitarle todas sus firmas: revisa su «Depende».`);
         }
         const dv = {}, dvAntes = {}; [['vi', 'valorInicial'], ['vf', 'valorFinal'], ['margen', 'margen']].forEach(([k, c]) => { if (String(x[k] == null ? '' : x[k]) !== String(b0[k] == null ? '' : b0[k])) { dv[c] = ppNum(x[k]); dvAntes[c] = fila[k] == null ? null : fila[k]; } });
+        if (esPm && b0.insumo && x.insumo && ppNum(x.cant) != null && ppNum(x.cant) !== ppNum(b0.cant)) { const como = (v) => (typeof fila.cant === 'string' ? String(v) : v);
+          op(2, { lugar: lugar(L), accion: 'Cantidad', clase, desc: `cantidad del insumo ${b0.comp || ''} — ${String(b0.mat || b0.texto || '').slice(0, 50)}: ${fila.cant == null ? '(vacía)' : fila.cant} → ${ppNum(x.cant)} ${b0.um || ''}`, ruta: `/${tabla}('${fila.id}')`, datos: { cantidadInsumo: como(ppNum(x.cant)), ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { cantidadInsumo: fila.cant, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } }); }
         if (Object.keys(dv).length) op(2, { lugar: lugar(L), accion: 'Rango', clase, desc: `rango de ${quien(x, b0)}: ${Object.entries(dv).map(([c, v]) => `${c === 'valorInicial' ? 'inicial' : c === 'valorFinal' ? 'final' : 'margen'} ${v == null ? '(vacío)' : v}`).join(', ')}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...dv, ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { ...dvAntes, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
       });
       const nuevosL = vivos.filter((x) => !bId.has(x.id)); if (nuevosL.length) estructural = true;

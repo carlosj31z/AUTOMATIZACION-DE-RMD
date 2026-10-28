@@ -836,8 +836,8 @@ with sync_playwright() as p:
         e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
         nums = e.evaluate("() => [...document.querySelectorAll('.pp-c-num, .pp-c-guion')].map(x => x.textContent.trim()).filter(Boolean)")
         acc = lambda n, a: e.evaluate("([n, a]) => { const tr = [...document.querySelectorAll('tr.pp-paso')].find(tr => (tr.querySelector('.pp-c-num') || {}).textContent === n + '.-'); tr.querySelector('.pp-acc [data-a=' + a + ']').click(); }", [n, a])
-        acc("2.1.3", "editar"); e.fill("#m-texto", "agitar durante 15 minutos."); e.wait_for_timeout(500); est1 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
-        acc("2.1.1", "agregar"); e.fill("#m-texto", "ENJUAGAR CON AGUA PURIFICADA."); e.wait_for_timeout(500); est2 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        acc("2.1.3", "editar"); e.wait_for_timeout(120); e.fill("#m-texto", "agitar durante 15 minutos."); e.wait_for_timeout(500); est1 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        acc("2.1.1", "agregar"); e.wait_for_timeout(120); e.fill("#m-texto", "ENJUAGAR CON AGUA PURIFICADA."); e.wait_for_timeout(500); est2 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
         acc("2.1.5", "quitar"); e.wait_for_timeout(200); quitados1 = e.evaluate("document.querySelectorAll('.pp-paso.qui').length")
         e.click("[data-a=deshacer]"); e.wait_for_timeout(200); quitados2 = e.evaluate("document.querySelectorAll('.pp-paso.qui').length")
         acc("2.1.5", "subir"); e.wait_for_timeout(200)
@@ -944,6 +944,31 @@ with sync_playwright() as p:
               and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
               and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
         return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN50 Borrador de Producción · insumos (v1.102): «＋ Insumo» en un paso de fabricación lista los insumos de la receta, propone lo que falta repartir y queda como «Agregar (insumo)»; «✎ Cantidad» ajusta un insumo ya puesto (cambio «Cantidad»), una cantidad inválida es error y pasarse de la receta avisa; en el portal el insumo nuevo sale «a mano» y el plan lo saca de lo que escribe")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        d0["arbol"]["estructuras"][2]["etiquetas"][1]["pasos"][1]["pm"] = [{"id": "MI1", "pasoId": None, "codigo": None, "texto": "AGUA PARA INYECCION CSP", "orden": 1, "tipo": 433, "insumo": True, "comp": "2500000010", "mat": "AGUA PARA INYECCION CSP", "cant": "10", "um": "L", "insId": "RI2"}]
+        for i, x in enumerate(d0["arbol"]["estructuras"][3]["insumos"]): x["id"] = "RI" + str(i + 1)
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        botones = e.evaluate("() => ({ paso: !!document.querySelector('tr[data-id=\"P20\"] [data-a=agregar-ins]'), cuadro: !!document.querySelector('tr[data-id=\"P1\"] [data-a=agregar-ins]'), ins: [...document.querySelectorAll('tr[data-id=\"MI1\"] [data-a]')].map((b) => b.dataset.a) })")
+        e.evaluate("() => document.querySelector('tr[data-id=\"P20\"] [data-a=agregar-ins]').click()"); e.wait_for_selector("#m-q")
+        todos = e.evaluate("() => [...document.querySelectorAll('#m-res [data-comp]')].map((b) => b.dataset.comp)")
+        e.fill("#m-q", "agua inyec"); e.wait_for_timeout(100); filtro = e.evaluate("() => [...document.querySelectorAll('#m-res [data-comp]')].map((b) => b.dataset.comp)")
+        e.click("#m-res [data-comp='2500000010']"); propuesta = e.input_value("#m-cant")
+        e.fill("#m-cant", "25"); e.wait_for_timeout(50); pasa = e.inner_text("#m-ins-av")
+        e.fill("#m-cant", "20"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        e.evaluate("() => document.querySelector('tr[data-id=\"MI1\"] [data-a=editar-ins]').click()"); e.wait_for_selector("#m-cant"); e.fill("#m-cant", "abc"); e.click(".pp-modal [data-a=aceptar]"); sigue = e.evaluate("() => !!document.querySelector('#m-cant')")
+        e.fill("#m-cant", "12,5"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        st = e.evaluate("""() => { const s = window.__pp.estado(); return { cmb: s.CMB.filter((c) => c.insumo).map((c) => [c.accion, c.despues || (c.campos || []).map((x) => x.antes + '>' + x.despues).join()]), av: s.AV.filter(([id]) => id === 'MI1' || String(id).startsWith('n:')).map(([, l]) => l.map((a) => a.nivel).join()), tags: [...document.querySelectorAll('tr[data-id=\"MI1\"] .pp-tag')].map((x) => x.textContent), W: s.W }; }""")
+        e.close()
+        r = pg.evaluate("""(W) => { const P = window.__rmdStats.plantilla, man = [], t = P.sinInsumosNuevos(W, man), p = t.estructuras[2].etiquetas[1].pasos; return { pm: p.map((x) => (x.pm || []).map((m) => m.id)), man }; }""", st["W"])
+        ok = (not errs and botones == {"paso": True, "cuadro": False, "ins": ["editar-ins", "subir", "bajar", "quitar", "comentar"]} and todos == ["1000000846", "2500000010", "9999999"] and filtro == ["2500000010"]
+              and propuesta == "20" and "suman 35" in pasa and sigue
+              and st["cmb"] == [["agregar", "AGUA PARA INYECCION CSP (2500000010) 20 L"], ["cantidad", "10 L>12.5 L"]] and "Cantidad" in st["tags"]
+              and r["pm"] == [[], ["MI1"]] and len(r["man"]) == 1 and "2500000010" in r["man"][0])
+        return ok, json.dumps({"botones": botones, "todos": todos, "filtro": filtro, "propuesta": propuesta, "pasa": pasa, "sigue": sigue, "st": {k: v for k, v in st.items() if k != "W"}, "plan": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
     @prueba("LN32 Importar el borrador a prueba de errores (v1.45): se reconoce por su contenido (da igual el nombre o la extensión del archivo), aguanta BOM, saltos de línea y atributos distintos, y cada daño (cortado, dañado, sin borrador, de otra plantilla, no es un borrador) se explica con su mensaje")
     def _():
         if not PP_GUARDADO: return False, "LN28 no dejó archivo"
