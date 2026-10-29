@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.104.3
+// @version      1.105.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.104.3';                                                       // mantener igual a @version
+  const VERSION = '1.105.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -15787,7 +15787,10 @@
     const cantCambiada = (x, b) => b && x.insumo && parseFloat(String(x.cant).replace(',', '.')) !== parseFloat(String(b.cant).replace(',', '.'));
     // insumos de la receta del RMD (uno por componente)
     let INSUMOS = null;
-    const insumosReceta = () => { if (INSUMOS) return INSUMOS; const m = new Map(); BASE.estructuras.forEach((e) => (e.insumos || []).forEach((i) => { if (i.comp && !m.has(i.comp)) m.set(i.comp, i); })); return (INSUMOS = [...m.values()]); };
+    // insumos de la receta; si el RMD no tiene la sección INSUMOS, los que ya están en sus pasos
+    const insumosReceta = () => { if (INSUMOS) return INSUMOS; const m = new Map(); BASE.estructuras.forEach((e) => (e.insumos || []).forEach((i) => { if (i.comp && !m.has(i.comp)) m.set(i.comp, i); }));
+      BASE.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => (p.pm || []).forEach((x) => { if (x.insumo && x.comp && !m.has(x.comp)) m.set(x.comp, { id: x.insId || null, comp: x.comp, desc: x.mat || x.texto || '', cant: null, um: x.um || '' }); }))));
+      return (INSUMOS = [...m.values()]); };
 
     // ---------- dibujo ----------
     function pintarTodo() {
@@ -15855,9 +15858,11 @@
     }
     // botón ✎ siempre visible junto a una cantidad de insumo
     const btCant = (a, id) => `<button type="button" class="pp-cant-ed" data-a="${a}" data-id="${esc(id)}" title="Cambiar la cantidad. El cambio se realiza en la Lista de Materiales (en el RMD no se edita)">✎</button>`;
+    // un insumo de la receta va dentro del paso como un proceso menor más: se puede poner debajo de cualquier fila del paso
+    const btInsDebajo = () => (insumosReceta().length ? bt('agregar-ins', '＋ Insumo debajo', 'Agregar debajo de esta fila un insumo de la receta (va como un proceso menor del paso), con su cantidad', 'w') : '');
     const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
-    const acciones = (clase, quitado, soloComentario, conPm, id) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario === 'insumo' ? bt('editar-ins', '✎ Cantidad', 'Cambiar la cantidad del insumo en este paso', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') + bt('quitar', '✕ Quitar', 'Quitar este insumo del paso', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
-      bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w')
+    const acciones = (clase, quitado, soloComentario, conPm, id) => `<span class="pp-acc">${quitado ? bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w') : soloComentario === 'insumo' ? bt('editar-ins', '✎ Cantidad', 'Cambiar la cantidad del insumo en este paso', 'w') + bt('agregar', '＋ Proceso menor debajo', 'Agregar un proceso menor debajo de este insumo', 'w') + btInsDebajo() + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') + bt('quitar', '✕ Quitar', 'Quitar este insumo del paso', 'qui') + bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD') : soloComentario ? bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD', 'w') :
+      bt('editar', '✎ Editar', 'Cambiar el texto', 'w') + (clase === 'paso' || clase === 'pm' ? bt('agregar', clase === 'pm' ? '＋ Proceso menor debajo' : '＋ Paso debajo', `Agregar ${clase === 'pm' ? 'un proceso menor' : 'un paso'} debajo de esta fila`, 'w') + (clase === 'pm' ? btInsDebajo() : '')
         + (conPm ? bt('agregar-pm', '＋ Proceso menor', 'Agregar un proceso menor dentro de este paso', 'w') + (insumosReceta().length ? bt('agregar-ins', '＋ Insumo', 'Agregar dentro de este paso un insumo de la receta, con su cantidad', 'w') : '') : '') + bt('mover-a', '⇅ Mover a…', 'Elegir en qué posición de la lista va', 'w') + bt('subir', '↑ Subir', 'Subir una posición') + bt('bajar', '↓ Bajar', 'Bajar una posición') : '')
       + (clase === 'paso' ? bt('duplicar', '⧉ Duplicar', 'Copia este paso, con sus procesos menores e insumos, justo debajo') + bt('copiar', '📋 Copiar', 'Copiar este paso para pegarlo en otra parte')
         + bt('marcar', MARCADOS.has(id) ? '☐ Desmarcar' : '☑ Seleccionar', MARCADOS.has(id) ? 'Quitarlo de los pasos marcados' : 'Marcar varios pasos para moverlos, copiarlos o quitarlos juntos (también Ctrl+clic)', 'w')
@@ -16107,11 +16112,16 @@
       const f = ref.id ? encontrar(ref.id) : null, x = f ? f.item : null, padre = f ? f.padre : ref.padre, e = f ? f.e : ref.e, t = f ? f.t : ref.t, lista = insumosReceta();
       const numero = (v) => { v = String(v == null ? '' : v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
       const enPasos = (comp) => { let s = 0; W.estructuras.forEach((e2) => [e2.pasos || [], ...(e2.etiquetas || []).map((t2) => t2.pasos || [])].forEach((l) => l.forEach((p) => { if (p.quitado) return; (p.pm || []).forEach((m) => { if (m.insumo && !m.quitado && m.comp === comp && (!x || m.id !== x.id)) s += numero(m.cant) || 0; }); }))); return s; };
-      const deReceta = (comp) => lista.find((i) => i.comp === comp) || null;
+      // la cantidad sale de la sección INSUMOS: si ahí se cambió (✎), vale la nueva
+      const cantIns = (comp) => { for (const e2 of W.estructuras) for (const y of e2.insumos || []) if (y.comp === comp) return PPN.cantRecetaCambiada(y) ? y.cantNueva : y.cant; return null; };
+      const deReceta = (comp) => { const i = lista.find((y) => y.comp === comp); if (!i) return null; const c = cantIns(comp); return c == null || c === '' ? i : { ...i, cant: c }; };
+      // filas del paso (procesos menores e insumos) para elegir debajo de cuál va el insumo nuevo
+      const posiciones = () => { const pm = (padre.pm || []).filter((m) => !m.quitado), sel = ref.despuesDe || (pm.length ? pm[pm.length - 1].id : '');
+        return `<option value="">Al inicio del paso</option>` + pm.map((m, i) => `<option value="${esc(m.id)}"${m.id === sel ? ' selected' : ''}>Debajo de ${i + 1}. ${m.insumo ? 'insumo ' : ''}${esc(String(m.insumo ? `${m.mat || m.texto} ${fmtDec(m.cant)} ${m.um || ''}` : m.texto || '').slice(0, 70))}</option>`).join(''); };
       let elegido = x ? deReceta(x.comp) || { comp: x.comp, desc: x.mat || x.texto, cant: null, um: x.um, id: x.insId } : null;
       const filaIns = (i) => { const usado = enPasos(i.comp); return `<button type="button" class="pp-sug-it${elegido && elegido.comp === i.comp ? ' elegido' : ''}" data-comp="${esc(i.comp)}"><span class="cod">${esc(i.comp)}</span><span class="tx">${esc(i.desc)}${i.txtadic ? ' ' + esc(i.txtadic) : ''}</span><span class="otra">receta ${esc(fmtDec(i.cant))} ${esc(i.um || '')}${usado ? ` · en pasos ${esc(fmtDec(usado))}` : ''}</span></button>`; };
       modal(`<h3>${x ? 'Insumo' : 'Agregar insumo'}<span>${esc(e.nombre)}${t ? ' › ' + esc(t.nombre) : ''} › ${esc(String(padre.texto || '').slice(0, 60))}</span></h3>
-        ${x ? '' : '<label class="pp-campo">Buscar en los insumos de la receta<input id="m-q" placeholder="código o descripción (p. ej. CAFEINA, 1100002760)"></label>'}<div id="m-res" class="pp-sug"></div>
+        ${x ? '' : `<p class="pp-nota">El insumo va dentro del paso como un proceso menor más: elige debajo de qué fila va.</p><label class="pp-campo">Posición dentro del paso<select id="m-pos">${posiciones()}</select></label><label class="pp-campo">Buscar en los insumos de la receta<input id="m-q" placeholder="código o descripción (p. ej. CAFEINA, 1100002760)"></label>`}<div id="m-res" class="pp-sug"></div>
         <label class="pp-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc((x && x.comentario) || '')}</textarea></label>
         <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>${x && BI.has(x.id) ? `<div class="pp-aviso-lm">⚠ ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
@@ -16119,7 +16129,7 @@
         const pintar = () => {
           if (x) { res.innerHTML = elegido ? filaIns(elegido.cant != null ? elegido : { ...elegido, cant: '' }) : ''; }
           else { const ps = PPN.normalizar(q.value).split(' ').filter(Boolean), r = lista.filter((i) => { const n = PPN.normalizar(`${i.comp} ${i.desc} ${i.txtadic || ''}`); return ps.every((w) => n.includes(w)); });
-            res.innerHTML = r.length ? r.slice(0, 60).map(filaIns).join('') : `<div class="pp-sug-tit">${lista.length ? 'Ningún insumo de la receta coincide.' : 'El RMD no tiene receta asociada: no hay insumos que agregar.'}</div>`; }
+            res.innerHTML = r.length ? r.slice(0, 60).map((i) => filaIns(deReceta(i.comp) || i)).join('') : `<div class="pp-sug-tit">${lista.length ? 'Ningún insumo de la receta coincide.' : 'El RMD no tiene receta asociada: no hay insumos que agregar.'}</div>`; }
           $('#m-um', m).textContent = elegido ? elegido.um || '' : ''; validar();
         };
         const validar = () => { const n = numero(cant.value); let t2 = '';
@@ -16132,11 +16142,12 @@
           pintar(); cant.focus(); cant.select(); });
         const aceptar = () => {
           if (!validar()) { (elegido ? cant : q || cant).focus(); return; }
-          const n = String(+numero(cant.value).toFixed(6)), com = $('#m-com', m).value.trim(); let nuevoId = null;
+          const n = String(+numero(cant.value).toFixed(6)), com = $('#m-com', m).value.trim(), tras = $('#m-pos', m) ? $('#m-pos', m).value : null; let nuevoId = null;
           cambio(() => {
             if (x) { const viva = encontrar(x.id).item; viva.cant = n; viva.comentario = com; return; }
             const p = encontrar(padre.id).item; if (!p.pm) p.pm = [];
-            nuevoId = `n:${seq++}`; p.pm.push({ id: nuevoId, insumo: true, comp: elegido.comp, mat: elegido.desc, texto: elegido.desc, cant: n, um: elegido.um || '', insId: elegido.id || null, codigo: null, pasoId: null, nuevo: false, tipo: null, comentario: com });
+            const i = tras ? p.pm.findIndex((y) => y.id === tras) : -1;
+            nuevoId = `n:${seq++}`; p.pm.splice(tras == null ? p.pm.length : tras === '' ? 0 : i < 0 ? p.pm.length : i + 1, 0, { id: nuevoId, insumo: true, comp: elegido.comp, mat: elegido.desc, texto: elegido.desc, cant: n, um: elegido.um || '', insId: elegido.id || null, codigo: null, pasoId: null, nuevo: false, tipo: null, comentario: com });
           });
           cerrar(); setTimeout(() => irA(x ? x.id : nuevoId), 30);
         };
@@ -16410,7 +16421,7 @@
         else if (a === 'm-mover') moverGrupoA(ids); else if (a === 'm-quitar') quitarGrupo(ids); else if (a === 'm-limpiar') limpiarMarcados(); }
       else if (a === 'editar-ins') editarInsumo({ id });
       else if (a === 'cant-receta') cantidadReceta(id);
-      else if (a === 'agregar-ins') { const f = encontrar(id); if (!f.item.pm) f.item.pm = []; editarInsumo({ nuevo: true, padre: f.item, e: f.e, t: f.t }); }
+      else if (a === 'agregar-ins') { const f = encontrar(id); if (f.clase === 'pm') { editarInsumo({ nuevo: true, padre: f.padre, e: f.e, t: f.t, despuesDe: id }); return; } if (!f.item.pm) f.item.pm = []; editarInsumo({ nuevo: true, padre: f.item, e: f.e, t: f.t }); }
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
@@ -16563,7 +16574,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 .pp-modal-fondo { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; background: rgba(20, 24, 28, .38); }
 .pp-modal { width: min(760px, 100%); max-height: 88vh; overflow: auto; padding: 18px 20px 14px; background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
 .pp-modal h3 { margin: 0 0 12px; font-size: 16px; } .pp-modal h3 span { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 400; color: var(--ap); }
-.pp-campo { display: block; margin: 10px 0; font-weight: 600; font-size: 12.5px; } .pp-campo textarea, .pp-campo input { display: block; width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--bd); border-radius: 6px; font: 13px/1.45 "Segoe UI", Roboto, Arial, sans-serif; font-weight: 400; }
+.pp-campo { display: block; margin: 10px 0; font-weight: 600; font-size: 12.5px; } .pp-campo textarea, .pp-campo input, .pp-campo select { display: block; width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--bd); border-radius: 6px; font: 13px/1.45 "Segoe UI", Roboto, Arial, sans-serif; font-weight: 400; }
 .pp-campo textarea:focus, .pp-campo input:focus, .pp-rango-ed input:focus { outline: 2px solid var(--acento); outline-offset: -1px; border-color: var(--acento); } .pp-campo .falta { border-color: var(--qui); }
 .pp-estado { min-height: 20px; font-size: 12.5px; } .pp-estado .ok { color: var(--agr); } .pp-estado .crea { color: var(--crea); font-weight: 600; } .pp-estado .err { color: var(--qui); } .pp-estado .avi { color: var(--cam); }
 .pp-aviso-gen { margin: 0 24px 8px; padding: 8px 14px; border-radius: 8px; background: rgba(10,110,209,.1); border-left: 4px solid #0a6ed1; font-size: 13px; } .pp-aviso-gen.aviso { background: rgba(224,160,0,.16); border-left-color: #e0a000; }

@@ -964,7 +964,7 @@ with sync_playwright() as p:
         st = e.evaluate("""() => { const s = window.__pp.estado(); return { cmb: s.CMB.filter((c) => c.insumo).map((c) => [c.accion, c.despues || (c.campos || []).map((x) => x.antes + '>' + x.despues).join()]), av: s.AV.filter(([id]) => id === 'MI1' || String(id).startsWith('n:')).map(([, l]) => l.map((a) => a.nivel).join()), lmAv: (s.AV.find(([id]) => id === 'MI1') || [, []])[1].some((a) => a.nivel === 'aviso' && a.texto.includes('Lista de Materiales')), tags: [...document.querySelectorAll('tr[data-id=\"MI1\"] .pp-tag')].map((x) => x.textContent), W: s.W }; }""")
         e.close()
         r = pg.evaluate("""(W) => { const P = window.__rmdStats.plantilla, man = [], t = P.sinInsumosNuevos(W, man), p = t.estructuras[2].etiquetas[1].pasos; return { pm: p.map((x) => (x.pm || []).map((m) => m.id)), man }; }""", st["W"])
-        ok = (not errs and botones == {"paso": True, "cuadro": False, "ins": ["editar-ins", "subir", "bajar", "quitar", "comentar"]} and todos == ["1000000846", "2500000010", "9999999"] and filtro == ["2500000010"]
+        ok = (not errs and botones == {"paso": True, "cuadro": False, "ins": ["editar-ins", "agregar", "agregar-ins", "subir", "bajar", "quitar", "comentar"]} and todos == ["1000000846", "2500000010", "9999999"] and filtro == ["2500000010"]
               and propuesta == "20" and "suman 35" in pasa and sigue
               and st["cmb"] == [["agregar", "AGUA PARA INYECCION CSP (2500000010) 20 L"], ["cantidad", "10 L>12.5 L"]] and "Cantidad" in st["tags"] and lm and st["lmAv"]
               and r["pm"] == [[], ["MI1"]] and len(r["man"]) == 1 and "2500000010" in r["man"][0])
@@ -993,6 +993,27 @@ with sync_playwright() as p:
               and st["cmb"] == [["cantidad", "insumo", "30 L>32.5 L"]] and any(a.startswith("aviso:El cambio en la cantidad") for a in st["av"]) and st["cam"] and st["antes"] == "30.000" and st["nueva"] == "32.500"
               and st["panel"] == ["Cantidad (insumo)"] and rb == {"cant": "32.5", "apl": 1} and fin == 0)
         return ok, json.dumps({"vis": vis, "dlg": dlg[:200], "propuesta": propuesta, "sigue": sigue, "st": {k: v for k, v in st.items() if k != "W"}, "rb": rb, "fin": fin, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN53 Borrador de Producción · insumo como proceso menor (v1.105.0): cada proceso menor e insumo de un paso tiene «＋ Insumo debajo»; el diálogo elige la posición dentro del paso (por defecto debajo de esa fila), la lista sale de la sección INSUMOS con la cantidad cambiada allí (✎) y propone lo que falta repartir; el insumo nuevo queda justo debajo")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        d0["arbol"]["estructuras"][2]["etiquetas"][1]["pasos"][1]["pm"] = [{"id": "MP1", "pasoId": "PM9", "codigo": "9001", "texto": "MEZCLAR 5 MINUTOS", "orden": 1, "tipo": 446},
+            {"id": "MI1", "pasoId": None, "codigo": None, "texto": "AGUA PARA INYECCION CSP", "orden": 2, "tipo": 433, "insumo": True, "comp": "2500000010", "mat": "AGUA PARA INYECCION CSP", "cant": "10", "um": "L", "insId": "RI2"}]
+        for i, x in enumerate(d0["arbol"]["estructuras"][3]["insumos"]): x["id"] = "RI" + str(i + 1)
+        comp = d0["arbol"]["estructuras"][3]["insumos"][1]["comp"]
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        bots = e.evaluate("""() => ['MP1', 'MI1'].map((id) => [...document.querySelectorAll(`tr[data-id="${id}"] .pp-acc [data-a]`)].map((b) => b.dataset.a))""")
+        e.click('tr[data-id="ins:RI2"] .pp-cant-ed'); e.wait_for_selector("#m-cant"); e.fill("#m-cant", "32,5"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(200)
+        e.evaluate("() => document.querySelector('tr[data-id=\"MP1\"] [data-a=\"agregar-ins\"]').click()"); e.wait_for_selector("#m-pos")
+        pos = e.evaluate("() => { const s = document.querySelector('#m-pos'); return [s.value, s.options.length]; }")
+        e.click(f'#m-res [data-comp="{comp}"]'); e.wait_for_timeout(100); propuesta = e.input_value("#m-cant"); lista = e.inner_text(f'#m-res [data-comp="{comp}"]')
+        e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(250)
+        orden = e.evaluate("() => window.__pp.estado().W.estructuras[2].etiquetas[1].pasos[1].pm.map((m) => m.id.startsWith('n:') ? 'nuevo:' + m.comp + ':' + m.cant : m.id)")
+        e.close()
+        ok = (not errs and all("agregar-ins" in b for b in bots) and pos == ["MP1", 3] and propuesta == "22.5" and "receta 32.5" in lista.replace(",", ".")
+              and orden == ["MP1", f"nuevo:{comp}:22.5", "MI1"])
+        return ok, json.dumps({"bots": bots, "pos": pos, "propuesta": propuesta, "lista": lista, "orden": orden, "errores": errs[:3]}, ensure_ascii=False)[:1500]
     @prueba("LN51 Borrador de Producción · varios pasos (v1.104): «⧉ Duplicar» copia el paso con sus procesos menores (ids nuevos, mismo código, el repetido es solo info); Ctrl+clic y Shift+clic marcan pasos; la barra los baja y sube juntos, los copia y «Pegar aquí al final» los pega en otra lista; arrastrar un paso de SAP a otra lista lo deja «Quitado» y agrega su copia; «Mover a…» lleva los marcados a otra lista; quitar en conjunto borra los nuevos")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
