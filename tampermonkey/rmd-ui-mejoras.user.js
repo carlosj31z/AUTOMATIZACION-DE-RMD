@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.104.2
+// @version      1.104.3
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.104.2';                                                       // mantener igual a @version
+  const VERSION = '1.104.3';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -8720,7 +8720,7 @@
     new Set([...CAMPOS_FILTRO, ...Object.keys(d)]).forEach((k) => { d[k] = ''; }); d.code = String(codigo);
     f.setData(d);
     filtroEquipo.ids = null; filtroEquipo.texto = ''; filtroEquipo.resumen = ''; if (filtroEquipo.input) filtroEquipo.input.setValue('');
-    return ctrl.onSearch();
+    return ctrl.onSearch({ sId: 'rmd-codigo' });                         // con evento: la pausa del refresco no la salta
   }
   async function restaurarFiltrosLista(ctrl, g) {
     if (!g) return;
@@ -8973,10 +8973,12 @@
       if (!pv) throw new Error(`SAP no devolvió la versión de fabricación ${rc.matnr} / ${rc.verid}`);
       avance(`quitando la receta ${rc.matnr} / ${rc.verid}…`);
       await ctrl.onBorrarRecetasAsignada(fila);
-      if (autorizado) { avance(`anulando en el DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.sendDMS(ctrl.generarNombre(fila), '', 'ANULAR'); }
+      if (autorizado) { avance(`anulando en el DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.sendDMS(await ctrl.generarNombre(fila), '', 'ANULAR'); }
       let nuevas = [];
       try {
-        await ctrl._updateModelRest(); await ctrl.onGetMdRecetaGeneral();
+        // lo mismo que Eliminar Receta del portal (onDeleteAsocReceta) tras quitarla
+        await ctrl._updateModelRest(); await ctrl.onGetMdRecetaGeneral(); await ctrl.onGetDataInitial();
+        vista.getModel('listMdReceta').refresh(true); await ctrl.actualizarCabeceraAsociarDatos();
         avance(`volviendo a asociar la receta ${rc.matnr} / ${rc.verid} (lista actual de SAP)…`);
         ctrl.onAsociarRecetasFrg();
         vista.setModel(new JSONModel([pv]), 'aListReceta');
@@ -8986,16 +8988,17 @@
         try { await ctrl.onAgregarRecetas(); nuevas = (ctrl.localModel && ctrl.localModel.getProperty('/aListMdRecetaId')) || []; } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
       } catch (e) { throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó quitada y no se pudo volver a asociar (${e.message || e}): asóciala a mano`); }
       finally { sap.ui.core.BusyIndicator.hide(); }
-      // la lista principal se vuelve a leer solo con este código para que «Asociar fórmulas» tome el RMD actualizado
+      // lo mismo que «Agregar» del portal (onConfirmAgregarRecetas): vuelve a leer este RMD y con eso arma «Asociar fórmulas».
+      // La lectura va forzada (soloCodigoEnLista): con una ventana abierta el refresco de la lista se pausa y «Asociar fórmulas» quedaba
+      // con la receta quitada, así que el PDF (Descargar / DMS) salía sin el código, la descripción ni el texto de la lista de materiales.
+      const lm = vista.getModel('listMD'), previa = lm.getData();
       await soloCodigoEnLista(ctrl, a.codigo);
-      if (!await hasta(() => (vista.getModel('listMD').getData() || []).some((x) => x.mdId === a.mdId), 30000)) throw new Error('la receta quedó asociada, pero el RMD no volvió a aparecer en la lista: guarda las Observaciones a mano');
-      await ctrl.actualizarCabeceraAsociarDatos(); await ctrl.onGetMdRecetaGeneral();
-      if (autorizado) {
-        if (ctrl.onGetDataEstructuraMD) await ctrl.onGetDataEstructuraMD();
-        const ids = nuevas.filter((id) => ((vista.getModel('asociarDatos').getData().aReceta || {}).results || []).some((x) => x.mdRecetaId === id));
-        if (!ids.length) throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó asociada, pero no se pudo enviar su documento al DMS: guarda el RMD en el portal o avisa a TI`);
-        for (const id of ids) { avance(`enviando al DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.onTratarInformacionDMS(id, 'ACTUALIZAR'); }
-      }
+      if (!await hasta(() => lm.getData() !== previa && (lm.getData() || []).some((x) => x.mdId === a.mdId), 30000)) throw new Error('la receta quedó asociada, pero no se pudo volver a leer el RMD: cierra «Asociar fórmulas» y ábrelo de nuevo antes de guardar o descargar');
+      await ctrl.actualizarCabeceraAsociarDatos(); await ctrl.onGetDataEstructuraMD(); await ctrl.onGetMdRecetaGeneral();
+      const enAsoc = ((vista.getModel('asociarDatos').getData().aReceta || {}).results || []);
+      if (!enAsoc.some((x) => x.recetaId && norm(x.recetaId.Matnr) === rc.matnr && norm(x.recetaId.Verid) === rc.verid && x.mdRecetaId !== fila.mdRecetaId) || enAsoc.some((x) => x.mdRecetaId === fila.mdRecetaId))
+        throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó asociada, pero «Asociar fórmulas» no la muestra actualizada: ciérralo y ábrelo de nuevo antes de guardar o descargar`);
+      if (autorizado) for (const id of nuevas) { avance(`enviando al DMS el documento de ${rc.matnr} / ${rc.verid}…`); await ctrl.onTratarInformacionDMS(id, 'ACTUALIZAR'); }
       sap.ui.core.BusyIndicator.hide(); await esperar(400);
     }
   }
