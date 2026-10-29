@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.105.0
+// @version      1.106.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.105.0';                                                       // mantener igual a @version
+  const VERSION = '1.106.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -15549,6 +15549,17 @@
       });
       return out;
     }
+    // Pasos nuevos idénticos (mismo texto, misma sección y etiqueta de la lista): en SAP se crea uno solo y se usa en todos sus lugares.
+    // id -> { clave, primero, padre (del primero, si es proceso menor), n }. La clave es la misma con la que el portal los junta al crearlos.
+    const claveNueva = (estr, etq, texto) => `${estr}|${etq || ''}|${String(texto || '').trim().replace(/\s+/g, ' ').toLowerCase()}`;
+    function nuevosIguales(trabajo) {
+      const grupos = new Map(), out = new Map(), vivos = (l) => (l || []).filter((x) => !x.quitado);
+      const ver = (x, estr, etq, padre) => { if (!x.nuevo || !String(x.texto || '').trim()) return; const k = claveNueva(estr, etq, x.texto); let g = grupos.get(k); if (!g) grupos.set(k, (g = { clave: k, primero: x.id, padre: padre ? padre.id : null, ids: [] })); g.ids.push(x.id); };
+      const lista = (l, estr, etq) => vivos(l).forEach((p) => { ver(p, estr, etq, null); vivos(p.pm).filter((m) => !m.insumo).forEach((m) => ver(m, estr, etq, p)); });
+      [...trabajo.estructuras].sort(porOrden).forEach((e) => { lista(e.pasos, e.estructuraId, null); [...(e.etiquetas || [])].sort(porOrden).forEach((t) => lista(t.pasos, e.estructuraId, t.etiquetaId)); });
+      grupos.forEach((g) => g.ids.forEach((id) => out.set(id, { clave: g.clave, primero: g.primero, padre: g.padre, n: g.ids.length })));
+      return out;
+    }
     // Avisos: id -> [{ nivel, texto }]. ctx.buscador, ctx.etiquetas.
     function avisos(trabajo, ctx = {}) {
       const out = new Map(), add = (id, nivel, texto) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto }); };
@@ -15556,6 +15567,7 @@
       const enBase = new Map(), cantBase = new Map();                          // id -> código en la base; insumo -> cantidad en la base
       (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => { enBase.set(m.id, String(m.codigo || '')); if (m.insumo) cantBase.set(m.id, m.cant); }); })));
       const igualQueSap = (x) => enBase.has(x.id) && enBase.get(x.id) === String(x.codigo || '');
+      const iguales = nuevosIguales(trabajo);
       const revisar = (x, estr, etq, esPm) => {
         const t = String(x.texto || '').trim();
         if (!t) { add(x.id, 'error', 'Falta el texto.'); return; }
@@ -15570,7 +15582,10 @@
           const ex = bus.exactos(t).filter((f) => f.estr === estr), aqui = ex.filter((f) => !etq || f.etq === etq);
           if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`);
           else if (ex.length) add(x.id, 'info', `Existe con el mismo texto en ${nomEtq(ex[0].etq)} (paso ${ex[0].codigo}). Usarlo en otra etiqueta puede hacer que no aparezca en su lugar en producción.`);
-          else add(x.id, 'info', 'Paso nuevo: el equipo RMD lo creará en SAP.');
+          else { const g = iguales.get(x.id);
+            if (!g || g.n < 2) add(x.id, 'info', 'Paso nuevo: el equipo RMD lo creará en SAP.');
+            else if (g.primero === x.id) add(x.id, 'info', `Paso nuevo: el equipo RMD lo creará en SAP una sola vez y se usará en los ${g.n} lugares donde está igual.`);
+            else add(x.id, 'info', `Igual al paso nuevo ${g.padre ? 'del proceso menor de ' + (numeros.get(g.padre) || 'más arriba') : numeros.get(g.primero) || 'de más arriba'}: se usa ese mismo paso, no se crea otro.`); }
         }
         if (!x.nuevo && x.etqCat && etq && x.etqCat !== etq && !esPm) add(x.id, igualQueSap(x) ? 'info' : 'aviso', `${igualQueSap(x) ? 'Ya está así en SAP: e' : 'E'}n el catálogo este paso es de ${nomEtq(x.etqCat)}, no de esta etiqueta; en producción podría no aparecer en su lugar.`);
         if (x.tipo === RANGO || x.vi != null || x.vf != null) {
@@ -15679,7 +15694,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada };
+    return { TIPO, RANGO, normalizar, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -15697,7 +15712,7 @@
     const CAJA = '<span class="pp-caja"></span>', CHECK = '<span class="pp-check"></span>';
     const ICO_CHECK = '<svg class="pp-ico-check" viewBox="0 0 16 16" aria-label="check"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.2 8.3l2.6 2.6 5-5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const app = $('#app');
-    let PQ, BASE, W, SOL, BUS, EQ = [], MIEMBROS = new Map(), ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), NUM_BASE = new Map(), sucio = false, seq = 1, filtro = 'todos';
+    let PQ, BASE, W, SOL, BUS, EQ = [], MIEMBROS = new Map(), ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), UNI = new Map(), NUM_BASE = new Map(), sucio = false, seq = 1, filtro = 'todos';
     const deshacer = [];
     let avisoInicial = '', pdfHecho = false, guardadoUna = false, imprimiendo = false, SELECCION = null, panelAbierto = false;
     let MARCADOS = new Set(), ANCLA = null, PORTA = null;               // varios pasos marcados (Ctrl/Shift+clic) y pasos copiados para pegar
@@ -15794,7 +15809,7 @@
 
     // ---------- dibujo ----------
     function pintarTodo() {
-      CMB = PPN.cambios(BASE, W); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras }); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
+      CMB = PPN.cambios(BASE, W); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras }); UNI = PPN.nuevosIguales(W); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
       const y = window.scrollY; podarMarcados();
       app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc${SELECCION ? ' con-sel' : ''}${MARCADOS.size ? ' multi' : ''}" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel${panelAbierto ? ' abierto' : ''}" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>
         <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${CMB.length}</b>`}</button>${htmlMulti()}`;
@@ -15804,7 +15819,8 @@
     }
     function contar() {
       const errores = [...AV.values()].flat().filter((a) => a.nivel === 'error').length, avisosN = [...AV.values()].flat().filter((a) => a.nivel === 'aviso').length;
-      const nuevos = CMB.filter((c) => (c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo).length + CMB.filter((c) => c.accion === 'agregar' && c.pm).reduce((s, c) => s + c.pm.filter((m) => m.nuevo).length, 0);
+      // los pasos nuevos idénticos se crean una sola vez
+      const nuevos = new Set([...CMB.filter((c) => (c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo).map((c) => c.id), ...CMB.filter((c) => c.accion === 'agregar' && c.pm).flatMap((c) => c.pm.filter((m) => m.nuevo).map((m) => m.id))].map((id) => (UNI.get(id) || { clave: id }).clave)).size;
       return { errores, avisos: avisosN, nuevos, total: CMB.length };
     }
     // Cabecera de ayuda: estado del RMD y avisos
@@ -15872,7 +15888,9 @@
       const out = [];
       if (!b) out.push('<span class="pp-tag agr">Nuevo</span>'); else if (x.quitado) out.push('<span class="pp-tag qui">Quitado</span>');
       else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (cantCambiada(x, b)) out.push('<span class="pp-tag cam">Cantidad</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (casillasCambiadas(x, b)) out.push('<span class="pp-tag cam">Casillas</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
-      if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}</span>${x.registro && REGISTRO[x.registro] ? `<span class="pp-tag reg" title="Qué anota Producción en este paso (lo indica quien pide el cambio)">${esc(REGISTRO[x.registro])}</span>` : ''}`);
+      const igual = !x.quitado && x.nuevo && UNI.get(x.id);
+      if (igual && igual.n > 1 && igual.primero !== x.id) out.push(`<span class="pp-tag crea" title="Es idéntico a otro paso nuevo: en SAP se crea uno solo y se usa también aquí">★ Usa el mismo paso nuevo</span>`);
+      else if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo${igual && igual.n > 1 ? `. Se crea una sola vez y se usa en los ${igual.n} lugares donde está igual` : ''}">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}${igual && igual.n > 1 ? ` · ${igual.n} lugares` : ''}</span>${x.registro && REGISTRO[x.registro] ? `<span class="pp-tag reg" title="Qué anota Producción en este paso (lo indica quien pide el cambio)">${esc(REGISTRO[x.registro])}</span>` : ''}`);
       else if (!x.quitado && x.insumo && !b) out.push('<span class="pp-tag ok" title="Insumo de la receta del RMD">Insumo de la receta</span>');
       else if (!x.quitado && x.codigo && x.texto != null && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
       return out.length ? `<span class="pp-tags">${out.join('')}</span>` : '';
@@ -17244,7 +17262,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo));
       const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && vale(etqL, f.etq)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
       if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1 && vale(etqL, pIgual.etiquetaId_etiquetaId)) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
-      const key = `${L.e.estructuraId}|${etqL || ''}|${texto.toLowerCase()}`; let n = nuevosPaso.get(key);
+      const key = PPN.claveNueva(L.e.estructuraId, etqL, texto); let n = nuevosPaso.get(key);       // los idénticos se crean una vez y se usan en todos sus lugares
       if (!n) {
         const m = await muestra(L.e.estructuraId, etqL); if (!m) { bloqueos.push(`No se pudo preparar el paso nuevo «${texto.slice(0, 70)}»: no hay pasos de ${L.e.nombre} en el catálogo para copiar sus datos.`); continue; }
         let tipo = ppNum(x.tipo) || ppNum(tipoBase), inferido = null;
@@ -17350,7 +17368,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       });
     }
     // pasos nuevos del catálogo primero
-    nuevosPaso.forEach((np) => op(0, { lugar: `${np.estrNombre}${np.etqNombre ? ' › ' + np.etqNombre : ''}`, accion: 'Crear', clase: 'catalogo', desc: `crear en SAP el paso nuevo «${np.texto.slice(0, 80)}»`, ruta: '/PASO', tipo: 'create', crearPaso: np, datos: np.fila, inv: { ruta: `/PASO('${np.pasoId}')`, datos: { activo: false } } }));
+    nuevosPaso.forEach((np) => op(0, { lugar: `${np.estrNombre}${np.etqNombre ? ' › ' + np.etqNombre : ''}`, accion: 'Crear', clase: 'catalogo', desc: `crear en SAP el paso nuevo «${np.texto.slice(0, 80)}»${np.items.length > 1 ? ` (uno solo, se usa en ${np.items.length} lugares)` : ''}`, ruta: '/PASO', tipo: 'create', crearPaso: np, datos: np.fila, inv: { ruta: `/PASO('${np.pasoId}')`, datos: { activo: false } } }));
     // equipos y utensilios: quitar, agregar y renumerar
     const catEq = new Map(); const ids = []; prop.trabajo.estructuras.forEach((e) => (e.equipos || []).forEach((x) => { if (!String(x.id).startsWith('n:') || x.quitado || !x.equipoId) return; ids.push(x.equipoId); }));
     for (let i = 0; i < ids.length; i += 40) (await leerTodoDe(modelo, 'EQUIPO', [new F({ filters: ids.slice(i, i + 40).map((c) => new F('equipoId', 'EQ', c)), and: false })], {})).forEach((q) => catEq.set(q.equipoId, q));
