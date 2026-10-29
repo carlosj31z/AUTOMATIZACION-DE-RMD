@@ -6,7 +6,8 @@ Lee el portal ya abierto en el Chromium de pruebas (CDP), con el modelo OData `m
 - Un RMD es la cadena de versiones que comparte `codigoversionprincipal` (o su propio código si es la primera).
 - Entra si alguna de sus versiones se registró, ingresó (fecha al inicio de la Observación) o autorizó en el mes.
   Las solicitudes sin código (Solicitado, Solicitud Aprobada/Rechazada) no cuentan: aún no tienen estructura.
-- V°B° = pasos activos de la estructura PROCEDIMIENTO con la casilla «R. Por» más los que tienen «V.B.».
+- V°B° = pasos activos de la estructura PROCEDIMIENTO con tipo de dato «Realizado por y Visto bueno» (441).
+  Aparte se informan los de tipo «Visto bueno» (440), que no entran en la comparación.
 - Vigente = la versión Autorizada más alta.
 """
 from __future__ import annotations
@@ -76,12 +77,12 @@ async ([ids, procedimiento]) => {""" + _JS_COMUN + """
     const lote = ids.slice(i, i + 10), porMd = new F({ filters: lote.map((id) => new F('mdId_mdId', 'EQ', id)), and: false });
     const [es, ps] = await Promise.all([
       todo('MD_ESTRUCTURA', [porMd], { $select: 'mdEstructuraId,activo' }, 'mdEstructuraId'),
-      todo('MD_ES_PASO', [porMd, new F({ filters: [new F('rpor', 'EQ', true), new F('vb', 'EQ', true)], and: false })],
-        { $select: 'mdEstructuraPasoId,mdId_mdId,mdEstructuraId_mdEstructuraId,estructuraId_estructuraId,activo,rpor,vb' }, 'mdEstructuraPasoId')]);
+      todo('MD_ES_PASO', [porMd, new F({ filters: [new F('tipoDatoId_iMaestraId', 'EQ', 441), new F('tipoDatoId_iMaestraId', 'EQ', 440)], and: false })],
+        { $select: 'mdEstructuraPasoId,mdId_mdId,mdEstructuraId_mdEstructuraId,estructuraId_estructuraId,activo,tipoDatoId_iMaestraId' }, 'mdEstructuraPasoId')]);
     const activas = new Set(es.filter((e) => e.activo !== false).map((e) => e.mdEstructuraId));
-    lote.forEach((id) => { res[id] = { rpor: 0, vb: 0 }; });
+    lote.forEach((id) => { res[id] = { vb: 0, solo_vb: 0 }; });
     ps.filter((p) => p.activo !== false && activas.has(p.mdEstructuraId_mdEstructuraId) && procedimiento.includes(p.estructuraId_estructuraId))
-      .forEach((p) => { res[p.mdId_mdId].rpor += p.rpor ? 1 : 0; res[p.mdId_mdId].vb += p.vb ? 1 : 0; });
+      .forEach((p) => { res[p.mdId_mdId][+p.tipoDatoId_iMaestraId === 441 ? 'vb' : 'solo_vb'] += 1; });
   }
   return res;
 }
@@ -159,9 +160,9 @@ COLUMNAS = [  # (título, ancho, formato)
     ("Movimiento en el mes", 22, None), ("Fecha último movimiento", 13, "dd/mm/yyyy"),
     ("Últ. versión", 8, None), ("Últ. código RMD", 13, None), ("Últ. estado", 13, None),
     ("Últ. F. registro", 12, "dd/mm/yyyy"), ("Últ. F. ingreso", 12, "dd/mm/yyyy"), ("Últ. F. autorización", 13, "dd/mm/yyyy"),
-    ("Últ. R. Por", 8, None), ("Últ. V.B.", 8, None), ("Últ. V°B°", 9, None),
+    ("Últ. V°B° (Realizado por y Visto bueno)", 14, None), ("Últ. solo «Visto bueno»", 10, None),
     ("Penúlt. versión", 9, None), ("Penúlt. código RMD", 13, None), ("Penúlt. estado", 13, None),
-    ("Penúlt. R. Por", 9, None), ("Penúlt. V.B.", 9, None), ("Penúlt. V°B°", 9, None),
+    ("Penúlt. V°B° (Realizado por y Visto bueno)", 14, None), ("Penúlt. solo «Visto bueno»", 10, None),
     ("Diferencia V°B°", 10, None), ("Variación", 14, None), ("Versión vigente", 9, None), ("¿Última es la vigente?", 11, None),
 ]
 
@@ -180,14 +181,14 @@ def escribir_excel(filas: List[dict], salida: Path, anio: int, mes: int) -> None
     orden = lambda r: (PLANTAS[r["ult"]["planta"]], r["ult"]["etapa"], r["ult"]["producto"])
     for r in sorted(filas, key=orden):
         u, p = r["ult"], r["pen"]
-        vb_u = u["rpor"] + u["vb"]
-        vb_p = p["rpor"] + p["vb"] if p else None
+        vb_u = u["vb"]
+        vb_p = p["vb"] if p else None
         dif = vb_u - vb_p if p else None
         ws.append([PLANTAS[u["planta"]], u["etapa"], u["producto"], u["seccion"], u["material"],
                    r["movimientos"], r["ultimo_mov"],
                    u["version"], u["codigo"], u["estado"], _fecha(u["registro"]), _ingreso(u["observacion"]), _fecha(u["autorizacion"]),
-                   u["rpor"], u["vb"], vb_u,
-                   p and p["version"], p and p["codigo"], p and p["estado"], p and p["rpor"], p and p["vb"], vb_p,
+                   vb_u, u["solo_vb"],
+                   p and p["version"], p and p["codigo"], p and p["estado"], vb_p, p and p["solo_vb"],
                    dif, _variacion(dif), r["vigente"], "Sí" if r["vigente"] == u["version"] else "No"])
     for i, (_, ancho, formato) in enumerate(COLUMNAS, 1):
         ws.column_dimensions[get_column_letter(i)].width = ancho
@@ -202,7 +203,7 @@ def escribir_excel(filas: List[dict], salida: Path, anio: int, mes: int) -> None
     tabla.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
     ws.add_table(tabla)
     ws.freeze_panes = "D2"
-    col_var = get_column_letter(24)
+    col_var = get_column_letter(22)
     rango = f"{col_var}2:{col_var}{ws.max_row}"
     for texto, color in (("Aumentó", "C6EFCE"), ("Disminuyó", "FFC7CE"), ("Se mantuvo", "FFEB9C")):
         ws.conditional_formatting.add(rango, CellIsRule(operator="equal", formula=[f'"{texto}"'], fill=PatternFill("solid", fgColor=color)))
@@ -217,7 +218,7 @@ def escribir_excel(filas: List[dict], salida: Path, anio: int, mes: int) -> None
     cuenta = collections.Counter()
     for r in filas:
         u, p = r["ult"], r["pen"]
-        dif = (u["rpor"] + u["vb"]) - (p["rpor"] + p["vb"]) if p else None
+        dif = u["vb"] - p["vb"] if p else None
         cuenta[(PLANTAS[u["planta"]], u["etapa"], _variacion(dif))] += 1
     for planta, etapa in sorted({k[:2] for k in cuenta}):
         n = [cuenta[(planta, etapa, v)] for v in variaciones]
@@ -233,8 +234,8 @@ def escribir_excel(filas: List[dict], salida: Path, anio: int, mes: int) -> None
         "(fecha al inicio de la Observación) o autorizó en el mes. Solo Planta Ate y Planta Lima.",
         "• Las solicitudes sin código (Solicitado, Solicitud Aprobada o Rechazada) no cuentan como versión: aún no tienen estructura.",
         "• Si un número de versión se repite, se toma la no cancelada más reciente.",
-        "• V°B° = pasos activos de la estructura PROCEDIMIENTO con la casilla «R. Por» + los que tienen «V.B.». "
-        "Un paso «Realizado por y Visto bueno» suma 2.",
+        "• V°B° = pasos activos de la estructura PROCEDIMIENTO con tipo de dato «Realizado por y Visto bueno». "
+        "Los de tipo «Visto bueno» solo se informan aparte y no entran en la diferencia.",
         "• Diferencia = V°B° de la última versión − V°B° de la penúltima.",
         "• Versión vigente = la versión Autorizada más alta. Ojo: al suspender, SAP cambia la fecha de autorización por la de la suspensión.",
         f"• Leído del portal (solo lectura) el {date.today():%d/%m/%Y}.",
