@@ -8720,7 +8720,7 @@
     new Set([...CAMPOS_FILTRO, ...Object.keys(d)]).forEach((k) => { d[k] = ''; }); d.code = String(codigo);
     f.setData(d);
     filtroEquipo.ids = null; filtroEquipo.texto = ''; filtroEquipo.resumen = ''; if (filtroEquipo.input) filtroEquipo.input.setValue('');
-    return ctrl.onSearch();
+    return ctrl.onSearch({ sId: 'rmd-codigo' });                         // con evento: la pausa del refresco no la salta
   }
   async function restaurarFiltrosLista(ctrl, g) {
     if (!g) return;
@@ -8988,11 +8988,12 @@
         try { await ctrl.onAgregarRecetas(); nuevas = (ctrl.localModel && ctrl.localModel.getProperty('/aListMdRecetaId')) || []; } finally { try { ctrl.onCancelAsociarRecetas(); } catch (e) { } }
       } catch (e) { throw new Error(`la receta ${rc.matnr} / ${rc.verid} quedó quitada y no se pudo volver a asociar (${e.message || e}): asóciala a mano`); }
       finally { sap.ui.core.BusyIndicator.hide(); }
-      // lo mismo que «Agregar» del portal (onConfirmAgregarRecetas): vuelve a leer este RMD (solo él) y con eso arma «Asociar fórmulas».
-      // No sirve onSearch: con una ventana abierta el refresco de la lista se pausa y «Asociar fórmulas» quedaba con la receta quitada,
-      // así que el PDF (Descargar / DMS) salía sin el código, la descripción ni el texto de la lista de materiales de la receta.
-      await ctrl.onGetDataInitial(false, [new F('mdId', 'EQ', a.mdId)]);
-      if (!(vista.getModel('listMD').getData() || []).some((x) => x.mdId === a.mdId)) throw new Error('la receta quedó asociada, pero no se pudo volver a leer el RMD: cierra «Asociar fórmulas» y ábrelo de nuevo antes de guardar o descargar');
+      // lo mismo que «Agregar» del portal (onConfirmAgregarRecetas): vuelve a leer este RMD y con eso arma «Asociar fórmulas».
+      // La lectura va forzada (soloCodigoEnLista): con una ventana abierta el refresco de la lista se pausa y «Asociar fórmulas» quedaba
+      // con la receta quitada, así que el PDF (Descargar / DMS) salía sin el código, la descripción ni el texto de la lista de materiales.
+      const lm = vista.getModel('listMD'), previa = lm.getData();
+      await soloCodigoEnLista(ctrl, a.codigo);
+      if (!await hasta(() => lm.getData() !== previa && (lm.getData() || []).some((x) => x.mdId === a.mdId), 30000)) throw new Error('la receta quedó asociada, pero no se pudo volver a leer el RMD: cierra «Asociar fórmulas» y ábrelo de nuevo antes de guardar o descargar');
       await ctrl.actualizarCabeceraAsociarDatos(); await ctrl.onGetDataEstructuraMD(); await ctrl.onGetMdRecetaGeneral();
       const enAsoc = ((vista.getModel('asociarDatos').getData().aReceta || {}).results || []);
       if (!enAsoc.some((x) => x.recetaId && norm(x.recetaId.Matnr) === rc.matnr && norm(x.recetaId.Verid) === rc.verid && x.mdRecetaId !== fila.mdRecetaId) || enAsoc.some((x) => x.mdRecetaId === fila.mdRecetaId))
