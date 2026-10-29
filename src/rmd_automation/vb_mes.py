@@ -8,6 +8,7 @@ Lee el portal ya abierto en el Chromium de pruebas (CDP), con el modelo OData `m
   Las solicitudes sin código (Solicitado, Solicitud Aprobada/Rechazada) no cuentan: aún no tienen estructura.
 - V°B° = pasos activos de la estructura PROCEDIMIENTO con tipo de dato «Realizado por y Visto bueno» (441).
   Aparte se informan los de tipo «Visto bueno» (440), que no entran en la comparación.
+- Las versiones Canceladas no cuentan: última y penúltima son las no canceladas.
 - Vigente = la versión Autorizada más alta.
 """
 from __future__ import annotations
@@ -102,8 +103,8 @@ def _ingreso(observacion: str):
 
 
 def _elegir(registros: List[dict]) -> dict:
-    """Si un número de versión se repite, vale la no cancelada más reciente."""
-    return max(registros, key=lambda x: (x["estado"] != "Cancelado", x["registro"]))
+    """Si un número de versión se repite, vale la más reciente."""
+    return max(registros, key=lambda x: x["registro"])
 
 
 def armar_filas(maestro: List[dict], anio: int, mes: int) -> List[dict]:
@@ -124,7 +125,10 @@ def armar_filas(maestro: List[dict], anio: int, mes: int) -> List[dict]:
             continue
         por_version = collections.defaultdict(list)
         for x in regs:
-            por_version[x["version"]].append(x)
+            if x["estado"] != "Cancelado":
+                por_version[x["version"]].append(x)
+        if not por_version:
+            continue
         versiones = sorted(por_version)
         ult = _elegir(por_version[versiones[-1]])
         pen = _elegir(por_version[versiones[-2]]) if len(versiones) > 1 else None
@@ -233,7 +237,7 @@ def escribir_excel(filas: List[dict], salida: Path, anio: int, mes: int) -> None
         "• Un RMD es la cadena de versiones de un mismo código principal; entra si alguna versión se registró, ingresó "
         "(fecha al inicio de la Observación) o autorizó en el mes. Solo Planta Ate y Planta Lima.",
         "• Las solicitudes sin código (Solicitado, Solicitud Aprobada o Rechazada) no cuentan como versión: aún no tienen estructura.",
-        "• Si un número de versión se repite, se toma la no cancelada más reciente.",
+        "• Las versiones Canceladas no se cuentan: se toma la versión anterior. Si un número de versión se repite, vale la más reciente.",
         "• V°B° = pasos activos de la estructura PROCEDIMIENTO con tipo de dato «Realizado por y Visto bueno». "
         "Los de tipo «Visto bueno» solo se informan aparte y no entran en la diferencia.",
         "• Diferencia = V°B° de la última versión − V°B° de la penúltima.",
