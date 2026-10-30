@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.106.0
+// @version      1.107.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.106.0';                                                       // mantener igual a @version
+  const VERSION = '1.107.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -78,6 +78,7 @@
     ['puesto', 'Puesto de trabajo faltante', 'La celda parpadea si falta asignarlo.'],
     ['bajas', 'Elementos de baja', 'En un RMD Ingresado avisa pasos, utensilios y equipos de baja en SAP.'],
     ['reglasrev', 'Reglas de revisión', 'Resalta lo que definas y los documentos citados que no están vigentes.'],
+    ['motivocaract', 'Motivo CARACTERIZACION en versiones nuevas', 'Al crear una versión con «Nueva Versión», avisa si quedó con el Motivo CARACTERIZACION copiado de la versión anterior: Status RMD la cuenta como caracterización.'],
     ['acuerdos', 'Acuerdos', 'Pestaña «Acuerdos» en Configuración Maestra para escribir los acuerdos de configuración (texto, códigos de paso de referencia e imágenes), compartidos con todos a través de status-rmd; y en la ventana del RMD, aviso si no cumple los que aplican a su planta, etapa y fase.'],
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
@@ -16958,7 +16959,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   // ---- Nueva versión Ingresada con «Nueva Versión» del portal ----
   async function ppVersiones(modelo, principal) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, p = isNaN(+principal) ? principal : +principal;
-    return (await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', String(principal)), new F('codigo', 'EQ', p)], and: false })], { $expand: 'estadoIdRmd', $orderby: 'mdId' })).map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' }));
+    return (await leerTodoDe(modelo, 'MD', [new F({ filters: [new F('codigoversionprincipal', 'EQ', String(principal)), new F('codigo', 'EQ', p)], and: false })], { $expand: 'estadoIdRmd,motivoId', $orderby: 'mdId' })).map((m) => ({ ...m, estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '' }));
   }
   function ppCerrarDialogosSap() {
     for (let i = 0; i < 8; i++) { const d = dialogos().pop(); if (!d) return; const b = [...d.querySelectorAll('button')].find((x) => x.getClientRects().length && /^(Cerrar|Cancelar)$/.test(norm(x.textContent))); if (!b) return; sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).firePress(); }
@@ -16993,8 +16994,83 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       if (i === 224) throw new Error(`la copia quedó incompleta (${n} de ${total} filas); revísala en el portal antes de importar`);
     }
     await esperar(1500); ppCerrarDialogosSap(); await esperar(800);
+    if (on('motivocaract')) aislar('motivoCaracterizacion', () => avisoCaract.revisar(origen, nueva));
     return { ...nueva, estado: nueva.estado };
   }
+  // ==CARACTERIZACION-INICIO==
+  // Motivo CARACTERIZACION en las versiones nuevas. Status RMD cuenta como caracterización (Ruta 2) cada RMD con Motivo CARACTERIZACION, y «Nueva
+  // Versión» copia el Motivo de la versión anterior. Al crear una versión nueva (a mano en la ventana del RMD o desde el script) se lee con qué
+  // Motivo quedó y, si es CARACTERIZACION, se avisa: si esa versión no es una caracterización, el Motivo se cambia en «Editar RM».
+  // leer(origen) -> versiones del master (con motivoId); confirmacion() -> mensaje «Nueva Versión» del portal o null; respuesta(m) -> texto del
+  // botón pulsado (null si no se supo); aceptado(t) -> si ese botón acepta; avisar(origen, nueva, motivo); esperar(ms). Aceptado, se busca la
+  // versión nueva hasta 15 min (lo mismo que espera «Crear la versión Ingresada»); si no se supo con qué botón se cerró el mensaje, 2 min.
+  function crearAvisoCaracterizacion({ leer, confirmacion, respuesta, aceptado, avisar, esperar, intervalo = 5000, tope = 900000, topeDudoso = 120000 }) {
+    const esMotivo = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '').includes('CARACTERIZ');
+    const motivoDe = (m) => (m && m.motivoId && m.motivoId.descripcion) || '';
+    const avisados = new Set();
+    const nuevaEntre = (lista, origen, ids) => (lista || []).find((m) => m && !ids.has(m.mdId) && m.mdId !== origen.mdId && (+m.version || 0) > (+origen.version || 0)) || null;
+    function revisar(origen, nueva) {
+      if (!nueva || avisados.has(nueva.mdId) || !esMotivo(motivoDe(nueva))) return false;
+      avisados.add(nueva.mdId); avisar(origen, nueva, motivoDe(nueva)); return true;
+    }
+    // Se anotan las versiones que ya existen antes de que el portal cree la nueva; si el mensaje se acepta (o se cerró sin saber con qué
+    // botón, p. ej. con Enter), se busca la versión nueva hasta que aparezca: el portal la crea en segundos y la copia de la configuración sigue después.
+    async function alPulsar(origen) {
+      const idsP = Promise.resolve().then(() => leer(origen)).then((l) => new Set((l || []).map((m) => m.mdId)), () => null);
+      const conf = await confirmacion(); if (!conf) return null;
+      const r = await respuesta(conf); if (r && !aceptado(r)) return null;
+      const ids = await idsP; if (!ids) return null;
+      for (let t = 0, fin = r ? tope : topeDudoso; t < fin; t += intervalo) {
+        await esperar(intervalo);
+        let n = null; try { n = nuevaEntre(await leer(origen), origen, ids); } catch (e) { /* se reintenta */ }
+        if (n) { revisar(origen, n); return n; }
+      }
+      return null;
+    }
+    return { esMotivo, motivoDe, nuevaEntre, revisar, alPulsar };
+  }
+  // ==CARACTERIZACION-FIN==
+  // Versiones del master de un RMD: por su linaje y por el enlace con la versión anterior (mdIdVersionAnt).
+  async function versionesConMotivo(o) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('sin la lista principal');
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, principal = String(o.codigoversionprincipal || o.codigo), p = isNaN(+principal) ? principal : +principal;
+    const filtros = [new F('codigoversionprincipal', 'EQ', principal), new F('codigo', 'EQ', p)]; if (o.mdId) filtros.push(new F('mdIdVersionAnt', 'EQ', o.mdId));
+    return leerTodoDe(modelo, 'MD', [new F({ filters: filtros, and: false })], { $expand: 'estadoIdRmd,motivoId,sucursalId', $orderby: 'mdId' });
+  }
+  // Respuesta de la persona a un mensaje del portal (sin el aviso de esperarRespuestaPortal: aquí no hay un proceso del script en curso)
+  async function respuestaPersona(m, ms = 600000) {
+    let pulsado = null; const oir = (e) => { const b = e.target.closest && e.target.closest('button'); if (b) pulsado = norm(b.textContent); };
+    m.addEventListener('click', oir, true);
+    const t0 = Date.now(); while (Date.now() - t0 < ms && m.isConnected && m.getClientRects().length) await esperar(200);
+    m.removeEventListener('click', oir, true); return pulsado;
+  }
+  let ventanaCaract = null;
+  function avisarCaracterizacion(origen, nueva, motivo) {
+    const extra = [nueva.nivelTxt, nueva.sucursalId && nueva.sucursalId.contenido].filter(Boolean).join(' · ');
+    const fila = `<li><b>${esc(nueva.codigo)}</b> v${esc(nueva.version)} · ${esc(nueva.descripcion || origen.descripcion || '')}${extra ? ` · ${esc(extra)}` : ''} <span class="rmd-nota">(Motivo copiado de la v${esc(origen.version)})</span></li>`;
+    if (ventanaCaract && ventanaCaract.fondo.isConnected) { ventanaCaract.cuerpo.querySelector('.rmd-caract-lista').insertAdjacentHTML('beforeend', fila); return; }
+    const v = ventana('Motivo CARACTERIZACION en la versión nueva', { cancelar: () => v.cerrar() });
+    v.fondo.classList.add('rmd-caract');
+    v.cuerpo.innerHTML = `<p>La versión nueva quedó con el Motivo <b>${esc(motivo)}</b>, que «Nueva Versión» copió de la versión anterior:</p>
+      <ul class="rmd-caract-lista">${fila}</ul>
+      <p class="rmd-nota">Con ese Motivo, Status RMD la cuenta como caracterización. Si esta versión no es una caracterización, cambia el Motivo en «Editar RM».</p>`;
+    v.pie.appendChild(botonModal('Entendido', 'primario', () => v.cerrar()));
+    ventanaCaract = v;
+  }
+  const avisoCaract = crearAvisoCaracterizacion({
+    leer: versionesConMotivo, respuesta: respuestaPersona, aceptado: esAceptar, avisar: avisarCaracterizacion, esperar,
+    confirmacion: () => hasta(() => [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)), 15000, 250),
+  });
+  // «Nueva Versión» pulsado a mano en la ventana de un RMD («<código> - <descripción>»). El script lo pulsa con firePress (sin clic) y lo revisa él mismo.
+  document.addEventListener('click', (e) => {
+    if (!on('motivocaract')) return;
+    const b = e.target.closest && e.target.closest('button');
+    if (!b || !(b.title === 'Nueva Versión' || norm(b.textContent) === 'Nueva Versión')) return;
+    const d = enDialogo(b), cod = d && (/^(\d{6,})\s*-/.exec(cabecera(d)) || [])[1]; if (!cod) return;
+    const ctrl = aislar('motivoCaracterizacion', controladorPrincipal), am = ctrl && ctrl.getView().getModel('asociarDatos'), asoc = am && am.getData();
+    if (!asoc || !asoc.mdId || String(asoc.codigo) !== cod) return;
+    avisoCaract.alPulsar({ ...asoc }).catch((err) => anotarError('motivoCaracterizacion', err));
+  }, true);
   // ---- Ventanas ----
   function abrirPlantillaProduccion(codigo) {
     const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista «Configuración Manufactura Digital».', true); return; }
@@ -17742,7 +17818,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'predanterior', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
-    ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'acuerdos', 'ordenest']],
+    ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'motivocaract', 'acuerdos', 'ordenest']],
     ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio']],
   ];
   const ICONOS_PANEL = {
