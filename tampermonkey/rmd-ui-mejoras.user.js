@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.107.0
+// @version      1.108.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.107.0';                                                       // mantener igual a @version
+  const VERSION = '1.108.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -7134,7 +7134,7 @@
   // Máximo 1000 filas por lectura (sin __next): $count y páginas de 1000 por mdId, 4 en paralelo; se sigue si la última vino llena.
   const EXPAND_MD = 'estadoIdRmd,sucursalId,motivoId,aReceta/recetaId';
   const SELECT_MD = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'nivelTxt', 'codAgrupadorReceta', 'codDefectoReceta', 'codigoversionprincipal',
-    'descripcion', 'observacion', 'fechaRegistro', 'usuarioRegistro', 'fechaAutorizacion', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'areaRmdTxt',
+    'descripcion', 'observacion', 'fechaRegistro', 'usuarioRegistro', 'fechaActualiza', 'fechaAutorizacion', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'areaRmdTxt',
     'estadoIdRmd/contenido', 'sucursalId/contenido', 'motivoId/descripcion',
     'aReceta/recetaId/Matnr', 'aReceta/recetaId/Verid', 'aReceta/recetaId/Atwrt', 'aReceta/recetaId/Text1', 'aReceta/recetaId/Mdv01',
     'aReceta/recetaId/Plnnr', 'aReceta/recetaId/Alnal'].join(',');
@@ -7218,6 +7218,50 @@
         inicio: dia(o.Gstrp), fin: dia(o.Gltrp), lote: o.Charg || '', rmd: conRmd.get(`${o.Aufnr}|${o.Matnr}`) || '' })),
     };
   }
+  // Trazabilidad de SAP para el Programa acumulado de Status RMD: cada cambio de estado de cada RMD con su fecha y hora, porque el MD solo
+  // guarda la última Fecha Autorización. MD_TRAZABILIDAD desde TRAZ_STATUS_DESDE (unas 7 500 filas en 2026, ~1 s); Status RMD la suma a lo
+  // que ya tenía. Las solicitudes no tienen Trazabilidad: van con su Fecha Solicitud y, si ya se aprobaron, rechazaron o cancelaron, con su
+  // última actualización (fechaActualiza).
+  // ==TRAZABILIDAD-INICIO==
+  const TRAZ_STATUS_DESDE = '2026-01-01';
+  // filas: MD_TRAZABILIDAD con estadoTrazab; datos: el maestro (MD). → { v: 1, generado, desde, items: [[código, solicitud, versión, etapa,
+  // [[fecha ISO, estado]…]]…] }: por RMD, sus cambios desde «desde» y el último de antes (su estado al empezar), si se conoce.
+  function trazabilidadParaStatusRmd(filas, datos, desde = TRAZ_STATUS_DESDE) {
+    const t0 = Date.parse(desde + 'T00:00:00Z'), porMd = new Map();
+    const agregar = (mdId, f, estado) => {
+      const d = f instanceof Date ? f : f ? new Date(f) : null, e = String(estado || '').replace(/\s+/g, ' ').trim();
+      if (mdId == null || !d || isNaN(d) || !e) return;
+      if (!porMd.has(mdId)) porMd.set(mdId, []);
+      porMd.get(mdId).push([d.getTime(), e]);
+    };
+    (filas || []).forEach((t) => { if (t && t.activo !== false) agregar(t.mdId_mdId, t.fechaRegistro, t.estadoTrazab && t.estadoTrazab.contenido); });
+    const mds = new Map();
+    (datos || []).forEach((md) => {
+      mds.set(md.mdId, md);
+      if (md.codigo || !md.codigoSolicitud) return;   // solicitud: aún sin código de RMD
+      const estado = String((md.estadoIdRmd && md.estadoIdRmd.contenido) || '').trim();
+      agregar(md.mdId, md.fechaSolicitud, 'Solicitado');
+      if (estado && !/^solicitado$/i.test(estado)) agregar(md.mdId, md.fechaActualiza || md.fechaSolicitud, estado);
+    });
+    const items = [];
+    porMd.forEach((ev, mdId) => {
+      const md = mds.get(mdId); if (!md) return;
+      ev.sort((a, b) => a[0] - b[0]);
+      const i = ev.findIndex((x) => x[0] >= t0); if (i < 0) return;   // sin cambios desde «desde»: Status RMD lo toma como hoy
+      items.push([md.codigo || '', md.codigoSolicitud || '', md.version != null ? String(md.version) : '', md.nivelTxt || '',
+        ev.slice(Math.max(0, i - 1)).map(([t, e]) => [new Date(t).toISOString(), e])]);
+    });
+    return { v: 1, generado: new Date().toISOString(), desde, items };
+  }
+  // ==TRAZABILIDAD-FIN==
+  async function leerTrazabilidadParaStatusRmd(modelo, datos, avisar) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const params = { $expand: 'estadoTrazab', $select: 'idTrazabilidad,mdId_mdId,fechaRegistro,activo,estadoTrazab/contenido' };
+    let filas;
+    try { filas = await leerEntidadCompleta(modelo, 'MD_TRAZABILIDAD', params, 'idTrazabilidad', avisar, [new F('fechaRegistro', 'GE', new Date(TRAZ_STATUS_DESDE + 'T00:00:00Z'))]); }
+    catch (e) { filas = await leerEntidadCompleta(modelo, 'MD_TRAZABILIDAD', params, 'idTrazabilidad', avisar); }   // si el servicio no acepta el filtro: toda (~44 000 filas) y se filtra aquí
+    return trazabilidadParaStatusRmd(filas, datos);
+  }
   const ICONO_ENVIAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5h11"/><path d="M4.5 11V8.5M7.5 11V6.5"/><path d="M10 6.5 13.5 3M10.8 3h2.7v2.7"/></svg>';
   async function enviarAStatusRmd(btn) {
     if (window.__rmdEnviandoStatus) return;
@@ -7243,8 +7287,12 @@
       let opSap = null, avisoOps = '';
       try { const ctrl = controladorPrincipal(); if (!ctrl || !ctrl.oModelErpNec) throw new Error('no se encontró el servicio de órdenes'); opSap = await leerOrdenesParaStatusRmd(ctrl, modelo); }
       catch (e) { avisoOps = ` No se pudieron leer las órdenes de producción (${e.message}).`; }
+      // La Trazabilidad (Programa acumulado de Status RMD) tampoco detiene el envío si no se puede leer.
+      let trazabilidad = null, avisoTraz = '';
+      try { trazabilidad = await leerTrazabilidadParaStatusRmd(modelo, datos, (h, t) => setTxt(span, `Leyendo la Trazabilidad… ${h}/${t}`)); }
+      catch (e) { avisoTraz = ` No se pudo leer la Trazabilidad (${e.message}).`; }
       const usuarioSap = usuarioSapActual();
-      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente), usuarioSap, opSap };
+      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente), usuarioSap, opSap, trazabilidad };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
@@ -7255,7 +7303,7 @@
       await hasta(() => respuesta || win.closed, 300000, 300);
       if (!respuesta) throw new Error(usuarioSap ? 'no llegó la confirmación de Status RMD (¿se cerró la pestaña?)' : 'no llegó la confirmación de Status RMD (¿se canceló el DNI o se cerró la pestaña?)');
       if (!respuesta.ok) throw new Error(respuesta.motivo || 'Status RMD no aceptó los datos');
-      toast(`Enviado a Status RMD: ${datos.length} RMD${opSap ? ` y ${opSap.ops.length} órdenes de producción` : ''} leídos de SAP. ${respuesta.resumen || ''}${avisoOps}`.trim(), !!avisoOps);
+      toast(`Enviado a Status RMD: ${datos.length} RMD${opSap ? ` y ${opSap.ops.length} órdenes de producción` : ''} leídos de SAP. ${respuesta.resumen || ''}${avisoOps}${avisoTraz}`.trim(), !!(avisoOps || avisoTraz));
     } catch (e) { toast('No se pudo enviar a Status RMD: ' + e.message, true); }
     finally { clearInterval(ping); window.removeEventListener('message', alMensaje); btn.disabled = false; setTxt(span, texto0); window.__rmdEnviandoStatus = false; btn.classList.remove('rmd-enviando'); btn.querySelectorAll('canvas.rmd-orbe').forEach((x) => x.remove()); }
   }
@@ -7266,7 +7314,7 @@
     const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra) return;
     if (!barra.querySelector('.rmd-status-rmd')) {
       const s = botonIcono(ICONO_ENVIAR, 'Status RMD', 'rmd-status-rmd', () => enviarAStatusRmd(s));
-      s.title = 'Enviar a Status RMD: el maestro completo con sus recetas y las órdenes de producción de ATE y LIMA de los próximos 15 días, en otra pestaña y con tu usuario de SAP'; s.setAttribute('aria-label', 'Enviar a Status RMD');
+      s.title = 'Enviar a Status RMD: el maestro completo con sus recetas, su Trazabilidad desde 2026 y las órdenes de producción de ATE y LIMA de los próximos 15 días, en otra pestaña y con tu usuario de SAP'; s.setAttribute('aria-label', 'Enviar a Status RMD');
       const IP = sap.ui.core.IconPool, info = IP && IP.getIconInfo && IP.getIconInfo('sap-icon://paper-plane'), svg = s.querySelector('svg');   // icono de SAP, como los vecinos
       if (info && svg) { const i = document.createElement('i'); i.className = 'rmd-ico-sap'; i.setAttribute('aria-hidden', 'true'); i.style.fontFamily = `'${info.fontFamily}'`; i.textContent = info.content; svg.replaceWith(i); }
       const ico = btnExportar.querySelector('.sapUiIcon'), caja = (btnExportar.closest('.sapMBtn') || btnExportar).getBoundingClientRect();
@@ -8285,9 +8333,10 @@
   // ---- Equipos por master ----
   // MD_ES_EQUIPO y MD_ES_UTENSILIO en páginas de 1000 (6 en paralelo); una fila por master y equipo.
   const ICONO_EQUIPOS = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M6.5 6.2v7.3"/></svg>';
-  async function leerEntidadCompleta(modeloPortal, entidad, params, clave, avisar) { return conLectura(modeloPortal, (modelo) => leerEntidadCompletaCon(modelo, entidad, params, clave, avisar)); }
-  async function leerEntidadCompletaCon(modelo, entidad, params, clave, avisar) {
-    const leer = (ruta, u) => new Promise((ok, mal) => modelo.read(ruta, { urlParameters: u, success: ok, error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
+  // filtros (opcional): los mismos en el conteo y en cada página
+  async function leerEntidadCompleta(modeloPortal, entidad, params, clave, avisar, filtros) { return conLectura(modeloPortal, (modelo) => leerEntidadCompletaCon(modelo, entidad, params, clave, avisar, filtros)); }
+  async function leerEntidadCompletaCon(modelo, entidad, params, clave, avisar, filtros) {
+    const leer = (ruta, u) => new Promise((ok, mal) => modelo.read(ruta, { filters: filtros, urlParameters: u, success: ok, error: (e) => mal(new Error(`el servidor no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) }));
     const POR = 1000, total = Number(await leer(`/${entidad}/$count`, {})) || 0, paginas = Math.max(1, Math.ceil(total / POR)), out = new Array(paginas);
     const pagina = async (i) => ((await leer(`/${entidad}`, { ...params, $orderby: clave, $top: String(POR), $skip: String(i * POR) })).results || []);
     let sig = 0, hechas = 0;
