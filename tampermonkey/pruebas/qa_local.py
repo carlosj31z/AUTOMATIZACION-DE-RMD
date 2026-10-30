@@ -993,6 +993,68 @@ with sync_playwright() as p:
               and st["cmb"] == [["cantidad", "insumo", "30 L>32.5 L"]] and any(a.startswith("aviso:El cambio en la cantidad") for a in st["av"]) and st["cam"] and st["antes"] == "30.000" and st["nueva"] == "32.500"
               and st["panel"] == ["Cantidad (insumo)"] and rb == {"cant": "32.5", "apl": 1} and fin == 0)
         return ok, json.dumps({"vis": vis, "dlg": dlg[:200], "propuesta": propuesta, "sigue": sigue, "st": {k: v for k, v in st.items() if k != "W"}, "rb": rb, "fin": fin, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN55 Motivo CARACTERIZACION en versiones nuevas (v1.107.0): «Nueva Versión» pulsado a mano en la ventana del RMD y aceptado → el script busca la versión nueva (por linaje y por mdIdVersionAnt, con el Motivo) y, si quedó con CARACTERIZACION, muestra el aviso con código, versión, etapa, planta y de qué versión se copió; con «Cancelar» no busca ni avisa. UI5 y el modelo OData simulados (solo lectura)")
+    def _():
+        pg.evaluate("""() => {
+          window.__car = { antes: window.sap, creada: false, lecturas: [] };
+          function F(a, b, c) { if (a && typeof a === 'object') { this.filters = a.filters; this.and = a.and; } else { this.path = a; this.op = b; this.value = c; } }
+          const md = (mdId, codigo, version, motivo, extra) => Object.assign({ mdId, codigo, version, codigoversionprincipal: '2202504506', motivoId: { descripcion: motivo } }, extra || {});
+          const modelo = { read: (ruta, o) => {
+            window.__car.lecturas.push({ ruta, filtros: (o.filters || []).map((f) => (f.filters || [f]).map((x) => [x.path, x.op, x.value])), expand: (o.urlParameters || {}).$expand });
+            const l = [md(501, '2202504506', 1, 'CONTROL DE CAMBIO'), md(502, '2202609344', 3, 'CARACTERIZACION')];
+            if (window.__car.creada) l.push(md(777, '2202609999', 4, 'Caracterización', { mdIdVersionAnt: 502, descripcion: 'MENTHOLATUM NF UNG (L)', nivelTxt: 'Fabricación', sucursalId: { contenido: 'PLANTA LIMA' } }));
+            setTimeout(() => o.success({ results: l }), 30); } };
+          const vista = { getModel: (n) => (n === 'mainModelv2' ? modelo : n === 'asociarDatos' ? { getData: () => ({ mdId: 502, codigo: '2202609344', version: 3, codigoversionprincipal: '2202504506', descripcion: 'MENTHOLATUM NF UNG (L)' }) } : null) };
+          const reg = { btnExpCar: { mEventRegistry: { press: [{ oListener: { getView: () => vista } }] } } };
+          window.sap = { ui: { getCore: () => ({ byId: (id) => reg[id] }), require: (n) => (n === 'sap/ui/model/Filter' ? F : null) } };
+          document.getElementById('app').insertAdjacentHTML('afterbegin', '<button id="btnExpCar" title="Exportar">E</button>');
+        }""")
+        abrir(pg, PRECAUCIONES, titulo="2202609344 - MENTHOLATUM NF UNG (L)")
+        pg.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop();
+          d.querySelector('.sapMListHdr').insertAdjacentHTML('beforeend', '<button id="btnNuevaVersion" title="Nueva Versión">NV</button>');
+          d.querySelector('#btnNuevaVersion').addEventListener('click', () => {           // el «portal»: confirma y, si se acepta, crea la versión
+            const m = document.createElement('div'); m.className = 'sapMDialog sapMMessageDialog'; m.setAttribute('role', 'alertdialog');
+            m.innerHTML = '<header><h2 class="sapMTitle">Confirmación</h2></header><section>¿Desea generar una nueva versión del RMD?</section><footer><button>Aceptar</button><button>Cancelar</button></footer>';
+            m.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { m.remove(); if (b.textContent === 'Aceptar') setTimeout(() => { window.__car.creada = true; }, 300); }));
+            document.body.appendChild(m); }); }""")
+        r = {}
+        pg.locator("#btnNuevaVersion").click(); pg.wait_for_timeout(600)
+        pg.locator(".sapMMessageDialog button", has_text="Aceptar").click()
+        pg.wait_for_selector(".rmd-caract", timeout=15000)
+        r["aviso"] = pg.evaluate("() => { const v = document.querySelector('.rmd-caract'); return { titulo: v.querySelector('h3').textContent, texto: v.querySelector('.rmd-modal-cuerpo').textContent.replace(/\\s+/g, ' ').trim(), botones: [...v.querySelectorAll('.rmd-modal-pie button')].map((b) => b.textContent) }; }")
+        r["lectura"] = pg.evaluate("() => window.__car.lecturas[window.__car.lecturas.length - 1]")
+        pg.locator(".rmd-caract .rmd-modal-pie button", has_text="Entendido").click(); pg.wait_for_timeout(300)
+        r["cerrado"] = pg.evaluate("!document.querySelector('.rmd-caract')")
+        # con «Cancelar»: ni busca la versión nueva ni avisa
+        pg.evaluate("() => { window.__car.creada = false; window.__car.lecturas = []; }")
+        pg.locator("#btnNuevaVersion").click(); pg.wait_for_timeout(600)
+        pg.locator(".sapMMessageDialog button", has_text="Cancelar").click(); pg.wait_for_timeout(6500)
+        r["cancelar"] = pg.evaluate("() => ({ aviso: !!document.querySelector('.rmd-caract'), lecturas: window.__car.lecturas.length })")
+        pg.evaluate("() => { window.sap = window.__car.antes; document.getElementById('btnExpCar').remove(); }")
+        cerrar_todo(pg)
+        t = r["aviso"]["texto"]
+        filtros = [x for g in r["lectura"]["filtros"] for x in g]
+        ok = (r["aviso"]["titulo"] == "Motivo CARACTERIZACION en la versión nueva" and all(x in t for x in ("Caracterización", "2202609999", "v4", "MENTHOLATUM NF UNG (L)", "Fabricación", "PLANTA LIMA", "copiado de la v3", "«Editar RM»"))
+              and r["aviso"]["botones"] == ["Entendido"] and r["cerrado"] and ["mdIdVersionAnt", "EQ", 502] in filtros and ["codigoversionprincipal", "EQ", "2202504506"] in filtros
+              and "motivoId" in r["lectura"]["expand"] and not r["cancelar"]["aviso"] and r["cancelar"]["lecturas"] <= 1)
+        return ok, json.dumps(r, ensure_ascii=False)[:1800]
+    @prueba("LN54 Borrador de Producción · pasos nuevos idénticos (v1.106.0): dos procesos menores nuevos con el mismo texto en la misma lista se crean una sola vez: el primero dice «Se creará en SAP · 2 lugares», el otro «Usa el mismo paso nuevo» con su aviso, y «A crear» cuenta 1; en otra sección es otro paso")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        r = e.evaluate("""() => { const s = window.__pp.estado(), p = s.W.estructuras[2].etiquetas[0].pasos[1];
+          p.pm = [{ id: 'n:900', pasoId: null, codigo: null, texto: 'VELOCIDAD  INICIAL (NIVEL 40 - 80):', orden: 1, tipo: 443, vi: '40', vf: '80', margen: '10', nuevo: true }];
+          window.__pp.duplicar([p.id]); const s2 = window.__pp.estado(), l = s2.W.estructuras[2].etiquetas[0].pasos, c = l.find((y) => y.copiaDe === p.id), m2 = c.pm[0];
+          const tag = (id) => [...document.querySelectorAll(`tr[data-id="${id}"] .pp-tag.crea`)].map((x) => x.textContent).join('|');
+          const av = (id) => (s2.AV.find(([k]) => k === id) || [, []])[1].map((a) => a.texto).join('|');
+          return { t1: tag('n:900'), t2: tag(m2.id), a1: av('n:900'), a2: av(m2.id), nuevos: s2.contar.nuevos, mismo: m2.texto }; }""")
+        N = pg.evaluate("""() => { const N = window.__rmdStats.plantilla.nucleo; return [N.claveNueva('E1', null, ' Velocidad  inicial:'), N.claveNueva('E1', null, 'VELOCIDAD INICIAL:'), N.claveNueva('E2', null, 'VELOCIDAD INICIAL:')]; }""")
+        e.close()
+        ok = (not errs and "· 2 lugares" in r["t1"] and r["t2"] == "★ Usa el mismo paso nuevo" and "una sola vez" in r["a1"] and "se usa ese mismo paso, no se crea otro" in r["a2"] and r["nuevos"] == 1
+              and N[0] == N[1] and N[1] != N[2])
+        return ok, json.dumps({"r": r, "N": N, "errores": errs[:3]}, ensure_ascii=False)[:1500]
     @prueba("LN53 Borrador de Producción · insumo como proceso menor (v1.105.0): cada proceso menor e insumo de un paso tiene «＋ Insumo debajo»; el diálogo elige la posición dentro del paso (por defecto debajo de esa fila), la lista sale de la sección INSUMOS con la cantidad cambiada allí (✎) y propone lo que falta repartir; el insumo nuevo queda justo debajo")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
