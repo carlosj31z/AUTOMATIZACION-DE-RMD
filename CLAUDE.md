@@ -123,16 +123,29 @@ cuenta). Escribir y responder siempre en **español**.
   bloques y se reinyecta el editor y su CSS de la versión nueva (como hace
   `ppHtml` en el userscript).
 
-## Estado al 2026-10-30
+## Estado al 2026-10-31
 
-- Publicada en SharePoint: **1.105.0** (insumo como proceso menor del paso).
-  En la rama por defecto: 1.105.0.
-- **PR #54 – v1.106.0** (rama `claude/pasos-nuevos-unicos`, sobre 1.105.0):
-  pasos nuevos idénticos (misma sección + etiqueta + texto sin
-  mayúsculas/espacios) se crean una sola vez en SAP. **Pendiente de fusionar y
-  de subir.** La siguiente versión debe ser > 1.106.0 y construirse encima.
-- PR #55: comando `vb-mes` (reporte mensual de V°B°), abierto.
-- PR #22 (v1.83.1, CC y NC de P1/P2): abierto y antiguo; revisar si sigue vigente.
+- Publicada en SharePoint: **1.108.0** (confirmado por Carlos). En la rama por
+  defecto: 1.108.0. **La siguiente versión debe ser > 1.108.0** y construirse
+  encima de la rama por defecto.
+- Fusionados hace poco:
+  - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
+    sin mayúsculas/espacios) se crean una sola vez en SAP.
+  - PR #57 – v1.107.0 + v1.108.0 (incluye 1.106.0): aviso de Motivo
+    CARACTERIZACION al crear una versión nueva, y «Enviar a Status RMD» manda la
+    Trazabilidad de SAP (`MD_TRAZABILIDAD`, desde 01/01/2026).
+- Abiertos en este repo:
+  - PR #55: comando `vb-mes` (reporte mensual de V°B°).
+  - PR #22 (v1.83.1, CC y NC de P1/P2): antiguo; revisar si sigue vigente.
+- status-rmd (`carlosj31z/REGISTRO-DE-MANUFACTURA-DIGITAL`):
+  - PR #20 y #21 fusionados: la pestaña Seguimiento RMD pasó a **INDICADORES**
+    (formato PPTX de ATE, autorizados del mes vs backlog, cuadro del mes del área
+    RMD con meta 80 %, detalle con Excel y PowerPoint, Ruta 2 = Motivo
+    CARACTERIZACION de SAP); Producción/Forecast con una fila por etapa;
+    estatus BORRADOR / INGRESAR / FLUJO SAP / CONTROL DE CAMBIO / POR REVISIÓN.
+  - PR #14 («Por autorizar»): **en pausa**, falta el OK de la jefa de Carlos;
+    no fusionar ni avanzar.
+  - PR #19 (fases de Acuerdos): abierto.
 - Pendientes conocidos:
   - **Insumo NUEVO en SAP**: en el Borrador de Producción el insumo nuevo
     queda «a mano» hasta capturar qué guarda «Agregar Insumo» del portal (probar
@@ -141,7 +154,7 @@ cuenta). Escribir y responder siempre en **español**.
   - Probar la tabla INSUMOS con un RMD de Fabricación.
   - Probar «Actualizar» real de Cambio de material en un Autorizado (DMS).
   - Contingencia «Por código» sin prueba real.
-  - status-rmd: «Por autorizar» descartado por ahora (falta OK de la jefa de Carlos).
+- Mantener esta sección al día al publicar una versión o fusionar un PR.
 
 ## Datos que no van en el repo
 
