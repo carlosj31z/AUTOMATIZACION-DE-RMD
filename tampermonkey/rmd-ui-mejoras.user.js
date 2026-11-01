@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.108.0
+// @version      1.109.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.108.0';                                                       // mantener igual a @version
+  const VERSION = '1.109.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -7133,7 +7133,7 @@
   }
   // Máximo 1000 filas por lectura (sin __next): $count y páginas de 1000 por mdId, 4 en paralelo; se sigue si la última vino llena.
   const EXPAND_MD = 'estadoIdRmd,sucursalId,motivoId,aReceta/recetaId';
-  const SELECT_MD = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'nivelTxt', 'codAgrupadorReceta', 'codDefectoReceta', 'codigoversionprincipal',
+  const SELECT_MD = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'nivelTxt', 'codAgrupadorReceta', 'codDefectoReceta', 'codigoversionprincipal', 'estadoIdProceso_iMaestraId',
     'descripcion', 'observacion', 'fechaRegistro', 'usuarioRegistro', 'fechaActualiza', 'fechaAutorizacion', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'areaRmdTxt',
     'estadoIdRmd/contenido', 'sucursalId/contenido', 'motivoId/descripcion',
     'aReceta/recetaId/Matnr', 'aReceta/recetaId/Verid', 'aReceta/recetaId/Atwrt', 'aReceta/recetaId/Text1', 'aReceta/recetaId/Mdv01',
@@ -7174,16 +7174,20 @@
   // postMessage a la pestaña de status-rmd.vercel.app (origen exacto) con el maestro y el usuario de sesión (nombre y correo del launchpad).
   const URL_STATUS_RMD = 'https://status-rmd.vercel.app/';
   const ORIGEN_STATUS_RMD = 'https://status-rmd.vercel.app';
-  // Fecha Registro / Solicitud con hora (ISO UTC) en las dos últimas columnas, por compatibilidad.
+  // Fecha Registro / Solicitud con hora (ISO UTC) después de las recetas, por compatibilidad. Al final, «Producción Estado» (Pendiente,
+  // Enviado, Aprobado…): Status RMD separa los pendientes en el flujo de Producción (enviados al jefe o gerente sin aprobar), que no
+  // dependen del área, para su «% del área».
   const COLUMNAS_PUENTE = ['codigo', 'codigoSolicitud', 'version', 'estado', 'codDefecto', 'codAgrupador', 'descripcion', 'etapa', 'fechaRegistro',
     'usuarioRegistro', 'fechaAut', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'planta', 'seccion', 'motivo', 'observacion', 'linaje', 'recetas',
-    'fechaRegistroHora', 'fechaSolicitudHora'];
-  function filaPuente(md) {
+    'fechaRegistroHora', 'fechaSolicitudHora', 'produccionEstado'];
+  // mapaProd: texto de «Producción Estado» por id (mapaProduccionEstado).
+  function filaPuente(md, mapaProd) {
     const f = datosBaseDeMD(md);
     const recetas = ((md.aReceta && md.aReceta.results) || []).map((r) => { const rc = r.recetaId || {}; return [rc.Matnr || '', rc.Verid || '', rc.Atwrt || '', (rc.Text1 || '').trim(), rc.Mdv01 || '', rc.Plnnr || '', rc.Alnal || '']; });
     const fechaHoraIso = (x) => (x instanceof Date && !isNaN(x) ? x.toISOString() : '');
     const v = { ...f, recetas, fechaRegistro: fechaIso(f.fechaRegistro), fechaSolicitud: fechaIso(f.fechaSolicitud),
-      fechaRegistroHora: fechaHoraIso(f.fechaRegistro), fechaSolicitudHora: fechaHoraIso(f.fechaSolicitud) };
+      fechaRegistroHora: fechaHoraIso(f.fechaRegistro), fechaSolicitudHora: fechaHoraIso(f.fechaSolicitud),
+      produccionEstado: (mapaProd && md.estadoIdProceso_iMaestraId != null && mapaProd[md.estadoIdProceso_iMaestraId]) || '' };
     return COLUMNAS_PUENTE.map((c) => v[c]);
   }
   // Usuario del launchpad (sap.ushell.Container.getUser()): nombre, correo e id.
@@ -7292,7 +7296,10 @@
       try { trazabilidad = await leerTrazabilidadParaStatusRmd(modelo, datos, (h, t) => setTxt(span, `Leyendo la Trazabilidad… ${h}/${t}`)); }
       catch (e) { avisoTraz = ` No se pudo leer la Trazabilidad (${e.message}).`; }
       const usuarioSap = usuarioSapActual();
-      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map(filaPuente), usuarioSap, opSap, trazabilidad };
+      // Textos de «Producción Estado»; sin ellos la columna va vacía y el maestro se envía igual.
+      let mapaProd = {};
+      try { mapaProd = await mapaProduccionEstado(controladorPrincipal()); } catch (e) { /* sin Producción Estado */ }
+      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map((md) => filaPuente(md, mapaProd)), usuarioSap, opSap, trazabilidad };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
