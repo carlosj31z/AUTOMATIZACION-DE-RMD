@@ -136,6 +136,8 @@ cuenta). Escribir y responder siempre en **español**.
   status-rmd (sin Excel). «Nueva Versión» de un producto del listado sin versión
   caracterizada → Motivo CARACTERIZACION puesto como «Editar RM» → Confirmar
   (`MERGE /MD('<mdId>')` con usuarioActualiza = `USUARIO.usuario` por correo).
+  **Solo Planta 2** (`CARACT_MOTIVO_PLANTAS = ['P2']`): Carlos dejó P1 pendiente
+  (2026-11-02); en SAP se marcaron solo las versiones de LIMA.
   El Motivo CARACTERIZACION del catálogo: código 24,
   `6c7e87b8-b17f-493e-969b-7e09b574abce`.
 - Fusionados hace poco:

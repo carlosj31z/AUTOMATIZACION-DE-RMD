@@ -114,6 +114,8 @@ function portal({ motivoNueva = 'CARACTERIZACION', respuesta = 'Aceptar', aparec
   ok('listado: lee las filas (y descarta las vacías)', items.length === 2 && J(items[0].materiales) === J(['5000002709', '5000002708']) && items[1].materiales.length === 0, J(items));
   ok('listado: Estatus de Status RMD y responsable de control de cambio', items[0].estatus === 'CONTROL DE CAMBIO' && items[0].respCC === 'ASC' && items[1].estatus === 'BORRADOR' && items[1].respCC === '');
   ok('listado: pendientes por material|ETAPA (solo los sin versión caracterizada)', pendientes.has('5000002709|ENVASE') && !pendientes.has('5000002708|ENVASE') && pendientes.size === 1);
+  const soloP2 = leerListadoCaract(['P1|PEN|A|ENVASE|PENDIENTE-PRO|2026-05-18||5000000001|5000000001', 'P2|SOL|B|ENVASE|PENDIENTE-PRO|2026-05-18||5000000002|5000000002'], ['P2']);
+  ok('listado: solo las plantas indicadas reciben el Motivo (P1 se lista pero no se toca)', soloP2.items.length === 2 && soloP2.pendientes.has('5000000002|ENVASE') && !soloP2.pendientes.has('5000000001|ENVASE'));
   ok('etapa desde nivelTxt', etapaCaract('Fabricación') === 'FABRICACION' && etapaCaract('ACONDICIONADO') === 'ACONDICIONADO' && etapaCaract('Inspección') === 'INSPECCION' && etapaCaract('') === '');
 }
 {
@@ -135,8 +137,11 @@ ok('«Enviar a Status RMD» manda el listado identificado', /caracterizacion: \{
 ok('el Motivo se graba como «Editar RM» (MERGE de /MD con los 8 campos) y se verifica', /usuarioActualiza: await usuarioPortal\(modelo\), fechaActualiza: new Date\(\),\s*codigo: md\.codigo, descripcion: md\.descripcion, nivelTxt: md\.nivelTxt, sucursalId_iMaestraId: md\.sucursalId_iMaestraId, motivoId_motivoId: motivoId, areaRmdTxt: md\.areaRmdTxt/.test(fuente) && /el portal no guardó el Motivo/.test(fuente));
 {
   const lineas = [...fuente.matchAll(/^    "(P[12]\|[^"]*)",$/gm)].map((m) => m[1]);
-  const { items, pendientes } = leerListadoCaract(lineas);
-  ok('listado embebido: 245 filas, con materiales y pendientes', items.length === 245 && items.filter((i) => i.materiales.length).length > 200 && pendientes.size > 100, J({ n: items.length, p: pendientes.size }));
+  const { items, pendientes } = leerListadoCaract(lineas, ['P2']);
+  ok('listado embebido: 245 filas, con materiales; Motivo automático solo en P2', items.length === 245 && items.filter((i) => i.materiales.length).length > 200 && pendientes.size > 50
+    && [...pendientes].every((k) => items.some((i) => i.pl === 'P2' && i.materiales.includes(k.split('|')[0]))), J({ n: items.length, p: pendientes.size }));
+  ok('MENTHOLATUM [Chile]: el UNG, no el NF (corrección de Carlos)', items.some((i) => /MENTHOLATUM/.test(i.nombre) && i.etapa === 'ENVASE' && J(i.materiales) === J(['5000001966'])));
+  ok('el script usa solo las plantas de CARACT_MOTIVO_PLANTAS', /const CARACT_MOTIVO_PLANTAS = \['P2'\];/.test(fuente) && /leerListadoCaract\(CARACT_LISTADO, CARACT_MOTIVO_PLANTAS\)/.test(fuente));
 }
 
 // ---- conexión con el resto del script ----

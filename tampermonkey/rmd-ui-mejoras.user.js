@@ -17097,14 +17097,15 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   // fecha de caracterización|observación|materiales de SAP|materiales aún sin versión caracterizada). items va a Status RMD con «Enviar a
   // Status RMD»; pendientes = «material|ETAPA» de los que la próxima versión nueva debe salir con el Motivo CARACTERIZACION.
   const ESTATUS_LISTADO_CARACT = { 'PENDIENTE-PRO': 'BORRADOR', 'POR INGRESAR': 'INGRESAR', 'FLUJO SAP': 'FLUJO SAP', 'PEND CC': 'CONTROL DE CAMBIO', 'PEND RMD OFICIAL': 'POR REVISIÓN' };
-  function leerListadoCaract(lineas) {
+  // plantas: solo en esas plantas la versión nueva recibe el Motivo (las demás se listan pero no se tocan).
+  function leerListadoCaract(lineas, plantas = null) {
     const items = [], pendientes = new Set();
     (lineas || []).forEach((l) => {
       const [pl, seccion, nombre, etapa, estatusListado, fechaCaract, obs, mats, pend] = String(l).split('|');
       if (!nombre || !etapa) return;
       items.push({ id: `${pl}|${nombre}|${etapa}`, pl, seccion, nombre, etapa, estatusListado, estatus: ESTATUS_LISTADO_CARACT[estatusListado] || '',
         respCC: estatusListado === 'PEND CC' && /ASC/i.test(obs || '') ? 'ASC' : '', fechaCaract, obs, materiales: mats ? mats.split(' ') : [] });
-      (pend ? pend.split(' ') : []).forEach((m) => pendientes.add(`${m}|${etapa}`));
+      if (!plantas || plantas.includes(pl)) (pend ? pend.split(' ') : []).forEach((m) => pendientes.add(`${m}|${etapa}`));
     });
     return { items, pendientes };
   }
@@ -17114,6 +17115,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     return [['FAB', 'FABRICACION'], ['ENV', 'ENVASE'], ['ACO', 'ACONDICIONADO'], ['INS', 'INSPECCION'], ['REC', 'RECUBRIMIENTO']].reduce((r, [p, e]) => r || (x.startsWith(p) ? e : ''), '');
   }
   // ==CARACTERIZACION-FIN==
+  // Plantas en las que «Nueva Versión» pone el Motivo CARACTERIZACION solo (Carlos, 2026-11-02: P1 aún no).
+  const CARACT_MOTIVO_PLANTAS = ['P2'];
   const CARACT_LISTADO_FECHA = '2026-11-02';
   const CARACT_LISTADO = [
     "P1|PEN|BRONCO AMOXIDIN 250 NF PVO SUS|FABRICACION|FLUJO SAP|2026-05-18|CC-ASC|5000002707|",
@@ -17348,8 +17351,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     "P2|SEM|FURACIN 0.2 % Pomada|FABRICACION|POR INGRESAR|2026-09-30|2026-11-02T00:00:00||",
     "P2|SEM|FURACIN 0.2 % Pomada|ENVASE|POR INGRESAR|2026-09-30|2026-11-02T00:00:00||",
     "P2|SEM|FURACIN 0.2 % Pomada|ACONDICIONADO|POR INGRESAR|2026-09-30|2026-11-02T00:00:00||",
-    "P2|MEN|MENTHOLATUM Ungüento [Chile]|FABRICACION|PENDIENTE-PRO|2026-09-30||5000003114 5000001960|5000001960",
-    "P2|MEN|MENTHOLATUM Ungüento [Chile]|ENVASE|PENDIENTE-PRO|2026-09-30||5000003116 5000001964 5000003119|5000003116 5000001964",
+    "P2|MEN|MENTHOLATUM Ungüento [Chile]|FABRICACION|PENDIENTE-PRO|2026-09-30||5000001960|5000001960",
+    "P2|MEN|MENTHOLATUM Ungüento [Chile]|ENVASE|PENDIENTE-PRO|2026-09-30||5000001966|5000001966",
     "P2|MEN|MENTHOLATUM Ungüento [Chile]|ACONDICIONADO|PENDIENTE-PRO|2026-09-30||6000000242|6000000242",
     "P2|SOL|DONAMED F 2 mg Tableta|FABRICACION|PENDIENTE-PRO|2026-10-22||5000000832|5000000832",
     "P2|SOL|GEMFIBROZILO 600 mg Tableta Recubierta|FABRICACION|PENDIENTE-PRO|2026-10-22||5000002759|5000002759",
@@ -17362,7 +17365,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     "P2|SEH|IDELLE 0.5 mg Óvulo|FABRICACION|PENDIENTE-PRO|2026-10-22||5000001808|5000001808",
     "P2|SEH|IDELLE 0.5 mg Óvulo|ENVASE|PENDIENTE-PRO|2026-10-22||5000000760|5000000760",
   ];
-  const listadoCaract = leerListadoCaract(CARACT_LISTADO);
+  const listadoCaract = leerListadoCaract(CARACT_LISTADO, CARACT_MOTIVO_PLANTAS);
   // Graba el Motivo de un MD igual que «Editar RM» → Confirmar (Service.onUpdateDataGeneral: MERGE de /MD('<mdId>') con estos 8 campos).
   let usuarioPortalCache = null;
   async function usuarioPortal(modelo) {
