@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.110.0
+// @version      1.111.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.110.0';                                                       // mantener igual a @version
+  const VERSION = '1.111.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -9133,7 +9133,7 @@
       v.cuerpo.querySelector('.rmd-mm-ayuda').innerHTML = sus ? 'Pega los códigos de los master <b>Autorizados o Ingresados</b> que quieres suspender (uno por línea o separados por espacios o comas).'
         : 'Pega los códigos de los master (en <b>cualquier estado</b> salvo Cancelado) a los que quieres agregar una observación.';
       v.cuerpo.querySelector('.rmd-mm-rotulo').innerHTML = sus ? '<b>Motivo de la suspensión</b> (opcional): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas".'
-        : '<b>Observación</b> (obligatoria): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas".';
+        : '<b>Observación</b> (obligatoria): se agrega como una línea nueva al final de las Observaciones de "Asociar fórmulas". <b>Tip:</b> «PENDIENTE BORRADOR CARACTERIZACION» o «PENDIENTE MASIVO» en la versión vigente marcan el pendiente en Status RMD sin generar una versión nueva.';
       mot.placeholder = sus ? 'Ej.: 20260924 Suspendido por actualización de fórmula (CC 26-300)' : 'Ej.: 20260925CJ Revisado en auditoría interna (sin cambios)';
       v.cuerpo.querySelector('.rmd-mm-nota').textContent = sus ? 'Cada RMD se suspende igual que a mano: "Asociar fórmulas" → Estado "Suspendido" → Guardar del portal (con sus validaciones, la trazabilidad y la anulación del documento de cada receta en el DMS). Requiere el permiso para cambiar el Estado (rol Jefe DT).'
         : 'Cada RMD se modifica igual que a mano: "Asociar fórmulas" → Observaciones → Guardar del portal. El Estado no cambia. Los Cancelados no se pueden modificar (el portal no guarda nada en un master cancelado).';
@@ -17409,6 +17409,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const t0 = Date.now(); while (Date.now() - t0 < ms && m.isConnected && m.getClientRects().length) await esperar(200);
     m.removeEventListener('click', oir, true); return pulsado;
   }
+  // Tip (Carlos, 2026-11-02): marcadores en Observaciones que Status RMD lee al «Enviar a Status RMD», como alternativa a una versión nueva.
+  const TIP_PEND_OBS = '<b>Tip:</b> si el borrador de Producción aún no llega, no hace falta generar una versión nueva: agrega en las Observaciones de la versión vigente (al final, sin borrar lo que hay; p. ej. con «Observación masiva») <b>«PENDIENTE BORRADOR CARACTERIZACION»</b>, o <b>«PENDIENTE MASIVO»</b> si es un masivo. Status RMD lo cuenta como pendiente (caracterización o Backlog).';
   let ventanaCaract = null;
   function avisarCaracterizacion(origen, nueva, motivo) {
     const extra = [nueva.nivelTxt, nueva.sucursalId && nueva.sucursalId.contenido].filter(Boolean).join(' · ');
@@ -17418,7 +17420,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     v.fondo.classList.add('rmd-caract');
     v.cuerpo.innerHTML = `<p>La versión nueva quedó con el Motivo <b>${esc(motivo)}</b>, que «Nueva Versión» copió de la versión anterior:</p>
       <ul class="rmd-caract-lista">${fila}</ul>
-      <p class="rmd-nota">Con ese Motivo, Status RMD la cuenta como caracterización. Si esta versión no es una caracterización, cambia el Motivo en «Editar RM».</p>`;
+      <p class="rmd-nota">Con ese Motivo, Status RMD la cuenta como caracterización. Si esta versión no es una caracterización, cambia el Motivo en «Editar RM».</p>
+      <p class="rmd-nota">${TIP_PEND_OBS}</p>`;
     v.pie.appendChild(botonModal('Entendido', 'primario', () => v.cerrar()));
     ventanaCaract = v;
   }
@@ -17428,7 +17431,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     v.cuerpo.innerHTML = `<p><b>${esc(nueva.codigo)}</b> v${esc(nueva.version)} · ${esc(nueva.descripcion || origen.descripcion || '')}</p>
       <p>Este producto está en el listado de caracterización y aún no tenía su versión caracterizada. ${err
         ? `Intenté ponerle el Motivo <b>CARACTERIZACION</b> (tenía «${esc(antes || 'sin Motivo')}»), pero falló: ${esc(err.message || err)}. Cámbialo en «Editar RM».`
-        : `Le puse el Motivo <b>CARACTERIZACION</b> (tenía «${esc(antes || 'sin Motivo')}»), como en «Editar RM». Si no corresponde, cámbialo ahí.`}</p>`;
+        : `Le puse el Motivo <b>CARACTERIZACION</b> (tenía «${esc(antes || 'sin Motivo')}»), como en «Editar RM». Si no corresponde, cámbialo ahí.`}</p>
+      <p class="rmd-nota">${TIP_PEND_OBS}</p>`;
     v.pie.appendChild(botonModal('Entendido', 'primario', () => v.cerrar()));
   }
   const avisoCaract = crearAvisoCaracterizacion({
