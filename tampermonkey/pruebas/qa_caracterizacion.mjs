@@ -9,6 +9,7 @@ const aqui = path.dirname(fileURLToPath(import.meta.url));
 const fuente = fs.readFileSync(path.join(aqui, '..', 'rmd-ui-mejoras.user.js'), 'utf8');
 const bloque = (ini, fin) => { const a = fuente.indexOf(ini), b = fuente.indexOf(fin); if (a < 0 || b < a) throw new Error('no encuentro el bloque ' + ini); return fuente.slice(a, b); };
 const crear = new Function(bloque('// ==CARACTERIZACION-INICIO==', '// ==CARACTERIZACION-FIN==') + '\nreturn crearAvisoCaracterizacion;')();
+const { leerListadoCaract, etapaCaract } = new Function(bloque('// ==CARACTERIZACION-INICIO==', '// ==CARACTERIZACION-FIN==') + '\nreturn { leerListadoCaract, etapaCaract };')();
 
 let fallas = 0;
 const ok = (nombre, cond, detalle = '') => { console.log((cond ? 'PASA  ' : 'FALLA ') + nombre + (cond || !detalle ? '' : ' — ' + detalle)); if (!cond) fallas++; };
@@ -105,6 +106,42 @@ function portal({ motivoNueva = 'CARACTERIZACION', respuesta = 'Aceptar', aparec
     confirmacion: async () => ({}), respuesta: async () => 'OK', aceptado: () => true, avisar: (o, n) => p.avisos.push(n.mdId), esperar: async () => {}, intervalo: 1, tope: 10 });
   const n = await aviso.alPulsar(p.origen);
   ok('si la lectura previa falla no adivina (sin lista de antes no busca)', n === null && p.avisos.length === 0);
+}
+
+// ---- v1.110.0: listado de caracterización y Motivo puesto en la versión nueva ----
+{
+  const { items, pendientes } = leerListadoCaract(['P1|PEN|BRONCO X SUS|ENVASE|PEND CC|2026-05-18|CC-ASC|5000002709 5000002708|5000002709', 'P2|SOL|SIN CODIGO|FABRICACION|PENDIENTE-PRO|2026-05-18|||', '|||']);
+  ok('listado: lee las filas (y descarta las vacías)', items.length === 2 && J(items[0].materiales) === J(['5000002709', '5000002708']) && items[1].materiales.length === 0, J(items));
+  ok('listado: Estatus de Status RMD y responsable de control de cambio', items[0].estatus === 'CONTROL DE CAMBIO' && items[0].respCC === 'ASC' && items[1].estatus === 'BORRADOR' && items[1].respCC === '');
+  ok('listado: pendientes por material|ETAPA (solo los sin versión caracterizada)', pendientes.has('5000002709|ENVASE') && !pendientes.has('5000002708|ENVASE') && pendientes.size === 1);
+  const soloP2 = leerListadoCaract(['P1|PEN|A|ENVASE|PENDIENTE-PRO|2026-05-18||5000000001|5000000001', 'P2|SOL|B|ENVASE|PENDIENTE-PRO|2026-05-18||5000000002|5000000002'], ['P2']);
+  ok('listado: solo las plantas indicadas reciben el Motivo (P1 se lista pero no se toca)', soloP2.items.length === 2 && soloP2.pendientes.has('5000000002|ENVASE') && !soloP2.pendientes.has('5000000001|ENVASE'));
+  ok('etapa desde nivelTxt', etapaCaract('Fabricación') === 'FABRICACION' && etapaCaract('ACONDICIONADO') === 'ACONDICIONADO' && etapaCaract('Inspección') === 'INSPECCION' && etapaCaract('') === '');
+}
+{
+  const puestos = [], avisos = [], avisosCaract = [];
+  const base = { leer: async () => [], confirmacion: async () => null, respuesta: async () => 'OK', aceptado: () => true, esperar: async () => {}, avisar: (o, n) => avisosCaract.push(n.mdId) };
+  const aviso = crear({ ...base, pendiente: (n) => n.codDefectoReceta === '5000002709', poner: async (o, n) => { puestos.push(n.mdId); }, avisarPuesto: (o, n, antes, err) => avisos.push({ mdId: n.mdId, antes, err: err && err.message }) });
+  const origen = md(2, 2, 'CONTROL DE CAMBIO');
+  const r = await aviso.revisar(origen, md(9, 3, 'CONTROL DE CAMBIO', { codDefectoReceta: '5000002709' }));
+  ok('pendiente del listado: pone el Motivo y avisa con el Motivo que tenía', r === 'puesto' && J(puestos) === J([9]) && J(avisos) === J([{ mdId: 9, antes: 'CONTROL DE CAMBIO', err: null }]), J({ r, puestos, avisos }));
+  ok('pendiente del listado: no lo pone dos veces', (await aviso.revisar(origen, md(9, 3, 'CONTROL DE CAMBIO', { codDefectoReceta: '5000002709' }))) === false && puestos.length === 1);
+  ok('fuera del listado: no toca el Motivo', (await aviso.revisar(origen, md(10, 3, 'CONTROL DE CAMBIO', { codDefectoReceta: '5000009999' }))) === false && puestos.length === 1);
+  ok('ya con CARACTERIZACION copiada: solo el aviso de siempre', aviso.revisar(origen, md(11, 3, 'CARACTERIZACION', { codDefectoReceta: '5000002709' })) === true && puestos.length === 1 && J(avisosCaract) === J([11]));
+  const aviso2 = crear({ ...base, pendiente: () => true, poner: async () => { throw new Error('sin permiso'); }, avisarPuesto: (o, n, antes, err) => avisos.push({ mdId: n.mdId, err: err && err.message }) });
+  ok('si falla al grabar avisa el error', (await aviso2.revisar(origen, md(12, 3, 'PEND-PRO'))) === 'error' && avisos[avisos.length - 1].err === 'sin permiso');
+  const aviso3 = crear({ ...base });
+  ok('sin poner (configuración anterior): igual que la v1.107', aviso3.revisar(origen, md(13, 3, 'PEND-PRO', { codDefectoReceta: '5000002709' })) === false);
+}
+ok('«Enviar a Status RMD» manda el listado identificado', /caracterizacion: \{ v: 1, generado: CARACT_LISTADO_FECHA, items: listadoCaract\.items \}/.test(fuente));
+ok('el Motivo se graba como «Editar RM» (MERGE de /MD con los 8 campos) y se verifica', /usuarioActualiza: await usuarioPortal\(modelo\), fechaActualiza: new Date\(\),\s*codigo: md\.codigo, descripcion: md\.descripcion, nivelTxt: md\.nivelTxt, sucursalId_iMaestraId: md\.sucursalId_iMaestraId, motivoId_motivoId: motivoId, areaRmdTxt: md\.areaRmdTxt/.test(fuente) && /el portal no guardó el Motivo/.test(fuente));
+{
+  const lineas = [...fuente.matchAll(/^    "(P[12]\|[^"]*)",$/gm)].map((m) => m[1]);
+  const { items, pendientes } = leerListadoCaract(lineas, ['P2']);
+  ok('listado embebido: 245 filas, con materiales; Motivo automático solo en P2', items.length === 245 && items.filter((i) => i.materiales.length).length > 200 && pendientes.size > 50
+    && [...pendientes].every((k) => items.some((i) => i.pl === 'P2' && i.materiales.includes(k.split('|')[0]))), J({ n: items.length, p: pendientes.size }));
+  ok('MENTHOLATUM [Chile]: el UNG, no el NF (corrección de Carlos)', items.some((i) => /MENTHOLATUM/.test(i.nombre) && i.etapa === 'ENVASE' && J(i.materiales) === J(['5000001966'])));
+  ok('el script usa solo las plantas de CARACT_MOTIVO_PLANTAS', /const CARACT_MOTIVO_PLANTAS = \['P2'\];/.test(fuente) && /leerListadoCaract\(CARACT_LISTADO, CARACT_MOTIVO_PLANTAS\)/.test(fuente));
 }
 
 // ---- conexión con el resto del script ----

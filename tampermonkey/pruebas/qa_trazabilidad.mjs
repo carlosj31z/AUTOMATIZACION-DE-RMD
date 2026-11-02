@@ -67,7 +67,7 @@ ok('el payload es JSON sin pérdidas (va por postMessage)', J(JSON.parse(J(t))) 
 
 // ---- conexión con el resto del script ----
 ok('«Enviar a Status RMD» lee la Trazabilidad y la manda en el mensaje (sin detener el envío si falla)',
-  /trazabilidad = await leerTrazabilidadParaStatusRmd\(modelo, datos,/.test(fuente) && /usuarioSap, opSap, trazabilidad \};/.test(fuente) && /avisoTraz = ` No se pudo leer la Trazabilidad/.test(fuente));
+  /trazabilidad = await leerTrazabilidadParaStatusRmd\(modelo, datos,/.test(fuente) && /usuarioSap, opSap, trazabilidad[,\s]/.test(fuente) && /avisoTraz = ` No se pudo leer la Trazabilidad/.test(fuente));
 ok('MD_TRAZABILIDAD con filtro por fecha y, si el servicio no lo acepta, sin filtro', /leerEntidadCompleta\(modelo, 'MD_TRAZABILIDAD', params, 'idTrazabilidad', avisar, \[new F\('fechaRegistro', 'GE'/.test(fuente)
   && /catch \(e\) \{ filas = await leerEntidadCompleta\(modelo, 'MD_TRAZABILIDAD', params, 'idTrazabilidad', avisar\); \}/.test(fuente));
 ok('leerEntidadCompleta pasa los filtros al conteo y a cada página', /async function leerEntidadCompletaCon\(modelo, entidad, params, clave, avisar, filtros\)/.test(fuente) && /modelo\.read\(ruta, \{ filters: filtros, urlParameters: u,/.test(fuente));
