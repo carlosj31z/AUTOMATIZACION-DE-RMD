@@ -345,6 +345,30 @@ def interfaz_publicar(archivo: str, subir: bool) -> None:
         sys.exit(1)
 
 
+@cli.command("vb-mes")
+@click.option("--mes", default=None, help="Mes AAAA-MM (por defecto, el mes en curso).")
+@click.option("--salida", type=click.Path(dir_okay=False), default=None,
+              help="Excel de salida (por defecto, RMD trabajados AAAA-MM - VB.xlsx).")
+def vb_mes_command(mes: str | None, salida: str | None) -> None:
+    """Excel de los RMD trabajados en el mes (ATE y LIMA): última y penúltima versión con sus V°B°.
+
+    Solo lectura. Usa el Chromium de RMD_CDP_URL con el portal abierto en «Configuración Manufactura Digital».
+    """
+    import os
+    from datetime import date
+    from pathlib import Path
+
+    from .vb_mes import escribir_excel, leer_portal
+
+    anio, num = map(int, (mes or f"{date.today():%Y-%m}").split("-"))
+    salida = salida or f"RMD trabajados {anio}-{num:02d} - VB.xlsx"
+    cdp = os.environ.get("RMD_CDP_URL", "http://127.0.0.1:9222")
+    click.echo(f"Leyendo el portal ({anio}-{num:02d})…")
+    filas = leer_portal(cdp, anio, num)
+    escribir_excel(filas, Path(salida), anio, num)
+    click.echo(f"{len(filas)} RMD. Detalle en {salida}")
+
+
 REVISIONES = [
     "Tren de equipos (TREN DE EQUIPOS PL2.xlsx): los equipos del RMD deben coincidir con la línea/sala de la etapa.",
     'Controles de cambio pendientes (1.-CC-NC-DES Para actualizar RMD.xlsx, hoja "PLANTA 2"): ¿alguno aplica a este RMD?',
