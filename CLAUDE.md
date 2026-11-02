@@ -126,7 +126,7 @@ cuenta). Escribir y responder siempre en **español**.
 ## Estado al 2026-11-02
 
 - Publicada en SharePoint: **1.110.0** (2026-11-02, 1 872 262 bytes). En la
-  rama por defecto: 1.110.0 (PR #61). **La siguiente versión debe ser > 1.110.0**
+  rama por defecto: 1.111.0 (tip de marcadores). **La siguiente versión debe ser > 1.111.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
   carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
@@ -146,6 +146,12 @@ cuenta). Escribir y responder siempre en **español**.
   guardado en `caracterizacion\marcar_resultado_*_LIMA.xlsx` de DESKTOP-KJ339H3).
   El Motivo CARACTERIZACION del catálogo: código 24,
   `6c7e87b8-b17f-493e-969b-7e09b574abce`.
+- 2026-11-02, v1.111.0: tip para usuarios (aviso del Motivo CARACTERIZACION y
+  «Observación masiva»): en vez de una versión nueva, escribir en Observaciones de
+  la vigente «PENDIENTE BORRADOR CARACTERIZACION» (status-rmd la cuenta como
+  caracterización pendiente: pestaña CARACTERIZACIÓN y Ruta 2) o «PENDIENTE MASIVO»
+  (cuenta en el Backlog de INDICADORES desde nov-2026 hasta que haya otra versión;
+  status-rmd PR #36). Los usuarios lo escriben; el script no lo graba solo.
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
