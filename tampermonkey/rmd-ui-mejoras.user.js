@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.109.0
+// @version      1.110.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.109.0';                                                       // mantener igual a @version
+  const VERSION = '1.110.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -78,7 +78,7 @@
     ['puesto', 'Puesto de trabajo faltante', 'La celda parpadea si falta asignarlo.'],
     ['bajas', 'Elementos de baja', 'En un RMD Ingresado avisa pasos, utensilios y equipos de baja en SAP.'],
     ['reglasrev', 'Reglas de revisión', 'Resalta lo que definas y los documentos citados que no están vigentes.'],
-    ['motivocaract', 'Motivo CARACTERIZACION en versiones nuevas', 'Al crear una versión con «Nueva Versión», avisa si quedó con el Motivo CARACTERIZACION copiado de la versión anterior: Status RMD la cuenta como caracterización.'],
+    ['motivocaract', 'Motivo CARACTERIZACION en versiones nuevas', 'Al crear una versión con «Nueva Versión», avisa si quedó con el Motivo CARACTERIZACION copiado de la versión anterior (Status RMD la cuenta como caracterización) y se lo pone a los productos del listado de caracterización que aún no tienen su versión caracterizada.'],
     ['acuerdos', 'Acuerdos', 'Pestaña «Acuerdos» en Configuración Maestra para escribir los acuerdos de configuración (texto, códigos de paso de referencia e imágenes), compartidos con todos a través de status-rmd; y en la ventana del RMD, aviso si no cumple los que aplican a su planta, etapa y fase.'],
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
@@ -7299,7 +7299,8 @@
       // Textos de «Producción Estado»; sin ellos la columna va vacía y el maestro se envía igual.
       let mapaProd = {};
       try { mapaProd = await mapaProduccionEstado(controladorPrincipal()); } catch (e) { /* sin Producción Estado */ }
-      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map((md) => filaPuente(md, mapaProd)), usuarioSap, opSap, trazabilidad };
+      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map((md) => filaPuente(md, mapaProd)), usuarioSap, opSap, trazabilidad,
+        caracterizacion: { v: 1, generado: CARACT_LISTADO_FECHA, items: listadoCaract.items } };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
@@ -17060,14 +17061,21 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   // leer(origen) -> versiones del master (con motivoId); confirmacion() -> mensaje «Nueva Versión» del portal o null; respuesta(m) -> texto del
   // botón pulsado (null si no se supo); aceptado(t) -> si ese botón acepta; avisar(origen, nueva, motivo); esperar(ms). Aceptado, se busca la
   // versión nueva hasta 15 min (lo mismo que espera «Crear la versión Ingresada»); si no se supo con qué botón se cerró el mensaje, 2 min.
-  function crearAvisoCaracterizacion({ leer, confirmacion, respuesta, aceptado, avisar, esperar, intervalo = 5000, tope = 900000, topeDudoso = 120000 }) {
+  // v1.110.0: los productos del listado de caracterización que aún no tienen su versión caracterizada (pendiente(nueva)) reciben el Motivo
+  // CARACTERIZACION en la versión nueva: poner(origen, nueva) lo graba como «Editar RM» y avisarPuesto(origen, nueva, motivoAntes, error) avisa.
+  function crearAvisoCaracterizacion({ leer, confirmacion, respuesta, aceptado, avisar, esperar, pendiente = () => false, poner = null, avisarPuesto = () => {}, intervalo = 5000, tope = 900000, topeDudoso = 120000 }) {
     const esMotivo = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '').includes('CARACTERIZ');
     const motivoDe = (m) => (m && m.motivoId && m.motivoId.descripcion) || '';
     const avisados = new Set();
     const nuevaEntre = (lista, origen, ids) => (lista || []).find((m) => m && !ids.has(m.mdId) && m.mdId !== origen.mdId && (+m.version || 0) > (+origen.version || 0)) || null;
     function revisar(origen, nueva) {
-      if (!nueva || avisados.has(nueva.mdId) || !esMotivo(motivoDe(nueva))) return false;
-      avisados.add(nueva.mdId); avisar(origen, nueva, motivoDe(nueva)); return true;
+      if (!nueva || avisados.has(nueva.mdId)) return false;
+      if (esMotivo(motivoDe(nueva))) { avisados.add(nueva.mdId); avisar(origen, nueva, motivoDe(nueva)); return true; }
+      if (!poner || !pendiente(nueva)) return false;
+      avisados.add(nueva.mdId);
+      const antes = motivoDe(nueva);
+      return Promise.resolve().then(() => poner(origen, nueva)).then(() => { avisarPuesto(origen, nueva, antes, null); return 'puesto'; },
+        (err) => { avisarPuesto(origen, nueva, antes, err); return 'error'; });
     }
     // Se anotan las versiones que ya existen antes de que el portal cree la nueva; si el mensaje se acepta (o se cerró sin saber con qué
     // botón, p. ej. con Enter), se busca la versión nueva hasta que aparezca: el portal la crea en segundos y la copia de la configuración sigue después.
@@ -17085,7 +17093,305 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     }
     return { esMotivo, motivoDe, nuevaEntre, revisar, alPulsar };
   }
+  // Listado de caracterización del área ya identificado en el portal (una línea por fila: planta|sección|nombre|etapa|estatus del listado|
+  // fecha de caracterización|observación|materiales de SAP|materiales aún sin versión caracterizada). items va a Status RMD con «Enviar a
+  // Status RMD»; pendientes = «material|ETAPA» de los que la próxima versión nueva debe salir con el Motivo CARACTERIZACION.
+  const ESTATUS_LISTADO_CARACT = { 'PENDIENTE-PRO': 'BORRADOR', 'POR INGRESAR': 'INGRESAR', 'FLUJO SAP': 'FLUJO SAP', 'PEND CC': 'CONTROL DE CAMBIO', 'PEND RMD OFICIAL': 'POR REVISIÓN' };
+  function leerListadoCaract(lineas) {
+    const items = [], pendientes = new Set();
+    (lineas || []).forEach((l) => {
+      const [pl, seccion, nombre, etapa, estatusListado, fechaCaract, obs, mats, pend] = String(l).split('|');
+      if (!nombre || !etapa) return;
+      items.push({ id: `${pl}|${nombre}|${etapa}`, pl, seccion, nombre, etapa, estatusListado, estatus: ESTATUS_LISTADO_CARACT[estatusListado] || '',
+        respCC: estatusListado === 'PEND CC' && /ASC/i.test(obs || '') ? 'ASC' : '', fechaCaract, obs, materiales: mats ? mats.split(' ') : [] });
+      (pend ? pend.split(' ') : []).forEach((m) => pendientes.add(`${m}|${etapa}`));
+    });
+    return { items, pendientes };
+  }
+  // Etapa fija de un RMD por su nivelTxt («Fabricación» -> FABRICACION).
+  function etapaCaract(t) {
+    const x = String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
+    return [['FAB', 'FABRICACION'], ['ENV', 'ENVASE'], ['ACO', 'ACONDICIONADO'], ['INS', 'INSPECCION'], ['REC', 'RECUBRIMIENTO']].reduce((r, [p, e]) => r || (x.startsWith(p) ? e : ''), '');
+  }
   // ==CARACTERIZACION-FIN==
+  const CARACT_LISTADO_FECHA = '2026-11-02';
+  const CARACT_LISTADO = [
+    "P1|PEN|BRONCO AMOXIDIN 250 NF PVO SUS|FABRICACION|FLUJO SAP|2026-05-18|CC-ASC|5000002707|",
+    "P1|PEN|BRONCO AMOXIDIN 250 NF PVO SUS|ENVASE|FLUJO SAP|2026-05-18|CC-ASC|5000002709 5000002708|5000002709 5000002708",
+    "P1|PEN|BRONCO AMOXIDIN 250 NF PVO SUS|ACONDICIONADO|FLUJO SAP|2026-05-18|CC-ASC|6000003067 6000003068|6000003067",
+    "P1|LIQ|MEJORALITO INFANTIL 100mg/mL SOL|FABRICACION|PEND CC|2026-05-18|pend cc|5000000281|",
+    "P1|LIQ|MEJORALITO INFANTIL 100mg/mL SOL|ENVASE|PEND CC|2026-05-18|pend cc|5000000282|",
+    "P1|LIQ|SMX+TMP (200+40)mg/5mL SUS(2000L)|FABRICACION|AUTORIZADO|2026-05-18||5000002077|",
+    "P1|LIQ|SMX+TMP (200+40)mg/5mL SUS(2000L)|ENVASE|AUTORIZADO|2026-05-18||5000002078|",
+    "P1|CEFA|CEFABRONCOL-S 250mg/5mL PVO SUS|FABRICACION|PEND CC|2026-05-18|pend cc|5000000412|",
+    "P1|CEFA|CEFABRONCOL-S 250mg/5mL PVO SUS|ENVASE|PEND CC|2026-05-18|pend cc|5000000421 5000000564 5000000413|5000000413",
+    "P1|CEFA|CEFRABIOTIC 500mg CAP|FABRICACION|PEND CC|2026-05-18|pend cc|5000002441|",
+    "P1|CEFA|CEFRABIOTIC 500mg CAP|ENVASE|PEND CC|2026-05-18|pend cc|5000002442|",
+    "P1|PV1|CLORURO SODIO 20% INY PEBD (2 000 L)|FABRICACION|AUTORIZADO|2026-05-18||5000001142|",
+    "P1|PV1|SMX+TMP (400+80)mg INY (100 L)|FABRICACION|AUTORIZADO|2026-05-18||5000002074|",
+    "P1|PV1|TRES B 5000 SOL INY|FABRICACION|AUTORIZADO|2026-05-18||5000002758|",
+    "P1|PV1|TRES B 5000 SOL INY|ENVASE|AUTORIZADO|2026-05-18||5000002769|",
+    "P1|GV2|DEXTROSA 10% INY|FABRICACION|PENDIENTE-PRO|2026-05-18|No llega borrador|5000001895|5000001895",
+    "P1|GV2|SOLUDEX 50% INY|FABRICACION|PENDIENTE-PRO|2026-05-18|No llega borrador|5000001907|5000001907",
+    "P1|GV2|SOLUDEX 50% INY|ENVASE|PENDIENTE-PRO|2026-05-18|No llega borrador|5000001910|5000001910",
+    "P1|SEL|IOPAMED 300 612 mg/mL INY|FABRICACION|AUTORIZADO|2026-06-18||5000000654|5000000654",
+    "P1|SEL|IOPAMED 300 612 mg/mL INY -50mL|ENVASE|AUTORIZADO|2026-06-18||5000001755 5000002843|5000002843",
+    "P1|LIQ|BIOTINOL 300mcg/10mL SOL|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000002986|5000002986",
+    "P1|LIQ|BIOTINOL 300mcg/10mL SOL|ENVASE|PENDIENTE-PRO|2026-06-18|No llega borrador|5000002569 5000002987|5000002569 5000002987",
+    "P1|LIQ|GRAVOL 15mg / 5mL Sol Oral|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000003150|5000003150",
+    "P1|LIQ|IBUPROFENO 100mg/5mL SUS|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador||",
+    "P1|LIQ|IBUPROFENO 100mg/5mL SUS|ENVASE|PENDIENTE-PRO|2026-06-18|No llega borrador|5000001196|5000001196",
+    "P1|LIQ|IBUPROFENO 100mg/5mL SUS|ACONDICIONADO|PENDIENTE-PRO|2026-06-18|No llega borrador||",
+    "P1|LIQ|LORATADINA 5 mg/5mL SOL|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000001121|5000001121",
+    "P1|LIQ|LORATADINA 5 mg/5mL SOL -60mL|ENVASE|PENDIENTE-PRO|2026-06-18|No llega borrador|5000001211|5000001211",
+    "P1|PEN|AMOXIDIN CL 400 PVO SUS|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000000740|5000000740",
+    "P1|PEN|AMOXIDIN CL 400 PVO SUS 70 mL Y 105 mL|ENVASE|PENDIENTE-PRO|2026-06-18|No llega borrador|5000001584|5000001584",
+    "P1|PEN|AMOXIDIN CL 400 PVO SUS 70 mL Y 105 mL|ACONDICIONADO|PENDIENTE-PRO|2026-06-18|No llega borrador|6300000141 6000001180|6300000141",
+    "P1|PV2|MULTI CONFORT SOL|FABRICACION|FLUJO SAP|2026-06-18|2026-09-08T00:00:00|5000001110|",
+    "P1|PV2|MULTI CONFORT SOL -120mL|ENVASE|FLUJO SAP|2026-06-18|2026-09-08T00:00:00|5000001580|5000001580",
+    "P1|PV1|VERAPAMILO 5mg/2mL INY|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000002018|5000002018",
+    "P1|PV1|VERAPAMILO 5mg/2mL INY|ENVASE|PENDIENTE-PRO|2026-06-18|No llega borrador|5000001758|5000001758",
+    "P1|ACO PV|VERAPAMILO 5mg/2mL INY|INSPECCION|PENDIENTE-PRO|2026-06-18|No llega borrador||",
+    "P1|ACO PV|VERAPAMILO 5mg/2mL INY|ACONDICIONADO|PENDIENTE-PRO|2026-06-18|No llega borrador|6000000151 6000001292|6000000151 6000001292",
+    "P1|PV1|MEDICORT 8mg/2mL INY|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000000507|5000000507",
+    "P1|PV1|LIDOCAINA 1% SOL INY -36L|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000001336|5000001336",
+    "P1|PV1|FLUMAZENIL 0.5mg/5mL INY|FABRICACION|PENDIENTE-PRO|2026-06-18|No llega borrador|5000000588|5000000588",
+    "P1|PV1|FLUMAZENIL 0.5mg/5mL INY|ENVASE|PENDIENTE-PRO|2026-06-18|No llega borrador|5000000611|5000000611",
+    "P1|ACO PV|FLUMAZENIL 0.5mg/5mL INY|INSPECCION|PENDIENTE-PRO|2026-06-18|No llega borrador||",
+    "P1|ACO PV|FLUMAZENIL 0.5mg/5mL INY|ACONDICIONADO|PENDIENTE-PRO|2026-06-18|No llega borrador|6000002597|6000002597",
+    "P1|GV2|LACTATO DE SODIO PARA SOLUCIÓN POLIELECTROLÍTICA -200L|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000000024|5000000024",
+    "P1|GV2|SOLUCION POLIELECTROLITICA|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001941|5000001941",
+    "P1|GV2|SOLUCION POLIELECTROLITICA|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001942|5000001942",
+    "P1|SEL|XILONEST BE SP 2 % CON EPINEFRINA 1:200 000 Solución Inyectable|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000000606|5000000606",
+    "P1|SEL|XILONEST BE SP 2 % CON EPINEFRINA 1:200 000 Solución Inyectable|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador||",
+    "P1|CEFA|CEFABRONCOL-S 500 mg Cápsula|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000000393|5000000393",
+    "P1|PEN|AMOXIDIN CL 600/42.9 (600 mg + 42.9 mg)/5 mL Polvo para Suspensión Oral|FABRICACION|AUTORIZADO|2026-07-17|2026-08-11T00:00:00|5000000897|",
+    "P1|PEN|AMOXIDIN CL 600/42.9 (600 mg + 42.9 mg)/5 mL Polvo para Suspensión Oral|ENVASE|AUTORIZADO|2026-07-17|2026-08-11T00:00:00|5000000898|",
+    "P1|LIQ|FUROXONA FORTE 50 mg/5 mL Suspensión Oral|FABRICACION|FLUJO SAP|2026-07-17|2026-09-25T00:00:00|5000002188|5000002188",
+    "P1|LIQ|FUROXONA FORTE 50 mg/5 mL Suspensión Oral- 120 mL|ENVASE|FLUJO SAP|2026-07-17|2026-09-25T00:00:00|5000002217|",
+    "P1|LIQ|FUROXONA FORTE 50 mg/5 mL Suspensión Oral|ACONDICIONADO|FLUJO SAP|2026-07-17|2026-09-25T00:00:00|6000002472|",
+    "P1|LIQ|CRELIVEROL 12 500 ug/10 mL Solución Oral|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000000502|5000000502",
+    "P1|LIQ|ENCICORT B 3 mg/mL Solución para Pulverización Bucal|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000002580|5000002580",
+    "P1|LIQ|RAQUIFEROL D3 NF 200 000 UI Solución Oral|FABRICACION|AUTORIZADO|2026-07-17|2026-09-05T00:00:00|5000002286|5000002286",
+    "P1|LIQ|TRAMEDIF 100 mg/mL Solución Oral|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001776|5000001776",
+    "P1|LIQ|TRAMEDIF 100 mg/mL Solución Oral|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001832|5000001832",
+    "P1|GV2|DEXTROSA 5 % Solución Inyectable / SOLUDEX 5 % Solución Inyectable -L3|FABRICACION|AUTORIZADO|2026-07-17|2026-09-08T00:00:00||",
+    "P1|GV2|DEXTROSA 5 % Solución Inyectable / SOLUDEX 5 % Solución Inyectable -L3|ENVASE|AUTORIZADO|2026-07-17|2026-09-08T00:00:00||",
+    "P1|PV1|BETACORT DEPOT 5 mg/mL + 2 mg/mL Suspensión Inyectable|FABRICACION|FLUJO SAP|2026-07-17|2026-08-26T00:00:00|5000002779|5000002779",
+    "P1|PV1|BETACORT DEPOT 5 mg/mL + 2 mg/mL Suspensión Inyectable|ENVASE|FLUJO SAP|2026-07-17|2026-08-26T00:00:00||",
+    "P1|ACO-P1|BETACORT DEPOT 5 mg/mL + 2 mg/mL Suspensión Inyectable|ACONDICIONADO|PENDIENTE-PRO|2026-07-17|No llega borrador||",
+    "P1|PV1|AGUA ESTÉRIL PARA INYECCIÓN Solución Inyectable 3 mL|ENVASE|FLUJO SAP|2026-07-17|2026-08-27T00:00:00|5000003135|",
+    "P1|PV1|AMIKABIOT 100 mg/2 mL Solución Inyectable|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001624|5000001624",
+    "P1|PV1|AMIKABIOT 100 mg/2 mL Solución Inyectable|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001914|5000001914",
+    "P1|PV1|RIGAMINOL 160 mg/2 mL Solución Inyectable|FABRICACION|AUTORIZADO|2026-07-17|2026-08-08T00:00:00|5000002244|",
+    "P1|PV1|RIGAMINOL 160 mg/2 mL Solución Inyectable|ENVASE|AUTORIZADO|2026-07-17|2026-08-08T00:00:00|5000002295 5000002295|5000002295",
+    "P1|PV1|ACIDO TRANEXÁMICO 1g/10 mL Solución Inyectable|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001581|5000001581",
+    "P1|PV1|ACIDO TRANEXÁMICO 1g/10 mL Solución Inyectable|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001582|5000001582",
+    "P1|PV1|GLUCONATO DE CALCIO 10 % Solución Inyectable|FABRICACION|AUTORIZADO|2026-07-17|2026-08-07T00:00:00||",
+    "P1|PV1|GLUCONATO DE CALCIO 10 % Solución Inyectable|ENVASE|AUTORIZADO|2026-07-17|2026-08-07T00:00:00|5000001056 5000001318|5000001318",
+    "P1|PV1|METOCLOPRAMIDA 10 mg/2 mL Solución Inyectable|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000002047|5000002047",
+    "P1|PV1|METOCLOPRAMIDA 10 mg/2 mL Solución Inyectable|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001197 5000002048|5000001197 5000002048",
+    "P1|PV1|XILONEST 2 % JALEA|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001827|5000001827",
+    "P1|PV1|XILONEST 2 % JALEA|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000000756|5000000756",
+    "P1|PV1|RIGAMINOL 80 mg/2 mL Solución Inyectable|FABRICACION|AUTORIZADO|2026-07-17||5000002243|",
+    "P1|PV2|AK-TROL NF (3.5 mg + 6000 UI + 1 mg)/mL Suspensión Oftálmica|FABRICACION|FLUJO SAP|2026-07-17|2026-10-29T00:00:00|5000001191|",
+    "P1|PV2|AKA-PRED AC 10 mg/mL Suspensión Oftálmica|FABRICACION|FLUJO SAP|2026-07-17||5000000518|",
+    "P1|PV2|AKA-PRED AC 10 mg/mL Suspensión Oftálmica|ENVASE|FLUJO SAP|2026-07-17||5000000197|5000000197",
+    "P1|PV2|AKWA TEARS 1.4 % Solución Oftálmica|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001120|5000001120",
+    "P1|PV2|AKWA TEARS 1.4 % Solución Oftálmica - 15 mL|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001125|5000001125",
+    "P1|PV2|ATENSOR 2 % Solución Oftálmica|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000002910|5000002910",
+    "P1|PV2|TIDORZAK FREE 20 mg/mL + 5 mg/mL Solución Oftálmica|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000002567|5000002567",
+    "P1|PV2|TIDORZAK FREE 20 mg/mL + 5 mg/mL Solución Oftálmica- 5mL|ENVASE|PENDIENTE-PRO|2026-07-17|No llega borrador|5000002566 5000002568|5000002566 5000002568",
+    "P1|PV2|URO GLICIN INY BOL 3000mL|FABRICACION|PENDIENTE-PRO|2026-07-17|No llega borrador|5000001921|5000001921",
+    "P1|PV1|GENTASIL 160mg/2mL INY|FABRICACION|AUTORIZADO|2026-08-05|2026-08-14T00:00:00|5000002866|",
+    "P1|PV1|GENTASIL 160mg/2mL INY|ENVASE|AUTORIZADO|2026-08-05|2026-08-14T00:00:00|5000002867|",
+    "P1|SEL|DISTENSIL 500mg INY - 37 L|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001062|5000001062",
+    "P1|SEL|DISTENSIL 500mg INY VIA 8mL TOFFLON|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001935 5000001948|5000001935 5000001948",
+    "P1|SEL|ENDOVIT NF INY VIA|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000003172|5000003172",
+    "P1|SEL|ENDOVIT NF INY VIA|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000003173|5000003173",
+    "P1|PV1|KENADOL 40 mg/mL SUSPENSIÓN INYECTABLE|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000002536|5000002536",
+    "P1|PV1|KENADOL 40 mg/mL SUSPENSIÓN INYECTABLE|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000002537|5000002537",
+    "P1|PV1|KETAMINA 500 mg/10 mL SOLUCIÓN INYECTABLE|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000000882|5000000882",
+    "P1|PV1|KETAMINA 500 mg/10 mL SOLUCIÓN INYECTABLE|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000000884|5000000884",
+    "P1|PV2|LEVAXAK 1 mg + 5 mg / mL Solución Oftálmica|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000002727|5000002727",
+    "P1|PV2|LEVAXAK 1 mg + 5 mg / mL Solución Oftálmica|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000002728 5000002729|5000002728 5000002729",
+    "P1|PV2|MEDICORTIL 10 mg + 1 mg Solución Oftálmica|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000002103|5000002103",
+    "P1|PV2|TROPIKACIL 1 % Solución Oftálmica|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001097|5000001097",
+    "P1|PV2|TOBRAXONA 0.3 % + 0.1 % Suspensión Oftálmica|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001115|5000001115",
+    "P1|PEN|AMOXIDIN 7 250 250 mg/5 mL Polvo para suspensión oral|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|6300000022 5000001767|6300000022 5000001767",
+    "P1|PEN|AMOXIDIN 7 250 250 mg/5 mL Polvo para suspensión oral|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001771 5000002158 5000001709|5000001771 5000002158 5000001709",
+    "P1|LIQ|GASEOVET 80 mg/mL Suspensión - Gotas|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001973 5000001974|5000001973 5000001974",
+    "P1|LIQ|GASEOVET 80 mg/mL Suspensión - Gotas|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador|5000001975 5000001975|5000001975 5000001975",
+    "P1|LIQ|GASEOVET 80 mg/mL Suspensión - Gotas|ACONDICIONADO|PENDIENTE-PRO|2026-09-29|No llega borrador|6000000099 6000000100|6000000099 6000000100",
+    "P1|LIQ|FLUIBRONCOL 100 mg/5 mL Jarabe|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000000795|5000000795",
+    "P1|LIQ|FLUIBRONCOL 100 mg/5 mL Jarabe|ENVASE|PENDIENTE-PRO|2026-09-29|No llega borrador||",
+    "P1|LIQ|FLUIBRONCOL 100 mg/5 mL Jarabe|ACONDICIONADO|PENDIENTE-PRO|2026-09-29|No llega borrador||",
+    "P1|LIQ|PARACETAMOL 120 mg/5 mL Solución Oral|FABRICACION|PENDIENTE-PRO|2026-09-29|No llega borrador|5000002024|5000002024",
+    "P1|PV1|EPINEFRINA 1 mg/mL Solución Inyectable|FABRICACION|PENDIENTE-PRO|2026-10-22|No llega borrador||",
+    "P1|PV1|EPINEFRINA 1 mg/mL Solución Inyectable|ENVASE|PENDIENTE-PRO|2026-10-22|No llega borrador|5000001352|5000001352",
+    "P2|SOL|SIMETICONA 80mg TABLETA MASTICABLE|FABRICACION|AUTORIZADO|2026-05-18||5000003055|",
+    "P2|ACO|SIMETICONA 80mg TABLETA MASTICABLE|ENVASE|AUTORIZADO|2026-05-18||5000003057|",
+    "P2|ACO|SIMETICONA 80mg TABLETA MASTICABLE|ACONDICIONADO|AUTORIZADO|2026-05-18||6000003476|",
+    "P2|SOL|DOXICICLINA 100 mg TABLETA|FABRICACION|FLUJO SAP|2026-05-18|van a corregir vb|5000002064|",
+    "P2|ACO|DOXICICLINA 100 mg TABLETA|ENVASE|AUTORIZADO|2026-05-18||5000002065|",
+    "P2|ACO|DOXICICLINA 100 mg TABLETA|ACONDICIONADO|AUTORIZADO|2026-05-18||6000000335|",
+    "P2|SOL|PALDOLOR EXTRA FORTE F 200mg + 500mg TABLETA RECUBIERTA|FABRICACION|FLUJO SAP|2026-05-18|van a corregir vb|5000002730|",
+    "P2|SOL|PALDOLOR EXTRA FORTE F 200mg + 500mg TABLETA RECUBIERTA|RECUBRIMIENTO|PENDIENTE-PRO|2026-05-18|Pend rpta I&D|5000002731|5000002731",
+    "P2|ACO|PALDOLOR EXTRA FORTE F 200mg + 500mg TABLETA RECUBIERTA|ENVASE|AUTORIZADO|2026-05-18||5000002732|",
+    "P2|ACO|PALDOLOR EXTRA FORTE F 200mg + 500mg TABLETA RECUBIERTA|ACONDICIONADO|AUTORIZADO|2026-05-18||6000003078|",
+    "P2|CBL|IBUMEJORAL MUJER 200 mg CAPSULA BLANDA|FABRICACION|AUTORIZADO|2026-05-18||5000000416|",
+    "P2|CBL|EVAKUA PERLAS 2.5 mg CAPSULA BLANDA|FABRICACION|AUTORIZADO|2026-05-18||5000001429|",
+    "P2|SOL|FLUIXX 600 mg GRANULOS PARA SOLUCION ORAL|FABRICACION|AUTORIZADO|2026-05-18||5000002932|",
+    "P2|ACO|FLUIXX 600 mg GRANULOS PARA SOLUCION ORAL|ENVASE|AUTORIZADO|2026-05-18||5000002933|",
+    "P2|SOL|FLUIXX 200 mg GRANULOS PARA SOLUCION ORAL|FABRICACION|AUTORIZADO|2026-05-18||5000002927|",
+    "P2|ACO|FLUIXX 200 mg GRANULOS PARA SOLUCION ORAL|ENVASE|AUTORIZADO|2026-05-18||5000002929|",
+    "P2|ACO|FLUIXX 200 mg GRANULOS PARA SOLUCION ORAL|ACONDICIONADO|AUTORIZADO|2026-05-18||6000003282|",
+    "P2|INH|SOLUTRES 150 mg/mL SUSPENSION INYECTABLE|FABRICACION|AUTORIZADO|2026-05-18||5000001846|",
+    "P2|INH|SOLUTRES 150 mg/mL SUSPENSION INYECTABLE|ENVASE|AUTORIZADO|2026-05-18||5000001847|",
+    "P2|INH|SOLUTRES 150 mg/mL SUSPENSION INYECTABLE|ACONDICIONADO|AUTORIZADO|2026-05-18||6000002320 6000003401|6000002320 6000003401",
+    "P2|INH|SOLUNA NF 50 mg/mL+ 5 mg/mL SOLUCION INYECTABLE|FABRICACION|AUTORIZADO|2026-05-18||5000002869|",
+    "P2|INH|SOLUNA NF 50 mg/mL+ 5 mg/mL SOLUCION INYECTABLE|ENVASE|AUTORIZADO|2026-05-18||5000002870|",
+    "P2|INH|SOLUNA NF 50 mg/mL+ 5 mg/mL SOLUCION INYECTABLE|ACONDICIONADO|AUTORIZADO|2026-05-18||6000003240|",
+    "P2|SOL|LEVODANTINA 500mg TABLETA RECUBIERTA|FABRICACION|PENDIENTE-PRO|2026-06-17||5000000006|5000000006",
+    "P2|SOL|LEVODANTINA 500mg TABLETA RECUBIERTA|RECUBRIMIENTO|PENDIENTE-PRO|2026-06-17||5000001608|5000001608",
+    "P2|ACO|LEVODANTINA 500 mg TAB REC B7|ENVASE|AUTORIZADO|2026-06-17||5000002559|",
+    "P2|ACO|LEVODANTINA 500 mg TAB REC B7 CJA x14|ACONDICIONADO|AUTORIZADO|2026-06-17||6000002329|",
+    "P2|SOL|LITIASIN K 1080 mg TABLETA DE LIBERACIÓN PROLONGADA|FABRICACION|POR INGRESAR|2026-06-17|2026-11-16T00:00:00|5000000678|",
+    "P2|ACO|LITIASIN K 1080 mg TABLETA DE LIBERACIÓN PROLONGADA|ENVASE|PEND RMD OFICIAL|2026-06-17|2026-11-18T00:00:00|5000000694 5000000679|5000000694",
+    "P2|SOL|MEJORAL ANTIGRIPAL 500 mg + 5 mg + 2 mg TABLETA|FABRICACION|PENDIENTE-PRO|2026-06-17||5000002920|5000002920",
+    "P2|ACO|MEJORAL ANTIGRIPAL 500 mg + 5 mg + 2 mg TABLETA|ENVASE|PEND RMD OFICIAL|2026-06-17|2026-11-09T00:00:00|5000002921|",
+    "P2|ACO|MEJORAL ANTIGRIPAL 500 mg + 5 mg + 2 mg TABLETA|ACONDICIONADO|PEND RMD OFICIAL|2026-06-17|2026-11-09T00:00:00|6000003276|",
+    "P2|SOL|NITROFURANTOINA 100 mg TABLETA|FABRICACION|AUTORIZADO|2026-06-17||5000001416 5000002332|",
+    "P2|ACO|NITROFURANTOINA 100 mg TABLETA|ENVASE|PEND CC|2026-06-17||5000002497|",
+    "P2|SOL|SULPIMED 200 mg TAB|FABRICACION|PENDIENTE-PRO|2026-06-17||5000002161|5000002161",
+    "P2|ACO|SULPIMED 200mg TAB B10|ENVASE|PEND RMD OFICIAL|2026-06-17|2026-11-03T00:00:00|5000002162|",
+    "P2|ACO|SULPIMED 200mg TAB B10 CJA x100|ACONDICIONADO|PEND RMD OFICIAL|2026-06-17|2026-11-03T00:00:00|6000002431|",
+    "P2|SOL|SINCOL NF 10 mg + 500 mg TABLETA RECUBIERTA|FABRICACION|PENDIENTE-PRO|2026-06-17||5000002775|5000002775",
+    "P2|SOL|SINCOL NF 10 mg + 500 mg TABLETA RECUBIERTA|RECUBRIMIENTO|PENDIENTE-PRO|2026-06-17||5000002776|5000002776",
+    "P2|ACO|SINCOL NF 10 mg + 500 mg TABLETA RECUBIERTA|ENVASE|PEND RMD OFICIAL|2026-06-17|2026-11-11T00:00:00|5000002778 5000002777|",
+    "P2|SOL|TRI AZIT 500mg TABLETA|FABRICACION|PENDIENTE-PRO|2026-06-17||5000002229|5000002229",
+    "P2|SOL|TRI AZIT 500mg TABLETA|RECUBRIMIENTO|PENDIENTE-PRO|2026-06-17||5000002279|5000002279",
+    "P2|ACO|TRI AZIT 500mg TAB B3 (ARGENTECNICA)|ENVASE|PEND CC|2026-06-17||5000002278|",
+    "P2|ACO|TRI AZIT 500mg TAB B3 CJA x3|ACONDICIONADO|PEND CC|2026-06-17||6000000142 6000002397|",
+    "P2|SEM|SITIDERM NF 0.050 g + 0.100 g + 1.000 % CREMA|FABRICACION|AUTORIZADO|2026-06-18|||",
+    "P2|SEM|SITIDERM NF 0.050 g + 0.100 g + 1.000 % CREMA|ENVASE|AUTORIZADO|2026-06-18||5000001227|",
+    "P2|ACO|ANTIGRIP - T ANTIGRIPAL PVO ORAL SOB 5g|ENVASE|PENDIENTE-PRO|2026-07-17|2026-10-21T00:00:00|5000002465|5000002465",
+    "P2|SOL|CLARIMED 250mg/5mL GRN SUS|FABRICACION|POR INGRESAR|2026-07-17|2026-11-13T00:00:00|5000001760|",
+    "P2|ACO|CLARIMED 250mg/5mL SUS FCO35 mL MM|ENVASE|PENDIENTE-PRO|2026-07-17|2026-10-23T00:00:00|5000001812|5000001812",
+    "P2|ACO|CLARIMED 250mg/5mL SUS FCO100mL|ENVASE|PENDIENTE-PRO|2026-07-17|2026-10-23T00:00:00|5000001805|5000001805",
+    "P2|ACO|CLARIMED 250mg/5mL SUS FCO100mL CJA x1 - SERIGRAFIADO|ACONDICIONADO|AUTORIZADO|2026-07-17||6000000173|",
+    "P2|ACO|CLARIMED 250mg/5mL SUS FCO35mL CJA x1MM - SERIGRAFIADO|ACONDICIONADO|AUTORIZADO|2026-07-17||6000002491|",
+    "P2|SOL|CLORFENAMINA 4mg TAB|FABRICACION|AUTORIZADO|2026-07-17||5000002020|",
+    "P2|SOL|EPITELIOL NF 50 000 UI TAB NUC|FABRICACION|AUTORIZADO|2026-07-17||5000003069 5000002227|5000002227",
+    "P2|SOL|EPITELIOL NF 50 000UI TAB REC|RECUBRIMIENTO|AUTORIZADO|2026-07-17||5000003070|",
+    "P2|ACO|EPITELIOL NF 50 000UI TAB REC B10 ESPV|ENVASE|AUTORIZADO|2026-07-17||5000003071|",
+    "P2|ACO|EPITELIOL NF 50 000UI TAB REC B10 CJA x300|ACONDICIONADO|AUTORIZADO|2026-07-17||6000003483|",
+    "P2|SOL|MACRODANTINA XR 100 CAP|FABRICACION|AUTORIZADO|2026-07-17||5000000786|5000000786",
+    "P2|ACO|MACRODANTINA XR 100 CAP F4|ENVASE|PENDIENTE-PRO|2026-07-17|2026-10-26T00:00:00|5000002625|5000002625",
+    "P2|ACO|MACRODANTINA XR 100 CAP F4 CJA x 20|ACONDICIONADO|PEND RMD OFICIAL|2026-07-17|2026-11-23T00:00:00|6000002967|",
+    "P2|SOL|NAPROXENO SOD 550mg TAB NUC|FABRICACION|PENDIENTE-PRO|2026-07-17||5000003040|5000003040",
+    "P2|ACO|NAPROXENO SOD 550mg TAB REC B10 CJA x300 (Marchesini)|ACONDICIONADO|PENDIENTE-PRO|2026-07-17||6000003469|6000003469",
+    "P2|SOL|FLUIBRONCOL ORAL 600mg GRN|FABRICACION|PENDIENTE-PRO|2026-07-17||5000000855|5000000855",
+    "P2|ACO|FLUIBRONCOL ORAL 600mg GRN SAC3g|ENVASE|FLUJO SAP|2026-07-17|van a corregir vb y proceso|5000000865|",
+    "P2|ACO|FLUIBRONCOL ORAL 600mg GRN 3g CJA x2 MM|ACONDICIONADO|FLUJO SAP|2026-07-17||6300000200|",
+    "P2|ACO|FLUIBRONCOL ORAL 600mg GRN 3g CJA x20|ACONDICIONADO|FLUJO SAP|2026-07-17||6000000118|",
+    "P2|SOL|SALES PARA REHIDRATACION ORAL 20.5g - 550.00 kg|FABRICACION|PEND CC|2026-07-17||5000000973|",
+    "P2|ACO|SALES PARA REHIDRATACION ORAL SOB 20.5g|ENVASE|PEND RMD OFICIAL|2026-07-17|2026-11-09T00:00:00|5000000182 5000001404|5000001404",
+    "P2|SOL|TRI AZIT 200mg/5mL PVO SUS-FSOLFA04|FABRICACION|PENDIENTE-PRO|2026-07-17||5000002240|5000002240",
+    "P2|ACO|TRI AZIT 200mg/5mL PVO SUS FCO15 mL|ENVASE|PEND CC|2026-07-17||5000002241|",
+    "P2|ACO|TRI AZIT 200mg/5mL PVO SUS FCO15mL CJA x1|ACONDICIONADO|PEND CC|2026-07-17||6000002414|",
+    "P2|SEH|PROMESTINE 1% CRM|FABRICACION|PENDIENTE-PRO|2026-07-20||5000000207|5000000207",
+    "P2|SEH|PROMESTINE 1% CRM TUB 15g|ENVASE|PENDIENTE-PRO|2026-07-20||5000000208|5000000208",
+    "P2|SEH|PROMESTINE 1% CRM TUB 15g CJA x 1|ACONDICIONADO|PENDIENTE-PRO|2026-07-20||6000000808|6000000808",
+    "P2|INH|SOLOUNA 5 INY|FABRICACION|FLUJO SAP|2026-07-20|van a corregir vb|5000001983|",
+    "P2|INH|SOLOUNA 5 INY AMP1mL|ENVASE|FLUJO SAP|2026-07-20|van a corregir vb|5000001996|5000001996",
+    "P2|INH|SOLOUNA 5 INY 1mL CJA x 1 (S/JERINGA)|ACONDICIONADO|FLUJO SAP|2026-07-20|van a corregir vb|6000001001|",
+    "P2|CBL|DOLORAL CB 400mg CAP BLANDA|FABRICACION|AUTORIZADO|2026-07-20||5000003307|",
+    "P2|CBL|DOLORAL CB 400mg CAP BLANDA B5|ENVASE|AUTORIZADO|2026-07-20||5000003308|",
+    "P2|CBL|DOLORAL CB 400mg CAP BLANDA B2 MM|ENVASE|AUTORIZADO|2026-07-20||5000003309|",
+    "P2|CBL|GASEOVET CB 125 mg CAP BLANDA|FABRICACION|PENDIENTE-PRO|2026-07-20||5000002563|5000002563",
+    "P2|ACO|GASEOVET CB 125 mg CAP BLANDA B10 P-C|ENVASE|PEND RMD OFICIAL|2026-07-20|2026-11-06T00:00:00|5000002564|",
+    "P2|ACO|GASEOVET CB 125 mg CAP BLANDA B10 x100 P-C|ACONDICIONADO|PEND RMD OFICIAL|2026-07-20|2026-11-06T00:00:00|6000002875|",
+    "P2|CBL|PROSTASIL 0.5mg CAP BLANDA|FABRICACION|AUTORIZADO|2026-07-20||5000002749|",
+    "P2|ACO|PROSTASIL 0.5mg CAP BLANDA B10|ENVASE|AUTORIZADO|2026-07-20||5000002750|",
+    "P2|SEM|BEN GAY GEL|FABRICACION|FLUJO SAP|2026-07-20|van a corregir vb|5000001007|",
+    "P2|SEM|BEN GAY GEL TUB28g|ENVASE|FLUJO SAP|2026-07-20|van a corregir vb|5000001008|",
+    "P2|SEM|CLINDESS 100mg OVU|FABRICACION|FLUJO SAP|2026-07-20|van a corregir vb|5000001817|",
+    "P2|SEM|CLINDESS 100mg OVU T7|ENVASE|FLUJO SAP|2026-07-20|van a corregir vb|5000001820|",
+    "P2|SEM|CLINDESS 100mg OVU T7 CJA x7|ACONDICIONADO|FLUJO SAP|2026-07-20|van a corregir vb|6000000217|",
+    "P2|SEM|DEQUAZOL-R NF 500+100 000 OVU|FABRICACION|PEND CC|2026-07-20||5000002655|",
+    "P2|SEM|DEQUAZOL-R NF 500+100 000 OVU T2|ENVASE|PEND CC|2026-07-20||5000002676|",
+    "P2|SEM|DEQUAZOL -R NF 500+100 000 OVU T2 CJA x 60|ACONDICIONADO|PEND CC|2026-07-20||6000003017|",
+    "P2|SEM|LOROPHYN NF 18.9mg OVU|FABRICACION|PENDIENTE-PRO|2026-07-20|van a corregir vb|5000002878|5000002878",
+    "P2|SEM|LOROPHYN NF 18.9mg OVU T3|ENVASE|PENDIENTE-PRO|2026-07-20|van a corregir vb|5000002879|5000002879",
+    "P2|SEM|LOROPHYN NF 18.9mg OVU T3 CJA x3|ACONDICIONADO|PENDIENTE-PRO|2026-07-20|van a corregir vb|6000003243 6000003244|6000003243 6000003244",
+    "P2|SEM|NISTAZINC NF UNG|FABRICACION|FLUJO SAP|2026-07-20|se corrigio vb|5000002668|",
+    "P2|SEM|NISTAZINC NF UNG TUB 15g|ENVASE|FLUJO SAP|2026-07-20|se corrigio vb|5000002669|",
+    "P2|SEM|NISTAZINC NF UNG TUB 30g|ENVASE|FLUJO SAP|2026-07-20|se corrigio vb|5000002670|",
+    "P2|SEM|NISTAZINC NF UNG TUB 15g CJA x 1|ACONDICIONADO|FLUJO SAP|2026-07-20|se corrigio vb|6000003023|",
+    "P2|SEM|NISTAZINC NF UNG TUB 30g CJA x 1|ACONDICIONADO|FLUJO SAP|2026-07-20|se corrigio vb|6000003024|",
+    "P2|SOL|ACIDO FOLICO 0.5 mg Tableta|FABRICACION|PEND RMD OFICIAL|2026-09-30|2026-10-30T00:00:00|5000000830|",
+    "P2|ACO|ACIDO FOLICO 0.5 mg Tableta|ENVASE|PENDIENTE-PRO|2026-09-30||5000002462 5000000529|5000002462 5000000529",
+    "P2|SOL|DOLOMEJORAL 550 mg Tableta Recubierta|FABRICACION|PENDIENTE-PRO|2026-09-30||5000000173|5000000173",
+    "P2|ACO|DOLOMEJORAL 550 mg Tableta Recubierta|RECUBRIMIENTO|PENDIENTE-PRO|2026-09-30||5000000569|5000000569",
+    "P2|SOL|GRAVERGOL 1 mg + 100 mg Tableta|FABRICACION|PENDIENTE-PRO|2026-09-30||5000001417|5000001417",
+    "P2|ACO|GRAVERGOL 1 mg + 100 mg Tableta|ENVASE|PENDIENTE-PRO|2026-09-30|||",
+    "P2|SEM|ACNOMEL 2 % + 8 % CREMA|FABRICACION|PENDIENTE-PRO|2026-09-30||5000000932|5000000932",
+    "P2|SEM|ACNOMEL 2 % + 8 % CREMA|ENVASE|PENDIENTE-PRO|2026-09-30|||",
+    "P2|SEM|ACNOMEL 2 % + 8 % CREMA|ACONDICIONADO|PENDIENTE-PRO|2026-09-30|||",
+    "P2|SEM|CRESULEN 90 mg Óvulo|FABRICACION|PENDIENTE-PRO|2026-09-30||5000000998|5000000998",
+    "P2|SEM|CRESULEN 90 mg Óvulo|ENVASE|PENDIENTE-PRO|2026-09-30||5000001012|5000001012",
+    "P2|ACO|MACRODANTINA 100 mg Cápsula|ENVASE|PENDIENTE-PRO|2026-09-30||5000001566|5000001566",
+    "P2|ACO|MACRODANTINA 100 mg Cápsula|ACONDICIONADO|PENDIENTE-PRO|2026-09-30||6000000949 6000000950 6300000132|6000000949 6000000950 6300000132",
+    "P2|ACO|MEJORAL MIGRAÑA 250 mg + 250 mg + 65 mg Tableta Recubierta|ENVASE|PENDIENTE-PRO|2026-09-30||5000002849 5000002850|5000002849 5000002850",
+    "P2|ACO|MEJORAL MIGRAÑA 250 mg + 250 mg + 65 mg Tableta Recubierta|ACONDICIONADO|PENDIENTE-PRO|2026-09-30|||",
+    "P2|SEM|FURACIN 0.2 % Pomada|FABRICACION|POR INGRESAR|2026-09-30|2026-11-02T00:00:00||",
+    "P2|SEM|FURACIN 0.2 % Pomada|ENVASE|POR INGRESAR|2026-09-30|2026-11-02T00:00:00||",
+    "P2|SEM|FURACIN 0.2 % Pomada|ACONDICIONADO|POR INGRESAR|2026-09-30|2026-11-02T00:00:00||",
+    "P2|MEN|MENTHOLATUM Ungüento [Chile]|FABRICACION|PENDIENTE-PRO|2026-09-30||5000003114 5000001960|5000001960",
+    "P2|MEN|MENTHOLATUM Ungüento [Chile]|ENVASE|PENDIENTE-PRO|2026-09-30||5000003116 5000001964 5000003119|5000003116 5000001964",
+    "P2|MEN|MENTHOLATUM Ungüento [Chile]|ACONDICIONADO|PENDIENTE-PRO|2026-09-30||6000000242|6000000242",
+    "P2|SOL|DONAMED F 2 mg Tableta|FABRICACION|PENDIENTE-PRO|2026-10-22||5000000832|5000000832",
+    "P2|SOL|GEMFIBROZILO 600 mg Tableta Recubierta|FABRICACION|PENDIENTE-PRO|2026-10-22||5000002759|5000002759",
+    "P2|SOL|GEMFIBROZILO 600 mg Tableta Recubierta|RECUBRIMIENTO|PENDIENTE-PRO|2026-10-22||5000002760|5000002760",
+    "P2|ACO|GEMFIBROZILO 600 mg Tableta Recubierta|ENVASE|PENDIENTE-PRO|2026-10-22||5000002761 5000003066|5000002761 5000003066",
+    "P2|ACO|GEMFIBROZILO 600 mg Tableta Recubierta|ACONDICIONADO|PENDIENTE-PRO|2026-10-22||6000003144|6000003144",
+    "P2|SOL|GLYCOLAX 17 g Polvo Para Solución Oral [Frasco 238 g]|FABRICACION|PENDIENTE-PRO|2026-10-22||5000003267|5000003267",
+    "P2|ACO|GLYCOLAX 17 g Polvo Para Solución Oral [Frasco 238 g]|ENVASE|PENDIENTE-PRO|2026-10-22||5000003266|",
+    "P2|ACO|GLYCOLAX 17 g Polvo Para Solución Oral [Frasco 238 g]|ACONDICIONADO|PENDIENTE-PRO|2026-10-22||6000003685|6000003685",
+    "P2|SEH|IDELLE 0.5 mg Óvulo|FABRICACION|PENDIENTE-PRO|2026-10-22||5000001808|5000001808",
+    "P2|SEH|IDELLE 0.5 mg Óvulo|ENVASE|PENDIENTE-PRO|2026-10-22||5000000760|5000000760",
+  ];
+  const listadoCaract = leerListadoCaract(CARACT_LISTADO);
+  // Graba el Motivo de un MD igual que «Editar RM» → Confirmar (Service.onUpdateDataGeneral: MERGE de /MD('<mdId>') con estos 8 campos).
+  let usuarioPortalCache = null;
+  async function usuarioPortal(modelo) {
+    if (usuarioPortalCache) return usuarioPortalCache;
+    const u = usuarioSapActual(); if (!u || !u.email) throw new Error('no se supo el usuario del portal');
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const [fila] = await leerTodoDe(modelo, 'USUARIO', [new F('correo', 'EQ', u.email)], { $select: 'usuarioId,usuario,correo' });
+    if (!fila || !fila.usuario) throw new Error(`el correo ${u.email} no está en USUARIO del portal`);
+    return (usuarioPortalCache = fila.usuario);
+  }
+  async function motivoCaractId(modelo) {
+    const l = await leerTodoDe(modelo, 'MOTIVO', [], { $select: 'motivoId,descripcion,abreviatura,activo' });
+    const m = l.find((x) => avisoCaract.esMotivo(x.descripcion) || avisoCaract.esMotivo(x.abreviatura));
+    if (!m) throw new Error('el catálogo MOTIVO no tiene CARACTERIZACION');
+    return m.motivoId;
+  }
+  async function ponerMotivoCaract(origen, nueva) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('sin la lista principal');
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const [md] = await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', nueva.mdId)], { $select: 'mdId,codigo,descripcion,nivelTxt,sucursalId_iMaestraId,areaRmdTxt,motivoId_motivoId' });
+    if (!md) throw new Error('no se encontró la versión nueva');
+    const motivoId = await motivoCaractId(modelo);
+    if (md.motivoId_motivoId === motivoId) return;
+    await modeloEscribir(modelo, 'update', modelo.createKey('/MD', { mdId: md.mdId }), { usuarioActualiza: await usuarioPortal(modelo), fechaActualiza: new Date(),
+      codigo: md.codigo, descripcion: md.descripcion, nivelTxt: md.nivelTxt, sucursalId_iMaestraId: md.sucursalId_iMaestraId, motivoId_motivoId: motivoId, areaRmdTxt: md.areaRmdTxt });
+    const [despues] = await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', nueva.mdId)], { $select: 'mdId,motivoId_motivoId' });
+    if (!despues || despues.motivoId_motivoId !== motivoId) throw new Error('el portal no guardó el Motivo');
+  }
+  const pendienteCaract = (nueva) => !!nueva && listadoCaract.pendientes.has(`${nueva.codDefectoReceta || ''}|${etapaCaract(nueva.nivelTxt)}`);
   // Versiones del master de un RMD: por su linaje y por el enlace con la versión anterior (mdIdVersionAnt).
   async function versionesConMotivo(o) {
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('sin la lista principal');
@@ -17113,8 +17419,18 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     v.pie.appendChild(botonModal('Entendido', 'primario', () => v.cerrar()));
     ventanaCaract = v;
   }
+  function avisarCaractPuesto(origen, nueva, antes, err) {
+    const v = ventana(err ? 'No se pudo poner el Motivo CARACTERIZACION' : 'Motivo CARACTERIZACION puesto', { cancelar: () => v.cerrar() });
+    v.fondo.classList.add('rmd-caract');
+    v.cuerpo.innerHTML = `<p><b>${esc(nueva.codigo)}</b> v${esc(nueva.version)} · ${esc(nueva.descripcion || origen.descripcion || '')}</p>
+      <p>Este producto está en el listado de caracterización y aún no tenía su versión caracterizada. ${err
+        ? `Intenté ponerle el Motivo <b>CARACTERIZACION</b> (tenía «${esc(antes || 'sin Motivo')}»), pero falló: ${esc(err.message || err)}. Cámbialo en «Editar RM».`
+        : `Le puse el Motivo <b>CARACTERIZACION</b> (tenía «${esc(antes || 'sin Motivo')}»), como en «Editar RM». Si no corresponde, cámbialo ahí.`}</p>`;
+    v.pie.appendChild(botonModal('Entendido', 'primario', () => v.cerrar()));
+  }
   const avisoCaract = crearAvisoCaracterizacion({
     leer: versionesConMotivo, respuesta: respuestaPersona, aceptado: esAceptar, avisar: avisarCaracterizacion, esperar,
+    pendiente: pendienteCaract, poner: ponerMotivoCaract, avisarPuesto: avisarCaractPuesto,
     confirmacion: () => hasta(() => [...document.querySelectorAll('.sapMMessageDialog')].find((x) => x.getClientRects().length && /nueva versi/i.test(x.textContent)), 15000, 250),
   });
   // «Nueva Versión» pulsado a mano en la ventana de un RMD («<código> - <descripción>»). El script lo pulsa con firePress (sin clic) y lo revisa él mismo.

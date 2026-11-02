@@ -123,11 +123,21 @@ cuenta). Escribir y responder siempre en **español**.
   bloques y se reinyecta el editor y su CSS de la versión nueva (como hace
   `ppHtml` en el userscript).
 
-## Estado al 2026-11-01
+## Estado al 2026-11-02
 
 - Publicada en SharePoint: **1.109.0** (2026-11-01). En la rama por defecto:
   1.109.0 (PR #59). **La siguiente versión debe ser > 1.109.0** y construirse
   encima de la rama por defecto.
+- 2026-11-02, v1.110.0 (rama `claude/caracterizacion-listado-motivo`): listado
+  de caracterización identificado en el portal embebido en el script
+  (`CARACT_LISTADO`, una línea por fila; se regenera desde la identificación con
+  `generar_listado_js.js` de `/mnt/project-files/caracterizacion/`). «Enviar a
+  Status RMD» lo manda (`caracterizacion`) a la pestaña CARACTERIZACIÓN de
+  status-rmd (sin Excel). «Nueva Versión» de un producto del listado sin versión
+  caracterizada → Motivo CARACTERIZACION puesto como «Editar RM» → Confirmar
+  (`MERGE /MD('<mdId>')` con usuarioActualiza = `USUARIO.usuario` por correo).
+  El Motivo CARACTERIZACION del catálogo: código 24,
+  `6c7e87b8-b17f-493e-969b-7e09b574abce`.
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
