@@ -123,17 +123,48 @@ cuenta). Escribir y responder siempre en **español**.
   bloques y se reinyecta el editor y su CSS de la versión nueva (como hace
   `ppHtml` en el userscript).
 
-## Estado al 2026-10-30
+## Estado al 2026-11-01
 
-- Publicada en SharePoint: **1.105.0** (insumo como proceso menor del paso).
-  En la rama por defecto: 1.105.0.
-- **PR #54 – v1.106.0** (rama `claude/pasos-nuevos-unicos`, sobre 1.105.0):
-  pasos nuevos idénticos (misma sección + etiqueta + texto sin
-  mayúsculas/espacios) se crean una sola vez en SAP. **Pendiente de fusionar y
-  de subir.** La siguiente versión debe ser > 1.106.0 y construirse encima.
-- PR #55: comando `vb-mes` (reporte mensual de V°B°), abierto.
-- PR #22 (v1.83.1, CC y NC de P1/P2): abierto y antiguo; revisar si sigue vigente.
+- Publicada en SharePoint: **1.109.0** (2026-11-01). En la rama por defecto:
+  1.109.0 (PR #59). **La siguiente versión debe ser > 1.109.0** y construirse
+  encima de la rama por defecto.
+- Fusionados hace poco:
+  - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
+    sin mayúsculas/espacios) se crean una sola vez en SAP.
+  - PR #57 – v1.107.0 + v1.108.0 (incluye 1.106.0): aviso de Motivo
+    CARACTERIZACION al crear una versión nueva, y «Enviar a Status RMD» manda la
+    Trazabilidad de SAP (`MD_TRAZABILIDAD`, desde 01/01/2026).
+  - PR #59 – v1.109.0: «Enviar a Status RMD» manda también `produccionEstado`.
+  - Comando `vb-mes` del CLI (Excel mensual de RMD trabajados con el V°B° de la
+    última y penúltima versión; las versiones Canceladas no cuentan).
+- Abiertos en este repo: PR #22 (v1.83.1, CC y NC de P1/P2): antiguo; revisar
+  si sigue vigente antes de tocarlo.
+- status-rmd (`carlosj31z/REGISTRO-DE-MANUFACTURA-DIGITAL`), pestaña
+  **INDICADORES** (PR #20–#25 fusionados):
+  - Cuadro del mes con detalle por clic, «± Otros», % total y % del área,
+    Horas efectivas. RUTA 1: «Programa N» (naranja) y «Backlog <mes> N» (azul),
+    % Programa del mes y % Backlog DOC (autorizados del backlog en el mes /
+    backlog al cierre del mes anterior; arranca en 0 cada mes).
+  - Rango del Programa PLA = lunes de la semana de carga del Programa de
+    Producción + 13 días; cuenta solo la última carga.
+  - **Backlog = solo RMD Ingresados** (sin suspendidos ni solicitudes
+    abiertas) + «Masivos pendientes» escritos a mano por mes y planta
+    (`ind_horas_efectivas[mes][pl].ma`); se suman al mostrar, también en meses
+    congelados. Acordado con Noelia el 2026-11-01.
+  - **Meses cerrados congelados** (`porMes[mes][pl].cong`) con el primer
+    cálculo tras el cierre; los cambios posteriores van a «± Otros» del mes
+    siguiente. Solo vale si `previo.reglas === REGLAS_CUADRO` (hoy 3): **al
+    cambiar reglas, subir `REGLAS_CUADRO`**. Octubre recongelado con reglas 3:
+    backlog P1 171, P2 100 (cuadra con Noelia).
+  - PR #14 («Por autorizar»): **en pausa**, falta el OK de la jefa de Carlos;
+    no fusionar ni avanzar.
+  - PR #19 (fases de Acuerdos: Cualquier fase / Fase 1 / Fase 2 incluye 2R):
+    abierto, sin conflictos; es el mismo criterio que el portal (v1.103.2+).
 - Pendientes conocidos:
+  - Usar «Enviar a Status RMD» con datos reales para validar los números (y el
+    ~72 de LIMA).
+  - Futuro: marcar los masivos en SAP (acuerdo con Vanesa y Ximena) y quitar la
+    marca al autorizar.
   - **Insumo NUEVO en SAP**: en el Borrador de Producción el insumo nuevo
     queda «a mano» hasta capturar qué guarda «Agregar Insumo» del portal (probar
     en 2202609013). En SAP un insumo de paso es `MD_ES_PASO_INSUMO_PASO` con
@@ -141,7 +172,7 @@ cuenta). Escribir y responder siempre en **español**.
   - Probar la tabla INSUMOS con un RMD de Fabricación.
   - Probar «Actualizar» real de Cambio de material en un Autorizado (DMS).
   - Contingencia «Por código» sin prueba real.
-  - status-rmd: «Por autorizar» descartado por ahora (falta OK de la jefa de Carlos).
+- Mantener esta sección al día al publicar una versión o fusionar un PR.
 
 ## Datos que no van en el repo
 
