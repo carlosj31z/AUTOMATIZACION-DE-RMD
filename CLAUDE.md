@@ -125,10 +125,15 @@ cuenta). Escribir y responder siempre en **español**.
 
 ## Estado al 2026-11-02
 
-- Publicada en SharePoint: **1.109.0** (2026-11-01). En la rama por defecto:
-  1.109.0 (PR #59). **La siguiente versión debe ser > 1.109.0** y construirse
-  encima de la rama por defecto.
-- 2026-11-02, v1.110.0 (rama `claude/caracterizacion-listado-motivo`): listado
+- Publicada en SharePoint: **1.110.0** (2026-11-02, 1 872 262 bytes). En la
+  rama por defecto: 1.110.0 (PR #61). **La siguiente versión debe ser > 1.110.0**
+  y construirse encima de la rama por defecto.
+- En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
+  carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
+  publicar --archivo <archivo> [--subir]`. El control de permisos de Claude Code
+  de esa PC lo frena como «despliegue a producción» salvo que Carlos lo
+  autorice en el hilo o agregue la regla de permitir.
+- 2026-11-02, v1.110.0 (PR #61): listado
   de caracterización identificado en el portal embebido en el script
   (`CARACT_LISTADO`, una línea por fila; se regenera desde la identificación con
   `generar_listado_js.js` de `/mnt/project-files/caracterizacion/`). «Enviar a
@@ -137,7 +142,8 @@ cuenta). Escribir y responder siempre en **español**.
   caracterizada → Motivo CARACTERIZACION puesto como «Editar RM» → Confirmar
   (`MERGE /MD('<mdId>')` con usuarioActualiza = `USUARIO.usuario` por correo).
   **Solo Planta 2** (`CARACT_MOTIVO_PLANTAS = ['P2']`): Carlos dejó P1 pendiente
-  (2026-11-02); en SAP se marcaron solo las versiones de LIMA.
+  (2026-11-02); en SAP se marcaron solo las 78 versiones de LIMA (Motivo anterior
+  guardado en `caracterizacion\marcar_resultado_*_LIMA.xlsx` de DESKTOP-KJ339H3).
   El Motivo CARACTERIZACION del catálogo: código 24,
   `6c7e87b8-b17f-493e-969b-7e09b574abce`.
 - Fusionados hace poco:
