@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.111.0
+// @version      1.112.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.111.0';                                                       // mantener igual a @version
+  const VERSION = '1.112.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -15645,7 +15645,7 @@
             else if (g.primero === x.id) add(x.id, 'info', `Paso nuevo: el equipo RMD lo creará en SAP una sola vez y se usará en los ${g.n} lugares donde está igual.`);
             else add(x.id, 'info', `Igual al paso nuevo ${g.padre ? 'del proceso menor de ' + (numeros.get(g.padre) || 'más arriba') : numeros.get(g.primero) || 'de más arriba'}: se usa ese mismo paso, no se crea otro.`); }
         }
-        if (!x.nuevo && x.etqCat && etq && x.etqCat !== etq && !esPm) add(x.id, igualQueSap(x) ? 'info' : 'aviso', `${igualQueSap(x) ? 'Ya está así en SAP: e' : 'E'}n el catálogo este paso es de ${nomEtq(x.etqCat)}, no de esta etiqueta; en producción podría no aparecer en su lugar.`);
+        if (!x.nuevo && x.etqCat && etq && x.etqCat !== etq && (!esPm || !igualQueSap(x))) add(x.id, igualQueSap(x) ? 'info' : 'aviso', `${igualQueSap(x) ? 'Ya está así en SAP: e' : 'E'}n el catálogo este paso es de ${nomEtq(x.etqCat)}, no de esta etiqueta; en producción podría no aparecer en su lugar.`);
         if (x.tipo === RANGO || x.vi != null || x.vf != null) {
           const a = num(x.vi), b = num(x.vf), m = num(x.margen);
           if ([a, b, m].some((v) => Number.isNaN(v))) add(x.id, 'error', 'El rango debe tener números (usa punto o coma para los decimales).');
@@ -16135,10 +16135,10 @@
         const pintarEstado = () => {
           const t = ta.value.trim(), igualBase = b && PPN.normalizar(t) === PPN.normalizar(b.texto);
           if (elegido && PPN.normalizar(t) !== PPN.normalizar(elegido.texto)) elegido = null;
-          if (!elegido && t) { const ex = BUS.exactos(t).filter((c) => c.estr === estr && (clase === 'pm' || !etq || c.etq === etq)); if (ex.length) elegido = ex[0]; }
+          if (!elegido && t) { const ex = BUS.exactos(t).filter((c) => c.estr === estr && (!etq || c.etq === etq)); if (ex.length) elegido = ex[0]; }
           if (!t) est.innerHTML = '<span class="err">Escribe el texto del paso o elige uno de la lista.</span>';
           else if (igualBase && (!elegido || String(elegido.codigo) === String(b.codigo))) est.innerHTML = '<span class="ok">Sin cambios en el texto.</span>';
-          else if (elegido) est.innerHTML = `<span class="ok">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${etq && elegido.etq && elegido.etq !== etq && clase !== 'pm' ? `<br><span class="avi">⚠ En el catálogo es de ${esc(ETQ.get(elegido.etq) || 'otra etiqueta')}: en producción podría no aparecer en su lugar.</span>` : ''}`;
+          else if (elegido) est.innerHTML = `<span class="ok">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${etq && elegido.etq && elegido.etq !== etq ? `<br><span class="avi">⚠ En el catálogo es de ${esc(ETQ.get(elegido.etq) || 'otra etiqueta')}: en producción podría no aparecer en su lugar. Al ingresarlo, el equipo RMD lo pasa a un paso de esta etiqueta.</span>` : ''}`;
           else est.innerHTML = '<span class="crea">★ Paso nuevo: no existe en SAP con este texto. El equipo RMD lo creará.</span>';
           rango.hidden = !conRango();
           $('#m-reg-l', m).hidden = !(t && !elegido && !(igualBase && b && b.codigo));
@@ -16155,7 +16155,7 @@
           if (mas) lim += 20; else lim = 12;
           const t = ta.value.trim(); if (t.length < 2) { sug.innerHTML = '<div class="pp-sug-tit">Escribe parte de una palabra (limp, agit, balanz…) y aparecen los pasos que ya existen.</div>'; return; }
           const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true });
-          sug.innerHTML = r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${etq && y.f.etq && y.f.etq !== etq && clase !== 'pm' ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="pp-sug-tit">Ningún paso de esta estructura coincide: si lo dejas así, queda «★ Se creará».</div>';
+          sug.innerHTML = r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${etq && y.f.etq && y.f.etq !== etq ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="pp-sug-tit">Ningún paso de esta estructura coincide: si lo dejas así, queda «★ Se creará».</div>';
         };
         let tm = 0; ta.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { pintarEstado(); pintarSug(); }, 140); });
         sug.addEventListener('click', (e) => { if (e.target.closest('[data-mas]')) { pintarSug(true); return; } const s = e.target.closest('[data-codigo]'); if (!s) return; elegido = BUS.porCodigo(s.dataset.codigo); ta.value = elegido.texto; pintarEstado(); pintarSug(); ta.focus(); });
@@ -17582,7 +17582,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const { datos, prop, extra, bIngresar } = v.__ppEd || {}, f = datos && ppItemDe(prop.trabajo, id), celda = [...v.cuerpo.querySelectorAll('[data-celda]')].find((y) => y.dataset.celda === id);
     if (!f || !celda || v.cuerpo.querySelector('.rmd-pp-ed')) return;
     let bus = ppBuscadores.get(datos); if (!bus) { bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo)); ppBuscadores.set(datos, bus); }
-    const x = f.item, b0 = (ppItemDe(datos.arbol, id) || {}).item || null, etqNom = new Map(datos.catalogo.etq), coincide = (y) => y.estr === f.estr && (f.pm || !f.etq || y.etq === f.etq);
+    const x = f.item, b0 = (ppItemDe(datos.arbol, id) || {}).item || null, etqNom = new Map(datos.catalogo.etq), coincide = (y) => y.estr === f.estr && (!f.etq || y.etq === f.etq);
     let elegido = x.codigo && !x.nuevo ? bus.porCodigo(x.codigo) || null : null, lim = 12;
     const ed = document.createElement('div'); ed.className = 'rmd-pp-ed';
     ed.innerHTML = `<textarea class="rmd-pp-ed-tx" rows="2" spellcheck="true" placeholder="Texto del paso, palabras para buscar o código">${esc(x.texto || '')}</textarea><div class="rmd-pp-ed-est"></div><div class="rmd-pp-ed-sug"></div>
@@ -17595,7 +17595,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       if (elegido && PPN.normalizar(t) !== PPN.normalizar(elegido.texto)) elegido = null;
       if (!elegido && t) { const ex = bus.exactos(t).filter(coincide); if (ex.length) elegido = ex[0]; }
       est.innerHTML = !t ? '<span class="rmd-rec-rojo">Escribe el texto del paso o elige uno de la lista.</span>'
-        : elegido ? `<span class="rmd-rec-nuevo">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${f.etq && elegido.etq && elegido.etq !== f.etq && !f.pm ? ` <span class="rmd-pp-av aviso">⚠ En el catálogo es de ${esc(etqNom.get(elegido.etq) || 'otra etiqueta')}.</span>` : ''}`
+        : elegido ? `<span class="rmd-rec-nuevo">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${f.etq && elegido.etq && elegido.etq !== f.etq ? ` <span class="rmd-pp-av aviso">⚠ En el catálogo es de ${esc(etqNom.get(elegido.etq) || 'otra etiqueta')}.</span>` : ''}`
         : b0 && b0.codigo && PPN.normalizar(t) === PPN.normalizar(b0.texto) ? `<span class="rmd-nota">Queda como está en SAP (paso ${esc(b0.codigo)}).</span>`
         : '<span class="rmd-pp-crea">★ Paso nuevo: se creará en SAP con este texto</span>';
     };
@@ -17604,7 +17604,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       if (/^\d{3,}$/.test(t)) { const y = bus.porCodigo(t); sug.innerHTML = y ? `<button type="button" class="rmd-pp-sug-it${elegido && String(elegido.codigo) === String(y.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.codigo)}"><span class="cod">${esc(y.codigo)}</span><span class="tx">${esc(y.texto)}</span>${coincide(y) ? '' : `<span class="otra">${y.estr !== f.estr ? 'otra estructura' : esc(etqNom.get(y.etq) || 'otra etiqueta')}</span>`}</button>` : '<div class="rmd-nota">No hay un paso con ese código en el catálogo de la plantilla.</div>'; return; }
       if (t.length < 2) { sug.innerHTML = '<div class="rmd-nota">Escribe parte de una palabra (limp, agit, balanz…) o el código del paso.</div>'; return; }
       const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true });
-      sug.innerHTML = r.length ? `<div class="rmd-nota">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="rmd-pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${f.etq && y.f.etq && y.f.etq !== f.etq && !f.pm ? `<span class="otra">${esc(etqNom.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="rmd-pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="rmd-nota">Ningún paso de esta estructura coincide: si lo dejas así, se creará.</div>';
+      sug.innerHTML = r.length ? `<div class="rmd-nota">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="rmd-pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${f.etq && y.f.etq && y.f.etq !== f.etq ? `<span class="otra">${esc(etqNom.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="rmd-pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="rmd-nota">Ningún paso de esta estructura coincide: si lo dejas así, se creará.</div>';
     };
     const cerrar = () => { celda.replaceChildren(...antes); if (bIngresar) bIngresar.disabled = !!bIngresar.title; };
     const aplicar = async () => {
@@ -17708,6 +17708,17 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const catNuevo = new Map();                                                           // id del borrador -> fila del catálogo
     // pasos y procesos menores con la etiqueta de su lista (de un proceso menor, la de su paso): un paso de otra etapa no se ve en Producción
     const nomEtq = await nombresEtiqueta(modelo).catch(() => new Map()), etapaDest = dest.nivelTxt || '', vale = (etqL, etq) => !etiquetaChoca(etqL, etq || null, nomEtq.get(etq), etapaDest);
+    // un código de otra etiqueta (p. ej. un proceso menor que el borrador tomó por su texto de otra etapa) no se ve en Producción: se pasa, como «Corregir»,
+    // a un paso del mismo texto de la etiqueta de la lista (el que exista o uno nuevo que copia su tipo de dato y casillas)
+    const deOtra = new Map(), pasarDeOtra = (x, L, tipoBase, pm) => {
+      const c = !x.nuevo && !x.insumo && x.codigo && porCodigo.get(String(x.codigo)); if (!c || deOtra.has(x.id) || vale(L.t ? L.t.etiquetaId : null, c.etiquetaId_etiquetaId)) return;
+      deOtra.set(x.id, { c, x, L, pm }); buscarTexto.push({ x, L, tipoBase, pm });
+    };
+    listas.forEach((L) => {
+      const bId = new Map(L.b.map((y) => [y.id, y]));
+      L.w.filter((x) => !x.quitado && pide(x, bId.get(x.id))).forEach((x) => pasarDeOtra(x, L, (bId.get(x.id) || {}).tipo, L.kind === 'pm'));
+      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach((m) => pasarDeOtra(m, { e: L.e, t: L.t, pmDe: x }, null, true)));
+    });
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
       const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
@@ -17726,6 +17737,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
         if ((x.rpor || x.vb) && +tipo === PP_SIN_TIPO) tipo = x.rpor && x.vb ? 441 : x.rpor ? 439 : 440;
         const rango = +tipo === (PPN.RANGO || 443);
         let sim = null; if (inferido) { const sp = await ppLeerUno(modelo, 'PASO', [new F('codigo', 'EQ', String(inferido.codigo))], PP_PASO_SEL); if (sp) sim = { paso: sp, md: await configDe(sp.pasoId) }; }
+        if (!sim && deOtra.has(x.id)) { const c0 = deOtra.get(x.id).c; sim = { paso: c0, md: await configDe(c0.pasoId) }; }
         const sp0 = (sim && sim.paso) || {}, pick = (a, b) => (a != null && a !== '' ? a : b == null ? null : b);
         n = { key, texto, estr: L.e.estructuraId, etq: etqL, estrNombre: L.e.nombre, etqNombre: L.t ? L.t.nombre : '', pasoId: ppUuid(), tipo, items: [], codigo: null,
           fila: { terminal: null, usuarioRegistro: usuario, fechaRegistro: ahora, activo: true, descripcion: texto, numeracion: !!m.numeracion, tipoDatoId_iMaestraId: tipo, estadoId_iMaestraId: m.estadoId_iMaestraId, estructuraId_estructuraId: L.e.estructuraId, etiquetaId_etiquetaId: etqL,
@@ -17737,6 +17749,9 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       }
       n.items.push(x); catNuevo.set(x.id, n);
     }
+    const yaDicho = new Set(avisos);
+    deOtra.forEach(({ c, x, L, pm }) => { const nv = catNuevo.get(x.id); if (!nv && !x.__codigo) return;
+      const t = (`${pm ? 'El proceso menor' : 'El paso'} ${c.codigo} «${String(x.texto || c.descripcion || '').slice(0, 60)}» es de la etiqueta ${nomEtq.get(c.etiquetaId_etiquetaId) || 'sin etiqueta'} y su lista (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) es de otra: para que se vea en Producción ${nv ? 'se crea con el mismo texto en la etiqueta de la lista' : `se usa el paso ${x.__codigo}, del mismo texto y de la etiqueta de la lista`}.`); if (!yaDicho.has(t)) { yaDicho.add(t); avisos.push(t); } });
     const cod = (x) => String(x.__codigo || x.codigo || ''), codVer = (x) => cod(x) || '(nuevo)';
     const catDe = (x) => (catNuevo.has(x.id) ? { pasoId: catNuevo.get(x.id).pasoId, tipoDatoId_iMaestraId: catNuevo.get(x.id).tipo, ...['decimales', 'margen', 'valorInicial', 'valorFinal', 'clvModelo', 'automatico'].reduce((o, k) => ({ ...o, [k]: catNuevo.get(x.id).fila[k] }), {}) } : porCodigo.get(cod(x)));
     const faltan = [...new Set(listas.flatMap((L) => L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id)) && !catDe(x)).map((x) => cod(x) || String(x.texto || '').slice(0, 40))))];

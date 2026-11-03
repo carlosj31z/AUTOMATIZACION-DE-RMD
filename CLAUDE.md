@@ -123,10 +123,10 @@ cuenta). Escribir y responder siempre en **español**.
   bloques y se reinyecta el editor y su CSS de la versión nueva (como hace
   `ppHtml` en el userscript).
 
-## Estado al 2026-11-02
+## Estado al 2026-11-03
 
 - Publicada en SharePoint: **1.110.0** (2026-11-02, 1 872 262 bytes). En la
-  rama por defecto: 1.111.0 (tip de marcadores). **La siguiente versión debe ser > 1.111.0**
+  rama por defecto: 1.112.0 (incluye 1.111.0). **La siguiente versión debe ser > 1.112.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
   carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
@@ -152,6 +152,11 @@ cuenta). Escribir y responder siempre en **español**.
   caracterización pendiente: pestaña CARACTERIZACIÓN y Ruta 2) o «PENDIENTE MASIVO»
   (cuenta en el Backlog de INDICADORES desde nov-2026 hasta que haya otra versión;
   status-rmd PR #36). Los usuarios lo escriben; el script no lo graba solo.
+- 2026-11-03, v1.112.0: el ingreso del borrador de Producción bloqueaba pasos y
+  procesos menores de otra etiqueta que su lista; el editor del borrador elegía los
+  procesos menores por texto de cualquier etiqueta. Ahora el editor se queda en la
+  etiqueta de la lista y el ingreso pasa los de otra etiqueta a un paso del mismo
+  texto de la etiqueta de la lista (existente o nuevo), con aviso.
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
