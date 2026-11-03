@@ -125,8 +125,8 @@ cuenta). Escribir y responder siempre en **español**.
 
 ## Estado al 2026-11-03
 
-- Publicada en SharePoint: **1.110.0** (2026-11-02, 1 872 262 bytes). En la
-  rama por defecto: 1.112.0 (incluye 1.111.0). **La siguiente versión debe ser > 1.112.0**
+- Publicada en SharePoint: **1.112.0** (2026-11-03, 1 874 924 bytes). En la
+  rama por defecto: 1.113.0. **La siguiente versión debe ser > 1.113.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
   carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
@@ -157,6 +157,10 @@ cuenta). Escribir y responder siempre en **español**.
   procesos menores por texto de cualquier etiqueta. Ahora el editor se queda en la
   etiqueta de la lista y el ingreso pasa los de otra etiqueta a un paso del mismo
   texto de la etiqueta de la lista (existente o nuevo), con aviso.
+- 2026-11-03, v1.113.0: Exportar → «V°B° última vs. penúltima» (el `vb-mes` en el
+  portal); casilla «Distinguir tildes» en el borrador (`trabajo.tildes`, núcleo
+  `PPN.tildes/igualTexto`); cuadro «Etiqueta distinta a su lista» en Ingresar en SAP
+  (`plan.otraEtiqueta`); «Abrir como HTML» en la revisión del borrador (PDF → .html).
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
