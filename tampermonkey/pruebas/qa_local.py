@@ -1336,6 +1336,45 @@ with sync_playwright() as p:
               and r["ancha"]["marca"] is not None and r["ancha"]["th"] >= r["ancha"]["mayor"] + 8)
         return ok, json.dumps(r, ensure_ascii=False)
 
+    @prueba("LN-AUT v1.115.0 RMD Autorizado: en «Editar Paso» (paso mayor o proceso menor) el texto queda de solo lectura con aviso, no se puede escribir y el Grabar no graba un texto cambiado; en un RMD Ingresado todo sigue igual")
+    def _():
+        pg.evaluate("""() => {
+          window.__aut = { antes: window.sap, estado: 465, portal: 0, store: {} };
+          const lm = { getProperty: (r) => r.split('/').filter(Boolean).reduce((o, k) => (o == null ? o : o[k]), window.__aut.store),
+            setProperty: (r, v) => { const ks = r.split('/').filter(Boolean), u = ks.pop(); ks.reduce((o, k) => o[k], window.__aut.store)[u] = v; } };
+          const modelo = { read: (ruta, o) => setTimeout(() => o.success({ results: [] }), 10) };
+          const vista = { getModel: (n) => (n === 'localModel' ? lm : n === 'mainModelv2' ? modelo : n === 'asociarDatos' ? { getData: () => ({ mdId: 900, codigo: '2202609013', estadoIdRmd_iMaestraId: window.__aut.estado, aEstructura: { results: [] } }) } : null) };
+          const M = { onGrabarPasoPadre() { window.__aut.portal++; } };
+          const grabar = { getText: () => 'Grabar', data: (k) => (k === 'component' ? 'pasoHijo' : null), mEventRegistry: { press: [{ oListener: M, fFunction: M.onGrabarPasoPadre }] } };
+          const reg = { btnExpAut: { mEventRegistry: { press: [{ oListener: { getView: () => vista } }] } }, btnGrabarAut: grabar };
+          window.__aut.grabar = grabar;
+          window.sap = { ui: { getCore: () => ({ byId: (id) => reg[id] }), require: () => null, core: { BusyIndicator: { show() {}, hide() {} } } } };
+          document.getElementById('app').insertAdjacentHTML('afterbegin', '<button id="btnExpAut" title="Exportar">E</button>');
+          const d = document.createElement('div'); d.className = 'sapMDialog sapMDialogOpen'; d.setAttribute('role', 'dialog'); d.id = '__dialogAut';
+          d.innerHTML = `<header><div class="sapMBar"><div class="sapMBarMiddle"><h2 class="sapMTitle">Editar Paso</h2></div></div></header><section class="sapMDialogSection"><div class="sapMDialogScrollCont">
+            <label for="taAut">Descripción Paso:</label><div class="sapMInputBase"><textarea id="taAut" rows="3" style="width:600px">AGREGAR EL ALCOHOL LENTAMENTE.</textarea></div></div></section><footer><button id="btnGrabarAut"><span id="btnGrabarAut-inner">Grabar</span></button><button>Cancelar</button></footer>`;
+          document.getElementById('app').appendChild(d); }""")
+        pg.wait_for_timeout(1500)
+        r = {}
+        r["aut"] = pg.evaluate("() => { const ta = document.getElementById('taAut'), d = document.getElementById('__dialogAut'); return { ro: ta.readOnly, aviso: (d.querySelector('.rmd-ep-autorizado') || {}).textContent || '', envuelto: !!window.__aut.grabar.mEventRegistry.press[0].fFunction.__rmdGrabar, global: window.__rmdStats.rmdAbiertoAutorizado() }; }")
+        pg.locator("#taAut").click(); pg.keyboard.type("XX"); pg.wait_for_timeout(200)
+        r["escrito"] = pg.evaluate("document.getElementById('taAut').value")
+        # el modelo trae un texto cambiado (p. ej. por otra vía): el Grabar no llama al portal y devuelve el texto guardado
+        r["grabar_aut"] = pg.evaluate("""async () => { const a = window.__aut; a.store.pasoHijoSeleccionado = { pasoId: 'p1', codigo: '5001', descripcion: 'AGREGAR EL ALCOHOL RAPIDO.' }; a.store.pasoHijoSeleccionadoBackUp = { pasoId: 'p1', codigo: '5001', descripcion: 'AGREGAR EL ALCOHOL LENTAMENTE.' };
+          const reg = a.grabar.mEventRegistry.press[0]; await reg.fFunction.call(reg.oListener, { getSource: () => a.grabar }); await new Promise((r) => setTimeout(r, 100));
+          return { portal: a.portal, texto: a.store.pasoHijoSeleccionado.descripcion, toast: [...document.querySelectorAll('.rmd-toast')].map((t) => t.textContent).join(' ') }; }""")
+        # el mismo diálogo en un RMD Ingresado: se libera y Grabar llega al portal
+        pg.evaluate("() => { window.__aut.estado = 467; document.getElementById('__dialogAut').querySelector('.sapMDialogSection').appendChild(document.createElement('i')); }")
+        pg.wait_for_timeout(1200)
+        r["ing"] = pg.evaluate("() => { const d = document.getElementById('__dialogAut'); return { ro: document.getElementById('taAut').readOnly, aviso: !!d.querySelector('.rmd-ep-autorizado') }; }")
+        r["grabar_ing"] = pg.evaluate("""async () => { const a = window.__aut; a.store.pasoHijoSeleccionado = { pasoId: 'p1', codigo: '5001', descripcion: 'AGREGAR EL ALCOHOL RAPIDO.' };
+          const reg = a.grabar.mEventRegistry.press[0]; await reg.fFunction.call(reg.oListener, { getSource: () => a.grabar }); await new Promise((r) => setTimeout(r, 300)); return a.portal; }""")
+        pg.evaluate("() => { document.getElementById('__dialogAut').remove(); document.getElementById('btnExpAut').remove(); window.sap = window.__aut.antes; }")
+        ok = (r["aut"]["ro"] and "RMD Autorizado" in r["aut"]["aviso"] and r["aut"]["envuelto"] and r["aut"]["global"] and r["escrito"] == "AGREGAR EL ALCOHOL LENTAMENTE."
+              and r["grabar_aut"]["portal"] == 0 and r["grabar_aut"]["texto"] == "AGREGAR EL ALCOHOL LENTAMENTE." and "Autorizado" in r["grabar_aut"]["toast"]
+              and not r["ing"]["ro"] and not r["ing"]["aviso"] and r["grabar_ing"] == 1)
+        return ok, json.dumps(r, ensure_ascii=False)[:900]
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
