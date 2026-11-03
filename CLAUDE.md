@@ -126,7 +126,7 @@ cuenta). Escribir y responder siempre en **español**.
 ## Estado al 2026-11-03
 
 - Publicada en SharePoint: **1.112.0** (2026-11-03, 1 874 924 bytes). En la
-  rama por defecto: 1.113.0. **La siguiente versión debe ser > 1.113.0**
+  rama por defecto: 1.114.0. **La siguiente versión debe ser > 1.114.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
   carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
@@ -161,6 +161,11 @@ cuenta). Escribir y responder siempre en **español**.
   portal); casilla «Distinguir tildes» en el borrador (`trabajo.tildes`, núcleo
   `PPN.tildes/igualTexto`); cuadro «Etiqueta distinta a su lista» en Ingresar en SAP
   (`plan.otraEtiqueta`); «Abrir como HTML» en la revisión del borrador (PDF → .html).
+- 2026-11-03, v1.114.0: **regla de Carlos: en los textos de los pasos ninguna palabra
+  lleva tilde** (la Ñ sí). El borrador marca en rojo cada palabra con tilde, avisa por
+  paso y trae «Quitar tildes» (en la ventana del paso y en la barra para todo el
+  borrador; activa «Distinguir tildes» para que el cambio llegue a SAP). En el portal,
+  `reglasDeFila` marca la Descripción con tilde (también sale en la revisión del ingreso).
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
