@@ -125,7 +125,7 @@ cuenta). Escribir y responder siempre en **español**.
 
 ## Estado al 2026-11-03
 
-- Publicada en SharePoint: **1.112.0** (2026-11-03, 1 874 924 bytes). En la
+- Publicada en SharePoint: **1.114.0** (2026-11-03, 1 899 828 bytes). En la
   rama por defecto: 1.114.0. **La siguiente versión debe ser > 1.114.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
