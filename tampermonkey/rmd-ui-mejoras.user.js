@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.114.0
+// @version      1.115.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.114.0';                                                       // mantener igual a @version
+  const VERSION = '1.115.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -590,6 +590,8 @@
   .rmd-sel-cab .rmd-sel-repetir { flex: 0 0 auto; margin-left: auto; font-size: 12px; font-weight: 600; }
   .rmd-sel-orden { -moz-appearance: textfield; } .rmd-sel-orden::-webkit-inner-spin-button, .rmd-sel-orden::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .rmd-sel-orden, .rmd-sel-cant input { width: 44px; height: 22px; text-align: center; border: 1px solid var(--rmd-borde); border-radius: 4px; background: transparent; color: inherit; font: 600 13px var(--rmd-fuente); }
+  .rmd-ep-autorizado { margin: 8px 16px 0; padding: 7px 10px; border-left: 3px solid var(--rmd-rojo, #d9363e); border-radius: 3px; background: rgba(217,54,62,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
+  textarea.rmd-bloq-aut, input.rmd-bloq-aut { cursor: not-allowed; opacity: .75; }
   .rmd-ep-aviso { margin: 8px 16px 0; padding: 7px 10px; border-left: 3px solid var(--rmd-acento); border-radius: 3px; background: rgba(27,141,236,.10); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-ep-cambio { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; } .rmd-ep-cambio div { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; }
   .rmd-ep-cambio span { color: var(--rmd-apagado); font-size: 12px; } .rmd-ep-cambio p { margin: 4px 0 0; } .rmd-ep-cambio div:first-child p { color: var(--rmd-apagado); }
@@ -10843,7 +10845,7 @@
     const comp = bG.data && bG.data('component');
     let reloj = 0, ultima = null, listaP = null;
     const revisar = async () => {
-      const b = controladorPrincipal(); if (!b || !d.isConnected) return;
+      const b = controladorPrincipal(); if (!b || !d.isConnected || rmdAbiertoAutorizado(b)) return;
       const lm = b.getView().getModel('localModel'), dd = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado'); if (!dd || !dd.pasoId) return;
       const modelo = b.getView().getModel('mainModelv2'); if (!listaP) { listaP = listaDeEdicion(modelo, lm, comp).catch(() => null); listaP.then((li) => avisoEtiquetaAlEditar(d, M, b, comp, li)); }
       const texto = norm(ta.value); if (texto === ultima) return; ultima = texto;
@@ -10909,14 +10911,47 @@
     return true;
   }
   window.__rmdStats.validarComoGrabar = validarComoGrabar;   // pruebas
+  // ---- RMD Autorizado: ninguna palabra de sus pasos ni de sus procesos menores se cambia (regla de Carlos, 2026-11-03) ----
+  // El Grabar del portal en un RMD Autorizado crea un paso nuevo con el texto cambiado: se bloquea. Se aplica aunque «Editar paso con aviso» esté apagado.
+  const ID_AUTORIZADO = '465';
+  const AVISO_AUTORIZADO = 'Este RMD está Autorizado: no se puede cambiar ninguna palabra de sus pasos ni de sus procesos menores. Haz el cambio en una versión nueva.';
+  function rmdAbiertoAutorizado(b) {
+    try { const c = b || controladorPrincipal(), a = c && c.getView().getModel('asociarDatos'); return !!a && String((a.getData() || {}).estadoIdRmd_iMaestraId) === ID_AUTORIZADO; } catch (e) { return false; }
+  }
+  window.__rmdStats.rmdAbiertoAutorizado = () => rmdAbiertoAutorizado();   // pruebas
+  // campos de texto del paso en la ventana: «Descripción Paso»/«Descripción» y los enlazados a descripcion
+  function camposTextoPaso(d) {
+    const xs = [campoDe(d, 'Descripción Paso'), campoDe(d, 'Descripción')];
+    d.querySelectorAll('textarea, input').forEach((el) => { const c = typeof sap !== 'undefined' ? ctlDe(el) : null; if (c && /descripcion/i.test(rutaDe(c, 'value'))) xs.push(el); });
+    return [...new Set(xs.filter(Boolean))];
+  }
+  function bloquearTextoPasoAutorizado(d, b) {
+    const aut = rmdAbiertoAutorizado(b);
+    if (!aut) {   // la misma ventana se reutiliza en otro RMD: se deja como estaba
+      d.querySelectorAll('.rmd-bloq-aut').forEach((el) => { el.readOnly = false; el.removeAttribute('aria-readonly'); el.classList.remove('rmd-bloq-aut'); el.removeAttribute('title'); });
+      d.querySelectorAll('.rmd-ep-autorizado').forEach((x) => x.remove()); return false;
+    }
+    camposTextoPaso(d).forEach((el) => {
+      if (!el.readOnly) el.readOnly = true;
+      if (!el.classList.contains('rmd-bloq-aut')) { el.classList.add('rmd-bloq-aut'); el.setAttribute('aria-readonly', 'true'); el.title = AVISO_AUTORIZADO; }
+      const aa = el.parentElement && el.parentElement.querySelector(':scope > .rmd-aa'); if (aa) aa.remove();   // «Aa» escribiría en el campo
+    });
+    d.querySelectorAll('.rmd-ep-aviso, .rmd-ep-dup, .rmd-ep-etq').forEach((x) => x.remove());
+    if (!d.querySelector('.rmd-ep-autorizado')) {
+      const a = document.createElement('div'); a.className = 'rmd-ep-autorizado'; a.setAttribute('role', 'status');
+      a.innerHTML = '🔒 <b>RMD Autorizado:</b> no se puede cambiar ninguna palabra de este paso (tampoco de los procesos menores). Haz el cambio en una versión nueva.';
+      const sec = d.querySelector('.sapMDialogSection'); if (sec) sec.prepend(a);
+    }
+    return true;
+  }
   function gestionarEdicionPasos() {
-    const d = dialogos().find((x) => /^Editar Paso/i.test(cabecera(x))); if (!d || typeof sap === 'undefined') return;
+    // «Editar Paso» del paso mayor y del proceso menor (mismo Grabar onGrabarPasoPadre, component pasoPadre/pasoHijo)
+    const d = dialogos().find((x) => /^Editar Paso/i.test(cabecera(x)) || (/^Editar/i.test(cabecera(x)) && !!campoDe(x, 'Descripción Paso'))); if (!d || typeof sap === 'undefined') return;
     const bG = [...d.querySelectorAll('button')].map((x) => sap.ui.getCore().byId(x.id.replace(/-inner$/, ''))).find((x) => x && x.getText && x.getText() === 'Grabar');
     const reg = bG && ((bG.mEventRegistry || {}).press || [])[0], M = reg && reg.oListener;
     if (!M || typeof M.onGrabarPasoPadre !== 'function' || (reg.fFunction !== M.onGrabarPasoPadre && !reg.fFunction.__rmdGrabar)) return;
-    if (!on('editarpaso')) { if (reg.fFunction.__rmdGrabar) reg.fFunction = reg.fFunction.__rmdGrabar; return; }
-    avisoUsoAlAbrir(d, bG);
-    vigilarDuplicadoAlEditar(d, bG, M);
+    const autorizado = bloquearTextoPasoAutorizado(d);
+    if (on('editarpaso') && !autorizado) { avisoUsoAlAbrir(d, bG); vigilarDuplicadoAlEditar(d, bG, M); }
     if (reg.fFunction.__rmdGrabar) return;
     const orig = reg.fFunction;
     const w = async function (e) {
@@ -10926,7 +10961,13 @@
       try {
         const b = controladorPrincipal(); if (!b) return portal();
         const comp = fuente && fuente.data('component'), lm = b.getView().getModel('localModel');
-        const dd = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado'), nn = lm.getProperty(comp === 'pasoPadre' ? '/pasoPadreSeleccionadoBackUp' : '/pasoHijoSeleccionadoBackUp');
+        const ruta = comp === 'pasoPadre' ? '/pasoPadreSeleccionado' : '/pasoHijoSeleccionado';
+        const dd = lm.getProperty(ruta), nn = lm.getProperty(ruta + 'BackUp');
+        // RMD Autorizado: el texto no cambia; se devuelve el texto guardado y no se graba
+        if (dd && nn && rmdAbiertoAutorizado(b) && String(dd.descripcion == null ? '' : dd.descripcion) !== String(nn.descripcion == null ? '' : nn.descripcion)) {
+          lm.setProperty(ruta + '/descripcion', nn.descripcion); toast(AVISO_AUTORIZADO + ' No se grabó el texto.', true); return undefined;
+        }
+        if (!on('editarpaso')) return portal();
         if (!dd || !dd.pasoId || JSON.stringify(dd) === JSON.stringify(nn)) return portal();
         const modelo = b.getView().getModel('mainModelv2'), md = b.getView().getModel('asociarDatos').getData();
         const li = await listaDeEdicion(modelo, lm, comp).catch(() => null);
@@ -11554,7 +11595,7 @@
       // «Nuevo Paso» / «Editar Paso» se detectan por el campo «Descripción Paso», no por el título.
       const d = enDialogo(ta); const aplica = d && (gestionada(d) || !!campoDe(d, 'Descripción Paso'));
       if (!aplica) { if (ta.classList.contains('rmd-ortografia')) ta.classList.remove('rmd-ortografia'); const b = ta.parentElement && ta.parentElement.querySelector(':scope > .rmd-aa'); if (b) b.remove(); return; }
-      if (ta.readOnly || ta.disabled) return;
+      if (ta.readOnly || ta.disabled || ta.classList.contains('rmd-bloq-aut')) return;
       if (!on('pasominusculas')) { const b = ta.parentElement && ta.parentElement.querySelector(':scope > .rmd-aa'); if (b) b.remove(); }
       else if (casiTodoMayus(ta.value) && ta.parentElement && !ta.parentElement.querySelector(':scope > .rmd-aa')) {
         getComputedStyle(ta.parentElement).position === 'static' && (ta.parentElement.style.position = 'relative');
@@ -11751,6 +11792,7 @@
   }
   async function crearEnMinusculas(tabla) {
     if (window.__rmdMinusculas) return;
+    if (rmdAbiertoAutorizado()) { toast(AVISO_AUTORIZADO, true); return; }
     const sel = seleccionadas(tabla);
     if (sel.length !== 1) { toast('Marca la casilla de UN solo paso (el que está en MAYÚSCULAS) y pulsa "En minúsculas".', true); return; }
     const p = pasoMaestroDeFila(sel[0], tabla);
@@ -11826,7 +11868,7 @@
     const origen = esMenor ? { tipo: 'menor', id: o.mdEstructuraPasoInsumoPasoId, orden: o.orden } : { tipo: 'mayor', id: o.mdEstructuraPasoId, orden: o.orden };
     const b = controladorPrincipal(), md = b && b.getView().getModel('asociarDatos').getData();
     if (!b) { toast('No se encontró el controlador del portal para esta lista.', true); return; }
-    if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) { toast('Este RMD está autorizado o suspendido: sus pasos no se pueden cambiar.', true); return; }
+    if (['465', '468'].includes(String(md.estadoIdRmd_iMaestraId))) { toast(rmdAbiertoAutorizado(b) ? AVISO_AUTORIZADO : 'Este RMD está suspendido: sus pasos no se pueden cambiar.', true); return; }
     const modelo = b.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     const pms = esMenor ? [] : await leerTodoDe(modelo, 'MD_ES_PASO_INSUMO_PASO', [new F('pasoId_mdEstructuraPasoId', 'EQ', o.mdEstructuraPasoId)], { $select: 'mdEstructuraPasoInsumoPasoId,activo' }).catch(() => []);
     const nPM = pms.filter((x) => x.activo !== false).length;

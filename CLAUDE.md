@@ -126,7 +126,7 @@ cuenta). Escribir y responder siempre en **español**.
 ## Estado al 2026-11-03
 
 - Publicada en SharePoint: **1.114.0** (2026-11-03, 1 899 828 bytes). En la
-  rama por defecto: 1.114.0. **La siguiente versión debe ser > 1.114.0**
+  rama por defecto: 1.115.0. **La siguiente versión debe ser > 1.115.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
   carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
@@ -166,6 +166,11 @@ cuenta). Escribir y responder siempre en **español**.
   paso y trae «Quitar tildes» (en la ventana del paso y en la barra para todo el
   borrador; activa «Distinguir tildes» para que el cambio llegue a SAP). En el portal,
   `reglasDeFila` marca la Descripción con tilde (también sale en la revisión del ingreso).
+- 2026-11-03, v1.115.0: **regla de Carlos: en un RMD Autorizado no se edita ninguna
+  palabra de sus pasos ni de sus procesos menores.** «Editar Paso» (también desde
+  «Procesos Menores para el Paso…») deja la Descripción de solo lectura con aviso
+  (`bloquearTextoPasoAutorizado`), el Grabar envuelto no graba un texto cambiado
+  (aunque «Editar paso con aviso» esté apagado) y «En minúsculas» se bloquea.
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
