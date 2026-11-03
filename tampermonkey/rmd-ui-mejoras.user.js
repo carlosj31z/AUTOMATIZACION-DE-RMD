@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.113.0
+// @version      1.114.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.113.0';                                                       // mantener igual a @version
+  const VERSION = '1.114.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1644,6 +1644,9 @@
       if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"' });
       else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(sinCalidadCorrecta(desc))) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)' });
     }
+    // Regla de Carlos (2026-11-03): en los pasos ninguna palabra lleva tilde
+    if (f.desc != null) { const ct = [...new Set(String(f.desc).normalize('NFC').match(/\p{L}*[áéíóúàèìòùäëïöüÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ]\p{L}*/gu) || [])];
+      if (ct.length) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: `Lleva tilde (${ct.slice(0, 6).join(', ')}): en los pasos ninguna palabra lleva tilde` }); }
     const vacio = (v) => v !== undefined && !norm(v);
     if (NUMERICOS.has(t) && vacio(f.dec)) out.push({ col: 'DECIMAL', clase: 'rmd-falta', msg: `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar` });
     if (t === 'RANGO') {
@@ -15548,6 +15551,13 @@
     const conTildes = (t) => String(t == null ? '' : t).normalize('NFC').toUpperCase().replace(/[^\p{L}\p{N}%°]+/gu, ' ').replace(/\s+/g, ' ').trim();
     const claveTexto = (t) => (TILDES ? conTildes(t) : normalizar(t));
     const igualTexto = (a, b) => claveTexto(a) === claveTexto(b);
+    // Regla de Carlos (2026-11-03): en los textos de los pasos ninguna palabra lleva tilde. Se marcan las que la llevan y «Quitar tildes» la saca
+    // (la Ñ se conserva)
+    const RX_TILDE = /[áéíóúàèìòùäëïöüÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ]/;
+    const quitarTildes = (t) => String(t == null ? '' : t).normalize('NFD').replace(/(?!\u0303)[\u0300-\u036f]/g, '').normalize('NFC');
+    // [[fragmento, conTilde], …]
+    const tildesEn = (texto) => String(texto == null ? '' : texto).normalize('NFC').split(/(\p{L}+)/u).filter((x) => x !== '').map((x) => [x, RX_TILDE.test(x)]);
+    const palabrasConTilde = (texto) => tildesEn(texto).filter((f) => f[1]).map((f) => f[0]);
     const fichas = (n) => n.split(' ').filter((w) => w && !VACIAS.has(w));
     const contar = (arr) => { const m = new Map(); arr.forEach((x) => m.set(x, (m.get(x) || 0) + 1)); return m; };
     const bigramas = (n) => { const s = ' ' + n + ' ', a = []; for (let i = 0; i < s.length - 1; i++) a.push(s.slice(i, i + 2)); return contar(a); };
@@ -15739,6 +15749,9 @@
       const revisar = (x, estr, etq, esPm) => {
         const t = String(x.texto || '').trim();
         if (!t) { add(x.id, 'error', 'Falta el texto.'); return; }
+        const ct = x.insumo ? [] : palabrasConTilde(t);
+        if (ct.length) { const ya = igualQueSap(x) && !TILDES, l = [...new Set(ct)].slice(0, 6).join(', ');
+          add(x.id, ya ? 'info' : 'aviso', `${ya ? 'Ya está así en SAP: l' : 'L'}leva tilde (${l}). En los pasos ninguna palabra lleva tilde: usa «Quitar tildes».`); }
         // mismas excepciones de Calidad que en el portal
         const n = normalizar(t), cc = esPm || !/\bBIOCARGA\b/.test(n) ? n.replace(/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES O CONTROL DE CALIDAD/g, 'CALIDAD EN OPERACIONES')
           .replace(/FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION FPRO \d+(?: VIGENTE)? A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA/g, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION') : '';
@@ -15862,7 +15875,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, normalizar, tildes, conTildes, igualTexto, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales };
+    return { TIPO, RANGO, normalizar, tildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -15927,6 +15940,30 @@
 
     // ---------- estado ----------
     function cambio(fn) { const rb = document.querySelector('.pp-recuperar'); if (rb && !cambio.recuperando) rb.remove(); deshacer.push(clon({ W, SOL })); if (deshacer.length > 60) deshacer.shift(); fn(); sucio = true; pdfHecho = false; guardarLocal(); pintarTodo(); }
+    // pasos y procesos menores (sin insumos ni quitados) que llevan tilde: [{ x, e, t }]
+    function conTilde() {
+      const out = [], vivos = (l) => (l || []).filter((y) => !y.quitado);
+      W.estructuras.forEach((e) => [[null, e.pasos], ...(e.etiquetas || []).map((t) => [t, t.pasos])].forEach(([t, l]) => vivos(l).forEach((p) => {
+        if (PPN.palabrasConTilde(p.texto).length) out.push({ x: p, e, t });
+        vivos(p.pm).forEach((m) => { if (!m.insumo && PPN.palabrasConTilde(m.texto).length) out.push({ x: m, e, t }); });
+      })));
+      return out;
+    }
+    // «Quitar tildes» en todo el borrador: cada texto sin tilde usa el paso de SAP que ya existe así en su etiqueta, o queda como paso nuevo
+    function quitarTildesTodo() {
+      const l = conTilde(); if (!l.length) return;
+      if (!confirm(`Se quitarán las tildes de ${l.length} paso${l.length === 1 ? '' : 's'} o proceso${l.length === 1 ? '' : 's'} menor${l.length === 1 ? '' : 'es'}. Cada uno usará el paso sin tilde que ya existe en SAP o quedará como paso nuevo. También se activa «Distinguir tildes». ¿Continuar?`)) return;
+      cambio(() => {
+        W.tildes = true; PPN.tildes(true);
+        l.forEach(({ x, e, t }) => {
+          const nt = PPN.quitarTildes(x.texto), b = BI.get(x.id); x.texto = nt;
+          const ex = BUS.exactos(nt).filter((c) => c.estr === e.estructuraId && (!t || c.etq === t.etiquetaId));
+          if (b && PPN.igualTexto(nt, b.texto)) { x.codigo = b.codigo; x.pasoId = b.pasoId; x.nuevo = false; x.etqCat = b.etqCat; x.tipo = b.tipo; }
+          else if (ex.length) { x.codigo = String(ex[0].codigo); x.pasoId = null; x.nuevo = false; x.etqCat = ex[0].etq; x.tipo = ex[0].tipo; }
+          else { x.codigo = null; x.pasoId = null; x.nuevo = true; x.etqCat = null; x.tipo = b ? b.tipo : (x.tipo || null); }
+        });
+      });
+    }
     function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } armarDatosPdf().catch(() => {}); }, 400); }
     // Datos del borrador dentro del PDF: enlaces invisibles al final del resumen. «Guardar como PDF» de Chrome y Edge guarda cada dirección tal cual,
     // y el portal la lee al importar el PDF (no hace falta el .html). Se arman tras cada cambio para que también sirva Ctrl+P.
@@ -16007,6 +16044,7 @@
         <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador, pero el archivo para enviar aún no se descargó">${sucio ? '● Sin guardar en archivo' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <label class="pp-tildes" title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" id="pp-tildes"${W.tildes ? ' checked' : ''}> Distinguir tildes</label>
+        ${(() => { const nt = conTilde().length; return nt ? `<button type="button" data-a="quitar-tildes" class="pp-quitar-tildes" title="En los pasos ninguna palabra lleva tilde: quita las tildes de los ${nt} textos marcados en rojo">Quitar tildes (${nt})</button>` : ''; })()}
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="guardar" title="Descarga un archivo con tu borrador para seguir editándolo otro día">Guardar borrador</button>
         <button type="button" data-a="pdf" class="primario" title="Genera el PDF con los cambios marcados: es lo que se envía a Documentación Técnica (lleva los datos para importarlo)">Generar PDF</button></div>
@@ -16075,6 +16113,8 @@
     }
     const colorDe = (x) => (x.formato && x.colorHex && /^#?[0-9a-f]{3,8}$/i.test(String(x.colorHex).trim()) ? ` style="color:${String(x.colorHex).trim().replace(/^(?!#)/, '#')}"` : '');
     // celda de texto + marcas del borrador
+    // las palabras con tilde se marcan: en los pasos no se usan tildes
+    const txt = (t) => PPN.tildesEn(t).map(([y, c]) => (c ? `<mark class="pp-tilde" title="Lleva tilde: en los pasos ninguna palabra lleva tilde («Quitar tildes»)">${esc(y)}</mark>` : esc(y))).join('');
     const celdaTexto = (x, b, texto, conRango) => `<span class="pp-tx"${colorDe(x)}>${texto}</span>${conRango ? htmlRango(x) : ''}${marcasDe(x, b)}${htmlAntes(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}`;
     function tipoFila(x, esPm, conforme) {
       let r;
@@ -16092,7 +16132,7 @@
     // ---- procedimiento: una etiqueta ----
     function filaPaso(p, numero, conforme, conPm) {
       const b = BI.get(p.id), r = tipoFila(p, false, conforme), num = p.quitado ? `<s>${esc(NUM_BASE.get(p.id) || '')}${NUM_BASE.get(p.id) ? '.-' : ''}</s>` : `${esc(numero || '')}${numero ? '.-' : ''}`;
-      const tx = celdaTexto(p, b, esc(p.texto)), acc = acciones('paso', p.quitado, false, conPm, p.id);
+      const tx = celdaTexto(p, b, txt(p.texto)), acc = acciones('paso', p.quitado, false, conPm, p.id);
       let celdas;
       if (r === 'T') celdas = [`<td colspan="5" class="pp-c-tx">${tx}</td>`];
       else if (r === 'I') celdas = [`<td colspan="3" class="pp-c-tx">${tx}</td>`, `<td colspan="2" class="pp-c-caja">${CAJA}</td>`];
@@ -16106,7 +16146,7 @@
     }
     function filaPm(m, conforme) {
       const b = BI.get(m.id), r = tipoFila(m, true, conforme), acc = acciones('pm', m.quitado, m.insumo ? 'insumo' : false);
-      const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`, true) + (b && cantCambiada(m, b) ? `<div class="pp-antes">Antes: ${esc(fmtDec(b.cant))} ${esc(b.um || '')}</div>` : '') : celdaTexto(m, b, esc(m.texto), true);
+      const texto = m.insumo ? celdaTexto(m, b, `${esc(m.mat || m.texto)} (${esc(m.comp)})`, true) + (b && cantCambiada(m, b) ? `<div class="pp-antes">Antes: ${esc(fmtDec(b.cant))} ${esc(b.um || '')}</div>` : '') : celdaTexto(m, b, txt(m.texto), true);
       const celdas = ['<td></td>'];
       if (m.insumo) celdas.push(`<td class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`, `<td class="pp-c-cant">${esc(fmtDec(m.cant))} ${esc(m.um || '')}${m.quitado ? '' : btCant('editar-ins', m.id)}</td>`);
       else celdas.push(`<td colspan="2" class="pp-c-pm${m.tab ? ' tab' : ''}">${texto}</td>`);
@@ -16126,8 +16166,8 @@
     // ---- cuadros (Precauciones, Notas, Condiciones) ----
     function htmlCuadro(e, lista) {
       const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false, p.id);
-        return `<tr class="pp-paso ${estadoCl(p, b)}${MARCADOS.has(p.id) ? ' marc' : ''}" data-id="${esc(p.id)}" tabindex="0"${p.quitado ? '' : ' draggable="true"'}><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, esc(p.texto))}${acc}</td></tr>`
-          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, esc(m.insumo ? `${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}` : m.texto), true)}${acciones('pm', m.quitado, m.insumo ? 'insumo' : false)}</td></tr>`; }).join('')); }).join('');
+        return `<tr class="pp-paso ${estadoCl(p, b)}${MARCADOS.has(p.id) ? ' marc' : ''}" data-id="${esc(p.id)}" tabindex="0"${p.quitado ? '' : ' draggable="true"'}><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, txt(p.texto))}${acc}</td></tr>`
+          + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, m.insumo ? esc(`${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}`) : txt(m.texto), true)}${acciones('pm', m.quitado, m.insumo ? 'insumo' : false)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
       return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>${htmlPegarFinal(`est:${e.id}`)}`;
     }
@@ -16237,6 +16277,7 @@
       const conRango = () => clase === 'pm' && ((elegido ? elegido.tipo === RANGO : x.tipo === RANGO) || x.vi != null || x.vf != null);
       modal(`<h3>${titulo}<span>${esc(donde)}${ref.padre ? ' › ' + esc(ref.padre.texto).slice(0, 60) : ''}</span></h3>
         <label class="pp-campo">Texto<textarea id="m-texto" rows="3" spellcheck="true">${esc(x.texto)}</textarea></label>
+        <div id="m-tilde" class="pp-tilde-av" hidden></div>
         <div id="m-estado" class="pp-estado"></div><div id="m-sug" class="pp-sug"></div>
         <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label><span id="m-rango-av" class="pp-rango-av"></span></div>
         <label id="m-reg-l" class="pp-campo" hidden>¿Qué anota Producción en este paso nuevo? (opcional)<select id="m-reg"><option value="">Sin indicar: lo decide el equipo RMD</option>${Object.entries(REGISTRO).map(([k, t]) => `<option value="${k}"${x.registro === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
@@ -16244,7 +16285,13 @@
         <div class="pp-fijo">${clase === 'paso' ? `<fieldset class="pp-cas"><legend>Quién firma este paso</legend><label><input type="checkbox" id="m-rpor"${x.rpor ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Realizado por»</label><label><input type="checkbox" id="m-vb"${x.vb ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Visto bueno»</label>${x.edit ? '<span class="pp-nota">Este paso pide un dato: lleva su caja de dato.</span>' : '<span class="pp-nota">Márcalo solo cuando el paso lo amerite.</span>'}</fieldset>` : ''}
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
         const ta = $('#m-texto', m), est = $('#m-estado', m), sug = $('#m-sug', m), rango = $('#m-rango', m);
+        let quitoTildes = false;
+        const pintarTilde = () => { const ct = [...new Set(PPN.palabrasConTilde(ta.value))], av = $('#m-tilde', m); av.hidden = !ct.length;
+          av.innerHTML = ct.length ? `⚠ Lleva tilde: <b>${ct.slice(0, 8).map(esc).join(', ')}</b>. En los pasos ninguna palabra lleva tilde. <button type="button" id="m-quitar-tildes">Quitar tildes</button>` : ''; };
+        $('#m-tilde', m).addEventListener('click', (e) => { if (!e.target.closest('#m-quitar-tildes')) return; ta.value = PPN.quitarTildes(ta.value); quitoTildes = true; elegido = null; pintarEstado(); pintarSug(); ta.focus(); });
         const pintarEstado = () => {
+          pintarTilde();
+          const tPrev = PPN.tildes(); if (quitoTildes) PPN.tildes(true);
           const t = ta.value.trim(), igualBase = b && PPN.igualTexto(t, b.texto);
           if (elegido && !PPN.igualTexto(t, elegido.texto)) elegido = null;
           if (!elegido && t) { const ex = BUS.exactos(t).filter((c) => c.estr === estr && (!etq || c.etq === etq)); if (ex.length) elegido = ex[0]; }
@@ -16254,6 +16301,7 @@
           else est.innerHTML = '<span class="crea">★ Paso nuevo: no existe en SAP con este texto. El equipo RMD lo creará.</span>';
           rango.hidden = !conRango();
           $('#m-reg-l', m).hidden = !(t && !elegido && !(igualBase && b && b.codigo));
+          PPN.tildes(tPrev);
           validarRango();
         };
         const numero = (v) => { v = String(v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
@@ -16276,6 +16324,8 @@
           if (!validarRango()) { $('#m-vi', m).focus(); return; }
           const vi = $('#m-vi', m).value.trim(), vf = $('#m-vf', m).value.trim(), mg = $('#m-mg', m).value.trim(), com = $('#m-com', m).value.trim(), reg = $('#m-reg-l', m).hidden ? '' : $('#m-reg', m).value;
           cambio(() => {
+            // al quitar tildes el texto debe contar como distinto al de SAP (con tilde): se activa «Distinguir tildes»
+            if (quitoTildes) { W.tildes = true; PPN.tildes(true); }
             let it = x;
             if (!ref.id) { it = { id: `n:${seq++}`, texto: '', pm: clase === 'paso' ? [] : undefined }; const lista = ref.lista, i = ref.despuesDe ? lista.findIndex((y) => y.id === ref.despuesDe) + 1 : lista.length; lista.splice(i, 0, it); }
             const viva = ref.id ? encontrar(ref.id).item : it;
@@ -16612,6 +16662,7 @@
       else if (a === 'cant-receta') cantidadReceta(id);
       else if (a === 'agregar-ins') { const f = encontrar(id); if (f.clase === 'pm') { editarInsumo({ nuevo: true, padre: f.padre, e: f.e, t: f.t, despuesDe: id }); return; } if (!f.item.pm) f.item.pm = []; editarInsumo({ nuevo: true, padre: f.item, e: f.e, t: f.t }); }
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
+      else if (a === 'quitar-tildes') quitarTildesTodo();
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
     app.addEventListener('change', (ev) => { const sel = ev.target.closest('select.pp-ir'); if (!sel || !sel.value) return; const id = sel.value; sel.value = ''; irA(id); });
@@ -16722,7 +16773,7 @@ button { font: inherit; cursor: pointer; } button:disabled { cursor: default; op
 .pp-firmas2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; } .pp-firma td { height: 22px; } .pp-vacio { color: var(--ap); font-style: italic; }
 .pp-com-tit { border: 0; background: none; opacity: .2; padding: 0 4px; font-size: 12px; } .pp-sub:hover .pp-com-tit, .pp-etq-tit:hover .pp-com-tit, .pp-com-tit:focus-visible { opacity: 1; }
 /* marcas del borrador */
-.pp-tx { white-space: pre-wrap; } .pp-rango { color: var(--ap); font-size: 11px; white-space: nowrap; }
+.pp-tx { white-space: pre-wrap; } .pp-quitar-tildes { color: #a00000; border-color: #d99 !important; } .pp-tilde-av { margin: 4px 0; padding: 5px 8px; border-radius: 6px; background: #fff0f0; color: #8a0000; font-size: 12px; } .pp-tilde-av button { margin-left: 6px; } mark.pp-tilde { background: #ffd6d6; color: #a00000; border-bottom: 2px solid #d00000; padding: 0 1px; border-radius: 2px; } .pp-rango { color: var(--ap); font-size: 11px; white-space: nowrap; }
 .pp-tags { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: 1px; }
 .pp-tag { padding: 0 6px; border-radius: 8px; font: 600 10.5px/16px "Segoe UI", Arial, sans-serif; white-space: nowrap; }
 .pp-tag.agr { background: var(--agr-f); color: var(--agr); } .pp-tag.qui { background: var(--qui-f); color: var(--qui); } .pp-tag.cam { background: var(--cam-f); color: var(--cam); } .pp-tag.mov { background: var(--mov-f); color: var(--mov); }
@@ -16821,7 +16872,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 @media print {
   @page { size: A4; margin: 10mm 9mm 12mm; }
   html, body { background: #fff; } .pp-barra, .pp-panel, .pp-acc, .pp-mas, .pp-com-tit, .pp-recuperar, .pp-toast, .pp-pantalla, .pp-aviso-gen, .pp-ayuda, .pp-modal-fondo, .pp-cajon, .pp-multi, .pp-cant-ed { display: none !important; }
-  .pp-t tr.sel { outline: 0 !important; } .pp-t tr[data-id] { cursor: default; }
+  .pp-t tr.sel { outline: 0 !important; } .pp-t tr[data-id] { cursor: default; } mark.pp-tilde { background: none; color: inherit; border: 0; padding: 0; }
   .pp-datos-pdf { display: block; line-height: 1px; }   /* sin recortar: Chrome no guarda los enlaces de un contenedor con overflow: hidden */ .pp-datos-pdf a { display: inline-block; width: 2px; height: 2px; overflow: hidden; color: #fff; font-size: 1px; line-height: 1px; text-decoration: none; }
   .pp-t tr[data-id] { outline: 0 !important; }
   .pp-cuerpo { display: block; margin: 0; padding: 0; } .pp-doc { border: 0; box-shadow: none; padding: 0; } .pp-pagina { width: 100%; }
