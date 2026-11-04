@@ -135,9 +135,9 @@
   window.__rmdUiMejoras = true;
 
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
-  // Regla de CINTIA (04/11/2026): Karla Vanessa Moreno se muestra como Vanessa (usuario VMORENO), nunca Karla. Solo al mostrar
+  // Regla de CINTIA (04/11/2026): Karla Vanessa Moreno se muestra como Vanessa (usuario VM), nunca Karla. Solo al mostrar
   // (pantallas, PDF y Excel); en SAP su usuario sigue siendo KMORENOM y lo que se graba o se busca no cambia.
-  const USUARIOS_VISIBLES = { KMORENOM: 'VMORENO' };
+  const USUARIOS_VISIBLES = { KMORENOM: 'VM' };
   const usuarioVisible = (u) => { const t = String(u == null ? '' : u), k = t.trim().toUpperCase(); return USUARIOS_VISIBLES[k] || t.replace(/\bKarla\s+(?=Vanessa\b)/gi, ''); };
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -5921,10 +5921,10 @@
       [19, 19, 11.5], [20, 23, 9], [24, 24, 12.375], [25, 27, 7], [28, 28, 34], [29, 30, 10]];
     const ANCHOS_RESUMEN = [[1, 1, 18.75], [2, 2, 21.25], [3, 7, 7], [16, 16, 17.25], [17, 17, 22.75], [18, 18, 18.375], [30, 30, 15.375], [31, 31, 19.5],
       [32, 32, 17.75], [52, 52, 13.375], [53, 53, 19.5], [54, 54, 21.75], [67, 67, 26.375], [68, 68, 12]];
-    // Hoja1: planta, nombre, iniciales en Observación y usuario SAP que autoriza (Karla Vanessa Moreno, KMORENOM, va como Vanessa: VMORENO; ver usuarioVisible).
+    // Hoja1: planta, nombre, iniciales en Observación y usuario SAP que autoriza (Karla Vanessa Moreno, KMORENOM, va como Vanessa: VM; ver usuarioVisible).
     const uVis = typeof usuarioVisible === 'function' ? usuarioVisible : (u) => u;   // el bloque también corre suelto en las pruebas
     const PERSONAS = [['PLANTA 1', 'CUELLAR LOYOLA NOELIA ROSA', 'NC', 'NCUELLARL'], ['PLANTA 1', 'QUISPE JIMENA', 'JQ', 'JQUISPEP'],
-      ['PLANTA 2', 'MORENO VANESSA', 'VM', 'VMORENO'], ['PLANTA 2', 'DINA  VALDERRAMA', 'DV', '']];
+      ['PLANTA 2', 'MORENO VANESSA', 'VM', 'VM'], ['PLANTA 2', 'DINA  VALDERRAMA', 'DV', '']];
     // Plazos del «% dentro de plazo» (días hábiles ingreso -> autorización).
     const PLAZOS = [['1', 5], ['2', 10], ['3', 30]];
     const PLANTAS = ['PLANTA ATE', 'PLANTA LIMA'];

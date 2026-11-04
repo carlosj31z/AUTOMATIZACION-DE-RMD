@@ -171,7 +171,7 @@ cuenta). Escribir y responder siempre en **español**.
   «Procesos Menores para el Paso…») deja la Descripción de solo lectura con aviso
   (`bloquearTextoPasoAutorizado`), el Grabar envuelto no graba un texto cambiado
   (aunque «Editar paso con aviso» esté apagado) y «En minúsculas» se bloquea.
-- 2026-11-04, v1.116.0: **regla de CINTIA: Karla Vanessa Moreno se muestra como Vanessa (VMORENO), nunca Karla**
+- 2026-11-04, v1.116.0: **regla de CINTIA: Karla Vanessa Moreno se muestra como Vanessa (VM), nunca Karla**
   (`usuarioVisible`, solo al mostrar; en SAP sigue KMORENOM). Igual en status-rmd (`AUTORIZADORES_SAP`).
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
