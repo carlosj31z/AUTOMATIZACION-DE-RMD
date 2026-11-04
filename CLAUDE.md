@@ -176,7 +176,15 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-04, v1.117.0: **«Mis movimientos»** (Exportar y Ctrl+K, opción `mismov`): pedido de Carlos, los RMD en los que el usuario
   del portal hizo algo entre dos fechas (hoy por defecto) con su status de hoy y Excel. Lee MD (registro/actualización/autorización),
   MD_TRAZABILIDAD (usuarioRegistro + estado) y las filas de la estructura (`MISMOV_TABLAS`) filtradas por usuario y fecha en el servidor.
-  Lógica en el bloque `==MISMOV==` (`pruebas/qa_mismov.mjs`); ventana en `pruebas/qa_mismov_ventana.py`. **La siguiente versión debe ser > 1.117.0.**
+  Lógica en el bloque `==MISMOV==` (`pruebas/qa_mismov.mjs`); ventana en `pruebas/qa_mismov_ventana.py`.
+- 2026-11-04, v1.118.0 (PR #72): «Generar plantilla» con más de una receta asociada pregunta con cuál se emite.
+- 2026-11-04, v1.119.0: **pedido de Carlos: la detección de tildes queda APAGADA por defecto** (se usa poco y daba
+  avisos incoherentes). Opción `detectartildes` del panel («Detectar tildes en los pasos», en `APAGADAS_POR_DEFECTO`):
+  apagada, el portal no marca la Descripción con tilde (`reglasDeFila`) ni la revisión del borrador avisa tildes, y la
+  casilla «Distinguir tildes» se oculta (salvo que el borrador la traiga activada). Núcleo: `PPN.detectarTildes(v)`
+  (falso por defecto: `palabrasConTilde`/`tildesEn` no marcan nada). En el editor del borrador hay una casilla
+  «Detectar tildes» (apagada; se recuerda en el navegador con `rmdPlantillaDetectarTildes`). La regla de pasos sin
+  tilde sigue: quien quiera la ayuda la enciende. **La siguiente versión debe ser > 1.119.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

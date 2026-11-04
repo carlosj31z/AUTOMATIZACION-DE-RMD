@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.118.0
+// @version      1.119.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.118.0';                                                       // mantener igual a @version
+  const VERSION = '1.119.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -77,6 +77,7 @@
     ['sintipo', '«Sin tipo de dato» resaltado', 'Se muestra en rojo y negrita.'],
     ['puesto', 'Puesto de trabajo faltante', 'La celda parpadea si falta asignarlo.'],
     ['bajas', 'Elementos de baja', 'En un RMD Ingresado avisa pasos, utensilios y equipos de baja en SAP.'],
+    ['detectartildes', 'Detectar tildes en los pasos', 'Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde), con «Quitar tildes» y «Distinguir tildes» en la Plantilla para Producción. Apagada por defecto.'],
     ['reglasrev', 'Reglas de revisión', 'Resalta lo que definas y los documentos citados que no están vigentes.'],
     ['motivocaract', 'Motivo CARACTERIZACION en versiones nuevas', 'Al crear una versión con «Nueva Versión», avisa si quedó con el Motivo CARACTERIZACION copiado de la versión anterior (Status RMD la cuenta como caracterización) y se lo pone a los productos del listado de caracterización que aún no tienen su versión caracterizada.'],
     ['acuerdos', 'Acuerdos', 'Pestaña «Acuerdos» en Configuración Maestra para escribir los acuerdos de configuración (texto, códigos de paso de referencia e imágenes), compartidos con todos a través de status-rmd; y en la ventana del RMD, aviso si no cumple los que aplican a su planta, etapa y fase.'],
@@ -101,7 +102,7 @@
   opc.recetaruta = true;
   const on = (k) => opc.activo && opc[k];
   // Desactivadas por defecto: alteran la disposición de las ventanas.
-  const APAGADAS_POR_DEFECTO = ['vivo'];
+  const APAGADAS_POR_DEFECTO = ['vivo', 'detectartildes'];   // detectartildes (v1.119.0): se usa poco y daba avisos incoherentes
   APAGADAS_POR_DEFECTO.forEach((k) => { if (opc[k] === true && leer()[k] === undefined) opc[k] = false; });
   // v1.59: «RMD en vivo» se apaga una vez aunque estuviera encendida (algunas ventanas no se veían completas); se puede volver a encender en el panel.
   if (!opc.vivoApagadoV159) { opc.vivo = false; opc.vivoApagadoV159 = true; guardar({ ...leer(), vivo: false, vivoApagadoV159: true }); }
@@ -1663,7 +1664,7 @@
       else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(sinCalidadCorrecta(desc))) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)' });
     }
     // Regla de Carlos (2026-11-03): en los pasos ninguna palabra lleva tilde
-    if (f.desc != null) { const ct = [...new Set(String(f.desc).normalize('NFC').match(/\p{L}*[áéíóúàèìòùäëïöüÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ]\p{L}*/gu) || [])];
+    if (f.desc != null && on('detectartildes')) { const ct = [...new Set(String(f.desc).normalize('NFC').match(/\p{L}*[áéíóúàèìòùäëïöüÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ]\p{L}*/gu) || [])];
       if (ct.length) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: `Lleva tilde (${ct.slice(0, 6).join(', ')}): en los pasos ninguna palabra lleva tilde` }); }
     const vacio = (v) => v !== undefined && !norm(v);
     if (NUMERICOS.has(t) && vacio(f.dec)) out.push({ col: 'DECIMAL', clase: 'rmd-falta', msg: `Falta Decimal (Tipo Dato: ${tipo}); el portal no deja guardar` });
@@ -15774,9 +15775,12 @@
     // (la Ñ se conserva)
     const RX_TILDE = /[áéíóúàèìòùäëïöüÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ]/;
     const quitarTildes = (t) => String(t == null ? '' : t).normalize('NFD').replace(/(?!\u0303)[\u0300-\u036f]/g, '').normalize('NFC');
+    // v1.119.0: la detección de tildes está apagada por defecto (se usa poco y daba avisos incoherentes); se enciende con detectarTildes(true)
+    let DETECTAR = false;
+    const detectarTildes = (v) => { if (v !== undefined) DETECTAR = !!v; return DETECTAR; };
     // [[fragmento, conTilde], …]
-    const tildesEn = (texto) => String(texto == null ? '' : texto).normalize('NFC').split(/(\p{L}+)/u).filter((x) => x !== '').map((x) => [x, RX_TILDE.test(x)]);
-    const palabrasConTilde = (texto) => tildesEn(texto).filter((f) => f[1]).map((f) => f[0]);
+    const tildesEn = (texto) => String(texto == null ? '' : texto).normalize('NFC').split(/(\p{L}+)/u).filter((x) => x !== '').map((x) => [x, DETECTAR && RX_TILDE.test(x)]);
+    const palabrasConTilde = (texto) => (DETECTAR ? tildesEn(texto) : []).filter((f) => f[1]).map((f) => f[0]);
     const fichas = (n) => n.split(' ').filter((w) => w && !VACIAS.has(w));
     const contar = (arr) => { const m = new Map(); arr.forEach((x) => m.set(x, (m.get(x) || 0) + 1)); return m; };
     const bigramas = (n) => { const s = ' ' + n + ' ', a = []; for (let i = 0; i < s.length - 1; i++) a.push(s.slice(i, i + 2)); return contar(a); };
@@ -16094,7 +16098,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, normalizar, tildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales };
+    return { TIPO, RANGO, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -16127,6 +16131,8 @@
       return JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
     }
     const CLAVE_AYUDA = 'rmdPlantillaAyuda';
+    const CLAVE_DETECTAR = 'rmdPlantillaDetectarTildes';               // v1.119.0: «Detectar tildes» apagada por defecto; la preferencia queda en este navegador
+    try { PPN.detectarTildes(localStorage.getItem(CLAVE_DETECTAR) === '1'); } catch (e) { PPN.detectarTildes(false); }
     async function iniciar() {
       app.innerHTML = '<div class="pp-cargando">Abriendo la plantilla…</div>';
       try {
@@ -16262,7 +16268,8 @@
       return `<header class="pp-barra"><div class="pp-titulo"><b>Borrador de Producción · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)}</span></div>
         <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador, pero el archivo para enviar aún no se descargó">${sucio ? '● Sin guardar en archivo' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
-        <label class="pp-tildes" title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" id="pp-tildes"${W.tildes ? ' checked' : ''}> Distinguir tildes</label>
+        <label class="pp-detectar" title="Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde) y ofrece «Quitar tildes». Apagada por defecto; se recuerda en este navegador"><input type="checkbox" id="pp-detectar"${PPN.detectarTildes() ? ' checked' : ''}> Detectar tildes</label>
+        <label class="pp-tildes"${PPN.detectarTildes() || W.tildes ? '' : ' hidden'} title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" id="pp-tildes"${W.tildes ? ' checked' : ''}> Distinguir tildes</label>
         ${(() => { const nt = conTilde().length; return nt ? `<button type="button" data-a="quitar-tildes" class="pp-quitar-tildes" title="En los pasos ninguna palabra lleva tilde: quita las tildes de los ${nt} textos marcados en rojo">Quitar tildes (${nt})</button>` : ''; })()}
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="guardar" title="Descarga un archivo con tu borrador para seguir editándolo otro día">Guardar borrador</button>
@@ -16839,7 +16846,8 @@
     app.addEventListener('drop', (ev) => { if (!ARRASTRE) return; const d = destinoSoltar(ev), ids = ARRASTRE; ARRASTRE = null; limpiarSoltar(); if (!d) return; ev.preventDefault(); colocar(ids, d.lista, d.tras, ev.ctrlKey || ev.metaKey || ev.altKey); });
     app.addEventListener('dragend', () => { ARRASTRE = null; limpiarSoltar(); $$('.pp-arrastrando').forEach((x) => x.classList.remove('pp-arrastrando')); });
     app.addEventListener('mousedown', (ev) => { if (ev.shiftKey && ev.target.closest('.pp-doc tr.pp-paso')) ev.preventDefault(); });
-    app.addEventListener('change', (ev) => { if (ev.target.id === 'pp-tildes') { const v = ev.target.checked; cambio(() => { if (v) W.tildes = true; else delete W.tildes; }); } });   // Shift+clic marca un tramo sin seleccionar texto
+    app.addEventListener('change', (ev) => { if (ev.target.id === 'pp-detectar') { const v = ev.target.checked; PPN.detectarTildes(v); try { if (v) localStorage.setItem(CLAVE_DETECTAR, '1'); else localStorage.removeItem(CLAVE_DETECTAR); } catch (e) { /* sin almacenamiento */ } pintarTodo(); return; }
+      if (ev.target.id === 'pp-tildes') { const v = ev.target.checked; cambio(() => { if (v) W.tildes = true; else delete W.tildes; }); } });   // Shift+clic marca un tramo sin seleccionar texto
     function listaDe(ref) {
       const [tipo, id] = ref.split(/:(.+)/); const f = encontrar(id);
       return tipo === 'est' ? { lista: f.item.pasos || (f.item.pasos = []), e: f.item, t: null } : { lista: f.item.pasos || (f.item.pasos = []), e: f.e, t: f.item };
@@ -17104,6 +17112,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   // 1) Exporta un .html autónomo con el RMD (8 listas del PDF, trazabilidad, logo) y el catálogo de SAP.
   // 2) Importa solo en un RMD Ingresado (el mismo o la versión Ingresada más nueva); revisa cambios, rebusca pasos nuevos y muestra el plan. No escribe.
   const PPN = ppNucleo();
+  PPN.detectarTildes(on('detectartildes'));                                 // se vuelve a leer en cada revisión (el panel puede cambiarla)
   const PP = { cat: null, catT: 0 };
   const PP_TTL_CATALOGO = 12 * 3600000;
   const ppLimpio = (t) => String(t == null ? '' : t).replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
@@ -17363,7 +17372,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     return versiones.filter((m) => ing(m) && (+m.version > +base.version || (+m.version === +base.version && new Date(m.fechaRegistro) > new Date(base.fechaRegistro)))).sort((x, y) => (+y.version - +x.version) || (new Date(y.fechaRegistro) - new Date(x.fechaRegistro)))[0] || null;
   }
   async function ppAnalizar(datos, prop) {
-    PPN.tildes(!!(prop.trabajo && prop.trabajo.tildes));
+    PPN.detectarTildes(on('detectartildes')); PPN.tildes(!!(prop.trabajo && prop.trabajo.tildes));
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
     if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital»');
     await ppModeloListo(modelo);
@@ -17965,7 +17974,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
     v.cuerpo.innerHTML = `${cab}${creada}${rehecho}
       ${s.observacion ? `<p class="rmd-nota">Observación: ${esc(s.observacion)}</p>` : ''}<ul class="rmd-pp-checks">${lineas.join('')}</ul>
-      <label class="rmd-pp-tildes" title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" class="rmd-pp-tildes-c"${prop.trabajo.tildes ? ' checked' : ''}> Distinguir tildes${prop.trabajo.tildes ? ' <span class="rmd-nota">(activada en el borrador)</span>' : ''}</label>
+      <label class="rmd-pp-tildes"${on('detectartildes') || prop.trabajo.tildes ? '' : ' hidden'} title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" class="rmd-pp-tildes-c"${prop.trabajo.tildes ? ' checked' : ''}> Distinguir tildes${prop.trabajo.tildes ? ' <span class="rmd-nota">(activada en el borrador)</span>' : ''}</label>
       ${an.cambios.length ? `<table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>` : '<p class="rmd-nota">El borrador no trae cambios.</p>'}
       ${an.enSap.length ? `<details class="rmd-pp-sap"><summary>Cambios hechos en SAP desde la plantilla (${an.enSap.length})</summary><table class="rmd-tabla rmd-pp-t"><tbody>${an.enSap.map((c) => `<tr><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}</td><td>${esc(ppDespues(c))}</td></tr>`).join('')}</tbody></table></details>` : ''}
       <p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>`;
@@ -18104,7 +18113,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     return t;
   }
   async function ppPlanEscritura(datos, prop0, an, modelo, usuario) {
-    PPN.tildes(!!(prop0.trabajo && prop0.trabajo.tildes));
+    PPN.detectarTildes(on('detectartildes')); PPN.tildes(!!(prop0.trabajo && prop0.trabajo.tildes));
     const manual = [], prop = { ...prop0, trabajo: ppSinInsumosNuevos(prop0.trabajo, manual) };
     prop.trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (PPN.cantRecetaCambiada(x)) manual.push(`Cambiar en la Lista de Materiales la cantidad del insumo ${x.comp || ''} — ${String(x.desc || '').slice(0, 50)}: ${x.cant == null ? '(vacía)' : x.cant} → ${x.cantNueva} ${x.um || ''} (receta del RMD). En el RMD no se puede editar.`); }));
     const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
@@ -18666,7 +18675,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'predanterior', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
-    ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'reglasrev', 'motivocaract', 'acuerdos', 'ordenest']],
+    ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'detectartildes', 'reglasrev', 'motivocaract', 'acuerdos', 'ordenest']],
     ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'vbversiones', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio']],
   ];
   const ICONOS_PANEL = {
