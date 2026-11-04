@@ -123,9 +123,9 @@ cuenta). Escribir y responder siempre en **español**.
   bloques y se reinyecta el editor y su CSS de la versión nueva (como hace
   `ppHtml` en el userscript).
 
-## Estado al 2026-11-03
+## Estado al 2026-11-04
 
-- Publicada en SharePoint: **1.114.0** (2026-11-03, 1 899 828 bytes). En la
+- Publicada en SharePoint: **1.116.0** (2026-11-04, 1 904 714 bytes). En la
   rama por defecto: 1.116.0. **La siguiente versión debe ser > 1.116.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
