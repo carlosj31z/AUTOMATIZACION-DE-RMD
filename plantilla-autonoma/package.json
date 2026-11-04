@@ -1,0 +1,7 @@
+{
+  "name": "rmd-plantilla-autonoma",
+  "private": true,
+  "description": "Generador de la Plantilla para Producción desde el PDF del master y el Excel de Pasos (una sola página HTML sin conexión)",
+  "scripts": { "construir": "node construir.mjs", "probar": "node prueba.mjs" },
+  "devDependencies": { "pdfjs-dist": "3.11.174", "xlsx": "0.18.5" }
+}
