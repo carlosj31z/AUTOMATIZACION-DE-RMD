@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Plantilla RMD desde PDF @@VERSION_GEN@@ (editor @@VERSION_EDITOR@@)">
+<title>Plantilla para Producción</title>
+<style>
+:root { --tx: #1f2328; --ap: #59636e; --bd: #d0d7de; --fondo: #f3f4f6; --carta: #fff; --ac: #0b5cad; --ac-f: #e8f1fb; --ok: #1a7f37; --ok-f: #e6f4ea; --av: #9a6700; --av-f: #fff4d6; --er: #b42318; --er-f: #fdecea; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tx: #e6e8eb; --ap: #a0a8b3; --bd: #3a414a; --fondo: #15181c; --carta: #1d2127; --ac: #6aa8ec; --ac-f: #1c2c40; --ok: #4ac26b; --ok-f: #16301f; --av: #e0b04a; --av-f: #3a2e12; --er: #f2786d; --er-f: #3d1a17; color-scheme: dark; } }
+:root[data-theme="dark"] { --tx: #e6e8eb; --ap: #a0a8b3; --bd: #3a414a; --fondo: #15181c; --carta: #1d2127; --ac: #6aa8ec; --ac-f: #1c2c40; --ok: #4ac26b; --ok-f: #16301f; --av: #e0b04a; --av-f: #3a2e12; --er: #f2786d; --er-f: #3d1a17; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--fondo); color: var(--tx); font: 14px/1.5 "Segoe UI", Roboto, Arial, sans-serif; }
+main { max-width: 1060px; margin: 0 auto; padding: 28px 16px 40px; }
+h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--ap); margin: 0 0 22px; max-width: 760px; }
+.pasos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .pasos { grid-template-columns: 1fr; } }
+.zona { position: relative; background: var(--carta); border: 1.5px dashed var(--bd); border-radius: 10px; padding: 18px 18px 16px; cursor: pointer; transition: border-color .15s, background .15s; min-height: 132px; }
+.zona:hover, .zona.sobre { border-color: var(--ac); background: var(--ac-f); }
+.zona.lista { border-style: solid; border-color: var(--ok); }
+.zona input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.zona .num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ac); color: #fff; font-weight: 700; font-size: 13px; margin-right: 8px; }
+.zona.lista .num { background: var(--ok); }
+.zona b.tit { font-size: 15px; }
+.zona p { margin: 8px 0 0; color: var(--ap); font-size: 13px; }
+.zona .arch { margin-top: 10px; font-weight: 600; color: var(--tx); word-break: break-word; }
+.zona .det { color: var(--ap); font-size: 12.5px; }
+.fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 16px 0 0; }
+label.campo { display: grid; gap: 4px; font-size: 12.5px; color: var(--ap); }
+label.campo input { font: inherit; padding: 7px 10px; border: 1px solid var(--bd); border-radius: 6px; background: var(--carta); color: var(--tx); width: 190px; }
+button { font: inherit; border-radius: 7px; border: 1px solid var(--bd); background: var(--carta); color: var(--tx); padding: 8px 16px; cursor: pointer; }
+button.prim { background: var(--ac); border-color: var(--ac); color: #fff; font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+a.boton { display: inline-block; text-decoration: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; background: var(--ok); color: #fff; }
+#estado { margin: 14px 0 0; min-height: 21px; color: var(--ap); }
+#estado.error { color: var(--er); background: var(--er-f); padding: 8px 12px; border-radius: 7px; }
+#resultado { margin-top: 18px; display: none; }
+.carta { background: var(--carta); border: 1px solid var(--bd); border-radius: 10px; padding: 16px 18px; }
+.carta h2 { font-size: 17px; margin: 0 0 2px; }
+.carta .meta { color: var(--ap); margin: 0 0 12px; font-size: 13px; }
+.cifras { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.cifra { border: 1px solid var(--bd); border-radius: 8px; padding: 6px 12px; min-width: 96px; }
+.cifra b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.cifra span { color: var(--ap); font-size: 12px; }
+.cifra.ok { border-color: var(--ok); background: var(--ok-f); }
+.cifra.av { border-color: var(--av); background: var(--av-f); }
+details { margin: 0 0 12px; }
+details summary { cursor: pointer; color: var(--av); font-weight: 600; }
+details ul { margin: 6px 0 0; padding-left: 20px; font-size: 12.5px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.nota { color: var(--ap); font-size: 12.5px; margin: 10px 0 0; }
+#vista { width: 100%; height: 82vh; border: 1px solid var(--bd); border-radius: 10px; margin-top: 14px; background: #e9ebee; }
+.pie { color: var(--ap); font-size: 12px; margin-top: 26px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Plantilla para Producción</h1>
+  <p class="sub">Genera la plantilla del RMD que se entrega a Producción a partir del <b>PDF del master</b> (impresión del portal) y del <b>exportado de Pasos de SAP</b>. Todo se procesa en esta computadora: los archivos no se envían a ningún lado.</p>
+
+  <div class="pasos">
+    <div class="zona" id="z-pdf">
+      <input type="file" id="f-pdf" accept=".pdf,application/pdf" aria-label="PDF del master">
+      <span class="num">1</span><b class="tit">PDF del master</b>
+      <p>La impresión del RMD desde el portal (p. ej. «2202609381-FAB-6-…pdf»). Arrástralo aquí o haz clic.</p>
+      <div class="arch" id="n-pdf"></div><div class="det" id="d-pdf"></div>
+    </div>
+    <div class="zona" id="z-xls">
+      <input type="file" id="f-xls" accept=".xlsx,.xls" aria-label="Excel de Pasos">
+      <span class="num">2</span><b class="tit">Excel de Pasos (SAP)</b>
+      <p>El exportado del mantenimiento de Pasos (columnas Codigo, Descripción, Estructura, Etiqueta, Estado, Tipo de dato).</p>
+      <div class="arch" id="n-xls"></div><div class="det" id="d-xls"></div>
+    </div>
+  </div>
+
+  <div class="fila">
+    <label class="campo">Código del RMD<input id="codigo" inputmode="numeric" placeholder="Se toma del nombre del PDF"></label>
+    <button class="prim" id="generar" disabled>Generar plantilla</button>
+  </div>
+  <div id="estado"></div>
+
+  <section id="resultado">
+    <div class="carta">
+      <h2 id="r-tit"></h2>
+      <p class="meta" id="r-meta"></p>
+      <div class="cifras" id="r-cifras"></div>
+      <div id="r-avisos"></div>
+      <div class="acciones">
+        <a class="boton" id="descargar" download>Descargar plantilla (.html)</a>
+        <button id="abrir">Abrir en otra pestaña</button>
+      </div>
+      <p class="nota">La plantilla es un solo archivo .html: se envía a Producción tal cual y se abre con Chrome o Edge. Producción marca sus cambios y la devuelve con «Guardar borrador».</p>
+    </div>
+    <iframe id="vista" title="Vista de la plantilla"></iframe>
+  </section>
+  <p class="pie">Generador de plantillas · versión @@VERSION_GEN@@ · editor de la plantilla @@VERSION_EDITOR@@ · catálogo de equipos y utensilios: @@FUENTE_BASE@@</p>
+</main>
+
+<script id="base-datos" type="application/octet-stream">@@BASE_GZ_B64@@</script>
+<script>@@PDFJS_WORKER@@</script>
+<script>@@PDFJS@@</script>
+<script>@@SHEETJS@@</script>
+<script>@@LECTOR@@</script>
+<script>
+// Editor y núcleo de la plantilla: copiados tal cual del userscript (ppEditorApp / ppNucleo / PP_EDITOR_CSS).
+// Aquí no se ejecuta el editor: su código se escribe dentro de cada plantilla, igual que ppHtml.
+@@NUCLEO@@
+@@EDITOR@@
+const PP_EDITOR_CSS = @@CSS@@;
+</script>
+<script>
+(function () {
+  'use strict';
+  const VERSION_GEN = '@@VERSION_GEN@@', VERSION_EDITOR = '@@VERSION_EDITOR@@';
+  const $ = (s) => document.querySelector(s);
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const PPN = ppNucleo();
+  const S = { pdf: null, pdfNombre: '', xls: null, xlsNombre: '', cat: null, base: null, url: null };
+  const estado = (t, error) => { const e = $('#estado'); e.className = error ? 'error' : ''; e.innerHTML = t; };
+  const pausa = () => new Promise((r) => setTimeout(r, 30));
+
+  async function gunzip(bytes) { return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+  async function gzip(texto) { return new Uint8Array(await new Response(new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); }
+  function aBase64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+  const deBase64 = (b64) => Uint8Array.from(atob(b64.replace(/\s+/g, '')), (c) => c.charCodeAt(0));
+  async function base() { if (!S.base) S.base = JSON.parse(await gunzip(deBase64($('#base-datos').textContent))); return S.base; }
+
+  function zona(idZona, idInput, aceptar) {
+    const z = $(idZona), inp = $(idInput);
+    ['dragenter', 'dragover'].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add('sobre'); }));
+    ['dragleave', 'drop'].forEach((ev) => z.addEventListener(ev, () => z.classList.remove('sobre')));
+    z.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) aceptar(f); });
+    inp.addEventListener('change', () => { if (inp.files[0]) aceptar(inp.files[0]); inp.value = ''; });
+  }
+  zona('#z-pdf', '#f-pdf', async (f) => {
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') return estado('El archivo 1 debe ser el PDF del master.', true);
+    S.pdf = new Uint8Array(await f.arrayBuffer()); S.pdfNombre = f.name;
+    $('#n-pdf').textContent = f.name; $('#d-pdf').textContent = `${(f.size / 1048576).toFixed(2)} MB`; $('#z-pdf').classList.add('lista');
+    const m = /(\d{10})/.exec(f.name); if (m) $('#codigo').value = m[1];
+    listo();
+  });
+  zona('#z-xls', '#f-xls', async (f) => {
+    if (!/\.xlsx?$/i.test(f.name)) return estado('El archivo 2 debe ser el Excel de Pasos (.xlsx).', true);
+    S.xls = await f.arrayBuffer(); S.xlsNombre = f.name; S.cat = null;
+    $('#n-xls').textContent = f.name; $('#d-xls').textContent = `${(f.size / 1048576).toFixed(2)} MB`; $('#z-xls').classList.add('lista');
+    listo();
+  });
+  function listo() { $('#generar').disabled = !(S.pdf && S.xls); if (S.pdf && S.xls) estado('Listo para generar.'); }
+
+  async function catalogo() {
+    if (S.cat) return S.cat;
+    estado('Leyendo el Excel de Pasos… (puede tardar unos segundos)'); await pausa();
+    const wb = XLSX.read(S.xls, { type: 'array', dense: true });
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+    S.cat = RMDLector.leerCatalogo(filas, await base());
+    $('#d-xls').textContent = `${S.cat.filas.length.toLocaleString('es-PE')} pasos activos${S.cat.deBaja ? ` · ${S.cat.deBaja} de baja (no se usan)` : ''}`;
+    return S.cat;
+  }
+
+  function htmlPlantilla(b64, titulo) {
+    // mismo armado que ppHtml del userscript
+    return `<!doctype html>\n<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Plantilla RMD desde PDF ${VERSION_GEN} (editor ${VERSION_EDITOR})"><title>${esc(titulo)}</title><style>${PP_EDITOR_CSS}</style></head>\n<body><div id="app"><div class="pp-cargando">Abriendo el borrador… Si esta pantalla no avanza, abre el archivo con Google Chrome o Microsoft Edge desde la carpeta donde lo guardaste (no desde la vista previa del correo ni de Teams).<noscript><br>Para usarlo hay que tener JavaScript activado.</noscript></div></div>\n<script id="rmd-datos" type="application/octet-stream">${b64}<\/script>\n<script id="rmd-borrador" type="application/json">null<\/script>\n<script>(${ppEditorApp.toString()})((${ppNucleo.toString()})());<\/script>\n</body></html>`;
+  }
+
+  async function generar() {
+    const bt = $('#generar'); bt.disabled = true; $('#resultado').style.display = 'none';
+    try {
+      if (!window.CompressionStream || !window.DecompressionStream) throw new Error('este navegador es antiguo: usa Google Chrome o Microsoft Edge actualizados');
+      const B = await base(), cat = await catalogo();
+      estado('Leyendo el PDF del master…'); await pausa();
+      const pags = await RMDLector.leerPdf(pdfjsLib, S.pdf.slice(), (t) => estado(t));
+      const codigo = $('#codigo').value.trim();
+      const r = RMDLector.leerMaster(pags, cat, B, { codigo });
+      if (!r.arbol.estructuras.length) throw new Error('no se encontraron secciones en el PDF. Debe ser la impresión del master desde el portal RMD');
+      if (!codigo) $('#codigo').value = '';
+      estado('Armando la plantilla…'); await pausa();
+      const paq = RMDLector.armarPaquete(r, cat, B, PPN, { script: `plantilla desde PDF ${VERSION_GEN} (editor ${VERSION_EDITOR})` });
+      const b64 = aBase64(await gzip(JSON.stringify(paq))), d = new Date();
+      const rm = { ...paq.rmd, codigo: paq.rmd.codigo || 'sin-codigo' };
+      const nombre = PPN.nombreArchivo('Plantilla', rm, d, 'html');
+      const html = htmlPlantilla(b64, PPN.nombreArchivo('Borrador', rm, d).replace(/ \d{4}-\d\d-\d\d$/, ''));
+      if (S.url) URL.revokeObjectURL(S.url);
+      S.url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      mostrar(r, paq, nombre, html.length);
+      estado('');
+    } catch (e) {
+      console.error(e); estado(`<b>No se pudo generar la plantilla:</b> ${esc(e.message || e)}.`, true);
+    } finally { bt.disabled = !(S.pdf && S.xls); }
+  }
+
+  function mostrar(r, paq, nombre, bytes) {
+    const E = r.arbol.estructuras, s = r.stats, rm = paq.rmd;
+    const listas = (e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)];
+    const nPasos = E.reduce((a, e) => a + listas(e).reduce((b, l) => b + l.length, 0), 0);
+    const nEq = E.reduce((a, e) => a + e.equipos.length + e.utensilios.length, 0), nIns = E.reduce((a, e) => a + e.insumos.filter((i) => i.comp).length, 0);
+    const total = s.pasos + s.pm, pct = total ? Math.round((s.conCodigo / total) * 1000) / 10 : 0;
+    $('#r-tit').textContent = `RMD ${rm.codigo || '(sin código)'} v${rm.version} · ${rm.etapa} · ${rm.descripcion}`;
+    $('#r-meta').textContent = `${rm.estadoFechaPor}${rm.receta && rm.receta.matnr ? ` · Material ${rm.receta.matnr} · Versión de fabricación ${rm.receta.verid}` : ''}${rm.teorico ? ` · Teórico ${rm.teorico}` : ''} · ${(bytes / 1048576).toFixed(1)} MB`;
+    const cifra = (n, t, cl) => `<div class="cifra ${cl || ''}"><b>${n}</b><span>${t}</span></div>`;
+    $('#r-cifras').innerHTML = cifra(E.length, 'secciones') + cifra(nPasos, 'pasos') + cifra(s.pm, 'procesos menores') + cifra(nIns, 'insumos de la receta') + cifra(nEq, 'equipos y utensilios')
+      + cifra(`${pct} %`, `con código de SAP (${s.conCodigo} de ${total})`, pct === 100 ? 'ok' : 'av');
+    const av = [];
+    if (s.sinCodigo.length) av.push(`<details><summary>${s.sinCodigo.length} texto${s.sinCodigo.length === 1 ? '' : 's'} sin código en el Excel de Pasos (quedan con el texto del PDF)</summary><ul>${s.sinCodigo.map((x) => `<li>${esc(x.donde)} (${esc(x.clase)}): ${esc(x.texto)}</li>`).join('')}</ul></details>`);
+    if (s.equiposSinId.length) av.push(`<details><summary>${s.equiposSinId.length === 1 ? '1 equipo o utensilio que no está' : s.equiposSinId.length + ' equipos o utensilios que no están'} en el catálogo de equipos (se muestran igual)</summary><ul>${s.equiposSinId.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></details>`);
+    if (!rm.codigo) av.push('<details open><summary>Falta el código del RMD</summary><ul><li>Escríbelo arriba y vuelve a generar, para que el nombre del archivo y la plantilla lo lleven.</li></ul></details>');
+    $('#r-avisos').innerHTML = av.join('');
+    const a = $('#descargar'); a.href = S.url; a.download = nombre; a.title = nombre;
+    $('#vista').src = S.url;
+    $('#resultado').style.display = 'block';
+    $('#resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('#generar').addEventListener('click', generar);
+  $('#abrir').addEventListener('click', () => { if (S.url) window.open(S.url, '_blank'); });
+  $('#codigo').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('#generar').disabled) generar(); });
+})();
+</script>
+</body>
+</html>

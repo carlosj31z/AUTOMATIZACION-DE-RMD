@@ -98,6 +98,13 @@ cuenta). Escribir y responder siempre en **español**.
 - **Escribir en el portal o en SharePoint** solo con autorización escrita de
   Carlos.
 
+## Plantilla para Producción sin portal (2026-11-04)
+
+- Pedido de Carlos para sustentar las plantillas a gerencia **sin mostrar las mejoras de interfaz**: página única
+  `plantilla-autonoma/Generador de plantillas RMD.html` (PDF del master + Excel de Pasos de SAP → plantilla .html con el
+  mismo editor). Se construye con `node construir.mjs` (copia `ppEditorApp`/`ppNucleo`/`PP_EDITOR_CSS` del userscript);
+  al cambiar el editor del userscript hay que reconstruirla. No toca el userscript ni se sube a SharePoint.
+
 ## PCs de Carlos
 
 - `MIFPCWLIMAGG20` (trabajo): carpeta `Downloads\AUTOMATIZACION-DE-RMD-claude-rmd-automation-ingreso-vh53j1`.
