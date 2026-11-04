@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.117.0
+// @version      1.118.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.117.0';                                                       // mantener igual a @version
+  const VERSION = '1.118.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -430,6 +430,7 @@
   .rmd-rec-delta { color: var(--rmd-ambar); font-weight: 600; } .rmd-rec-linea { margin: 6px 0 0; } .rmd-rec-rojo { color: var(--rmd-rojo); } .rmd-rec-nuevo { color: var(--rmd-verde); font-weight: 600; } span.rmd-rec-quitado { color: var(--rmd-rojo); font-weight: 600; }
   .rmd-rec-pie { margin-top: 10px; color: var(--rmd-apagado); font-size: 12px; }
   /* Plantilla para Producción e importación */
+  .rmd-pp-rec-t tbody tr { cursor: pointer; } .rmd-pp-rec-t td { vertical-align: top; } .rmd-pp-rec-bloq td { opacity: .7; } .rmd-pp-rec-t input { margin: 2px 0 0; }
   .rmd-modal.rmd-pp { width: min(760px, 96vw); } .rmd-modal.rmd-pp-imp { width: min(1280px, 97vw); height: min(860px, 94vh); }
   .rmd-pp-campo { display: block; margin: 12px 0 8px; font-weight: 600; } .rmd-pp-campo input { display: block; width: 260px; height: 32px; margin-top: 4px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
   .rmd-pp-cab { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; } .rmd-pp-checks { margin: 6px 0 10px; padding-left: 4px; list-style: none; } .rmd-pp-checks li { margin: 3px 0; }
@@ -17145,7 +17146,34 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     espec.filter(act).sort((a, b) => (+a.Merknr || +a.orden || 0) - (+b.Merknr || +b.orden || 0)).forEach((s) => { const e = E.get(s.mdEstructuraId_mdEstructuraId); if (e) e.espec.push({ id: s.mdEstructuraEspecificacionId, ensayo: ppLimpio(s.ensayoHijo), padre: ppLimpio(s.ensayoPadreSAP), grupoId: s.ensayoPadreId_iMaestraId == null ? null : s.ensayoPadreId_iMaestraId, grupo: ppLimpio(s.ensayoPadreId && s.ensayoPadreId.contenido) || ppLimpio(s.ensayoPadreSAP), especificacion: ppLimpio(s.especificacion), vi: ppNulo(s.valorInicial), vf: ppNulo(s.valorFinal), orden: s.orden }); });
     const out = { estructuras: [...E.values()].sort(orden) };
     out.estructuras.forEach((e) => e.etiquetas.sort(orden));
+    // recetas asociadas y receta de cada insumo: fuera del JSON del archivo (no enumerables) para no cambiar el paquete
+    const insRec = new Map(insumos.filter(act).map((i) => [i.estructuraRecetaInsumoId, i.mdRecetaId_mdRecetaId]));
+    Object.defineProperty(out, 'recetas', { value: recetas.filter(act).map((r) => ppRecetaInfo(r, insumos.filter((i) => act(i) && i.mdRecetaId_mdRecetaId === r.mdRecetaId).length)), enumerable: false });
+    Object.defineProperty(out, 'insRec', { value: insRec, enumerable: false });
     return out;
+  }
+  // Datos de una receta asociada (RECETA: Text1 nombre, Verid versión de fabricación, Mksp estado, Plnnr/Alnal hoja de ruta, Mdv01 puesto de trabajo)
+  function ppRecetaInfo(r, nInsumos) {
+    const rc = r.recetaId || {}, mksp = norm(rc.Mksp), hoy = Date.now(), fin = rc.Bdatu ? new Date(rc.Bdatu) : null, ini = rc.Adatu ? new Date(rc.Adatu) : null;
+    let estado = TEXTO_MKSP[mksp] || (mksp ? `Bloqueo ${mksp}` : 'No bloqueado');
+    if (fin && !isNaN(fin) && fin.getTime() < hoy - 86400000) estado += ' · vencida';
+    else if (ini && !isNaN(ini) && ini.getTime() > hoy) estado += ' · todavía no vigente';
+    return { mdRecetaId: r.mdRecetaId, matnr: norm(rc.Matnr), verid: norm(rc.Verid), nombre: ppLimpio(rc.Text1), estado, bloqueada: !!mksp, hojaRuta: [norm(rc.Plnnr), norm(rc.Alnal)].filter(Boolean).join(' / '), puesto: norm(rc.Mdv01), centro: norm(rc.Werks), insumos: nInsumos || 0 };
+  }
+  // Elegir con qué receta se emite la plantilla (más de una asociada: si no, se duplican los insumos). Devuelve el mdRecetaId o null (cancelar).
+  function ppElegirReceta(recetas, md) {
+    return new Promise((resolver) => {
+      const def = norm(md.codDefectoReceta), pre = (recetas.find((r) => r.matnr === def && !r.bloqueada) || recetas.find((r) => r.matnr === def) || recetas.find((r) => !r.bloqueada) || recetas[0]).mdRecetaId;
+      let listo = false; const fin = (x) => { if (listo) return; listo = true; v.cerrar(); resolver(x); };
+      const v = ventana('Elegir receta de la plantilla', { cancelar: () => fin(null) });
+      v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp-rec');
+      v.cuerpo.innerHTML = `<p class="rmd-nota">El RMD <b>${esc(md.codigo)} v${esc(md.version)}</b> tiene <b>${recetas.length} recetas asociadas</b>. Elige con cuál se emite la plantilla para Producción: sus insumos son los que van en el borrador (con todas, los insumos se duplican).</p>
+        <table class="rmd-tabla rmd-pp-rec-t"><thead><tr><th></th><th>Receta</th><th>Versión de fabricación</th><th>Estado de la receta</th><th>Hoja de ruta</th><th>Puesto de trabajo</th><th>Insumos</th></tr></thead><tbody>${recetas.map((r) => `<tr data-id="${esc(r.mdRecetaId)}"${r.bloqueada ? ' class="rmd-pp-rec-bloq"' : ''}><td><input type="radio" name="rmd-pp-rec" value="${esc(r.mdRecetaId)}"${r.mdRecetaId === pre ? ' checked' : ''}></td><td><b>${esc(r.matnr)}</b>${r.matnr === def ? ' <span class="rmd-nota">(por defecto)</span>' : ''}<br>${esc(r.nombre || '—')}</td><td class="rmd-nowrap">${esc(r.verid || '—')}</td><td>${esc(r.estado)}</td><td class="rmd-nowrap">${esc(r.hojaRuta || '—')}</td><td class="rmd-nowrap">${esc(r.puesto || '—')}</td><td class="rmd-nowrap">${r.insumos}</td></tr>`).join('')}</tbody></table>`;
+      v.cuerpo.querySelectorAll('tbody tr').forEach((tr) => tr.addEventListener('click', (e) => { if (e.target.tagName !== 'INPUT') tr.querySelector('input').checked = true; }));
+      const elegida = () => { const i = v.cuerpo.querySelector('input[name="rmd-pp-rec"]:checked'); return i ? (recetas.find((r) => String(r.mdRecetaId) === i.value) || {}).mdRecetaId : null; };
+      v.pie.append(botonModal('Cancelar', '', () => fin(null)), botonModal('Generar con esta receta', 'primario', () => { const id = elegida(); if (id != null) fin(id); }));
+      setTimeout(() => { const i = v.cuerpo.querySelector('input:checked'); if (i) i.focus(); }, 30);
+    });
   }
   // Catálogo de SAP (caché local 12 h)
   async function ppCatalogo(modelo, forzar, avisar) {
@@ -17179,7 +17207,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     arbol.estructuras.forEach((e) => { idxE(e.estructuraId); e.etiquetas.forEach((t) => idxT(t.etiquetaId)); [e.pasos, ...e.etiquetas.map((t) => t.pasos)].forEach((l) => l.forEach((p) => { if (p.etqCat) idxT(p.etqCat); })); });
     const lineas = pasos.map((p) => [p[0], idxE(p[1]), idxT(p[2]), p[3], p[4]].join('\t')).join('\n');
     return { formato: 1, tipo: 'plantilla-rmd', generado: new Date().toISOString(), por: usuario || '', script: VERSION,
-      rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), areas: extra.areas || [], principal: md.codigoversionprincipal || String(md.codigo), estadoFechaPor: extra.estadoFechaPor || '', logo: extra.logo || null },
+      rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), areas: extra.areas || [], principal: md.codigoversionprincipal || String(md.codigo), estadoFechaPor: extra.estadoFechaPor || '', logo: extra.logo || null, ...(extra.receta ? { receta: { matnr: extra.receta.matnr, verid: extra.receta.verid, nombre: extra.receta.nombre, hojaRuta: extra.receta.hojaRuta, puesto: extra.receta.puesto } } : {}) },
       tipos: cat.tipos || {}, arbol, huella: PPN.huella(arbol),
       catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
   }
@@ -17223,14 +17251,21 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     if (!md) throw new Error(`no se encontró el RMD ${codigo}`);
     md.estado = norm(md.estadoIdRmd && md.estadoIdRmd.contenido);
     const [arbol, cat, estadoFechaPor, logo] = await Promise.all([ppLeerArbol(modelo, md), ppCatalogo(modelo, !!op.forzar, avisar), ppEstadoFechaPor(modelo, md), ppLogo()]);
-    // insumos de la receta por defecto
-    const def = norm(md.codDefectoReceta); if (def) arbol.estructuras.forEach((e) => { if (e.insumos.some((i) => i.matnr === def)) e.insumos = e.insumos.filter((i) => i.matnr === def); });
+    // insumos de una sola receta: con más de una asociada se pregunta cuál (si no, los insumos se duplican)
+    const recetas = arbol.recetas || []; let receta = recetas.length === 1 ? recetas[0] : null;
+    if (recetas.length > 1) {
+      const id = op.receta != null ? op.receta : op.elegirReceta ? await op.elegirReceta(recetas, md) : null;
+      if (id == null && op.elegirReceta) { const e = new Error('se canceló la elección de la receta'); e.cancelado = true; throw e; }
+      receta = recetas.find((r) => String(r.mdRecetaId) === String(id)) || null;
+    }
+    if (receta) arbol.estructuras.forEach((e) => { e.insumos = e.insumos.filter((i) => String(arbol.insRec.get(i.id)) === String(receta.mdRecetaId)); });
+    else { const def = norm(md.codDefectoReceta); if (def) arbol.estructuras.forEach((e) => { if (e.insumos.some((i) => i.matnr === def)) e.insumos = e.insumos.filter((i) => i.matnr === def); }); }
     avisar('Armando el archivo…');
-    const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
+    const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas, receta }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
     const nombre = PPN.nombreArchivo('Plantilla', paq.rmd, d, 'html');
     const html = ppHtml(b64, null, PPN.nombreArchivo('Borrador', paq.rmd, d).replace(/ \d{4}-\d\d-\d\d$/, ''));
     const cuenta = (f) => arbol.estructuras.reduce((s, e) => s + f(e), 0);
-    return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length } };
+    return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length, recetas: recetas.length, receta } };
   }
   // ---- Lectura del archivo del borrador ----
   // contenido de <script id="…"> independiente del orden de atributos
@@ -17849,10 +17884,11 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       if (ocupado) return; const c = cod.value.trim(); if (!/^\d{5,}$/.test(c)) { setTxt(est, 'Escribe el código del RMD.'); est.classList.add('error'); return; }
       ocupado = true; bGen.disabled = bImp.disabled = true; est.classList.remove('error');
       try {
-        const r = await ppGenerar(c, { forzar: v.cuerpo.querySelector('.rmd-pp-forzar').checked, avisar: (t) => setTxt(est, t) });
+        const r = await ppGenerar(c, { forzar: v.cuerpo.querySelector('.rmd-pp-forzar').checked, avisar: (t) => setTxt(est, t), elegirReceta: (recs, md) => { setTxt(est, `El RMD tiene ${recs.length} recetas asociadas: elige con cuál se emite la plantilla.`); return ppElegirReceta(recs, md); } });
         descargarArchivo(r.nombre, r.html, 'text/html;charset=utf-8');
-        setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos. Envíalo a Producción.`);
-      } catch (e) { setTxt(est, 'No se pudo generar: ' + e.message); est.classList.add('error'); }
+        const rec = r.resumen.recetas > 1 && r.resumen.receta ? ` · receta ${r.resumen.receta.matnr} / ${r.resumen.receta.verid}${r.resumen.receta.nombre ? ` (${r.resumen.receta.nombre})` : ''}` : '';
+        setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores${rec} · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos. Envíalo a Producción.`);
+      } catch (e) { if (e.cancelado) setTxt(est, 'No se generó la plantilla: falta elegir la receta.'); else { setTxt(est, 'No se pudo generar: ' + e.message); est.classList.add('error'); } }
       finally { ocupado = false; bGen.disabled = bImp.disabled = false; }
     });
     const bImp = botonModal('Importar un borrador…', '', () => { if (!ocupado) { v.cerrar(); elegirBorrador(); } });
@@ -18034,7 +18070,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     e.preventDefault(); abrirArchivos(fs);
   });
   window.__rmdStats.plantillaPdf = { leer: ppLeerPdf, trozos: ppTrozosPdf };   // pruebas
-  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN, sinInsumosNuevos: ppSinInsumosNuevos,
+  window.__rmdStats.plantilla = { abrir: abrirPlantillaProduccion, versiones: ppVersiones, crearVersionNueva: ppCrearVersionNueva, archivo: ppArchivoValido, abrirArchivos, ingreso: null, plan: ppPlanEscritura, ingresar: abrirIngreso, verificar: ppVerificarIngreso, generar: ppGenerar, leerArbol: ppLeerArbol, catalogo: ppCatalogo, paquete: ppPaquete, html: ppHtml, empacar: ppEmpacar, desempacar: ppDesempacar, leer: ppLeerBorrador, analizar: ppAnalizar, destino: ppDestino, mapear: ppMapear, excel: ppExcel, abrir: abrirPlantillaProduccion, importar: abrirImportarBorrador, nucleo: PPN, sinInsumosNuevos: ppSinInsumosNuevos, elegirReceta: ppElegirReceta,
     revisar: (datos, prop, an, analizar) => { const v = ppVentanaBorrador(); v.__ppAnalizar = analizar; pintarImportacion(v, datos, prop, an, {}); return v; } };   // pruebas
   // ---- Ingreso automático del borrador ----
   // Mismas escrituras que el portal: aPaso / aPasoInsumoPaso en MD_ESTRUCTURA, catálogo de equipos (TABLAS_ARRAY_MD_SKIP) + aEquipo, aUtensilio,

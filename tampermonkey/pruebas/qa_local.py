@@ -1375,6 +1375,55 @@ with sync_playwright() as p:
               and not r["ing"]["ro"] and not r["ing"]["aviso"] and r["grabar_ing"] == 1)
         return ok, json.dumps(r, ensure_ascii=False)[:900]
 
+    @prueba("LN56 Plantilla para Producción con varias recetas (v1.118.0): pregunta con cuál se emite (receta, versión de fabricación, estado, hoja de ruta, puesto) y solo lleva los insumos de esa; con una receta no pregunta; Cancelar no genera")
+    def _():
+        pg.evaluate("""() => {
+          window.__rec = { antes: window.sap, n: 2 };
+          function F(a, b, c) { if (a && typeof a === 'object') { this.filters = a.filters; this.and = a.and; } else { this.path = a; this.op = b; this.value = c; } }
+          const rc = (id, matnr, verid, texto, mksp, plnnr, puesto) => ({ mdRecetaId: id, mdId_mdId: 900, activo: true, recetaId: { Matnr: matnr, Verid: verid, Text1: texto, Mksp: mksp, Plnnr: plnnr, Alnal: '1', Mdv01: puesto, Werks: '1000' } });
+          const ins = (id, rec, comp) => ({ estructuraRecetaInsumoId: id, mdEstructuraId_mdEstructuraId: 1, mdRecetaId_mdRecetaId: rec, Component: comp, Maktx: 'INSUMO ' + comp, CompQty: '1', CompUnit: 'KG', ItemNo: id, activo: true });
+          const datos = () => ({ MD: [{ mdId: 900, codigo: 2202609013, version: 5, descripcion: 'PRODUCTO X', nivelTxt: 'FABRICACION', codDefectoReceta: '6000000002', estadoIdRmd_iMaestraId: 467, estadoIdRmd: { contenido: 'Ingresado' }, sucursalId: { contenido: 'PLANTA LIMA' } }],
+            MD_ESTRUCTURA: [{ mdEstructuraId: 1, estructuraId_estructuraId: 10, estructuraId: { descripcion: 'INSUMOS' }, orden: 1, activo: true }],
+            MD_RECETA: [rc(71, '6000000001', '0001', 'PRODUCTO X 100 ML', '', '50001234', 'FMENFA01'), rc(72, '6000000002', '0002', 'PRODUCTO X 200 ML', '1', '50005678', 'FMENFA02')].slice(0, window.__rec.n),
+            MD_ES_RE_INSUMO: [ins(1, 71, '1000001'), ins(2, 71, '1000002'), ins(3, 72, '1000001'), ins(4, 72, '1000003')] });
+          const modelo = { read: (ruta, o) => { const e = ruta.replace(/^\\//, '').replace(/\\/\\$count$/, ''); setTimeout(() => (/\\$count$/.test(ruta) ? o.success('0') : o.success({ results: datos()[e] || [] })), 5); } };
+          const vista = { getModel: (n) => (n === 'mainModelv2' ? modelo : null) };
+          const reg = { btnExpRec: { mEventRegistry: { press: [{ oListener: { getView: () => vista } }] } } };
+          const req = (n) => (n === 'sap/ui/model/Filter' ? F : null); req.toUrl = () => 'about:blank';
+          window.sap = { ui: { getCore: () => ({ byId: (id) => reg[id] }), require: req } };
+          document.getElementById('app').insertAdjacentHTML('afterbegin', '<button id="btnExpRec" title="Exportar">E</button>');
+          const P = window.__rmdStats.plantilla;
+          window.__rec.gen = (forzar) => { window.__rec.r = null; window.__rec.err = null; P.generar('2202609013', { forzar, elegirReceta: (r, md) => { window.__rec.pregunto = true; return P.elegirReceta(r, md); } }).then((r) => { window.__rec.r = r; }, (e) => { window.__rec.err = { msg: e.message, cancelado: !!e.cancelado }; }); };
+        }""")
+        r = {}
+        pg.evaluate("() => window.__rec.gen(true)")
+        pg.wait_for_selector(".rmd-pp-rec", timeout=15000)
+        r["dialogo"] = pg.evaluate("""() => { const v = document.querySelector('.rmd-pp-rec'); return { titulo: v.querySelector('h3').textContent, cab: [...v.querySelectorAll('thead th')].map((t) => t.textContent),
+          filas: [...v.querySelectorAll('tbody tr')].map((t) => t.innerText.replace(/\\s+/g, ' ').trim()), marcada: v.querySelector('input:checked').value }; }""")
+        pg.locator(".rmd-pp-rec tbody tr").nth(0).click()
+        pg.locator(".rmd-pp-rec .rmd-modal-pie button", has_text="Generar con esta receta").click()
+        pg.wait_for_function("() => window.__rec.r || window.__rec.err", timeout=15000)
+        r["gen"] = pg.evaluate("() => window.__rec.err || { ins: window.__rec.r.paquete.arbol.estructuras[0].insumos.map((i) => i.comp), receta: window.__rec.r.paquete.rmd.receta, enJson: 'recetas' in JSON.parse(JSON.stringify(window.__rec.r.paquete.arbol)) }")
+        # Cancelar: no genera
+        pg.evaluate("() => window.__rec.gen(false)")
+        pg.wait_for_selector(".rmd-pp-rec", timeout=15000)
+        pg.locator(".rmd-pp-rec .rmd-modal-pie button", has_text="Cancelar").click()
+        pg.wait_for_function("() => window.__rec.r || window.__rec.err", timeout=15000)
+        r["cancelar"] = pg.evaluate("() => window.__rec.err")
+        # una sola receta: no pregunta
+        pg.evaluate("() => { window.__rec.n = 1; window.__rec.pregunto = false; window.__rec.gen(false); }")
+        pg.wait_for_function("() => window.__rec.r || window.__rec.err", timeout=15000)
+        r["una"] = pg.evaluate("() => ({ pregunto: window.__rec.pregunto, err: window.__rec.err, ins: window.__rec.r && window.__rec.r.paquete.arbol.estructuras[0].insumos.map((i) => i.comp), dlg: !!document.querySelector('.rmd-pp-rec') })")
+        pg.evaluate("() => { document.getElementById('btnExpRec').remove(); window.sap = window.__rec.antes; }")
+        d = r["dialogo"]
+        ok = (d["titulo"] == "Elegir receta de la plantilla" and d["cab"][1:6] == ["Receta", "Versión de fabricación", "Estado de la receta", "Hoja de ruta", "Puesto de trabajo"]
+              and len(d["filas"]) == 2 and "PRODUCTO X 100 ML" in d["filas"][0] and "0001" in d["filas"][0] and "No bloqueado" in d["filas"][0] and "50001234 / 1" in d["filas"][0] and "FMENFA01" in d["filas"][0]
+              and "Bloqueado para cada utilización" in d["filas"][1] and d["marcada"] == "72"
+              and r["gen"].get("ins") == ["1000001", "1000002"] and r["gen"]["receta"]["verid"] == "0001" and not r["gen"]["enJson"]
+              and r["cancelar"] and r["cancelar"]["cancelado"]
+              and not r["una"]["pregunto"] and r["una"]["ins"] == ["1000001", "1000002"] and not r["una"]["dlg"])
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
