@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.115.0
+// @version      1.117.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.115.0';                                                       // mantener igual a @version
+  const VERSION = '1.117.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -83,6 +83,7 @@
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
+    ['mismov', 'Mis movimientos', 'En el menú Exportar y en Ctrl+K: los RMD en los que hiciste algún movimiento en SAP (hoy por defecto, o entre dos fechas) con su status de hoy (Ingresado, Autorizado o Suspendido), y su Excel.'],
     ['vbversiones', 'V°B° última vs. penúltima', 'En el menú Exportar: Excel de los RMD trabajados en un mes (Ate y Lima) con los V°B° de su última versión frente a la penúltima, la diferencia y un resumen por planta y etapa (como el comando vb-mes).'],
     ['ultimaversion', 'Última versión de cada master', 'Excel de los Autorizados, Ingresados y Suspendidos (su última versión) con sus Observaciones y un resumen por producto.'],
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
@@ -135,6 +136,10 @@
   window.__rmdUiMejoras = true;
 
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
+  // Regla de CINTIA (04/11/2026): Karla Vanessa Moreno se muestra como Vanessa (usuario VM), nunca Karla. Solo al mostrar
+  // (pantallas, PDF y Excel); en SAP su usuario sigue siendo KMORENOM y lo que se graba o se busca no cambia.
+  const USUARIOS_VISIBLES = { KMORENOM: 'VM' };
+  const usuarioVisible = (u) => { const t = String(u == null ? '' : u), k = t.trim().toUpperCase(); return USUARIOS_VISIBLES[k] || t.replace(/\bKarla\s+(?=Vanessa\b)/gi, ''); };
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
   const faseDe = (x) => String(x).split('…')[0].replace(/[\d.,:~]+/g, '#');
@@ -660,6 +665,16 @@
     background: color-mix(in srgb, currentColor 9%, transparent); font: 600 12px/16px var(--rmd-fuente); letter-spacing: .1px; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
   .rmd-estado-punto { position: relative; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
   .rmd-estado-sub { padding-left: 7px; border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent); font-weight: 400; font-size: 11.5px; opacity: .85; }
+  /* Mis movimientos */
+  .rmd-mismov-fechas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0; } .rmd-mismov-fechas label { display: inline-flex; align-items: center; gap: 6px; }
+  .rmd-mismov-atajos { font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-mismov-resumen { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+  .rmd-mismov-chip { padding: 3px 10px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); border-radius: 999px; background: transparent; color: var(--rmd-texto, inherit); font: 500 12.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-mismov-chip.ingresado { color: var(--rmd-acento-texto); } .rmd-mismov-chip.autorizado { color: var(--rmd-verde); } .rmd-mismov-chip.suspendido { color: var(--rmd-ambar); } .rmd-mismov-chip.otros { color: var(--rmd-apagado); }
+  .rmd-mismov-chip[aria-pressed="true"] { background: color-mix(in srgb, currentColor 14%, transparent); border-color: currentColor; }
+  .rmd-mismov-estado { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); font-weight: 600; font-size: 12px; }
+  .rmd-mismov-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-mismov-estado.autorizado { color: var(--rmd-verde); } .rmd-mismov-estado.suspendido { color: var(--rmd-ambar); } .rmd-mismov-estado.otros { color: var(--rmd-apagado); }
+  .rmd-mismov-ver, .rmd-mismov-sub { color: var(--rmd-apagado); font-size: 12px; }
   .rmd-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-estado.autorizado { color: var(--rmd-verde); } .rmd-estado.suspendido { color: var(--rmd-ambar); } .rmd-estado.otro { color: var(--rmd-apagado); }
 
   /* ── Título del PM: máx. 2 líneas ── */
@@ -5917,9 +5932,10 @@
       [19, 19, 11.5], [20, 23, 9], [24, 24, 12.375], [25, 27, 7], [28, 28, 34], [29, 30, 10]];
     const ANCHOS_RESUMEN = [[1, 1, 18.75], [2, 2, 21.25], [3, 7, 7], [16, 16, 17.25], [17, 17, 22.75], [18, 18, 18.375], [30, 30, 15.375], [31, 31, 19.5],
       [32, 32, 17.75], [52, 52, 13.375], [53, 53, 19.5], [54, 54, 21.75], [67, 67, 26.375], [68, 68, 12]];
-    // Hoja1: planta, nombre, iniciales en Observación y usuario SAP que autoriza.
+    // Hoja1: planta, nombre, iniciales en Observación y usuario SAP que autoriza (Karla Vanessa Moreno, KMORENOM, va como Vanessa: VM; ver usuarioVisible).
+    const uVis = typeof usuarioVisible === 'function' ? usuarioVisible : (u) => u;   // el bloque también corre suelto en las pruebas
     const PERSONAS = [['PLANTA 1', 'CUELLAR LOYOLA NOELIA ROSA', 'NC', 'NCUELLARL'], ['PLANTA 1', 'QUISPE JIMENA', 'JQ', 'JQUISPEP'],
-      ['PLANTA 2', 'MORENO KARLA VANESSA', 'VM', 'KMORENOM'], ['PLANTA 2', 'DINA  VALDERRAMA', 'DV', '']];
+      ['PLANTA 2', 'MORENO VANESSA', 'VM', 'VM'], ['PLANTA 2', 'DINA  VALDERRAMA', 'DV', '']];
     // Plazos del «% dentro de plazo» (días hábiles ingreso -> autorización).
     const PLAZOS = [['1', 5], ['2', 10], ['3', 30]];
     const PLANTAS = ['PLANTA ATE', 'PLANTA LIMA'];
@@ -6070,7 +6086,7 @@
         if (af === MES) est.mes++; else if (af === 'ANTIGUO') est.antiguo++;
         const obs = f.observacion ? String(f.observacion).slice(0, 32767) : null;
         registros.push([nulo(f.codigo), nulo(f.codigoSolicitud), nulo(f.version), nulo(f.estado), nulo(f.codDefecto), nulo(f.codAgrupador), nulo(f.descripcion), nulo(f.etapa),
-          fechaOk(f.fechaRegistro), nulo(f.usuarioRegistro), nulo(f.fechaAut), nulo(f.usuarioAutorizacion), nulo(af), fechaOk(f.fechaSolicitud), nulo(f.planta), nulo(f.seccion),
+          fechaOk(f.fechaRegistro), nulo(uVis(f.usuarioRegistro)), nulo(f.fechaAut), nulo(uVis(f.usuarioAutorizacion)), nulo(af), fechaOk(f.fechaSolicitud), nulo(f.planta), nulo(f.seccion),
           nulo(f.motivo), obs, k.S, k.T, k.U, k.V, k.W, noContar, k.Y, k.Z, k.AA, nota, k.AC, k.AD]);
         est.sap++;
       });
@@ -7452,7 +7468,7 @@
   const contFila = (md) => ({ mdId: md.mdId, codigo: String(md.codigo || ''), version: md.version != null ? String(md.version) : '', etapa: md.nivelTxt || '', descripcion: md.descripcion || '',
     material: md.codDefectoReceta || '', agrupador: md.codAgrupadorReceta || '', estado: (md.estadoIdRmd && md.estadoIdRmd.contenido) || '', fecha: Contingencia.diaDe(md.fechaAutorizacion),
     planta: (md.sucursalId && md.sucursalId.contenido) || '', observacion: String(md.observacion || '').trim(),
-    usuario: md.usuarioAutorizacion || '', hora: contHora(md.fechaAutorizacion),
+    usuario: usuarioVisible(md.usuarioAutorizacion || ''), hora: contHora(md.fechaAutorizacion),
     recetas: md.aReceta && md.aReceta.results ? md.aReceta.results.filter((x) => x.recetaId).map((x) => String(x.recetaId.Text1 || '').trim()) : null });
   // hora local de la autorización; '' si la fecha viene sin hora (medianoche UTC)
   const contHora = (x) => (!(x instanceof Date) || isNaN(x) || x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? '' : `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`);
@@ -8536,7 +8552,7 @@
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
     tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
       [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, x.m.usuarioRegistro, x.m.usuarioActualiza, x.prod]),
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod]),
       { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda' }, { congelar: 'E2', activa: true });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
@@ -8544,7 +8560,7 @@
       'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
       [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
       todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
-        ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), x.m.usuarioRegistro, fx(x.m.fechaAutorizacion), x.m.usuarioAutorizacion, x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), usuarioVisible(x.m.usuarioRegistro), fx(x.m.fechaAutorizacion), usuarioVisible(x.m.usuarioAutorizacion), x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
         x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
       { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'fechaCelda', 20: 'fechaCelda', 23: 'fechaCelda', 25: 'numCelda' }, { congelar: 'C2' });
     //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
@@ -8672,6 +8688,164 @@
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
     window.__rmdStats.vbVersiones = { armar: vbArmarFilas, excel: vbExcel, generar: () => bGen.click() };
   }
+  // ---- Mis movimientos: los RMD en los que el usuario del portal hizo algo entre dos fechas, con su status de hoy ----
+  // Fuentes (solo lectura): MD (registro, actualización y autorización), MD_TRAZABILIDAD (cambios de estado) y las filas de la estructura
+  // (pasos, procesos menores, etiquetas, equipos, utensilios, especificaciones, insumos y recetas) con usuarioRegistro/usuarioActualiza.
+  // ==MISMOV-INICIO==
+  const MISMOV_TABLAS = [
+    ['MD_ESTRUCTURA', 'mdEstructuraId', 'estructura', 'estructuras'], ['MD_ES_ETIQUETA', 'mdEsEtiquetaId', 'etiqueta', 'etiquetas'],
+    ['MD_ES_PASO', 'mdEstructuraPasoId', 'paso', 'pasos'], ['MD_ES_PASO_INSUMO_PASO', 'mdEstructuraPasoInsumoPasoId', 'proceso menor', 'procesos menores'],
+    ['MD_ES_EQUIPO', 'mdEstructuraEquipoId', 'equipo', 'equipos'], ['MD_ES_UTENSILIO', 'mdEstructuraUtensilioId', 'utensilio', 'utensilios'],
+    ['MD_ES_ESPECIFICACION', 'mdEstructuraEspecificacionId', 'especificación', 'especificaciones'], ['MD_ES_RE_INSUMO', 'estructuraRecetaInsumoId', 'insumo', 'insumos'],
+    ['MD_RECETA', 'mdRecetaId', 'receta', 'recetas']];
+  const MISMOV_GRUPOS = ['Ingresado', 'Autorizado', 'Suspendido', 'Otros'];
+  const misMovGrupo = (estado) => (/^ingres/i.test(estado) ? 'Ingresado' : /^autoriz/i.test(estado) ? 'Autorizado' : /^suspend/i.test(estado) ? 'Suspendido' : 'Otros');
+  // { usuario, desde, hasta (ms, [desde, hasta)), mds: MD con estadoIdRmd/sucursalId, traz: MD_TRAZABILIDAD, filas: { entidad: filas } }
+  // → [{ mdId, codigo, version, producto, etapa, planta, estado, grupo, acciones: [texto], primero, ultimo }] del más reciente al más antiguo
+  function misMovArmar({ usuario, desde, hasta, mds, traz, filas }) {
+    const u = String(usuario || '').trim().toUpperCase(), mio = (x) => String(x || '').trim().toUpperCase() === u;
+    const ms = (v) => { const d = v instanceof Date ? v : v ? new Date(v) : null; return d && !isNaN(d) ? d.getTime() : 0; };
+    const dentro = (t) => t >= desde && t < hasta;
+    const porMd = new Map(), de = (mdId) => { if (!porMd.has(mdId)) porMd.set(mdId, { ts: [], estados: [], creada: 0, autorizo: 0, actualizo: 0, conteo: new Map() }); return porMd.get(mdId); };
+    const mdPorId = new Map((mds || []).map((m) => [m.mdId, m]));
+    mdPorId.forEach((m, id) => {
+      const tR = ms(m.fechaRegistro), tA = ms(m.fechaActualiza), tZ = ms(m.fechaAutorizacion);
+      if (mio(m.usuarioRegistro) && dentro(tR)) { const x = de(id); x.creada = tR; x.ts.push(tR); }
+      if (mio(m.usuarioAutorizacion) && dentro(tZ)) { const x = de(id); x.autorizo = tZ; x.ts.push(tZ); }
+      if (mio(m.usuarioActualiza) && dentro(tA)) { const x = de(id); x.actualizo = tA; x.ts.push(tA); }
+    });
+    (traz || []).forEach((t) => {
+      const tR = ms(t.fechaRegistro), e = String((t.estadoTrazab && t.estadoTrazab.contenido) || '').replace(/\s+/g, ' ').trim();
+      if (!t || t.activo === false || !mio(t.usuarioRegistro) || !dentro(tR) || !e || t.mdId_mdId == null) return;
+      const x = de(t.mdId_mdId); x.estados.push([tR, e]); x.ts.push(tR);
+    });
+    MISMOV_TABLAS.forEach(([ent, , uno, varios]) => (((filas || {})[ent]) || []).forEach((f) => {
+      if (f.mdId_mdId == null) return;
+      const tR = ms(f.fechaRegistro), tA = ms(f.fechaActualiza), m = mdPorId.get(f.mdId_mdId);
+      const alta = mio(f.usuarioRegistro) && dentro(tR), cambio = mio(f.usuarioActualiza) && dentro(tA); if (!alta && !cambio) return;
+      // las filas que copia «Nueva Versión» al crear la versión no son trabajo aparte
+      const copia = alta && m && mio(m.usuarioRegistro) && Math.abs(tR - ms(m.fechaRegistro)) < 15 * 60000;
+      const tipo = f.activo === false ? (alta && !cambio ? null : 'quitados') : alta && !copia ? 'agregados' : cambio ? 'modificados' : null;
+      const x = de(f.mdId_mdId); x.ts.push(cambio ? tA : tR); if (!tipo) return;
+      const k = `${ent}|${tipo}`; x.conteo.set(k, { n: ((x.conteo.get(k) || {}).n || 0) + 1, uno, varios, tipo });
+    }));
+    const out = [];
+    porMd.forEach((x, mdId) => {
+      const m = mdPorId.get(mdId) || { mdId }, estado = String((m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '').trim(), acciones = [];
+      if (x.creada) acciones.push(m.codigo ? `Creó la versión ${m.version != null ? m.version : ''}`.trim() : 'Registró la solicitud');
+      const vistos = new Set();
+      x.estados.sort((a, b) => a[0] - b[0]).forEach(([, e]) => { const t = `Pasó a ${e}`; if (!vistos.has(t)) { vistos.add(t); acciones.push(t); } });
+      if (x.autorizo && !x.estados.some(([, e]) => /^autoriz/i.test(e)) && /^autoriz/i.test(estado)) acciones.push('Autorizó');
+      const orden = { agregados: 0, modificados: 1, quitados: 2 };
+      [...x.conteo.values()].sort((a, b) => orden[a.tipo] - orden[b.tipo]).forEach((c) => {
+        const genero = /^(etiqueta|especificación|receta|estructura)$/.test(c.uno) ? 'a' : 'o';
+        acciones.push(`${c.n} ${c.n === 1 ? c.uno : c.varios} ${c.n === 1 ? c.tipo.replace(/os$/, genero) : c.tipo.replace(/os$/, genero + 's')}`);
+      });
+      if (!acciones.length) acciones.push(x.actualizo ? 'Actualizó los datos del RMD' : 'Movimiento en el RMD');
+      out.push({ mdId, codigo: m.codigo ? String(m.codigo) : '', solicitud: m.codigoSolicitud ? String(m.codigoSolicitud) : '', version: m.version != null ? m.version : '', producto: String(m.descripcion || '').trim(),
+        etapa: String(m.nivelTxt || '').trim(), planta: String((m.sucursalId && m.sucursalId.contenido) || '').trim(), estado: estado || '(sin estado)', grupo: misMovGrupo(estado), acciones,
+        primero: Math.min(...x.ts), ultimo: Math.max(...x.ts) });
+    });
+    return out.sort((a, b) => b.ultimo - a.ultimo);
+  }
+  // ==MISMOV-FIN==
+  async function misMovLeer(modelo, usuario, desde, hasta, avance) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, avisos = [];
+    const rango = (cu, cf) => new F({ filters: [new F(cu, 'EQ', usuario), new F(cf, 'GE', new Date(desde)), new F(cf, 'LT', new Date(hasta))], and: true });
+    const ambos = () => new F({ filters: [rango('usuarioRegistro', 'fechaRegistro'), rango('usuarioActualiza', 'fechaActualiza')], and: false });
+    const leer = async (ent, filtro, params) => {
+      try { return await leerTodoDe(modelo, ent, [filtro], params); }
+      catch (e) { try { return await leerTodoDe(modelo, ent, [filtro], {}); } catch (e2) { avisos.push(`${ent}: ${e2.message || e2}`); return []; } }
+    };
+    const SEL_FILA = 'mdId_mdId,activo,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza';
+    const tareas = [
+      ['md', () => leer('MD', ambos(), { $select: 'mdId' })],
+      ['aut', () => leer('MD', rango('usuarioAutorizacion', 'fechaAutorizacion'), { $select: 'mdId' })],
+      ['traz', () => leer('MD_TRAZABILIDAD', rango('usuarioRegistro', 'fechaRegistro'), { $expand: 'estadoTrazab', $select: 'idTrazabilidad,mdId_mdId,fechaRegistro,usuarioRegistro,activo,estadoTrazab/contenido' })],
+      ...MISMOV_TABLAS.map(([ent, clave]) => [ent, () => leer(ent, ambos(), { $select: `${clave},${SEL_FILA}` })])];
+    const res = {}; let i = 0, hechas = 0;
+    await Promise.all(Array.from({ length: 3 }, async () => { while (i < tareas.length) { const [k, fn] = tareas[i++]; res[k] = await fn(); avance(`Leyendo tus movimientos en SAP… ${++hechas} de ${tareas.length}`); } }));
+    const filas = Object.fromEntries(MISMOV_TABLAS.map(([ent]) => [ent, res[ent] || []]));
+    const ids = [...new Set([...res.md, ...res.aut].map((x) => x.mdId).concat(res.traz.map((x) => x.mdId_mdId), Object.values(filas).flat().map((x) => x.mdId_mdId)).filter((x) => x != null))];
+    let mds = [];
+    if (ids.length) {
+      avance(`Leyendo el status de ${ids.length} RMD…`);
+      mds = await leerPorIds(modelo, 'MD', 'mdId', ids, { $expand: 'estadoIdRmd,sucursalId',
+        $select: 'mdId,codigo,codigoSolicitud,version,descripcion,nivelTxt,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,estadoIdRmd/contenido,sucursalId/contenido' });
+    }
+    return { items: misMovArmar({ usuario, desde, hasta, mds, traz: res.traz, filas }), avisos };
+  }
+  function misMovExcel(items, usuario, dTxt, hTxt) {
+    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento'];
+    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17].map((w, i) => [i + 1, i + 1, w]),
+      tabla: { nombre: 'MisMovimientos', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, items.length + 1)}`, estilo: 'TableStyleMedium2' } });
+    cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
+    const est = { Autorizado: 'estAut', Ingresado: 'estIng', Suspendido: 'estSus' };
+    items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo)]
+      .forEach((v, c) => { if (v == null || v === '') return; h.poner({ c, r: i + 1 }, v, v instanceof Date ? 'fechaHora' : c === 5 && est[x.grupo] ? est[x.grupo] : 'normal'); }));
+    return { libro, nombre: `Mis movimientos RMD ${usuario} ${dTxt}${hTxt !== dTxt ? ' a ' + hTxt : ''}.xlsx` };
+  }
+  async function abrirMisMovimientos() {
+    const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para ver tus movimientos.', true); return; }
+    if (document.querySelector('.rmd-mismov')) return;
+    let trabajando = false, items = [], filtro = '', usuario = '';
+    const v = ventana('Mis movimientos en RMD', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-mismov');
+    const dd2 = (n) => String(n).padStart(2, '0'), iso = (d) => `${d.getFullYear()}-${dd2(d.getMonth() + 1)}-${dd2(d.getDate())}`, hoy = new Date();
+    v.cuerpo.innerHTML = `<p>Los RMD en los que <b>tú</b> hiciste algún movimiento en SAP entre las fechas (crear la versión, pasos, procesos menores, insumos, recetas, cambios de estado…), con su <b>status de hoy</b>. No cambia nada en SAP.</p>
+      <div class="rmd-mismov-fechas"><label>Desde <input type="date" class="rmd-mm-desde" value="${iso(hoy)}"></label><label>Hasta <input type="date" class="rmd-mm-hasta" value="${iso(hoy)}"></label>
+        <span class="rmd-mismov-atajos"><button type="button" class="rmd-link" data-r="hoy">Hoy</button> · <button type="button" class="rmd-link" data-r="ayer">Ayer</button> · <button type="button" class="rmd-link" data-r="semana">Esta semana</button> · <button type="button" class="rmd-link" data-r="mes">Este mes</button></span></div>
+      <p class="rmd-progreso"></p><div class="rmd-mismov-resumen" role="group" aria-label="Filtrar por status"></div><div class="rmd-mismov-res"></div>`;
+    const $ = (s) => v.cuerpo.querySelector(s), prog = $('.rmd-progreso'), resumen = $('.rmd-mismov-resumen'), caja = $('.rmd-mismov-res');
+    const avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const fecha = (s) => { const [a, m, d] = String(s || '').split('-').map(Number); return a && m && d ? new Date(a, m - 1, d) : null; };
+    const hora = (t) => { const d = new Date(t); return `${dd2(d.getDate())}/${dd2(d.getMonth() + 1)} ${dd2(d.getHours())}:${dd2(d.getMinutes())}`; };
+    const pintar = () => {
+      const n = (g) => items.filter((x) => x.grupo === g).length;
+      resumen.innerHTML = items.length ? [['', 'Todos', items.length], ...MISMOV_GRUPOS.map((g) => [g, g, n(g)]).filter(([, , k]) => k)].map(([g, t, k]) =>
+        `<button type="button" class="rmd-mismov-chip ${g ? misMovGrupo(g).toLowerCase() : ''}" data-g="${esc(g)}" aria-pressed="${filtro === g}"><b>${k}</b> ${esc(t)}</button>`).join('') : '';
+      const lista = items.filter((x) => !filtro || x.grupo === filtro);
+      caja.innerHTML = !items.length ? '' : `<table class="rmd-tabla rmd-mismov-tabla"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Qué hiciste</th><th>Último</th><th>Status de hoy</th></tr></thead><tbody>${lista.map((x) =>
+        `<tr><td class="rmd-nowrap">${x.codigo ? `<button type="button" class="rmd-link" data-cod="${esc(x.codigo)}" data-ver="${esc(x.version)}" title="Abrir la configuración de este RMD">${esc(x.codigo)}</button>` : esc(x.solicitud || '—')} <span class="rmd-mismov-ver">${x.version !== '' ? 'v' + esc(x.version) : ''}</span></td>
+        <td>${esc(x.producto)}${x.planta ? `<div class="rmd-mismov-sub">${esc(x.planta)}</div>` : ''}</td><td>${esc(x.etapa)}</td><td>${x.acciones.map(esc).join('<br>')}</td><td class="rmd-nowrap">${esc(hora(x.ultimo))}</td>
+        <td class="rmd-nowrap"><span class="rmd-mismov-estado ${x.grupo.toLowerCase()}">${esc(x.estado)}</span></td></tr>`).join('')}</tbody></table>`;
+      bXls.disabled = !items.length;
+    };
+    const buscar = async () => {
+      const d0 = fecha($('.rmd-mm-desde').value), d1 = fecha($('.rmd-mm-hasta').value);
+      if (!d0 || !d1) { avance('Elige las dos fechas.', true); return; }
+      if (d1 < d0) { avance('«Hasta» no puede ser antes de «Desde».', true); return; }
+      trabajando = true; bBuscar.disabled = true; bXls.disabled = true; items = []; filtro = ''; pintar();
+      try {
+        if (!usuario) { avance('Buscando tu usuario del portal…'); try { usuario = await usuarioPortal(modelo); } catch (e) { usuario = codigoUsuario(controladorPrincipal()); } }
+        if (!usuario) throw new Error('no se supo tu usuario del portal');
+        const fin = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate() + 1);
+        const r = await misMovLeer(modelo, usuario, d0.getTime(), fin.getTime(), avance); items = r.items;
+        const rango = +d0 === +d1 ? `el ${dd2(d0.getDate())}/${dd2(d0.getMonth() + 1)}/${d0.getFullYear()}` : `del ${dd2(d0.getDate())}/${dd2(d0.getMonth() + 1)} al ${dd2(d1.getDate())}/${dd2(d1.getMonth() + 1)}/${d1.getFullYear()}`;
+        avance((items.length ? `${items.length} RMD con movimientos de ${usuarioVisible(usuario)} ${rango}.` : `No hay movimientos de ${usuarioVisible(usuario)} ${rango}.`) +
+          (r.avisos.length ? ` Ojo: no se pudo leer ${r.avisos.map((a) => a.split(':')[0]).join(', ')}.` : ''), !!r.avisos.length && !items.length);
+        if (r.avisos.length) console.warn('[RMD] Mis movimientos:', r.avisos);
+      } catch (e) { avance('No se pudieron leer tus movimientos: ' + (e.message || e), true); }
+      finally { trabajando = false; bBuscar.disabled = false; pintar(); }
+    };
+    v.cuerpo.querySelector('.rmd-mismov-atajos').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-r]'); if (!b || trabajando) return;
+      const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()), r = b.dataset.r;
+      const d0 = r === 'ayer' ? new Date(h.getFullYear(), h.getMonth(), h.getDate() - 1) : r === 'semana' ? new Date(h.getFullYear(), h.getMonth(), h.getDate() - ((h.getDay() + 6) % 7)) : r === 'mes' ? new Date(h.getFullYear(), h.getMonth(), 1) : h;
+      $('.rmd-mm-desde').value = iso(d0); $('.rmd-mm-hasta').value = iso(r === 'ayer' ? d0 : h); buscar();
+    });
+    resumen.addEventListener('click', (e) => { const b = e.target.closest('button[data-g]'); if (!b) return; filtro = b.dataset.g === filtro ? '' : b.dataset.g; pintar(); });
+    caja.addEventListener('click', (e) => { const b = e.target.closest('button[data-cod]'); if (!b || trabajando) return; v.cerrar(); abrirRmdPorCodigo(b.dataset.cod, 'configurar', b.dataset.ver || undefined); });
+    const bBuscar = botonModal('Buscar', 'primario', buscar);
+    const bXls = botonModal('Exportar Excel', '', async () => {
+      const lista = items.filter((x) => !filtro || x.grupo === filtro); if (!lista.length) return;
+      const xl = misMovExcel(lista, usuarioVisible(usuario), $('.rmd-mm-desde').value, $('.rmd-mm-hasta').value); descargarArchivo(xl.nombre, await xl.libro.generar(), TIPO_XLSX);
+    });
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bXls, bBuscar);
+    window.__rmdStats.misMovimientos = { armar: misMovArmar, leer: (u, d, h) => misMovLeer(modelo, u, d, h, () => {}), buscar };
+    buscar();
+  }
+  window.__rmdStats.abrirMisMovimientos = abrirMisMovimientos;   // pruebas
   async function abrirUltimaVersion() {
     if (window.__rmdUltimaVersion) return;
     const ctrl = controladorPrincipal(), modelo = modeloListaPrincipal(); if (!modelo || !ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
@@ -8769,6 +8943,7 @@
     const opciones = [
       [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
       on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
+      on('mismov') && [ic('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/>'), 'Mis movimientos', 'Los RMD en los que hiciste algo (hoy o entre fechas) y su status', () => abrirMisMovimientos()],
       on('vbversiones') && [ic('<path d="M2.5 8.5l3 3 3-3.5"/><path d="M8 11.5l2 2 4-6"/><path d="M2.5 3.5h6M2.5 6h4"/>'), 'V°B° última vs. penúltima', 'RMD trabajados en un mes: V°B° de su última versión frente a la penúltima', () => abrirVbVersiones()],
       on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
       on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
@@ -9393,7 +9568,7 @@
       const h = libro.hoja('Modificaciones masivas', { activa: true, congelar: 'B2', cols: [13, 9, 44, 17, 16, 24, 14, 20, 14, 14, 40, 40, 70, 18, 28].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'ModificacionesMasivas', ref: `A1:O${Math.max(2, resultados.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
       resultados.forEach((x, i) => { const m = x.md || {};
-        [x.codigo, m.version, m.descripcion, m.codDefectoReceta, m.nivelTxt, m.areaRmdTxt, m.sucursalId && m.sucursalId.contenido, x.modo, x.estadoAntes, x.estadoDespues, x.resultado, x.motivo, x.obs, x.fecha, x.usuario]
+        [x.codigo, m.version, m.descripcion, m.codDefectoReceta, m.nivelTxt, m.areaRmdTxt, m.sucursalId && m.sucursalId.contenido, x.modo, x.estadoAntes, x.estadoDespues, x.resultado, x.motivo, x.obs, x.fecha, usuarioVisible(x.usuario)]
           .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, c === 13 ? new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), val.getHours(), val.getMinutes())) : val, c === 12 ? 'envuelto' : c === 13 ? 'fechaHora' : 'normal'); }); });
       descargarArchivo(`Modificaciones masivas RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())} ${dd(hoy.getHours())}${dd(hoy.getMinutes())}.xlsx`, await libro.generar(), TIPO_XLSX);
     });
@@ -10512,8 +10687,8 @@
   // destinatariosMD (DJEFPROD, DGERPROD); nombre desde USUARIO.
   const nombresUsuario = new Map(); let pidiendoUsuarios = null;
   function nombreDe(u) {                                                 // { completo, corto }
-    const completo = norm([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' ')) || norm(u.nombreMostrar || u.usuario || '');
-    return { completo, corto: norm([String(u.nombre || '').trim().split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
+    const completo = norm(usuarioVisible([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' '))) || norm(usuarioVisible(u.nombreMostrar || u.usuario || ''));
+    return { completo, corto: norm([usuarioVisible(String(u.nombre || '')).trim().split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
   }
   function pedirUsuarios(modelo, ids) {
     const faltan = ids.filter((id) => !nombresUsuario.has(id)); if (!faltan.length || pidiendoUsuarios) return;
@@ -11216,6 +11391,7 @@
       lista && on('suspension') && ['Modificaciones masivas', 'Suspender varios master o agregarles una observación', () => abrirModificacionesMasivas('suspender')],
       lista && on('suspension') && ['Observación masiva', 'Agregar una línea a las Observaciones de varios master', () => abrirModificacionesMasivas('observacion')],
       lista && on('exportar') && ['Exportar…', 'Exportado original, Equipos por master, Indicadores, Documentos citados', () => { const b = botonExportar(); const c = b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); if (c) c.firePress(); }],
+      lista && on('mismov') && ['Mis movimientos', 'Los RMD en los que hiciste algo hoy (o entre fechas) y su status: Ingresado, Autorizado o Suspendido', () => abrirMisMovimientos()],
       lista && on('equipos') && ['Equipos por master', 'Excel de todos los master con sus equipos', () => abrirEquiposPorMaster()],
       lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       lista && on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada documento', () => abrirCitasDeTodos()],
@@ -13124,7 +13300,7 @@
   function verHistorialAcuerdo(a) {
     const v = ventana(`Historial — ${a.titulo || 'acuerdo'}`, { cancelar: () => v.cerrar() });
     const h = a.historial.slice().reverse();
-    v.cuerpo.innerHTML = h.length ? `<table class="rmd-tabla"><thead><tr><th>Fecha</th><th>Quién</th><th>Qué</th></tr></thead><tbody>${h.map((x) => `<tr><td>${esc(fechaHoraCorta(x.fecha))}</td><td>${esc(x.por)}</td><td>${esc(x.accion)}</td></tr>`).join('')}</tbody></table>` : '<p>Sin historial.</p>';
+    v.cuerpo.innerHTML = h.length ? `<table class="rmd-tabla"><thead><tr><th>Fecha</th><th>Quién</th><th>Qué</th></tr></thead><tbody>${h.map((x) => `<tr><td>${esc(fechaHoraCorta(x.fecha))}</td><td>${esc(usuarioVisible(x.por))}</td><td>${esc(x.accion)}</td></tr>`).join('')}</tbody></table>` : '<p>Sin historial.</p>';
     v.pie.append(botonModal('Cerrar', 'primario', () => v.cerrar()));
   }
 
@@ -14294,12 +14470,12 @@
     };
     const cambios = e.cambios || [], hist = (e.post || []).map((f) => [f[0], f[1], utc(f[2]), f[3], f[4], f[5], f[6]]);
     (e.historial || []).forEach((h) => h.entradas.forEach((x) => {
-      if (x.cambios.length) x.cambios.forEach((c) => hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : 'Guardado', utc(x.ts), x.usuario, c.campo, c.antes, c.despues]));
-      else hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : x.primero ? 'Primer guardado registrado' : 'Guardado sin cambios', utc(x.ts), x.usuario, '', '', '']);
+      if (x.cambios.length) x.cambios.forEach((c) => hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : 'Guardado', utc(x.ts), usuarioVisible(x.usuario), c.campo, c.antes, c.despues]));
+      else hist.push([h.rotulo, x.accion === 'CREATE' ? 'Alta' : x.primero ? 'Primer guardado registrado' : 'Guardado sin cambios', utc(x.ts), usuarioVisible(x.usuario), '', '', '']);
     }));
-    tabla('Historia del producto', 'HistoriaProducto', ['Código', 'Versión', 'Estado', 'Descripción', 'Etapa', 'Planta', 'Versión origen', 'Registrada', 'Usuario', 'Observaciones'], [14, 9, 16, 60, 18, 18, 14, 17, 18, 80], (e.versiones || []).map((v) => [v.codigo, v.version, v.estado, v.descripcion, v.etapa, v.planta, v.origen, utc(v.fecha), v.usuario, v.obs || '']), { 7: 'fechaHora', 9: 'envuelto' });
+    tabla('Historia del producto', 'HistoriaProducto', ['Código', 'Versión', 'Estado', 'Descripción', 'Etapa', 'Planta', 'Versión origen', 'Registrada', 'Usuario', 'Observaciones'], [14, 9, 16, 60, 18, 18, 14, 17, 18, 80], (e.versiones || []).map((v) => [v.codigo, v.version, v.estado, v.descripcion, v.etapa, v.planta, v.origen, utc(v.fecha), usuarioVisible(v.usuario), v.obs || '']), { 7: 'fechaHora', 9: 'envuelto' });
     tabla('Diferencia entre versiones', 'CambiosEntreVersiones', ['Sección', 'Elemento', 'Cambio', 'Campo', 'Antes', 'Después', 'Solo cambia el orden', 'Usuario de la fila', 'Fecha de la fila', 'Usuario de la fila es de'],
-      [16, 70, 13, 22, 34, 34, 12, 16, 17, 22], cambios.map((c) => [c.seccion, c.elemento, c.tipo, c.campo, c.antes, c.despues, c.soloOrden ? 'Sí' : '', c.quien, utc(c.cuando), c.tipo === 'Quitado' ? (c.quitadoPor ? (c.porCambioDePaso ? 'quien cambió el paso de la fila' : 'quien lo quitó') : '') : c.alAutorizar ? 'el registro al autorizar (no necesariamente quien editó)' : c.modificado ? 'la última modificación' : 'el registro'])
+      [16, 70, 13, 22, 34, 34, 12, 16, 17, 22], cambios.map((c) => [c.seccion, c.elemento, c.tipo, c.campo, c.antes, c.despues, c.soloOrden ? 'Sí' : '', usuarioVisible(c.quien), utc(c.cuando), c.tipo === 'Quitado' ? (c.quitadoPor ? (c.porCambioDePaso ? 'quien cambió el paso de la fila' : 'quien lo quitó') : '') : c.alAutorizar ? 'el registro al autorizar (no necesariamente quien editó)' : c.modificado ? 'la última modificación' : 'el registro'])
         .concat((e.revertidos || []).map((f) => [f[0], f[1], f[2], f[3], f[4], f[5], '', f[6], utc(f[7]), 'quien hizo ese cambio'])), { 1: 'envuelto', 4: 'envuelto', 5: 'envuelto', 8: 'fechaHora' }, { activa: true });
     tabla('Historial post autorización', 'HistorialGuardados', ['Fila', 'Evento', 'Fecha y hora', 'Usuario', 'Campo', 'Antes', 'Después'], [70, 24, 17, 16, 30, 40, 40], hist, { 0: 'envuelto', 2: 'fechaHora', 5: 'envuelto', 6: 'envuelto' });
     tabla('Estados', 'EstadosRmd', ['Estado', 'Registrado', 'Usuario'], [30, 20, 18], (e.estados || []).map((x) => [x[0], x[1], x[2]]));
@@ -14344,7 +14520,7 @@
         filas.push([etiqueta(c.tipo), { text: [{ text: sinFlecha(c.elemento), bold: true }, c.campo && !['Paso', 'Proceso menor', 'Etiqueta', 'Receta', 'Insumo', 'Especificación'].includes(c.campo) ? { text: `\n${c.campo}`, color: '#555', fontSize: 7 } : ''], fontSize: 7.5 },
           { text: sinFlecha(c.antes), fontSize: 7.5, decoration: c.antes && (c.tipo === 'Quitado' || c.tipo === 'Reemplazado' || c.tipo === 'Modificado') ? 'lineThrough' : undefined, color: c.antes ? '#6b6b6b' : '#000' },
           { text: sinFlecha(c.despues), fontSize: 7.5, bold: !!c.despues },
-          { text: [c.quien || '', c.cuando ? `\n${fecha(c.cuando)}` : ''].join(''), fontSize: 6.5, color: '#555' }].map((x, i) => (i === 0 ? { ...x, fillColor: col[1] } : x)));
+          { text: [usuarioVisible(c.quien), c.cuando ? `\n${fecha(c.cuando)}` : ''].join(''), fontSize: 6.5, color: '#555' }].map((x, i) => (i === 0 ? { ...x, fillColor: col[1] } : x)));
       });
       cuerpo.push({ text: sec.toUpperCase(), bold: true, fontSize: 9.5, margin: [0, 6, 0, 3] });
       cuerpo.push({ table: { headerRows: 1, widths: [58, 200, '*', '*', 62], body: filas, dontBreakRows: true }, layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000', paddingTop: () => 2, paddingBottom: () => 2 }, margin: [0, 0, 0, 6] });
@@ -14839,9 +15015,9 @@
     const fecha = (t) => { const x = t ? new Date(t) : null, d = (n) => String(n).padStart(2, '0'); return x && !isNaN(x) ? `${d(x.getDate())}/${d(x.getMonth() + 1)}/${x.getFullYear()} ${d(x.getHours())}:${d(x.getMinutes())}` : ''; };
     const vis = (x) => tzPostVisible(x, verOrden), cuerpo = [], AZUL = '#0a6ed1', linea = '#d5dadd';
     const marca = (x) => { const c = tzPostClase(x); if (!c || !vis(x)) return ''; const col = TZ_POST_PDF[c];
-      return { stack: [{ text: TZ_POST_TXT[c].toUpperCase(), bold: true, fontSize: 6.5, color: col[0] }, { text: [x.quien, fecha(x.cuando)].filter(Boolean).join('\n'), fontSize: 6.3, color: '#5b6b7b' }], alignment: 'right' }; };
+      return { stack: [{ text: TZ_POST_TXT[c].toUpperCase(), bold: true, fontSize: 6.5, color: col[0] }, { text: [usuarioVisible(x.quien), fecha(x.cuando)].filter(Boolean).join('\n'), fontSize: 6.3, color: '#5b6b7b' }], alignment: 'right' }; };
     const detalle = (x) => (!vis(x) || !x.entradas || !x.entradas.length ? [] : x.entradas.filter((y) => verOrden || !y.soloOrden).flatMap((y) => y.cambios.map((c, i) => ({ text: [
-      { text: i ? '' : `${fecha(y.ts)} · ${y.usuario || 'portal'} — `, color: '#5b6b7b' }, { text: `${c.campo}: `, bold: true }, { text: sin(c.antes), decoration: c.antes && !/^\(/.test(c.antes) ? 'lineThrough' : undefined, color: '#7a7a7a' }, '  >  ', { text: sin(c.despues), bold: true }], fontSize: 6.8, margin: [0, 1, 0, 0] }))));
+      { text: i ? '' : `${fecha(y.ts)} · ${usuarioVisible(y.usuario) || 'portal'} — `, color: '#5b6b7b' }, { text: `${c.campo}: `, bold: true }, { text: sin(c.antes), decoration: c.antes && !/^\(/.test(c.antes) ? 'lineThrough' : undefined, color: '#7a7a7a' }, '  >  ', { text: sin(c.despues), bold: true }], fontSize: 6.8, margin: [0, 1, 0, 0] }))));
     const fila = (num, x, texto, sangria) => { const c = vis(x) ? tzPostClase(x) : null, fill = c ? TZ_POST_PDF[c][1] : undefined;
       return [{ text: num, fontSize: 7.5, color: '#5b6b7b', alignment: sangria ? 'right' : 'left', fillColor: fill },
         { stack: [{ text: texto, fontSize: 7.5, decoration: c === 'quitado' ? 'lineThrough' : undefined, color: c === 'quitado' ? TZ_POST_PDF.quitado[0] : '#1d2d3e', margin: [sangria ? 12 : 0, 0, 0, 0] }, ...detalle(x).map((d) => ({ ...d, margin: [sangria ? 12 : 0, 1, 0, 0] }))], fillColor: fill },
@@ -14960,21 +15136,21 @@
     }
     const textoNodo = (x) => (x.ent === 'estr' || x.ent === 'etq' ? x.nombre : x.ent === 'eq' || x.ent === 'ut' ? `${x.texto}${x.ref ? ' · ' + x.ref : ''}` : x.ent === 'esp' ? `${x.texto}${x.detalle ? ': ' + x.detalle : ''}` : x.ent === 'ins' ? `${x.texto} · ${x.detalle}` : x.texto);
     function htmlDetallePost(x) {
-      const quien = `${esc(x.quien || '—')}${x.cuando ? ', ' + esc(tzCuando(new Date(x.cuando))) : ''}`;
+      const quien = `${esc(usuarioVisible(x.quien) || '—')}${x.cuando ? ', ' + esc(tzCuando(new Date(x.cuando))) : ''}`;
       const base = x.marca === 'agregado' ? `<p class="rmd-nota">Agregado después de autorizar (${quien}).</p>` : x.marca === 'quitado' ? `<p class="rmd-nota">Quitado después de autorizar (${quien}).</p>` : '';
       if (x.aud !== 'listo') return base + (x.aud === 'error' ? `<p class="rmd-progreso error">No se pudo leer la auditoría: ${esc(x.error)}</p>` : '<p class="rmd-progreso rmd-espera-mini">Leyendo la auditoría…</p>');
       const es = x.entradas.filter((y) => E.paOrden || !y.soloOrden);
       if (!es.length) return base + (x.marca === 'modificado' ? `<p class="rmd-nota">${x.entradas.length ? 'Solo cambió el orden, por un paso agregado o quitado antes.' : 'Se guardó sin cambiar ningún dato.'}</p>` : '');
-      return base + (x.estado === 'revertido' ? '<p class="rmd-nota">Terminó igual que como estaba al autorizar.</p>' : '') + `<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${es.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${esc(y.usuario || 'portal')}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
+      return base + (x.estado === 'revertido' ? '<p class="rmd-nota">Terminó igual que como estaba al autorizar.</p>' : '') + `<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${es.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${esc(usuarioVisible(y.usuario) || 'portal')}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
     }
-    const quienCuando = (q, c) => `${q ? esc(q) : 'sin usuario registrado'}${c ? ', ' + esc(tzCuando(new Date(c))) : ''}`;
+    const quienCuando = (q, c) => `${q ? esc(usuarioVisible(q)) : 'sin usuario registrado'}${c ? ', ' + esc(tzCuando(new Date(c))) : ''}`;
     function htmlRevertido(x) {
       const alta = x.recreado ? `<p class="rmd-nota">Esta fila se volvió a agregar (${quienCuando(x.alta && x.alta.quien, x.alta && x.alta.cuando)})${x.bajaAnterior ? `; la que venía de la versión anterior se quitó (${quienCuando(x.bajaAnterior.quien, x.bajaAnterior.cuando)})` : ''}. SAP no guarda con qué datos se agregó: lo que sigue sale de sus guardados.</p>` : '';
-      return `<p class="rmd-nota">Quedó igual que en la versión anterior, pero cambió mientras se editaba esta versión:</p>${alta}<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${x.entradas.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${y.usuario ? esc(y.usuario) : '<span class="rmd-nota">sin usuario registrado</span>'}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
+      return `<p class="rmd-nota">Quedó igual que en la versión anterior, pero cambió mientras se editaba esta versión:</p>${alta}<table class="rmd-tabla rmd-pa-t"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>${x.entradas.map((y) => y.cambios.map((c, i) => `<tr>${i ? '<td></td><td></td>' : `<td class="rmd-nowrap">${esc(tzCuando(y.ts))}</td><td class="rmd-nowrap">${y.usuario ? esc(usuarioVisible(y.usuario)) : '<span class="rmd-nota">sin usuario registrado</span>'}</td>`}<td>${esc(c.campo)}</td><td class="rmd-tz-antes">${esc(c.antes)}</td><td class="rmd-tz-desp">${esc(c.despues)}</td></tr>`).join('')).join('')}</tbody></table>`;
     }
     function htmlDetalleDif(x) {
       if (x.marca === 'revertido') return htmlRevertido(x);
-      const es = (x.difs || []).filter((c) => E.paOrden || !c.soloOrden), fila = x.quien ? ` Usuario y fecha de la fila: ${esc(x.quien)}${x.cuando ? ', ' + esc(tzCuando(new Date(x.cuando))) : ''}${x.alAutorizar ? ' (al autorizar: no necesariamente quien editó)' : ''}.` : '';
+      const es = (x.difs || []).filter((c) => E.paOrden || !c.soloOrden), fila = x.quien ? ` Usuario y fecha de la fila: ${esc(usuarioVisible(x.quien))}${x.cuando ? ', ' + esc(tzCuando(new Date(x.cuando))) : ''}${x.alAutorizar ? ' (al autorizar: no necesariamente quien editó)' : ''}.` : '';
       if (x.marca === 'agregado') return `<p class="rmd-nota">Nuevo en esta versión${x.heredado ? ', con su paso' : ''}.${fila}</p>`;
       if (x.marca === 'quitado') return `<p class="rmd-nota">Estaba en la versión anterior${x.numQ && x.numQ !== '-' ? ` (${esc(x.numQ)})` : ''} y se quitó${x.heredado ? ' con su paso o etiqueta' : ''}${x.porCambioDePaso ? ' al cambiar el paso de esa fila por otro' : ''}${x.quien || x.cuando ? ` (${quienCuando(x.quien, x.cuando)})` : ''}.</p>`;
       if (!es.length) return `<p class="rmd-nota">Solo cambió el orden, por un paso agregado o quitado antes.${fila}</p>`;
@@ -14986,7 +15162,7 @@
       const coincide = (x) => !q || SIN_ACENTOS([textoNodo(x), x.codigo, x.quien, ...(x.entradas || []).flatMap((y) => [y.usuario, ...y.cambios.map((c) => `${c.campo} ${c.antes} ${c.despues}`)]), ...(x.difs || []).map((c) => `${c.campo} ${c.antes} ${c.despues}`)].join(' ')).includes(q);
       const item = (x, num, nivel) => {
         const c = vis(x) ? tzPostClase(x) : null, ab = !!c && E.paAbiertos.has(x.id);
-        const tag = c ? `<span class="rmd-pa-tag ${c}">${TZ_POST_TXT[c]}</span>${x.quien || x.cuando ? `<span class="rmd-pa-quien">${esc(x.quien || '—')}${x.cuando ? ' · ' + esc(tzCuando(new Date(x.cuando))) : ''}</span>` : ''}` : '';
+        const tag = c ? `<span class="rmd-pa-tag ${c}">${TZ_POST_TXT[c]}</span>${x.quien || x.cuando ? `<span class="rmd-pa-quien">${esc(usuarioVisible(x.quien) || '—')}${x.cuando ? ' · ' + esc(tzCuando(new Date(x.cuando))) : ''}</span>` : ''}` : '';
         const cod = x.codigo && !['eq', 'ut', 'ins'].includes(x.ent) ? `<span class="rmd-pa-cod">${esc(x.codigo)}</span>` : '';
         return `<div class="rmd-pa-item ${nivel}${c ? ' cambio ' + c : ''}${ab ? ' abierto' : ''}" data-id="${esc(x.id)}"><div class="rmd-pa-cab"${c ? ` data-a="pa-abrir" role="button" tabindex="0" aria-expanded="${ab}" title="Ver qué cambió"` : ''}><span class="rmd-pa-num">${esc(num)}</span><span class="rmd-pa-tx">${esc(textoNodo(x))}${cod}</span><span class="rmd-pa-marca">${tag}</span><span class="rmd-pa-chev" aria-hidden="true">${c ? '›' : ''}</span></div>${ab ? `<div class="rmd-pa-det">${detalle(x)}</div>` : ''}</div>`;
       };
@@ -15025,13 +15201,13 @@
     }
     const TZ_REV_SECCION = { etq: 'Etiquetas', paso: 'Pasos', pm: 'Procesos menores', esp: 'Especificaciones' };
     const filasRevExcel = () => (E.dif && E.rev && E.rev.fase === 'listo' ? tzPostNodos(E.dif.arbol).filter((x) => x.marca === 'revertido').flatMap((x) => x.entradas.flatMap((y) => y.cambios.map((c) =>
-      [TZ_REV_SECCION[x.ent] || '', `${x.lugar ? x.lugar + ' › ' : ''}${textoNodo(x)}${x.codigo ? ' (' + x.codigo + ')' : ''}`.replace(/\s+/g, ' ').trim(), TZ_POST_TXT.revertido, c.campo, c.antes, c.despues, y.usuario, y.ts]))) : []);
+      [TZ_REV_SECCION[x.ent] || '', `${x.lugar ? x.lugar + ' › ' : ''}${textoNodo(x)}${x.codigo ? ' (' + x.codigo + ')' : ''}`.replace(/\s+/g, ' ').trim(), TZ_POST_TXT.revertido, c.campo, c.antes, c.despues, usuarioVisible(y.usuario), y.ts]))) : []);
     const filasPostExcel = () => {
       const P = E.post; if (!P || !P.items) return null; const A = P.arbol, out = [];
       P.items.forEach((x) => { const c = tzPostClase(x); if (!c) return;
         const donde = `${x.lugar ? x.lugar + ' › ' : ''}${A.num.get(x.id) || A.num.get(x.padreId) || ''} ${textoNodo(x)}${x.codigo ? ' (' + x.codigo + ')' : ''}`.replace(/\s+/g, ' ').trim();
-        if (!(x.entradas || []).length) out.push([donde, TZ_POST_TXT[c], x.cuando ? new Date(x.cuando) : '', x.quien, '', '', '']);
-        (x.entradas || []).forEach((y) => y.cambios.forEach((ch) => out.push([donde, y.soloOrden ? TZ_POST_TXT.orden : TZ_POST_TXT[c], y.ts, y.usuario, ch.campo, ch.antes, ch.despues]))); });
+        if (!(x.entradas || []).length) out.push([donde, TZ_POST_TXT[c], x.cuando ? new Date(x.cuando) : '', usuarioVisible(x.quien), '', '', '']);
+        (x.entradas || []).forEach((y) => y.cambios.forEach((ch) => out.push([donde, y.soloOrden ? TZ_POST_TXT.orden : TZ_POST_TXT[c], y.ts, usuarioVisible(y.usuario), ch.campo, ch.antes, ch.despues]))); });
       return out;
     };
     async function pdfPost() {
@@ -15063,7 +15239,7 @@
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
       if (!E.linaje) return `<p class="rmd-progreso rmd-espera" data-orbe="searching">${esc(E.cargando || 'Leyendo las versiones del RMD…')}</p>`;
       const f = historiaProducto(), act = E.linaje.actual;
-      return `${ficha(act)}<p class="rmd-tz-resumen">Las versiones del producto, de la última a la primera, con sus observaciones de «Asociar fórmulas» (sin las canceladas). «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Versión origen</th><th>Registrada</th><th class="rmd-tz-obs-col">Observaciones</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td><span class="rmd-nowrap">${esc(x.codigo)}</span>${norm(x.descripcion) !== norm(act.descripcion) ? `<br><span class="rmd-nota">${esc(x.descripcion)}</span>` : ''}</td><td class="rmd-tz-num">v${esc(x.version)}</td><td class="rmd-nowrap"><span class="rmd-tz-est ${SIN_ACENTOS(x.estado || '').toLowerCase()}">${esc(x.estado)}</span></td><td class="rmd-nowrap">${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? `<br><span class="rmd-nota">${esc(x.usuario)}</span>` : ''}</td><td class="rmd-tz-obs-col">${htmlObs(x.obs)}</td><td class="rmd-nowrap">${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
+      return `${ficha(act)}<p class="rmd-tz-resumen">Las versiones del producto, de la última a la primera, con sus observaciones de «Asociar fórmulas» (sin las canceladas). «Ver diferencias» compara la versión con su origen.</p>${f.length ? `<table class="rmd-tabla rmd-tz-t rmd-tz-vers"><thead><tr><th>Código</th><th>Versión</th><th>Estado</th><th>Versión origen</th><th>Registrada</th><th class="rmd-tz-obs-col">Observaciones</th><th></th></tr></thead><tbody>${f.map((x) => `<tr class="${x.mdId === act.mdId ? 'rmd-tz-actual' : ''}"><td><span class="rmd-nowrap">${esc(x.codigo)}</span>${norm(x.descripcion) !== norm(act.descripcion) ? `<br><span class="rmd-nota">${esc(x.descripcion)}</span>` : ''}</td><td class="rmd-tz-num">v${esc(x.version)}</td><td class="rmd-nowrap"><span class="rmd-tz-est ${SIN_ACENTOS(x.estado || '').toLowerCase()}">${esc(x.estado)}</span></td><td class="rmd-nowrap">${esc(x.origen || '—')}</td><td class="rmd-nowrap">${esc(tzCuando(x.fecha))}${x.usuario ? `<br><span class="rmd-nota">${esc(usuarioVisible(x.usuario))}</span>` : ''}</td><td class="rmd-tz-obs-col">${htmlObs(x.obs)}</td><td class="rmd-nowrap">${x.origen ? `<button type="button" class="rmd-link" data-a="difver" data-id="${esc(x.mdId)}">Ver diferencias</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="rmd-nota">Sin datos</p>'}`;
     }
     function htmlVersiones() {
       if (E.error) return `<p class="rmd-progreso error">${esc(E.error)}</p>`;
@@ -17011,9 +17187,9 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   async function ppEstadoFechaPor(modelo, md) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, f = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : ''; };
     let fecha = '', por = '';
-    if (+md.estadoIdRmd_iMaestraId === 465) { fecha = f(md.fechaAutorizacion); por = norm(md.usuarioAutorizacion); }
+    if (+md.estadoIdRmd_iMaestraId === 465) { fecha = f(md.fechaAutorizacion); por = norm(usuarioVisible(md.usuarioAutorizacion)); }
     else { const tr = (await leerTodoDe(modelo, 'MD_TRAZABILIDAD', [new F('mdId_mdId', 'EQ', md.mdId)], { $orderby: 'idTrazabilidad' }).catch(() => [])).filter((x) => x.activo !== false).sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro));
-      if (tr[0]) { fecha = f(tr[0].fechaRegistro); por = norm(tr[0].usuarioRegistro); } }
+      if (tr[0]) { fecha = f(tr[0].fechaRegistro); por = norm(usuarioVisible(tr[0].usuarioRegistro)); } }
     return `${md.estado || ''}/ ${fecha} /${por}`;
   }
   // logo del encabezado (controller/table.js, «var E»)
@@ -17899,7 +18075,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);
     if (an.enSap.length) { bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
-      try { await ppDiarioCargar(); const g = PP_MARCAS.ingresos.find((y) => y.mdId === dest.mdId && y.borrador && y.borrador === prop.guardado && !y.deshecho); if (g) bloqueos.push(`Parece que este mismo borrador ya se ingresó el ${new Date(g.fecha).toLocaleString('es-PE')}${g.usuario ? ' (' + g.usuario + ')' : ''}.`); } catch (e) { /* sin diario */ } }
+      try { await ppDiarioCargar(); const g = PP_MARCAS.ingresos.find((y) => y.mdId === dest.mdId && y.borrador && y.borrador === prop.guardado && !y.deshecho); if (g) bloqueos.push(`Parece que este mismo borrador ya se ingresó el ${new Date(g.fecha).toLocaleString('es-PE')}${g.usuario ? ' (' + usuarioVisible(g.usuario) + ')' : ''}.`); } catch (e) { /* sin diario */ } }
     const errores = [...an.avisos.values()].flat().filter((a) => a.nivel === 'error').length; if (errores) bloqueos.push(`El borrador tiene ${errores} dato(s) por corregir marcados con ✕.`);
     if (!an.cambios.length) bloqueos.push('El borrador no trae cambios.');
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
