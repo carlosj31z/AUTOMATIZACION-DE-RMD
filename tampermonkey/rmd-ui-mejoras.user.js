@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.116.0
+// @version      1.117.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.116.0';                                                       // mantener igual a @version
+  const VERSION = '1.117.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -83,6 +83,7 @@
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
+    ['mismov', 'Mis movimientos', 'En el menú Exportar y en Ctrl+K: los RMD en los que hiciste algún movimiento en SAP (hoy por defecto, o entre dos fechas) con su status de hoy (Ingresado, Autorizado o Suspendido), y su Excel.'],
     ['vbversiones', 'V°B° última vs. penúltima', 'En el menú Exportar: Excel de los RMD trabajados en un mes (Ate y Lima) con los V°B° de su última versión frente a la penúltima, la diferencia y un resumen por planta y etapa (como el comando vb-mes).'],
     ['ultimaversion', 'Última versión de cada master', 'Excel de los Autorizados, Ingresados y Suspendidos (su última versión) con sus Observaciones y un resumen por producto.'],
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
@@ -664,6 +665,16 @@
     background: color-mix(in srgb, currentColor 9%, transparent); font: 600 12px/16px var(--rmd-fuente); letter-spacing: .1px; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
   .rmd-estado-punto { position: relative; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
   .rmd-estado-sub { padding-left: 7px; border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent); font-weight: 400; font-size: 11.5px; opacity: .85; }
+  /* Mis movimientos */
+  .rmd-mismov-fechas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0; } .rmd-mismov-fechas label { display: inline-flex; align-items: center; gap: 6px; }
+  .rmd-mismov-atajos { font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-mismov-resumen { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+  .rmd-mismov-chip { padding: 3px 10px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); border-radius: 999px; background: transparent; color: var(--rmd-texto, inherit); font: 500 12.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-mismov-chip.ingresado { color: var(--rmd-acento-texto); } .rmd-mismov-chip.autorizado { color: var(--rmd-verde); } .rmd-mismov-chip.suspendido { color: var(--rmd-ambar); } .rmd-mismov-chip.otros { color: var(--rmd-apagado); }
+  .rmd-mismov-chip[aria-pressed="true"] { background: color-mix(in srgb, currentColor 14%, transparent); border-color: currentColor; }
+  .rmd-mismov-estado { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: color-mix(in srgb, currentColor 9%, transparent); font-weight: 600; font-size: 12px; }
+  .rmd-mismov-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-mismov-estado.autorizado { color: var(--rmd-verde); } .rmd-mismov-estado.suspendido { color: var(--rmd-ambar); } .rmd-mismov-estado.otros { color: var(--rmd-apagado); }
+  .rmd-mismov-ver, .rmd-mismov-sub { color: var(--rmd-apagado); font-size: 12px; }
   .rmd-estado.ingresado { color: var(--rmd-acento-texto); } .rmd-estado.autorizado { color: var(--rmd-verde); } .rmd-estado.suspendido { color: var(--rmd-ambar); } .rmd-estado.otro { color: var(--rmd-apagado); }
 
   /* ── Título del PM: máx. 2 líneas ── */
@@ -8677,6 +8688,164 @@
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
     window.__rmdStats.vbVersiones = { armar: vbArmarFilas, excel: vbExcel, generar: () => bGen.click() };
   }
+  // ---- Mis movimientos: los RMD en los que el usuario del portal hizo algo entre dos fechas, con su status de hoy ----
+  // Fuentes (solo lectura): MD (registro, actualización y autorización), MD_TRAZABILIDAD (cambios de estado) y las filas de la estructura
+  // (pasos, procesos menores, etiquetas, equipos, utensilios, especificaciones, insumos y recetas) con usuarioRegistro/usuarioActualiza.
+  // ==MISMOV-INICIO==
+  const MISMOV_TABLAS = [
+    ['MD_ESTRUCTURA', 'mdEstructuraId', 'estructura', 'estructuras'], ['MD_ES_ETIQUETA', 'mdEsEtiquetaId', 'etiqueta', 'etiquetas'],
+    ['MD_ES_PASO', 'mdEstructuraPasoId', 'paso', 'pasos'], ['MD_ES_PASO_INSUMO_PASO', 'mdEstructuraPasoInsumoPasoId', 'proceso menor', 'procesos menores'],
+    ['MD_ES_EQUIPO', 'mdEstructuraEquipoId', 'equipo', 'equipos'], ['MD_ES_UTENSILIO', 'mdEstructuraUtensilioId', 'utensilio', 'utensilios'],
+    ['MD_ES_ESPECIFICACION', 'mdEstructuraEspecificacionId', 'especificación', 'especificaciones'], ['MD_ES_RE_INSUMO', 'estructuraRecetaInsumoId', 'insumo', 'insumos'],
+    ['MD_RECETA', 'mdRecetaId', 'receta', 'recetas']];
+  const MISMOV_GRUPOS = ['Ingresado', 'Autorizado', 'Suspendido', 'Otros'];
+  const misMovGrupo = (estado) => (/^ingres/i.test(estado) ? 'Ingresado' : /^autoriz/i.test(estado) ? 'Autorizado' : /^suspend/i.test(estado) ? 'Suspendido' : 'Otros');
+  // { usuario, desde, hasta (ms, [desde, hasta)), mds: MD con estadoIdRmd/sucursalId, traz: MD_TRAZABILIDAD, filas: { entidad: filas } }
+  // → [{ mdId, codigo, version, producto, etapa, planta, estado, grupo, acciones: [texto], primero, ultimo }] del más reciente al más antiguo
+  function misMovArmar({ usuario, desde, hasta, mds, traz, filas }) {
+    const u = String(usuario || '').trim().toUpperCase(), mio = (x) => String(x || '').trim().toUpperCase() === u;
+    const ms = (v) => { const d = v instanceof Date ? v : v ? new Date(v) : null; return d && !isNaN(d) ? d.getTime() : 0; };
+    const dentro = (t) => t >= desde && t < hasta;
+    const porMd = new Map(), de = (mdId) => { if (!porMd.has(mdId)) porMd.set(mdId, { ts: [], estados: [], creada: 0, autorizo: 0, actualizo: 0, conteo: new Map() }); return porMd.get(mdId); };
+    const mdPorId = new Map((mds || []).map((m) => [m.mdId, m]));
+    mdPorId.forEach((m, id) => {
+      const tR = ms(m.fechaRegistro), tA = ms(m.fechaActualiza), tZ = ms(m.fechaAutorizacion);
+      if (mio(m.usuarioRegistro) && dentro(tR)) { const x = de(id); x.creada = tR; x.ts.push(tR); }
+      if (mio(m.usuarioAutorizacion) && dentro(tZ)) { const x = de(id); x.autorizo = tZ; x.ts.push(tZ); }
+      if (mio(m.usuarioActualiza) && dentro(tA)) { const x = de(id); x.actualizo = tA; x.ts.push(tA); }
+    });
+    (traz || []).forEach((t) => {
+      const tR = ms(t.fechaRegistro), e = String((t.estadoTrazab && t.estadoTrazab.contenido) || '').replace(/\s+/g, ' ').trim();
+      if (!t || t.activo === false || !mio(t.usuarioRegistro) || !dentro(tR) || !e || t.mdId_mdId == null) return;
+      const x = de(t.mdId_mdId); x.estados.push([tR, e]); x.ts.push(tR);
+    });
+    MISMOV_TABLAS.forEach(([ent, , uno, varios]) => (((filas || {})[ent]) || []).forEach((f) => {
+      if (f.mdId_mdId == null) return;
+      const tR = ms(f.fechaRegistro), tA = ms(f.fechaActualiza), m = mdPorId.get(f.mdId_mdId);
+      const alta = mio(f.usuarioRegistro) && dentro(tR), cambio = mio(f.usuarioActualiza) && dentro(tA); if (!alta && !cambio) return;
+      // las filas que copia «Nueva Versión» al crear la versión no son trabajo aparte
+      const copia = alta && m && mio(m.usuarioRegistro) && Math.abs(tR - ms(m.fechaRegistro)) < 15 * 60000;
+      const tipo = f.activo === false ? (alta && !cambio ? null : 'quitados') : alta && !copia ? 'agregados' : cambio ? 'modificados' : null;
+      const x = de(f.mdId_mdId); x.ts.push(cambio ? tA : tR); if (!tipo) return;
+      const k = `${ent}|${tipo}`; x.conteo.set(k, { n: ((x.conteo.get(k) || {}).n || 0) + 1, uno, varios, tipo });
+    }));
+    const out = [];
+    porMd.forEach((x, mdId) => {
+      const m = mdPorId.get(mdId) || { mdId }, estado = String((m.estadoIdRmd && m.estadoIdRmd.contenido) || m.estado || '').trim(), acciones = [];
+      if (x.creada) acciones.push(m.codigo ? `Creó la versión ${m.version != null ? m.version : ''}`.trim() : 'Registró la solicitud');
+      const vistos = new Set();
+      x.estados.sort((a, b) => a[0] - b[0]).forEach(([, e]) => { const t = `Pasó a ${e}`; if (!vistos.has(t)) { vistos.add(t); acciones.push(t); } });
+      if (x.autorizo && !x.estados.some(([, e]) => /^autoriz/i.test(e)) && /^autoriz/i.test(estado)) acciones.push('Autorizó');
+      const orden = { agregados: 0, modificados: 1, quitados: 2 };
+      [...x.conteo.values()].sort((a, b) => orden[a.tipo] - orden[b.tipo]).forEach((c) => {
+        const genero = /^(etiqueta|especificación|receta|estructura)$/.test(c.uno) ? 'a' : 'o';
+        acciones.push(`${c.n} ${c.n === 1 ? c.uno : c.varios} ${c.n === 1 ? c.tipo.replace(/os$/, genero) : c.tipo.replace(/os$/, genero + 's')}`);
+      });
+      if (!acciones.length) acciones.push(x.actualizo ? 'Actualizó los datos del RMD' : 'Movimiento en el RMD');
+      out.push({ mdId, codigo: m.codigo ? String(m.codigo) : '', solicitud: m.codigoSolicitud ? String(m.codigoSolicitud) : '', version: m.version != null ? m.version : '', producto: String(m.descripcion || '').trim(),
+        etapa: String(m.nivelTxt || '').trim(), planta: String((m.sucursalId && m.sucursalId.contenido) || '').trim(), estado: estado || '(sin estado)', grupo: misMovGrupo(estado), acciones,
+        primero: Math.min(...x.ts), ultimo: Math.max(...x.ts) });
+    });
+    return out.sort((a, b) => b.ultimo - a.ultimo);
+  }
+  // ==MISMOV-FIN==
+  async function misMovLeer(modelo, usuario, desde, hasta, avance) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, avisos = [];
+    const rango = (cu, cf) => new F({ filters: [new F(cu, 'EQ', usuario), new F(cf, 'GE', new Date(desde)), new F(cf, 'LT', new Date(hasta))], and: true });
+    const ambos = () => new F({ filters: [rango('usuarioRegistro', 'fechaRegistro'), rango('usuarioActualiza', 'fechaActualiza')], and: false });
+    const leer = async (ent, filtro, params) => {
+      try { return await leerTodoDe(modelo, ent, [filtro], params); }
+      catch (e) { try { return await leerTodoDe(modelo, ent, [filtro], {}); } catch (e2) { avisos.push(`${ent}: ${e2.message || e2}`); return []; } }
+    };
+    const SEL_FILA = 'mdId_mdId,activo,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza';
+    const tareas = [
+      ['md', () => leer('MD', ambos(), { $select: 'mdId' })],
+      ['aut', () => leer('MD', rango('usuarioAutorizacion', 'fechaAutorizacion'), { $select: 'mdId' })],
+      ['traz', () => leer('MD_TRAZABILIDAD', rango('usuarioRegistro', 'fechaRegistro'), { $expand: 'estadoTrazab', $select: 'idTrazabilidad,mdId_mdId,fechaRegistro,usuarioRegistro,activo,estadoTrazab/contenido' })],
+      ...MISMOV_TABLAS.map(([ent, clave]) => [ent, () => leer(ent, ambos(), { $select: `${clave},${SEL_FILA}` })])];
+    const res = {}; let i = 0, hechas = 0;
+    await Promise.all(Array.from({ length: 3 }, async () => { while (i < tareas.length) { const [k, fn] = tareas[i++]; res[k] = await fn(); avance(`Leyendo tus movimientos en SAP… ${++hechas} de ${tareas.length}`); } }));
+    const filas = Object.fromEntries(MISMOV_TABLAS.map(([ent]) => [ent, res[ent] || []]));
+    const ids = [...new Set([...res.md, ...res.aut].map((x) => x.mdId).concat(res.traz.map((x) => x.mdId_mdId), Object.values(filas).flat().map((x) => x.mdId_mdId)).filter((x) => x != null))];
+    let mds = [];
+    if (ids.length) {
+      avance(`Leyendo el status de ${ids.length} RMD…`);
+      mds = await leerPorIds(modelo, 'MD', 'mdId', ids, { $expand: 'estadoIdRmd,sucursalId',
+        $select: 'mdId,codigo,codigoSolicitud,version,descripcion,nivelTxt,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,estadoIdRmd/contenido,sucursalId/contenido' });
+    }
+    return { items: misMovArmar({ usuario, desde, hasta, mds, traz: res.traz, filas }), avisos };
+  }
+  function misMovExcel(items, usuario, dTxt, hTxt) {
+    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento'];
+    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17].map((w, i) => [i + 1, i + 1, w]),
+      tabla: { nombre: 'MisMovimientos', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, items.length + 1)}`, estilo: 'TableStyleMedium2' } });
+    cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
+    const est = { Autorizado: 'estAut', Ingresado: 'estIng', Suspendido: 'estSus' };
+    items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo)]
+      .forEach((v, c) => { if (v == null || v === '') return; h.poner({ c, r: i + 1 }, v, v instanceof Date ? 'fechaHora' : c === 5 && est[x.grupo] ? est[x.grupo] : 'normal'); }));
+    return { libro, nombre: `Mis movimientos RMD ${usuario} ${dTxt}${hTxt !== dTxt ? ' a ' + hTxt : ''}.xlsx` };
+  }
+  async function abrirMisMovimientos() {
+    const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para ver tus movimientos.', true); return; }
+    if (document.querySelector('.rmd-mismov')) return;
+    let trabajando = false, items = [], filtro = '', usuario = '';
+    const v = ventana('Mis movimientos en RMD', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-mismov');
+    const dd2 = (n) => String(n).padStart(2, '0'), iso = (d) => `${d.getFullYear()}-${dd2(d.getMonth() + 1)}-${dd2(d.getDate())}`, hoy = new Date();
+    v.cuerpo.innerHTML = `<p>Los RMD en los que <b>tú</b> hiciste algún movimiento en SAP entre las fechas (crear la versión, pasos, procesos menores, insumos, recetas, cambios de estado…), con su <b>status de hoy</b>. No cambia nada en SAP.</p>
+      <div class="rmd-mismov-fechas"><label>Desde <input type="date" class="rmd-mm-desde" value="${iso(hoy)}"></label><label>Hasta <input type="date" class="rmd-mm-hasta" value="${iso(hoy)}"></label>
+        <span class="rmd-mismov-atajos"><button type="button" class="rmd-link" data-r="hoy">Hoy</button> · <button type="button" class="rmd-link" data-r="ayer">Ayer</button> · <button type="button" class="rmd-link" data-r="semana">Esta semana</button> · <button type="button" class="rmd-link" data-r="mes">Este mes</button></span></div>
+      <p class="rmd-progreso"></p><div class="rmd-mismov-resumen" role="group" aria-label="Filtrar por status"></div><div class="rmd-mismov-res"></div>`;
+    const $ = (s) => v.cuerpo.querySelector(s), prog = $('.rmd-progreso'), resumen = $('.rmd-mismov-resumen'), caja = $('.rmd-mismov-res');
+    const avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
+    const fecha = (s) => { const [a, m, d] = String(s || '').split('-').map(Number); return a && m && d ? new Date(a, m - 1, d) : null; };
+    const hora = (t) => { const d = new Date(t); return `${dd2(d.getDate())}/${dd2(d.getMonth() + 1)} ${dd2(d.getHours())}:${dd2(d.getMinutes())}`; };
+    const pintar = () => {
+      const n = (g) => items.filter((x) => x.grupo === g).length;
+      resumen.innerHTML = items.length ? [['', 'Todos', items.length], ...MISMOV_GRUPOS.map((g) => [g, g, n(g)]).filter(([, , k]) => k)].map(([g, t, k]) =>
+        `<button type="button" class="rmd-mismov-chip ${g ? misMovGrupo(g).toLowerCase() : ''}" data-g="${esc(g)}" aria-pressed="${filtro === g}"><b>${k}</b> ${esc(t)}</button>`).join('') : '';
+      const lista = items.filter((x) => !filtro || x.grupo === filtro);
+      caja.innerHTML = !items.length ? '' : `<table class="rmd-tabla rmd-mismov-tabla"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Qué hiciste</th><th>Último</th><th>Status de hoy</th></tr></thead><tbody>${lista.map((x) =>
+        `<tr><td class="rmd-nowrap">${x.codigo ? `<button type="button" class="rmd-link" data-cod="${esc(x.codigo)}" data-ver="${esc(x.version)}" title="Abrir la configuración de este RMD">${esc(x.codigo)}</button>` : esc(x.solicitud || '—')} <span class="rmd-mismov-ver">${x.version !== '' ? 'v' + esc(x.version) : ''}</span></td>
+        <td>${esc(x.producto)}${x.planta ? `<div class="rmd-mismov-sub">${esc(x.planta)}</div>` : ''}</td><td>${esc(x.etapa)}</td><td>${x.acciones.map(esc).join('<br>')}</td><td class="rmd-nowrap">${esc(hora(x.ultimo))}</td>
+        <td class="rmd-nowrap"><span class="rmd-mismov-estado ${x.grupo.toLowerCase()}">${esc(x.estado)}</span></td></tr>`).join('')}</tbody></table>`;
+      bXls.disabled = !items.length;
+    };
+    const buscar = async () => {
+      const d0 = fecha($('.rmd-mm-desde').value), d1 = fecha($('.rmd-mm-hasta').value);
+      if (!d0 || !d1) { avance('Elige las dos fechas.', true); return; }
+      if (d1 < d0) { avance('«Hasta» no puede ser antes de «Desde».', true); return; }
+      trabajando = true; bBuscar.disabled = true; bXls.disabled = true; items = []; filtro = ''; pintar();
+      try {
+        if (!usuario) { avance('Buscando tu usuario del portal…'); try { usuario = await usuarioPortal(modelo); } catch (e) { usuario = codigoUsuario(controladorPrincipal()); } }
+        if (!usuario) throw new Error('no se supo tu usuario del portal');
+        const fin = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate() + 1);
+        const r = await misMovLeer(modelo, usuario, d0.getTime(), fin.getTime(), avance); items = r.items;
+        const rango = +d0 === +d1 ? `el ${dd2(d0.getDate())}/${dd2(d0.getMonth() + 1)}/${d0.getFullYear()}` : `del ${dd2(d0.getDate())}/${dd2(d0.getMonth() + 1)} al ${dd2(d1.getDate())}/${dd2(d1.getMonth() + 1)}/${d1.getFullYear()}`;
+        avance((items.length ? `${items.length} RMD con movimientos de ${usuarioVisible(usuario)} ${rango}.` : `No hay movimientos de ${usuarioVisible(usuario)} ${rango}.`) +
+          (r.avisos.length ? ` Ojo: no se pudo leer ${r.avisos.map((a) => a.split(':')[0]).join(', ')}.` : ''), !!r.avisos.length && !items.length);
+        if (r.avisos.length) console.warn('[RMD] Mis movimientos:', r.avisos);
+      } catch (e) { avance('No se pudieron leer tus movimientos: ' + (e.message || e), true); }
+      finally { trabajando = false; bBuscar.disabled = false; pintar(); }
+    };
+    v.cuerpo.querySelector('.rmd-mismov-atajos').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-r]'); if (!b || trabajando) return;
+      const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()), r = b.dataset.r;
+      const d0 = r === 'ayer' ? new Date(h.getFullYear(), h.getMonth(), h.getDate() - 1) : r === 'semana' ? new Date(h.getFullYear(), h.getMonth(), h.getDate() - ((h.getDay() + 6) % 7)) : r === 'mes' ? new Date(h.getFullYear(), h.getMonth(), 1) : h;
+      $('.rmd-mm-desde').value = iso(d0); $('.rmd-mm-hasta').value = iso(r === 'ayer' ? d0 : h); buscar();
+    });
+    resumen.addEventListener('click', (e) => { const b = e.target.closest('button[data-g]'); if (!b) return; filtro = b.dataset.g === filtro ? '' : b.dataset.g; pintar(); });
+    caja.addEventListener('click', (e) => { const b = e.target.closest('button[data-cod]'); if (!b || trabajando) return; v.cerrar(); abrirRmdPorCodigo(b.dataset.cod, 'configurar', b.dataset.ver || undefined); });
+    const bBuscar = botonModal('Buscar', 'primario', buscar);
+    const bXls = botonModal('Exportar Excel', '', async () => {
+      const lista = items.filter((x) => !filtro || x.grupo === filtro); if (!lista.length) return;
+      const xl = misMovExcel(lista, usuarioVisible(usuario), $('.rmd-mm-desde').value, $('.rmd-mm-hasta').value); descargarArchivo(xl.nombre, await xl.libro.generar(), TIPO_XLSX);
+    });
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bXls, bBuscar);
+    window.__rmdStats.misMovimientos = { armar: misMovArmar, leer: (u, d, h) => misMovLeer(modelo, u, d, h, () => {}), buscar };
+    buscar();
+  }
+  window.__rmdStats.abrirMisMovimientos = abrirMisMovimientos;   // pruebas
   async function abrirUltimaVersion() {
     if (window.__rmdUltimaVersion) return;
     const ctrl = controladorPrincipal(), modelo = modeloListaPrincipal(); if (!modelo || !ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
@@ -8774,6 +8943,7 @@
     const opciones = [
       [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
       on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
+      on('mismov') && [ic('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/>'), 'Mis movimientos', 'Los RMD en los que hiciste algo (hoy o entre fechas) y su status', () => abrirMisMovimientos()],
       on('vbversiones') && [ic('<path d="M2.5 8.5l3 3 3-3.5"/><path d="M8 11.5l2 2 4-6"/><path d="M2.5 3.5h6M2.5 6h4"/>'), 'V°B° última vs. penúltima', 'RMD trabajados en un mes: V°B° de su última versión frente a la penúltima', () => abrirVbVersiones()],
       on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
       on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
@@ -11221,6 +11391,7 @@
       lista && on('suspension') && ['Modificaciones masivas', 'Suspender varios master o agregarles una observación', () => abrirModificacionesMasivas('suspender')],
       lista && on('suspension') && ['Observación masiva', 'Agregar una línea a las Observaciones de varios master', () => abrirModificacionesMasivas('observacion')],
       lista && on('exportar') && ['Exportar…', 'Exportado original, Equipos por master, Indicadores, Documentos citados', () => { const b = botonExportar(); const c = b && sap.ui.getCore().byId(b.id.replace(/-inner$/, '')); if (c) c.firePress(); }],
+      lista && on('mismov') && ['Mis movimientos', 'Los RMD en los que hiciste algo hoy (o entre fechas) y su status: Ingresado, Autorizado o Suspendido', () => abrirMisMovimientos()],
       lista && on('equipos') && ['Equipos por master', 'Excel de todos los master con sus equipos', () => abrirEquiposPorMaster()],
       lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       lista && on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada documento', () => abrirCitasDeTodos()],

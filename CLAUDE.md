@@ -126,7 +126,7 @@ cuenta). Escribir y responder siempre en **español**.
 ## Estado al 2026-11-03
 
 - Publicada en SharePoint: **1.114.0** (2026-11-03, 1 899 828 bytes). En la
-  rama por defecto: 1.116.0. **La siguiente versión debe ser > 1.116.0**
+  rama por defecto: 1.117.0. **La siguiente versión debe ser > 1.117.0**
   y construirse encima de la rama por defecto.
 - En `DESKTOP-KJ339H3` el CLI instalado no trae `interfaz`: se corre desde la
   carpeta con `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz
@@ -173,6 +173,10 @@ cuenta). Escribir y responder siempre en **español**.
   (aunque «Editar paso con aviso» esté apagado) y «En minúsculas» se bloquea.
 - 2026-11-04, v1.116.0: **regla de CINTIA: Karla Vanessa Moreno se muestra como Vanessa (VM), nunca Karla**
   (`usuarioVisible`, solo al mostrar; en SAP sigue KMORENOM). Igual en status-rmd (`AUTORIZADORES_SAP`).
+- 2026-11-04, v1.117.0: **«Mis movimientos»** (Exportar y Ctrl+K, opción `mismov`): pedido de Carlos, los RMD en los que el usuario
+  del portal hizo algo entre dos fechas (hoy por defecto) con su status de hoy y Excel. Lee MD (registro/actualización/autorización),
+  MD_TRAZABILIDAD (usuarioRegistro + estado) y las filas de la estructura (`MISMOV_TABLAS`) filtradas por usuario y fecha en el servidor.
+  Lógica en el bloque `==MISMOV==` (`pruebas/qa_mismov.mjs`); ventana en `pruebas/qa_mismov_ventana.py`. **La siguiente versión debe ser > 1.117.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
