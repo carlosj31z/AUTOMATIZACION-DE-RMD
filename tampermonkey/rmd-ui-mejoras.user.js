@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.119.0
+// @version      1.122.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.119.0';                                                       // mantener igual a @version
+  const VERSION = '1.122.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -84,7 +84,7 @@
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
-    ['mismov', 'Mis movimientos', 'En el menú Exportar y en Ctrl+K: los RMD en los que hiciste algún movimiento en SAP (hoy por defecto, o entre dos fechas) con su status de hoy (Ingresado, Autorizado o Suspendido), y su Excel.'],
+    ['mismov', 'Mis movimientos', 'En el menú Exportar: los RMD en los que hiciste algún movimiento en SAP (hoy por defecto, o entre dos fechas) con su status de hoy (Ingresado, Autorizado o Suspendido), y su Excel.'],
     ['vbversiones', 'V°B° última vs. penúltima', 'En el menú Exportar: Excel de los RMD trabajados en un mes (Ate y Lima) con los V°B° de su última versión frente a la penúltima, la diferencia y un resumen por planta y etapa (como el comando vb-mes).'],
     ['ultimaversion', 'Última versión de cada master', 'Excel de los Autorizados, Ingresados y Suspendidos (su última versión) con sus Observaciones y un resumen por producto.'],
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
@@ -96,10 +96,14 @@
     ['compararrmd', 'Comparar dos RMD', 'En el menú Exportar: busca dos RMD cualesquiera y muestra sus master lado a lado, como Draftable: lo quitado en rojo, lo agregado en verde, lo modificado con sus palabras resaltadas, y la lista de cambios para ir de uno a otro.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['controlescambio', 'Controles de Cambios', 'Pestaña en Configuración Maestra con las acciones de DOC abiertas (en plazo o vencidas) del registro de controles de cambio que tocan un RMD (Excel cargado a mano), sus RMD asociados según las Observaciones y el envío de evidencia a 4.- EVIDENCIA CC Y NC MASIVOS.'],
+    ['seguimientocc', 'Seguimiento de CC', 'Bandera ⚑ en cada CC de «Controles de Cambios» y pestaña «Seguimiento CC» en Configuración Maestra: los RMD impactados de cada CC con bandera (sugeridos por Observaciones, de «Mis movimientos» o buscándolos), si ya ejecutaron el CC, y Excel o copia para el cuadro. Compartido con el equipo a través de status-rmd; no escribe en SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
-  opc.recetaruta = true;
+  // v1.121.0 (pedido de CINTIA): sin revisión de la hoja de ruta (puesto de trabajo, hoja de ruta, contador y alternativa de la versión de
+  // fabricación). Confundía más de lo que ayudaba: «Recetas frente a SAP» y «Cambios de recetas en SAP» comparan solo la lista de materiales.
+  const REVISAR_HOJA_RUTA = false;
+  opc.recetaruta = REVISAR_HOJA_RUTA;
   const on = (k) => opc.activo && opc[k];
   // Desactivadas por defecto: alteran la disposición de las ventanas.
   const APAGADAS_POR_DEFECTO = ['vivo', 'detectartildes'];   // detectartildes (v1.119.0): se usa poco y daba avisos incoherentes
@@ -139,8 +143,24 @@
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
   // Regla de CINTIA (04/11/2026): Karla Vanessa Moreno se muestra como Vanessa (usuario VM), nunca Karla. Solo al mostrar
   // (pantallas, PDF y Excel); en SAP su usuario sigue siendo KMORENOM y lo que se graba o se busca no cambia.
+  // v1.121.0: se da por hecho que «Karla» no está en su nombre: saludo, iniciales (VM), «V.Moreno» de las líneas de CC y cualquier nombre mostrado.
   const USUARIOS_VISIBLES = { KMORENOM: 'VM' };
-  const usuarioVisible = (u) => { const t = String(u == null ? '' : u), k = t.trim().toUpperCase(); return USUARIOS_VISIBLES[k] || t.replace(/\bKarla\s+(?=Vanessa\b)/gi, ''); };
+  const esVanessa = (t) => /\bKMORENOM\b/i.test(t) || (/\bKARLA\b/i.test(t) && /\b(VANESSA|MORENO)\b/i.test(t));
+  const sinKarla = (t) => String(t).replace(/\bKarla\s+(?=Vanessa\b)/gi, '').replace(/\bKarla\b/gi, (m) => (m === 'KARLA' ? 'VANESSA' : m === 'karla' ? 'vanessa' : 'Vanessa'));
+  const usuarioVisible = (u) => { const t = String(u == null ? '' : u), k = t.trim().toUpperCase(); return USUARIOS_VISIBLES[k] || (esVanessa(t) ? sinKarla(t) : t); };
+  // Usuario conectado al portal (sap.ushell) con la regla de Vanessa: { id, email, nombre, apellido, completo }
+  function personaPortal() {
+    for (const w of [window, window.parent, window.top]) {
+      try {
+        const C = w && w.sap && w.sap.ushell && w.sap.ushell.Container, u = C && C.getUser && C.getUser(); if (!u) continue;
+        const g = (f) => { try { return String((u[f] && u[f]()) || '').trim(); } catch (e) { return ''; } };
+        const p = { id: g('getId'), email: g('getEmail'), nombre: g('getFirstName'), apellido: g('getLastName'), completo: g('getFullName') };
+        if (esVanessa([p.id, p.email.split('@')[0], p.nombre, p.apellido, p.completo].join(' '))) { p.nombre = norm(sinKarla(p.nombre)) || 'Vanessa'; p.completo = norm(sinKarla(p.completo)); }
+        return p;
+      } catch (e) { /* otro origen */ }
+    }
+    return null;
+  }
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
   const faseDe = (x) => String(x).split('…')[0].replace(/[\d.,:~]+/g, '#');
@@ -391,6 +411,9 @@
   .rmd-menu-ico { grid-row: 1 / span 2; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; background: color-mix(in srgb, var(--rmd-acento) 12%, transparent); color: var(--rmd-acento-texto); }
   .rmd-menu-ico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
   .rmd-menu-item:hover, .rmd-menu-item:focus-visible { background: rgba(27,141,236,.14); outline: none; }
+  .rmd-menu { max-height: calc(100vh - 90px); overflow-y: auto; }
+  .rmd-menu-sec { padding: 8px 10px 3px; font: 700 10.5px/1.2 var(--rmd-fuente); letter-spacing: .06em; text-transform: uppercase; color: var(--rmd-apagado); }
+  .rmd-menu-sec:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--rmd-borde); padding-top: 10px; }
   .rmd-busca-eq { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .rmd-busca-eq input[type=search], .rmd-susp-motivo { flex: 1 1 420px; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13.5px var(--rmd-fuente); }
   .rmd-link { border: 0; background: none; padding: 0; color: var(--rmd-acento-texto); text-decoration: underline; cursor: pointer; font: inherit; }
   .rmd-orden-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid #ff4d4d; border-radius: 3px; background: rgba(255,77,77,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
@@ -1052,6 +1075,28 @@
   .rmd-acu-imgs-ed { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 100%; } .rmd-acu-imgs-ed figure { margin: 0; display: flex; flex-direction: column; gap: 3px; width: 180px; } .rmd-acu-imgs-ed img { height: 100px; width: 100%; }
   .rmd-acu-imgs-ed figcaption { display: flex; gap: 3px; } .rmd-acu-imgs-ed figcaption input { flex: 1 1 auto; min-width: 0; font-size: 12px !important; } .rmd-acu-error { margin: 0; grid-column: 1 / -1; } .rmd-acu-campo > .rmd-btn { align-self: flex-start; }
   .rmd-cc-info { color: var(--rmd-apagado); font-size: 12.5px; margin-right: 8px; } .rmd-cc-desc { display: block; margin: 0 0 6px; white-space: pre-line; } .rmd-cc-dlg .sapMDialogScrollCont { padding: 12px 16px; } .rmd-cc-oculto { display: none !important; } .rmd-cc-colfiltro { margin-left: 2px; flex: none; } .rmd-cc-colfiltro .sapMBtnInner { min-width: 1.5rem; height: 1.5rem; padding: 0; } .rmd-cc-coltodo { padding-left: 4px; }
+  .rmd-seg-oculto { display: none !important; } .rmd-seg-pestana { padding: 0 0 8px; } .rmd-seg-tab { font: 14px/1.45 var(--rmd-fuente); color: var(--rmd-texto); }
+  .rmd-seg-barra-f { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; padding: 4px 0 8px; } .rmd-seg-barra-f label { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--rmd-apagado); }
+  .rmd-seg-barra-f select, .rmd-seg-barra-f input { height: 30px; min-width: 9rem; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
+  .rmd-seg-buscar input { width: 16rem; } .rmd-seg-espacio { flex: 1 1 auto; } .rmd-seg-info { margin: 0 0 8px; font-size: 12.5px; }
+  .rmd-seg-lista { display: flex; flex-direction: column; gap: 12px; } .rmd-seg-vacio { padding: 28px 12px; text-align: center; color: var(--rmd-apagado); border: 1px dashed var(--rmd-borde); border-radius: 8px; }
+  .rmd-seg-acc { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; } .rmd-seg-acc .rmd-btn { height: 26px; padding: 0 9px; font-size: 12.5px; } .rmd-seg-quitar { color: var(--rmd-rojo); }
+  .rmd-seg-cc { padding: 12px 14px; border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-ambar); border-radius: 8px; background: var(--rmd-superficie); }
+  .rmd-seg-cc.ejecutado { border-left-color: var(--rmd-verde); } .rmd-seg-cc.pendiente { border-left-color: var(--rmd-rojo); } .rmd-seg-cc.sin-rmd { border-left-color: var(--rmd-apagado); }
+  .rmd-seg-cc header { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 18px; } .rmd-seg-tit { flex: 1 1 20rem; min-width: 0; }
+  .rmd-seg-cc h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 3px; font-size: 15px; font-weight: 600; } .rmd-seg-cc .rmd-nota { font-size: 12.5px; } .rmd-seg-bandera { color: var(--rmd-rojo); }
+  .rmd-seg-estado { padding: 0 8px; border: 1px solid currentColor; border-radius: 10px; font-size: 12px; font-weight: 600; } .rmd-seg-estado.ejecutado { color: var(--rmd-verde); } .rmd-seg-estado.en-proceso { color: var(--rmd-ambar); }
+  .rmd-seg-estado.pendiente { color: var(--rmd-rojo); } .rmd-seg-estado.sin-rmd { color: var(--rmd-apagado); }
+  .rmd-seg-avance { flex: 0 0 10.5rem; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-seg-avance b { color: var(--rmd-texto); }
+  .rmd-seg-barra { height: 6px; margin-top: 4px; overflow: hidden; border: 1px solid var(--rmd-borde); border-radius: 3px; background: var(--rmd-cabecera); } .rmd-seg-barra i { display: block; height: 100%; background: var(--rmd-verde); }
+  .rmd-seg-acciones { margin: 6px 0 0; font-size: 13px; } .rmd-seg-acciones summary { cursor: pointer; color: var(--rmd-acento-texto); } .rmd-seg-acciones ul { margin: 4px 0 0; padding-left: 18px; } .rmd-seg-acciones li { white-space: pre-line; }
+  .rmd-seg-t { margin: 8px 0 0; font-size: 13px; } .rmd-seg-t tr.rmd-seg-hecho td { background: rgba(16,126,62,.07); } .rmd-seg-check { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+  .rmd-seg-obs.aplicado, .rmd-seg-sap.autorizado { color: var(--rmd-verde); font-weight: 600; } .rmd-seg-obs.pendiente, .rmd-seg-sap.ingresado { color: var(--rmd-ambar); font-weight: 600; } .rmd-seg-sap.suspendido, .rmd-seg-sap.no-encontrado { color: var(--rmd-rojo); }
+  .rmd-seg-x { height: 24px; padding: 0 7px; } .rmd-seg-sinrmd { margin: 8px 0 0; color: var(--rmd-apagado); font-size: 13px; }
+  .rmd-seg-fuentes { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 8px; border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-seg-fuentes button { padding: 6px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-apagado); font: 600 13px var(--rmd-fuente); cursor: pointer; } .rmd-seg-fuentes button[aria-selected="true"] { color: var(--rmd-acento-texto); border-bottom-color: var(--rmd-acento); }
+  .rmd-seg-opc input[type=search] { box-sizing: border-box; width: 100%; height: 32px; margin: 0 0 6px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
+  .rmd-seg-cands { max-height: 52vh; overflow: auto; } .rmd-seg-ct { font-size: 13px; } .rmd-seg-ct tr.rmd-seg-ya td { opacity: .6; } .rmd-seg-ct td:first-child { width: 1.6rem; }
   html { --rmd-curva: cubic-bezier(.22, 1, .36, 1); --rmd-brillo-txt: #ffffff; } html:not(.sapUiTheme-sap_fiori_3_dark) { --rmd-brillo-txt: #0d0d0d; }
   canvas.rmd-orbe { animation: rmd-orbe-entra .32s var(--rmd-curva) both; } canvas.rmd-orbe.rmd-sin-entrada { animation: none; }
   @keyframes rmd-orbe-entra { from { opacity: 0; scale: .25; filter: blur(4px); } }
@@ -2564,15 +2609,10 @@
   }
   // «L.Fernandez»: inicial del nombre y primer apellido según SAP (como en las líneas de CC)
   function responsableSap() {
-    for (const w of [window, window.parent, window.top]) {
-      try {
-        const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        let n = String((u.getFirstName && u.getFirstName()) || '').trim(), a = String((u.getLastName && u.getLastName()) || '').trim().split(/\s+/)[0] || '';
-        if (!n || !a) { const t = String((u.getFullName && u.getFullName()) || '').trim().split(/\s+/); n = n || t[0] || ''; a = a || t[1] || ''; }
-        if (n && a) return `${n.charAt(0).toUpperCase()}.${a.charAt(0).toUpperCase()}${a.slice(1).toLowerCase()}`;
-      } catch (e) { /* otro origen */ }
-    }
-    return '';
+    const p = personaPortal(); if (!p) return '';
+    let n = p.nombre, a = p.apellido.split(/\s+/)[0] || '';
+    if (!n || !a) { const t = p.completo.split(/\s+/); n = n || t[0] || ''; a = a || t[1] || ''; }
+    return n && a ? `${n.charAt(0).toUpperCase()}.${a.charAt(0).toUpperCase()}${a.slice(1).toLowerCase()}` : '';
   }
   function agregarLineaObs(c, tipo, linea) {
     const p = linea || Pendientes.plantilla(tipo, { iniciales: rsUsuarioIniciales(), responsable: responsableSap() }); if (!p) return;
@@ -3006,7 +3046,7 @@
     document.querySelectorAll('.rmd-con-estado, .rmd-pm-titulo').forEach((e) => e.classList.remove('rmd-con-estado', 'rmd-pm-titulo'));
     document.querySelectorAll('.rmd-campo-aviso').forEach((e) => e.classList.remove('rmd-campo-aviso'));
     document.querySelectorAll('.sapMDialog').forEach((d) => quitarEdicionEspec(d));
-    quitarOrbes(); quitarPestanasCC(); quitarPestanasAcu();
+    quitarOrbes(); quitarPestanasCC(); quitarPestanasAcu(); quitarPestanasSeg();
     document.querySelectorAll('.sapMDialog th, .sapMDialog td').forEach((c) => {
       c.style.removeProperty('display'); if (c.tagName === 'TH') { c.style.removeProperty('width'); c.style.removeProperty('min-width'); }
       c.classList.remove('rmd-marcar', 'rmd-desmarcar', 'rmd-falta', 'rmd-td-sintipo', 'rmd-sin-puesto', 'rmd-pm-mal', 'rmd-orden-mal'); delete c.dataset.rmdPm;
@@ -3074,7 +3114,7 @@
     if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarListaPredecesores, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas, gestionarControlesCambio, gestionarPestanaAcuerdos].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarListaPredecesores, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas, gestionarControlesCambio, gestionarPestanaAcuerdos, gestionarPestanaSeguimiento].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -7220,7 +7260,7 @@
       try {
         const C = w && w.sap && w.sap.ushell && w.sap.ushell.Container, u = C && C.getUser && C.getUser();
         if (!u) continue;
-        const id = String((u.getId && u.getId()) || ''), nombre = String((u.getFullName && u.getFullName()) || ''), email = String((u.getEmail && u.getEmail()) || '');
+        const id = String((u.getId && u.getId()) || ''), nombre = usuarioVisible(String((u.getFullName && u.getFullName()) || '')), email = String((u.getEmail && u.getEmail()) || '');
         if (id || email) return { id, nombre, email };
       } catch (e) { }
     }
@@ -8702,6 +8742,16 @@
     ['MD_RECETA', 'mdRecetaId', 'receta', 'recetas']];
   const MISMOV_GRUPOS = ['Ingresado', 'Autorizado', 'Suspendido', 'Otros'];
   const misMovGrupo = (estado) => (/^ingres/i.test(estado) ? 'Ingresado' : /^autoriz/i.test(estado) ? 'Autorizado' : /^suspend/i.test(estado) ? 'Suspendido' : 'Otros');
+  // v1.120.0 (pedido de CINTIA, reporte diario): cuándo y quién autorizó en SAP la versión (MD.fechaAutorizacion / usuarioAutorizacion; en un Suspendido es
+  // su última autorización). Una fecha sin hora (00:00:00 UTC) es un día de calendario: se muestra sin hora y sin correrla al día anterior.
+  // → { t (ms), soloDia, texto 'DD/MM/AAAA[ HH:MM]', usuario } o null
+  function misMovAutSap(fecha, usuario) {
+    const d = fecha instanceof Date ? fecha : fecha ? new Date(fecha) : null; if (!d || isNaN(d)) return null;
+    const soloDia = d.getUTCHours() + d.getUTCMinutes() + d.getUTCSeconds() === 0, p = (n) => String(n).padStart(2, '0');
+    const texto = soloDia ? `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`
+      : `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return { t: d.getTime(), soloDia, texto, usuario: String(usuario || '').trim() };
+  }
   // { usuario, desde, hasta (ms, [desde, hasta)), mds: MD con estadoIdRmd/sucursalId, traz: MD_TRAZABILIDAD, filas: { entidad: filas } }
   // → [{ mdId, codigo, version, producto, etapa, planta, estado, grupo, acciones: [texto], primero, ultimo }] del más reciente al más antiguo
   function misMovArmar({ usuario, desde, hasta, mds, traz, filas }) {
@@ -8746,7 +8796,7 @@
       if (!acciones.length) acciones.push(x.actualizo ? 'Actualizó los datos del RMD' : 'Movimiento en el RMD');
       out.push({ mdId, codigo: m.codigo ? String(m.codigo) : '', solicitud: m.codigoSolicitud ? String(m.codigoSolicitud) : '', version: m.version != null ? m.version : '', producto: String(m.descripcion || '').trim(),
         etapa: String(m.nivelTxt || '').trim(), planta: String((m.sucursalId && m.sucursalId.contenido) || '').trim(), estado: estado || '(sin estado)', grupo: misMovGrupo(estado), acciones,
-        primero: Math.min(...x.ts), ultimo: Math.max(...x.ts) });
+        autSap: misMovAutSap(m.fechaAutorizacion, m.usuarioAutorizacion), primero: Math.min(...x.ts), ultimo: Math.max(...x.ts) });
     });
     return out.sort((a, b) => b.ultimo - a.ultimo);
   }
@@ -8778,14 +8828,22 @@
     return { items: misMovArmar({ usuario, desde, hasta, mds, traz: res.traz, filas }), avisos };
   }
   function misMovExcel(items, usuario, dTxt, hTxt) {
-    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento'];
-    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17].map((w, i) => [i + 1, i + 1, w]),
+    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento', 'Autorizado en SAP', 'Usuario que autorizó'];
+    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17, 17, 22].map((w, i) => [i + 1, i + 1, w]),
       tabla: { nombre: 'MisMovimientos', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, items.length + 1)}`, estilo: 'TableStyleMedium2' } });
     cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
     const est = { Autorizado: 'estAut', Ingresado: 'estIng', Suspendido: 'estSus' };
-    items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo)]
+    items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo),
+      x.autSap ? (x.autSap.soloDia ? x.autSap.texto : new Date(x.autSap.t)) : null, x.autSap ? usuarioVisible(x.autSap.usuario) : null]
       .forEach((v, c) => { if (v == null || v === '') return; h.poner({ c, r: i + 1 }, v, v instanceof Date ? 'fechaHora' : c === 5 && est[x.grupo] ? est[x.grupo] : 'normal'); }));
     return { libro, nombre: `Mis movimientos RMD ${usuario} ${dTxt}${hTxt !== dTxt ? ' a ' + hTxt : ''}.xlsx` };
+  }
+  const MISMOV_COLS_REPORTE = ['Fecha', 'Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Qué hiciste', 'Status de hoy', 'Autorizado en SAP', 'Usuario que autorizó'];
+  function misMovTextoReporte(lista) {
+    const p = (n) => String(n).padStart(2, '0'), dia = (t) => { const d = new Date(t); return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`; };
+    const limpio = (v) => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
+    return lista.map((x) => [dia(x.ultimo), x.codigo || x.solicitud, x.version, x.producto, x.etapa, x.planta, x.acciones.join(' · '), x.estado,
+      x.autSap ? x.autSap.texto : '', x.autSap ? usuarioVisible(x.autSap.usuario) : ''].map(limpio).join('\t')).join('\r\n');
   }
   async function abrirMisMovimientos() {
     const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para ver tus movimientos.', true); return; }
@@ -8807,17 +8865,19 @@
       resumen.innerHTML = items.length ? [['', 'Todos', items.length], ...MISMOV_GRUPOS.map((g) => [g, g, n(g)]).filter(([, , k]) => k)].map(([g, t, k]) =>
         `<button type="button" class="rmd-mismov-chip ${g ? misMovGrupo(g).toLowerCase() : ''}" data-g="${esc(g)}" aria-pressed="${filtro === g}"><b>${k}</b> ${esc(t)}</button>`).join('') : '';
       const lista = items.filter((x) => !filtro || x.grupo === filtro);
-      caja.innerHTML = !items.length ? '' : `<table class="rmd-tabla rmd-mismov-tabla"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Qué hiciste</th><th>Último</th><th>Status de hoy</th></tr></thead><tbody>${lista.map((x) =>
+      caja.innerHTML = !items.length ? '' : `<table class="rmd-tabla rmd-mismov-tabla"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Qué hiciste</th><th>Último</th><th>Status de hoy</th><th>Autorizado en SAP</th></tr></thead><tbody>${lista.map((x) =>
         `<tr><td class="rmd-nowrap">${x.codigo ? `<button type="button" class="rmd-link" data-cod="${esc(x.codigo)}" data-ver="${esc(x.version)}" title="Abrir la configuración de este RMD">${esc(x.codigo)}</button>` : esc(x.solicitud || '—')} <span class="rmd-mismov-ver">${x.version !== '' ? 'v' + esc(x.version) : ''}</span></td>
         <td>${esc(x.producto)}${x.planta ? `<div class="rmd-mismov-sub">${esc(x.planta)}</div>` : ''}</td><td>${esc(x.etapa)}</td><td>${x.acciones.map(esc).join('<br>')}</td><td class="rmd-nowrap">${esc(hora(x.ultimo))}</td>
-        <td class="rmd-nowrap"><span class="rmd-mismov-estado ${x.grupo.toLowerCase()}">${esc(x.estado)}</span></td></tr>`).join('')}</tbody></table>`;
-      bXls.disabled = !items.length;
+        <td class="rmd-nowrap"><span class="rmd-mismov-estado ${x.grupo.toLowerCase()}">${esc(x.estado)}</span></td>
+        <td class="rmd-nowrap rmd-mismov-aut">${x.autSap ? `${esc(x.autSap.texto)}${x.autSap.usuario ? `<div class="rmd-mismov-sub" title="${esc(x.autSap.usuario)}">${esc(usuarioVisible(x.autSap.usuario))}</div>` : ''}`
+          : `<span class="rmd-mismov-sub">${x.grupo === 'Ingresado' ? 'Aún no' : '—'}</span>`}</td></tr>`).join('')}</tbody></table>`;
+      bXls.disabled = !items.length; bCopiar.disabled = !items.length;
     };
     const buscar = async () => {
       const d0 = fecha($('.rmd-mm-desde').value), d1 = fecha($('.rmd-mm-hasta').value);
       if (!d0 || !d1) { avance('Elige las dos fechas.', true); return; }
       if (d1 < d0) { avance('«Hasta» no puede ser antes de «Desde».', true); return; }
-      trabajando = true; bBuscar.disabled = true; bXls.disabled = true; items = []; filtro = ''; pintar();
+      trabajando = true; bBuscar.disabled = true; bXls.disabled = true; bCopiar.disabled = true; items = []; filtro = ''; pintar();
       try {
         if (!usuario) { avance('Buscando tu usuario del portal…'); try { usuario = await usuarioPortal(modelo); } catch (e) { usuario = codigoUsuario(controladorPrincipal()); } }
         if (!usuario) throw new Error('no se supo tu usuario del portal');
@@ -8843,7 +8903,13 @@
       const lista = items.filter((x) => !filtro || x.grupo === filtro); if (!lista.length) return;
       const xl = misMovExcel(lista, usuarioVisible(usuario), $('.rmd-mm-desde').value, $('.rmd-mm-hasta').value); descargarArchivo(xl.nombre, await xl.libro.generar(), TIPO_XLSX);
     });
-    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bXls, bBuscar);
+    // Copiar para el reporte diario: lo que se ve, como filas separadas por tabulador (sin títulos) para pegar en Excel debajo de lo ya reportado.
+    const bCopiar = botonModal('Copiar para el reporte', '', async () => {
+      const lista = items.filter((x) => !filtro || x.grupo === filtro); if (!lista.length) return;
+      avance((await copiarAlPortapapeles(misMovTextoReporte(lista))) ? `${lista.length} fila(s) copiadas: pégalas en tu Excel (Ctrl+V). Columnas: ${MISMOV_COLS_REPORTE.join(' · ')}.` : 'No se pudo copiar: usa «Exportar Excel».', false);
+    });
+    bCopiar.title = 'Copia las filas que se ven (sin títulos) para pegarlas en el Excel del reporte diario';
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bCopiar, bXls, bBuscar);
     window.__rmdStats.misMovimientos = { armar: misMovArmar, leer: (u, d, h) => misMovLeer(modelo, u, d, h, () => {}), buscar };
     buscar();
   }
@@ -8942,21 +9008,31 @@
     if (document.querySelector('.rmd-menu')) { cerrarMenuExportar(); return; }
     const b = botonExportar(); if (!b) return;
     const ic = (d) => `<svg viewBox="0 0 16 16" aria-hidden="true">${d}</svg>`;
+    // v1.121.0: por secciones (lo del día, los reportes en Excel y las herramientas), cada una solo si tiene opciones
+    const seccion = (titulo, items) => { const xs = items.filter(Boolean); return xs.length ? [titulo, ...xs] : []; };
     const opciones = [
-      [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
-      on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
-      on('mismov') && [ic('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/>'), 'Mis movimientos', 'Los RMD en los que hiciste algo (hoy o entre fechas) y su status', () => abrirMisMovimientos()],
-      on('vbversiones') && [ic('<path d="M2.5 8.5l3 3 3-3.5"/><path d="M8 11.5l2 2 4-6"/><path d="M2.5 3.5h6M2.5 6h4"/>'), 'V°B° última vs. penúltima', 'RMD trabajados en un mes: V°B° de su última versión frente a la penúltima', () => abrirVbVersiones()],
-      on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
-      on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
-      on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
-      on('contingencia') && [ic('<path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/>'), 'Contingencia a SharePoint', 'Master de lo autorizado ayer (u hoy) a 3.-CONTINGENCIA', () => abrirContingencia()],
-      on('compararrmd') && [ic('<rect x="1.5" y="2.5" width="5.5" height="11" rx="1"/><rect x="9" y="2.5" width="5.5" height="11" rx="1"/><path d="M3 6h2.5M3 8.5h2.5M10.5 6h2.5M10.5 8.5h2.5"/>'), 'Comparar dos RMD', 'Sus master lado a lado, con las diferencias resaltadas', () => abrirCompararRmd()],
-      on('plantillaprod') && [ic('<path d="M3 13.5h3l7-7-3-3-7 7z"/><path d="M8.5 5 11 7.5"/>'), 'Plantilla para Producción', 'Borrador .html para que Producción proponga cambios', () => abrirPlantillaProduccion()],
-      on('cambiosrecetas') && [ic('<path d="M13 6.5A5 5 0 0 0 3.6 4.4M3 9.5a5 5 0 0 0 9.4 2.1"/><path d="M3.5 2v2.6h2.6M12.5 14v-2.6H9.9"/>'), 'Recetas con cambios en SAP', 'Master cuya receta u hoja de ruta cambió en SAP', () => exportarCambiosRecetas()],
+      ...seccion('Del día', [
+        on('mismov') && [ic('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/>'), 'Mis movimientos', 'Los RMD en los que hiciste algo (hoy o entre fechas) y su status', () => abrirMisMovimientos()],
+        on('contingencia') && [ic('<path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/>'), 'Contingencia a SharePoint', 'Master de lo autorizado ayer (u hoy) a 3.-CONTINGENCIA', () => abrirContingencia()],
+      ]),
+      ...seccion('Reportes en Excel', [
+        [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
+        on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
+        on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
+        on('vbversiones') && [ic('<path d="M2.5 8.5l3 3 3-3.5"/><path d="M8 11.5l2 2 4-6"/><path d="M2.5 3.5h6M2.5 6h4"/>'), 'V°B° última vs. penúltima', 'RMD trabajados en un mes: V°B° de su última versión frente a la penúltima', () => abrirVbVersiones()],
+        on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
+        on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
+        on('cambiosrecetas') && [ic('<path d="M13 6.5A5 5 0 0 0 3.6 4.4M3 9.5a5 5 0 0 0 9.4 2.1"/><path d="M3.5 2v2.6h2.6M12.5 14v-2.6H9.9"/>'), 'Cambios de recetas en SAP', 'Excel de los master cuya lista de materiales cambió en SAP', () => exportarCambiosRecetas()],
+      ]),
+      ...seccion('Herramientas', [
+        on('compararrmd') && [ic('<rect x="1.5" y="2.5" width="5.5" height="11" rx="1"/><rect x="9" y="2.5" width="5.5" height="11" rx="1"/><path d="M3 6h2.5M3 8.5h2.5M10.5 6h2.5M10.5 8.5h2.5"/>'), 'Comparar dos RMD', 'Sus master lado a lado, con las diferencias resaltadas', () => abrirCompararRmd()],
+        on('plantillaprod') && [ic('<path d="M3 13.5h3l7-7-3-3-7 7z"/><path d="M8.5 5 11 7.5"/>'), 'Plantilla para Producción', 'Borrador .html para que Producción proponga cambios', () => abrirPlantillaProduccion()],
+      ]),
     ].filter(Boolean);
     const m = document.createElement('div'); m.className = 'rmd-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Exportar');
-    opciones.forEach(([icono, t, sub, fn]) => {
+    opciones.forEach((op) => {
+      if (typeof op === 'string') { const sec = document.createElement('div'); sec.className = 'rmd-menu-sec'; sec.setAttribute('role', 'presentation'); sec.textContent = op; m.appendChild(sec); return; }
+      const [icono, t, sub, fn] = op;
       const x = document.createElement('button'); x.type = 'button'; x.className = 'rmd-menu-item'; x.setAttribute('role', 'menuitem');
       x.innerHTML = `<i class="rmd-menu-ico">${icono}</i><b>${esc(t)}</b><span>${esc(sub)}</span>`; x.addEventListener('click', () => { cerrarMenuExportar(); fn(); }); m.appendChild(x);
     });
@@ -10689,8 +10765,9 @@
   // destinatariosMD (DJEFPROD, DGERPROD); nombre desde USUARIO.
   const nombresUsuario = new Map(); let pidiendoUsuarios = null;
   function nombreDe(u) {                                                 // { completo, corto }
-    const completo = norm(usuarioVisible([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' '))) || norm(usuarioVisible(u.nombreMostrar || u.usuario || ''));
-    return { completo, corto: norm([usuarioVisible(String(u.nombre || '')).trim().split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
+    const ella = esVanessa([u.usuario, u.nombre, u.apellidoPaterno, u.nombreMostrar].join(' ')), vis = (t) => norm(ella ? sinKarla(t || '') : usuarioVisible(t || ''));
+    const completo = vis([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' ')) || vis(u.nombreMostrar || u.usuario || '');
+    return { completo, corto: norm([vis(String(u.nombre || '')).split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
   }
   function pedirUsuarios(modelo, ids) {
     const faltan = ids.filter((id) => !nombresUsuario.has(id)); if (!faltan.length || pidiendoUsuarios) return;
@@ -11179,11 +11256,8 @@
   }
   const capitalizar = (t) => String(t || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
   function primerNombre() {
-    for (const w of [window, window.parent, window.top]) {
-      try { const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        const n = (u.getFirstName && u.getFirstName()) || (u.getFullName && u.getFullName()) || ''; if (n) return capitalizar(n.trim().split(/\s+/)[0]); } catch (e) { }
-    }
-    return '';
+    const p = personaPortal(), n = p && (p.nombre || p.completo);
+    return n ? capitalizar(n.split(/\s+/)[0]) : '';
   }
   function codigoUsuario(ctrl) {
     try { const c = ctrl && ctrl.localModel && ctrl.localModel.getProperty('/oInfoUsuario/data/usuario'); if (c) return String(c).toUpperCase(); } catch (e) { /* sin modelo */ }
@@ -13431,7 +13505,7 @@
   function quitarPestanaAcu(itb) {
     const items = itb.getItems(), i = items.findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_ACU); if (i < 0) return;
     const v = ACUV.vista && ACUV.vista.itb === itb ? ACUV.vista : null;
-    if (itb.getSelectedKey() === CLAVE_PESTANA_ACU) { if (v) v.mostrar(false); const prim = items.find((x) => x.getKey && x.getKey() !== CLAVE_PESTANA_ACU && x.getKey() !== CLAVE_PESTANA_CC && x.getText);
+    if (itb.getSelectedKey() === CLAVE_PESTANA_ACU) { if (v) v.mostrar(false); const prim = items.find((x) => x.getKey && ![CLAVE_PESTANA_ACU, CLAVE_PESTANA_CC, CLAVE_PESTANA_SEG].includes(x.getKey()) && x.getText);
       if (prim) { itb.setSelectedKey(prim.getKey()); itb.fireSelect({ key: prim.getKey(), selectedKey: prim.getKey(), item: prim, selectedItem: prim }); } }   // el portal muestra su tabla en su manejador de select
     const sep = items[i - 1]; itb.removeItem(items[i]).destroy(); if (sep && sep.__rmdAcu) itb.removeItem(sep).destroy();
     if (v) { v.ajenos().forEach((x) => x.removeStyleClass('rmd-acu-oculto')); if (v.agr) v.cuerpo.removeAggregation(v.agr, v.cont); v.cont.destroy(); ACUV.vista = null; }
@@ -13449,7 +13523,7 @@
     const enCuerpo = !!(agr && agr.multiple);
     const pestana = new ITF({ key: CLAVE_PESTANA_ACU, text: 'Acuerdos', icon: 'sap-icon://notes', iconColor: 'Positive', tooltip: 'Acuerdos de configuración de RMD: lo que uno escribe lo ven todos (también en status-rmd)', content: enCuerpo ? [] : [cont] });
     if (enCuerpo) { cont.setVisible(false); cuerpo.addAggregation(agr.name, cont); }
-    const items = itb.getItems(), iCC = items.findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_CC);
+    const items = itb.getItems(), iCC = Math.max(...[CLAVE_PESTANA_CC, CLAVE_PESTANA_SEG].map((k) => items.findIndex((x) => x.getKey && x.getKey() === k)));   // a la derecha de «Controles de Cambios» y «Seguimiento CC»
     const sep = new ITS(); sep.__rmdAcu = true;
     if (iCC >= 0) { itb.insertItem(sep, iCC + 1); itb.insertItem(pestana, iCC + 2); } else { itb.addItem(sep); itb.addItem(pestana); }
     const cab = dp && dp.getHeader && dp.getHeader(), conservar0 = dp && dp.getPreserveHeaderStateOnScroll ? dp.getPreserveHeaderStateOnScroll() : null;
@@ -13457,7 +13531,7 @@
     const mostrar = (nuestra) => {
       if (enCuerpo) { cont.setVisible(nuestra); ajenos().forEach((x) => (nuestra ? x.addStyleClass('rmd-acu-oculto') : x.removeStyleClass('rmd-acu-oculto'))); }
       if (!dp) return;
-      if (!nuestra) { if (conservar0 !== null && itb.getSelectedKey() !== CLAVE_PESTANA_CC) dp.setPreserveHeaderStateOnScroll(conservar0); reposicionarDP(dp); return; }
+      if (!nuestra) { if (conservar0 !== null && ![CLAVE_PESTANA_CC, CLAVE_PESTANA_SEG].includes(itb.getSelectedKey())) dp.setPreserveHeaderStateOnScroll(conservar0); reposicionarDP(dp); return; }
       if (conservar0 !== null) dp.setPreserveHeaderStateOnScroll(true);
       dp.setHeaderExpanded(true);
       const w = dp.getDomRef && dp.getDomRef('contentWrapper'); if (w) w.scrollTop = 0;
@@ -13899,10 +13973,17 @@
     if (!RS.datos) {
       let d = null; try { d = await Almacen.leer('recetasSap'); } catch (e) { d = null; }
       RS.datos = d && d.v === 1 && Array.isArray(d.hallazgos) ? d : RS_VACIO(); RS.ver++;
+      if (!REVISAR_HOJA_RUTA) RS.datos.hallazgos = RS.datos.hallazgos.map(rsSinRuta).filter(Boolean);
     }
     return RS.datos;
   }
   const rsGuardar = () => Almacen.guardar('recetasSap', RS.datos).catch(() => {});
+  // hallazgo guardado por una versión anterior: sin la parte de la hoja de ruta (y fuera si solo era eso)
+  function rsSinRuta(h) {
+    if (!h || !(h.tipos || []).includes('ruta')) return h;
+    const tipos = h.tipos.filter((t) => t !== 'ruta'); return tipos.length ? { ...h, tipos, ruta: null, rutaAvisa: false } : null;
+  }
+  const rsHallazgos = (d) => (REVISAR_HOJA_RUTA ? d.hallazgos : d.hallazgos.map(rsSinRuta).filter(Boolean));
   async function rsCopias() {
     if (!RS.copias) { let c = null; try { c = await Almacen.leer('recetasSapCopias'); } catch (e) { c = null; } RS.copias = c && typeof c === 'object' ? c : {}; }
     return RS.copias;
@@ -13948,7 +14029,7 @@
         sap.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
       }
       let ruta = null, rutaAvisa = false, textoCab = null;
-      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { const hoyV = versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null; ruta = rsRuta(rc, hoyV); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; textoCab = textoCabEtapa(md.etapa) ? difTextoCab(rc, hoyV) : null; }
+      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { const hoyV = versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null; if (REVISAR_HOJA_RUTA) { ruta = rsRuta(rc, hoyV); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; } textoCab = textoCabEtapa(md.etapa) ? difTextoCab(rc, hoyV) : null; }
       if (!dif.length && !textoCab && !rutaAvisa) return;
       const fechas = dif.map((d) => d.fecha).filter(Boolean), fechaSap = fechas.length ? new Date(Math.max(...fechas.map((f) => +f))) : dif.length && ultima ? ultima.fecha : null;
       const huella = rsHash(dif.map((d) => [d.tipo, d.comp, d.compAntes || '', d.antes ? d.antes.q + d.antes.u : '', d.ahora ? d.ahora.q + d.ahora.u : ''].join(':')).join(';') + '#' + (ruta ? (ruta.existe ? '' : 'X') + ruta.cambios.map((c) => c.clave + c.sap).join(',') : '') + (textoCab ? '#t' + rsHash(textoCab.ahora) : ''));
@@ -14055,7 +14136,7 @@
   function rsGrupos() {
     const d = RS.datos; if (!d) return [];
     const por = new Map();
-    d.hallazgos.forEach((h) => {
+    rsHallazgos(d).forEach((h) => {
       let g = por.get(h.mdId); if (!g) { g = { mdId: h.mdId, codigo: h.codigo, version: h.version, estado: h.estado, descripcion: h.descripcion, etapa: h.etapa, planta: h.planta, area: h.area, recetas: [], tipos: new Set(), fechaSap: null, detectado: 0 }; por.set(h.mdId, g); }
       g.recetas.push(h); h.tipos.forEach((t) => g.tipos.add(t)); if (h.fechaSap && (!g.fechaSap || h.fechaSap > g.fechaSap)) g.fechaSap = h.fechaSap; g.detectado = Math.max(g.detectado, h.detectado || 0);
     });
@@ -14068,19 +14149,14 @@
   const rsCuando = (ms) => (ms ? fechaHoraCorta(ms) : '');
   const rsMarca = { nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Quitado en SAP', reemplazo: 'Reemplazado por otra versión del material' };
   function rsUsuarioIniciales() {
-    for (const w of [window, window.parent, window.top]) {
-      try {
-        const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        let i = Reglas.inicialesDe((u.getFirstName && u.getFirstName()) || '', (u.getLastName && u.getLastName()) || '');
-        if (i.length < 2) { const n = String((u.getFullName && u.getFullName()) || '').trim().split(/\s+/); i = Reglas.inicialesDe(n[0], n[1]); }
-        if (i) return i;
-      } catch (e) { /* otro origen */ }
-    }
-    return '';
+    const p = personaPortal(); if (!p) return '';
+    let i = Reglas.inicialesDe(p.nombre, p.apellido);
+    if (i.length < 2) { const n = p.completo.split(/\s+/); i = Reglas.inicialesDe(n[0], n[1]); }
+    return i;
   }
   // ---- Icono junto a «Manufactura Digital» ----
   function rsEstadoBoton(b) {
-    const d = RS.datos, mds = d ? new Set(d.hallazgos.map((h) => h.mdId)) : new Set(), n = mds.size, ing = d ? new Set(d.hallazgos.filter((h) => h.estado === 'Ingresado').map((h) => h.mdId)).size : 0;
+    const d = RS.datos, mds = d ? new Set(rsHallazgos(d).map((h) => h.mdId)) : new Set(), n = mds.size, ing = d ? new Set(rsHallazgos(d).filter((h) => h.estado === 'Ingresado').map((h) => h.mdId)).size : 0;
     b.classList.toggle('vacio', !n); b.classList.toggle('leyendo', RS.leyendo); setTxt(b.querySelector('.n'), n ? String(n) : '');
     const ult = d && (d.ultima.ing || d.ultima.aut) ? ` Última revisión: ${fechaHoraCorta(Math.max(d.ultima.ing, d.ultima.aut))}.` : '';
     const t = RS.leyendo ? `Revisando las recetas de los RMD frente a SAP… ${RS.progreso}` : n ? `${n} RMD con cambios en su receta en SAP pendientes de volver a asociar (${ing} Ingresados, ${n - ing} Autorizados).${ult} Clic para ver el detalle.`
@@ -14114,7 +14190,7 @@
     tarjeta.classList.add('rmd-cr'); RS.ventana = v;
     const cerrarOrig = v.cerrar; v.cerrar = () => { RS.ventana = null; cerrarOrig(); };
     v.cuerpo.innerHTML = `<p class="rmd-cr-intro">RMD <b>Ingresados y Autorizados</b> cuya receta cambió en SAP después de asociarla: hay que retirarla y volver a asociarla para traer lo nuevo. Es solo un aviso: no impide autorizar.
-      SAP informa la <b>fecha</b> de cada cambio de componentes de la lista de materiales (no la del texto de la lista ni la de la hoja de ruta); la <b>hora</b> es la de la revisión que lo detectó.</p>
+      SAP informa la <b>fecha</b> de cada cambio de componentes de la lista de materiales (no la del texto de la lista); la <b>hora</b> es la de la revisión que lo detectó.</p>
       <div class="rmd-cr-barra"><div class="rmd-cr-chips" role="tablist"></div><input type="search" class="rmd-cr-buscar" placeholder="Buscar por código, descripción, receta o componente"></div>
       <p class="rmd-progreso rmd-cr-estado"></p><div class="rmd-cr-tabla"></div>`;
     const q = (s) => v.cuerpo.querySelector(s), chips = q('.rmd-cr-chips'), buscar = q('.rmd-cr-buscar'), estado = q('.rmd-cr-estado'), tabla = q('.rmd-cr-tabla');
@@ -14140,7 +14216,7 @@
     v.pintar = () => {
       const grupos = rsGrupos(), d = RS.datos, cuenta = (f) => grupos.filter(f).length;
       const defs = [['todos', 'Todos', grupos.length], ['Ingresado', 'Ingresados', cuenta((g) => g.estado === 'Ingresado')], ['Autorizado', 'Autorizados', cuenta((g) => g.estado === 'Autorizado')],
-        ['lista', 'Lista de materiales', cuenta((g) => g.tipos.has('lista'))], ['ruta', 'Hoja de ruta', cuenta((g) => g.tipos.has('ruta'))]];
+        ['lista', 'Lista de materiales', cuenta((g) => g.tipos.has('lista'))], REVISAR_HOJA_RUTA && ['ruta', 'Hoja de ruta', cuenta((g) => g.tipos.has('ruta'))]].filter(Boolean);
       chips.innerHTML = defs.map(([k, t, n]) => `<button type="button" role="tab" data-f="${k}" class="${filtro === k ? 'activo' : ''}" aria-selected="${filtro === k}">${esc(t)} <span>${n}</span></button>`).join('');
       v.pintarEstado();
       const filas = filtrados(), hoyDia = new Date(), ini = rsUsuarioIniciales();
@@ -14157,7 +14233,7 @@
           <td class="rmd-nowrap">${esc(g.estado)}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-nowrap">${esc(h.receta)}</span>`).join('<br>')}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-cr-tag ${h.tipos.length > 1 ? 'dos' : h.tipos[0]}">${esc(rsTipoTxt(h.tipos))}</span> ${esc(rsResumenReceta(h))}`).join('<br>')}</td>
-          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio del texto de la lista ni de la hoja de ruta">—</span>'}</td>
+          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio del texto de la lista">—</span>'}</td>
           <td class="rmd-nowrap">${esc(rsCuando(g.detectado))}</td>
           <td class="rmd-cr-obs">${r ? esc(r) : g.obs ? `<span title="${esc(g.obs.linea)}">✓ ${esc(fechaHoraCorta(g.obs.t).slice(0, 10))}</span>` : ini ? `<input type="text" class="rmd-cr-obs-in" data-a="obs" value="${esc(editadas.has(g.mdId) ? editadas.get(g.mdId) : linea)}" title="Puedes editar el texto antes de agregarlo" aria-label="Observación de ${esc(g.codigo)}">` : ''}</td>
           <td class="rmd-nowrap"><button type="button" class="rmd-link" data-a="ver">${abierto ? 'Ocultar' : 'Ver detalle'}</button> · <button type="button" class="rmd-link" data-a="abrir" title="Abrir «Asociar fórmulas» de este RMD">Abrir</button></td></tr>
@@ -14218,7 +14294,7 @@
   function rsArmarExcel() {
     const d = RS.datos || RS_VACIO(), hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
     const utc = (x) => (x instanceof Date && !isNaN(x) ? new Date(Date.UTC(x.getFullYear(), x.getMonth(), x.getDate(), x.getHours(), x.getMinutes())) : '');
-    const hs = [...d.hallazgos].sort((a, b) => (+(b.fechaSap || 0) - +(a.fechaSap || 0)) || String(b.codigo).localeCompare(String(a.codigo))), grupos = new Map(rsGrupos().map((g) => [g.mdId, g])), ini = rsUsuarioIniciales();
+    const hs = [...rsHallazgos(d)].sort((a, b) => (+(b.fechaSap || 0) - +(a.fechaSap || 0)) || String(b.codigo).localeCompare(String(a.codigo))), grupos = new Map(rsGrupos().map((g) => [g.mdId, g])), ini = rsUsuarioIniciales();
     const tabla = (nombre, nt, cab, anchos, datos, estilos = {}, op = {}) => {
       const h = libro.hoja(nombre, { activa: !!op.activa, congelar: op.congelar || 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
@@ -14247,8 +14323,8 @@
       ['Última revisión de SAP', `Ingresados ${d.ultima.ing ? fechaHoraCorta(d.ultima.ing) : 'sin revisar'} · Autorizados ${d.ultima.aut ? fechaHoraCorta(d.ultima.aut) : 'sin revisar'}`],
       ['Listas de materiales revisadas', d.cobertura ? `${d.cobertura.alDia} de ${d.cobertura.listas} al día${d.cobertura.alDia < d.cobertura.listas ? ' (el resto se revisa solo, en segundo plano: este Excel puede estar incompleto)' : ''}` : 'sin revisar'],
       ['RMD con cambios', new Set(hs.map((h) => h.mdId)).size], ['Recetas con cambios', hs.length],
-      ['Qué compara', 'La lista de materiales (componentes, cantidades y, salvo en Acondicionado y Envase, el texto de la lista que el PDF imprime bajo los insumos) y los datos de la versión de fabricación (puesto de trabajo, hoja de ruta, contador y alternativa) copiados en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
-      ['Fecha y hora', 'SAP informa la fecha «válido desde» de cada componente, no la hora ni la fecha de la hoja de ruta. «Detectado el» es la fecha y hora de la revisión que vio la diferencia por primera vez.'],
+      ['Qué compara', 'La lista de materiales (componentes, cantidades y, salvo en Acondicionado y Envase, el texto de la lista que el PDF imprime bajo los insumos) copiada en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
+      ['Fecha y hora', 'SAP informa la fecha «válido desde» de cada componente, no la hora. «Detectado el» es la fecha y hora de la revisión que vio la diferencia por primera vez.'],
       ['Cómo se corrige', 'En «Asociar fórmulas» del RMD: Eliminar Receta → Agregar Producto → asociarla de nuevo.']]
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Recetas con cambios en SAP ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, rmd: new Set(hs.map((h) => h.mdId)).size, recetas: hs.length, diferencias: dif.length };
@@ -15527,7 +15603,7 @@
   }
   function quitarPestanaCC(itb) {
     const items = itb.getItems(), i = items.findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_CC); if (i < 0) return;
-    if (itb.getSelectedKey() === CLAVE_PESTANA_CC) { if (ACC.vista && ACC.vista.itb === itb) ACC.vista.mostrar(false); const prim = items.find((x) => x.getKey && x.getKey() !== CLAVE_PESTANA_CC && x.getText); if (prim) itb.setSelectedKey(prim.getKey()); }
+    if (itb.getSelectedKey() === CLAVE_PESTANA_CC) { if (ACC.vista && ACC.vista.itb === itb) ACC.vista.mostrar(false); const prim = items.find((x) => x.getKey && ![CLAVE_PESTANA_CC, CLAVE_PESTANA_SEG, CLAVE_PESTANA_ACU].includes(x.getKey()) && x.getText); if (prim) itb.setSelectedKey(prim.getKey()); }
     const sep = items[i - 1]; itb.removeItem(items[i]).destroy(); if (sep && sep.__rmd) itb.removeItem(sep).destroy();
     const v = ACC.vista;
     if (v && v.itb === itb) {
@@ -15548,7 +15624,7 @@
     const [ITF, ITS, VBox, HBox, Table, Column, CLI, Text, Title, Label, Input, Select, Item, Button, Toolbar, Spacer, ObjectStatus, Link, JSONModel] =
       ['m/IconTabFilter', 'm/IconTabSeparator', 'm/VBox', 'm/HBox', 'm/Table', 'm/Column', 'm/ColumnListItem', 'm/Text', 'm/Title', 'm/Label', 'm/Input', 'm/Select', 'ui/core/Item', 'm/Button', 'm/Toolbar', 'm/ToolbarSpacer', 'm/ObjectStatus', 'm/Link', 'ui/model/json/JSONModel'].map(ui5);
     if (![ITF, ITS, VBox, HBox, Table, Column, CLI, Text, Title, Label, Input, Select, Item, Button, Toolbar, Spacer, ObjectStatus, Link, JSONModel].every(Boolean)) return;
-    const modelo = new JSONModel({ filas: [], total: 0, info: '', ocupado: false, f: { codigo: '', descripcion: '', planta: '', estado: '', analista: '' }, analistas: [], fc: {}, fa: {} });
+    const modelo = new JSONModel({ filas: [], total: 0, info: '', ocupado: false, seg: !!on('seguimientocc'), f: { codigo: '', descripcion: '', planta: '', estado: '', analista: '' }, analistas: [], fc: {}, fa: {} });
     const filtro = (prop, etiqueta, ctl) => new VBox({ items: [new Label({ text: etiqueta + ':' }), ctl] }).addStyleClass('rmd-cc-filtro');
     const sel = (prop, opciones) => new Select({ width: '100%', selectedKey: `{cc>/f/${prop}}`, change: () => pintarFilasCC(), items: opciones.map(([k, t]) => new Item({ key: k, text: t })) });
     const selAnalista = new Select({ width: '100%', selectedKey: '{cc>/f/analista}', change: () => pintarFilasCC(), items: { path: 'cc>/analistas', template: new Item({ key: '{cc>k}', text: '{cc>t}' }), templateShareable: false } });
@@ -15571,14 +15647,15 @@
       headerToolbar: new Toolbar({ content: [new Title({ text: 'Controles de Cambios ({cc>/total})' }), new Spacer(), new Text({ text: '{cc>/info}' }).addStyleClass('rmd-cc-info'),
         new Button({ icon: 'sap-icon://excel-attachment', text: 'Cargar Excel', type: 'Transparent', tooltip: 'Excel del REGISTRO DE CONTROLES DE CAMBIO P1-P2 (hoja «ACCIONES CC»): se toman las acciones de DOC abiertas, en plazo o vencidas, que tocan un RMD', press: () => archivo.click() }),
         new Button({ icon: 'sap-icon://refresh', type: 'Transparent', tooltip: 'Volver a leer las Observaciones de los RMD', press: () => leerRmdParaCC(true).catch((e) => toast('No se pudieron leer los RMD: ' + e.message, true)) })] }),
-      columns: COLS_CC.map(({ t, w, c }) => new Column({ width: w || undefined, header: !c ? new Text({ text: t, wrapping: true }) : new HBox({ alignItems: 'Center', items: [
-        new Text({ text: t, wrapping: true }), new Button({ icon: 'sap-icon://filter', type: `{= \${cc>/fa/${c}} ? 'Emphasized' : 'Transparent' }`, tooltip: `Filtrar ${t}`,
-          press: (e) => abrirFiltroColumnaCC(c, t, e.getSource()) }).addStyleClass('rmd-cc-colfiltro')] }) })),
+      columns: COLS_CC.map(({ t, w, c, ft, wSeg }) => new Column({ width: wSeg ? `{= \${cc>/seg} ? '${wSeg}' : '${w}' }` : w || undefined, header: !c ? new Text({ text: t, wrapping: true }) : new HBox({ alignItems: 'Center', items: [
+        new Text({ text: t, wrapping: true }), new Button({ icon: 'sap-icon://filter', type: `{= \${cc>/fa/${c}} ? 'Emphasized' : 'Transparent' }`, tooltip: `Filtrar ${ft || t}`, visible: wSeg ? '{cc>/seg}' : true,
+          press: (e) => abrirFiltroColumnaCC(c, ft || t, e.getSource()) }).addStyleClass('rmd-cc-colfiltro')] }) })),
       items: { path: 'cc>/filas', templateShareable: false, template: new CLI({ cells: [
         new Text({ text: '{cc>codigoTxt}' }), new Text({ text: '{cc>accion}' }), new Text({ text: '{cc>descripcion}', maxLines: 3, tooltip: '{cc>descripcion}' }), new Text({ text: '{cc>etapaTxt}' }), new Text({ text: '{cc>area}' }), new Text({ text: '{cc>planta}' }),
         estado(), new Text({ text: '{cc>plazoTxt}' }), new Text({ text: '{cc>ingresoTxt}' }), new Text({ text: '{cc>autorizacionTxt}' }), new Text({ text: '{cc>analista}' }),
         new ObjectStatus({ text: '{cc>rmdTxt}', state: '{cc>rmdEstado}', tooltip: '{cc>rmdTip}' }),
-        new Button({ icon: 'sap-icon://documents', type: 'Transparent', tooltip: 'RMD asociados y envío de evidencia', press: (e) => abrirRmdAsociados(e.getSource().getBindingContext('cc').getObject()) })] }) } }).addStyleClass('rmd-cc-tabla');
+        new HBox({ alignItems: 'Center', items: [new Button({ icon: 'sap-icon://documents', type: 'Transparent', tooltip: 'RMD asociados y envío de evidencia', press: (e) => abrirRmdAsociados(e.getSource().getBindingContext('cc').getObject()) }),
+          new Button({ icon: 'sap-icon://flag', visible: '{cc>/seg}', type: '{= ${cc>bandera} ? "Emphasized" : "Transparent" }', tooltip: '{cc>banderaTip}', press: (e) => segAlternarBandera(e.getSource().getBindingContext('cc').getObject()).catch(segFallo) }).addStyleClass('rmd-cc-bandera')] })] }) } }).addStyleClass('rmd-cc-tabla');
     const cont = new VBox({ items: [barra, tabla], width: '100%' }).addStyleClass('rmd-cc-pestana');
     cont.setModel(modelo, 'cc');
     const sep = new ITS(); sep.__rmd = true;
@@ -15590,8 +15667,8 @@
     const enCuerpo = !!(agr && agr.multiple);
     const pestana = new ITF({ key: CLAVE_PESTANA_CC, text: 'Controles de Cambios', icon: 'sap-icon://approvals', iconColor: 'Critical', tooltip: 'Acciones abiertas de DOC del registro de controles de cambio con sus RMD asociados', content: enCuerpo ? [] : [cont] });
     if (enCuerpo) { cont.setVisible(false); cuerpo.addAggregation(agr.name, cont); }
-    // a la izquierda de «Acuerdos» si esa pestaña ya está (y de su separador)
-    const iAcu = itb.getItems().findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_ACU), antes = iAcu > 0 && itb.getItems()[iAcu - 1].__rmdAcu ? iAcu - 1 : iAcu;
+    // a la izquierda de «Seguimiento CC» o «Acuerdos» si ya están (y de su separador)
+    const iAcu = itb.getItems().findIndex((x) => x.getKey && [CLAVE_PESTANA_SEG, CLAVE_PESTANA_ACU].includes(x.getKey())), previo = iAcu > 0 && itb.getItems()[iAcu - 1], antes = previo && (previo.__rmdAcu || previo.__rmdSeg) ? iAcu - 1 : iAcu;
     if (antes >= 0) { itb.insertItem(sep, antes); itb.insertItem(pestana, antes + 1); } else { itb.addItem(sep); itb.addItem(pestana); }
     const cab = dp && dp.getHeader && dp.getHeader(), conservar0 = dp && dp.getPreserveHeaderStateOnScroll ? dp.getPreserveHeaderStateOnScroll() : null;
     const ajenos = () => (enCuerpo ? cuerpo.getAggregation(agr.name) || [] : []).concat(cab && cab.getContent ? cab.getContent() : []).filter((c) => c !== cont && c !== itb && c.addStyleClass);
@@ -15607,7 +15684,7 @@
     ACC.vista = { itb, modelo, tabla, archivo, pestana, cont, dp, cuerpo, agr: enCuerpo ? agr.name : '', ajenos, conservar0, mostrar };
     itb.attachSelect((e) => {
       const nuestra = e.getParameter('key') === CLAVE_PESTANA_CC; mostrar(nuestra);
-      if (nuestra) { if (!ACC.datos) leerAccionesGuardadas(); if (ACC.datos) leerRmdParaCC(false).catch((er) => toast('No se pudieron leer los RMD: ' + er.message, true)); }
+      if (nuestra) { if (!ACC.datos) leerAccionesGuardadas(); if (ACC.datos) leerRmdParaCC(false).catch((er) => toast('No se pudieron leer los RMD: ' + er.message, true)); if (on('seguimientocc')) leerSeguimiento(false); }
     });
     if (!ACC.datos) leerAccionesGuardadas(); else refrescarPestanaCC();
   }
@@ -15615,7 +15692,8 @@
   // Columnas de la tabla; con «c» la cabecera lleva un filtro de valores (como el de Excel) sobre ese campo de filasPestanaCC
   const COLS_CC = [{ t: 'Código', w: '6.5rem', c: 'codigoTxt' }, { t: 'Acción', w: '5rem', c: 'accion' }, { t: 'Descripción', c: 'descripcion' }, { t: 'Etapa', w: '6rem', c: 'etapas' }, { t: 'Área', w: '4.5rem', c: 'area' },
     { t: 'Planta', w: '5rem', c: 'planta' }, { t: 'Estado', w: '6rem', c: 'estado' }, { t: 'Plazo', w: '6rem', c: 'plazoTxt' }, { t: 'Fecha de ingreso', w: '6rem', c: 'ingresoTxt' },
-    { t: 'Fecha de autorización', w: '6.5rem', c: 'autorizacionTxt' }, { t: 'Analista', w: '6.5rem', c: 'analista' }, { t: 'RMD', w: '5rem', c: 'rmdTxt' }, { t: 'Acción', w: '3.5rem' }];
+    { t: 'Fecha de autorización', w: '6.5rem', c: 'autorizacionTxt' }, { t: 'Analista', w: '6.5rem', c: 'analista' }, { t: 'RMD', w: '5rem', c: 'rmdTxt' },
+    { t: 'Acción', w: '3.5rem', wSeg: '5.5rem', c: 'banderaTxt', ft: 'Bandera' }];   // con «Seguimiento de CC» (v1.122.0) lleva también la bandera ⚑ y su filtro (Con bandera)
   const VACIAS_CC = '(Vacías)';
   const valoresColCC = (x, c) => { const v = Array.isArray(x[c]) ? x[c].map(String) : [x[c] == null ? '' : String(x[c])]; return v.length ? v : ['']; };
   const claveOrdenCC = (v) => (/^\d\d\/\d\d\/\d{4}$/.test(v) ? v.slice(6) + v.slice(3, 5) + v.slice(0, 2) : v);
@@ -15649,6 +15727,12 @@
       afterClose: () => pop.destroy() }).addStyleClass('rmd-cc-colpop');
     pop.setModel(m, 'p'); marcarTodo(); pop.openBy(boton);
   }
+  // bandera ⚑ del CC (la comparten todas sus acciones): está en «Seguimiento CC»
+  function banderaCC(a) {
+    const seg = segConBandera(a.carpeta), n = seg ? (seg.rmd || []).length : 0;
+    return { bandera: !!seg, banderaTxt: seg ? 'Con bandera' : '', banderaTip: seg ? `Con bandera (${usuarioVisible(seg.marcadoPor)}, ${segDia(seg.marcadoEn)}): en «Seguimiento CC» con ${n} RMD. Pulsa para quitarla.`
+      : SEG.error && !SEG.lista ? `Sin conexión con status-rmd: no se puede marcar (${SEG.error})` : 'Marcar con bandera: el CC pasa a la pestaña «Seguimiento CC» para asociar sus RMD y seguir si ya se ejecutó' };
+  }
   function filasPestanaCC() {
     const acciones = (ACC.datos && ACC.datos.acciones) || [];
     return acciones.map((a) => {
@@ -15656,7 +15740,8 @@
       return { ...a, codigoTxt: a.codigo + (a.adenda ? ' ' + a.adenda : ''), etapaTxt: a.etapas.join(', '), plazoTxt: ccFecha(a.plazo),
         ingresoTxt: r ? ccFecha(r.ingreso) : '', autorizacionTxt: r ? ccFecha(r.autorizacion) : '',
         rmdTxt: !r ? (ACC.leyendo ? '…' : '') : r.n ? `${r.autorizados}/${r.n} aut.` : 'Sin RMD', rmdEstado: !r ? 'None' : !r.n ? 'Warning' : r.autorizados === r.n ? 'Success' : 'Information',
-        rmdTip: !r ? '' : r.n ? `${r.n} RMD con el ${a.codigo} en Observaciones: ${r.autorizados} Autorizados, ${r.pendientes} con el CC pendiente` : `Ningún RMD de ${a.planta || 'la planta'} nombra el ${a.codigo} en Observaciones` };
+        rmdTip: !r ? '' : r.n ? `${r.n} RMD con el ${a.codigo} en Observaciones: ${r.autorizados} Autorizados, ${r.pendientes} con el CC pendiente` : `Ningún RMD de ${a.planta || 'la planta'} nombra el ${a.codigo} en Observaciones`,
+        ...banderaCC(a) };
     });
   }
   function pintarFilasCC() {
@@ -15670,8 +15755,11 @@
     v.modelo.setProperty('/analistas', [{ k: '', t: 'Todos' }].concat([...new Set(todas.map((x) => x.analista).filter(Boolean))].sort().map((a) => ({ k: a, t: a }))));
   }
   function refrescarPestanaCC() {
+    refrescarPestanaSeg();                                                    // «Seguimiento CC» usa los mismos RMD leídos
     const v = ACC.vista; if (!v) return;
     if (v.itb.bIsDestroyed || !v.pestana.getParent()) { v.archivo.remove(); ACC.vista = null; return; }
+    const seg = !!on('seguimientocc'); if (v.modelo.getProperty('/seg') !== seg) v.modelo.setProperty('/seg', seg);
+    if (seg && !SEG.leidoEn && !SEG.leyendo) leerSeguimiento(false);
     const d = ACC.datos;
     v.modelo.setProperty('/info', !d ? 'Sin Excel cargado' : `${d.archivo} · cargado el ${fechaHoraCorta(d.cargado)}${ACC.leyendo ? ` · leyendo RMD ${ACC.avance || ''}` : ''}`);
     v.modelo.setProperty('/ocupado', !!ACC.leyendo && !ACC.ind);
@@ -15755,6 +15843,399 @@
     finally { if (ACC.dlg === x) { x.modelo.setProperty('/ocupado', false); leerEvidencias(); } }
   }
   window.__rmdStats.controlesCambio = { AccionesCC, ACC, cargar: cargarExcelAcciones, leer: leerRmdParaCC, abrir: abrirRmdAsociados, ponerMds: (mds) => { ACC.mds = mds; ACC.ind = AccionesCC.indiceRmd(mds, Pendientes.analizar, Pendientes.ccsDe); ACC.leidoEn = Date.now(); refrescarPestanaCC(); } };   // pruebas
+
+  // ---- 9 quinquies bis. Seguimiento de CC con bandera (v1.122.0, pedido de CINTIA) ----
+  // En «Controles de Cambios» cada CC se marca con una bandera; los marcados pasan a la pestaña «Seguimiento CC», donde el equipo de RMD asocia
+  // a mano los RMD impactados y ve si cada uno ya ejecutó el CC. Se guarda en Supabase como los Acuerdos (una fila «ccseguimiento:<CC>» por CC),
+  // así lo ve todo el equipo. Al marcar se asocian de entrada los RMD que ya nombran el CC en Observaciones; luego se suman desde «Mis
+  // movimientos» o buscando. Un RMD se da por ejecutado solo cuando su versión de hoy está Autorizada con el CC aplicado en Observaciones
+  // (o si alguien lo marca a mano). No escribe nada en SAP.
+  // ==SEGCC-INICIO==
+  const SeguimientoCC = (() => {
+    const plano = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+    const fam = (m) => String((m && (m.linaje || m.codigo)) || '');            // linaje del RMD: codigoversionprincipal o su código
+    const ORDEN = { 'Pendiente': 0, 'En proceso': 1, 'Sin RMD': 2, 'Ejecutado': 3 };
+    const TIPO_TXT = { aplicado: 'Aplicado', pendiente: 'Pendiente', mencion: 'Mencionado' };
+    // seguimiento nuevo de un CC (id = código + adenda, como la carpeta de evidencias) con sus acciones del Excel
+    function nuevo(cc, acciones, quien, ahora) {
+      return { id: cc.carpeta, codigo: cc.codigo, adenda: cc.adenda || '', planta: cc.planta || '',
+        acciones: acciones.map((a) => ({ accion: a.accion || '', descripcion: a.descripcion || '', plazo: a.plazo || '', analista: a.analista || '', estado: a.estado || '' })),
+        marcadoPor: quien, marcadoEn: ahora, actualizadoPor: quien, actualizadoEn: ahora, rmd: [], historial: [{ fecha: ahora, por: quien, accion: 'Marcó el CC con bandera' }] };
+    }
+    // suma RMD sin repetir su linaje → cuántos entraron
+    function agregar(rec, rmds, quien, ahora, origen) {
+      rec.rmd = rec.rmd || []; const ya = new Set(rec.rmd.map((r) => r.fam)); let n = 0;
+      (rmds || []).forEach((m) => {
+        const f = fam(m); if (!f || ya.has(f)) return; ya.add(f); n++;
+        rec.rmd.push({ fam: f, codigo: String(m.codigo || ''), descripcion: m.descripcion || '', etapa: m.etapa || '', planta: m.planta || '', agregadoPor: quien, agregadoEn: ahora, origen: origen || 'A mano' });
+      });
+      return n;
+    }
+    // versión de hoy del RMD: la más alta no cancelada de su linaje
+    function versionHoy(r, mds) {
+      const vs = (mds || []).filter((m) => fam(m) === r.fam || String(m.codigo) === String(r.codigo));
+      vs.sort((a, b) => (+b.version || 0) - (+a.version || 0) || (+b.mdId || 0) - (+a.mdId || 0));
+      return vs.find((m) => !/CANCELAD/.test(plano(m.estado))) || vs[0] || null;
+    }
+    // un RMD frente al CC: cómo nombra el CC su versión de hoy y si ya lo ejecutó (automático: Autorizado con el CC aplicado; o a mano)
+    function estadoRmd(r, mds, ind, codigoCC) {
+      const md = versionHoy(r, mds), est = md ? String(md.estado || '') : '';
+      const l = md && ind && ind.get(codigoCC), tipo = (l && l.get(md.mdId) && l.get(md.mdId).tipo) || '';
+      const aut = /AUTORIZAD/.test(plano(est)), auto = tipo === 'aplicado' && aut;
+      const ejecutado = typeof r.manual === 'boolean' ? r.manual : auto;
+      // En proceso: la versión de hoy ya trae el CC aplicado (sin autorizar) o hay una versión Ingresada; si no, Pendiente
+      const enProceso = tipo === 'aplicado' || /INGRESAD/.test(plano(est));
+      return { md, codigo: md ? String(md.codigo) : r.codigo, version: md ? String(md.version) : '', estadoSap: est || (md ? '' : 'No encontrado'), tipo, tipoTxt: TIPO_TXT[tipo] || '—',
+        auto, manual: typeof r.manual === 'boolean', ejecutado, estado: ejecutado ? 'Ejecutado' : enProceso ? 'En proceso' : 'Pendiente', fechaAut: md && aut ? md.fechaAut || '' : '' };
+    }
+    function estadoCC(es) {
+      if (!es.length) return 'Sin RMD';
+      const n = es.filter((e) => e.ejecutado).length;
+      return n === es.length ? 'Ejecutado' : n || es.some((e) => e.estado === 'En proceso') ? 'En proceso' : 'Pendiente';
+    }
+    // ✓ a mano: si coincide con lo automático se vuelve a lo automático
+    function marcar(r, ejecutado, auto, quien, ahora) {
+      if (ejecutado === auto) { delete r.manual; delete r.manualPor; delete r.manualEn; } else { r.manual = ejecutado; r.manualPor = quien; r.manualEn = ahora; }
+    }
+    const plazoDe = (rec) => (rec.acciones || []).map((a) => a.plazo).filter(Boolean).sort()[0] || '';
+    const analistasDe = (rec) => [...new Set((rec.acciones || []).map((a) => a.analista).filter(Boolean))].join(', ');
+    const accionesTxt = (rec) => (rec.acciones || []).map((a) => `Acción ${a.accion || 's/n'}: ${a.descripcion}`).join(' | ');
+    // Cuadro: una fila por CC y RMD (un CC sin RMD, una fila); items = [{ rec, filas: [{ r, e }], estado }]
+    const COLS = ['Código CC', 'Planta', 'Acciones', 'Plazo', 'Analista', 'Estado del CC', 'Código RMD', 'Versión', 'Producto', 'Etapa', 'Status en SAP', 'CC en Observaciones', 'Ejecutado', 'Fecha de autorización', 'Asociado por', 'Marcado por'];
+    function filasCuadro(items, dia, quien) {
+      const out = [], d = (iso) => (iso ? dia(iso) : ''), q = quien || ((x) => x);
+      items.forEach(({ rec, filas, estado }) => {
+        const cab = [rec.codigo + (rec.adenda ? ' ' + rec.adenda : ''), rec.planta, accionesTxt(rec), d(plazoDe(rec)), analistasDe(rec), estado];
+        const pie = (r) => [r ? `${q(r.agregadoPor)} ${d(r.agregadoEn)}`.trim() : '', `${q(rec.marcadoPor)} ${d(rec.marcadoEn)}`.trim()];
+        if (!filas.length) { out.push([...cab, '', '', '', '', '', '', '', '', ...pie(null)]); return; }
+        filas.forEach(({ r, e }) => out.push([...cab, e ? e.codigo : r.codigo, e ? e.version : '', r.descripcion, r.etapa, e ? e.estadoSap : '', e ? e.tipoTxt : '',
+          e ? (e.ejecutado ? (e.manual ? 'Sí (a mano)' : 'Sí') : 'No') : '', e ? d(e.fechaAut) : '', ...pie(r)]));
+      });
+      return out;
+    }
+    return { fam, nuevo, agregar, versionHoy, estadoRmd, estadoCC, marcar, plazoDe, analistasDe, accionesTxt, filasCuadro, COLS, ORDEN, TIPO_TXT };
+  })();
+  // ==SEGCC-FIN==
+  const CLAVE_PESTANA_SEG = 'rmdSeguimientoCC', SEG_PREFIJO = 'ccseguimiento:';
+  const SEG = { lista: null, fuente: '', error: '', leyendo: null, leidoEn: 0, ver: 0 };
+  const SEGV = { vista: null, f: { planta: '', estado: '', q: '' } };
+  // fecha del día en hora local (las marcas con hora vienen en UTC: de noche en Perú ya es el día siguiente en UTC)
+  const segDia = (iso) => { const s = String(iso || ''), d = s.length > 10 ? new Date(s) : null, p = (n) => String(n).padStart(2, '0');
+    if (d && !isNaN(d)) return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : s; };
+  function segGuardarCopia(lista, fuente) {
+    SEG.lista = lista; SEG.fuente = fuente; SEG.leidoEn = Date.now(); SEG.ver++;
+    Almacen.guardar('ccSeguimiento', { lista, fuente, guardado: new Date().toISOString() }).catch(() => { /* la copia es opcional */ });
+    refrescarPestanaSeg(); refrescarPestanaCC();
+  }
+  function leerSeguimiento(forzar) {
+    if (SEG.leyendo) return SEG.leyendo;
+    if (!forzar && SEG.lista && Date.now() - SEG.leidoEn < 120000) return Promise.resolve(SEG.lista);
+    SEG.leyendo = fetch(`${ACU_SUPABASE}?key=like.${encodeURIComponent(SEG_PREFIJO + '*')}&select=value`, { headers: acuCabeceras() })
+      .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then((filas) => { SEG.error = ''; segGuardarCopia(filas.map((f) => f.value).filter((x) => x && x.id), 'status-rmd'); return SEG.lista; })
+      .catch(async (e) => {
+        SEG.error = e.message || String(e); SEG.leidoEn = Date.now();
+        if (!SEG.lista) { const c = await Almacen.leer('ccSeguimiento').catch(() => null); if (c && Array.isArray(c.lista)) { SEG.lista = c.lista; SEG.fuente = `copia del ${fechaHoraCorta(c.guardado)}`; } }
+        SEG.ver++; return SEG.lista;
+      })
+      .finally(() => { SEG.leyendo = null; refrescarPestanaSeg(); refrescarPestanaCC(); });
+    refrescarPestanaSeg();
+    return SEG.leyendo;
+  }
+  // Lee la fila de hoy del CC, le aplica «cambiar» (undefined = no cambia, null = borrar) y la guarda: así no se pisa lo que otro acaba de agregar.
+  async function segCambiar(id, cambiar) {
+    const clave = encodeURIComponent(SEG_PREFIJO + id);
+    const r0 = await fetch(`${ACU_SUPABASE}?key=eq.${clave}&select=value`, { headers: acuCabeceras() });
+    if (!r0.ok) throw new Error('status-rmd respondió ' + r0.status);
+    const actual = ((await r0.json())[0] || {}).value || null;
+    const nuevo = cambiar(actual ? JSON.parse(JSON.stringify(actual)) : null);
+    if (nuevo === undefined) return actual;
+    if (nuevo === null) {
+      const r = await fetch(`${ACU_SUPABASE}?key=eq.${clave}`, { method: 'DELETE', headers: acuCabeceras() }); if (!r.ok) throw new Error('status-rmd respondió ' + r.status);
+    } else {
+      nuevo.actualizadoPor = acuQuien(); nuevo.actualizadoEn = new Date().toISOString(); nuevo.historial = (nuevo.historial || []).slice(-80);
+      const r = await fetch(`${ACU_SUPABASE}?on_conflict=key`, { method: 'POST', headers: acuCabeceras({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify([{ key: SEG_PREFIJO + id, value: nuevo, updated_at: nuevo.actualizadoEn }]) });
+      if (!r.ok) throw new Error('status-rmd respondió ' + r.status);
+    }
+    segGuardarCopia((SEG.lista || []).filter((x) => x.id !== id).concat(nuevo ? [nuevo] : []), 'status-rmd');
+    return nuevo;
+  }
+  const segFallo = (e) => toast('No se pudo guardar en status-rmd: ' + (e.message || e), true);
+  const segConBandera = (id) => (SEG.lista || []).find((x) => x.id === id) || null;
+  // RMD que nombran el CC en Observaciones (última versión de cada uno), de la planta del CC
+  const segSugeridos = (rec) => (ACC.ind ? AccionesCC.asociados(ACC.ind, { codigo: rec.codigo, planta: rec.planta }, false) : []);
+  // Bandera de una fila de «Controles de Cambios»: marca el CC (con sus RMD sugeridos) o lo quita del seguimiento
+  async function segAlternarBandera(fila) {
+    const id = fila.carpeta, rec = segConBandera(id), quien = acuQuien(), ahora = new Date().toISOString();
+    if (rec) {
+      const n = (rec.rmd || []).length;
+      if (!await confirmar(`¿Quitar la bandera del ${fila.codigoTxt}?`, `Sale de «Seguimiento CC» para todo el equipo${n ? ` y se pierden sus ${n} RMD asociados` : ''}.`, 'No cambia nada en SAP.', { si: 'Quitar bandera', peligro: true })) return;
+      await segCambiar(id, () => null); toast(`${fila.codigoTxt} ya no tiene bandera.`); return;
+    }
+    const acciones = ((ACC.datos && ACC.datos.acciones) || []).filter((a) => a.carpeta === id), sug = segSugeridos(fila);
+    const r = await segCambiar(id, (actual) => {
+      if (actual) return undefined;                                    // otro ya lo marcó
+      const x = SeguimientoCC.nuevo(fila, acciones.length ? acciones : [fila], quien, ahora), n = SeguimientoCC.agregar(x, sug, quien, ahora, 'Observaciones');
+      if (n) x.historial.push({ fecha: ahora, por: quien, accion: `Asoció ${n} RMD que ya nombran el CC en Observaciones` });
+      return x;
+    });
+    toast(`${fila.codigoTxt} con bandera: está en la pestaña «Seguimiento CC»${r && r.rmd.length ? ` con ${r.rmd.length} RMD que ya lo nombran en Observaciones` : ''}.`);
+  }
+  // CC con bandera, con el estado de cada RMD (si ya se leyeron los RMD) y los filtros de la pestaña
+  function segItems(filtrar) {
+    const f = SEGV.f, P = (t) => SIN_ACENTOS(t), palabras = P(f.q).split(/\s+/).filter(Boolean);
+    return (SEG.lista || []).map((rec) => {
+      const filas = (rec.rmd || []).map((r) => ({ r, e: ACC.mds ? SeguimientoCC.estadoRmd(r, ACC.mds, ACC.ind, rec.codigo) : null }));
+      const estado = ACC.mds ? SeguimientoCC.estadoCC(filas.map((x) => x.e)) : filas.length ? '…' : 'Sin RMD';
+      return { rec, filas, estado, ejecutados: filas.filter((x) => x.e && x.e.ejecutado).length };
+    }).filter((x) => !filtrar || ((!f.planta || AccionesCC.mismaPlanta(x.rec.planta, f.planta === 'P1' ? 'PLANTA ATE' : 'PLANTA LIMA')) && (!f.estado || x.estado === f.estado)
+      && (!palabras.length || (() => { const t = P([x.rec.codigo, x.rec.adenda, SeguimientoCC.accionesTxt(x.rec), SeguimientoCC.analistasDe(x.rec), ...x.filas.flatMap(({ r, e }) => [r.codigo, e && e.codigo, r.descripcion, r.etapa])].join(' ')); return palabras.every((w) => t.includes(w)); })())))
+      .sort((a, b) => (SeguimientoCC.ORDEN[a.estado] ?? 1) - (SeguimientoCC.ORDEN[b.estado] ?? 1) || String(SeguimientoCC.plazoDe(a.rec) || '9').localeCompare(String(SeguimientoCC.plazoDe(b.rec) || '9')) || String(a.rec.id).localeCompare(String(b.rec.id)));
+  }
+  const segClase = (e) => SIN_ACENTOS(e).toLowerCase().replace(/[^a-z]+/g, '-');
+  function htmlSeguimiento(x) {
+    const { rec, filas, estado, ejecutados } = x, n = filas.length, pct = n ? Math.round((ejecutados / n) * 100) : 0, plazo = SeguimientoCC.plazoDe(rec), an = SeguimientoCC.analistasDe(rec);
+    const fila = ({ r, e }) => `<tr data-fam="${esc(r.fam)}" class="${e && e.ejecutado ? 'rmd-seg-hecho' : ''}">
+      <td class="rmd-nowrap"><button type="button" class="rmd-link" data-acc="abrir" title="Ir al RMD (queda filtrado en la lista principal)">${esc(e ? e.codigo : r.codigo)}</button>${e && e.version ? ` <span class="rmd-nota">v${esc(e.version)}</span>` : ''}</td>
+      <td>${esc(r.descripcion)}${r.planta ? `<div class="rmd-nota">${esc(r.planta)}</div>` : ''}</td><td>${esc(r.etapa)}</td>
+      <td class="rmd-nowrap">${e ? `<span class="rmd-seg-sap ${segClase(e.estadoSap)}">${esc(e.estadoSap || '—')}</span>` : '…'}</td>
+      <td class="rmd-nowrap">${e ? `<span class="rmd-seg-obs ${e.tipo}" title="Cómo nombra el CC la Observación de su versión de hoy">${esc(e.tipoTxt)}</span>` : '…'}</td>
+      <td class="rmd-nowrap"><label class="rmd-seg-check" title="${e && e.manual ? `Marcado a mano por ${esc(usuarioVisible(r.manualPor || ''))}${r.manualEn ? ' el ' + esc(segDia(r.manualEn)) : ''}` : 'Automático: Autorizado con el CC aplicado en Observaciones. Puedes marcarlo a mano.'}"><input type="checkbox" data-acc="ejecutado"${e && e.ejecutado ? ' checked' : ''}${e ? '' : ' disabled'}> ${e && e.ejecutado ? 'Ejecutado' : 'No'}</label>${e && e.manual ? ' <span class="rmd-nota">(a mano)</span>' : ''}${e && e.fechaAut && e.ejecutado ? `<div class="rmd-nota">Aut. ${esc(segDia(e.fechaAut))}</div>` : ''}</td>
+      <td class="rmd-nota rmd-nowrap" title="${esc(`${usuarioVisible(r.agregadoPor || '')} · ${segDia(r.agregadoEn)}`)}">${esc(r.origen === 'Observaciones' ? 'Observaciones' : r.origen === 'Mis movimientos' ? 'Mis movimientos' : 'A mano')}</td>
+      <td><button type="button" class="rmd-btn rmd-seg-x" data-acc="quitar" title="Quitar este RMD del CC">✕</button></td></tr>`;
+    return `<section class="rmd-seg-cc ${segClase(estado)}" data-id="${esc(rec.id)}"><header>
+      <div class="rmd-seg-tit"><h4><span class="rmd-seg-bandera" aria-hidden="true">⚑</span> ${esc(rec.codigo)}${rec.adenda ? ' ' + esc(rec.adenda) : ''} <span class="rmd-seg-estado ${segClase(estado)}">${esc(estado)}</span></h4>
+        <div class="rmd-nota">${[rec.planta, plazo && `Plazo ${segDia(plazo)}`, an && `Analista ${an}`, `Bandera de ${usuarioVisible(rec.marcadoPor) || '—'} el ${segDia(rec.marcadoEn)}`].filter(Boolean).map(esc).join(' · ')}</div></div>
+      <div class="rmd-seg-avance" title="${ejecutados} de ${n} RMD ya ejecutaron el CC"><b>${ejecutados} de ${n}</b> ejecutados<div class="rmd-seg-barra"><i style="width:${pct}%"></i></div></div>
+      <div class="rmd-seg-acc"><button type="button" class="rmd-btn primario" data-acc="asociar">+ Asociar RMD</button><button type="button" class="rmd-btn" data-acc="historial">Historial</button><button type="button" class="rmd-btn rmd-seg-quitar" data-acc="quitarcc" title="Quitar la bandera (sale del seguimiento para todos)">Quitar bandera</button></div></header>
+      ${(rec.acciones || []).length ? `<details class="rmd-seg-acciones"><summary>${rec.acciones.length === 1 ? '1 acción' : rec.acciones.length + ' acciones'} del CC</summary><ul>${rec.acciones.map((a) => `<li><b>Acción ${esc(a.accion || 's/n')}</b>${a.plazo ? ` · plazo ${esc(segDia(a.plazo))}` : ''}${a.estado ? ` · ${esc(a.estado)}` : ''}: ${esc(a.descripcion)}</li>`).join('')}</ul></details>` : ''}
+      ${n ? `<table class="rmd-tabla rmd-seg-t"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Status en SAP</th><th>CC en Observaciones</th><th>¿Ejecutó el CC?</th><th>Asociado</th><th></th></tr></thead><tbody>${filas.map(fila).join('')}</tbody></table>`
+        : '<p class="rmd-seg-sinrmd">Sin RMD asociados. Pulsa «+ Asociar RMD» para elegirlos de los que nombran el CC, de tus movimientos o buscándolos.</p>'}</section>`;
+  }
+  function pintarPestanaSeg() {
+    const v = SEGV.vista, raiz = v && v.html.getDomRef(); if (!raiz) return;
+    if (!raiz.__rmdSeg) {
+      raiz.__rmdSeg = true;
+      raiz.innerHTML = `<div class="rmd-seg-barra-f">
+        <label>Planta <select data-f="planta"><option value="">Todas</option><option value="P1">Planta 1 (Ate)</option><option value="P2">Planta 2 (Lima)</option></select></label>
+        <label>Estado <select data-f="estado"><option value="">Todos</option><option>Pendiente</option><option>En proceso</option><option>Ejecutado</option><option>Sin RMD</option></select></label>
+        <label class="rmd-seg-buscar">Buscar <input data-f="q" placeholder="CC, código RMD o producto"></label><span class="rmd-seg-espacio"></span>
+        <button type="button" class="rmd-btn" data-acc="copiar" title="Copia lo que se ve (una fila por CC y RMD, sin títulos) para pegarlo en tu cuadro de Excel">Copiar para el cuadro</button>
+        <button type="button" class="rmd-btn" data-acc="excel">Exportar Excel</button><button type="button" class="rmd-btn" data-acc="actualizar" title="Volver a leer el seguimiento y los RMD">Actualizar</button></div>
+        <div class="rmd-seg-info rmd-nota"></div><div class="rmd-seg-lista"></div>`;
+      Object.entries(SEGV.f).forEach(([k, val]) => { const el = raiz.querySelector(`[data-f="${k}"]`); if (el) el.value = val; });
+      const filtrar = (e) => { const k = e.target.dataset && e.target.dataset.f; if (k) { SEGV.f[k] = e.target.value; pintarPestanaSeg(); } };
+      raiz.addEventListener('change', (e) => { if (e.target.dataset && e.target.dataset.acc === 'ejecutado') { segMarcarEjecutado(e.target); return; } filtrar(e); });
+      raiz.addEventListener('input', filtrar);
+      raiz.addEventListener('keydown', (e) => e.stopPropagation());
+      raiz.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-acc]'); if (!b || b.dataset.acc === 'ejecutado') return;
+        const acc = b.dataset.acc, sec = b.closest('[data-id]'), rec = sec && segConBandera(sec.dataset.id), tr = b.closest('tr[data-fam]');
+        if (acc === 'actualizar') { leerSeguimiento(true); leerRmdParaCC(true).catch((er) => toast('No se pudieron leer los RMD: ' + er.message, true)); }
+        else if (acc === 'excel') segExcel().catch((er) => toast('No se pudo exportar: ' + er.message, true));
+        else if (acc === 'copiar') segCopiar();
+        else if (!rec) return;
+        else if (acc === 'asociar') abrirAsociarSeg(rec);
+        else if (acc === 'historial') segHistorial(rec);
+        else if (acc === 'quitarcc') segAlternarBandera({ carpeta: rec.id, codigoTxt: rec.codigo + (rec.adenda ? ' ' + rec.adenda : '') }).catch(segFallo);
+        else if (acc === 'quitar' && tr) {
+          const r = (rec.rmd || []).find((x) => x.fam === tr.dataset.fam); if (!r) return;
+          confirmar(`¿Quitar el RMD ${r.codigo} del ${rec.codigo}?`, 'Deja de seguirse en este CC (para todo el equipo).', 'No cambia nada en SAP.', { si: 'Quitar', peligro: true }).then((si) => {
+            if (!si) return; const quien = acuQuien(), ahora = new Date().toISOString();
+            segCambiar(rec.id, (a) => { if (!a) return undefined; a.rmd = (a.rmd || []).filter((x) => x.fam !== r.fam); a.historial.push({ fecha: ahora, por: quien, accion: `Quitó el RMD ${r.codigo}` }); return a; }).catch(segFallo);
+          });
+        } else if (acc === 'abrir' && tr) {
+          // con Configuración Maestra abierta el portal no deja abrir otro RMD: queda filtrado en la lista principal
+          const r = (rec.rmd || []).find((x) => x.fam === tr.dataset.fam), e2 = r && ACC.mds ? SeguimientoCC.estadoRmd(r, ACC.mds, ACC.ind, rec.codigo) : null, md = e2 && e2.md; if (!r) return;
+          abrirRmdPorCodigo(md ? md.codigo : r.codigo, 'configurar', md ? md.version : undefined);
+        }
+      });
+    }
+    const todos = segItems(false), vis = segItems(true), lista = raiz.querySelector('.rmd-seg-lista');
+    const est = (k) => todos.filter((x) => x.estado === k).length;
+    raiz.querySelector('.rmd-seg-info').textContent = SEG.leyendo && !SEG.lista ? 'Leyendo el seguimiento de status-rmd…'
+      : `${vis.length === todos.length ? todos.length : `${vis.length} de ${todos.length}`} CC con bandera · ${est('Pendiente')} pendientes · ${est('En proceso')} en proceso · ${est('Ejecutado')} ejecutados · fuente: ${SEG.fuente || 'sin datos'}`
+        + `${SEG.error ? ` · sin conexión con status-rmd (${SEG.error}): no se puede guardar` : ''}${ACC.leyendo ? ` · leyendo RMD ${ACC.avance || ''}` : !ACC.mds ? ' · faltan leer los RMD' : ''}`;
+    const html = vis.length ? vis.map(htmlSeguimiento).join('') : `<div class="rmd-seg-vacio">${todos.length ? 'Ningún CC coincide con los filtros.' : 'Todavía no hay CC con bandera. En la pestaña «Controles de Cambios» pulsa la bandera ⚑ del CC que quieras seguir.'}</div>`;
+    if (lista.__html !== html) { const abiertos = new Set([...lista.querySelectorAll('details[open]')].map((x) => x.closest('[data-id]').dataset.id)); lista.__html = html; lista.innerHTML = html;
+      lista.querySelectorAll('details').forEach((x) => { if (abiertos.has(x.closest('[data-id]').dataset.id)) x.open = true; }); }
+  }
+  function segMarcarEjecutado(cb) {
+    const sec = cb.closest('[data-id]'), tr = cb.closest('tr[data-fam]'), rec = sec && segConBandera(sec.dataset.id); if (!rec || !tr || !ACC.mds) return;
+    const fam = tr.dataset.fam, quiere = cb.checked, quien = acuQuien(), ahora = new Date().toISOString(); cb.disabled = true;
+    segCambiar(rec.id, (a) => {
+      const r = a && (a.rmd || []).find((x) => x.fam === fam); if (!r) return undefined;
+      const e = SeguimientoCC.estadoRmd(r, ACC.mds, ACC.ind, a.codigo); SeguimientoCC.marcar(r, quiere, e.auto, quien, ahora);
+      a.historial.push({ fecha: ahora, por: quien, accion: `${quiere ? 'Marcó' : 'Desmarcó'} como ejecutado el RMD ${r.codigo}${quiere === e.auto ? ' (queda automático)' : ' (a mano)'}` }); return a;
+    }).catch((er) => { segFallo(er); refrescarPestanaSeg(); });
+  }
+  function segHistorial(rec) {
+    const v = ventana(`Historial · ${rec.codigo}${rec.adenda ? ' ' + rec.adenda : ''}`, { cancelar: () => v.cerrar() });
+    const h = (rec.historial || []).slice().reverse();
+    v.cuerpo.innerHTML = h.length ? `<table class="rmd-tabla"><thead><tr><th>Fecha</th><th>Quién</th><th>Qué</th></tr></thead><tbody>${h.map((x) => `<tr><td class="rmd-nowrap">${esc(fechaHoraCorta(x.fecha))}</td><td>${esc(usuarioVisible(x.por))}</td><td>${esc(x.accion)}</td></tr>`).join('')}</tbody></table>` : '<p>Sin historial.</p>';
+    v.pie.append(botonModal('Cerrar', '', () => v.cerrar()));
+  }
+  // «Asociar RMD»: de los que nombran el CC en Observaciones, de «Mis movimientos» (hoy o entre fechas) o buscando por código o producto
+  function abrirAsociarSeg(rec0) {
+    const v = ventana(`Asociar RMD · ${rec0.codigo}${rec0.adenda ? ' ' + rec0.adenda : ''}`, { reporte: true, cancelar: () => v.cerrar() });
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-seg-asociar');
+    const dd2 = (n) => String(n).padStart(2, '0'), iso = (d) => `${d.getFullYear()}-${dd2(d.getMonth() + 1)}-${dd2(d.getDate())}`, hoy = new Date();
+    let fuente = 'sugeridos', movs = null, leyendo = false; const sel = new Map();
+    v.cuerpo.innerHTML = `<p>Marca los RMD que impacta el <b>${esc(rec0.codigo)}</b> y pulsa «Asociar». No cambia nada en SAP; lo ve todo el equipo en «Seguimiento CC».</p>
+      <div class="rmd-seg-fuentes" role="tablist"><button type="button" role="tab" data-f="sugeridos">Nombran el CC en Observaciones</button><button type="button" role="tab" data-f="movs">Mis movimientos</button><button type="button" role="tab" data-f="buscar">Buscar</button></div>
+      <div class="rmd-seg-opc"></div><p class="rmd-progreso"></p><div class="rmd-seg-cands"></div>`;
+    const $ = (s) => v.cuerpo.querySelector(s), opc = $('.rmd-seg-opc'), prog = $('.rmd-progreso'), caja = $('.rmd-seg-cands');
+    const avance = (t, error) => { setTxt(prog, t || ''); prog.classList.toggle('error', !!error); };
+    const rec = () => segConBandera(rec0.id) || rec0, ya = () => new Set((rec().rmd || []).map((r) => r.fam));
+    const ultimas = () => { const m = new Map(); (ACC.mds || []).forEach((x) => { const f = SeguimientoCC.fam(x), y = m.get(f); if (!y || (+x.version || 0) > (+y.version || 0)) m.set(f, x); }); return [...m.values()]; };
+    const tipoEn = (md) => { const l = ACC.ind && ACC.ind.get(rec0.codigo), t = l && l.get(md.mdId); return t ? SeguimientoCC.TIPO_TXT[t.tipo] : ''; };
+    const candidatos = () => {
+      if (fuente === 'sugeridos') return segSugeridos(rec0);
+      if (fuente === 'movs') return (movs || []).filter((x) => x.codigo && (!rec0.planta || AccionesCC.mismaPlanta(rec0.planta, x.planta))).map((x) => { const md = (ACC.mds || []).find((m) => m.mdId === x.mdId);
+        return md ? { ...md, nota: x.acciones.join(' · ') } : { mdId: x.mdId, codigo: x.codigo, linaje: '', version: String(x.version), descripcion: x.producto, etapa: x.etapa, planta: x.planta, estado: x.estado, nota: x.acciones.join(' · ') }; });
+      const q = SIN_ACENTOS(($('.rmd-seg-q') || {}).value || '').split(/\s+/).filter(Boolean); if (!q.length) return [];
+      return ultimas().filter((m) => { const t = SIN_ACENTOS(`${m.codigo} ${m.linaje} ${m.descripcion} ${m.etapa}`); return q.every((w) => t.includes(w)); })
+        .filter((m) => !rec0.planta || AccionesCC.mismaPlanta(rec0.planta, m.planta)).slice(0, 80);
+    };
+    const pintar = () => {
+      v.cuerpo.querySelectorAll('.rmd-seg-fuentes button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.f === fuente)));
+      const lista = candidatos(), y = ya();
+      caja.innerHTML = !lista.length ? `<p class="rmd-nota">${fuente === 'sugeridos' ? (ACC.mds ? `Ningún RMD de ${esc(rec0.planta || 'la planta')} nombra el ${esc(rec0.codigo)} en Observaciones. Busca o usa «Mis movimientos».` : 'Leyendo los RMD…')
+        : fuente === 'movs' ? (movs ? 'No hay movimientos tuyos en esas fechas.' : '') : 'Escribe el código o parte del nombre del producto.'}</p>`
+        : `<table class="rmd-tabla rmd-seg-ct"><thead><tr><th></th><th>RMD</th><th>Producto</th><th>Etapa</th><th>Status</th><th>${fuente === 'movs' ? 'Qué hiciste' : 'CC en Observaciones'}</th></tr></thead><tbody>${lista.map((m) => {
+          const f = SeguimientoCC.fam(m), dentro = y.has(f);
+          return `<tr data-fam="${esc(f)}" class="${dentro ? 'rmd-seg-ya' : ''}"><td><input type="checkbox" data-fam="${esc(f)}"${dentro ? ' checked disabled title="Ya está asociado"' : sel.has(f) ? ' checked' : ''}></td>
+            <td class="rmd-nowrap">${esc(m.codigo)}${m.version !== '' && m.version != null ? ` <span class="rmd-nota">v${esc(m.version)}</span>` : ''}</td><td>${esc(m.descripcion)}${m.planta ? `<div class="rmd-nota">${esc(m.planta)}</div>` : ''}</td>
+            <td>${esc(m.etapa)}</td><td class="rmd-nowrap">${esc(m.estado)}</td><td>${esc(fuente === 'movs' ? m.nota || '' : tipoEn(m) || '—')}${dentro ? ' <span class="rmd-nota">(ya asociado)</span>' : ''}</td></tr>`; }).join('')}</tbody></table>`;
+      caja.__lista = lista; bOk.textContent = sel.size ? `Asociar (${sel.size})` : 'Asociar'; bOk.disabled = !sel.size || leyendo;
+    };
+    const ponerOpc = () => {
+      opc.innerHTML = fuente === 'movs' ? `<div class="rmd-mismov-fechas"><label>Desde <input type="date" class="rmd-seg-d0" value="${iso(hoy)}"></label><label>Hasta <input type="date" class="rmd-seg-d1" value="${iso(hoy)}"></label> <button type="button" class="rmd-btn" data-a="movs">Ver mis movimientos</button></div>`
+        : fuente === 'buscar' ? '<input type="search" class="rmd-seg-q" placeholder="Código RMD o producto (Enter)" autocomplete="off">' : '';
+      const q = $('.rmd-seg-q'); if (q) { q.addEventListener('input', () => pintar()); setTimeout(() => q.focus(), 30); }
+    };
+    const leerMovs = async () => {
+      const fecha = (s) => { const [a, m, d] = String(s || '').split('-').map(Number); return a && m && d ? new Date(a, m - 1, d) : null; };
+      const d0 = fecha(($('.rmd-seg-d0') || {}).value), d1 = fecha(($('.rmd-seg-d1') || {}).value); if (!d0 || !d1 || d1 < d0) { avance('Revisa las fechas.', true); return; }
+      const modelo = modeloListaPrincipal(); if (!modelo) { avance('Abre Configuración Maestra desde la lista principal de RMD.', true); return; }
+      leyendo = true; pintar();
+      try { const u = await usuarioPortal(modelo).catch(() => codigoUsuario(controladorPrincipal())); if (!u) throw new Error('no se supo tu usuario del portal');
+        const r = await misMovLeer(modelo, u, d0.getTime(), new Date(d1.getFullYear(), d1.getMonth(), d1.getDate() + 1).getTime(), avance); movs = r.items;
+        avance(`${movs.length} RMD con movimientos tuyos.`); }
+      catch (e) { avance('No se pudieron leer tus movimientos: ' + (e.message || e), true); } finally { leyendo = false; pintar(); }
+    };
+    v.cuerpo.addEventListener('click', (e) => {
+      const f = e.target.closest('.rmd-seg-fuentes button'); if (f) { fuente = f.dataset.f; avance(''); ponerOpc(); pintar(); if (fuente === 'movs' && !movs) leerMovs(); return; }
+      if (e.target.closest('[data-a="movs"]')) leerMovs();
+    });
+    v.cuerpo.addEventListener('keydown', (e) => e.stopPropagation());
+    caja.addEventListener('change', (e) => {
+      const cb = e.target.closest('input[data-fam]'); if (!cb || cb.disabled) return;
+      const m = (caja.__lista || []).find((x) => SeguimientoCC.fam(x) === cb.dataset.fam); if (cb.checked && m) sel.set(cb.dataset.fam, { m, origen: fuente === 'movs' ? 'Mis movimientos' : fuente === 'sugeridos' ? 'Observaciones' : 'A mano' }); else sel.delete(cb.dataset.fam);
+      pintar();
+    });
+    const bOk = botonModal('Asociar', 'primario', async () => {
+      if (!sel.size) return; bOk.disabled = true; const quien = acuQuien(), ahora = new Date().toISOString(), elegidos = [...sel.values()];
+      try {
+        let n = 0;
+        await segCambiar(rec0.id, (a) => {
+          if (!a) throw new Error('el CC ya no tiene bandera');
+          ['Observaciones', 'Mis movimientos', 'A mano'].forEach((o) => { n += SeguimientoCC.agregar(a, elegidos.filter((x) => x.origen === o).map((x) => x.m), quien, ahora, o); });
+          if (!n) return undefined; a.historial.push({ fecha: ahora, por: quien, accion: `Asoció ${n} RMD: ${elegidos.map((x) => x.m.codigo).join(', ')}` }); return a;
+        });
+        v.cerrar(); toast(n ? `${n} RMD asociados al ${rec0.codigo}.` : 'Esos RMD ya estaban asociados.');
+      } catch (e) { bOk.disabled = false; avance('No se pudo guardar en status-rmd: ' + (e.message || e), true); }
+    });
+    v.pie.append(botonModal('Cancelar', '', () => v.cerrar()), bOk);
+    ponerOpc(); pintar();
+    if (!ACC.mds) leerRmdParaCC(false).then(pintar, (e) => avance('No se pudieron leer los RMD: ' + e.message, true));
+    SEGV.asociar = { v, pintar, sel, elegir: (f) => { fuente = f; ponerOpc(); pintar(); } };   // pruebas
+  }
+  function segCuadro() {
+    const vis = segItems(true);
+    return { vis, filas: SeguimientoCC.filasCuadro(vis, segDia, usuarioVisible) };
+  }
+  function segLibro() {
+    const { filas } = segCuadro(), C = SeguimientoCC.COLS, libro = Xlsx.crearLibro(), hoy = new Date(), p = (n) => String(n).padStart(2, '0');
+    const h = libro.hoja('Seguimiento CC', { activa: true, congelar: 'B2', cols: [16, 9, 60, 11, 18, 13, 13, 8, 42, 15, 13, 14, 12, 13, 26, 26].map((w, i) => [i + 1, i + 1, w]),
+      tabla: { nombre: 'SeguimientoCC', ref: `A1:${Xlsx.letra(C.length - 1)}${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
+    C.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
+    const est = { Ejecutado: 'estAut', 'En proceso': 'estIng', Pendiente: 'estSus', 'Sin RMD': 'estSus' };
+    filas.forEach((f, i) => f.forEach((x, c) => { if (x !== '' && x != null) h.poner({ c, r: i + 1 }, c === 7 && /^\d+$/.test(x) ? +x : x, c === 5 && est[x] ? est[x] : c === 2 ? 'envuelto' : 'normal'); }));
+    return { libro, nombre: `Seguimiento CC ${hoy.getFullYear()}-${p(hoy.getMonth() + 1)}-${p(hoy.getDate())}.xlsx`, filas: filas.length };
+  }
+  async function segExcel() { const x = segLibro(); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); }
+  async function segCopiar() {
+    const { filas } = segCuadro(); if (!filas.length) { toast('No hay filas para copiar.', true); return; }
+    const t = filas.map((f) => f.map((x) => String(x == null ? '' : x).replace(/[\t\r\n]+/g, ' ').trim()).join('\t')).join('\r\n');
+    toast((await copiarAlPortapapeles(t)) ? `${filas.length} fila(s) copiadas para tu cuadro (Ctrl+V en Excel). Columnas: ${SeguimientoCC.COLS.join(' · ')}.` : 'No se pudo copiar: usa «Exportar Excel».', false);
+  }
+  function refrescarPestanaSeg() {
+    const v = SEGV.vista; if (!v) return;
+    if (v.itb.bIsDestroyed || !v.pestana.getParent()) { SEGV.vista = null; return; }
+    const n = (SEG.lista || []).length; if (v.pestana.getCount && String(v.pestana.getCount()) !== String(n || '')) v.pestana.setCount(n ? String(n) : '');
+    if (v.itb.getSelectedKey() === CLAVE_PESTANA_SEG) aislar('pintarPestanaSeg', pintarPestanaSeg);
+    if (SEGV.asociar && SEGV.asociar.v.fondo.isConnected) aislar('pintarAsociarSeg', SEGV.asociar.pintar);
+  }
+  function gestionarPestanaSeguimiento() {
+    const activo = on('seguimientocc'), vcc = ACC.vista;
+    if (vcc && !vcc.itb.bIsDestroyed && vcc.modelo.getProperty('/seg') !== !!activo) refrescarPestanaCC();   // muestra u oculta la columna de la bandera
+    document.querySelectorAll('.sapMDialog .sapMITB').forEach((el) => {
+      const itb = sap.ui.getCore().byId(el.id); if (!itb || !itb.getItems) return;
+      const d = enDialogo(el), c = d && sap.ui.getCore().byId(d.id), t = (c && c.getTitle && c.getTitle()) || (d && cabecera(d)); if (!d || !/^Configuraci[oó]n Maestra/i.test(norm(t))) return;
+      const items = itb.getItems(), nuestro = items.find((i) => i.getKey && i.getKey() === CLAVE_PESTANA_SEG);
+      if (!activo) { if (nuestro) quitarPestanaSeg(itb); return; }
+      if (nuestro || !items.some((i) => /Motivo de lapsos/i.test((i.getText && i.getText()) || ''))) return;
+      // va entre «Controles de Cambios» y «Acuerdos»: se espera a que esas pestañas (si están activas) ya estén puestas
+      if (on('controlescambio') && !items.some((i) => i.getKey && i.getKey() === CLAVE_PESTANA_CC)) return;
+      if (on('acuerdos') && !items.some((i) => i.getKey && i.getKey() === CLAVE_PESTANA_ACU)) return;
+      if (modulosCCListos() && ui5('ui/core/HTML')) aislar('montarPestanaSeg', () => montarPestanaSeg(itb));
+      else if (!ui5('ui/core/HTML')) sap.ui.require(['sap/ui/core/HTML'], () => programarAjuste());
+    });
+  }
+  function montarPestanaSeg(itb) {
+    const [ITF, ITS, VBox, HTML] = ['m/IconTabFilter', 'm/IconTabSeparator', 'm/VBox', 'ui/core/HTML'].map(ui5); if (![ITF, ITS, VBox, HTML].every(Boolean)) return;
+    const html = new HTML({ content: '<div class="rmd-seg-tab"></div>', preferDOM: true, afterRendering: () => aislar('pintarPestanaSeg', pintarPestanaSeg) });
+    const cont = new VBox({ items: [html], width: '100%' }).addStyleClass('rmd-seg-pestana');
+    let dp = itb.getParent(); while (dp && !(dp.getHeaderExpanded && dp.getContent)) dp = dp.getParent && dp.getParent();
+    const cuerpo = dp && dp.getContent(), agr = cuerpo && cuerpo.getMetadata && cuerpo.getMetadata().getDefaultAggregation && cuerpo.getMetadata().getDefaultAggregation();
+    const enCuerpo = !!(agr && agr.multiple);
+    const pestana = new ITF({ key: CLAVE_PESTANA_SEG, text: 'Seguimiento CC', icon: 'sap-icon://flag', iconColor: 'Critical', count: (SEG.lista || []).length ? String(SEG.lista.length) : '',
+      tooltip: 'CC marcados con bandera: sus RMD impactados y si ya ejecutaron el CC (lo ve todo el equipo)', content: enCuerpo ? [] : [cont] });
+    if (enCuerpo) { cont.setVisible(false); cuerpo.addAggregation(agr.name, cont); }
+    const items = itb.getItems(), iCC = items.findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_CC), sep = new ITS(); sep.__rmdSeg = true;
+    if (iCC >= 0) { itb.insertItem(sep, iCC + 1); itb.insertItem(pestana, iCC + 2); } else { itb.addItem(sep); itb.addItem(pestana); }
+    const cab = dp && dp.getHeader && dp.getHeader(), conservar0 = dp && dp.getPreserveHeaderStateOnScroll ? dp.getPreserveHeaderStateOnScroll() : null;
+    const ajenos = () => (enCuerpo ? cuerpo.getAggregation(agr.name) || [] : []).concat(cab && cab.getContent ? cab.getContent() : []).filter((x) => x !== cont && x !== itb && x.addStyleClass);
+    const mostrar = (nuestra) => {
+      if (enCuerpo) { cont.setVisible(nuestra); ajenos().forEach((x) => (nuestra ? x.addStyleClass('rmd-seg-oculto') : x.removeStyleClass('rmd-seg-oculto'))); }
+      if (!dp) return;
+      if (!nuestra) { if (conservar0 !== null && ![CLAVE_PESTANA_CC, CLAVE_PESTANA_ACU].includes(itb.getSelectedKey())) dp.setPreserveHeaderStateOnScroll(conservar0); reposicionarDP(dp); return; }
+      if (conservar0 !== null) dp.setPreserveHeaderStateOnScroll(true);
+      dp.setHeaderExpanded(true);
+      const w = dp.getDomRef && dp.getDomRef('contentWrapper'); if (w) w.scrollTop = 0;
+      reposicionarDP(dp);
+    };
+    SEGV.vista = { itb, pestana, cont, html, dp, cuerpo, agr: enCuerpo ? agr.name : '', ajenos, mostrar };
+    itb.attachSelect((e) => { const nuestra = e.getParameter('key') === CLAVE_PESTANA_SEG; setTimeout(() => { mostrar(nuestra); if (nuestra) {
+      leerSeguimiento(true); if (!ACC.datos) leerAccionesGuardadas(); leerRmdParaCC(false).catch((er) => toast('No se pudieron leer los RMD: ' + er.message, true)); refrescarPestanaSeg(); } }, 0); });
+    leerSeguimiento(false);
+  }
+  function quitarPestanaSeg(itb) {
+    const items = itb.getItems(), i = items.findIndex((x) => x.getKey && x.getKey() === CLAVE_PESTANA_SEG); if (i < 0) return;
+    const v = SEGV.vista && SEGV.vista.itb === itb ? SEGV.vista : null;
+    if (itb.getSelectedKey() === CLAVE_PESTANA_SEG) { if (v) v.mostrar(false); const prim = items.find((x) => x.getKey && ![CLAVE_PESTANA_SEG, CLAVE_PESTANA_CC, CLAVE_PESTANA_ACU].includes(x.getKey()) && x.getText);
+      if (prim) { itb.setSelectedKey(prim.getKey()); itb.fireSelect({ key: prim.getKey(), selectedKey: prim.getKey(), item: prim, selectedItem: prim }); } }
+    const sep = items[i - 1]; itb.removeItem(items[i]).destroy(); if (sep && sep.__rmdSeg) itb.removeItem(sep).destroy();
+    if (v) { v.ajenos().forEach((x) => x.removeStyleClass('rmd-seg-oculto')); if (v.agr) v.cuerpo.removeAggregation(v.agr, v.cont); v.cont.destroy(); SEGV.vista = null; }
+  }
+  function quitarPestanasSeg() {
+    document.querySelectorAll('.sapMITB').forEach((el) => { const itb = window.sap && sap.ui.getCore().byId(el.id); if (itb && itb.getItems) aislar('quitarPestanaSeg', () => quitarPestanaSeg(itb)); });
+  }
+  window.__rmdStats.seguimientoCC = { SeguimientoCC, SEG, SEGV, leer: leerSeguimiento, cambiar: segCambiar, bandera: segAlternarBandera, cuadro: segCuadro, items: segItems,
+    excel: async () => { const x = segLibro(), b = await x.libro.generar(); return { nombre: x.nombre, filas: x.filas, bytes: b.length, pk: b[0] === 0x50 && b[1] === 0x4b }; } };   // pruebas
 
   // ==== PLANTILLA-PRODUCCION:INICIO ====
   // ---- 9 sexies. Plantilla para Producción ----
@@ -18676,7 +19157,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'detectartildes', 'reglasrev', 'motivocaract', 'acuerdos', 'ordenest']],
-    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'vbversiones', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio']],
+    ['Reportes y herramientas', 'reporte', ['exportar', 'mismov', 'equipos', 'ultimaversion', 'vbversiones', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio', 'seguimientocc']],
   ];
   const ICONOS_PANEL = {
     flecha: '<path d="M6 3.5 10.5 8 6 12.5"/>', buscar: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>', cerrar: '<path d="M4 4l8 8M12 4l-8 8"/>',
