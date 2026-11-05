@@ -15919,7 +15919,10 @@
   const CLAVE_PESTANA_SEG = 'rmdSeguimientoCC', SEG_PREFIJO = 'ccseguimiento:';
   const SEG = { lista: null, fuente: '', error: '', leyendo: null, leidoEn: 0, ver: 0 };
   const SEGV = { vista: null, f: { planta: '', estado: '', q: '' } };
-  const segDia = (iso) => { const s = String(iso || ''); return /^\d{4}-\d{2}-\d{2}/.test(s) ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : s; };
+  // fecha del día en hora local (las marcas con hora vienen en UTC: de noche en Perú ya es el día siguiente en UTC)
+  const segDia = (iso) => { const s = String(iso || ''), d = s.length > 10 ? new Date(s) : null, p = (n) => String(n).padStart(2, '0');
+    if (d && !isNaN(d)) return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : s; };
   function segGuardarCopia(lista, fuente) {
     SEG.lista = lista; SEG.fuente = fuente; SEG.leidoEn = Date.now(); SEG.ver++;
     Almacen.guardar('ccSeguimiento', { lista, fuente, guardado: new Date().toISOString() }).catch(() => { /* la copia es opcional */ });
@@ -16000,7 +16003,7 @@
       <td class="rmd-nowrap">${e ? `<span class="rmd-seg-sap ${segClase(e.estadoSap)}">${esc(e.estadoSap || '—')}</span>` : '…'}</td>
       <td class="rmd-nowrap">${e ? `<span class="rmd-seg-obs ${e.tipo}" title="Cómo nombra el CC la Observación de su versión de hoy">${esc(e.tipoTxt)}</span>` : '…'}</td>
       <td class="rmd-nowrap"><label class="rmd-seg-check" title="${e && e.manual ? `Marcado a mano por ${esc(usuarioVisible(r.manualPor || ''))}${r.manualEn ? ' el ' + esc(segDia(r.manualEn)) : ''}` : 'Automático: Autorizado con el CC aplicado en Observaciones. Puedes marcarlo a mano.'}"><input type="checkbox" data-acc="ejecutado"${e && e.ejecutado ? ' checked' : ''}${e ? '' : ' disabled'}> ${e && e.ejecutado ? 'Ejecutado' : 'No'}</label>${e && e.manual ? ' <span class="rmd-nota">(a mano)</span>' : ''}${e && e.fechaAut && e.ejecutado ? `<div class="rmd-nota">Aut. ${esc(segDia(e.fechaAut))}</div>` : ''}</td>
-      <td class="rmd-nota">${esc(r.origen === 'Observaciones' ? 'Por Observaciones' : r.origen === 'Mis movimientos' ? 'Desde mis movimientos' : 'A mano')}<br>${esc(usuarioVisible(r.agregadoPor || ''))}</td>
+      <td class="rmd-nota rmd-nowrap" title="${esc(`${usuarioVisible(r.agregadoPor || '')} · ${segDia(r.agregadoEn)}`)}">${esc(r.origen === 'Observaciones' ? 'Observaciones' : r.origen === 'Mis movimientos' ? 'Mis movimientos' : 'A mano')}</td>
       <td><button type="button" class="rmd-btn rmd-seg-x" data-acc="quitar" title="Quitar este RMD del CC">✕</button></td></tr>`;
     return `<section class="rmd-seg-cc ${segClase(estado)}" data-id="${esc(rec.id)}"><header>
       <div class="rmd-seg-tit"><h4><span class="rmd-seg-bandera" aria-hidden="true">⚑</span> ${esc(rec.codigo)}${rec.adenda ? ' ' + esc(rec.adenda) : ''} <span class="rmd-seg-estado ${segClase(estado)}">${esc(estado)}</span></h4>
@@ -16090,7 +16093,7 @@
     const tipoEn = (md) => { const l = ACC.ind && ACC.ind.get(rec0.codigo), t = l && l.get(md.mdId); return t ? SeguimientoCC.TIPO_TXT[t.tipo] : ''; };
     const candidatos = () => {
       if (fuente === 'sugeridos') return segSugeridos(rec0);
-      if (fuente === 'movs') return (movs || []).filter((x) => x.codigo).map((x) => { const md = (ACC.mds || []).find((m) => m.mdId === x.mdId);
+      if (fuente === 'movs') return (movs || []).filter((x) => x.codigo && (!rec0.planta || AccionesCC.mismaPlanta(rec0.planta, x.planta))).map((x) => { const md = (ACC.mds || []).find((m) => m.mdId === x.mdId);
         return md ? { ...md, nota: x.acciones.join(' · ') } : { mdId: x.mdId, codigo: x.codigo, linaje: '', version: String(x.version), descripcion: x.producto, etapa: x.etapa, planta: x.planta, estado: x.estado, nota: x.acciones.join(' · ') }; });
       const q = SIN_ACENTOS(($('.rmd-seg-q') || {}).value || '').split(/\s+/).filter(Boolean); if (!q.length) return [];
       return ultimas().filter((m) => { const t = SIN_ACENTOS(`${m.codigo} ${m.linaje} ${m.descripcion} ${m.etapa}`); return q.every((w) => t.includes(w)); })
