@@ -198,7 +198,13 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-05, v1.121.0 (encima de la 1.120.0): **regla de CINTIA: KARLA VANESSA MORENO MORALES es «Vanessa», nunca Karla**, también en el
   saludo, las iniciales (VM) y «V.Moreno» de las líneas de CC (`personaPortal`, `esVanessa`, `sinKarla`). **Sin revisión de la hoja de ruta**
   (`REVISAR_HOJA_RUTA = false`; lo guardado con tipo `ruta` se ignora con `rsSinRuta`). Menú Exportar por secciones y «Mis movimientos»
-  en el panel (Ctrl+K sigue retirado desde la v1.57). **La siguiente versión debe ser > 1.121.0.**
+  en el panel (Ctrl+K sigue retirado desde la v1.57).
+- 2026-11-05, v1.122.0 (encima de la 1.121.0, mismo PR #76): **pedido de CINTIA: bandera ⚑ en cada CC de «Controles de Cambios»** y pestaña
+  **«Seguimiento CC»** (entre CC y Acuerdos) para asociar a mano los RMD impactados y ver si ya ejecutaron el CC (automático = versión de hoy
+  Autorizada con el CC aplicado en Observaciones; o a mano). Asociar desde Observaciones, «Mis movimientos» o buscando; «Copiar para el cuadro»
+  y Excel (`SeguimientoCC.COLS`). Se guarda en Supabase de status-rmd, fila `ccseguimiento:<carpeta del CC>` (relee antes de guardar,
+  `segCambiar`); no escribe en SAP. Opción `seguimientocc`. Lógica en el bloque `==SEGCC==` (`pruebas/qa_seguimiento_cc.mjs`); prueba en el
+  portal real sin escrituras: `pruebas/qa_seguimiento_portal.py` (cortafuegos + status-rmd simulado). **La siguiente versión debe ser > 1.122.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
