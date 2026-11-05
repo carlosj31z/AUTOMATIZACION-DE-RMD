@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.119.0
+// @version      1.120.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.119.0';                                                       // mantener igual a @version
+  const VERSION = '1.120.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -8702,6 +8702,16 @@
     ['MD_RECETA', 'mdRecetaId', 'receta', 'recetas']];
   const MISMOV_GRUPOS = ['Ingresado', 'Autorizado', 'Suspendido', 'Otros'];
   const misMovGrupo = (estado) => (/^ingres/i.test(estado) ? 'Ingresado' : /^autoriz/i.test(estado) ? 'Autorizado' : /^suspend/i.test(estado) ? 'Suspendido' : 'Otros');
+  // v1.120.0 (pedido de CINTIA, reporte diario): cuándo y quién autorizó en SAP la versión (MD.fechaAutorizacion / usuarioAutorizacion; en un Suspendido es
+  // su última autorización). Una fecha sin hora (00:00:00 UTC) es un día de calendario: se muestra sin hora y sin correrla al día anterior.
+  // → { t (ms), soloDia, texto 'DD/MM/AAAA[ HH:MM]', usuario } o null
+  function misMovAutSap(fecha, usuario) {
+    const d = fecha instanceof Date ? fecha : fecha ? new Date(fecha) : null; if (!d || isNaN(d)) return null;
+    const soloDia = d.getUTCHours() + d.getUTCMinutes() + d.getUTCSeconds() === 0, p = (n) => String(n).padStart(2, '0');
+    const texto = soloDia ? `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`
+      : `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return { t: d.getTime(), soloDia, texto, usuario: String(usuario || '').trim() };
+  }
   // { usuario, desde, hasta (ms, [desde, hasta)), mds: MD con estadoIdRmd/sucursalId, traz: MD_TRAZABILIDAD, filas: { entidad: filas } }
   // → [{ mdId, codigo, version, producto, etapa, planta, estado, grupo, acciones: [texto], primero, ultimo }] del más reciente al más antiguo
   function misMovArmar({ usuario, desde, hasta, mds, traz, filas }) {
@@ -8746,7 +8756,7 @@
       if (!acciones.length) acciones.push(x.actualizo ? 'Actualizó los datos del RMD' : 'Movimiento en el RMD');
       out.push({ mdId, codigo: m.codigo ? String(m.codigo) : '', solicitud: m.codigoSolicitud ? String(m.codigoSolicitud) : '', version: m.version != null ? m.version : '', producto: String(m.descripcion || '').trim(),
         etapa: String(m.nivelTxt || '').trim(), planta: String((m.sucursalId && m.sucursalId.contenido) || '').trim(), estado: estado || '(sin estado)', grupo: misMovGrupo(estado), acciones,
-        primero: Math.min(...x.ts), ultimo: Math.max(...x.ts) });
+        autSap: misMovAutSap(m.fechaAutorizacion, m.usuarioAutorizacion), primero: Math.min(...x.ts), ultimo: Math.max(...x.ts) });
     });
     return out.sort((a, b) => b.ultimo - a.ultimo);
   }
@@ -8778,14 +8788,22 @@
     return { items: misMovArmar({ usuario, desde, hasta, mds, traz: res.traz, filas }), avisos };
   }
   function misMovExcel(items, usuario, dTxt, hTxt) {
-    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento'];
-    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17].map((w, i) => [i + 1, i + 1, w]),
+    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento', 'Autorizado en SAP', 'Usuario que autorizó'];
+    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17, 17, 22].map((w, i) => [i + 1, i + 1, w]),
       tabla: { nombre: 'MisMovimientos', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, items.length + 1)}`, estilo: 'TableStyleMedium2' } });
     cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
     const est = { Autorizado: 'estAut', Ingresado: 'estIng', Suspendido: 'estSus' };
-    items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo)]
+    items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo),
+      x.autSap ? (x.autSap.soloDia ? x.autSap.texto : new Date(x.autSap.t)) : null, x.autSap ? usuarioVisible(x.autSap.usuario) : null]
       .forEach((v, c) => { if (v == null || v === '') return; h.poner({ c, r: i + 1 }, v, v instanceof Date ? 'fechaHora' : c === 5 && est[x.grupo] ? est[x.grupo] : 'normal'); }));
     return { libro, nombre: `Mis movimientos RMD ${usuario} ${dTxt}${hTxt !== dTxt ? ' a ' + hTxt : ''}.xlsx` };
+  }
+  const MISMOV_COLS_REPORTE = ['Fecha', 'Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Qué hiciste', 'Status de hoy', 'Autorizado en SAP', 'Usuario que autorizó'];
+  function misMovTextoReporte(lista) {
+    const p = (n) => String(n).padStart(2, '0'), dia = (t) => { const d = new Date(t); return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`; };
+    const limpio = (v) => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
+    return lista.map((x) => [dia(x.ultimo), x.codigo || x.solicitud, x.version, x.producto, x.etapa, x.planta, x.acciones.join(' · '), x.estado,
+      x.autSap ? x.autSap.texto : '', x.autSap ? usuarioVisible(x.autSap.usuario) : ''].map(limpio).join('\t')).join('\r\n');
   }
   async function abrirMisMovimientos() {
     const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para ver tus movimientos.', true); return; }
@@ -8807,17 +8825,19 @@
       resumen.innerHTML = items.length ? [['', 'Todos', items.length], ...MISMOV_GRUPOS.map((g) => [g, g, n(g)]).filter(([, , k]) => k)].map(([g, t, k]) =>
         `<button type="button" class="rmd-mismov-chip ${g ? misMovGrupo(g).toLowerCase() : ''}" data-g="${esc(g)}" aria-pressed="${filtro === g}"><b>${k}</b> ${esc(t)}</button>`).join('') : '';
       const lista = items.filter((x) => !filtro || x.grupo === filtro);
-      caja.innerHTML = !items.length ? '' : `<table class="rmd-tabla rmd-mismov-tabla"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Qué hiciste</th><th>Último</th><th>Status de hoy</th></tr></thead><tbody>${lista.map((x) =>
+      caja.innerHTML = !items.length ? '' : `<table class="rmd-tabla rmd-mismov-tabla"><thead><tr><th>RMD</th><th>Producto</th><th>Etapa</th><th>Qué hiciste</th><th>Último</th><th>Status de hoy</th><th>Autorizado en SAP</th></tr></thead><tbody>${lista.map((x) =>
         `<tr><td class="rmd-nowrap">${x.codigo ? `<button type="button" class="rmd-link" data-cod="${esc(x.codigo)}" data-ver="${esc(x.version)}" title="Abrir la configuración de este RMD">${esc(x.codigo)}</button>` : esc(x.solicitud || '—')} <span class="rmd-mismov-ver">${x.version !== '' ? 'v' + esc(x.version) : ''}</span></td>
         <td>${esc(x.producto)}${x.planta ? `<div class="rmd-mismov-sub">${esc(x.planta)}</div>` : ''}</td><td>${esc(x.etapa)}</td><td>${x.acciones.map(esc).join('<br>')}</td><td class="rmd-nowrap">${esc(hora(x.ultimo))}</td>
-        <td class="rmd-nowrap"><span class="rmd-mismov-estado ${x.grupo.toLowerCase()}">${esc(x.estado)}</span></td></tr>`).join('')}</tbody></table>`;
-      bXls.disabled = !items.length;
+        <td class="rmd-nowrap"><span class="rmd-mismov-estado ${x.grupo.toLowerCase()}">${esc(x.estado)}</span></td>
+        <td class="rmd-nowrap rmd-mismov-aut">${x.autSap ? `${esc(x.autSap.texto)}${x.autSap.usuario ? `<div class="rmd-mismov-sub" title="${esc(x.autSap.usuario)}">${esc(usuarioVisible(x.autSap.usuario))}</div>` : ''}`
+          : `<span class="rmd-mismov-sub">${x.grupo === 'Ingresado' ? 'Aún no' : '—'}</span>`}</td></tr>`).join('')}</tbody></table>`;
+      bXls.disabled = !items.length; bCopiar.disabled = !items.length;
     };
     const buscar = async () => {
       const d0 = fecha($('.rmd-mm-desde').value), d1 = fecha($('.rmd-mm-hasta').value);
       if (!d0 || !d1) { avance('Elige las dos fechas.', true); return; }
       if (d1 < d0) { avance('«Hasta» no puede ser antes de «Desde».', true); return; }
-      trabajando = true; bBuscar.disabled = true; bXls.disabled = true; items = []; filtro = ''; pintar();
+      trabajando = true; bBuscar.disabled = true; bXls.disabled = true; bCopiar.disabled = true; items = []; filtro = ''; pintar();
       try {
         if (!usuario) { avance('Buscando tu usuario del portal…'); try { usuario = await usuarioPortal(modelo); } catch (e) { usuario = codigoUsuario(controladorPrincipal()); } }
         if (!usuario) throw new Error('no se supo tu usuario del portal');
@@ -8843,7 +8863,13 @@
       const lista = items.filter((x) => !filtro || x.grupo === filtro); if (!lista.length) return;
       const xl = misMovExcel(lista, usuarioVisible(usuario), $('.rmd-mm-desde').value, $('.rmd-mm-hasta').value); descargarArchivo(xl.nombre, await xl.libro.generar(), TIPO_XLSX);
     });
-    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bXls, bBuscar);
+    // Copiar para el reporte diario: lo que se ve, como filas separadas por tabulador (sin títulos) para pegar en Excel debajo de lo ya reportado.
+    const bCopiar = botonModal('Copiar para el reporte', '', async () => {
+      const lista = items.filter((x) => !filtro || x.grupo === filtro); if (!lista.length) return;
+      avance((await copiarAlPortapapeles(misMovTextoReporte(lista))) ? `${lista.length} fila(s) copiadas: pégalas en tu Excel (Ctrl+V). Columnas: ${MISMOV_COLS_REPORTE.join(' · ')}.` : 'No se pudo copiar: usa «Exportar Excel».', false);
+    });
+    bCopiar.title = 'Copia las filas que se ven (sin títulos) para pegarlas en el Excel del reporte diario';
+    v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bCopiar, bXls, bBuscar);
     window.__rmdStats.misMovimientos = { armar: misMovArmar, leer: (u, d, h) => misMovLeer(modelo, u, d, h, () => {}), buscar };
     buscar();
   }

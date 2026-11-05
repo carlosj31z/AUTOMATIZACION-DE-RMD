@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const fuente = fs.readFileSync(path.join(aqui, '..', 'rmd-ui-mejoras.user.js'), 'utf8');
 const bloque = (ini, fin) => { const a = fuente.indexOf(ini), b = fuente.indexOf(fin); if (a < 0 || b < a) throw new Error('no encuentro el bloque ' + ini); return fuente.slice(a, b); };
-const { armar, grupo } = new Function(bloque('// ==MISMOV-INICIO==', '// ==MISMOV-FIN==') + '\nreturn { armar: misMovArmar, grupo: misMovGrupo };')();
+const { armar, grupo, autSap } = new Function(bloque('// ==MISMOV-INICIO==', '// ==MISMOV-FIN==') + '\nreturn { armar: misMovArmar, grupo: misMovGrupo, autSap: misMovAutSap };')();
 
 let fallas = 0;
 const ok = (nombre, cond, detalle = '') => { console.log((cond ? 'PASA  ' : 'FALLA ') + nombre + (cond || !detalle ? '' : ' — ' + detalle)); if (!cond) fallas++; };
@@ -59,6 +59,11 @@ ok('solicitud sin código', J(por[6].acciones) === J(['Registró la solicitud'])
 ok('solo actualización del MD', J(por[7].acciones) === J(['Actualizó los datos del RMD']) && por[7].grupo === 'Otros');
 ok('primero y último', por[4].primero === +D('2026-11-04T17:00:00Z') && por[4].ultimo === +D('2026-11-04T17:21:00Z'));
 ok('grupos', grupo('Ingresado') === 'Ingresado' && grupo('AUTORIZADO') === 'Autorizado' && grupo('Suspendido') === 'Suspendido' && grupo('Cancelado') === 'Otros' && grupo('') === 'Otros');
+ok('autorización SAP: fecha y usuario del MD', por[2].autSap && por[2].autSap.t === +D('2026-11-04T18:00:00Z') && por[2].autSap.usuario === 'CJESUSZ' && !por[2].autSap.soloDia, J(por[2].autSap));
+ok('sin autorización: autSap nulo', por[1].autSap === null && por[4].autSap === null);
+ok('fecha sin hora (00:00 UTC) = ese día, sin hora', autSap(D('2026-11-04T00:00:00Z'), 'KMORENOM').texto === '04/11/2026' && autSap(D('2026-11-04T00:00:00Z'), 'x').soloDia, J(autSap(D('2026-11-04T00:00:00Z'), 'x')));
+ok('fecha con hora: DD/MM/AAAA HH:MM', /^\d\d\/\d\d\/2026 \d\d:\d\d$/.test(autSap('2026-11-04T18:05:00Z', '').texto), autSap('2026-11-04T18:05:00Z', '').texto);
+ok('sin fecha: nulo', autSap(null, 'X') === null && autSap('basura', 'X') === null);
 ok('sin datos: lista vacía', J(armar({ usuario: 'X', desde, hasta, mds: [], traz: [], filas: {} })) === '[]');
 
 console.log(fallas ? `\n${fallas} FALLA(S)` : '\nTodo pasa.');

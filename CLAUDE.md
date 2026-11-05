@@ -191,7 +191,10 @@ cuenta). Escribir y responder siempre en **español**.
   casilla «Distinguir tildes» se oculta (salvo que el borrador la traiga activada). Núcleo: `PPN.detectarTildes(v)`
   (falso por defecto: `palabrasConTilde`/`tildesEn` no marcan nada). En el editor del borrador hay una casilla
   «Detectar tildes» (apagada; se recuerda en el navegador con `rmdPlantillaDetectarTildes`). La regla de pasos sin
-  tilde sigue: quien quiera la ayuda la enciende. **La siguiente versión debe ser > 1.119.0.**
+  tilde sigue: quien quiera la ayuda la enciende.
+- 2026-11-05, v1.120.0: **pedido de CINTIA (reporte diario de actividades)**: «Mis movimientos» muestra **Autorizado en SAP**
+  (MD.fechaAutorizacion + usuarioAutorizacion, `misMovAutSap`; fecha 00:00 UTC = solo el día) en la tabla y el Excel, y el botón
+  **Copiar para el reporte** (filas TSV sin títulos, `misMovTextoReporte`). **La siguiente versión debe ser > 1.120.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
