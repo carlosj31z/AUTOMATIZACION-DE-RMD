@@ -536,7 +536,7 @@ with sync_playwright() as p:
         h({ cod: '2202600003', v: 1, estado: 'Ingresado', desc: 'PRODUCTO TRES SUS', rec: '6000005835', hu: 'c2', det: Date.UTC(2026, 8, 28, 20, 0), fecha: F(2026, 8, 14),
             dif: [dif('reemplazo', '1100012482', 'FOLLETO H v.1', { q: 0.34, u: 'MLL' }, { q: 0.34, u: 'MLL' }, F(2026, 8, 14), '500000002100')] }),
       ]; }"""
-    @prueba("LN21 Cambios de recetas en SAP (v1.37): la ventana agrupa por RMD (una fila por RMD aunque tenga varias recetas), cuenta por estado y por tipo, filtra, busca por componente, despliega el detalle con la fecha del cambio en SAP y marca lo ya observado")
+    @prueba("LN21 Cambios de recetas en SAP (v1.37; sin hoja de ruta desde v1.121.0): la ventana agrupa por RMD (una fila por RMD aunque tenga varias recetas), cuenta por estado y por tipo, filtra, busca por componente, despliega el detalle con la fecha del cambio en SAP y marca lo ya observado")
     def _():
         res = {}
         pg.evaluate("async (js) => { const S = window.__rmdStats.recetasSap; window.__resp = await S.respaldo(); await S.poner(eval('(' + js + ')')(), { ing: Date.now(), aut: Date.now() }); }", HALLAZGOS_JS)
@@ -545,7 +545,7 @@ with sync_playwright() as p:
         leer = lambda: pg.evaluate("({ filas: [...document.querySelectorAll('.rmd-cr .rmd-cr-fila')].map(r => r.dataset.md), chips: [...document.querySelectorAll('.rmd-cr-chips button')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) })")
         res["inicio"] = leer()
         pg.locator(".rmd-cr-chips button[data-f=Autorizado]").click(); pg.wait_for_timeout(200); res["autorizados"] = leer()["filas"]
-        pg.locator(".rmd-cr-chips button[data-f=ruta]").click(); pg.wait_for_timeout(200); res["ruta"] = leer()["filas"]
+        res["ruta"] = pg.evaluate("document.querySelectorAll('.rmd-cr-chips button[data-f=ruta]').length")   # v1.121.0: sin revisión de la hoja de ruta
         pg.locator(".rmd-cr-chips button[data-f=todos]").click(); pg.locator(".rmd-cr-buscar").fill("cinta"); pg.wait_for_timeout(250); res["buscar"] = leer()["filas"]
         pg.locator(".rmd-cr-buscar").fill(""); pg.wait_for_timeout(200)
         pg.locator(".rmd-cr-fila[data-md=M2202600001] button[data-a=ver]").click(); pg.wait_for_timeout(250)
@@ -563,14 +563,15 @@ with sync_playwright() as p:
         pg.locator(".rmd-cr .rmd-modal-pie button", has_text="Cerrar").click(); pg.wait_for_timeout(300)
         pg.evaluate("async () => { await window.__rmdStats.recetasSap.restaurar(window.__resp); }")
         i = res["inicio"]
-        ok = (res["grupos"] == [["2202600003", "Ingresado", "lista+ruta", 2], ["2202600001", "Ingresado", "lista", 1], ["2202600002", "Autorizado", "ruta", 1]]   # (por fecha en SAP: la más reciente primero, sin fecha al final)
-              and i["chips"] == ["Todos 3", "Ingresados 2", "Autorizados 1", "Lista de materiales 2", "Hoja de ruta 2"] and len(i["filas"]) == 3
-              and res["autorizados"] == ["M2202600002"] and set(res["ruta"]) == {"M2202600002", "M2202600003"} and res["buscar"] == ["M2202600001"]
+        # v1.121.0: lo guardado de la hoja de ruta se ignora (2202600002 solo tenía hoja de ruta: sale; 2202600003 queda solo con la lista)
+        ok = (res["grupos"] == [["2202600003", "Ingresado", "lista", 2], ["2202600001", "Ingresado", "lista", 1]]   # (por fecha en SAP: la más reciente primero)
+              and i["chips"] == ["Todos 2", "Ingresados 2", "Autorizados 0", "Lista de materiales 2"] and len(i["filas"]) == 2
+              and res["autorizados"] == [] and res["ruta"] == 0 and res["buscar"] == ["M2202600001"]
               and res["detalle"] and res["detalle"]["cab"] == "Cambio en SAP" and "17/08/2026" in res["detalle"]["fechas"] and not res["detalle"]["tieneAsociada"]
               and res["observado"]["texto"].startswith("✓") and res["observado"]["bloqueada"] and res["seleccion"]["marcadas"] == ["M2202600003"]
               and res["tras_borrar"]["grupos"] == 0 and "Pulsa" in res["tras_borrar"]["texto"])
         return ok, json.dumps(res, ensure_ascii=False, default=str)[:1500]
-    @prueba("LN22 Revisión de recetas frente a SAP (v1.37, con lecturas de mentira): detecta componentes nuevos, con otra cantidad, quitados y reemplazados con su fecha; puesto de trabajo y hoja de ruta; no avisa lo que coincide ni lo que no se pudo leer; la huella cambia con lo que cambia")
+    @prueba("LN22 Revisión de recetas frente a SAP (v1.37, con lecturas de mentira): detecta componentes nuevos, con otra cantidad, quitados y reemplazados con su fecha; ya no avisa puesto de trabajo ni hoja de ruta (v1.121.0); no avisa lo que coincide ni lo que no se pudo leer; la huella cambia con lo que cambia")
     def _():
         r = pg.evaluate("""() => { const S = window.__rmdStats.recetasSap;
           const md = (id, cod, est) => [id, { mdId: id, codigo: cod, version: 3, estado: est, linaje: cod, descripcion: 'PRODUCTO ' + cod, etapa: 'ENVASE', area: 'SOL', planta: 'PLANTA ATE' }];
@@ -588,10 +589,11 @@ with sync_playwright() as p:
           const h = S.comparar(recs, porMd, copias, bom, versiones, verOk), por = Object.fromEntries(h.map(x => [x.mdRecetaId, x]));
           const h2 = S.comparar(recs, porMd, { ...copias, r1: [...copias.r1, ['C7', '1', 'UN', 'OTRO']] }, bom, versiones, verOk);
           return { cuantos: h.map(x => x.mdRecetaId), r1: por.r1.dif.map(d => d.tipo + ':' + d.comp).sort(), r1tipos: por.r1.tipos, r1fecha: por.r1.fechaSap.toISOString().slice(0, 10), r1cambio: por.r1.dif.map(d => d.cambio).filter(Boolean).sort(),
-            r2: [por.r2.tipos, por.r2.ruta.cambios.map(c => c.campo + ' ' + c.asociada + '→' + c.sap)], r3: [por.r3.tipos, por.r3.ruta.existe], r4: !!por.r4, r5: !!por.r5,
+            r2: !!por.r2, r3: !!por.r3, r4: !!por.r4, r5: !!por.r5,
             huellaIgual: S.comparar(recs, porMd, copias, bom, versiones, verOk).find(x => x.mdRecetaId === 'r1').huella === por.r1.huella, huellaDistinta: h2.find(x => x.mdRecetaId === 'r1').huella !== por.r1.huella }; }""")
-        ok = (r["cuantos"] == ["r1", "r2", "r3"] and r["r1"] == ["cambia:C1", "nuevo:C9", "quitado:C2"] and r["r1tipos"] == ["lista"]   # (C3 solo cambió de descripción: no es una diferencia)
-              and r["r1fecha"] == "2026-09-02" and r["r1cambio"] == ["500000002071", "500000002150"] and r["r2"] == [["ruta"], ["Puesto de trabajo (línea) AAPVAC01→AAPVAC09"]] and r["r3"] == [["ruta"], False]
+        # v1.121.0: sin revisión de la hoja de ruta: r2 (otro puesto) y r3 (versión de fabricación que ya no existe) no se avisan
+        ok = (r["cuantos"] == ["r1"] and r["r1"] == ["cambia:C1", "nuevo:C9", "quitado:C2"] and r["r1tipos"] == ["lista"]   # (C3 solo cambió de descripción: no es una diferencia)
+              and r["r1fecha"] == "2026-09-02" and r["r1cambio"] == ["500000002071", "500000002150"] and not r["r2"] and not r["r3"]
               and not r["r4"] and not r["r5"] and r["huellaIgual"] and r["huellaDistinta"])
         return ok, json.dumps(r, ensure_ascii=False, default=str)
     @prueba("LN22b Texto de la lista de materiales (v1.67, lecturas de mentira): si el texto que el PDF imprime bajo los insumos (TextoCab) cambió en SAP, avisa dentro de «Lista de materiales» con el texto del RMD y el de SAP (detalle, resumen y Excel); no avisa por espacios ni por signos de puntuación sueltos (sí por números: 8.0 → 80) ni si no se leyó el texto; Acondicionado y Envase no se consideran")

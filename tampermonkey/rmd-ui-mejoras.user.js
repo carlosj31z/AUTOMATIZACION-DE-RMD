@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.120.0
+// @version      1.121.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.120.0';                                                       // mantener igual a @version
+  const VERSION = '1.121.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -84,7 +84,7 @@
     ['ordenest', 'Orden de las estructuras', 'Lo compara con los últimos RMD autorizados de la misma sección y etapa.'],
     ['exportar', 'Menú Exportar', 'Exportado original con «Producción Estado» y los demás reportes.'],
     ['equipos', 'Equipos por master', 'Excel de todos los master con sus equipos, instrumentos y materiales.'],
-    ['mismov', 'Mis movimientos', 'En el menú Exportar y en Ctrl+K: los RMD en los que hiciste algún movimiento en SAP (hoy por defecto, o entre dos fechas) con su status de hoy (Ingresado, Autorizado o Suspendido), y su Excel.'],
+    ['mismov', 'Mis movimientos', 'En el menú Exportar: los RMD en los que hiciste algún movimiento en SAP (hoy por defecto, o entre dos fechas) con su status de hoy (Ingresado, Autorizado o Suspendido), y su Excel.'],
     ['vbversiones', 'V°B° última vs. penúltima', 'En el menú Exportar: Excel de los RMD trabajados en un mes (Ate y Lima) con los V°B° de su última versión frente a la penúltima, la diferencia y un resumen por planta y etapa (como el comando vb-mes).'],
     ['ultimaversion', 'Última versión de cada master', 'Excel de los Autorizados, Ingresados y Suspendidos (su última versión) con sus Observaciones y un resumen por producto.'],
     ['indicadores', 'Indicadores del mes', 'Excel del mes con sus tablas dinámicas.'],
@@ -99,7 +99,10 @@
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
-  opc.recetaruta = true;
+  // v1.121.0 (pedido de CINTIA): sin revisión de la hoja de ruta (puesto de trabajo, hoja de ruta, contador y alternativa de la versión de
+  // fabricación). Confundía más de lo que ayudaba: «Recetas frente a SAP» y «Cambios de recetas en SAP» comparan solo la lista de materiales.
+  const REVISAR_HOJA_RUTA = false;
+  opc.recetaruta = REVISAR_HOJA_RUTA;
   const on = (k) => opc.activo && opc[k];
   // Desactivadas por defecto: alteran la disposición de las ventanas.
   const APAGADAS_POR_DEFECTO = ['vivo', 'detectartildes'];   // detectartildes (v1.119.0): se usa poco y daba avisos incoherentes
@@ -139,8 +142,24 @@
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
   // Regla de CINTIA (04/11/2026): Karla Vanessa Moreno se muestra como Vanessa (usuario VM), nunca Karla. Solo al mostrar
   // (pantallas, PDF y Excel); en SAP su usuario sigue siendo KMORENOM y lo que se graba o se busca no cambia.
+  // v1.121.0: se da por hecho que «Karla» no está en su nombre: saludo, iniciales (VM), «V.Moreno» de las líneas de CC y cualquier nombre mostrado.
   const USUARIOS_VISIBLES = { KMORENOM: 'VM' };
-  const usuarioVisible = (u) => { const t = String(u == null ? '' : u), k = t.trim().toUpperCase(); return USUARIOS_VISIBLES[k] || t.replace(/\bKarla\s+(?=Vanessa\b)/gi, ''); };
+  const esVanessa = (t) => /\bKMORENOM\b/i.test(t) || (/\bKARLA\b/i.test(t) && /\b(VANESSA|MORENO)\b/i.test(t));
+  const sinKarla = (t) => String(t).replace(/\bKarla\s+(?=Vanessa\b)/gi, '').replace(/\bKarla\b/gi, (m) => (m === 'KARLA' ? 'VANESSA' : m === 'karla' ? 'vanessa' : 'Vanessa'));
+  const usuarioVisible = (u) => { const t = String(u == null ? '' : u), k = t.trim().toUpperCase(); return USUARIOS_VISIBLES[k] || (esVanessa(t) ? sinKarla(t) : t); };
+  // Usuario conectado al portal (sap.ushell) con la regla de Vanessa: { id, email, nombre, apellido, completo }
+  function personaPortal() {
+    for (const w of [window, window.parent, window.top]) {
+      try {
+        const C = w && w.sap && w.sap.ushell && w.sap.ushell.Container, u = C && C.getUser && C.getUser(); if (!u) continue;
+        const g = (f) => { try { return String((u[f] && u[f]()) || '').trim(); } catch (e) { return ''; } };
+        const p = { id: g('getId'), email: g('getEmail'), nombre: g('getFirstName'), apellido: g('getLastName'), completo: g('getFullName') };
+        if (esVanessa([p.id, p.email.split('@')[0], p.nombre, p.apellido, p.completo].join(' '))) { p.nombre = norm(sinKarla(p.nombre)) || 'Vanessa'; p.completo = norm(sinKarla(p.completo)); }
+        return p;
+      } catch (e) { /* otro origen */ }
+    }
+    return null;
+  }
   const NORM = (t) => norm(t).toUpperCase();
   const SIN_ACENTOS = (t) => NORM(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
   const faseDe = (x) => String(x).split('…')[0].replace(/[\d.,:~]+/g, '#');
@@ -391,6 +410,9 @@
   .rmd-menu-ico { grid-row: 1 / span 2; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; background: color-mix(in srgb, var(--rmd-acento) 12%, transparent); color: var(--rmd-acento-texto); }
   .rmd-menu-ico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
   .rmd-menu-item:hover, .rmd-menu-item:focus-visible { background: rgba(27,141,236,.14); outline: none; }
+  .rmd-menu { max-height: calc(100vh - 90px); overflow-y: auto; }
+  .rmd-menu-sec { padding: 8px 10px 3px; font: 700 10.5px/1.2 var(--rmd-fuente); letter-spacing: .06em; text-transform: uppercase; color: var(--rmd-apagado); }
+  .rmd-menu-sec:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--rmd-borde); padding-top: 10px; }
   .rmd-busca-eq { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .rmd-busca-eq input[type=search], .rmd-susp-motivo { flex: 1 1 420px; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13.5px var(--rmd-fuente); }
   .rmd-link { border: 0; background: none; padding: 0; color: var(--rmd-acento-texto); text-decoration: underline; cursor: pointer; font: inherit; }
   .rmd-orden-aviso { margin: 6px 16px 4px; padding: 7px 10px; border-left: 3px solid #ff4d4d; border-radius: 3px; background: rgba(255,77,77,.09); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
@@ -2564,15 +2586,10 @@
   }
   // «L.Fernandez»: inicial del nombre y primer apellido según SAP (como en las líneas de CC)
   function responsableSap() {
-    for (const w of [window, window.parent, window.top]) {
-      try {
-        const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        let n = String((u.getFirstName && u.getFirstName()) || '').trim(), a = String((u.getLastName && u.getLastName()) || '').trim().split(/\s+/)[0] || '';
-        if (!n || !a) { const t = String((u.getFullName && u.getFullName()) || '').trim().split(/\s+/); n = n || t[0] || ''; a = a || t[1] || ''; }
-        if (n && a) return `${n.charAt(0).toUpperCase()}.${a.charAt(0).toUpperCase()}${a.slice(1).toLowerCase()}`;
-      } catch (e) { /* otro origen */ }
-    }
-    return '';
+    const p = personaPortal(); if (!p) return '';
+    let n = p.nombre, a = p.apellido.split(/\s+/)[0] || '';
+    if (!n || !a) { const t = p.completo.split(/\s+/); n = n || t[0] || ''; a = a || t[1] || ''; }
+    return n && a ? `${n.charAt(0).toUpperCase()}.${a.charAt(0).toUpperCase()}${a.slice(1).toLowerCase()}` : '';
   }
   function agregarLineaObs(c, tipo, linea) {
     const p = linea || Pendientes.plantilla(tipo, { iniciales: rsUsuarioIniciales(), responsable: responsableSap() }); if (!p) return;
@@ -7220,7 +7237,7 @@
       try {
         const C = w && w.sap && w.sap.ushell && w.sap.ushell.Container, u = C && C.getUser && C.getUser();
         if (!u) continue;
-        const id = String((u.getId && u.getId()) || ''), nombre = String((u.getFullName && u.getFullName()) || ''), email = String((u.getEmail && u.getEmail()) || '');
+        const id = String((u.getId && u.getId()) || ''), nombre = usuarioVisible(String((u.getFullName && u.getFullName()) || '')), email = String((u.getEmail && u.getEmail()) || '');
         if (id || email) return { id, nombre, email };
       } catch (e) { }
     }
@@ -8968,21 +8985,31 @@
     if (document.querySelector('.rmd-menu')) { cerrarMenuExportar(); return; }
     const b = botonExportar(); if (!b) return;
     const ic = (d) => `<svg viewBox="0 0 16 16" aria-hidden="true">${d}</svg>`;
+    // v1.121.0: por secciones (lo del día, los reportes en Excel y las herramientas), cada una solo si tiene opciones
+    const seccion = (titulo, items) => { const xs = items.filter(Boolean); return xs.length ? [titulo, ...xs] : []; };
     const opciones = [
-      [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
-      on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
-      on('mismov') && [ic('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/>'), 'Mis movimientos', 'Los RMD en los que hiciste algo (hoy o entre fechas) y su status', () => abrirMisMovimientos()],
-      on('vbversiones') && [ic('<path d="M2.5 8.5l3 3 3-3.5"/><path d="M8 11.5l2 2 4-6"/><path d="M2.5 3.5h6M2.5 6h4"/>'), 'V°B° última vs. penúltima', 'RMD trabajados en un mes: V°B° de su última versión frente a la penúltima', () => abrirVbVersiones()],
-      on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
-      on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
-      on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
-      on('contingencia') && [ic('<path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/>'), 'Contingencia a SharePoint', 'Master de lo autorizado ayer (u hoy) a 3.-CONTINGENCIA', () => abrirContingencia()],
-      on('compararrmd') && [ic('<rect x="1.5" y="2.5" width="5.5" height="11" rx="1"/><rect x="9" y="2.5" width="5.5" height="11" rx="1"/><path d="M3 6h2.5M3 8.5h2.5M10.5 6h2.5M10.5 8.5h2.5"/>'), 'Comparar dos RMD', 'Sus master lado a lado, con las diferencias resaltadas', () => abrirCompararRmd()],
-      on('plantillaprod') && [ic('<path d="M3 13.5h3l7-7-3-3-7 7z"/><path d="M8.5 5 11 7.5"/>'), 'Plantilla para Producción', 'Borrador .html para que Producción proponga cambios', () => abrirPlantillaProduccion()],
-      on('cambiosrecetas') && [ic('<path d="M13 6.5A5 5 0 0 0 3.6 4.4M3 9.5a5 5 0 0 0 9.4 2.1"/><path d="M3.5 2v2.6h2.6M12.5 14v-2.6H9.9"/>'), 'Recetas con cambios en SAP', 'Master cuya receta u hoja de ruta cambió en SAP', () => exportarCambiosRecetas()],
+      ...seccion('Del día', [
+        on('mismov') && [ic('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/>'), 'Mis movimientos', 'Los RMD en los que hiciste algo (hoy o entre fechas) y su status', () => abrirMisMovimientos()],
+        on('contingencia') && [ic('<path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M8.5 7v5M6.5 10l2 2 2-2"/>'), 'Contingencia a SharePoint', 'Master de lo autorizado ayer (u hoy) a 3.-CONTINGENCIA', () => abrirContingencia()],
+      ]),
+      ...seccion('Reportes en Excel', [
+        [ic('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6 6v7.5"/>'), 'Exportado original', 'Excel de la lista filtrada, con Producción Estado', () => exportadoOriginal(ctrl, fnOrig)],
+        on('ultimaversion') && [ic('<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 8.5l1.7 1.7 3.3-3.4"/>'), 'Última versión de cada master', 'Autorizados, Ingresados y Suspendidos, con sus Observaciones', () => abrirUltimaVersion()],
+        on('indicadores') && [ic('<path d="M2 14h12M4 11.5V8M7 11.5V4.5M10 11.5V6.5M13 11.5V3"/>'), 'Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
+        on('vbversiones') && [ic('<path d="M2.5 8.5l3 3 3-3.5"/><path d="M8 11.5l2 2 4-6"/><path d="M2.5 3.5h6M2.5 6h4"/>'), 'V°B° última vs. penúltima', 'RMD trabajados en un mes: V°B° de su última versión frente a la penúltima', () => abrirVbVersiones()],
+        on('equipos') && [ic('<path d="M5.5 2.5v3l-3 6.5a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-3-6.5v-3M4.5 2.5h7"/>'), 'Equipos por master', 'Equipos, instrumentos y materiales de cada master', () => abrirEquiposPorMaster()],
+        on('citastodos') && [ic('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6 8h4.5M6 10.5h4.5"/>'), 'Documentos citados', 'Qué master cita cada documento · 1–2 min', () => abrirCitasDeTodos()],
+        on('cambiosrecetas') && [ic('<path d="M13 6.5A5 5 0 0 0 3.6 4.4M3 9.5a5 5 0 0 0 9.4 2.1"/><path d="M3.5 2v2.6h2.6M12.5 14v-2.6H9.9"/>'), 'Cambios de recetas en SAP', 'Excel de los master cuya lista de materiales cambió en SAP', () => exportarCambiosRecetas()],
+      ]),
+      ...seccion('Herramientas', [
+        on('compararrmd') && [ic('<rect x="1.5" y="2.5" width="5.5" height="11" rx="1"/><rect x="9" y="2.5" width="5.5" height="11" rx="1"/><path d="M3 6h2.5M3 8.5h2.5M10.5 6h2.5M10.5 8.5h2.5"/>'), 'Comparar dos RMD', 'Sus master lado a lado, con las diferencias resaltadas', () => abrirCompararRmd()],
+        on('plantillaprod') && [ic('<path d="M3 13.5h3l7-7-3-3-7 7z"/><path d="M8.5 5 11 7.5"/>'), 'Plantilla para Producción', 'Borrador .html para que Producción proponga cambios', () => abrirPlantillaProduccion()],
+      ]),
     ].filter(Boolean);
     const m = document.createElement('div'); m.className = 'rmd-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Exportar');
-    opciones.forEach(([icono, t, sub, fn]) => {
+    opciones.forEach((op) => {
+      if (typeof op === 'string') { const sec = document.createElement('div'); sec.className = 'rmd-menu-sec'; sec.setAttribute('role', 'presentation'); sec.textContent = op; m.appendChild(sec); return; }
+      const [icono, t, sub, fn] = op;
       const x = document.createElement('button'); x.type = 'button'; x.className = 'rmd-menu-item'; x.setAttribute('role', 'menuitem');
       x.innerHTML = `<i class="rmd-menu-ico">${icono}</i><b>${esc(t)}</b><span>${esc(sub)}</span>`; x.addEventListener('click', () => { cerrarMenuExportar(); fn(); }); m.appendChild(x);
     });
@@ -10715,8 +10742,9 @@
   // destinatariosMD (DJEFPROD, DGERPROD); nombre desde USUARIO.
   const nombresUsuario = new Map(); let pidiendoUsuarios = null;
   function nombreDe(u) {                                                 // { completo, corto }
-    const completo = norm(usuarioVisible([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' '))) || norm(usuarioVisible(u.nombreMostrar || u.usuario || ''));
-    return { completo, corto: norm([usuarioVisible(String(u.nombre || '')).trim().split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
+    const ella = esVanessa([u.usuario, u.nombre, u.apellidoPaterno, u.nombreMostrar].join(' ')), vis = (t) => norm(ella ? sinKarla(t || '') : usuarioVisible(t || ''));
+    const completo = vis([u.nombre, u.apellidoPaterno, u.apellidoMaterno].filter(Boolean).join(' ')) || vis(u.nombreMostrar || u.usuario || '');
+    return { completo, corto: norm([vis(String(u.nombre || '')).split(/\s+/)[0], u.apellidoPaterno].filter(Boolean).join(' ')) || completo };
   }
   function pedirUsuarios(modelo, ids) {
     const faltan = ids.filter((id) => !nombresUsuario.has(id)); if (!faltan.length || pidiendoUsuarios) return;
@@ -11205,11 +11233,8 @@
   }
   const capitalizar = (t) => String(t || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
   function primerNombre() {
-    for (const w of [window, window.parent, window.top]) {
-      try { const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        const n = (u.getFirstName && u.getFirstName()) || (u.getFullName && u.getFullName()) || ''; if (n) return capitalizar(n.trim().split(/\s+/)[0]); } catch (e) { }
-    }
-    return '';
+    const p = personaPortal(), n = p && (p.nombre || p.completo);
+    return n ? capitalizar(n.split(/\s+/)[0]) : '';
   }
   function codigoUsuario(ctrl) {
     try { const c = ctrl && ctrl.localModel && ctrl.localModel.getProperty('/oInfoUsuario/data/usuario'); if (c) return String(c).toUpperCase(); } catch (e) { /* sin modelo */ }
@@ -13925,10 +13950,17 @@
     if (!RS.datos) {
       let d = null; try { d = await Almacen.leer('recetasSap'); } catch (e) { d = null; }
       RS.datos = d && d.v === 1 && Array.isArray(d.hallazgos) ? d : RS_VACIO(); RS.ver++;
+      if (!REVISAR_HOJA_RUTA) RS.datos.hallazgos = RS.datos.hallazgos.map(rsSinRuta).filter(Boolean);
     }
     return RS.datos;
   }
   const rsGuardar = () => Almacen.guardar('recetasSap', RS.datos).catch(() => {});
+  // hallazgo guardado por una versión anterior: sin la parte de la hoja de ruta (y fuera si solo era eso)
+  function rsSinRuta(h) {
+    if (!h || !(h.tipos || []).includes('ruta')) return h;
+    const tipos = h.tipos.filter((t) => t !== 'ruta'); return tipos.length ? { ...h, tipos, ruta: null, rutaAvisa: false } : null;
+  }
+  const rsHallazgos = (d) => (REVISAR_HOJA_RUTA ? d.hallazgos : d.hallazgos.map(rsSinRuta).filter(Boolean));
   async function rsCopias() {
     if (!RS.copias) { let c = null; try { c = await Almacen.leer('recetasSapCopias'); } catch (e) { c = null; } RS.copias = c && typeof c === 'object' ? c : {}; }
     return RS.copias;
@@ -13974,7 +14006,7 @@
         sap.forEach((x) => { const f = fechaBom(x.ValidFrom); if (f && norm(x.ChangeNo) && (!ultima || f > ultima.fecha)) ultima = { fecha: f, cambio: norm(x.ChangeNo) }; });
       }
       let ruta = null, rutaAvisa = false, textoCab = null;
-      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { const hoyV = versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null; ruta = rsRuta(rc, hoyV); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; textoCab = textoCabEtapa(md.etapa) ? difTextoCab(rc, hoyV) : null; }
+      if (verOk.has(norm(rc.Matnr) + '|' + norm(rc.Werks))) { const hoyV = versiones.get([norm(rc.Matnr), norm(rc.Werks), norm(rc.Verid)].join('|')) || null; if (REVISAR_HOJA_RUTA) { ruta = rsRuta(rc, hoyV); rutaAvisa = !ruta.existe || ruta.cambios.length > 0; } textoCab = textoCabEtapa(md.etapa) ? difTextoCab(rc, hoyV) : null; }
       if (!dif.length && !textoCab && !rutaAvisa) return;
       const fechas = dif.map((d) => d.fecha).filter(Boolean), fechaSap = fechas.length ? new Date(Math.max(...fechas.map((f) => +f))) : dif.length && ultima ? ultima.fecha : null;
       const huella = rsHash(dif.map((d) => [d.tipo, d.comp, d.compAntes || '', d.antes ? d.antes.q + d.antes.u : '', d.ahora ? d.ahora.q + d.ahora.u : ''].join(':')).join(';') + '#' + (ruta ? (ruta.existe ? '' : 'X') + ruta.cambios.map((c) => c.clave + c.sap).join(',') : '') + (textoCab ? '#t' + rsHash(textoCab.ahora) : ''));
@@ -14081,7 +14113,7 @@
   function rsGrupos() {
     const d = RS.datos; if (!d) return [];
     const por = new Map();
-    d.hallazgos.forEach((h) => {
+    rsHallazgos(d).forEach((h) => {
       let g = por.get(h.mdId); if (!g) { g = { mdId: h.mdId, codigo: h.codigo, version: h.version, estado: h.estado, descripcion: h.descripcion, etapa: h.etapa, planta: h.planta, area: h.area, recetas: [], tipos: new Set(), fechaSap: null, detectado: 0 }; por.set(h.mdId, g); }
       g.recetas.push(h); h.tipos.forEach((t) => g.tipos.add(t)); if (h.fechaSap && (!g.fechaSap || h.fechaSap > g.fechaSap)) g.fechaSap = h.fechaSap; g.detectado = Math.max(g.detectado, h.detectado || 0);
     });
@@ -14094,19 +14126,14 @@
   const rsCuando = (ms) => (ms ? fechaHoraCorta(ms) : '');
   const rsMarca = { nuevo: 'Nuevo en SAP', cambia: 'Otra cantidad o unidad', quitado: 'Quitado en SAP', reemplazo: 'Reemplazado por otra versión del material' };
   function rsUsuarioIniciales() {
-    for (const w of [window, window.parent, window.top]) {
-      try {
-        const u = w.sap && w.sap.ushell && w.sap.ushell.Container && w.sap.ushell.Container.getUser(); if (!u) continue;
-        let i = Reglas.inicialesDe((u.getFirstName && u.getFirstName()) || '', (u.getLastName && u.getLastName()) || '');
-        if (i.length < 2) { const n = String((u.getFullName && u.getFullName()) || '').trim().split(/\s+/); i = Reglas.inicialesDe(n[0], n[1]); }
-        if (i) return i;
-      } catch (e) { /* otro origen */ }
-    }
-    return '';
+    const p = personaPortal(); if (!p) return '';
+    let i = Reglas.inicialesDe(p.nombre, p.apellido);
+    if (i.length < 2) { const n = p.completo.split(/\s+/); i = Reglas.inicialesDe(n[0], n[1]); }
+    return i;
   }
   // ---- Icono junto a «Manufactura Digital» ----
   function rsEstadoBoton(b) {
-    const d = RS.datos, mds = d ? new Set(d.hallazgos.map((h) => h.mdId)) : new Set(), n = mds.size, ing = d ? new Set(d.hallazgos.filter((h) => h.estado === 'Ingresado').map((h) => h.mdId)).size : 0;
+    const d = RS.datos, mds = d ? new Set(rsHallazgos(d).map((h) => h.mdId)) : new Set(), n = mds.size, ing = d ? new Set(rsHallazgos(d).filter((h) => h.estado === 'Ingresado').map((h) => h.mdId)).size : 0;
     b.classList.toggle('vacio', !n); b.classList.toggle('leyendo', RS.leyendo); setTxt(b.querySelector('.n'), n ? String(n) : '');
     const ult = d && (d.ultima.ing || d.ultima.aut) ? ` Última revisión: ${fechaHoraCorta(Math.max(d.ultima.ing, d.ultima.aut))}.` : '';
     const t = RS.leyendo ? `Revisando las recetas de los RMD frente a SAP… ${RS.progreso}` : n ? `${n} RMD con cambios en su receta en SAP pendientes de volver a asociar (${ing} Ingresados, ${n - ing} Autorizados).${ult} Clic para ver el detalle.`
@@ -14140,7 +14167,7 @@
     tarjeta.classList.add('rmd-cr'); RS.ventana = v;
     const cerrarOrig = v.cerrar; v.cerrar = () => { RS.ventana = null; cerrarOrig(); };
     v.cuerpo.innerHTML = `<p class="rmd-cr-intro">RMD <b>Ingresados y Autorizados</b> cuya receta cambió en SAP después de asociarla: hay que retirarla y volver a asociarla para traer lo nuevo. Es solo un aviso: no impide autorizar.
-      SAP informa la <b>fecha</b> de cada cambio de componentes de la lista de materiales (no la del texto de la lista ni la de la hoja de ruta); la <b>hora</b> es la de la revisión que lo detectó.</p>
+      SAP informa la <b>fecha</b> de cada cambio de componentes de la lista de materiales (no la del texto de la lista); la <b>hora</b> es la de la revisión que lo detectó.</p>
       <div class="rmd-cr-barra"><div class="rmd-cr-chips" role="tablist"></div><input type="search" class="rmd-cr-buscar" placeholder="Buscar por código, descripción, receta o componente"></div>
       <p class="rmd-progreso rmd-cr-estado"></p><div class="rmd-cr-tabla"></div>`;
     const q = (s) => v.cuerpo.querySelector(s), chips = q('.rmd-cr-chips'), buscar = q('.rmd-cr-buscar'), estado = q('.rmd-cr-estado'), tabla = q('.rmd-cr-tabla');
@@ -14166,7 +14193,7 @@
     v.pintar = () => {
       const grupos = rsGrupos(), d = RS.datos, cuenta = (f) => grupos.filter(f).length;
       const defs = [['todos', 'Todos', grupos.length], ['Ingresado', 'Ingresados', cuenta((g) => g.estado === 'Ingresado')], ['Autorizado', 'Autorizados', cuenta((g) => g.estado === 'Autorizado')],
-        ['lista', 'Lista de materiales', cuenta((g) => g.tipos.has('lista'))], ['ruta', 'Hoja de ruta', cuenta((g) => g.tipos.has('ruta'))]];
+        ['lista', 'Lista de materiales', cuenta((g) => g.tipos.has('lista'))], REVISAR_HOJA_RUTA && ['ruta', 'Hoja de ruta', cuenta((g) => g.tipos.has('ruta'))]].filter(Boolean);
       chips.innerHTML = defs.map(([k, t, n]) => `<button type="button" role="tab" data-f="${k}" class="${filtro === k ? 'activo' : ''}" aria-selected="${filtro === k}">${esc(t)} <span>${n}</span></button>`).join('');
       v.pintarEstado();
       const filas = filtrados(), hoyDia = new Date(), ini = rsUsuarioIniciales();
@@ -14183,7 +14210,7 @@
           <td class="rmd-nowrap">${esc(g.estado)}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-nowrap">${esc(h.receta)}</span>`).join('<br>')}</td>
           <td>${g.recetas.map((h) => `<span class="rmd-cr-tag ${h.tipos.length > 1 ? 'dos' : h.tipos[0]}">${esc(rsTipoTxt(h.tipos))}</span> ${esc(rsResumenReceta(h))}`).join('<br>')}</td>
-          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio del texto de la lista ni de la hoja de ruta">—</span>'}</td>
+          <td class="rmd-nowrap">${esc(rsFechaSap(g.fechaSap)) || '<span class="rmd-nota" title="SAP no informa la fecha del cambio del texto de la lista">—</span>'}</td>
           <td class="rmd-nowrap">${esc(rsCuando(g.detectado))}</td>
           <td class="rmd-cr-obs">${r ? esc(r) : g.obs ? `<span title="${esc(g.obs.linea)}">✓ ${esc(fechaHoraCorta(g.obs.t).slice(0, 10))}</span>` : ini ? `<input type="text" class="rmd-cr-obs-in" data-a="obs" value="${esc(editadas.has(g.mdId) ? editadas.get(g.mdId) : linea)}" title="Puedes editar el texto antes de agregarlo" aria-label="Observación de ${esc(g.codigo)}">` : ''}</td>
           <td class="rmd-nowrap"><button type="button" class="rmd-link" data-a="ver">${abierto ? 'Ocultar' : 'Ver detalle'}</button> · <button type="button" class="rmd-link" data-a="abrir" title="Abrir «Asociar fórmulas» de este RMD">Abrir</button></td></tr>
@@ -14244,7 +14271,7 @@
   function rsArmarExcel() {
     const d = RS.datos || RS_VACIO(), hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
     const utc = (x) => (x instanceof Date && !isNaN(x) ? new Date(Date.UTC(x.getFullYear(), x.getMonth(), x.getDate(), x.getHours(), x.getMinutes())) : '');
-    const hs = [...d.hallazgos].sort((a, b) => (+(b.fechaSap || 0) - +(a.fechaSap || 0)) || String(b.codigo).localeCompare(String(a.codigo))), grupos = new Map(rsGrupos().map((g) => [g.mdId, g])), ini = rsUsuarioIniciales();
+    const hs = [...rsHallazgos(d)].sort((a, b) => (+(b.fechaSap || 0) - +(a.fechaSap || 0)) || String(b.codigo).localeCompare(String(a.codigo))), grupos = new Map(rsGrupos().map((g) => [g.mdId, g])), ini = rsUsuarioIniciales();
     const tabla = (nombre, nt, cab, anchos, datos, estilos = {}, op = {}) => {
       const h = libro.hoja(nombre, { activa: !!op.activa, congelar: op.congelar || 'A2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: nt, ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, datos.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
@@ -14273,8 +14300,8 @@
       ['Última revisión de SAP', `Ingresados ${d.ultima.ing ? fechaHoraCorta(d.ultima.ing) : 'sin revisar'} · Autorizados ${d.ultima.aut ? fechaHoraCorta(d.ultima.aut) : 'sin revisar'}`],
       ['Listas de materiales revisadas', d.cobertura ? `${d.cobertura.alDia} de ${d.cobertura.listas} al día${d.cobertura.alDia < d.cobertura.listas ? ' (el resto se revisa solo, en segundo plano: este Excel puede estar incompleto)' : ''}` : 'sin revisar'],
       ['RMD con cambios', new Set(hs.map((h) => h.mdId)).size], ['Recetas con cambios', hs.length],
-      ['Qué compara', 'La lista de materiales (componentes, cantidades y, salvo en Acondicionado y Envase, el texto de la lista que el PDF imprime bajo los insumos) y los datos de la versión de fabricación (puesto de trabajo, hoja de ruta, contador y alternativa) copiados en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
-      ['Fecha y hora', 'SAP informa la fecha «válido desde» de cada componente, no la hora ni la fecha de la hoja de ruta. «Detectado el» es la fecha y hora de la revisión que vio la diferencia por primera vez.'],
+      ['Qué compara', 'La lista de materiales (componentes, cantidades y, salvo en Acondicionado y Envase, el texto de la lista que el PDF imprime bajo los insumos) copiada en el RMD al asociar la receta, frente a lo que devuelve hoy SAP. Solo se revisa la última versión de cada RMD Ingresado o Autorizado.'],
+      ['Fecha y hora', 'SAP informa la fecha «válido desde» de cada componente, no la hora. «Detectado el» es la fecha y hora de la revisión que vio la diferencia por primera vez.'],
       ['Cómo se corrige', 'En «Asociar fórmulas» del RMD: Eliminar Receta → Agregar Producto → asociarla de nuevo.']]
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Recetas con cambios en SAP ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, rmd: new Set(hs.map((h) => h.mdId)).size, recetas: hs.length, diferencias: dif.length };
@@ -18702,7 +18729,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'detectartildes', 'reglasrev', 'motivocaract', 'acuerdos', 'ordenest']],
-    ['Reportes y herramientas', 'reporte', ['exportar', 'equipos', 'ultimaversion', 'vbversiones', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio']],
+    ['Reportes y herramientas', 'reporte', ['exportar', 'mismov', 'equipos', 'ultimaversion', 'vbversiones', 'indicadores', 'citastodos', 'documentos', 'verop', 'statusrmd', 'contingencia', 'compararrmd', 'plantillaprod', 'suspension', 'controlescambio']],
   ];
   const ICONOS_PANEL = {
     flecha: '<path d="M6 3.5 10.5 8 6 12.5"/>', buscar: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>', cerrar: '<path d="M4 4l8 8M12 4l-8 8"/>',

@@ -194,7 +194,11 @@ cuenta). Escribir y responder siempre en **español**.
   tilde sigue: quien quiera la ayuda la enciende.
 - 2026-11-05, v1.120.0: **pedido de CINTIA (reporte diario de actividades)**: «Mis movimientos» muestra **Autorizado en SAP**
   (MD.fechaAutorizacion + usuarioAutorizacion, `misMovAutSap`; fecha 00:00 UTC = solo el día) en la tabla y el Excel, y el botón
-  **Copiar para el reporte** (filas TSV sin títulos, `misMovTextoReporte`). **La siguiente versión debe ser > 1.120.0.**
+  **Copiar para el reporte** (filas TSV sin títulos, `misMovTextoReporte`).
+- 2026-11-05, v1.121.0 (encima de la 1.120.0): **regla de CINTIA: KARLA VANESSA MORENO MORALES es «Vanessa», nunca Karla**, también en el
+  saludo, las iniciales (VM) y «V.Moreno» de las líneas de CC (`personaPortal`, `esVanessa`, `sinKarla`). **Sin revisión de la hoja de ruta**
+  (`REVISAR_HOJA_RUTA = false`; lo guardado con tipo `ruta` se ignora con `rsSinRuta`). Menú Exportar por secciones y «Mis movimientos»
+  en el panel (Ctrl+K sigue retirado desde la v1.57). **La siguiente versión debe ser > 1.121.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

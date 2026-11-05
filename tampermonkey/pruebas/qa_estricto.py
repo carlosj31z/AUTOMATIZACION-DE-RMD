@@ -1218,7 +1218,7 @@ with sync_playwright() as p:
         RMD_ING = os.environ.get("RMD_ING", "2202609241")     # un RMD INGRESADO (v1.28: observación masiva y suspensión, simuladas)
         RMD_CMP = os.environ.get("RMD_CMP", "2202609157")     # un RMD AUTORIZADO de Fabricación o Envase cuyo Guardar abre el «Comparador de fórmula» (v1.70)
         cerrar_seguro(); pg.wait_for_timeout(1000)
-        @prueba("T1 El icono 'Exportar' abre el menú (original, Última versión de cada master, Equipos por master, Indicadores, Documentos citados de todos, Plantilla para Producción, Recetas con cambios en SAP); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
+        @prueba("T1 El icono 'Exportar' abre el menú por secciones (v1.121.0: Del día, Reportes en Excel, Herramientas); el exportado original es el del portal con 'Producción Estado' al final (build() interceptado: no descarga)")
         def _():
             fr.locator(".sapUiCompFilterBar button[title='Restablecer los filtros']").first.click(); pg.wait_for_timeout(6000)   # sin el filtro de código que dejan otros bloques (exporta la lista entera)
             fr.evaluate("""() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); window.__exp = []; window.__buildOrig = S && S.prototype.build;
@@ -1232,7 +1232,7 @@ with sync_playwright() as p:
             e = fr.evaluate("window.__exp.pop()")
             fr.evaluate("() => { const S = sap.ui.require('sap/ui/export/Spreadsheet'); if (S && window.__buildOrig) S.prototype.build = window.__buildOrig; }")
             vm = (e["ultima"] or {}).get("valueMap") or {}
-            ok = (items == ["Exportado original", "Última versión de cada master", "Equipos por master", "Indicadores del mes", "Documentos citados", "Plantilla para Producción", "Recetas con cambios en SAP"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
+            ok = (items == ["Mis movimientos", "Contingencia a SharePoint", "Exportado original", "Última versión de cada master", "Indicadores del mes", "V°B° última vs. penúltima", "Equipos por master", "Documentos citados", "Cambios de recetas en SAP", "Comparar dos RMD", "Plantilla para Producción"] and len(e["cols"]) == 19 and e["cols"][:4] == ["Código", "Código de Solicitud", "Versión", "Estado"]
                   and e["cols"][-1] == "Producción Estado" and "PENDIENTE" in vm.values() and e["filas"] > 1000)
             return ok, f"menú={items} columnas={len(e['cols'])} última={e['cols'][-1]} valores={vm} filas={e['filas']}"
         @prueba("T2 Buscar por equipo: por código (un equipo aunque el catálogo lo repita) y por palabras; trae los master de todos los estados")
@@ -1749,19 +1749,20 @@ with sync_playwright() as p:
                 pg.wait_for_timeout(2500); sin = fr.evaluate(ESTADOY)
                 fr.evaluate("() => { " + CTRLY + ".getView().getModel('listMdReceta').setData(window.__recY); }"); pg.wait_for_timeout(2500); con = fr.evaluate(ESTADOY)
                 return (sin["aviso"] == "" and sin["iconos"] == 0 and "Lista de materiales" in con["aviso"] and con["iconos"] >= 1), f"sin la receta={sin} con la receta={{'iconos': {con['iconos']}}}"
-            @prueba("Y3 Hoja de ruta / puesto (siempre activo, ya no es una opción del panel): con un puesto y hoja de ruta distintos en la receta asociada (SOLO EN MEMORIA), el detalle muestra asociada → SAP hoy")
+            @prueba("Y3 Sin revisión de la hoja de ruta (v1.121.0): con un puesto y hoja de ruta distintos en la receta asociada (SOLO EN MEMORIA) no hay aviso de hoja de ruta ni puesto")
             def _():
                 por_defecto = fr.evaluate("document.querySelectorAll(\"#rmd-ui-panel input[data-k='recetaruta']\").length")   # (ya no está en el panel)
                 try:
                     fr.evaluate("() => { const r = " + CTRLY + ".getView().getModel('listMdReceta').getData()[0].recetaId; window.__rcY = { Mdv01: r.Mdv01, Plnnr: r.Plnnr }; r.Mdv01 = 'PUESTOVIEJO'; r.Plnnr = '999'; }")
                     fr.locator(".rmd-revisar-recetas").click(); pg.wait_for_timeout(9000)
-                    e = fr.evaluate(ESTADOY); fr.locator(".rmd-rec-icono").first.click(); pg.wait_for_timeout(900)
+                    e = fr.evaluate(ESTADOY)
+                    if fr.locator(".rmd-rec-icono").count(): fr.locator(".rmd-rec-icono").first.click(); pg.wait_for_timeout(900)
                     t = fr.evaluate("(() => { const t = document.querySelector('.rmd-rec-detalle'); return t && { fijo: t.classList.contains('fijo'), filas: [...t.querySelectorAll('tbody tr')].map(r => r.innerText.replace(/\\s+/g, ' ')).filter(x => /Puesto de trabajo|Hoja de ruta/.test(x)) }; })()")
                     pg.keyboard.press("Escape"); pg.wait_for_timeout(400)
                 finally:
                     fr.evaluate("() => { try { Object.assign(" + CTRLY + ".getView().getModel('listMdReceta').getData()[0].recetaId, window.__rcY || {}); } catch (e) {} }")
                     pass
-                ok = (por_defecto == 0 and "Hoja de ruta o puesto de trabajo distinto en SAP" in e["aviso"] and t and t["fijo"] and any("PUESTOVIEJO" in x for x in t["filas"]) and any(x.startswith("Hoja de ruta 999") for x in t["filas"]))
+                ok = (por_defecto == 0 and "Hoja de ruta" not in e["aviso"] and not (t and t["filas"]))
                 return ok, f"opciones en el panel={por_defecto} detalle={t}"
             cerrar_seguro()
         finally:
@@ -2062,7 +2063,7 @@ with sync_playwright() as p:
                 ok = (len(filas) == len(set(filas)) == x["rmd"] and bool(filas) and det and det["cab"] == "Cambio en SAP" and len(det["fechas"]) >= 1 and not det["asociada"] and "listas de materiales al día" in estado
                       and hojas == ["Resumen", "Diferencias", "Información"] and x["diferencias"] > 0 and dif.count("<row ") == x["diferencias"] + 1 and res.count("<row ") == x["recetas"] + 1)
                 return ok, f"filas={filas} detalle={det} estado={estado[:150]!r} excel={ {k: v for k, v in x.items() if k != 'base64'} } hojas={hojas}"
-            @prueba("U5 Menú Exportar: incluye «Recetas con cambios en SAP» (y Ctrl+K «Cambios de recetas en SAP»)")
+            @prueba("U5 Menú Exportar: «Cambios de recetas en SAP» (mismo nombre que su ventana desde v1.121.0)")
             def _():
                 fr.locator("button[title='Exportar']").first.click(); pg.wait_for_timeout(700)
                 items = fr.evaluate("[...document.querySelectorAll('.rmd-menu .rmd-menu-item b')].map(b => b.textContent)")
@@ -2070,7 +2071,7 @@ with sync_playwright() as p:
                 fr.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))"); pg.wait_for_timeout(600)
                 paleta = fr.evaluate("[...document.querySelectorAll('.rmd-paleta-fondo *')].some(x => x.children.length === 0 && /Cambios de recetas en SAP/.test(x.textContent))")
                 pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
-                return ("Recetas con cambios en SAP" in items), f"menú={items} paleta={paleta}"
+                return ("Cambios de recetas en SAP" in items), f"menú={items} paleta={paleta}"
             @prueba("U8 Hoja de ruta (v1.71): tras un guardado del portal (Eliminar Receta, Agregar Producto, Guardar…) se rehace la revisión de la receta; una lectura no la invalida")
             def _():
                 r = fr.evaluate("""async () => { const b = [...document.querySelectorAll('button')].find(x => x.title === 'Exportar' && !x.closest('.sapMDialog')), c = sap.ui.getCore().byId(b.id.replace(/-inner$/, '')).mEventRegistry.press[0].oListener, m = c.getView().getModel('mainModelv2');
