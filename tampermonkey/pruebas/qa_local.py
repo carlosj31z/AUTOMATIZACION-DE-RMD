@@ -23,6 +23,8 @@ def registrar(nombre, ok, detalle=""):
 
 def prueba(nombre):
     def deco(fn):
+        solo = os.environ.get("QA_SOLO")                                   # QA_SOLO=LN57,LN28 corre solo esas pruebas
+        if solo and not any(nombre.startswith(x.strip() + " ") for x in solo.split(",")): return fn
         try:
             r = fn()
             if r is None or r is True: registrar(nombre, True)
@@ -1425,6 +1427,64 @@ with sync_playwright() as p:
               and r["cancelar"] and r["cancelar"]["cancelado"]
               and not r["una"]["pregunto"] and r["una"]["ins"] == ["1000001", "1000002"] and not r["una"]["dlg"])
         return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
+    # ---- v1.123.0: vista simple de ingreso dentro del portal y vista completa de Documentación Técnica ----
+    PP_DT_JS = """(d) => { const dt = (tipo, o = {}) => ({ tipo, dec: null, edit: false, cc: false, mov: false, genpp: false, color: null, clv: null, puesto: null, pmop: false, dep: '', depTxt: '', ...o });
+      const t1 = d.arbol.estructuras[2].etiquetas[0].pasos; t1[0].dt = dt(436, { edit: true }); t1[1].dt = dt(446); t1[1].pm[0].dt = { tipo: 433, dec: null, edit: true, cc: false, mov: false, genpp: false, tab: false, color: null };
+      t1[2].dt = dt(443, { dec: '1', edit: true, dep: 'P10', depTxt: '2001' }); t1[3].dt = dt(436, { edit: true, dep: 'P12', depTxt: '2003' });
+      d.arbol.estructuras[2].etiquetas[1].pasos.forEach((p) => { p.dt = dt(+p.tipo); }); d.arbol.estructuras[0].pasos[0].dt = dt(446);
+      d.cat.tipos = { 433: 'Texto', 436: 'Fecha y Hora', 438: 'Números', 443: 'Rango', 446: 'Sin tipo de dato', 447: 'Notificación' }; return d; }"""
+    @prueba("LN57 Vista simple de ingreso (v1.123.0): se abre DENTRO del portal a pantalla completa con la vista completa de Documentación Técnica (tipo de dato, decimales, Depende, casillas por paso y Conforme / Proceso menor por etiqueta); ⚙ Configuración cambia tipo, decimales, Clave Modelo, Puesto, color y Depende con sus reglas en vivo; «Copiar para Claude» resume cambios y errores; «Guardar en SAP» entrega el borrador al portal; las escrituras siguen el Guardar de la tabla de Pasos del portal (Clave Modelo / Puesto solo en Notificación, color en formato + colorHex + colorRgb); Cerrar quita la vista sin tocar las ventanas del portal")
+    def _():
+        d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
+        r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, N = P.nucleo, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] });
+          const W = JSON.parse(JSON.stringify(d.arbol)), p12 = W.estructuras[2].etiquetas[0].pasos[2]; p12.dt.dec = '2'; p12.dt.cc = true; p12.dt.color = '#152cc1'; W.estructuras[2].etiquetas[0].conforme = false;
+          const cm = N.cambios(d.arbol, W, { tipos: d.cat.tipos }).filter((c) => c.accion === 'config').map((c) => [c.clase, c.campos.map((x) => `${x.campo}:${x.antes}>${x.despues}`).join('|')]);
+          const W2 = JSON.parse(JSON.stringify(d.arbol)), q = W2.estructuras[2].etiquetas[0].pasos; q[2].dt.dec = null; q[2].vi = null; q[3].dt.tipo = 447; q[3].dt.dep = 'P13'; q[1].dt.pmop = true;
+          const av = [...N.avisos(W2, { base: d.arbol.estructuras, dt: true }).entries()].map(([id, l]) => [id, l.map((a) => a.nivel + ':' + a.texto.slice(0, 40))]);
+          const avSin = [...N.avisos(W2, { base: d.arbol.estructuras }).values()].flat().filter((a) => /decimales|Clave Modelo|sí mismo/.test(a.texto)).length;
+          const esc1 = P.dtEscritura({ tipo: 447, clv: 'SETPRE', puesto: 'FMENFA01', color: '#152CC1', edit: true, dec: '0' }, ['tipo', 'clv', 'color', 'edit', 'dec'], false);
+          const esc2 = P.dtEscritura({ tipo: 438, clv: 'SETPRE', puesto: 'X', color: null, tab: true }, ['tipo', 'color', 'tab'], false);
+          const esc3 = P.dtEscritura({ tipo: 433, tab: true, pmop: true }, ['tab', 'pmop'], true);
+          const ventanas = [...document.querySelectorAll('.sapMDialog')].map((x) => x.getBoundingClientRect().width);
+          window.__vistaGuardada = null; const V = await P.montarVista(paq, null, { claves: [['SETPRE', 'Setup Pre Proceso'], ['PROCESO', 'Proceso']], puestos: ['FMENFA01'] }); V.emb.guardar = (p) => { window.__vistaGuardada = p; };
+          return { cm, av, avSin, esc1, esc2, esc3, ventanas, fondo: (() => { const b = V.fondo.getBoundingClientRect(); return [b.width === innerWidth, b.height === innerHeight, getComputedStyle(V.fondo).position]; })() }; }""", d0)
+        fr = None
+        for _ in range(60):
+            fr = next((f for f in pg.frames if f != pg.main_frame), None)
+            try:
+                if fr and fr.evaluate("() => !!document.querySelector('.pp-doc')"): break
+            except Exception: pass                                           # el marco todavía navega a su srcdoc
+            pg.wait_for_timeout(250)
+        v = fr.evaluate("""() => ({ titulo: document.querySelector('.pp-titulo b').textContent, dt: document.querySelector('#pp-vista-dt').checked, chips: [...document.querySelectorAll('.pp-dt')].length,
+          etq: [...document.querySelectorAll('.pp-dt-etq')].map((x) => x.textContent.trim()), botones: [...document.querySelectorAll('.pp-barra [data-a]')].map((b) => b.dataset.a), aviso: (document.querySelector('.pp-aviso-gen') || {}).textContent || '' })""")
+        fila = lambda n: "[...document.querySelectorAll('tr.pp-paso')].find(tr => (tr.querySelector('.pp-c-num') || {}).textContent === '" + n + ".-')"
+        fr.evaluate("() => " + fila("2.1.4") + ".querySelector('[data-a=config]').click()"); fr.wait_for_selector("#c-tipo")
+        fr.select_option("#c-tipo", "447"); fr.wait_for_timeout(100); av1 = fr.inner_text("#c-av"); notif = fr.evaluate("() => !document.querySelector('.pp-cfg-notif').classList.contains('apagado')")
+        fr.fill("#c-clv", "SETPRE"); fr.fill("#c-puesto", "fmenfa01"); fr.fill("#c-dec", "x"); fr.wait_for_timeout(100); av2 = fr.inner_text("#c-av"); fr.click(".pp-modal [data-a=aceptar]"); sigue = fr.evaluate("() => !!document.querySelector('#c-tipo')")
+        fr.fill("#c-dec", ""); fr.evaluate("() => { const s = document.querySelector('#c-dep'); s.value = 'P11'; s.dispatchEvent(new Event('input', { bubbles: true })); }")
+        fr.evaluate("() => { const c = document.querySelector('#c-color'); c.value = '#152cc1'; c.dispatchEvent(new Event('input', { bubbles: true })); }"); fr.click(".pp-modal [data-a=aceptar]"); fr.wait_for_timeout(250)
+        fr.evaluate("() => [...document.querySelectorAll('.pp-etq-tit [data-a=config-etq]')][0].click()"); fr.wait_for_selector("#c-conf"); fr.uncheck("#c-conf"); fr.click(".pp-modal [data-a=aceptar]"); fr.wait_for_timeout(250)
+        st = fr.evaluate("""() => { const s = window.__pp.estado(), p = window.__pp.encontrar('P13').item; return { dt: p.dt, edit: p.edit, contar: s.contar, tags: [...document.querySelectorAll('tr[data-id=P13] .pp-tag')].map((t) => t.textContent),
+          chips: [...document.querySelectorAll('tr[data-id=P13] .pp-dt-c')].map((t) => t.textContent + (t.classList.contains('cam') ? '*' : '')), cm: s.CMB.filter((c) => c.accion === 'config').length, claude: window.__pp.textoParaClaude() }; }""")
+        fr.click("[data-a=sap]"); pg.wait_for_timeout(200)
+        g = pg.evaluate("() => window.__vistaGuardada && { vista: window.__vistaGuardada.vista, dtP13: window.__vistaGuardada.trabajo.estructuras[2].etiquetas[0].pasos[3].dt, conf: window.__vistaGuardada.trabajo.estructuras[2].etiquetas[0].conforme }")
+        pg.evaluate("() => window.__rmdStats.vista && window.__rmdStats.vista.cerrar()"); pg.wait_for_timeout(150)
+        queda = pg.evaluate("() => ({ vista: !!document.querySelector('.rmd-vista-fondo'), emb: !!window.__rmdVistaEmb, ventanas: [...document.querySelectorAll('.sapMDialog')].map((x) => x.getBoundingClientRect().width) })")
+        cm = dict((tuple(x) for x in r["cm"]))
+        avs = dict((k, " ".join(l)) for k, l in r["av"])
+        ok = (cm.get("paso", "").startswith("Decimales:1>2|Estado CC:No>Sí|Color (Formato):—>#152cc1") and cm.get("etiqueta") == "Conforme:Sí>No"
+              and "decimales" in avs.get("P12", "") and "error:Tipo «Rango»" in avs.get("P12", "") and "falta la Clave" in avs.get("P13", "") and "sí mismo" in avs.get("P13", "") and "PM OP" in avs.get("P11", "") and r["avSin"] == 0
+              and r["esc1"] == {"tipoDatoId_iMaestraId": 447, "tipoDatoIdAnterior_iMaestraId": 447, "decimales": 0, "clvModelo": "SETPRE", "puestoTrabajo": "FMENFA01", "automatico": True, "edit": True, "formato": True, "colorHex": "#152cc1", "colorRgb": "rgb(21,44,193)"}
+              and r["esc2"] == {"tipoDatoId_iMaestraId": 438, "tipoDatoIdAnterior_iMaestraId": 438, "clvModelo": None, "puestoTrabajo": None, "automatico": None, "formato": False, "colorHex": None, "colorRgb": None}
+              and r["esc3"] == {"tab": True} and r["fondo"] == [True, True, "fixed"] and r["ventanas"] == queda["ventanas"]
+              and v["titulo"].startswith("Vista simple de ingreso · RMD 2202600001 v3") and v["dt"] and v["chips"] >= 6 and any("Conforme: Sí" in x for x in v["etq"]) and {"sap", "claude", "cerrar-vista"} <= set(v["botones"]) and "Autorizado" in v["aviso"]
+              and "Clave Modelo" in av1 and notif and "Decimales: un número entero" in av2 and sigue
+              and st["dt"]["tipo"] == 447 and st["dt"]["clv"] == "SETPRE" and st["dt"]["puesto"] == "FMENFA01" and st["dt"]["dep"] == "P11" and st["dt"]["depFijo"] and st["dt"]["color"] == "#152cc1" and st["edit"]
+              and "Configuración" in st["tags"] and any(c.startswith("Notificación") and c.endswith("*") for c in st["chips"]) and any("Depende: 2.1.2.- 2002*" == c for c in st["chips"]) and st["cm"] == 2
+              and "CAMBIOS" in st["claude"] and "Configuración" in st["claude"] and "Tipo de dato: Fecha y Hora → Notificación" in st["claude"]
+              and g and g["vista"] == "dt" and g["dtP13"]["tipo"] == 447 and g["conf"] is False and not queda["vista"] and not queda["emb"])
+        return ok, json.dumps({ "r": {k: r[k] for k in ("avSin", "ventanas", "fondo")}, "claude": st["claude"][:900], "av": avs, "v": v, "av1": av1, "av2": av2, "notif": notif, "sigue": sigue, "edit": st["edit"], "st": {k: st[k] for k in ("dt", "tags", "chips", "cm")}, "g": g, "queda": queda }, ensure_ascii=False)[:2400]
 
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
