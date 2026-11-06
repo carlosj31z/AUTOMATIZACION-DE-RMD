@@ -17157,7 +17157,7 @@
       if (!EMB || typeof EMB.guardar !== 'function') return;
       const n = contar(); if (!n.total) { aviso('Todavía no hay cambios.'); return; }
       if (obsCambiada() && !OBS.editable) { aviso('Las Observaciones solo se cambian en un RMD Ingresado.'); return; }
-      if (n.errores) { pendientes(n, null); return; }
+      if (n.errores && CMB.length) { pendientes(n, null); return; }      // solo Observaciones: lo que ya venía mal de SAP no lo frena
       EMB.guardar(clon(propActual()));
     }
     function cerrarVista() { if (!EMB || typeof EMB.cerrar !== 'function') return; if (sucio && !confirm('Lo editado no se guardó en SAP. Queda guardado en este navegador y se ofrece recuperarlo al volver a abrir la vista. ¿Cerrar?')) return; sucio = false; EMB.cerrar(); }
@@ -17882,7 +17882,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 .pp-cfg-av { min-height: 4px; }
 .pp-barra-vista { border-top: 3px solid var(--acento); }
 /* v1.124.0: Observaciones en la vista del portal */
-.pp-obs { margin: 8px 16px 0; padding: 8px 12px; border: 1px solid var(--bd2); border-left: 3px solid var(--acento); border-radius: 6px; background: #fff; font: 12px/17px "Segoe UI", Arial, sans-serif; }
+.pp-obs { scroll-margin-top: 110px; margin: 8px 16px 0; padding: 8px 12px; border: 1px solid var(--bd2); border-left: 3px solid var(--acento); border-radius: 6px; background: #fff; font: 12px/17px "Segoe UI", Arial, sans-serif; }
 .pp-obs-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; } .pp-obs-cab small { color: var(--ap); } .pp-obs-cam { color: #8a5a00; font-weight: 600; }
 .pp-obs-cuerpo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; } @media (max-width: 900px) { .pp-obs-cuerpo { grid-template-columns: 1fr; } }
 .pp-obs textarea { width: 100%; box-sizing: border-box; resize: vertical; max-height: 190px; font: 12px/16px Consolas, "Courier New", monospace; padding: 5px 7px; border: 1px solid var(--bd2); border-radius: 4px; }
@@ -18934,7 +18934,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     // v1.124.0: Observaciones escritas en la vista: se guardan al final del ingreso (o solas si no hay otros cambios)
     const obsNueva = extra.desdeVista ? ppObsNueva(datos, prop) : null, soloObs = obsNueva != null && !an.cambios.length;
     if (obsNueva != null) v.cuerpo.querySelector('.rmd-pp-checks').insertAdjacentHTML('afterend', `<div class="rmd-ing-nota"><b>Observaciones nuevas</b> (se guardan con el Guardar de «Asociar fórmulas»${soloObs ? '' : ', al terminar el ingreso'}):<pre class="rmd-pp-obs">${esc(obsNueva)}</pre></div>`);
-    const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length && !soloObs ? 'El borrador no trae cambios.' : '';
+    const sinIngreso = soloObs ? '' : errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length && !soloObs ? 'El borrador no trae cambios.' : '';
     const bIngresar = soloObs ? botonModal('Guardar Observaciones en SAP…', 'primario', async () => {
       if (!(await confirmar('¿Guardar las Observaciones?', `Se reemplazan las Observaciones del RMD ${an.destino.codigo} v${an.destino.version} con el texto de la vista, con el Guardar de «Asociar fórmulas» del portal.`, 'No uses el portal mientras se guarda.'))) return;
       bIngresar.disabled = true; const pr = document.createElement('p'); pr.className = 'rmd-progreso rmd-espera'; pr.textContent = 'Guardando las Observaciones…'; v.cuerpo.append(pr);
