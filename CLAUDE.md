@@ -21,6 +21,30 @@ cuenta). Escribir y responder siempre en **español**.
   ATE, Planta 2 = LIMA). Acuerdos y otros datos compartidos viven ahí en una
   tabla clave-valor de Supabase.
 
+## Empieza aquí (si llegas nuevo, sobre todo desde otra cuenta)
+
+- **Trabajo en equipo de hoy: reducir los RMD pendientes.** Plan completo en
+  `docs/plan_reduccion_pendientes.md` (glosario, criterio, cifras, qué es
+  «actualizar», reparto, Chrome de pruebas, plantilla de reporte). Léelo entero
+  antes de tocar un RMD.
+- Resumen: de **2 441** masters con última versión Suspendida (última versión =
+  la mayor entre Autorizado, Ingresado y Suspendido), la propuesta del
+  2026-11-05 pasa **1 349 a INACTIVO** (status nuevo que hará TI), **excluye 687**
+  cuya receta ya está en un RMD Autorizado vigente de otro master, deja **222
+  pendientes reales** (151 alta, 70 media, 1 ya solicitada; ATE 123, LIMA 99) y
+  **183 por revisar**.
+- «Actualizar» = versión nueva Ingresada con la receta vigente, los CC
+  pendientes y del listado aplicados, términos homologados en los pasos (sin
+  tildes), 1.ª línea de Observaciones con la nomenclatura del usuario SAP que la
+  hace y notas con los CC aplicados y lo que quede pendiente.
+- Cada persona usa **su cuenta de Claude y su sesión de SAP**; la memoria de
+  Claude no se comparte entre cuentas: lo compartido es este repo y la hoja de
+  seguimiento (un reclamo por RMD, para no pisarse).
+- **Analizar e inferir con evidencia; lo que no quede claro se deja como
+  CONSULTA** (columna Consultas de la hoja y sección del reporte) y se sigue con
+  lo demás. Nunca se escribe en SAP un supuesto ni sin el OK escrito de la
+  persona dueña de la sesión.
+
 ## Versiones y publicación del userscript
 
 - La versión va en `// @version` y en `const VERSION` (deben ser iguales),
@@ -249,6 +273,11 @@ cuenta). Escribir y responder siempre en **español**.
   - Probar la tabla INSUMOS con un RMD de Fabricación.
   - Probar «Actualizar» real de Cambio de material en un Autorizado (DMS).
   - Contingencia «Por código» sin prueba real.
+- 2026-11-05/06: **propuesta INACTIVO v2** (Excel en la carpeta del proyecto
+  `suspendidos-inactivo/`) y **plan de reducción de pendientes en equipo**
+  (`docs/plan_reduccion_pendientes.md`, hoja inicial en `plan-pendientes/`).
+  Piloto de 10 RMD de prioridad alta en curso con Carlos: lo que decida (sobre
+  todo la lista de términos homologados) manda sobre el plan.
 - Mantener esta sección al día al publicar una versión o fusionar un PR.
 
 ## Datos que no van en el repo
