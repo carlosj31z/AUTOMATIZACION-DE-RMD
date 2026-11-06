@@ -17917,7 +17917,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       equipos: equipos.filter((x) => x.activo !== false && (x.equnr || x.eqktx)).map((x) => [x.equipoId, ppLimpio(x.equnr), ppLimpio(x.CodigoGaci), ppLimpio(x.eqktx)]),
       utensilios: utensilios.filter((x) => x.activo !== false && +x.estadoId_iMaestraId !== 1).map((x) => [x.utensilioId, ppLimpio(x.codigo), ppLimpio(x.descripcion), x.clasificacionId_clasificacionUtensilioId || '']),   // 4.º campo: agrupador
       agrupadores: agrupadores.filter((x) => x.activo !== false).map((x) => [x.clasificacionUtensilioId, ppLimpio(x.descripcion)]),
-      tipos: Object.fromEntries(maestra.filter((x) => x.iMaestraId >= 430 && x.iMaestraId <= 460).map((x) => [x.iMaestraId, ppLimpio(x.contenido)])) };
+      tipos: Object.fromEntries(maestra.filter((x) => x.iMaestraId >= 432 && x.iMaestraId <= 450).map((x) => [x.iMaestraId, ppLimpio(x.contenido)])) };
     PP.cat = c; PP.catT = c.t; try { await Almacen.guardar('ppCatalogo', c); } catch (e) { }
     return c;
   }
@@ -17932,7 +17932,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const lineas = pasos.map((p) => [p[0], idxE(p[1]), idxT(p[2]), p[3], p[4]].join('\t')).join('\n');
     return { formato: 1, tipo: 'plantilla-rmd', generado: new Date().toISOString(), por: usuario || '', script: VERSION,
       rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), areas: extra.areas || [], principal: md.codigoversionprincipal || String(md.codigo), estadoFechaPor: extra.estadoFechaPor || '', logo: extra.logo || null, ...(extra.receta ? { receta: { matnr: extra.receta.matnr, verid: extra.receta.verid, nombre: extra.receta.nombre, hojaRuta: extra.receta.hojaRuta, puesto: extra.receta.puesto } } : {}) },
-      tipos: cat.tipos || {}, arbol, huella: PPN.huella(arbol),
+      tipos: Object.fromEntries(Object.entries(cat.tipos || {}).filter(([k]) => +k >= 432 && +k <= 450)), arbol, huella: PPN.huella(arbol),   // tipos: solo tipos de dato 432-450 (430-460 traía estados)
       catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
   }
   // «Estado / Fecha / Por» como el PDF
