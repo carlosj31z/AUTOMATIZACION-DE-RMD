@@ -1478,13 +1478,52 @@ with sync_playwright() as p:
               and r["esc1"] == {"tipoDatoId_iMaestraId": 447, "tipoDatoIdAnterior_iMaestraId": 447, "decimales": 0, "clvModelo": "SETPRE", "puestoTrabajo": "FMENFA01", "automatico": True, "edit": True, "formato": True, "colorHex": "#152cc1", "colorRgb": "rgb(21,44,193)"}
               and r["esc2"] == {"tipoDatoId_iMaestraId": 438, "tipoDatoIdAnterior_iMaestraId": 438, "clvModelo": None, "puestoTrabajo": None, "automatico": None, "formato": False, "colorHex": None, "colorRgb": None}
               and r["esc3"] == {"tab": True} and r["fondo"] == [True, True, "fixed"] and r["ventanas"] == queda["ventanas"]
-              and v["titulo"].startswith("Vista simple de ingreso · RMD 2202600001 v3") and v["dt"] and v["chips"] >= 6 and any("Conforme: Sí" in x for x in v["etq"]) and {"sap", "claude", "cerrar-vista"} <= set(v["botones"]) and "Autorizado" in v["aviso"]
+              and v["titulo"].startswith("Edición rápida · RMD 2202600001 v3") and v["dt"] and v["chips"] >= 6 and any("Conforme: Sí" in x for x in v["etq"]) and {"sap", "claude", "cerrar-vista"} <= set(v["botones"]) and "Autorizado" in v["aviso"]
               and "Clave Modelo" in av1 and notif and "Decimales: un número entero" in av2 and sigue
               and st["dt"]["tipo"] == 447 and st["dt"]["clv"] == "SETPRE" and st["dt"]["puesto"] == "FMENFA01" and st["dt"]["dep"] == "P11" and st["dt"]["depFijo"] and st["dt"]["color"] == "#152cc1" and st["edit"]
               and "Configuración" in st["tags"] and any(c.startswith("Notificación") and c.endswith("*") for c in st["chips"]) and any("Depende: 2.1.2.- 2002*" == c for c in st["chips"]) and st["cm"] == 2
               and "CAMBIOS" in st["claude"] and "Configuración" in st["claude"] and "Tipo de dato: Fecha y Hora → Notificación" in st["claude"]
               and g and g["vista"] == "dt" and g["dtP13"]["tipo"] == 447 and g["conf"] is False and not queda["vista"] and not queda["emb"])
         return ok, json.dumps({ "r": {k: r[k] for k in ("avSin", "ventanas", "fondo")}, "claude": st["claude"][:900], "av": avs, "v": v, "av1": av1, "av2": av2, "notif": notif, "sigue": sigue, "edit": st["edit"], "st": {k: st[k] for k in ("dt", "tags", "chips", "cm")}, "g": g, "queda": queda }, ensure_ascii=False)[:2400]
+
+    @prueba("LN58 Edición rápida (v1.124.0): los pasos de RENDIMIENTO / CONDICIONES AMBIENTALES no piden predecesor (y se avisa si lo traen); en un RMD Ingresado la vista muestra las Observaciones en lugar de «Cómo se usa»: avisa la 1.ª línea copiada de la versión anterior y la arma con la fecha de hoy, avisa el CC pendiente de la versión anterior y lo anota como aplicado, y «Guardar en SAP» lleva las Observaciones nuevas")
+    def _():
+        d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
+        r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, N = P.nucleo;
+          const W = JSON.parse(JSON.stringify(d.arbol)), q = W.estructuras[2].etiquetas[0].pasos; q[3].dt.dep = ''; q[3].dt.tipo = 433;
+          const falta = (w) => [...N.avisos(w, { base: d.arbol.estructuras, dt: true }).values()].flat().filter((a) => /Falta el predecesor/.test(a.texto)).length;
+          const normal = falta(W); const W2 = JSON.parse(JSON.stringify(W)); W2.estructuras[2].etiquetas[0].nombre = 'RENDIMIENTO'; const rend = falta(W2);
+          const W3 = JSON.parse(JSON.stringify(W2)); W3.estructuras[2].etiquetas[0].pasos[3].dt.dep = 'P12';
+          const conDep = [...N.avisos(W3, { base: d.arbol.estructuras, dt: true }).values()].flat().filter((a) => /no llevan predecesor/.test(a.texto)).length;
+          const W4 = JSON.parse(JSON.stringify(W)); W4.estructuras[2].nombre = '4.- CONDICIONES AMBIENTALES'; const amb = falta(W4);
+          const paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); paq.rmd.estado = 'Ingresado'; paq.rmd.version = 3;
+          const l0 = '20261001CJ-1-C2.0-FI1.0-FA1.0-F2'; paq.rmd.observacion = l0 + '\\n20261001CJ Pendiente aplicar 26-200-CC';
+          window.__vistaGuardada = null;
+          const V = await P.montarVista(paq, null, { claves: [], puestos: [], obs: true, previa: { version: 2, codigo: '2202600000', estado: 'Autorizado', observacion: paq.rmd.observacion } }); V.emb.guardar = (p) => { window.__vistaGuardada = p; };
+          return { normal, rend, conDep, amb }; }""", d0)
+        fr = None
+        for _ in range(60):
+            fr = next((f for f in pg.frames if f != pg.main_frame), None)
+            try:
+                if fr and fr.evaluate("() => !!document.querySelector('.pp-obs')"): break
+            except Exception: pass
+            pg.wait_for_timeout(250)
+        v1 = fr.evaluate("() => ({ ayuda: !!document.querySelector('.pp-ayuda'), rev: document.querySelector('.pp-obs-der').textContent, ta: document.querySelector('#pp-obs-ta').value, gen: !!document.querySelector('.pp-obs-gen') })")
+        fr.click("[data-a=obs-aplicar]"); fr.wait_for_timeout(150)
+        fr.fill("#pp-obs-ini", "CJ"); fr.select_option("#pp-obs-fase", "F3"); fr.click("[data-a=obs-nom]"); fr.wait_for_timeout(150)
+        v2 = fr.evaluate("() => ({ ta: document.querySelector('#pp-obs-ta').value, rev: document.querySelector('.pp-obs-der').textContent, total: window.__pp.estado().contar.total, claude: window.__pp.textoParaClaude() })")
+        fr.click("[data-a=ayuda]"); fr.wait_for_timeout(100); ayuda = fr.evaluate("() => !!document.querySelector('.pp-ayuda')")
+        fr.click("[data-a=sap]"); pg.wait_for_timeout(200)
+        g = pg.evaluate("() => window.__vistaGuardada && window.__vistaGuardada.trabajo.obs")
+        pg.evaluate("() => window.__rmdStats.vista && window.__rmdStats.vista.cerrar()"); pg.wait_for_timeout(150)
+        import datetime
+        hoy = datetime.date.today().strftime("%Y%m%d")
+        ls = v2["ta"].split("\n")
+        ok = (r["normal"] >= 1 and r["rend"] == 0 and r["conDep"] >= 1 and r["amb"] == 0
+              and not v1["ayuda"] and v1["gen"] and "misma de la v2" in v1["rev"] and "Falta aplicar 26-200-CC" in v1["rev"]
+              and ls[0] == hoy + "CJ-1-C2.0-FI1.0-FA1.0-F3" and any(x.startswith("26-200-CC/") for x in ls) and "Falta aplicar 26-200-CC" not in v2["rev"] and "1.ª línea" in v2["rev"]
+              and v2["total"] == 1 and "OBSERVACIONES (cambiadas en la vista)" in v2["claude"] and ayuda and g == v2["ta"])
+        return ok, json.dumps({"r": r, "v1": v1, "v2": {k: v2[k] for k in ("ta", "rev", "total")}, "ayuda": ayuda, "g": g}, ensure_ascii=False)[:2400]
 
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)

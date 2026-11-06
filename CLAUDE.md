@@ -235,7 +235,12 @@ cuenta). Escribir y responder siempre en **español**.
   `accion:'config'`). «Guardar en SAP…» reusa revisión/ingreso del borrador; ops nuevas «Configuración» (`ppDtEscritura`, reglas del Grabar del portal:
   color `formato`+`colorHex` minúsculas+`colorRgb`; `clvModelo`/`puestoTrabajo`/`automatico` solo con tipo 447; `tipoDatoIdAnterior` = `tipoDatoId`) y
   «Predecesor» (fase 5). `PPN.huella` no incluye `dt` (las plantillas viejas siguen valiendo). Prueba `qa_local.py` LN57.
-  **La siguiente versión debe ser > 1.123.0.**
+- 2026-11-06, v1.124.0: pedido de Carlos: la vista se llama **«Edición rápida»** y está en el **menú de cada fila, debajo de «Configurar el RMD»**
+  (`menuVistaEnFilas`, `sap.m.MenuItem` con `__rmdVista`; ya no en Exportar). **Observaciones en la vista** en lugar de «Cómo se usa» (`ppObsEmb`
+  en el portal: nomenclatura, listado de CC, pendientes heredados; `W.obs` en el editor); se guardan con `ppGuardarObs` = `modificarUno(..., { reemplazar })`
+  (Guardar de «Asociar fórmulas») al final del ingreso. **Regla de Carlos: los pasos de RENDIMIENTO y CONDICIONES AMBIENTALES no llevan predecesor**
+  (`PPN.listaSinPredecesor`: aviso, «Paso anterior» y cadena automática del plan). Prueba `qa_local.py` LN58.
+  **La siguiente versión debe ser > 1.124.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
