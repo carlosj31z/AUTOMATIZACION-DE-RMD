@@ -228,7 +228,14 @@ cuenta). Escribir y responder siempre en **español**.
   Autorizada con el CC aplicado en Observaciones; o a mano). Asociar desde Observaciones, «Mis movimientos» o buscando; «Copiar para el cuadro»
   y Excel (`SeguimientoCC.COLS`). Se guarda en Supabase de status-rmd, fila `ccseguimiento:<carpeta del CC>` (relee antes de guardar,
   `segCambiar`); no escribe en SAP. Opción `seguimientocc`. Lógica en el bloque `==SEGCC==` (`pruebas/qa_seguimiento_cc.mjs`); prueba en el
-  portal real sin escrituras: `pruebas/qa_seguimiento_portal.py` (cortafuegos + status-rmd simulado). **La siguiente versión debe ser > 1.122.0.**
+  portal real sin escrituras: `pruebas/qa_seguimiento_portal.py` (cortafuegos + status-rmd simulado).
+- 2026-11-06, v1.123.0: **pedido de Carlos: «Vista simple de ingreso»** (opción `vistasimple`, Exportar → Herramientas): el editor del borrador
+  dentro del portal (capa a pantalla completa con iframe `srcdoc`, `montarVista`/`window.__rmdVistaEmb`), leído de SAP, con **vista completa de DT**
+  por defecto (campo `dt` por paso/proceso menor: tipo, decimales, Depende, Clave Modelo, Puesto, casillas, color; núcleo `DT_CAMPOS`/`avisosDt`,
+  `accion:'config'`). «Guardar en SAP…» reusa revisión/ingreso del borrador; ops nuevas «Configuración» (`ppDtEscritura`, reglas del Grabar del portal:
+  color `formato`+`colorHex` minúsculas+`colorRgb`; `clvModelo`/`puestoTrabajo`/`automatico` solo con tipo 447; `tipoDatoIdAnterior` = `tipoDatoId`) y
+  «Predecesor» (fase 5). `PPN.huella` no incluye `dt` (las plantillas viejas siguen valiendo). Prueba `qa_local.py` LN57.
+  **La siguiente versión debe ser > 1.123.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
