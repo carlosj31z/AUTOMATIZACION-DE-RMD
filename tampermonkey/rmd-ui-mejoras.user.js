@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.123.0
+// @version      1.124.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.123.0';                                                       // mantener igual a @version
+  const VERSION = '1.124.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -95,7 +95,7 @@
     ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). «Por código» carga o reemplaza masters en específico aunque ya esté la misma versión. Necesita el cargador 1.1.0.'],
     ['compararrmd', 'Comparar dos RMD', 'En el menú Exportar: busca dos RMD cualesquiera y muestra sus master lado a lado, como Draftable: lo quitado en rojo, lo agregado en verde, lo modificado con sus palabras resaltadas, y la lista de cambios para ir de uno a otro.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
-    ['vistasimple', 'Vista simple de ingreso', 'En el menú Exportar: abre un RMD en una vista como la del borrador de Producción, aquí en el portal; haces todos los cambios y «Guardar en SAP» los escribe de una vez con revisión y «Deshacer». La vista completa (Documentación Técnica) edita tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto y color.'],
+    ['vistasimple', 'Edición rápida', 'En el menú de cada RMD, debajo de «Configurar el RMD»: abre el RMD en una vista como la del borrador de Producción, aquí en el portal; haces todos los cambios (también las Observaciones) y «Guardar en SAP» los escribe de una vez con revisión y «Deshacer». La vista completa (Documentación Técnica) edita tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto y color.'],
     ['controlescambio', 'Controles de Cambios', 'Pestaña en Configuración Maestra con las acciones de DOC abiertas (en plazo o vencidas) del registro de controles de cambio que tocan un RMD (Excel cargado a mano), sus RMD asociados según las Observaciones y el envío de evidencia a 4.- EVIDENCIA CC Y NC MASIVOS.'],
     ['seguimientocc', 'Seguimiento de CC', 'Bandera ⚑ en cada CC de «Controles de Cambios» y pestaña «Seguimiento CC» en Configuración Maestra: los RMD impactados de cada CC con bandera (sugeridos por Observaciones, de «Mis movimientos» o buscándolos), si ya ejecutaron el CC, y Excel o copia para el cuadro. Compartido con el equipo a través de status-rmd; no escribe en SAP.'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
@@ -811,6 +811,7 @@
 
   /* ── Vista previa / registro ── */
   .rmd-modal-fondo { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; background: rgba(0,0,0,.5); }
+  .rmd-pp-obs { margin: 4px 0 0; padding: 6px 8px; background: #f6f8fa; border-radius: 4px; white-space: pre-wrap; font: 12px/16px Consolas, monospace; max-height: 160px; overflow: auto; }
   .rmd-vista-fondo { position: fixed; inset: 0; z-index: 99990; background: #e9ebee; } .rmd-vista-marco { display: block; width: 100%; height: 100%; border: 0; }
   .rmd-modal { display: flex; flex-direction: column; width: min(920px, 94vw); max-height: 88vh; padding: 20px 24px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,.45); font: 14px/1.45 var(--rmd-fuente); }
   .rmd-modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
@@ -2310,7 +2311,7 @@
   // filas por búsqueda, para comparar con la versión anterior aunque la lista esté filtrada
   function vigilarListaPrincipal() {
     const ctl = tablaPrincipal(); if (!ctl || ctl.__rmdVigila) return;
-    ctl.__rmdVigila = true; ctl.attachUpdateFinished(() => cachearFilas(ctl)); cachearFilas(ctl);
+    ctl.__rmdVigila = true; ctl.attachUpdateFinished(() => { cachearFilas(ctl); aislar('menuVistaEnFilas', () => menuVistaEnFilas(ctl)); }); cachearFilas(ctl); aislar('menuVistaEnFilas', () => menuVistaEnFilas(ctl));
   }
   function filaPrincipal(codigo) {
     const ctl = tablaPrincipal(); if (ctl) cachearFilas(ctl);
@@ -9029,7 +9030,6 @@
       ...seccion('Herramientas', [
         on('compararrmd') && [ic('<rect x="1.5" y="2.5" width="5.5" height="11" rx="1"/><rect x="9" y="2.5" width="5.5" height="11" rx="1"/><path d="M3 6h2.5M3 8.5h2.5M10.5 6h2.5M10.5 8.5h2.5"/>'), 'Comparar dos RMD', 'Sus master lado a lado, con las diferencias resaltadas', () => abrirCompararRmd()],
         on('plantillaprod') && [ic('<path d="M3 13.5h3l7-7-3-3-7 7z"/><path d="M8.5 5 11 7.5"/>'), 'Plantilla para Producción', 'Borrador .html para que Producción proponga cambios', () => abrirPlantillaProduccion()],
-        on('vistasimple') && [ic('<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13M4 8h5M4 10.5h7"/>'), 'Vista simple de ingreso', 'Editar todo el RMD de una vez y guardar en SAP (vista completa para DT)', () => abrirVistaSimple()],
       ]),
     ].filter(Boolean);
     const m = document.createElement('div'); m.className = 'rmd-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Exportar');
@@ -11475,7 +11475,6 @@
       lista && on('indicadores') && ['Indicadores del mes', 'BD RMD del mes con sus tablas dinámicas', () => abrirIndicadores()],
       lista && on('citastodos') && ['Documentos citados en todos los master', 'Qué master citan cada documento', () => abrirCitasDeTodos()],
       lista && on('plantillaprod') && ['Plantilla para Producción', 'Generar el archivo para que Producción deje su borrador de cambios a un RMD', () => abrirPlantillaProduccion()],
-      lista && on('vistasimple') && ['Vista simple de ingreso', 'Editar todo el RMD de una vez y guardar en SAP, con la vista completa de Documentación Técnica', () => abrirVistaSimple()],
       lista && on('plantillaprod') && ['Importar borrador de Producción', 'Abrir el borrador que devolvió Producción y ver su plan de ingreso (solo en un RMD Ingresado)', () => elegirBorrador()],
       lista && on('cambiosrecetas') && ['Cambios de recetas en SAP', 'RMD Ingresados y Autorizados cuya receta cambió en SAP', () => abrirCambiosRecetas()],
       lista && on('statusrmd') && document.querySelector('.rmd-status-rmd') && ['Enviar a Status RMD', 'Maestro completo a Status RMD', clic('.rmd-status-rmd')],
@@ -16533,10 +16532,14 @@
       if (clase !== 'pm' && String(b.dt.dep || '') !== String(x.dt.dep || '')) out.push({ k: 'dep', campo: 'depende', nombre: 'Depende', antes: b.dt.depTxt || (b.dt.dep ? '(otro paso)' : '—'), despues: x.dt.depTxt || (x.dt.dep ? '(otro paso)' : '—') });
       return out;
     }
+    // listas cuyos pasos no llevan predecesor (como la revisión de la tabla de Pasos del portal) y pasos condicionales o en paralelo
+    const LISTA_SIN_PRED = /^(RENDIMIENTO|CONDICIONES AMBIENTALES)/, PASO_INDEPENDIENTE = /\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA/;
+    const planoNom = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().replace(/^\d+(\.\d+)*\.?-?\s*/, '');
+    function listaSinPredecesor(e, t) { for (const n of [t && t.nombre, e && e.nombre]) { const k = planoNom(n); if (LISTA_SIN_PRED.test(k)) return k.match(LISTA_SIN_PRED)[1]; } return ''; }
     // reglas de la configuración (vista completa): las mismas que pide el portal al grabar y las de «Cómo se configura un RMD»
     function avisosDt(trabajo, add, numeros) {
       const vivos = (l) => (l || []).filter((x) => !x.quitado), todos = new Map(), orden = [];
-      trabajo.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => vivos(l).forEach((p) => { todos.set(p.id, { p, l }); orden.push(p.id); })));
+      trabajo.estructuras.forEach((e) => [[null, e.pasos || []], ...(e.etiquetas || []).map((t) => [t, t.pasos || []])].forEach(([t, l]) => { const sinPred = listaSinPredecesor(e, t); vivos(l).forEach((p) => { todos.set(p.id, { p, l, sinPred }); orden.push(p.id); }); }));
       const quitados = new Set(); trabajo.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => (l || []).filter((x) => x.quitado).forEach((x) => quitados.add(x.id))));
       const fila = (x, esPm) => {
         const d = x.dt; if (!d || x.insumo) return; const tipo = +d.tipo || 0, vacio = (v) => v == null || String(v).trim() === '';
@@ -16552,11 +16555,12 @@
         if (!esPm && d.pmop) add(x.id, 'aviso', '«PM OP» no se marca en ningún paso (indicación del equipo).');
         if (!vacio(d.color) && !/^#?[0-9a-f]{6}$/i.test(String(d.color).trim())) add(x.id, 'error', 'Color: usa el formato #RRGGBB.');
         if (esPm) return;
-        const dep = String(d.dep || '');
+        const dep = String(d.dep || ''), sinPred = todos.get(x.id).sinPred;
+        if (sinPred) { if (dep) add(x.id, 'aviso', `En ${sinPred} los pasos no llevan predecesor: vacía «Depende».`); return; }
         if (dep && dep === x.id) add(x.id, 'error', 'Depende de sí mismo: en Producción nunca se habilita.');
         else if (dep && quitados.has(dep)) add(x.id, 'error', 'Depende de un paso que se quita: elige otro predecesor.');
         else if (dep && todos.has(dep)) { const pd = todos.get(dep), mismo = pd.l === todos.get(x.id).l; if (mismo && pd.l.indexOf(pd.p) > pd.l.indexOf(x)) add(x.id, 'error', 'Depende de un paso posterior: en Producción nunca se habilita.'); if (+((pd.p.dt || {}).tipo) === DT_SIN_TIPO) add(x.id, 'aviso', 'El predecesor es un «Sin tipo de dato»: debe depender del paso anterior con tipo de dato.'); }
-        else if (!dep && tipo && tipo !== DT_SIN_TIPO) { const l = todos.get(x.id).l, i = l.indexOf(x); if (vivos(l.slice(0, i)).some((y) => y.dt && +y.dt.tipo !== DT_SIN_TIPO)) add(x.id, 'aviso', 'Falta el predecesor (Depende): todo paso con tipo de dato depende de un paso anterior con tipo de dato, salvo los condicionales o en paralelo.'); }
+        else if (!dep && tipo && tipo !== DT_SIN_TIPO && !PASO_INDEPENDIENTE.test(planoNom(x.texto))) { const l = todos.get(x.id).l, i = l.indexOf(x); if (vivos(l.slice(0, i)).some((y) => y.dt && +y.dt.tipo !== DT_SIN_TIPO)) add(x.id, 'aviso', 'Falta el predecesor (Depende): todo paso con tipo de dato depende de un paso anterior con tipo de dato, salvo los condicionales o en paralelo.'); }
       };
       orden.forEach((id) => { const { p } = todos.get(id); fila(p, false); vivos(p.pm).forEach((m) => fila(m, true)); });
     }
@@ -16636,7 +16640,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO };
+    return { TIPO, RANGO, listaSinPredecesor, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -16654,7 +16658,8 @@
     const CAJA = '<span class="pp-caja"></span>', CHECK = '<span class="pp-check"></span>';
     const ICO_CHECK = '<svg class="pp-ico-check" viewBox="0 0 16 16" aria-label="check"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.2 8.3l2.6 2.6 5-5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const app = $('#app');
-    const EMB = window.RMD_EMBED || null;                              // v1.123.0: abierto dentro del portal («Vista simple de ingreso»)
+    const EMB = window.RMD_EMBED || null;                              // v1.123.0: abierto dentro del portal («Edición rápida»)
+    const OBS = (EMB && EMB.obs) || null;                              // v1.124.0: Observaciones del RMD (nomenclatura, CC, pendientes, notas)
     let DT = !!(EMB && EMB.dt);                                         // vista completa de Documentación Técnica
     let PQ, BASE, W, SOL, BUS, EQ = [], MIEMBROS = new Map(), ETQ = new Map(), BI = new Map(), CMB = [], AV = new Map(), MOV = new Set(), UNI = new Map(), NUM_BASE = new Map(), sucio = false, seq = 1, filtro = 'todos';
     const deshacer = [];
@@ -16794,13 +16799,14 @@
       const errores = [...AV.values()].flat().filter((a) => a.nivel === 'error').length, avisosN = [...AV.values()].flat().filter((a) => a.nivel === 'aviso').length;
       // los pasos nuevos idénticos se crean una sola vez
       const nuevos = new Set([...CMB.filter((c) => (c.accion === 'agregar' || c.accion === 'cambiar') && c.nuevo).map((c) => c.id), ...CMB.filter((c) => c.accion === 'agregar' && c.pm).flatMap((c) => c.pm.filter((m) => m.nuevo).map((m) => m.id))].map((id) => (UNI.get(id) || { clave: id }).clave)).size;
-      return { errores, avisos: avisosN, nuevos, total: CMB.length };
+      return { errores, avisos: avisosN, nuevos, total: CMB.length + (obsCambiada() ? 1 : 0) };
     }
     // Cabecera de ayuda: estado del RMD y avisos
     function htmlAvisosGenerales() {
       const partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
+      if (OBS) { partes.push(htmlObs()); ver = true; }                     // en la vista del portal: Observaciones en lugar de «Cómo se usa» (que queda en «Ayuda»)
       if (!ver || ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> (o <b>☑ Seleccionar</b>) marca pasos y <b>Shift+clic</b> marca un tramo. Abajo aparece una barra para <b>duplicarlos</b> (p. ej. para otro lote), <b>copiarlos</b> y pegarlos en otra parte, <b>subirlos</b>, <b>bajarlos</b>, <b>moverlos</b> o <b>quitarlos</b> juntos. También puedes <b>arrastrarlos</b>; si mantienes <b>Ctrl</b> al soltar, se copian. Una copia lleva el paso con sus procesos menores e insumos.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>: ingrésalo por solicitud o envíalo por correo a <b>Documentación Técnica</b>; lleva los datos para importar tus cambios, así que es el único archivo que hay que enviar. <b>Guardar borrador</b> es opcional: descarga un archivo para seguir editando otro día.</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
@@ -17066,7 +17072,7 @@
     }
     // el paso anterior (en su lista) con tipo de dato: el predecesor habitual
     function depSugerido(x) {
-      const r = IDXP.get(x.id); if (!r) return ''; const i = r.lista.indexOf(r.p);
+      const r = IDXP.get(x.id); if (!r || PPN.listaSinPredecesor(r.e, r.t)) return ''; const i = r.lista.indexOf(r.p);   // RENDIMIENTO / CONDICIONES AMBIENTALES: sin predecesor
       for (let j = i - 1; j >= 0; j--) { const y = r.lista[j]; if (y.quitado) continue; const t = +(y.dt ? y.dt.tipo : y.tipo); if (t && t !== PPN.DT_SIN_TIPO) return y.id; }
       return '';
     }
@@ -17132,12 +17138,13 @@
       });
     }
     function htmlBarraVista(r, n) {
-      return `<header class="pp-barra pp-barra-vista"><div class="pp-titulo"><b>Vista simple de ingreso · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)} · ${esc(r.estado || '')}</span></div>
+      return `<header class="pp-barra pp-barra-vista"><div class="pp-titulo"><b>Edición rápida · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)} · ${esc(r.estado || '')}</span></div>
         <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador; nada se escribe en SAP hasta «Guardar en SAP»">${sucio ? '● Sin guardar en SAP' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <label class="pp-detectar" title="Muestra y deja editar la configuración de cada paso: tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto de trabajo y color"><input type="checkbox" id="pp-vista-dt"${DT ? ' checked' : ''}> Vista completa (DT)</label>
         <label class="pp-detectar" title="Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde). Apagada por defecto"><input type="checkbox" id="pp-detectar"${PPN.detectarTildes() ? ' checked' : ''}> Detectar tildes</label>
         ${(() => { const nt = conTilde().length; return nt ? `<button type="button" data-a="quitar-tildes" class="pp-quitar-tildes">Quitar tildes (${nt})</button>` : ''; })()}
+        <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="claude" title="Copia en texto los cambios, errores y avisos para pegarlos en el chat de Claude y revisarlos más rápido">Copiar para Claude</button>
         <button type="button" data-a="guardar" title="Descarga el borrador (.html) para seguir otro día o enviarlo">Guardar borrador</button>
         <button type="button" data-a="cerrar-vista" title="Volver al portal (lo editado queda guardado en este navegador)">Cerrar</button>
@@ -17149,6 +17156,7 @@
     function guardarEnSap() {
       if (!EMB || typeof EMB.guardar !== 'function') return;
       const n = contar(); if (!n.total) { aviso('Todavía no hay cambios.'); return; }
+      if (obsCambiada() && !OBS.editable) { aviso('Las Observaciones solo se cambian en un RMD Ingresado.'); return; }
       if (n.errores) { pendientes(n, null); return; }
       EMB.guardar(clon(propActual()));
     }
@@ -17158,7 +17166,73 @@
       const lineas = [`RMD ${r.codigo} v${r.version} · ${r.descripcion} · ${r.etapa} · ${r.planta} · ${r.estado || ''}`, `Vista ${DT ? 'completa (DT)' : 'simple'} · ${n.total} cambio(s), ${n.errores} error(es), ${n.avisos} aviso(s), ${n.nuevos} paso(s) nuevo(s)`, '', 'CAMBIOS'];
       CMB.forEach((c) => lineas.push(`- ${c.numero || ''} ${ETQ_ACCION[c.accion] || c.accion}${c.clase === 'pm' ? ' (proceso menor)' : ''} · ${c.lugar || ''}: ${c.accion === 'quitar' ? c.antes : c.campos ? `${String(c.texto || '').slice(0, 60)} — ${c.campos.map((y) => `${y.campo}: ${y.antes} → ${y.despues}`).join('; ')}` : `${c.antes ? c.antes + ' → ' : ''}${c.despues || c.texto || ''}`}${c.codigo ? ` (paso ${c.codigo})` : ''}${c.nuevo ? ' ★ nuevo' : ''}${c.comentario ? ` · comentario: ${c.comentario}` : ''}`));
       ['error', 'aviso'].forEach((nv) => { const l = [...AV.entries()].flatMap(([id, xs]) => xs.filter((a) => a.nivel === nv).map((a) => `- ${etiqueta(id)}: ${a.texto}`)); if (l.length) lineas.push('', nv === 'error' ? 'ERRORES' : 'AVISOS', ...l); });
+      if (OBS) { const R = OBS.revisar(obsTexto()); lineas.push('', `OBSERVACIONES${obsCambiada() ? ' (cambiadas en la vista)' : ''}`, obsTexto() || '(vacías)');
+        [...R.nomenclatura.map((t) => 'Nomenclatura: ' + t), ...R.pendientes.map((p) => p.texto), ...R.formato.map((t) => 'Formato de CC: ' + t)].forEach((t) => lineas.push('- ' + t)); }
       return lineas.join('\n');
+    }
+    // ---------- Observaciones (v1.124.0, solo en la vista del portal) ----------
+    const obsTexto = () => (W && W.obs != null ? String(W.obs) : OBS ? OBS.texto : '');
+    const obsCambiada = () => !!(OBS && W && W.obs != null && String(W.obs).replace(/\s+$/, '') !== String(OBS.texto).replace(/\s+$/, ''));
+    function htmlObs() {
+      const t = obsTexto(), ed = OBS.editable, filas = Math.min(9, Math.max(3, t.split('\n').length + 1));
+      return `<section class="pp-obs" aria-label="Observaciones"><div class="pp-obs-cab"><b>Observaciones</b>${obsCambiada() ? '<span class="pp-obs-cam">● cambiadas: se guardan con «Guardar en SAP»</span>' : ''}
+        <small>${ed ? (OBS.previa ? `versión anterior: v${esc(OBS.previa.version)}${OBS.previa.estado ? ' · ' + esc(OBS.previa.estado) : ''}` : 'sin versión anterior') : 'Solo lectura: las Observaciones se cambian en un RMD Ingresado.'}</small></div>
+        <div class="pp-obs-cuerpo"><div class="pp-obs-izq"><textarea id="pp-obs-ta" rows="${filas}" spellcheck="false" aria-label="Observaciones"${ed ? '' : ' readonly'}>${esc(t)}</textarea>
+        ${ed ? `<div class="pp-obs-bot"><button type="button" data-a="obs-cc" title="Control de cambio aplicado (del listado de la planta del RMD, o la plantilla 26-###-CC/…)">+ CC</button><button type="button" data-a="obs-pendiente" title="Lo que falta aplicar: la siguiente versión lo hereda y el portal lo avisa">+ Pendiente</button><button type="button" data-a="obs-nota" title="Otra anotación con fecha e iniciales">+ Nota</button><button type="button" data-a="obs-nota-cambios" title="Una nota con el resumen de los cambios hechos en esta vista">+ Nota con los cambios</button>${obsCambiada() ? '<button type="button" data-a="obs-restaurar" title="Vuelve a las Observaciones de SAP">Restaurar</button>' : ''}</div>` : ''}</div>
+        <div class="pp-obs-der">${htmlObsRevision()}</div></div></section>`;
+    }
+    function htmlObsRevision() {
+      const R = OBS.revisar(obsTexto()), s = R.sugerida, ed = OBS.editable, opt = (l, v) => l.map((x) => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('');
+      const nom = R.ok ? `<div class="pp-obs-l ok">✓ 1.ª línea: ${esc(R.resumen)}</div>` : R.nomenclatura.map((x) => `<div class="pp-obs-l av">⚠ ${esc(x)}</div>`).join('');
+      const gen = ed && !R.ok ? `<div class="pp-obs-gen" title="AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase"><span>${esc(s.hoy)}</span><input id="pp-obs-ini" maxlength="2" spellcheck="false" value="${esc(s.ini)}" title="Tus iniciales (nombre + apellido)" aria-label="Iniciales">-<select id="pp-obs-pri" title="Prioridad" aria-label="Prioridad">${opt(['1', '2', '3'], s.pri)}</select>-<select id="pp-obs-com" title="Complejidad" aria-label="Complejidad">${opt(s.complejidades, s.com)}</select>-FI1.0-FA1.0-<select id="pp-obs-fase" title="Fase de esta versión (no se copia de la anterior)" aria-label="Fase"><option value="">F?</option>${opt(s.fases, s.fase)}</select>
+        <button type="button" data-a="obs-nom">${s.reemplazar ? 'Reemplazar 1.ª línea' : 'Poner como 1.ª línea'}</button>${s.faseAnt ? `<small>fase de la ${esc(s.vAnt)}: <b>${esc(s.faseAnt)}</b></small>` : ''}</div>` : '';
+      const chips = (l, cls) => l.map((c) => `<span class="pp-obs-cc ${cls}">${esc(c)}</span>`).join('');
+      const cc = R.aplicados.length || R.heredados.length ? `<div class="pp-obs-l">CC aplicados: ${chips(R.aplicados, '') || '<i>ninguno nuevo</i>'}${R.heredados.length ? ` <small>de la versión anterior:</small> ${chips(R.heredados, 'viejo')}` : ''}</div>` : '';
+      const res = R.resueltos.length ? `<div class="pp-obs-l ok">✓ Resuelto: ${R.resueltos.map(esc).join(', ')}</div>` : '';
+      const pend = R.pendientes.map((p) => `<div class="pp-obs-l ${p.propio ? 'info' : 'av'}">${p.propio ? 'ℹ' : '⚠'} ${esc(p.texto)}${p.cc && ed ? ` <button type="button" data-a="obs-aplicar" data-cc="${esc(p.cc)}" title="Agrega la línea de CC aplicado (del listado si está)">Anotar como aplicado</button>` : ''}</div>`).join('');
+      const fmt = R.formato.map((x) => `<div class="pp-obs-l av">✎ ${esc(x)} («26-379-CC/L.Fernandez/2026-10-22;descripción;proceso;moderado»)</div>`).join('');
+      return nom + gen + cc + res + pend + fmt;
+    }
+    // pone texto al final (o en lugar de todo) y deja seleccionada la parte a escribir
+    function obsPoner(nuevo, sel) {
+      W.obs = nuevo; sucio = true; pdfHecho = false; guardarLocal(); pintarTodo();
+      const ta = document.getElementById('pp-obs-ta'); if (!ta) return; ta.focus();
+      if (sel) ta.setSelectionRange(sel[0], sel[1]); ta.scrollTop = ta.scrollHeight;
+    }
+    function obsAgregar(p) { if (!p) return; const v = obsTexto(), base = v && !/\n$/.test(v) ? v + '\n' : v; obsPoner(base + p.texto, p.sel ? [base.length + p.sel[0], base.length + p.sel[1]] : null); }
+    function obsNotaCambios() {
+      const cuenta = new Map(); CMB.forEach((c) => { const k = (ETQ_ACCION[c.accion] || c.accion) + (c.clase === 'pm' ? ' (proceso menor)' : ''); cuenta.set(k, (cuenta.get(k) || 0) + 1); });
+      if (!cuenta.size) { aviso('Todavía no hay cambios en los pasos para resumir.'); return; }
+      const plano = (t) => String(t).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const pre = OBS.notaPrefijo(), cuerpo = 'SE ACTUALIZA: ' + [...cuenta].map(([k, n]) => `${n} ${plano(k)}`).join(', ');
+      obsAgregar({ texto: pre + cuerpo, sel: [pre.length, pre.length + cuerpo.length] });
+    }
+    function obsElegirCC() {
+      const lista0 = OBS.opcionesCC('', obsTexto()); if (!lista0) { obsAgregar(OBS.plantilla('cc')); aviso('No hay listado de CC cargado (Reglas de revisión): se agregó la plantilla para escribirlo.'); return; }
+      modal(`<h3>Control de cambio aplicado<span>Listado de la planta del RMD (${esc(OBS.planta)})</span></h3><input type="search" class="pp-obs-q" placeholder="Buscar por código, producto o descripción" aria-label="Buscar CC">
+        <ul class="pp-obs-lista" role="listbox"></ul><div class="pp-pie"><button type="button" data-x="libre" title="La plantilla 26-###-CC/… para un CC que no está en el listado">Escribir otro</button><button type="button" data-x="cancelar">Cancelar</button></div>`, (m, cerrar) => {
+        const q = m.querySelector('.pp-obs-q'), ul = m.querySelector('.pp-obs-lista'); let ops = [];
+        const pintar = () => { ops = OBS.opcionesCC(q.value, obsTexto()) || [];
+          ul.innerHTML = ops.length ? ops.map((o, i) => `<li role="option" data-i="${i}" class="${o.anotado ? 'anotado' : ''}${o.aplica ? '' : ' no-aplica'}"><b>${esc(o.codigo)}</b> ${esc(o.descripcion)}<small>${[o.fecha, o.estatus, !o.aplica && 'no aplica', o.anotado && 'ya anotado'].filter(Boolean).map(esc).join(' · ')}</small></li>`).join('') : '<li class="vacio">Ningún CC del listado coincide: usa «Escribir otro».</li>'; };
+        ul.addEventListener('click', (e) => { const li = e.target.closest('li[data-i]'); if (!li) return; cerrar(); obsAgregar(ops[+li.dataset.i].linea); });
+        m.addEventListener('click', (e) => { const b = e.target.closest('button[data-x]'); if (!b) return; cerrar(); if (b.dataset.x === 'libre') obsAgregar(OBS.plantilla('cc')); });
+        q.addEventListener('input', pintar); q.addEventListener('keydown', (e) => { if (e.key === 'Enter' && ops[0]) { e.preventDefault(); cerrar(); obsAgregar(ops[0].linea); } });
+        pintar(); setTimeout(() => q.focus(), 20);
+      });
+    }
+    function obsAccion(a, b) {
+      if (!OBS || !OBS.editable) return;
+      if (a === 'obs-cc') obsElegirCC();
+      else if (a === 'obs-pendiente' || a === 'obs-nota') obsAgregar(OBS.plantilla(a.slice(4)));
+      else if (a === 'obs-nota-cambios') obsNotaCambios();
+      else if (a === 'obs-aplicar') obsAgregar(OBS.lineaCC(b.dataset.cc));
+      else if (a === 'obs-restaurar') { delete W.obs; sucio = true; guardarLocal(); pintarTodo(); }
+      else if (a === 'obs-nom') {
+        const v = (id) => (document.getElementById(id) || {}).value || '', ini = v('pp-obs-ini').toUpperCase().replace(/[^A-ZÑ]/g, '');
+        if (ini.length !== 2) { aviso('Escribe tus 2 iniciales (nombre + apellido).'); return; }
+        if (!v('pp-obs-fase')) { aviso('Elige la fase de esta versión: no se copia de la anterior.'); return; }
+        const R = OBS.revisar(obsTexto()); obsPoner(OBS.nomenclatura(obsTexto(), { ini, pri: v('pp-obs-pri'), com: v('pp-obs-com'), fase: v('pp-obs-fase') }, R.sugerida.reemplazar));
+      }
     }
     function copiarParaClaude() { const t = textoParaClaude(); const ok = () => aviso('Copiado: pégalo en el chat de Claude.'); try { navigator.clipboard.writeText(t).then(ok, () => { fallback(t); ok(); }); } catch (e) { fallback(t); ok(); } }
     function fallback(t) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) { /* sin portapapeles */ } ta.remove(); }
@@ -17538,7 +17612,12 @@
     app.addEventListener('drop', (ev) => { if (!ARRASTRE) return; const d = destinoSoltar(ev), ids = ARRASTRE; ARRASTRE = null; limpiarSoltar(); if (!d) return; ev.preventDefault(); colocar(ids, d.lista, d.tras, ev.ctrlKey || ev.metaKey || ev.altKey); });
     app.addEventListener('dragend', () => { ARRASTRE = null; limpiarSoltar(); $$('.pp-arrastrando').forEach((x) => x.classList.remove('pp-arrastrando')); });
     app.addEventListener('mousedown', (ev) => { if (ev.shiftKey && ev.target.closest('.pp-doc tr.pp-paso')) ev.preventDefault(); });
-    app.addEventListener('change', (ev) => { if (ev.target.id === 'pp-vista-dt') { DT = ev.target.checked; try { localStorage.setItem(CLAVE_DT, DT ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } pintarTodo(); return; }
+    // Observaciones: al escribir solo se repinta su revisión (sin perder el foco); al salir del cuadro, todo
+    let obsT = 0;
+    app.addEventListener('input', (ev) => { if (ev.target.id !== 'pp-obs-ta' || !OBS || !OBS.editable) return; W.obs = ev.target.value; sucio = true; pdfHecho = false; clearTimeout(obsT);
+      obsT = setTimeout(() => { guardarLocal(); const d = document.querySelector('.pp-obs-der'); if (d) d.innerHTML = htmlObsRevision(); }, 250); });
+    app.addEventListener('change', (ev) => { if (ev.target.id === 'pp-obs-ta') { clearTimeout(obsT); guardarLocal(); pintarTodo(); return; }
+      if (ev.target.id === 'pp-vista-dt') { DT = ev.target.checked; try { localStorage.setItem(CLAVE_DT, DT ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } pintarTodo(); return; }
       if (ev.target.id === 'pp-detectar') { const v = ev.target.checked; PPN.detectarTildes(v); try { if (v) localStorage.setItem(CLAVE_DETECTAR, '1'); else localStorage.removeItem(CLAVE_DETECTAR); } catch (e) { /* sin almacenamiento */ } pintarTodo(); return; }
       if (ev.target.id === 'pp-tildes') { const v = ev.target.checked; cambio(() => { if (v) W.tildes = true; else delete W.tildes; }); } });   // Shift+clic marca un tramo sin seleccionar texto
     function listaDe(ref) {
@@ -17565,6 +17644,7 @@
       else if (a === 'config-etq') editarConfigEtiqueta(b.dataset.id);
       else if (a === 'sap') guardarEnSap();
       else if (a === 'claude') copiarParaClaude();
+      else if (a.startsWith('obs-')) obsAccion(a, b);
       else if (a === 'cerrar-vista') cerrarVista();
       else if (a === 'comentar') comentar(id);
       else if (a === 'quitar') quitar(id);
@@ -17801,6 +17881,18 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 .pp-cfg-notif { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; } .pp-cfg-notif .pp-nota { grid-column: 1 / -1; } .pp-cfg-notif.apagado { opacity: .5; } .pp-cfg input[type=color] { width: 44px; height: 26px; padding: 0 2px; vertical-align: middle; }
 .pp-cfg-av { min-height: 4px; }
 .pp-barra-vista { border-top: 3px solid var(--acento); }
+/* v1.124.0: Observaciones en la vista del portal */
+.pp-obs { margin: 8px 16px 0; padding: 8px 12px; border: 1px solid var(--bd2); border-left: 3px solid var(--acento); border-radius: 6px; background: #fff; font: 12px/17px "Segoe UI", Arial, sans-serif; }
+.pp-obs-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; } .pp-obs-cab small { color: var(--ap); } .pp-obs-cam { color: #8a5a00; font-weight: 600; }
+.pp-obs-cuerpo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; } @media (max-width: 900px) { .pp-obs-cuerpo { grid-template-columns: 1fr; } }
+.pp-obs textarea { width: 100%; box-sizing: border-box; resize: vertical; max-height: 190px; font: 12px/16px Consolas, "Courier New", monospace; padding: 5px 7px; border: 1px solid var(--bd2); border-radius: 4px; }
+.pp-obs textarea[readonly] { background: #f6f8fa; } .pp-obs-bot { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; } .pp-obs-bot button, .pp-obs-der button { font-size: 11px; padding: 1px 8px; }
+.pp-obs-der { max-height: 210px; overflow: auto; } .pp-obs-l { margin: 0 0 3px; } .pp-obs-l.ok { color: #1e7a3c; } .pp-obs-l.av { color: #8a5a00; } .pp-obs-l.info { color: var(--ap); }
+.pp-obs-gen { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 2px 0 6px; font-family: Consolas, "Courier New", monospace; } .pp-obs-gen input { width: 2.6em; text-transform: uppercase; } .pp-obs-gen button { margin-left: 6px; font-family: "Segoe UI", Arial, sans-serif; } .pp-obs-gen small { flex-basis: 100%; font-family: "Segoe UI", Arial, sans-serif; color: var(--ap); }
+.pp-obs-cc { display: inline-block; margin: 0 3px 2px 0; padding: 0 6px; border: 1px solid #9cc7a8; border-radius: 8px; background: #eef8f1; } .pp-obs-cc.viejo { opacity: .6; }
+.pp-obs-lista { list-style: none; margin: 8px 0; padding: 0; max-height: 50vh; overflow: auto; border: 1px solid var(--bd2); border-radius: 4px; } .pp-obs-lista li { padding: 5px 8px; border-bottom: 1px solid var(--bd2); cursor: pointer; } .pp-obs-lista li:hover { background: #f0f4fa; }
+.pp-obs-lista li small { display: block; color: var(--ap); } .pp-obs-lista li.anotado { opacity: .55; } .pp-obs-lista li.no-aplica b { text-decoration: line-through; } .pp-obs-lista li.vacio { cursor: default; color: var(--ap); } .pp-obs-q { width: 100%; box-sizing: border-box; }
+@media print { .pp-obs { display: none; } }
 @media print { .pp-dt { display: none; } }
 @media (pointer: coarse) { .pp-acc { width: 168px; } .pp-acc button { height: 34px; font-size: 13px; } .pp-flujo li > button { min-height: 40px; } }
 @media print {
@@ -18638,7 +18730,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista «Configuración Manufactura Digital».', true); return; }
     const asoc = ctrl.getView().getModel('asociarDatos'), abierto = asoc && asoc.getData() && asoc.getData().codigo;
     const filtro = (ctrl.getView().getModel('oDataFilter') || { getProperty: () => '' }).getProperty('/code');
-    const v = ventana('Vista simple de ingreso', { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false;
+    const v = ventana('Edición rápida', { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false;
     v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-v-pegar');
     v.cuerpo.innerHTML = `<p class="rmd-nota">Abre el RMD en una vista como la del borrador de Producción: haces todos los cambios sin esperar al portal y al final <b>«Guardar en SAP»</b> los revisa con las reglas, muestra cada escritura, pide confirmación y los escribe de una vez (con comprobación y «Deshacer ingreso»). La <b>vista completa</b> (Documentación Técnica) muestra y edita el tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto de trabajo y color de cada paso.</p>
       <label class="rmd-pp-campo">Código del RMD <input class="rmd-pp-cod" value="${esc(codigo || abierto || filtro || '')}" placeholder="p. ej. 2202609013" inputmode="numeric"></label>
@@ -18657,18 +18749,94 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     cod.addEventListener('keydown', (e) => { if (e.key === 'Enter') bAbrir.click(); }); setTimeout(() => cod.focus(), 30);
   }
   async function ppVistaDesdeSap(codigo, op = {}) {
-    const r = await ppGenerar(codigo, op), ctrl = controladorPrincipal();
-    (op.avisar || (() => {}))('Leyendo las Claves Modelo y los puestos de trabajo…');
-    const [claves, puestos] = await Promise.all([ppClavesModelo(ctrl), ppPuestosRmd(ctrl, r.paquete.arbol.recetas)]);
-    await montarVista(r.paquete, null, { claves, puestos });
+    const r = await ppGenerar(codigo, op), ctrl = controladorPrincipal(), rmd = r.paquete.rmd;
+    (op.avisar || (() => {}))('Leyendo las Claves Modelo, los puestos de trabajo y la versión anterior…');
+    const previaDe = async () => { try { const vA = +rmd.version || 0; return (await versionesConPlanta(ctrl.getView().getModel('mainModelv2'), rmd.principal)).filter((m) => m.mdId !== rmd.mdId && !/cancel/i.test(m.estado) && (+m.version || 0) < vA).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0] || null; } catch (e) { return null; } };
+    const [claves, puestos, previa] = await Promise.all([ppClavesModelo(ctrl), ppPuestosRmd(ctrl, r.paquete.arbol.recetas), previaDe()]);
+    await montarVista(r.paquete, null, { claves, puestos, obs: true, previa });
     return r;
+  }
+  // v1.124.0: Observaciones en la vista (pedido de Carlos): 1.ª línea de nomenclatura, CC aplicados del listado, pendientes heredados y notas.
+  // Las funciones corren en el portal (listado de CC, usuario de SAP); el editor del marco solo pinta y escribe el texto.
+  function ppObsEmb(rmd, previa) {
+    const planta = rmd.planta || '', responsable = responsableSap(), ini = rsUsuarioIniciales(), vAnt = previa ? `v${previa.version}` : '';
+    const l0Ant = previa ? String(previa.observacion || '').split(/\r?\n/)[0].trim() : '', ant = l0Ant ? partesNomenclatura(l0Ant) : null;
+    const listado = () => (RR.cambios && RR.cambios.cambios) || null;
+    return {
+      texto: String(rmd.observacion || ''), editable: /ingresad/i.test(rmd.estado || ''), planta, hayListado: () => !!listado(),
+      previa: previa ? { version: previa.version, codigo: String(previa.codigo), estado: previa.estado || '' } : null,
+      revisar(texto) {
+        const l0 = String(texto || '').split(/\r?\n/)[0], res = analizarNomenclatura(l0), act = partesNomenclatura(l0), copiada = res.ok && !!l0Ant && l0.trim() === l0Ant;
+        const h = Pendientes.heredados(previa ? [{ version: previa.version, codigo: previa.codigo, estado: previa.estado, observacion: previa.observacion }] : [], { version: rmd.version, observacion: texto });
+        const pendientes = [...h.ccs.map((x) => ({ cc: x.cc, texto: `Falta aplicar ${x.cc} (pendiente de la v${x.version}): ${x.linea}` })), ...h.textos.map((x) => ({ texto: `Pendiente de la v${x.version}: ${x.linea}. Revisa si ya se aplicó.` })),
+          ...(h.motivos || []).map((x) => ({ texto: `La v${x.version} se suspendió por: ${x.linea}. Revisa que esta versión lo atienda.` })), ...h.propios.map((x) => ({ propio: true, texto: `Pendiente anotado en esta versión: ${x.linea}` }))];
+        return { ok: res.ok && !copiada, resumen: res.ok ? (res.corto || res.resumen || '') : '',
+          nomenclatura: copiada ? [`La 1.ª línea es la misma de la ${vAnt} (se copió al crear la versión): pon la fecha de hoy y tus iniciales, y revisa prioridad, complejidad y fase.`] : res.ok ? [] : res.avisos,
+          aplicados: h.aplicados.filter((x) => !x.heredado).map((x) => x.codigo), heredados: h.aplicados.filter((x) => x.heredado).map((x) => x.codigo), resueltos: h.resueltos.map((x) => `${x.cc} (de la v${x.version})`), pendientes,
+          formato: h.formato.map((x) => `${x.linea}: falta ${x.faltan.join(', ')}`),
+          sugerida: { hoy: hoyAAAAMMDD(), ini: ini || act.ini || (ant && ant.ini) || '', pri: act.prioridad || (ant && ant.prioridad) || '2', com: act.complejidad || (ant && ant.complejidad) || 'C1.0',
+            fase: copiada ? '' : act.fase || '', faseAnt: (ant && ant.fase) || '', vAnt, reemplazar: !!act.parece, fases: FASES_NOM, complejidades: COMPLEJIDADES } };
+      },
+      nomenclatura(texto, { ini: i2, pri, com, fase }, reemplazar) {
+        const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), i2, pri, com, fase), ls = String(texto || '').split(/\r?\n/);
+        return (reemplazar ? [nueva, ...ls.slice(1)] : [nueva, ...ls.filter((x, i) => i || x.trim())]).join('\n');
+      },
+      plantilla: (tipo) => Pendientes.plantilla(tipo, { iniciales: ini, responsable }),
+      opcionesCC(q, texto) {
+        const c = listado(); if (!c) return null;
+        return Pendientes.opcionesListado(c, { planta, texto, q }).slice(0, 80).map((o) => ({ codigo: o.codigo, descripcion: o.descripcion || o.nomenclatura || '', fecha: o.fecha || '', estatus: o.estatus || '', aplica: !!o.aplica, anotado: !!o.anotado, linea: Pendientes.lineaListado(o, { responsable }) }));
+      },
+      lineaCC(cc) {
+        const c = listado(), o = c && Pendientes.opcionesListado(c, { planta, texto: '', q: cc }).find((x) => x.codigo === cc);
+        if (o) return Pendientes.lineaListado(o, { responsable });
+        const p0 = Pendientes.plantilla('cc', { iniciales: ini, responsable }), resto = p0.texto.replace(/^\d{2}-###-CC/, ''), texto = cc + resto, desde = texto.indexOf(';') + 1;
+        return { texto, sel: [desde, desde + 'descripción'.length] };
+      },
+      notaPrefijo: () => { const p0 = Pendientes.plantilla('nota', { iniciales: ini, responsable }); return p0.texto.slice(0, p0.sel[0]); },
+    };
+  }
+  // Observaciones de la vista: con el Guardar de «Asociar fórmulas» (como la Observación masiva), en el RMD Ingresado donde se ingresó
+  async function ppGuardarObs(destino, texto, base) {
+    const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital»');
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter;
+    const md = (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', destino.mdId)], { $select: 'mdId,codigo,observacion,estadoIdRmd_iMaestraId' }))[0];
+    if (!md || +md.estadoIdRmd_iMaestraId !== 467) throw new Error('el RMD ya no está Ingresado');
+    const igual = (a, b) => String(a || '').replace(/\s+$/, '') === String(b || '').replace(/\s+$/, '');
+    if (base && base.mdId === md.mdId && !igual(md.observacion, base.observacion)) throw new Error('las Observaciones cambiaron en SAP desde que abriste la vista: vuelve a abrirla y escríbelas otra vez');
+    if (igual(md.observacion, texto)) return { obs: texto, mensajes: [], igual: true };
+    const capa = VISTA && VISTA.fondo; if (capa) capa.style.visibility = 'hidden';
+    try { return await modificarUno(ctrl, String(md.codigo), { reemplazar: String(texto).replace(/\s+$/, '') }); } finally { if (capa) capa.style.visibility = ''; }
+  }
+  // Observaciones cambiadas en la vista (o null)
+  const ppObsNueva = (datos, prop) => { const t = prop && prop.trabajo && prop.trabajo.obs; return t != null && String(t).replace(/\s+$/, '') !== String(datos.rmd.observacion || '').replace(/\s+$/, '') ? String(t) : null; };
+  // «Edición rápida» en el menú de cada RMD de la lista (debajo de «Configurar el RMD»)
+  async function abrirEdicionRapida(codigo, version) {
+    if (VISTA) VISTA.cerrar();
+    const espera = ventana('Edición rápida'); espera.cuerpo.innerHTML = `<p class="rmd-progreso rmd-espera">Leyendo el RMD ${esc(codigo)}${version != null ? ` v${esc(version)}` : ''} de SAP…</p>`;
+    const p = espera.cuerpo.querySelector('.rmd-progreso');
+    try { await ppVistaDesdeSap(String(codigo), { avisar: (t) => setTxt(p, t), elegirReceta: (recs, md) => { setTxt(p, `El RMD tiene ${recs.length} recetas asociadas: elige con cuál se ven los insumos.`); return ppElegirReceta(recs, md); } }); espera.cerrar(); }
+    catch (e) { if (e.cancelado) { espera.cerrar(); return; } p.classList.add('error'); setTxt(p, 'No se pudo abrir: ' + e.message); espera.pie.append(botonModal('Cerrar', '', () => espera.cerrar())); }
+  }
+  const TEXTO_MENU_VISTA = 'Edición rápida';
+  function menuVistaEnFilas(ctl) {
+    if (!on('vistasimple') || !ctl || !ctl.getItems) return;
+    const MenuItem = sap.ui.require('sap/m/MenuItem') || (sap.m && sap.m.MenuItem); if (!MenuItem) return;
+    ctl.getItems().forEach((fila) => {
+      const mb = (fila.getCells ? fila.getCells() : []).find((c) => c.getMetadata().getName() === 'sap.m.MenuButton'), menu = mb && mb.getMenu && mb.getMenu();
+      if (!menu || menu.getItems().some((x) => x.__rmdVista)) return;
+      const i = menu.getItems().findIndex((x) => x.getText() === ACCIONES_FILA.configurar); if (i < 0) return;
+      const it = new MenuItem({ text: TEXTO_MENU_VISTA, icon: 'sap-icon://edit', tooltip: 'Editar todo el RMD de una vez (textos, pasos, configuración y Observaciones) y guardarlo en SAP al final' });
+      it.__rmdVista = true;
+      it.attachPress(() => { const c = mb.getBindingContext('listMD'), o = c && c.getObject(); if (o && o.codigo != null) setTimeout(() => abrirEdicionRapida(o.codigo, o.version), 0); else toast('No se pudo leer el RMD de esta fila.', true); });
+      menu.insertItem(it, i + 1);
+    });
   }
   async function montarVista(datos, prop, extra = {}) {
     if (VISTA) VISTA.cerrar();
     const ctrl = controladorPrincipal(), paq = { ...datos }; delete paq.desdePdf;
-    const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado,
+    const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado, obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa) : null,
       guardar: (p2) => { vistaGuardar(paq, p2).catch((e) => toast('No se pudo revisar: ' + e.message, true)); }, cerrar: () => { if (VISTA) VISTA.cerrar(); } };
-    const titulo = `Vista simple · RMD ${paq.rmd.codigo} v${paq.rmd.version}`, html = ppHtml(await ppEmpacar(paq), prop, titulo, true);
+    const titulo = `Edición rápida · RMD ${paq.rmd.codigo} v${paq.rmd.version}`, html = ppHtml(await ppEmpacar(paq), prop, titulo, true);
     const f = document.createElement('div'); f.className = 'rmd-vista-fondo'; f.setAttribute('role', 'dialog'); f.setAttribute('aria-label', titulo);
     const fr = document.createElement('iframe'); fr.className = 'rmd-vista-marco'; fr.title = titulo; f.appendChild(fr);
     window.__rmdVistaEmb = emb; document.body.appendChild(f); fr.srcdoc = html;
@@ -18685,7 +18853,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
   // tras un ingreso desde la vista: se vuelve a abrir con el RMD como quedó en SAP
   async function ppVistaTrasIngreso(destino) {
     document.querySelectorAll('.rmd-modal-fondo').forEach((f) => f.remove());
-    const espera = ventana('Vista simple de ingreso'); espera.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">Volviendo a leer el RMD de SAP…</p>';
+    const espera = ventana('Edición rápida'); espera.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">Volviendo a leer el RMD de SAP…</p>';
     try { await ppVistaDesdeSap(String(destino.codigo), { avisar: (t) => setTxt(espera.cuerpo.querySelector('.rmd-progreso'), t), elegirReceta: (recs, md) => ppElegirReceta(recs, md) }); espera.cerrar(); }
     catch (e) { espera.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo volver a abrir la vista: ${esc(e.message)}</p>`; espera.pie.append(botonModal('Cerrar', '', () => espera.cerrar())); }
   }
@@ -18763,8 +18931,17 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       ${an.cambios.length ? `<table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>` : '<p class="rmd-nota">El borrador no trae cambios.</p>'}
       ${an.enSap.length ? `<details class="rmd-pp-sap"><summary>Cambios hechos en SAP desde la plantilla (${an.enSap.length})</summary><table class="rmd-tabla rmd-pp-t"><tbody>${an.enSap.map((c) => `<tr><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}</td><td>${esc(ppDespues(c))}</td></tr>`).join('')}</tbody></table></details>` : ''}
       <p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>`;
-    const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length ? 'El borrador no trae cambios.' : '';
-    const bIngresar = botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an)); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
+    // v1.124.0: Observaciones escritas en la vista: se guardan al final del ingreso (o solas si no hay otros cambios)
+    const obsNueva = extra.desdeVista ? ppObsNueva(datos, prop) : null, soloObs = obsNueva != null && !an.cambios.length;
+    if (obsNueva != null) v.cuerpo.querySelector('.rmd-pp-checks').insertAdjacentHTML('afterend', `<div class="rmd-ing-nota"><b>Observaciones nuevas</b> (se guardan con el Guardar de «Asociar fórmulas»${soloObs ? '' : ', al terminar el ingreso'}):<pre class="rmd-pp-obs">${esc(obsNueva)}</pre></div>`);
+    const sinIngreso = errores ? `Hay ${errores} dato(s) por corregir en el borrador.` : an.enSap.length ? 'El RMD cambió en SAP desde la plantilla.' : !an.cambios.length && !soloObs ? 'El borrador no trae cambios.' : '';
+    const bIngresar = soloObs ? botonModal('Guardar Observaciones en SAP…', 'primario', async () => {
+      if (!(await confirmar('¿Guardar las Observaciones?', `Se reemplazan las Observaciones del RMD ${an.destino.codigo} v${an.destino.version} con el texto de la vista, con el Guardar de «Asociar fórmulas» del portal.`, 'No uses el portal mientras se guarda.'))) return;
+      bIngresar.disabled = true; const pr = document.createElement('p'); pr.className = 'rmd-progreso rmd-espera'; pr.textContent = 'Guardando las Observaciones…'; v.cuerpo.append(pr);
+      try { const r2 = await ppGuardarObs(an.destino, obsNueva, datos.rmd); pr.className = 'rmd-progreso'; pr.textContent = `✓ Observaciones guardadas en SAP.${(r2.mensajes || []).length ? ' El portal dijo: ' + r2.mensajes.join(' · ') : ''}`;
+        v.pie.append(botonModal('Volver a la vista (leída otra vez de SAP)', 'primario', () => { v.cerrar(); ppVistaTrasIngreso(an.destino); })); }
+      catch (e) { pr.className = 'rmd-progreso error'; pr.textContent = 'No se guardaron las Observaciones: ' + e.message; bIngresar.disabled = false; }
+    }) : botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an, { obs: obsNueva })); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
     const cT = v.cuerpo.querySelector('.rmd-pp-tildes-c');
     if (cT) cT.addEventListener('change', async () => { cT.disabled = true; if (cT.checked) prop.trabajo.tildes = true; else delete prop.trabajo.tildes;
       try { const an2 = await ppAnalizar(datos, prop); pintarImportacion(v, datos, prop, an2, extra); } catch (e) { toast('No se pudo revisar otra vez: ' + e.message, true); cT.disabled = false; } });
@@ -18792,7 +18969,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
     window.__rmdStats.plantilla.rehacer = () => bRehacer.click();
     v.pie.append(...(an.enSap.length && !errores ? [bRehacer] : []));
     // v1.123.0: el borrador (de Producción o de la vista) en la vista simple dentro del portal, con la vista completa de Documentación Técnica
-    const bVista = extra.desdeVista ? botonModal('Volver a la vista', '', () => v.cerrar()) : botonModal('Abrir en la vista simple', '', async () => {
+    const bVista = extra.desdeVista ? botonModal('Volver a la vista', '', () => v.cerrar()) : botonModal('Abrir en Edición rápida', '', async () => {
       bVista.disabled = true; try { const ctrl = controladorPrincipal(); const [claves, puestos] = await Promise.all([ppClavesModelo(ctrl), ppPuestosRmd(ctrl, [])]); v.cerrar(); await montarVista(datos, { ...prop, guardado: prop.guardado || new Date().toISOString() }, { claves, puestos }); }
       catch (e) { toast('No se pudo abrir la vista: ' + e.message, true); bVista.disabled = false; } });
     bVista.title = extra.desdeVista ? 'Cierra esta revisión y vuelve a la vista para seguir editando' : 'Abre este borrador en la vista simple, aquí en el portal (con la vista completa de Documentación Técnica), para hacer los ajustes y guardar en SAP';
@@ -19161,6 +19338,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       const salta = (id) => { let c = id, g = 0; while (c && quitados.has(c) && g++ < 50) c = predDe(c); return c; };
       const ordenBase = (L) => [...L.b].sort((a, b) => (+((rowsMd.get(D(a.id)) || {}).orden) || 0) - (+((rowsMd.get(D(b.id)) || {}).orden) || 0));
       for (const s of seqPasos) {
+        if (PPN.listaSinPredecesor(s.L.e, s.L.t)) continue;                                  // RENDIMIENTO / CONDICIONES AMBIENTALES: sus pasos no llevan predecesor
         const seq = s.vivos;
         // lista encadenada: se reencadena completa
         const orig = ordenBase(s.L).map((y) => D(y.id)).filter((id) => rowsMd.has(id) && +rowsMd.get(id).tipoDatoId_iMaestraId !== PP_SIN_TIPO);
@@ -19393,7 +19571,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       ${ppHtmlOtraEtiqueta(plan.otraEtiqueta)}
       ${plan.revision.length ? `<details class="rmd-ing-nota ambar rmd-ing-rev" open><summary><b>Revisión con las reglas: ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''}</b> (no bloquean; se aceptan al confirmar)</summary><ul>${plan.revision.slice(0, 60).map((a) => `<li><span class="rmd-nota">${esc(a.donde)}</span><br>${esc(a.texto)}</li>`).join('')}${plan.revision.length > 60 ? `<li>… y ${plan.revision.length - 60} más</li>` : ''}</ul></details>` : '<p class="rmd-nota rmd-ing-rev-ok">✓ Revisión con las reglas: sin alertas en lo que se ingresa.</p>'}
       <div class="rmd-ing-ops">${grupos()}</div>
-      <label class="rmd-ing-conf"><input type="checkbox" class="rmd-pp-ok"><span><b>Marca aquí para poder ingresar:</b> confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${plan.revision.length ? ` y acepto las ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''} de la revisión` : ''}${plan.resumen.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}.</span></label>
+      <label class="rmd-ing-conf"><input type="checkbox" class="rmd-pp-ok"><span><b>Marca aquí para poder ingresar:</b> confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${plan.revision.length ? ` y acepto las ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''} de la revisión` : ''}${plan.resumen.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}${opc.obs != null ? ' y, al terminar, guardar sus Observaciones nuevas (con el Guardar de «Asociar fórmulas»; «Deshacer ingreso» no las revierte)' : ''}.</span></label>
       <div class="rmd-ing-barra" hidden><i></i></div><div class="rmd-progreso rmd-pp-prog"></div>`;
     const cuerpo = v.cuerpo, prog = cuerpo.querySelector('.rmd-pp-prog'), ok = cuerpo.querySelector('.rmd-pp-ok'), barra = cuerpo.querySelector('.rmd-ing-barra'), bi = barra.querySelector('i');
     const pintar = () => { const abiertos = new Set([...cuerpo.querySelectorAll('.rmd-ing-grupo[open] summary b')].map((x) => x.textContent)); cuerpo.querySelector('.rmd-ing-ops').innerHTML = grupos(); cuerpo.querySelectorAll('.rmd-ing-grupo').forEach((g) => { if (abiertos.has(g.querySelector('summary b').textContent)) g.open = true; }); };
@@ -19430,6 +19608,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
         else if (est.diario.length < plan.ops.length) { setTxt(prog, `Detenido tras ${hechas} operaciones.`); await guardar(false, est.diario, ['Detenido']); }
         else if (simular || opc.simular) setTxt(prog, `Simulación lista: ${est.diario.length} escrituras que se harían (no se envió nada).`);
         else { setTxt(prog, 'Comprobando el resultado…'); est.dif = await ppVerificarIngreso(modelo, an.destino, prop, plan); await guardar(false, est.diario, est.dif); bi.style.width = '100%';
+          if (opc.obs != null) { setTxt(prog, 'Guardando las Observaciones…'); try { const r2 = await ppGuardarObs(an.destino, opc.obs, datos.rmd); est.obs = { ok: true, mensajes: r2.mensajes || [] }; } catch (e) { est.obs = { ok: false, error: e.message }; } setTxt(prog, ''); }
           cuerpo.querySelector('.rmd-ing-pasos').outerHTML = pasos(4); resultado(); }
         bX.disabled = false;
       } catch (e) { setTxt(prog, 'No se escribió nada: ' + e.message); prog.classList.add('error'); }
@@ -19439,7 +19618,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       const bien = !est.dif.length, rev = plan.avisos.concat(plan.manual);
       const bloque = `<div class="rmd-ing-res ${bien ? 'ok' : 'mal'}"><b>${bien ? '✓ El RMD quedó como el borrador' : '⚠ El RMD quedó con diferencias'}</b><span>${est.diario.filter((x) => x.estado === 'hecho').length} escrituras hechas${plan.nuevos.length ? ` · ${plan.nuevos.length} paso${plan.nuevos.length > 1 ? 's' : ''} nuevo${plan.nuevos.length > 1 ? 's' : ''}: ${plan.nuevos.map((x) => x.codigo).join(', ')}` : ''}</span></div>
         ${est.dif.length ? `<div class="rmd-ing-nota rojo"><b>Diferencias encontradas</b><ul>${est.dif.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
-        ${listaAv('Para revisar en SAP RMD (las filas ingresadas quedan marcadas en las ventanas de pasos)', rev, 'ambar')}`;
+        ${listaAv('Para revisar en SAP RMD (las filas ingresadas quedan marcadas en las ventanas de pasos)', rev, 'ambar')}
+        ${est.obs ? `<div class="rmd-ing-nota ${est.obs.ok ? '' : 'rojo'}"><b>${est.obs.ok ? '✓ Observaciones guardadas' : '✕ No se guardaron las Observaciones'}</b>${est.obs.ok ? (est.obs.mensajes.length ? ': ' + esc(est.obs.mensajes.join(' · ')) : '') : ': ' + esc(est.obs.error) + '. Escríbelas en «Asociar fórmulas» o vuelve a la vista y guarda otra vez.'}</div>` : ''}`;
       cuerpo.querySelectorAll('.rmd-ing-nota').forEach((x) => x.remove()); cuerpo.querySelector('.rmd-ing-cards').insertAdjacentHTML('beforebegin', bloque);
       bAbrir.style.display = bDes.style.display = ''; bIng.style.display = bSim.style.display = 'none';
       if (VISTA) v.pie.append(botonModal('Volver a la vista (leída otra vez de SAP)', 'primario', () => { v.cerrar(); ppVistaTrasIngreso(an.destino); }));
