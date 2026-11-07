@@ -253,3 +253,11 @@ un cambio de status masivo.
   `/mnt/project-files/backlog-inactivos/inactivos.py` (md del portal + Excel
   del equipo). La página status-rmd ya no cuenta estos códigos como suspendidos
   ni backlog (REGISTRO-DE-MANUFACTURA-DIGITAL PR #52).
+
+### INACTIVO a la vista en el portal (userscript v1.127.0)
+
+Mientras TI no crea el status, el userscript muestra como **INACTIVO** (solo a la vista) los 1 313 `md_id` con
+`listo = SÍ` de este listado, siempre que hoy sigan Suspendidos: columna Estado de la lista principal, cabecera del RMD y
+los Excel del script (Exportado original, Última versión de cada master, Mis movimientos). No escribe nada en el portal ni
+en SAP. Si el equipo cambia el listado, se regenera la lista del script con
+`node analisis/suspendidos_inactivo/generar_inactivos_js.mjs <csv>`.
