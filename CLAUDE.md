@@ -261,7 +261,11 @@ cuenta). Escribir y responder siempre en **español**.
   1.127.0 publicada en SharePoint el 2026-11-07 (2 122 247 bytes; la subió CINTIA).
 - 2026-11-07, v1.127.1: **la etiqueta del Estado en la cabecera también en RMD con código corto** (1–5 dígitos, `CODIGO_CORTO`, solo en
   `decorarCabeceras`; los demás ajustes siguen en `GESTIONADAS`). Prueba `qa_local.py` LN25j.
-  **La siguiente versión debe ser > 1.127.1.**
+- 2026-11-07, v1.128.0 (incluye la 1.127.1): **pedido de CINTIA: «Cambiar paso» sugiere pasos similares** (solo de la misma etiqueta,
+  regla de CINTIA) con uso en masters Autorizados/Ingresados (`usoDePasos`), fecha y creador (`nombresCreadores`) y orden «Sugerido»
+  (`puntuarSugerencias`: parecido 55 %, uso 30 %, mismo tipo de dato, sin tildes). Encaje de ventanas: `encajarEnPantalla` (clase
+  `rmd-encajada` en `.rmd-modal` que no cabe; menús flotantes se corren). Prueba `pruebas/qa_pasos_similares.py`.
+  **La siguiente versión debe ser > 1.128.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

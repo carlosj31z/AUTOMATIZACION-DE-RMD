@@ -1617,7 +1617,7 @@ with sync_playwright() as p:
             finally:
                 pg.unroute("**/*", guardia_w)
             etiquetas = {e for v in busquedas.values() for e in v[0]}
-            ok = etiquetas == {"FABRICACION"} and sum(len(v[0]) for v in busquedas.values()) > 0 and all("etiqueta FABRICACION" in v[1] or "Ningún paso" in v[1] for v in busquedas.values())
+            ok = etiquetas == {"FABRICACION"} and sum(len(v[0]) for v in busquedas.values()) > 0 and all("FABRICACION" in v[1] or "Ningún paso" in v[1] for v in busquedas.values())
             return ok, f"etiquetas={etiquetas} " + " · ".join(f"{q}: {len(v[0])} — {v[1][:110]!r}" for q, v in busquedas.items())
         @prueba("W8b Al cambiar el paso de una fila, los pasos que dependen de ella reciben en «Depende» el código nuevo (v1.71, SIMULADO): con las filas mal citadas reales del RMD_EDIT, solo depende + quién y cuándo")
         def _():
