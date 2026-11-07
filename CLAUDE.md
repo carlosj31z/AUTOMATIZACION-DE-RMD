@@ -252,7 +252,13 @@ cuenta). Escribir y responder siempre en **español**.
   (`fechaRegistro`, sin Cancelado ni Solicitud Rechazada), se **quita** si alguna versión del linaje se suspendió el **mes anterior**
   (trazabilidad) y se **suma** el master con última versión Suspendida en el mes aunque no tenga versión nueva (una vez por master).
   Columna «Solicitado de <mes>» en Pendientes y Solicitados. Prueba `qa_local.py` LN25h.
-  **La siguiente versión debe ser > 1.126.0.**
+- 2026-11-07, v1.127.0 (incluye la 1.126.0): **pedido de CINTIA: INACTIVO solo a la vista.** Los 1 313 `md_id` «listo = SÍ» de
+  `docs/rmd_a_inactivo_2026-11-07.csv` van embebidos (bloque `==INACTIVOS==`, `INACTIVO_IDS_HEX`, sin nombres; se regenera con
+  `analisis/suspendidos_inactivo/generar_inactivos_js.mjs`). Si siguen Suspendidos se ven INACTIVO en la lista principal
+  (`inactivoEnLista`, solo el texto del DOM) y la cabecera, y salen INACTIVO en Exportado original (copia de las filas en
+  `Spreadsheet.build`), Última versión (`marcarInactivosUV`: solo la última versión; fuera de Pendientes) y Mis movimientos. Nada se
+  escribe en SAP ni en el modelo; «Enviar a Status RMD» no cambia. Opción `inactivovista`. Pruebas `qa_inactivos.mjs` y `qa_local.py` LN25i.
+  **La siguiente versión debe ser > 1.127.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

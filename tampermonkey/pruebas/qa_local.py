@@ -753,7 +753,7 @@ with sync_playwright() as p:
           const x = U.armar(U.ultimas(mds), {}, new Date(2026, 9, 16), ['prueba']), u8 = await x.libro.generar();
           return { us, prods, hojas: x.libro && u8.length > 1000, conteo: x.conteo, productos: x.productos }; }""")
         esperado = [['102', 'Ingresado', 4, '101', '103', None], ['200', 'Autorizado', 2, None, '', None], ['300', 'Suspendido', 1, None, '', '200'], ['500', 'Suspendido', 2, None, '', None]]
-        ok = (r["us"] == esperado and r["prods"] == ['DEXTROSA 5%', 'SOLUTRES 150mg/mL', 'LEVOCERT 5mg', 'LEVOCERT 5mg', 'LINEA GOTAS OFTALMICAS PV2', 'SOLICARE 9‰', 'AMOXIDIN CL 600'] and r["hojas"] and r["conteo"] == {"a": 1, "i": 1, "s": 2, "n": 4})
+        ok = (r["us"] == esperado and r["prods"] == ['DEXTROSA 5%', 'SOLUTRES 150mg/mL', 'LEVOCERT 5mg', 'LEVOCERT 5mg', 'LINEA GOTAS OFTALMICAS PV2', 'SOLICARE 9‰', 'AMOXIDIN CL 600'] and r["hojas"] and r["conteo"] == {"a": 1, "i": 1, "s": 2, "x": 0, "n": 4})
         return ok, json.dumps(r, ensure_ascii=False)[:600]
     @prueba("LN25g Última versión (v1.125.0): fecha de suspensión = la ÚLTIMA «Suspendido» de MD_TRAZABILIDAD (no la fechaActualiza del MD) y hoja «Solicitados» con las solicitudes abiertas (Solicitado y Solicitud Aprobada, no Rechazada) y la última versión de su master")
     def _():
@@ -793,6 +793,25 @@ with sync_playwright() as p:
         esperado = [["A2", True, True, "Registrado en el mes"], ["B2", False, True, "Quitado"], ["C1", True, True, "Suspendido en el mes"], ["D2", True, True, "Registrado en el mes"], ["E1", True, False, "Registrado en el mes"]]
         ok = r["res"] == esperado and r["dm"] == {"cuentan": 4, "pendientes": 3, "quitados": 1} and r["ok"]
         return ok, json.dumps(r, ensure_ascii=False)[:700]
+    @prueba("LN25i INACTIVO solo a la vista (v1.127.0): en «Última versión» la última versión Suspendida de un master de la lista sale INACTIVO (no en Pendientes ni como suspendido; las versiones anteriores y los no listados igual), y el Exportado original cambia una copia de la fila, no la del portal")
+    def _():
+        r = pg.evaluate("""async () => { const U = window.__rmdStats.ultimaVersion, e = (c) => ({ contenido: c });
+          const LISTADO = 'cfde1928-939b-4f03-b62d-6ce56faa1770', LISTADO2 = 'fd20b7ab-a18d-44fb-aca0-2610e75a8ae3';   // dos md_id de docs/rmd_a_inactivo_2026-11-07.csv
+          const md = (id, o) => ({ mdId: id, codigo: o.codigo, version: o.v, estadoIdRmd: e(o.e), descripcion: o.d, nivelTxt: 'ACONDICIONADO', sucursalId_iMaestraId: 67, sucursalId: { contenido: 'PLANTA ATE' },
+            areaRmdTxt: 'LIQUIDOS', codigoversionprincipal: o.p || '', observacion: '', fechaRegistro: new Date(2025, 0, 1), fechaActualiza: new Date(2025, 0, 1) });
+          const mds = [md(LISTADO, { codigo: '10589', v: 1, e: 'Suspendido', d: 'AAA JBE' }),                                     // listado, última versión Suspendida → INACTIVO
+            md('x-2', { codigo: 'B1', v: 1, e: 'Suspendido', d: 'BBB JBE' }),                                                          // no listado → Suspendido
+            md(LISTADO2, { codigo: '10778', v: 1, e: 'Suspendido', d: 'CCC SOL' }), md('x-4', { codigo: 'C2', v: 2, e: 'Ingresado', d: 'CCC SOL', p: '10778' })];   // listado pero con versión nueva: no es la última
+          const items = U.ultimas(mds), n = U.inactivos(items);
+          const est = items.map((x) => [x.md.codigo, x.estado]).sort();
+          const x = U.armar(items, {}, new Date(2026, 10, 7), [], []), u8 = await x.libro.generar();
+          const fila = { mdId: LISTADO, codigo: '10589', estadoIdRmd: { contenido: 'Suspendido' } }, otra = { mdId: 'x-2', estadoIdRmd: { contenido: 'Suspendido' } };
+          const st = { workbook: { columns: [{ label: 'Código', property: 'codigo' }, { label: 'Estado', property: 'estadoIdRmd/contenido' }] }, dataSource: [fila, otra] };
+          const nx = window.__rmdStats.inactivosEnFilasExport(st);
+          return { n, est, conteo: x.conteo, ok: u8.length > 1000, nx, exp: st.dataSource.map((f) => f.estadoIdRmd.contenido), original: fila.estadoIdRmd.contenido, misma: st.dataSource[1] === otra }; }""")
+        ok = (r["n"] == 1 and r["est"] == [["10589", "INACTIVO"], ["B1", "Suspendido"], ["C2", "Ingresado"]] and r["conteo"]["x"] == 1 and r["conteo"]["s"] == 1 and r["ok"]
+              and r["nx"] == 1 and r["exp"] == ["INACTIVO", "Suspendido"] and r["original"] == "Suspendido" and r["misma"])
+        return ok, json.dumps(r, ensure_ascii=False)[:600]
     @prueba("LN25f Festividades del Perú (v1.73): calendario con la hora de Lima (como máximo 2 semanas antes; si se cruzan, la de fecha más cercana; Químico Farmacéutico el 13/5), textos e insignias SVG válidas; en el portal sin animaciones")
     def _():
         r = pg.evaluate("""() => { const F = window.__rmdStats.fiestas, d = (y, m, dd) => new Date(Date.UTC(y, m - 1, dd));
