@@ -1676,7 +1676,8 @@
     if (el.classList.contains('rmd-modal')) {
       el.classList.remove('rmd-encajada');
       const r = el.getBoundingClientRect(); if (!r.width) return;
-      if (r.width > W - 2 * M + 0.5 || r.height > H - 2 * M + 0.5 || r.left < M - 0.5 || r.top < M - 0.5 || r.right > W - M + 0.5 || r.bottom > H - M + 0.5) el.classList.add('rmd-encajada');
+      // solo si de verdad se sale (las de pantalla completa de la vista móvil caben justo y no se tocan)
+      if (r.left < -0.5 || r.top < -0.5 || r.right > W + 0.5 || r.bottom > H + 0.5) el.classList.add('rmd-encajada');
       return;
     }
     if (getComputedStyle(el).position !== 'fixed') return;
