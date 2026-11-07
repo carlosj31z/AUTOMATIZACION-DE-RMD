@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.125.0
+// @version      1.126.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.125.0';                                                       // mantener igual a @version
+  const VERSION = '1.126.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -494,7 +494,7 @@
   .rmd-bajas-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #f0b400; border-radius: 4px; background: rgba(240,180,0,.15); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-uv-filtros { display: grid; gap: 8px; margin: 8px 0; } .rmd-uv-filtros fieldset { margin: 0; padding: 6px 12px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; }
   .rmd-uv-filtros legend { padding: 0 4px; font-weight: 600; font-size: 12px; } .rmd-uv-filtros label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
-  .rmd-uv-lista { display: flex; flex-wrap: wrap; gap: 2px 16px; max-height: 112px; overflow: auto; } .rmd-uv-desde { margin-left: 16px; }
+  .rmd-uv-lista { display: flex; flex-wrap: wrap; gap: 2px 16px; max-height: 112px; overflow: auto; } .rmd-uv-desde { margin-left: 16px; } .rmd-uv-filtros fieldset > .rmd-nota { display: block; margin-top: 2px; }
   .sapMDialog.sapMMessageDialog.rmd-espera-respuesta { z-index: 100002 !important; box-shadow: 0 0 0 3px var(--rmd-acento), 0 12px 32px rgba(0,0,0,.28) !important; }   /* encima de las ventanas del script: la responde la persona */
   .rmd-dep-aviso, .rmd-etq-aviso { display: flex; align-items: center; gap: 10px; margin: 6px 16px 4px; padding: 8px 12px; border-left: 4px solid #e53935; border-radius: 4px; background: rgba(229,57,53,.13); color: var(--rmd-texto); font: 13px/1.45 var(--rmd-fuente); }
   .rmd-dep-aviso b, .rmd-etq-aviso b { color: var(--rmd-rojo); } .rmd-dep-ico { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #e53935; color: #fff; font: 700 13px/22px var(--rmd-fuente); text-align: center; }
@@ -8554,24 +8554,44 @@
       unir(c, 'd:' + [SIN_ACENTOS(norm(m.descripcion || '')), m.sucursalId_iMaestraId, SIN_ACENTOS(norm(m.areaRmdTxt || '')), SIN_ACENTOS(norm(m.nivelTxt || ''))].join('|'));
     });
     const lin = new Map(); mds.forEach((m) => { const k = raiz(nodo(m)); if (!lin.has(k)) lin.set(k, []); lin.get(k).push(m); });
-    const out = [], solicitados = [];
+    const out = [], solicitados = [], linajes = [];
     lin.forEach((vs, k) => {
       vs.sort((a, b) => (+b.version || 0) - (+a.version || 0) || new Date(b.fechaRegistro || 0) - new Date(a.fechaRegistro || 0));
-      const u = vs.find((m) => ESTADOS_UV.includes(estadoUV(m)));
+      const u = vs.find((m) => ESTADOS_UV.includes(estadoUV(m))); linajes.push({ k, vs, u: u || null });
       // v1.125.0: solicitudes abiertas (Solicitado o Solicitud Aprobada) con la última versión de su linaje (o ninguna, si es un master nuevo)
-      const sols = vs.filter((m) => ESTADOS_SOLIC_UV.includes(estadoUV(m))); sols.forEach((m) => solicitados.push({ md: m, estado: estadoUV(m), ultima: u || null }));
+      const sols = vs.filter((m) => ESTADOS_SOLIC_UV.includes(estadoUV(m))); sols.forEach((m) => solicitados.push({ md: m, estado: estadoUV(m), ultima: u || null, linaje: k }));
       if (!u) return;
       const aut = vs.find((m) => m !== u && estadoUV(m) === 'Autorizado');
       const posterior = vs.filter((m) => (+m.version || 0) > (+u.version || 0) && !ESTADOS_UV.includes(estadoUV(m)) && estadoUV(m) !== 'Cancelado');
       const principal = String(u.codigoversionprincipal || '').trim() || vs[vs.length - 1].codigo;
-      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, solicitudes: sols, reemplazo: null, historial: vs });
+      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, solicitudes: sols, reemplazo: null, historial: vs, linaje: k });
     });
     const claveMat = (m) => [norm(m.codDefectoReceta || ''), SIN_ACENTOS(norm(m.nivelTxt || '')), m.sucursalId_iMaestraId].join('|'), vivos = new Map();
     out.filter((x) => x.estado !== 'Suspendido' && norm(x.md.codDefectoReceta || '')).sort((a, b) => (a.estado === 'Autorizado' ? 0 : 1) - (b.estado === 'Autorizado' ? 0 : 1))
       .forEach((x) => { const k = claveMat(x.md); if (!vivos.has(k)) vivos.set(k, x.md); });
     out.forEach((x) => { if (x.estado === 'Suspendido' && norm(x.md.codDefectoReceta || '')) { const v = vivos.get(claveMat(x.md)); if (v && v.codigo !== x.md.codigo) x.reemplazo = v; } });
-    out.solicitados = solicitados;
+    out.solicitados = solicitados; out.linajes = linajes;
     return out;
+  }
+  // v1.126.0: SOLICITADOS DEL MES (criterio del equipo, pedido de Carlos). Mes = anio/mes (1-12), fechas con la hora local.
+  //  1) entra todo registro (MD) con FECHA DE REGISTRO en el mes (cualquier estado menos Cancelado y Solicitud Rechazada);
+  //  2) se quita si su master (alguna versión del linaje) se SUSPENDIÓ el mes anterior (última «Suspendido» de la trazabilidad): ya contó ese mes;
+  //  3) se suma el master cuya última versión está Suspendida con suspensión en el mes, aunque aún no tenga versión nueva (una vez por master).
+  // linajes = ultimasVersiones(...).linajes; susp = Map(mdId → Date). → [{ md, linaje, criterio, cuenta, estado, pendiente, fSusp, ultima }]
+  const EXCLUIDOS_SDM = ['Cancelado', 'Solicitud Rechazada'];
+  function solicitadosDelMes(linajes, susp, anio, mes) {
+    const ini = new Date(anio, mes - 1, 1), fin = new Date(anio, mes, 1), iniAnt = new Date(anio, mes - 2, 1);
+    const fecha = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d : null; };
+    const enMes = (d) => !!d && d >= ini && d < fin, enAnt = (d) => !!d && d >= iniAnt && d < ini;
+    const mesAnt = iniAnt.toLocaleDateString('es-PE', { month: 'long' }), res = [];
+    (linajes || []).forEach((L) => {
+      const sAnt = L.vs.find((m) => enAnt(susp.get(m.mdId)));
+      const reg = L.vs.filter((m) => enMes(fecha(m.fechaRegistro)) && !EXCLUIDOS_SDM.includes(estadoUV(m)));
+      const fila = (m, criterio, cuenta) => { const e = estadoUV(m); res.push({ md: m, linaje: L.k, criterio, cuenta, estado: e, pendiente: e !== 'Autorizado', fSusp: susp.get(m.mdId) || null, ultima: L.u }); };
+      reg.forEach((m) => fila(m, sAnt ? `Quitado: su master se suspendió en ${mesAnt} (${sAnt.codigo || sAnt.codigoSolicitud || ''} v${sAnt.version})` : 'Registrado en el mes', !sAnt));
+      if (L.u && estadoUV(L.u) === 'Suspendido' && enMes(susp.get(L.u.mdId)) && !(reg.length && !sAnt)) fila(L.u, 'Suspendido en el mes (aún sin versión nueva)', true);
+    });
+    return res;
   }
   const lineasObs = (t) => String(t || '').split(/\r?\n/).map((x) => norm(x)).filter(Boolean);
   // CC aplicados y pendientes heredados de la última versión, con sus versiones anteriores del mismo linaje
@@ -8581,7 +8601,7 @@
   const etapaUV = (e) => SIN_ACENTOS(norm(e || '')) || '(sin etapa)';
   const NOMBRE_ETAPA_UV = { FABRICACION: 'Fabricación', RECUBRIMIENTO: 'Recubrimiento', ENVASE: 'Envase', INSPECCION: 'Inspección', ACONDICIONADO: 'Acondicionado' };
   const etapaBonita = (e) => NOMBRE_ETAPA_UV[e] || (e.charAt(0) + e.slice(1).toLowerCase());
-  function armarUltimaVersionExcel(items, mapaProd, hoy = new Date(), filtros = [], solicitados = []) {
+  function armarUltimaVersionExcel(items, mapaProd, hoy = new Date(), filtros = [], solicitados = [], delMes = null) {
     const libro = Xlsx.crearLibro(), dd = (n) => String(n).padStart(2, '0');
     const fx = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null; };
     const estiloEst = (e) => (e === 'Autorizado' ? 'estAut' : e === 'Suspendido' ? 'estSus' : 'estIng');
@@ -8612,10 +8632,20 @@
     //  Pendientes
     // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
-    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Última suspensión (trazabilidad)', 'Solicitud abierta (versión siguiente)', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
-      [12, 10, 12, 14, 24, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), fx(x.fSusp), x.solic, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod]),
-      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'fechaCelda', 4: 'textoCelda', 5: 'codigoCelda', 6: 'numCelda', 8: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'textoCelda' }, { congelar: 'G2', activa: true });
+    // v1.126.0: linajes que cuentan como solicitados del mes (criterio del equipo)
+    const linMes = new Set(delMes ? delMes.lista.filter((z) => z.cuenta).map((z) => z.linaje) : []), sdm = (k) => (delMes ? (linMes.has(k) ? 'Sí' : 'No') : '');
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Última suspensión (trazabilidad)', 'Solicitud abierta (versión siguiente)', delMes ? `Solicitado de ${delMes.etiqueta}` : 'Solicitado del mes', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 14, 24, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), fx(x.fSusp), x.solic, sdm(x.linaje), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'fechaCelda', 4: 'textoCelda', 5: (f) => (f[5] === 'Sí' ? 'estIng' : 'celda'), 6: 'codigoCelda', 7: 'numCelda', 9: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'textoCelda', 19: 'textoCelda' }, { congelar: 'H2', activa: true });
+    //  Solicitados del mes (v1.126.0): los que cuentan primero (pendientes antes que autorizados) y al final los quitados, para revisar
+    const sdmFilas = delMes ? delMes.lista.slice().sort((a, b) => (b.cuenta - a.cuenta) || (b.pendiente - a.pendiente) || (new Date(a.md.fechaRegistro || 0) - new Date(b.md.fechaRegistro || 0))) : [];
+    if (delMes) tabla('Solicitados del mes', 'SolicitadosMes', ['¿Cuenta?', '¿Pendiente?', 'Criterio', 'Estado actual', 'Fecha registro', 'Última suspensión (trazabilidad)', 'Código RMD / solicitud', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Usuario registro',
+      'Última versión del master', 'Estado de la última versión', 'Producción Estado'],
+      [9, 11, 46, 16, 12, 14, 16, 8, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 18],
+      sdmFilas.map((z) => { const m = z.md, obs = lineasObs(m.observacion); return [z.cuenta ? 'Sí' : 'No', z.cuenta ? (z.pendiente ? 'Sí' : 'No (autorizado)') : '', z.criterio, z.estado, fx(m.fechaRegistro), fx(z.fSusp), m.codigo || m.codigoSolicitud || '', +m.version || m.version, productoDeDescripcion(m.descripcion), m.descripcion,
+        etapaBonita(etapaUV(m.nivelTxt)), (m.sucursalId && m.sucursalId.contenido) || '', m.areaRmdTxt || '', (m.motivoId && m.motivoId.descripcion) || '', obs[obs.length - 1] || '', usuarioVisible(m.usuarioRegistro), z.ultima ? `${z.ultima.codigo} v${z.ultima.version}` : '(sin versión aún)', z.ultima ? estadoUV(z.ultima) : '', mapaProd[m.estadoIdProceso_iMaestraId] || '']; }),
+      { 0: (f) => (f[0] === 'Sí' ? 'estAut' : 'estSus'), 1: (f) => (f[1] === 'Sí' ? 'estIng' : 'celda'), 2: 'textoCelda', 3: (f) => (ESTADOS_UV.includes(f[3]) ? estiloEst(f[3]) : 'estIng'), 4: 'fechaCelda', 5: 'fechaCelda', 6: 'codigoCelda', 7: 'numCelda', 9: 'textoCelda', 14: 'textoCelda', 17: (f) => (f[17] ? estiloEst(f[17]) : 'celda') }, { congelar: 'D2' });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
@@ -8630,10 +8660,10 @@
       return { y, m, f: d && !isNaN(d) ? d : null, dias: d && !isNaN(d) ? Math.max(0, Math.floor((hoy - d) / 864e5)) : null, ultima: obs[obs.length - 1] || '', u: y.ultima }; })
       .sort((a, b) => (b.dias || 0) - (a.dias || 0) || nat(productoDeDescripcion(a.m.descripcion), productoDeDescripcion(b.m.descripcion)));
     tabla('Solicitados', 'Solicitados', ['Estado', 'Días desde la solicitud', 'Fecha solicitud', 'Código de solicitud', 'Versión solicitada', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Solicitado por',
-      'Última versión actual', 'Estado de la última versión', 'Última suspensión (trazabilidad)', 'Producción Estado'],
-      [16, 10, 12, 14, 9, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 14, 18],
+      'Última versión actual', 'Estado de la última versión', 'Última suspensión (trazabilidad)', 'Producción Estado', delMes ? `Solicitado de ${delMes.etiqueta}` : 'Solicitado del mes'],
+      [16, 10, 12, 14, 9, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 14, 18, 12],
       sol.map((x) => [x.y.estado, x.dias, fx(x.f), x.m.codigoSolicitud || x.m.codigo, +x.m.version || x.m.version, productoDeDescripcion(x.m.descripcion), x.m.descripcion, etapaBonita(etapaUV(x.m.nivelTxt)), (x.m.sucursalId && x.m.sucursalId.contenido) || '', x.m.areaRmdTxt || '',
-        (x.m.motivoId && x.m.motivoId.descripcion) || '', x.ultima, usuarioVisible(x.m.usuarioRegistro), x.u ? `${x.u.codigo} v${x.u.version}` : '(master nuevo)', x.u ? estadoUV(x.u) : '', fx(x.y.fSuspUlt), mapaProd[x.m.estadoIdProceso_iMaestraId] || '']),
+        (x.m.motivoId && x.m.motivoId.descripcion) || '', x.ultima, usuarioVisible(x.m.usuarioRegistro), x.u ? `${x.u.codigo} v${x.u.version}` : '(master nuevo)', x.u ? estadoUV(x.u) : '', fx(x.y.fSuspUlt), mapaProd[x.m.estadoIdProceso_iMaestraId] || '', sdm(x.y.linaje)]),
       { 0: 'estIng', 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 14: (f) => (f[14] ? estiloEst(f[14]) : 'celda'), 15: 'fechaCelda' }, { congelar: 'E2' });
     //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
     const frases = [];
@@ -8657,7 +8687,8 @@
       prods.map((p) => [p.nombre, p.estado, p.c.n, p.c.a, p.c.i, p.c.s, pct(p.c.a, p.c.n), ...etapas.map((e) => resumenEtapa(p.xs.filter((x) => x.etapa === e))),
         p.xs.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado]).map((x) => `${x.estado} · ${x.m.codigo} v${x.m.version} (${etapaBonita(x.etapa).toLowerCase()}): ${x.ultima || 'sin observaciones'}`).join('\n')]),
       { 0: 'codigoCelda', 1: (f) => (f[1] === 'Todo autorizado' ? 'estAut' : f[1] === 'Por autorizar' ? 'estIng' : 'estSus'), 2: 'numCelda', 3: 'numCelda', 4: 'numCelda', 5: 'numCelda', 6: 'pctCelda', [7 + etapas.length]: 'textoCelda' }, { congelar: 'B2' });
-    return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length, solicitados: sol.length };
+    return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length, solicitados: sol.length,
+      delMes: delMes ? { cuentan: sdmFilas.filter((z) => z.cuenta).length, pendientes: sdmFilas.filter((z) => z.cuenta && z.pendiente).length, quitados: sdmFilas.filter((z) => !z.cuenta).length } : null };
   }
   // ---- V°B° de la última versión frente a la penúltima (RMD trabajados en un mes; mismo criterio que el comando vb-mes) ----
   // Un RMD = cadena de versiones con el mismo código principal; entra si alguna versión se registró, ingresó (fecha al inicio de la Observación)
@@ -8949,12 +8980,12 @@
     const ctrl = controladorPrincipal(), modelo = modeloListaPrincipal(); if (!modelo || !ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
     let trabajando = true; window.__rmdUltimaVersion = true;
     const v = ventana('Última versión de cada master', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
-    v.cuerpo.innerHTML = `<p>Excel con la <b>última versión</b> de cada master que está <b>Autorizado, Ingresado o Suspendido</b> (sin Cancelados), con lo que dicen sus <b>Observaciones</b> para saber por qué está pendiente, y un resumen por producto. La fecha de los <b>Suspendidos</b> es la <b>última suspensión</b> que figura en la trazabilidad, y la hoja <b>Solicitados</b> trae las solicitudes abiertas (Solicitado o Solicitud Aprobada). No cambia nada en SAP.</p>
+    v.cuerpo.innerHTML = `<p>Excel con la <b>última versión</b> de cada master que está <b>Autorizado, Ingresado o Suspendido</b> (sin Cancelados), con lo que dicen sus <b>Observaciones</b> para saber por qué está pendiente, y un resumen por producto. La fecha de los <b>Suspendidos</b> es la <b>última suspensión</b> que figura en la trazabilidad, la hoja <b>Solicitados</b> trae las solicitudes abiertas (Solicitado o Solicitud Aprobada) y la hoja <b>Solicitados del mes</b> aplica el criterio del equipo para saber tus pendientes del mes. No cambia nada en SAP.</p>
       <div class="rmd-uv-filtros" hidden></div><p class="rmd-progreso">Leyendo los master de SAP…</p>`;
     const prog = v.cuerpo.querySelector('.rmd-progreso'), caja = v.cuerpo.querySelector('.rmd-uv-filtros'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
     const bGen = botonModal('Exportar Excel', 'primario', () => {}); bGen.disabled = true;
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
-    let items = [], mapa = {}, solicitados = [], trazOk = true;
+    let items = [], mapa = {}, solicitados = [], trazOk = true, susp = new Map();
     const valores = (k) => { const n = new Map(); items.forEach((x) => { const val = k(x) || '(sin dato)'; n.set(val, (n.get(val) || 0) + 1); }); return [...n.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es')); };
     const grupo = (titulo, nombre, pares) => `<fieldset><legend>${esc(titulo)}${pares.length > 3 ? ` <button type="button" class="rmd-link" data-todos="${nombre}">todas</button> · <button type="button" class="rmd-link" data-ninguna="${nombre}">ninguna</button>` : ''}</legend><div class="rmd-uv-lista">${pares.map(([val, n]) => `<label><input type="checkbox" data-g="${nombre}" value="${esc(val)}" checked> ${esc(val)} <span class="rmd-nota">(${n.toLocaleString('es-PE')})</span></label>`).join('')}</div></fieldset>`;
     const etapaDe = (x) => etapaBonita(etapaUV(x.md.nivelTxt)), plantaDe = (x) => (x.md.sucursalId && x.md.sucursalId.contenido) || '', areaDe = (x) => x.md.areaRmdTxt || '';
@@ -8973,14 +9004,22 @@
       if (!todos('etapa')) filtros.push('Etapas: ' + [...et].join(', ')); if (!todos('planta')) filtros.push('Plantas: ' + [...pl].join(', ')); if (!todos('area')) filtros.push('Áreas: ' + [...ar].join(', '));
       if (sinReemp) filtros.push('Sin los Suspendidos reemplazados por otro master vigente'); if (d0) filtros.push(`Suspendidos solo desde el ${desde.split('-').reverse().join('/')}`);
       if (!conSol) filtros.push('Sin la hoja Solicitados');
-      return { lista, filtros, sols };
+      // v1.126.0: Solicitados del mes (criterio del equipo), con los mismos filtros de etapa, planta y área
+      let delMes = null; const mesTxt = caja.querySelector('#rmd-uv-mes').value;
+      if (caja.querySelector('#rmd-uv-sdm').checked && /^\d{4}-\d{2}$/.test(mesTxt)) {
+        const [an, me] = mesTxt.split('-').map(Number), etiqueta = new Date(an, me - 1, 1).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' }).replace(' de ', ' ');
+        delMes = { etiqueta, lista: solicitadosDelMes(items.linajes || [], susp, an, me).filter((z) => !sale('etapa', etapaDe(z)) && !sale('planta', plantaDe(z)) && !sale('area', areaDe(z))) };
+      } else filtros.push('Sin la hoja Solicitados del mes');
+      return { lista, filtros, sols, delMes };
     };
-    const contar = () => { const { lista, sols } = elegidos(), c = (e) => lista.filter((x) => x.estado === e).length;
+    const contar = () => { const { lista, sols, delMes } = elegidos(), c = (e) => lista.filter((x) => x.estado === e).length;
+      const nota = caja.querySelector('.rmd-uv-sdm-cuenta');
+      if (nota) { const cu = delMes ? delMes.lista.filter((z) => z.cuenta) : [];
+        setTxt(nota, delMes ? `Solicitados de ${delMes.etiqueta}: ${cu.length} (${cu.filter((z) => !/^Suspendido en/.test(z.criterio)).length} registrados en el mes + ${cu.filter((z) => /^Suspendido en/.test(z.criterio)).length} suspendidos en el mes sin versión nueva; ${delMes.lista.length - cu.length} quitados porque su master se suspendió el mes anterior). Pendientes (sin autorizar): ${cu.filter((z) => z.pendiente).length}.` : ''); }
       avance(`Se exportarán ${lista.length.toLocaleString('es-PE')} master: ${c('Autorizado')} autorizados, ${c('Ingresado')} ingresados y ${c('Suspendido')} suspendidos`
-        + (caja.querySelector('#rmd-uv-solic').checked ? `, y ${sols.length.toLocaleString('es-PE')} solicitados.` : '.') + (trazOk ? '' : ' Ojo: no se pudo leer la trazabilidad; la fecha de los suspendidos es su última actualización.')); bGen.disabled = !lista.length && !sols.length; };
+        + (caja.querySelector('#rmd-uv-solic').checked ? `, y ${sols.length.toLocaleString('es-PE')} solicitados.` : '.') + (trazOk ? '' : ' Ojo: no se pudo leer la trazabilidad; la fecha de los suspendidos es su última actualización.')); bGen.disabled = !lista.length && !sols.length && !(delMes && delMes.lista.length); };
     try {
       const pag = { md: '', tr: '' }, av = () => avance(`Leyendo los master de SAP… ${pag.md}${pag.tr ? ' · trazabilidad ' + pag.tr : ''}`);
-      let susp;
       [items, mapa, susp] = await Promise.all([
         leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId,motivoId', $select: SELECT_MD_UV }, 'mdId', (h, t) => { pag.md = `página ${h} de ${t}`; av(); }).then(ultimasVersiones),
         mapaProduccionEstado(ctrl).catch(() => ({})),
@@ -8994,6 +9033,9 @@
         + `<fieldset><legend>Suspendidos</legend><label><input type="checkbox" id="rmd-uv-reemp" checked> Quitar los ${nReemp} que ya tienen otro master Autorizado o Ingresado (mismo material, etapa y planta)</label>
            <label class="rmd-uv-desde">Solo los suspendidos desde <input type="date" id="rmd-uv-desde"> <span class="rmd-nota">(vacío: todos; fecha de la última suspensión en la trazabilidad)</span></label></fieldset>`
         + `<fieldset><legend>Solicitados</legend><label><input type="checkbox" id="rmd-uv-solic" checked> Agregar la hoja «Solicitados» con las ${solicitados.length.toLocaleString('es-PE')} solicitudes abiertas (${solicitados.filter((y) => y.estado === 'Solicitado').length} Solicitado, ${solicitados.filter((y) => y.estado === 'Solicitud Aprobada').length} Solicitud Aprobada)</label></fieldset>`
+        + `<fieldset><legend>Solicitados del mes</legend><label><input type="checkbox" id="rmd-uv-sdm" checked> Agregar la hoja «Solicitados del mes» del mes <input type="month" id="rmd-uv-mes" value="${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}"></label>
+           <span class="rmd-nota">Criterio del equipo: todo lo registrado en el mes (fecha de registro), menos lo de masters suspendidos el mes anterior, más los suspendidos en el mes aunque aún no tengan versión nueva.</span>
+           <span class="rmd-nota rmd-uv-sdm-cuenta"></span></fieldset>`
         + grupo('Etapa', 'etapa', valores(etapaDe)) + grupo('Planta', 'planta', valores(plantaDe)) + grupo('Área (sección)', 'area', valores(areaDe));
       caja.hidden = false; caja.addEventListener('change', contar); contar();
       caja.addEventListener('click', (e) => { const b = e.target.closest('[data-todos],[data-ninguna]'); if (!b) return; const g = b.dataset.todos || b.dataset.ninguna;
@@ -9002,18 +9044,18 @@
     finally { trabajando = false; window.__rmdUltimaVersion = false; }
     bGen.addEventListener('click', async () => {
       if (window.__rmdUltimaVersion) return;
-      const { lista, filtros, sols } = elegidos(); if (!lista.length && !sols.length) return;
+      const { lista, filtros, sols, delMes } = elegidos(); if (!lista.length && !sols.length && !(delMes && delMes.lista.length)) return;
       window.__rmdUltimaVersion = true; trabajando = true; bGen.disabled = true;
       try {
         const t0 = Date.now(); avance(`Armando el Excel con ${lista.length.toLocaleString('es-PE')} master…`); await esperar(40);
-        const { libro, nombre, conteo, productos, solicitados: nSol } = armarUltimaVersionExcel(lista, mapa, new Date(), filtros, sols), u8 = await libro.generar();
+        const { libro, nombre, conteo, productos, solicitados: nSol, delMes: dm } = armarUltimaVersionExcel(lista, mapa, new Date(), filtros, sols, delMes), u8 = await libro.generar();
         descargarArchivo(nombre, u8, TIPO_XLSX);
-        avance(`✓ Descargado «${nombre}» (${Math.round((Date.now() - t0) / 1000)} s): ${lista.length.toLocaleString('es-PE')} master (${conteo.a} autorizados, ${conteo.i} ingresados, ${conteo.s} suspendidos) de ${productos} productos y ${nSol} solicitados.`);
+        avance(`✓ Descargado «${nombre}» (${Math.round((Date.now() - t0) / 1000)} s): ${lista.length.toLocaleString('es-PE')} master (${conteo.a} autorizados, ${conteo.i} ingresados, ${conteo.s} suspendidos) de ${productos} productos y ${nSol} solicitados.` + (dm ? ` Solicitados de ${delMes.etiqueta}: ${dm.cuentan} (${dm.pendientes} pendientes).` : ''));
       } catch (e) { avance('No se pudo exportar: ' + e.message, true); }
       finally { window.__rmdUltimaVersion = false; trabajando = false; bGen.disabled = false; }
     });
   }
-  window.__rmdStats.ultimaVersion = { producto: productoDeDescripcion, ultimas: ultimasVersiones, armar: armarUltimaVersionExcel, suspension: ultimaSuspensionDeTraz, abrir: () => abrirUltimaVersion(), exportar: () => { const b = [...document.querySelectorAll('.rmd-modal-pie button')].find((x) => x.textContent === 'Exportar Excel'); if (b) b.click(); return !!b; } };   // pruebas
+  window.__rmdStats.ultimaVersion = { producto: productoDeDescripcion, ultimas: ultimasVersiones, armar: armarUltimaVersionExcel, suspension: ultimaSuspensionDeTraz, delMes: solicitadosDelMes, abrir: () => abrirUltimaVersion(), exportar: () => { const b = [...document.querySelectorAll('.rmd-modal-pie button')].find((x) => x.textContent === 'Exportar Excel'); if (b) b.click(); return !!b; } };   // pruebas
   // ---- Menú del icono «Exportar» de la lista principal ----
   // Exportado original (+ «Producción Estado» al final), Equipos por master e Indicadores.
   const buscarExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));

@@ -244,7 +244,12 @@ cuenta). Escribir y responder siempre en **español**.
   «Suspendido» de `MD_TRAZABILIDAD`** (`ultimaSuspensionDeTraz`, `fechaSuspUV`; antes `fechaActualiza`), columna «Última suspensión
   (trazabilidad)», y hoja nueva **«Solicitados»** (Solicitado + Solicitud Aprobada, `ESTADOS_SOLIC_UV`, `ultimasVersiones(...).solicitados`)
   con la última versión de su master. Prueba `qa_local.py` LN25g.
-  **La siguiente versión debe ser > 1.125.0.**
+- 2026-11-07, v1.126.0 (incluye la 1.125.0): pedido de Carlos (criterio del equipo): hoja **«Solicitados del mes»** en «Última versión de
+  cada master» (`solicitadosDelMes(linajes, susp, anio, mes)`, `ultimasVersiones(...).linajes`): entra lo **registrado en el mes**
+  (`fechaRegistro`, sin Cancelado ni Solicitud Rechazada), se **quita** si alguna versión del linaje se suspendió el **mes anterior**
+  (trazabilidad) y se **suma** el master con última versión Suspendida en el mes aunque no tenga versión nueva (una vez por master).
+  Columna «Solicitado de <mes>» en Pendientes y Solicitados. Prueba `qa_local.py` LN25h.
+  **La siguiente versión debe ser > 1.126.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
