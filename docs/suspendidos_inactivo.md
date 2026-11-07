@@ -234,3 +234,22 @@ Para rehacer el análisis desde cero es más simple partir del exportado
 4. Mantén las reglas: solo la última versión por master; analizar con evidencia
    y dejar como CONSULTA lo dudoso; nada en SAP sin OK escrito de Carlos;
    archivos simples y términos entendibles (sin jerga).
+
+## 9. Listado para el cambio automático a INACTIVO (2026-11-07)
+
+`docs/rmd_a_inactivo_2026-11-07.csv` (separado por `;`, UTF-8): los 1 328
+INACTIVO de la decisión del equipo cruzados con el portal del 07/11/2026 03:59Z
+(lectura de `/MD`, solo lectura), con el **ID interno (`md_id`)** que usaría
+un cambio de status masivo.
+
+- `listo = SÍ` (1 313: ATE 880, LIMA 433): es la última versión de su master y
+  sigue Suspendido.
+- `listo = NO` (15): 12 de ATE con una versión o solicitud más nueva; MEJORAL
+  MIGRAÑA (2202505691) hoy Autorizado y TIFOBIOTIC 500 mg (2202506269) hoy
+  Cancelado; GRAVOL AP `6000001752` no es un RMD (es material; el RMD sería
+  2202403352). Los revisa el equipo.
+- **Antes de cambiar**, volver a verificar cada fila el mismo día (el portal
+  cambia) y tener el OK escrito de Carlos. Generador:
+  `/mnt/project-files/backlog-inactivos/inactivos.py` (md del portal + Excel
+  del equipo). La página status-rmd ya no cuenta estos códigos como suspendidos
+  ni backlog (REGISTRO-DE-MANUFACTURA-DIGITAL PR #52).
