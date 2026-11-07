@@ -27,12 +27,15 @@ cuenta). Escribir y responder siempre en **español**.
   `docs/plan_reduccion_pendientes.md` (glosario, criterio, cifras, qué es
   «actualizar», reparto, Chrome de pruebas, plantilla de reporte). Léelo entero
   antes de tocar un RMD.
-- Resumen: de **2 441** masters con última versión Suspendida (última versión =
-  la mayor entre Autorizado, Ingresado y Suspendido), la propuesta del
-  2026-11-05 pasa **1 349 a INACTIVO** (status nuevo que hará TI), **excluye 687**
-  cuya receta ya está en un RMD Autorizado vigente de otro master, deja **222
-  pendientes reales** (151 alta, 70 media, 1 ya solicitada; ATE 123, LIMA 99) y
-  **183 por revisar**.
+- **Suspendidos → INACTIVO: todo en `docs/suspendidos_inactivo.md`.** Decisión
+  final del equipo (2026-11-07, Excel «ANALISIS DE SUSPENDIDOS - decision del
+  equipo 2026-11-07.xlsx», columna CONCLUSION, que manda): de **1 806**
+  suspendidos (última versión de cada master), **1 328 pasan a INACTIVO** (ATE
+  892, LIMA 436) y **478 siguen SUSPENDIDOS** (ATE 324, LIMA 154). INACTIVO es un
+  status nuevo que hará TI; falta definir cómo se carga y aclarar dudas abiertas.
+- Cifras viejas (no usar para decidir): la propuesta v2 del 2026-11-05 tenía base
+  2 441, 1 349 a INACTIVO, 687 excluidos, 222 pendientes reales y 183 por
+  revisar; el plan de pendientes y el piloto partieron de esas cifras.
 - «Actualizar» = versión nueva Ingresada con la receta vigente, los CC
   pendientes y del listado aplicados, términos homologados en los pasos (sin
   tildes), 1.ª línea de Observaciones con la nomenclatura del usuario SAP que la
@@ -294,8 +297,10 @@ cuenta). Escribir y responder siempre en **español**.
   - Probar la tabla INSUMOS con un RMD de Fabricación.
   - Probar «Actualizar» real de Cambio de material en un Autorizado (DMS).
   - Contingencia «Por código» sin prueba real.
-- 2026-11-05/06: **propuesta INACTIVO v2** (Excel en la carpeta del proyecto
-  `suspendidos-inactivo/`) y **plan de reducción de pendientes en equipo**
+- 2026-11-05/07: **suspendidos → INACTIVO**, decisión del equipo 1 328 a
+  INACTIVO / 478 siguen suspendidos (ver `docs/suspendidos_inactivo.md`;
+  archivos en la carpeta del proyecto `suspendidos-inactivo/`, scripts en
+  `analisis/suspendidos_inactivo/`) y **plan de reducción de pendientes en equipo**
   (`docs/plan_reduccion_pendientes.md`, hoja inicial en `plan-pendientes/`).
   Piloto de 10 RMD de prioridad alta en curso con Carlos: lo que decida (sobre
   todo la lista de términos homologados) manda sobre el plan.
