@@ -812,6 +812,20 @@ with sync_playwright() as p:
         ok = (r["n"] == 1 and r["est"] == [["10589", "INACTIVO"], ["B1", "Suspendido"], ["C2", "Ingresado"]] and r["conteo"]["x"] == 1 and r["conteo"]["s"] == 1 and r["ok"]
               and r["nx"] == 1 and r["exp"] == ["INACTIVO", "Suspendido"] and r["original"] == "Suspendido" and r["misma"])
         return ok, json.dumps(r, ensure_ascii=False)[:600]
+    @prueba("LN25j Cabecera con código corto (v1.127.1): «10589 - …» lleva la etiqueta del Estado como «2202609081 - …», sin los demás ajustes de ventana (su tamaño no cambia)")
+    def _():
+        cerrar_todo(pg)
+        def medir(titulo):
+            abrir(pg, PRECAUCIONES[:2], titulo=titulo)
+            pg.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), s = d.querySelector('section');
+              s.insertAdjacentHTML('afterbegin', '<label for="estmaq" aria-label="Estado del RMD">Estado del RMD</label><input id="estmaq" value="Suspendido">'); }""")
+            pg.wait_for_timeout(1500)
+            r = pg.evaluate("""() => { const d = [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].pop(), b = d.querySelector('.rmd-estado');
+              return { etiqueta: b ? b.textContent : null, ancho: Math.round(d.getBoundingClientRect().width), ajustada: d.className }; }""")
+            cerrar_todo(pg); return r
+        corto, largo = medir("10589 - LORATADINA DE PRUEBA"), medir("2202609081 - PRODUCTO DE PRUEBA")
+        ok = (corto["etiqueta"] or "").startswith("Suspendido") and (largo["etiqueta"] or "").startswith("Suspendido") and "rmd-g" not in corto["ajustada"] and "rmd-g" in largo["ajustada"]
+        return ok, json.dumps({"corto": corto, "largo": largo}, ensure_ascii=False)[:500]
     @prueba("LN25f Festividades del Perú (v1.73): calendario con la hora de Lima (como máximo 2 semanas antes; si se cruzan, la de fecha más cercana; Químico Farmacéutico el 13/5), textos e insignias SVG válidas; en el portal sin animaciones")
     def _():
         r = pg.evaluate("""() => { const F = window.__rmdStats.fiestas, d = (y, m, dd) => new Date(Date.UTC(y, m - 1, dd));

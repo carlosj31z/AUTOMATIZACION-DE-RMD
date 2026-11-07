@@ -258,7 +258,10 @@ cuenta). Escribir y responder siempre en **español**.
   (`inactivoEnLista`, solo el texto del DOM) y la cabecera, y salen INACTIVO en Exportado original (copia de las filas en
   `Spreadsheet.build`), Última versión (`marcarInactivosUV`: solo la última versión; fuera de Pendientes) y Mis movimientos. Nada se
   escribe en SAP ni en el modelo; «Enviar a Status RMD» no cambia. Opción `inactivovista`. Pruebas `qa_inactivos.mjs` y `qa_local.py` LN25i.
-  **La siguiente versión debe ser > 1.127.0.**
+  1.127.0 publicada en SharePoint el 2026-11-07 (2 122 247 bytes; la subió CINTIA).
+- 2026-11-07, v1.127.1: **la etiqueta del Estado en la cabecera también en RMD con código corto** (1–5 dígitos, `CODIGO_CORTO`, solo en
+  `decorarCabeceras`; los demás ajustes siguen en `GESTIONADAS`). Prueba `qa_local.py` LN25j.
+  **La siguiente versión debe ser > 1.127.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
