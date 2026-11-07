@@ -771,6 +771,28 @@ with sync_playwright() as p:
             solic101: items.find((x) => x.md.codigo === '101').solicitudes.map((y) => y.codigoSolicitud), n: x.solicitados, ok: u8.length > 1000 }; }""")
         ok = (r["s101"] == "2025-12-05" and r["s200"] == "2026-05-03" and r["sols"] == [["S-1", "Solicitado", "101"], ["S-2", "Solicitud Aprobada", None]] and r["solic101"] == ["S-1"] and r["n"] == 2 and r["ok"])
         return ok, json.dumps(r, ensure_ascii=False)[:600]
+    @prueba("LN25h Solicitados del mes (v1.126.0): entra lo registrado en el mes, se quita si su master se suspendió el mes anterior, se suma el suspendido en el mes sin versión nueva (una vez por master); sin Cancelados ni Rechazados; hoja en el Excel y marca en Pendientes")
+    def _():
+        r = pg.evaluate("""async () => { const U = window.__rmdStats.ultimaVersion, e = (c) => ({ contenido: c });
+          const md = (o) => ({ mdId: 'id' + (o.codigo || o.sol), codigo: o.codigo || null, codigoSolicitud: o.sol || null, version: o.v, estadoIdRmd: e(o.e), descripcion: o.d, nivelTxt: 'FABRICACION', sucursalId_iMaestraId: 68, sucursalId: { contenido: 'PLANTA LIMA' },
+            areaRmdTxt: 'SOLIDOS', codigoversionprincipal: o.p || '', observacion: '', fechaRegistro: o.fr, fechaActualiza: o.fr });
+          const nov = (d) => new Date(2026, 10, d), oct = (d) => new Date(2026, 9, d), ant = new Date(2025, 0, 1);
+          const mds = [
+            md({ codigo: 'A1', v: 1, e: 'Autorizado', d: 'AAA TAB', fr: ant }), md({ sol: 'A2', v: 2, e: 'Solicitado', p: 'A1', d: 'AAA TAB', fr: nov(3) }),            // registrado en nov → cuenta
+            md({ codigo: 'B1', v: 1, e: 'Suspendido', d: 'BBB TAB', fr: ant }), md({ codigo: 'B2', v: 2, e: 'Ingresado', p: 'B1', d: 'BBB TAB', fr: nov(4) }),              // B1 suspendido en oct → se quita
+            md({ codigo: 'C1', v: 1, e: 'Suspendido', d: 'CCC TAB', fr: ant }),                                                                                     // suspendido en nov sin versión nueva → suma
+            md({ codigo: 'D1', v: 1, e: 'Suspendido', d: 'DDD TAB', fr: ant }), md({ sol: 'D2', v: 2, e: 'Solicitud Aprobada', p: 'D1', d: 'DDD TAB', fr: nov(5) }),     // suspendido en nov y solicitado en nov → una sola vez
+            md({ codigo: 'E1', v: 1, e: 'Autorizado', d: 'EEE TAB', fr: nov(2) }),                                                                                  // registrado y autorizado en nov → cuenta, no pendiente
+            md({ codigo: 'F1', v: 1, e: 'Cancelado', d: 'FFF TAB', fr: nov(2) }), md({ sol: 'G1', v: 1, e: 'Solicitud Rechazada', d: 'GGG TAB', fr: nov(2) }),         // no entran
+            md({ codigo: 'H1', v: 1, e: 'Suspendido', d: 'HHH TAB', fr: ant }), md({ codigo: 'H2', v: 2, e: 'Ingresado', p: 'H1', d: 'HHH TAB', fr: oct(20) })];        // registrado en oct → no entra
+          const susp = new Map([['idB1', oct(15)], ['idC1', nov(6)], ['idD1', nov(1)], ['idH1', oct(10)]]);
+          const items = U.ultimas(mds), lista = U.delMes(items.linajes, susp, 2026, 11);
+          const res = lista.map((z) => [z.md.codigo || z.md.codigoSolicitud, z.cuenta, z.pendiente, z.criterio.split(':')[0].split(' (')[0]]).sort();
+          const x = U.armar(items, {}, nov(7), [], items.solicitados, { etiqueta: 'noviembre 2026', lista }), u8 = await x.libro.generar();
+          return { res, dm: x.delMes, ok: u8.length > 1000, hojas: x.libro.hojas ? x.libro.hojas.map((h) => h.nombre) : null }; }""")
+        esperado = [["A2", True, True, "Registrado en el mes"], ["B2", False, True, "Quitado"], ["C1", True, True, "Suspendido en el mes"], ["D2", True, True, "Registrado en el mes"], ["E1", True, False, "Registrado en el mes"]]
+        ok = r["res"] == esperado and r["dm"] == {"cuentan": 4, "pendientes": 3, "quitados": 1} and r["ok"]
+        return ok, json.dumps(r, ensure_ascii=False)[:700]
     @prueba("LN25f Festividades del Perú (v1.73): calendario con la hora de Lima (como máximo 2 semanas antes; si se cruzan, la de fecha más cercana; Químico Farmacéutico el 13/5), textos e insignias SVG válidas; en el portal sin animaciones")
     def _():
         r = pg.evaluate("""() => { const F = window.__rmdStats.fiestas, d = (y, m, dd) => new Date(Date.UTC(y, m - 1, dd));
