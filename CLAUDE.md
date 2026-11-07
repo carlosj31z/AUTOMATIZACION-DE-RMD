@@ -240,7 +240,11 @@ cuenta). Escribir y responder siempre en **español**.
   en el portal: nomenclatura, listado de CC, pendientes heredados; `W.obs` en el editor); se guardan con `ppGuardarObs` = `modificarUno(..., { reemplazar })`
   (Guardar de «Asociar fórmulas») al final del ingreso. **Regla de Carlos: los pasos de RENDIMIENTO y CONDICIONES AMBIENTALES no llevan predecesor**
   (`PPN.listaSinPredecesor`: aviso, «Paso anterior» y cadena automática del plan). Prueba `qa_local.py` LN58.
-  **La siguiente versión debe ser > 1.124.0.**
+- 2026-11-07, v1.125.0: pedido de Carlos: en **«Última versión de cada master»** la fecha de los Suspendidos sale de la **última
+  «Suspendido» de `MD_TRAZABILIDAD`** (`ultimaSuspensionDeTraz`, `fechaSuspUV`; antes `fechaActualiza`), columna «Última suspensión
+  (trazabilidad)», y hoja nueva **«Solicitados»** (Solicitado + Solicitud Aprobada, `ESTADOS_SOLIC_UV`, `ultimasVersiones(...).solicitados`)
+  con la última versión de su master. Prueba `qa_local.py` LN25g.
+  **La siguiente versión debe ser > 1.125.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

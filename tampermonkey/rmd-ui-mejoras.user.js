@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.124.0
+// @version      1.125.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.124.0';                                                       // mantener igual a @version
+  const VERSION = '1.125.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -8521,7 +8521,19 @@
   // Linaje como «Historia del producto»: codigoversionprincipal, mdIdVersionAnt y, sin enlace, la misma descripción, planta, área y etapa.
   // De cada linaje, la versión más alta en esos tres estados;
   // las solicitudes (Solicitado, Solicitud Aprobada / Rechazada) y los Cancelados no entran. Producto: la descripción hasta la forma farmacéutica.
-  const ESTADOS_UV = ['Autorizado', 'Ingresado', 'Suspendido'];
+  const ESTADOS_UV = ['Autorizado', 'Ingresado', 'Suspendido'], ESTADOS_SOLIC_UV = ['Solicitado', 'Solicitud Aprobada'];
+  // v1.125.0: fecha de la ÚLTIMA suspensión de cada RMD según la trazabilidad (MD_TRAZABILIDAD, estado «Suspendido», la más reciente).
+  // El MD no la guarda: su fechaActualiza cambia con cualquier edición posterior. → Map(mdId → Date)
+  function ultimaSuspensionDeTraz(filas) {
+    const m = new Map();
+    (filas || []).forEach((t) => {
+      if (!t || t.activo === false || !/^suspendido$/i.test(String((t.estadoTrazab && t.estadoTrazab.contenido) || '').trim())) return;
+      const d = t.fechaRegistro ? new Date(t.fechaRegistro) : null; if (!d || isNaN(d)) return;
+      const a = m.get(t.mdId_mdId); if (!a || d > a) m.set(t.mdId_mdId, d);
+    });
+    return m;
+  }
+  const fechaSuspUV = (x) => (x.fSusp || x.md.fechaActualiza || x.md.fechaRegistro || null);
   const SELECT_MD_UV = 'mdId,mdIdVersionAnt,sucursalId_iMaestraId,codigo,codigoversionprincipal,codigoSolicitud,version,descripcion,codDefectoReceta,codAgrupadorReceta,nivelTxt,areaRmdTxt,af,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,fechaSolicitud,observacion,estadoIdProceso_iMaestraId,estadoIdRmd/contenido,sucursalId/contenido,motivoId/descripcion';
   const FORMAS_UV = /\s(INY|INYECTABLE|TAB|TABLETAS?|CAP|CAPS|CAPSULAS?|SOL|SUS|SUSP|SOF|OVU|OVULOS?|PVO|POLVO|JBE|JARABE|UNG|CREMA|GEL|SAC|SOB|POT|AMP\d*|VIAL|PEBD|PEAD|FCO\S*|CJA\S*|BOL|GTS|EMULSION|LOCION|SPRAY|AEROSOL)(?=\s|$|[^A-Za-zÁÉÍÓÚÑáéíóúñ])/i;
   function productoDeDescripcion(d) {
@@ -8542,19 +8554,23 @@
       unir(c, 'd:' + [SIN_ACENTOS(norm(m.descripcion || '')), m.sucursalId_iMaestraId, SIN_ACENTOS(norm(m.areaRmdTxt || '')), SIN_ACENTOS(norm(m.nivelTxt || ''))].join('|'));
     });
     const lin = new Map(); mds.forEach((m) => { const k = raiz(nodo(m)); if (!lin.has(k)) lin.set(k, []); lin.get(k).push(m); });
-    const out = [];
+    const out = [], solicitados = [];
     lin.forEach((vs, k) => {
       vs.sort((a, b) => (+b.version || 0) - (+a.version || 0) || new Date(b.fechaRegistro || 0) - new Date(a.fechaRegistro || 0));
-      const u = vs.find((m) => ESTADOS_UV.includes(estadoUV(m))); if (!u) return;
+      const u = vs.find((m) => ESTADOS_UV.includes(estadoUV(m)));
+      // v1.125.0: solicitudes abiertas (Solicitado o Solicitud Aprobada) con la última versión de su linaje (o ninguna, si es un master nuevo)
+      const sols = vs.filter((m) => ESTADOS_SOLIC_UV.includes(estadoUV(m))); sols.forEach((m) => solicitados.push({ md: m, estado: estadoUV(m), ultima: u || null }));
+      if (!u) return;
       const aut = vs.find((m) => m !== u && estadoUV(m) === 'Autorizado');
       const posterior = vs.filter((m) => (+m.version || 0) > (+u.version || 0) && !ESTADOS_UV.includes(estadoUV(m)) && estadoUV(m) !== 'Cancelado');
       const principal = String(u.codigoversionprincipal || '').trim() || vs[vs.length - 1].codigo;
-      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, reemplazo: null, historial: vs });
+      out.push({ md: u, estado: estadoUV(u), principal, versiones: vs.length, autVigente: aut || null, posterior, solicitudes: sols, reemplazo: null, historial: vs });
     });
     const claveMat = (m) => [norm(m.codDefectoReceta || ''), SIN_ACENTOS(norm(m.nivelTxt || '')), m.sucursalId_iMaestraId].join('|'), vivos = new Map();
     out.filter((x) => x.estado !== 'Suspendido' && norm(x.md.codDefectoReceta || '')).sort((a, b) => (a.estado === 'Autorizado' ? 0 : 1) - (b.estado === 'Autorizado' ? 0 : 1))
       .forEach((x) => { const k = claveMat(x.md); if (!vivos.has(k)) vivos.set(k, x.md); });
     out.forEach((x) => { if (x.estado === 'Suspendido' && norm(x.md.codDefectoReceta || '')) { const v = vivos.get(claveMat(x.md)); if (v && v.codigo !== x.md.codigo) x.reemplazo = v; } });
+    out.solicitados = solicitados;
     return out;
   }
   const lineasObs = (t) => String(t || '').split(/\r?\n/).map((x) => norm(x)).filter(Boolean);
@@ -8565,17 +8581,18 @@
   const etapaUV = (e) => SIN_ACENTOS(norm(e || '')) || '(sin etapa)';
   const NOMBRE_ETAPA_UV = { FABRICACION: 'Fabricación', RECUBRIMIENTO: 'Recubrimiento', ENVASE: 'Envase', INSPECCION: 'Inspección', ACONDICIONADO: 'Acondicionado' };
   const etapaBonita = (e) => NOMBRE_ETAPA_UV[e] || (e.charAt(0) + e.slice(1).toLowerCase());
-  function armarUltimaVersionExcel(items, mapaProd, hoy = new Date(), filtros = []) {
+  function armarUltimaVersionExcel(items, mapaProd, hoy = new Date(), filtros = [], solicitados = []) {
     const libro = Xlsx.crearLibro(), dd = (n) => String(n).padStart(2, '0');
     const fx = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null; };
     const estiloEst = (e) => (e === 'Autorizado' ? 'estAut' : e === 'Suspendido' ? 'estSus' : 'estIng');
     const nat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true });
     const filas = items.map((x) => {
-      const m = x.md, obs = lineasObs(m.observacion), fEstado = x.estado === 'Autorizado' ? m.fechaAutorizacion : x.estado === 'Suspendido' ? (m.fechaActualiza || m.fechaRegistro) : m.fechaRegistro;
-      const f = fEstado ? new Date(fEstado) : null;
+      const m = x.md, obs = lineasObs(m.observacion), fEstado = x.estado === 'Autorizado' ? m.fechaAutorizacion : x.estado === 'Suspendido' ? fechaSuspUV(x) : m.fechaRegistro;
+      const f = fEstado ? new Date(fEstado) : null, fSusp = x.estado === 'Suspendido' ? (x.fSusp || null) : null;
+      const solic = (x.solicitudes || []).map((y) => `${y.codigoSolicitud || y.codigo || ''} v${y.version} (${estadoUV(y)})`).join(', ');
       const reemp = x.reemplazo ? `${x.reemplazo.codigo} v${x.reemplazo.version} (${estadoUV(x.reemplazo)})` : '';
       return { ...x, m, reemp, producto: productoDeDescripcion(m.descripcion), etapa: etapaUV(m.nivelTxt), planta: (m.sucursalId && m.sucursalId.contenido) || '', seccion: m.areaRmdTxt || '', motivo: (m.motivoId && m.motivoId.descripcion) || '',
-        obs: obs.join('\n'), ultima: obs[obs.length - 1] || '', fEstado: f, dias: f && !isNaN(f) ? Math.max(0, Math.floor((hoy - f) / 864e5)) : null, prod: mapaProd[m.estadoIdProceso_iMaestraId] || '', pd: pendientesDeLinaje(x) };
+        obs: obs.join('\n'), ultima: obs[obs.length - 1] || '', fEstado: f, fSusp, solic, dias: f && !isNaN(f) ? Math.max(0, Math.floor((hoy - f) / 864e5)) : null, prod: mapaProd[m.estadoIdProceso_iMaestraId] || '', pd: pendientesDeLinaje(x) };
     });
     const ccTxt = (x) => x.pd.aplicados.map((a) => a.codigo + (a.heredado ? ' (ant.)' : '')).join(', ');
     const pendCcTxt = (x) => x.pd.ccs.map((p) => `${p.cc} (v${p.version}: ${p.linea})`).join('\n');
@@ -8595,19 +8612,29 @@
     //  Pendientes
     // Ingresados del más antiguo al más nuevo; Suspendidos del más reciente al más antiguo
     const pend = filas.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
-    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
-      [12, 10, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod]),
-      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda' }, { congelar: 'E2', activa: true });
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Última suspensión (trazabilidad)', 'Solicitud abierta (versión siguiente)', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
+      [12, 10, 12, 14, 24, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), fx(x.fSusp), x.solic, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod]),
+      { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'fechaCelda', 4: 'textoCelda', 5: 'codigoCelda', 6: 'numCelda', 8: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'textoCelda' }, { congelar: 'G2', activa: true });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
-      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
-      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 6, 12, 18, 10, 16, 22, 20, 16],
+      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'Última suspensión (trazabilidad)', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 14, 6, 12, 18, 10, 16, 22, 20, 16],
       todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
-        ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), usuarioVisible(x.m.usuarioRegistro), fx(x.m.fechaAutorizacion), usuarioVisible(x.m.usuarioAutorizacion), x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
+        ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), usuarioVisible(x.m.usuarioRegistro), fx(x.m.fechaAutorizacion), usuarioVisible(x.m.usuarioAutorizacion), fx(x.fSusp), x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
         x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
-      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'fechaCelda', 20: 'fechaCelda', 23: 'fechaCelda', 25: 'numCelda' }, { congelar: 'C2' });
+      { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'fechaCelda', 20: 'fechaCelda', 22: 'fechaCelda', 24: 'fechaCelda', 26: 'numCelda' }, { congelar: 'C2' });
+    //  Solicitados (v1.125.0): solicitudes abiertas (Solicitado o Solicitud Aprobada), de la más antigua a la más nueva, con la última versión de su master
+    const sol = (solicitados || []).map((y) => { const m = y.md, f = m.fechaSolicitud || m.fechaRegistro, d = f ? new Date(f) : null, obs = lineasObs(m.observacion);
+      return { y, m, f: d && !isNaN(d) ? d : null, dias: d && !isNaN(d) ? Math.max(0, Math.floor((hoy - d) / 864e5)) : null, ultima: obs[obs.length - 1] || '', u: y.ultima }; })
+      .sort((a, b) => (b.dias || 0) - (a.dias || 0) || nat(productoDeDescripcion(a.m.descripcion), productoDeDescripcion(b.m.descripcion)));
+    tabla('Solicitados', 'Solicitados', ['Estado', 'Días desde la solicitud', 'Fecha solicitud', 'Código de solicitud', 'Versión solicitada', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Solicitado por',
+      'Última versión actual', 'Estado de la última versión', 'Última suspensión (trazabilidad)', 'Producción Estado'],
+      [16, 10, 12, 14, 9, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 14, 18],
+      sol.map((x) => [x.y.estado, x.dias, fx(x.f), x.m.codigoSolicitud || x.m.codigo, +x.m.version || x.m.version, productoDeDescripcion(x.m.descripcion), x.m.descripcion, etapaBonita(etapaUV(x.m.nivelTxt)), (x.m.sucursalId && x.m.sucursalId.contenido) || '', x.m.areaRmdTxt || '',
+        (x.m.motivoId && x.m.motivoId.descripcion) || '', x.ultima, usuarioVisible(x.m.usuarioRegistro), x.u ? `${x.u.codigo} v${x.u.version}` : '(master nuevo)', x.u ? estadoUV(x.u) : '', fx(x.y.fSuspUlt), mapaProd[x.m.estadoIdProceso_iMaestraId] || '']),
+      { 0: 'estIng', 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 14: (f) => (f[14] ? estiloEst(f[14]) : 'celda'), 15: 'fechaCelda' }, { congelar: 'E2' });
     //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
     const frases = [];
     filas.forEach((x) => (x.historial || [x.m]).forEach((m) => { const a = Pendientes.analizar(m.observacion);
@@ -8630,7 +8657,7 @@
       prods.map((p) => [p.nombre, p.estado, p.c.n, p.c.a, p.c.i, p.c.s, pct(p.c.a, p.c.n), ...etapas.map((e) => resumenEtapa(p.xs.filter((x) => x.etapa === e))),
         p.xs.filter((x) => x.estado !== 'Autorizado').sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado]).map((x) => `${x.estado} · ${x.m.codigo} v${x.m.version} (${etapaBonita(x.etapa).toLowerCase()}): ${x.ultima || 'sin observaciones'}`).join('\n')]),
       { 0: 'codigoCelda', 1: (f) => (f[1] === 'Todo autorizado' ? 'estAut' : f[1] === 'Por autorizar' ? 'estIng' : 'estSus'), 2: 'numCelda', 3: 'numCelda', 4: 'numCelda', 5: 'numCelda', 6: 'pctCelda', [7 + etapas.length]: 'textoCelda' }, { congelar: 'B2' });
-    return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length };
+    return { libro, nombre: `RMD última versión ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, conteo: cR, productos: prods.length, solicitados: sol.length };
   }
   // ---- V°B° de la última versión frente a la penúltima (RMD trabajados en un mes; mismo criterio que el comando vb-mes) ----
   // Un RMD = cadena de versiones con el mismo código principal; entra si alguna versión se registró, ingresó (fecha al inicio de la Observación)
@@ -8922,12 +8949,12 @@
     const ctrl = controladorPrincipal(), modelo = modeloListaPrincipal(); if (!modelo || !ctrl) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
     let trabajando = true; window.__rmdUltimaVersion = true;
     const v = ventana('Última versión de cada master', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
-    v.cuerpo.innerHTML = `<p>Excel con la <b>última versión</b> de cada master que está <b>Autorizado, Ingresado o Suspendido</b> (sin solicitudes ni Cancelados), con lo que dicen sus <b>Observaciones</b> para saber por qué está pendiente, y un resumen por producto. No cambia nada en SAP.</p>
+    v.cuerpo.innerHTML = `<p>Excel con la <b>última versión</b> de cada master que está <b>Autorizado, Ingresado o Suspendido</b> (sin Cancelados), con lo que dicen sus <b>Observaciones</b> para saber por qué está pendiente, y un resumen por producto. La fecha de los <b>Suspendidos</b> es la <b>última suspensión</b> que figura en la trazabilidad, y la hoja <b>Solicitados</b> trae las solicitudes abiertas (Solicitado o Solicitud Aprobada). No cambia nada en SAP.</p>
       <div class="rmd-uv-filtros" hidden></div><p class="rmd-progreso">Leyendo los master de SAP…</p>`;
     const prog = v.cuerpo.querySelector('.rmd-progreso'), caja = v.cuerpo.querySelector('.rmd-uv-filtros'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
     const bGen = botonModal('Exportar Excel', 'primario', () => {}); bGen.disabled = true;
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
-    let items = [], mapa = {};
+    let items = [], mapa = {}, solicitados = [], trazOk = true;
     const valores = (k) => { const n = new Map(); items.forEach((x) => { const val = k(x) || '(sin dato)'; n.set(val, (n.get(val) || 0) + 1); }); return [...n.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es')); };
     const grupo = (titulo, nombre, pares) => `<fieldset><legend>${esc(titulo)}${pares.length > 3 ? ` <button type="button" class="rmd-link" data-todos="${nombre}">todas</button> · <button type="button" class="rmd-link" data-ninguna="${nombre}">ninguna</button>` : ''}</legend><div class="rmd-uv-lista">${pares.map(([val, n]) => `<label><input type="checkbox" data-g="${nombre}" value="${esc(val)}" checked> ${esc(val)} <span class="rmd-nota">(${n.toLocaleString('es-PE')})</span></label>`).join('')}</div></fieldset>`;
     const etapaDe = (x) => etapaBonita(etapaUV(x.md.nivelTxt)), plantaDe = (x) => (x.md.sucursalId && x.md.sucursalId.contenido) || '', areaDe = (x) => x.md.areaRmdTxt || '';
@@ -8936,23 +8963,37 @@
       const est = marcados('estado'), et = marcados('etapa'), pl = marcados('planta'), ar = marcados('area'), sinReemp = caja.querySelector('#rmd-uv-reemp').checked, desde = caja.querySelector('#rmd-uv-desde').value;
       const d0 = desde ? new Date(desde + 'T00:00:00') : null;
       const lista = items.filter((x) => est.has(x.estado) && et.has(etapaDe(x) || '(sin dato)') && pl.has(plantaDe(x) || '(sin dato)') && ar.has(areaDe(x) || '(sin dato)')
-        && !(x.estado === 'Suspendido' && ((sinReemp && x.reemplazo) || (d0 && new Date(x.md.fechaActualiza || x.md.fechaRegistro || 0) < d0))));
+        && !(x.estado === 'Suspendido' && ((sinReemp && x.reemplazo) || (d0 && new Date(fechaSuspUV(x) || 0) < d0))));
+      // Solicitados: mismos filtros de etapa, planta y área (un valor que no está en la lista no se quita)
+      const sale = (g, val) => { const i = [...caja.querySelectorAll(`input[data-g="${g}"]`)].find((y) => y.value === (val || '(sin dato)')); return i && !i.checked; };
+      const conSol = caja.querySelector('#rmd-uv-solic').checked;
+      const sols = conSol ? solicitados.filter((y) => !sale('etapa', etapaDe(y)) && !sale('planta', plantaDe(y)) && !sale('area', areaDe(y))) : [];
       const filtros = [], todos = (g) => caja.querySelectorAll(`input[data-g="${g}"]`).length === marcados(g).size;
       if (!todos('estado')) filtros.push('Estados: ' + [...est].join(', '));
       if (!todos('etapa')) filtros.push('Etapas: ' + [...et].join(', ')); if (!todos('planta')) filtros.push('Plantas: ' + [...pl].join(', ')); if (!todos('area')) filtros.push('Áreas: ' + [...ar].join(', '));
       if (sinReemp) filtros.push('Sin los Suspendidos reemplazados por otro master vigente'); if (d0) filtros.push(`Suspendidos solo desde el ${desde.split('-').reverse().join('/')}`);
-      return { lista, filtros };
+      if (!conSol) filtros.push('Sin la hoja Solicitados');
+      return { lista, filtros, sols };
     };
-    const contar = () => { const { lista } = elegidos(), c = (e) => lista.filter((x) => x.estado === e).length;
-      avance(`Se exportarán ${lista.length.toLocaleString('es-PE')} master: ${c('Autorizado')} autorizados, ${c('Ingresado')} ingresados y ${c('Suspendido')} suspendidos.`); bGen.disabled = !lista.length; };
+    const contar = () => { const { lista, sols } = elegidos(), c = (e) => lista.filter((x) => x.estado === e).length;
+      avance(`Se exportarán ${lista.length.toLocaleString('es-PE')} master: ${c('Autorizado')} autorizados, ${c('Ingresado')} ingresados y ${c('Suspendido')} suspendidos`
+        + (caja.querySelector('#rmd-uv-solic').checked ? `, y ${sols.length.toLocaleString('es-PE')} solicitados.` : '.') + (trazOk ? '' : ' Ojo: no se pudo leer la trazabilidad; la fecha de los suspendidos es su última actualización.')); bGen.disabled = !lista.length && !sols.length; };
     try {
-      [items, mapa] = await Promise.all([
-        leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId,motivoId', $select: SELECT_MD_UV }, 'mdId', (h, t) => avance(`Leyendo los master de SAP… página ${h} de ${t}`)).then(ultimasVersiones),
-        mapaProduccionEstado(ctrl).catch(() => ({}))]);
+      const pag = { md: '', tr: '' }, av = () => avance(`Leyendo los master de SAP… ${pag.md}${pag.tr ? ' · trazabilidad ' + pag.tr : ''}`);
+      let susp;
+      [items, mapa, susp] = await Promise.all([
+        leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId,motivoId', $select: SELECT_MD_UV }, 'mdId', (h, t) => { pag.md = `página ${h} de ${t}`; av(); }).then(ultimasVersiones),
+        mapaProduccionEstado(ctrl).catch(() => ({})),
+        leerEntidadCompleta(modelo, 'MD_TRAZABILIDAD', { $expand: 'estadoTrazab', $select: 'idTrazabilidad,mdId_mdId,fechaRegistro,activo,estadoTrazab/contenido' }, 'idTrazabilidad', (h, t) => { pag.tr = `${h} de ${t}`; av(); })
+          .then(ultimaSuspensionDeTraz).catch(() => { trazOk = false; return new Map(); })]);
+      solicitados = items.solicitados || [];
+      items.forEach((x) => { x.fSusp = susp.get(x.md.mdId) || null; });
+      solicitados.forEach((y) => { y.fSuspUlt = y.ultima && estadoUV(y.ultima) === 'Suspendido' ? susp.get(y.ultima.mdId) || null : null; });
       const nReemp = items.filter((x) => x.reemplazo).length;
       caja.innerHTML = grupo('Estado de la última versión', 'estado', ESTADOS_UV.map((e) => [e, items.filter((x) => x.estado === e).length]))
         + `<fieldset><legend>Suspendidos</legend><label><input type="checkbox" id="rmd-uv-reemp" checked> Quitar los ${nReemp} que ya tienen otro master Autorizado o Ingresado (mismo material, etapa y planta)</label>
-           <label class="rmd-uv-desde">Solo los suspendidos desde <input type="date" id="rmd-uv-desde"> <span class="rmd-nota">(vacío: todos)</span></label></fieldset>`
+           <label class="rmd-uv-desde">Solo los suspendidos desde <input type="date" id="rmd-uv-desde"> <span class="rmd-nota">(vacío: todos; fecha de la última suspensión en la trazabilidad)</span></label></fieldset>`
+        + `<fieldset><legend>Solicitados</legend><label><input type="checkbox" id="rmd-uv-solic" checked> Agregar la hoja «Solicitados» con las ${solicitados.length.toLocaleString('es-PE')} solicitudes abiertas (${solicitados.filter((y) => y.estado === 'Solicitado').length} Solicitado, ${solicitados.filter((y) => y.estado === 'Solicitud Aprobada').length} Solicitud Aprobada)</label></fieldset>`
         + grupo('Etapa', 'etapa', valores(etapaDe)) + grupo('Planta', 'planta', valores(plantaDe)) + grupo('Área (sección)', 'area', valores(areaDe));
       caja.hidden = false; caja.addEventListener('change', contar); contar();
       caja.addEventListener('click', (e) => { const b = e.target.closest('[data-todos],[data-ninguna]'); if (!b) return; const g = b.dataset.todos || b.dataset.ninguna;
@@ -8961,18 +9002,18 @@
     finally { trabajando = false; window.__rmdUltimaVersion = false; }
     bGen.addEventListener('click', async () => {
       if (window.__rmdUltimaVersion) return;
-      const { lista, filtros } = elegidos(); if (!lista.length) return;
+      const { lista, filtros, sols } = elegidos(); if (!lista.length && !sols.length) return;
       window.__rmdUltimaVersion = true; trabajando = true; bGen.disabled = true;
       try {
         const t0 = Date.now(); avance(`Armando el Excel con ${lista.length.toLocaleString('es-PE')} master…`); await esperar(40);
-        const { libro, nombre, conteo, productos } = armarUltimaVersionExcel(lista, mapa, new Date(), filtros), u8 = await libro.generar();
+        const { libro, nombre, conteo, productos, solicitados: nSol } = armarUltimaVersionExcel(lista, mapa, new Date(), filtros, sols), u8 = await libro.generar();
         descargarArchivo(nombre, u8, TIPO_XLSX);
-        avance(`✓ Descargado «${nombre}» (${Math.round((Date.now() - t0) / 1000)} s): ${lista.length.toLocaleString('es-PE')} master (${conteo.a} autorizados, ${conteo.i} ingresados, ${conteo.s} suspendidos) de ${productos} productos.`);
+        avance(`✓ Descargado «${nombre}» (${Math.round((Date.now() - t0) / 1000)} s): ${lista.length.toLocaleString('es-PE')} master (${conteo.a} autorizados, ${conteo.i} ingresados, ${conteo.s} suspendidos) de ${productos} productos y ${nSol} solicitados.`);
       } catch (e) { avance('No se pudo exportar: ' + e.message, true); }
       finally { window.__rmdUltimaVersion = false; trabajando = false; bGen.disabled = false; }
     });
   }
-  window.__rmdStats.ultimaVersion = { producto: productoDeDescripcion, ultimas: ultimasVersiones, armar: armarUltimaVersionExcel, abrir: () => abrirUltimaVersion(), exportar: () => { const b = [...document.querySelectorAll('.rmd-modal-pie button')].find((x) => x.textContent === 'Exportar Excel'); if (b) b.click(); return !!b; } };   // pruebas
+  window.__rmdStats.ultimaVersion = { producto: productoDeDescripcion, ultimas: ultimasVersiones, armar: armarUltimaVersionExcel, suspension: ultimaSuspensionDeTraz, abrir: () => abrirUltimaVersion(), exportar: () => { const b = [...document.querySelectorAll('.rmd-modal-pie button')].find((x) => x.textContent === 'Exportar Excel'); if (b) b.click(); return !!b; } };   // pruebas
   // ---- Menú del icono «Exportar» de la lista principal ----
   // Exportado original (+ «Producción Estado» al final), Equipos por master e Indicadores.
   const buscarExportar = () => [...document.querySelectorAll('button[title="Exportar"]')].find((b) => !b.closest('.sapMDialog') && visible(b));
