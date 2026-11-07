@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.127.0
+// @version      1.127.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.127.0';                                                       // mantener igual a @version
+  const VERSION = '1.127.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -179,6 +179,9 @@
   const GESTIONADAS = /^\d{6,}\s*-|^Procesos Menores para el Paso|^Adicionar /i;
   const cabecera = (d) => norm((d.querySelector('h2') || {}).textContent);
   const gestionada = (d) => GESTIONADAS.test(cabecera(d));
+  // v1.127.1: RMD con código corto (1 a 5 dígitos, p. ej. «10589 - …», migrados antes de SAP): solo llevan la etiqueta del Estado en la cabecera;
+  // el resto de ajustes de ventana sigue solo en las GESTIONADAS (no se cambia su tamaño).
+  const CODIGO_CORTO = /^\d{1,5}\s*-/;
   // abierta según UI5 (sin medir la página); si no hay control, por su caja
   const abierta = (d) => { const c = window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore().byId(d.id); return c && typeof c.isOpen === 'function' ? c.isOpen() : d.getClientRects().length > 0; };
   const dialogosVisibles = () => [...document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog)')].filter(abierta);
@@ -2290,7 +2293,7 @@
   function decorarCabeceras() {
     const estado0 = on('estado') ? estadoDelRmd() : '', estado = estado0 && /^suspendido$/i.test(estado0) ? estadoVisible(mdIdAbierto(), estado0) : estado0;
     dialogos().forEach((d) => {
-      if (!gestionada(d)) return;
+      if (!gestionada(d) && !CODIGO_CORTO.test(cabecera(d))) return;
       const h2 = d.querySelector('header h2.sapMTitle, h2.sapMTitle'); if (!h2) return;
       const barra = h2.closest('.sapMBar') || h2.parentElement;
       let b = barra.querySelector('.rmd-estado');
