@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.127.1
+// @version      1.128.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.127.1';                                                       // mantener igual a @version
+  const VERSION = '1.128.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -639,7 +639,21 @@
   .rmd-cp-actual { padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 6px; margin-bottom: 8px; } .rmd-cp-actual span { color: var(--rmd-apagado); font-size: 12px; } .rmd-cp-actual p { margin: 4px 0 0; }
   .rmd-cp-busca { display: flex; gap: 8px; margin: 8px 0; } .rmd-cp-busca input { flex: 1; }
   .rmd-cp-res tr[data-i] { cursor: pointer; } .rmd-cp-res tr.rmd-cp-sel td { background: rgba(27,141,236,.16); }
-  .rmd-creado { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100001; display: flex; flex-direction: column; gap: 4px; min-width: 380px; max-width: min(640px, 90vw); padding: 12px 16px; border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-verde); box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 13px/1.4 var(--rmd-fuente); }
+  .rmd-modal.rmd-cp-ventana { width: min(1240px, 96vw); height: min(820px, 90vh); } .rmd-cp-ventana .rmd-modal-cuerpo { display: flex; flex-direction: column; } .rmd-cp-ventana .rmd-modal-cuerpo > * { flex-shrink: 0; }
+  .rmd-cp-ventana .rmd-cp-res { flex: 1 1 auto; min-height: 120px; overflow: auto; border: 1px solid var(--rmd-borde); border-radius: 6px; } .rmd-cp-ventana .rmd-cp-res:empty { border: 0; min-height: 0; }
+  .rmd-cp-tabla { margin: 0; } .rmd-cp-tabla thead th { position: sticky; top: 0; z-index: 1; background: var(--rmd-superficie); } .rmd-cp-tabla td, .rmd-cp-tabla th { padding: 5px 7px; } .rmd-cp-tabla td:nth-child(3) { min-width: 260px; }
+  .rmd-cp-tabla .rmd-num { text-align: right; white-space: nowrap; } .rmd-cp-tabla .rmd-cp-col-aut, .rmd-cp-tabla .rmd-cp-col-ing { font-weight: 600; } .rmd-cp-tabla th.rmd-cp-col-aut { color: var(--rmd-verde); } .rmd-cp-tabla th.rmd-cp-col-ing { color: var(--rmd-acento-texto); }
+  .rmd-cp-res tr.rmd-cp-rec:not(.rmd-cp-sel) td { background: rgba(60,200,120,.08); } .rmd-cp-cargando { color: var(--rmd-apagado); }
+  .rmd-cp-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; } .rmd-cp-chip { padding: 0 6px; border-radius: 9px; border: 1px solid var(--rmd-borde); color: var(--rmd-apagado); font-size: 11px; line-height: 17px; white-space: nowrap; }
+  .rmd-cp-chip.rec { border-color: var(--rmd-verde); color: var(--rmd-verde); font-weight: 600; } .rmd-cp-chip.aviso { border-color: var(--rmd-ambar); color: var(--rmd-ambar); }
+  .rmd-cp-busca { flex-wrap: wrap; align-items: center; } .rmd-cp-busca input { min-width: 200px; } .rmd-cp-orden { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--rmd-apagado); font-size: 13px; }
+  .rmd-cp-orden select { height: 30px; padding: 0 6px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 13px var(--rmd-fuente); }
+  .rmd-cp-actual .rmd-cp-uso-actual { margin: 2px 0 0; font-size: 12.5px; }
+  /* pantallas bajas o angostas (laptop, zoom): más alto para la tabla de sugeridos */
+  @media (max-height: 820px) { .rmd-cp-ventana h3 { margin-bottom: 6px; } .rmd-cp-ventana .rmd-cp-explica { margin: 0 0 4px; font-size: 12px; line-height: 1.35; } .rmd-cp-ventana .rmd-cp-actual { padding: 4px 8px; margin-bottom: 4px; } .rmd-cp-ventana .rmd-cp-busca { margin: 4px 0; } .rmd-cp-ventana .rmd-progreso { margin: 0 0 4px; } .rmd-cp-ventana .rmd-cp-res { min-height: 45%; } }
+  @media (max-height: 680px) { .rmd-cp-ventana .rmd-cp-explica { display: none; } .rmd-cp-ventana .rmd-cp-actual p { display: inline; margin: 0 0 0 6px; } }
+  @media (max-width: 1150px) { .rmd-cp-tabla td:nth-child(3) { min-width: 180px; } .rmd-cp-tabla td, .rmd-cp-tabla th { padding: 4px 5px; font-size: 12.5px; } .rmd-cp-tabla th:nth-child(4), .rmd-cp-tabla td:nth-child(4) { display: none; } }
+  .rmd-creado { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100001; display: flex; flex-direction: column; gap: 4px; min-width: min(380px, calc(100vw - 16px)); box-sizing: border-box; max-width: min(640px, 90vw); padding: 12px 16px; border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-left: 4px solid var(--rmd-verde); box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 13px/1.4 var(--rmd-fuente); }
   .rmd-creado b { font-size: 14.5px; } .rmd-creado-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
   .rmd-token-mas { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; margin: 0 2px 0 6px; border-radius: 3px; background: var(--rmd-acento); color: #fff; font: 700 12px/1 var(--rmd-fuente); cursor: pointer; }
   .rmd-token-mas:hover { filter: brightness(1.15); } .sapMToken[draggable] { cursor: grab; } .sapMToken.rmd-token-arrastre { opacity: .45; } .sapMToken.rmd-token-destino { box-shadow: -3px 0 0 var(--rmd-acento); }
@@ -819,6 +833,7 @@
   .rmd-vista-fondo { position: fixed; inset: 0; z-index: 99990; background: #e9ebee; } .rmd-vista-marco { display: block; width: 100%; height: 100%; border: 0; }
   .rmd-modal { display: flex; flex-direction: column; width: min(920px, 94vw); max-height: 88vh; padding: 20px 24px 16px; background: var(--rmd-superficie); color: var(--rmd-texto); border: 1px solid var(--rmd-borde); border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,.45); font: 14px/1.45 var(--rmd-fuente); }
   .rmd-modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+  .rmd-modal.rmd-encajada { box-sizing: border-box !important; max-width: calc(100vw - 16px) !important; max-height: calc(100vh - 16px) !important; min-width: 0 !important; }
   .rmd-modal-cuerpo { flex: 1 1 auto; min-height: 0; overflow: auto; } .rmd-modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
   .rmd-modal p { margin: 0 0 10px; } .rmd-modal label { color: var(--rmd-texto); } .rmd-modal input[type=checkbox] { accent-color: var(--rmd-acento); }
   /* ── Confirmación propia ── */
@@ -1654,6 +1669,37 @@
   `;
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
+  // ---- v1.128.0: las ventanas, menús y paneles del script siempre quedan dentro de la pantalla ----
+  // Ventanas (.rmd-modal): si con su tamaño propio no caben (pantalla chica, zoom del navegador), se ajustan al borde con 8 px de margen
+  // y su contenido se desplaza. Menús y paneles flotantes: se corren o se acortan para no salir por abajo ni por los lados.
+  // No toca las ventanas del portal (regla de Carlos: sus dimensiones no se cambian).
+  const SEL_FLOTANTES = '.rmd-menu, .rmd-menu-filtro-col, .rmd-rec-detalle, .rmd-cc-elegir';
+  function encajarEnPantalla(el) {
+    if (!el || !el.isConnected) return;
+    const M = 8, W = document.documentElement.clientWidth || innerWidth, H = innerHeight;
+    if (el.classList.contains('rmd-modal')) {
+      el.classList.remove('rmd-encajada');
+      const r = el.getBoundingClientRect(); if (!r.width) return;
+      // solo si de verdad se sale (las de pantalla completa de la vista móvil caben justo y no se tocan)
+      if (r.left < -0.5 || r.top < -0.5 || r.right > W + 0.5 || r.bottom > H + 0.5) el.classList.add('rmd-encajada');
+      return;
+    }
+    if (getComputedStyle(el).position !== 'fixed') return;
+    let r = el.getBoundingClientRect(); if (!r.width) return;
+    if (r.height > H - 2 * M + 0.5) { el.style.maxHeight = `${H - 2 * M}px`; el.style.overflowY = 'auto'; r = el.getBoundingClientRect(); }
+    if (r.width > W - 2 * M + 0.5) { el.style.maxWidth = `${W - 2 * M}px`; el.style.overflowX = 'auto'; r = el.getBoundingClientRect(); }
+    if (r.bottom > H - M + 0.5) { el.style.top = `${Math.max(M, H - M - r.height)}px`; el.style.bottom = 'auto'; } else if (r.top < M - 0.5) { el.style.top = `${M}px`; el.style.bottom = 'auto'; }
+    if (r.right > W - M + 0.5) { el.style.left = `${Math.max(M, W - M - r.width)}px`; el.style.right = 'auto'; } else if (r.left < M - 0.5) { el.style.left = `${M}px`; el.style.right = 'auto'; }
+  }
+  const encajados = new WeakSet(), obsTamano = typeof ResizeObserver === 'function' ? new ResizeObserver((xs) => xs.forEach((x) => encajarEnPantalla(x.target))) : null;
+  function vigilarEncaje(el) {
+    const objetivos = el.matches && el.matches('.rmd-modal-fondo') ? [...el.querySelectorAll(':scope > .rmd-modal')] : el.matches && el.matches(SEL_FLOTANTES) ? [el] : [];
+    objetivos.forEach((x) => { requestAnimationFrame(() => encajarEnPantalla(x)); if (obsTamano && !encajados.has(x)) { encajados.add(x); obsTamano.observe(x); } });
+  }
+  const encajarTodo = () => document.querySelectorAll(`.rmd-modal-fondo > .rmd-modal, ${SEL_FLOTANTES}`).forEach(encajarEnPantalla);
+  const obsEncaje = new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.nodeType === 1) vigilarEncaje(n); })));
+  obsEncaje.observe(document.documentElement, { childList: true }); if (document.body) obsEncaje.observe(document.body, { childList: true });
+  addEventListener('resize', () => requestAnimationFrame(encajarTodo));
   function aplicarClases() {
     [['ancho', 'rmd-ui'], ['columnas', 'rmd-cols'], ['sintipo', 'rmd-sintipo'],
       ['puesto', 'rmd-puesto'], ['reglas', 'rmd-reglas'], ['pasosvacios', 'rmd-vacios'], ['estadocolor', 'rmd-estcolor'], ['textosportal', 'rmd-textos']].forEach(([k, c]) => html.classList.toggle(c, !!on(k)));
@@ -3055,6 +3101,7 @@
 
   let pendiente = false;
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec }, ponerCambios };   // pruebas
+  window.__rmdStats.encajar = { uno: encajarEnPantalla, todo: encajarTodo };   // pruebas
   // Al desactivar las mejoras se retira todo lo añadido
   function limpiezaTotal() {
     quitarHojasTabla(); document.querySelectorAll('details.rmd-agr').forEach((x) => x.remove());
@@ -12282,6 +12329,93 @@
     else { const ref = hdr.querySelector('.sapMTBSeparator') || [...hdr.querySelectorAll('button')].find((x) => x.title === 'Imprimir'); b.style.marginRight = '10px'; if (ref) hdr.insertBefore(b, ref); else hdr.appendChild(b); }
   }
 
+  // ---- «Cambiar paso»: pasos similares sugeridos (v1.128.0) ----
+  // Al abrir la ventana se listan los pasos parecidos al actual (misma estructura y misma etiqueta) con en cuántos masters se usan
+  // (Autorizados e Ingresados), cuándo se crearon y quién. El orden «Sugerido» junta parecido del texto, uso en Autorizados/Ingresados,
+  // mismo tipo de dato y la regla de textos sin tildes. Solo lectura: nada se graba hasta pulsar «Cambiar paso» y confirmar.
+  const VACIAS_PASO = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'o', 'u', 'a', 'al', 'en', 'con', 'por', 'para', 'se', 'que', 'un', 'una', 'su', 'sus', 'lo', 'le', 'segun']);
+  const tokensPaso = (t) => clavePasoSim(t).split(' ').filter((w) => w && !VACIAS_PASO.has(w));
+  const clavePasoSim = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9%°]+/g, ' ').trim();
+  // palabras para buscar candidatos en SAP (las más largas y significativas)
+  const palabrasClavePaso = (t) => [...new Set(tokensPaso(t).filter((w) => w.length >= 4 && !/^\d+$/.test(w)))].sort((a, b) => b.length - a.length).slice(0, 3);
+  // 0–1: palabras en común (Dice, con raíz de 5 letras) y trigramas de letras
+  function similitudPaso(a, b) {
+    const A = [...new Set(tokensPaso(a))], B = new Set(tokensPaso(b)); if (!A.length || !B.size) return 0;
+    const raices = new Set([...B].filter((w) => w.length >= 5).map((w) => w.slice(0, 5)));
+    let comun = 0; A.forEach((w) => { if (B.has(w)) comun++; else if (w.length >= 5 && raices.has(w.slice(0, 5))) comun += 0.7; });
+    const dice = (2 * comun) / (A.length + B.size);
+    const tri = (s) => { const t = ` ${tokensPaso(s).join(' ')} `, r = new Set(); for (let i = 0; i < t.length - 2; i++) r.add(t.slice(i, i + 3)); return r; };
+    const ta = tri(a), tb = tri(b); let it = 0; ta.forEach((x) => { if (tb.has(x)) it++; });
+    const jac = it / ((ta.size + tb.size - it) || 1);
+    return Math.max(0, Math.min(1, 0.6 * dice + 0.4 * jac));
+  }
+  const conTildePaso = (t) => /[áéíóúÁÉÍÓÚüÜ]/.test(String(t || ''));   // regla de Carlos: ninguna palabra lleva tilde (la Ñ sí)
+  const enMayusculasPaso = (t) => { const l = String(t || '').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, ''); return l.length >= 6 && l === l.toUpperCase(); };
+  // los más parecidos al texto actual (mín. 30 %), como mucho n
+  function elegirParecidos(cands, texto, n) {
+    cands.forEach((x) => { x.sim = similitudPaso(texto, x.descripcion); });
+    return cands.filter((x) => x.sim >= 0.3).sort((a, b) => b.sim - a.sim || (+a.codigo || 0) - (+b.codigo || 0)).slice(0, n);
+  }
+  // puntaje 0–1 y motivos; ★ Recomendado al primero si es bastante parecido
+  function puntuarSugerencias(lista, actual) {
+    const peso = (x) => (x.uso ? 2 * x.uso.aut + x.uso.ing : 0), maxUso = Math.max(1, ...lista.map(peso));
+    lista.forEach((x) => {
+      const uso = x.uso ? Math.log1p(peso(x)) / Math.log1p(maxUso) : 0, mismoTipo = actual.tipoDatoId != null && String(x.tipoDatoId_iMaestraId) === String(actual.tipoDatoId);
+      const igual = clavePasoSim(x.descripcion) === clavePasoSim(actual.descripcion), tilde = conTildePaso(x.descripcion), mayus = enMayusculasPaso(x.descripcion);
+      x.mismoTipo = mismoTipo; x.textoIgual = igual; x.conTilde = tilde; x.mayus = mayus;
+      x.puntaje = 0.55 * (x.sim || 0) + 0.3 * uso + (mismoTipo ? 0.1 : 0) + (igual ? 0.05 : 0) - (tilde ? 0.08 : 0) - (mayus ? 0.04 : 0) - (x.uso && !x.uso.total ? 0.05 : 0);
+      x.motivos = [`Parecido ${Math.round((x.sim || 0) * 100)} %`]
+        .concat(x.uso ? [`${x.uso.aut} Autorizado(s), ${x.uso.ing} Ingresado(s), ${x.uso.total} master(s) en total`] : ['contando masters…'])
+        .concat(mismoTipo ? ['mismo tipo de dato'] : actual.tipoDatoId != null ? ['otro tipo de dato en el maestro (en este RMD se conserva el de la fila)'] : [])
+        .concat(igual ? ['mismo texto (solo cambian mayúsculas, tildes o signos)'] : [], tilde ? ['tiene tilde (los textos de los pasos van sin tildes)'] : [], mayus ? ['en MAYÚSCULAS'] : []);
+      x.recomendado = false;
+    });
+    const top = [...lista].sort((a, b) => b.puntaje - a.puntaje)[0];
+    if (top && (top.sim || 0) >= 0.45 && top.uso) top.recomendado = true;
+    return lista;
+  }
+  function ordenarSugerencias(lista, como) {
+    const f = (x) => (x.fechaRegistro ? new Date(x.fechaRegistro).getTime() : 0), u = (x, k) => (x.uso ? x.uso[k] : -1);
+    const cmp = { aut: (a, b) => u(b, 'aut') - u(a, 'aut') || u(b, 'ing') - u(a, 'ing'), ing: (a, b) => u(b, 'ing') - u(a, 'ing') || u(b, 'aut') - u(a, 'aut'), sim: (a, b) => (b.sim || 0) - (a.sim || 0), fecha: (a, b) => f(b) - f(a) }[como]
+      || ((a, b) => (b.recomendado - a.recomendado) || (b.puntaje || 0) - (a.puntaje || 0));
+    return [...lista].sort((a, b) => cmp(a, b) || (+a.codigo || 0) - (+b.codigo || 0));
+  }
+  function chipsSugerencia(x) {
+    return [x.recomendado && '<span class="rmd-cp-chip rec">★ Recomendado</span>', x.textoIgual && '<span class="rmd-cp-chip">Mismo texto</span>',
+      x.mismoTipo === false && '<span class="rmd-cp-chip aviso" title="El tipo de dato del maestro es otro; en este RMD se conserva el de la fila">Otro tipo de dato</span>',
+      x.conTilde && '<span class="rmd-cp-chip aviso" title="Regla: ninguna palabra de los pasos lleva tilde">Con tilde</span>', x.mayus && '<span class="rmd-cp-chip">MAYÚSCULAS</span>',
+      x.uso && !x.uso.total && '<span class="rmd-cp-chip">Sin uso</span>'].filter(Boolean).join('');
+  }
+  const fechaLimaCorta = (d) => { if (!d) return ''; const x = new Date(d); return isNaN(x) ? '' : x.toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric' }); };
+  // masters (códigos RMD distintos) que usan cada paso, como paso o como proceso menor; alAvanzar(pasoId, uso) a medida que llega
+  async function usoDePasos(modelo, ids, alAvanzar) {
+    const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, out = new Map(), cola = [...new Set(ids.filter(Boolean))];
+    const leer = async (entidad, campo, id) => {
+      try { return await leerTodoDe(modelo, entidad, [new F(campo, 'EQ', id)], { $expand: 'mdId', $select: `mdId_mdId,activo,mdId/codigo,mdId/estadoIdRmd_iMaestraId` }); }
+      catch (e) { return leerTodoDe(modelo, entidad, [new F(campo, 'EQ', id)], { $expand: 'mdId' }).catch(() => []); }
+    };
+    const uno = async (id) => {
+      const [a, b] = await Promise.all([leer('MD_ES_PASO', 'pasoId_pasoId', id), leer('MD_ES_PASO_INSUMO_PASO', 'pasoHijoId_pasoId', id)]);
+      const aut = new Set(), ing = new Set(), todos = new Set();
+      [...a, ...b].forEach((x) => { if (x.activo === false || !x.mdId) return; const c = String(x.mdId.codigo || x.mdId_mdId), e = String(x.mdId.estadoIdRmd_iMaestraId); todos.add(c); if (e === '465') aut.add(c); else if (e === '467') ing.add(c); });
+      const u = { aut: aut.size, ing: ing.size, total: todos.size }; out.set(id, u); if (alAvanzar) try { alAvanzar(id, u); } catch (e) { }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, cola.length) }, async () => { while (cola.length) await uno(cola.shift()); }));
+    return out;
+  }
+  // nombre de quien creó el paso (USUARIO.usuario = usuarioRegistro), con la regla de Vanessa
+  const nombresCreadoresCache = new Map();
+  async function nombresCreadores(modelo, usuarios) {
+    const cods = [...new Set(usuarios.map((u) => String(u || '').trim().toUpperCase()).filter(Boolean))], faltan = cods.filter((c) => !nombresCreadoresCache.has(c));
+    if (faltan.length) {
+      const us = await leerPorIds(modelo, 'USUARIO', 'usuario', faltan, { $select: 'usuarioId,usuario,nombre,apellidoPaterno,apellidoMaterno,nombreMostrar' }).catch(() => []);
+      us.forEach((u) => { const c = String(u.usuario || '').toUpperCase(), n = nombreDe(u); nombresCreadoresCache.set(c, `${n.corto || n.completo} (${usuarioVisible(u.usuario)})`); });
+      faltan.forEach((c) => { if (!nombresCreadoresCache.has(c)) nombresCreadoresCache.set(c, usuarioVisible(c)); });
+    }
+    return new Map(cods.map((c) => [c, nombresCreadoresCache.get(c)]));
+  }
+  window.__rmdStats.pasosSimilares = { similitud: similitudPaso, claves: palabrasClavePaso, elegir: elegirParecidos, puntuar: puntuarSugerencias, ordenar: ordenarSugerencias, chips: chipsSugerencia, uso: (ids) => usoDePasos(controladorPrincipal().getView().getModel('mainModelv2'), ids) };   // pruebas
+
   // ---- «Cambiar paso» ----
   // Actualiza solo pasoId_pasoId de la fila MD_ES_PASO; la configuración y los PM (pasoId_mdEstructuraPasoId) se mantienen.
   // No en Autorizados ni Suspendidos.
@@ -12309,15 +12443,17 @@
     const nombreLista = destino.etiquetaId ? nomEtq.get(destino.etiquetaId) || 'de la lista' : '';
     const v = ventana('Cambiar el paso por otro código', { cancelar: () => v.cerrar() });
     const tipo = nombreTipo(o.tipoDatoId_iMaestraId, tabla) || '';
-    v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>${esMenor ? 'Proceso menor' : 'Paso'} actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p></div>
-      <p class="rmd-nota">Solo cambia el paso maestro al que apunta esta fila. <b>Se conserva</b> toda su configuración en este RMD${tipo ? ` (tipo de dato ${esc(tipo)}` : ' ('}, decimales, valores, ${esMenor ? 'casillas y orden)' : `puesto de trabajo, clave modelo, casillas, depende y orden) y sus <b>${nPM} proceso(s) menor(es)</b>`}.</p>
-      <div class="rmd-cp-busca"><input type="search" class="rmd-cp-q" placeholder="Código o palabras de la descripción del paso nuevo" aria-label="Paso nuevo"><button type="button" class="rmd-btn rmd-cp-buscar">Buscar</button></div>
+    v.fondo.querySelector('.rmd-modal').classList.add('rmd-cp-ventana');
+    v.cuerpo.innerHTML = `<div class="rmd-cp-actual"><span>${esMenor ? 'Proceso menor' : 'Paso'} actual (orden ${esc(o.orden)})</span><p><b>${esc(m.codigo)}</b> — ${esc(m.descripcion)}</p><p class="rmd-cp-uso-actual rmd-nota">Contando en cuántos masters se usa…</p></div>
+      <p class="rmd-nota rmd-cp-explica">Solo cambia el paso maestro al que apunta esta fila. <b>Se conserva</b> toda su configuración en este RMD${tipo ? ` (tipo de dato ${esc(tipo)}` : ' ('}, decimales, valores, ${esMenor ? 'casillas y orden)' : `puesto de trabajo, clave modelo, casillas, depende y orden) y sus <b>${nPM} proceso(s) menor(es)</b>`}.</p>
+      <div class="rmd-cp-busca"><input type="search" class="rmd-cp-q" placeholder="Código o palabras de la descripción del paso nuevo" aria-label="Paso nuevo"><button type="button" class="rmd-btn rmd-cp-buscar">Buscar</button><button type="button" class="rmd-btn rmd-cp-volver" hidden>Ver sugeridos</button>
+        <label class="rmd-cp-orden">Ordenar por <select class="rmd-cp-ord"><option value="sugerido">Sugerido</option><option value="aut">Más usado en Autorizados</option><option value="ing">Más usado en Ingresados</option><option value="sim">Más parecido</option><option value="fecha">Más reciente</option></select></label></div>
       <p class="rmd-progreso"></p><div class="rmd-cp-res"></div>`;
-    const q = v.cuerpo.querySelector('.rmd-cp-q'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-cp-res');
-    let elegido = null, hallados = [];
+    const q = v.cuerpo.querySelector('.rmd-cp-q'), prog = v.cuerpo.querySelector('.rmd-progreso'), res = v.cuerpo.querySelector('.rmd-cp-res'), ord = v.cuerpo.querySelector('.rmd-cp-ord'), bVolver = v.cuerpo.querySelector('.rmd-cp-volver');
+    let elegido = null, hallados = [], sugeridos = [], modo = 'sugeridos', turno = 0;
     const bCambiar = botonModal('Cambiar paso', 'primario', async () => {
       if (!elegido) return;
-      if (!permitido(elegido)) { setTxt(prog, `El paso ${elegido.codigo} es de otra etiqueta: en Producción no se vería en esta lista.`); return; }
+      if (!permitido(elegido) || !mismaEtq(elegido)) { setTxt(prog, `El paso ${elegido.codigo} es de otra etiqueta: el paso nuevo debe ser de la misma etiqueta.`); return; }
       const ok = await confirmar('¿Cambiar el paso?', `Orden ${o.orden}: el ${esMenor ? 'proceso menor' : 'paso'} ${m.codigo} pasa a ser el ${elegido.codigo} — ${elegido.descripcion}.`, `Se conserva la configuración de esta fila${esMenor ? '' : ` y sus ${nPM} proceso(s) menor(es)`}. Los demás RMD no cambian.`, { si: 'Cambiar', no: 'Cancelar' });
       if (!ok) return;
       window.__rmdCambiando = true; bCambiar.disabled = true; sap.ui.core.BusyIndicator.show(0);
@@ -12328,30 +12464,84 @@
       finally { window.__rmdCambiando = false; sap.ui.core.BusyIndicator.hide(); }
     });
     bCambiar.disabled = true;
+    const actual = { descripcion: m.descripcion, tipoDatoId: o.tipoDatoId_iMaestraId, etiquetaId: m.etiquetaId_etiquetaId };
+    const num = (n) => (n == null ? '<span class="rmd-cp-cargando" title="Contando…">…</span>' : n.toLocaleString('es-PE'));
     const pintar = () => {
-      res.innerHTML = hallados.length ? `<table class="rmd-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th>Etiqueta</th><th>Tipo de dato (maestro)</th></tr></thead><tbody>${hallados.map((x, i) =>
-        `<tr class="${elegido === x ? 'rmd-cp-sel' : ''}" data-i="${i}"><td><input type="radio" name="rmd-cp" ${elegido === x ? 'checked' : ''}></td><td>${esc(x.codigo)}</td><td>${esc(x.descripcion)}</td><td>${esc((x.etiquetaId && x.etiquetaId.descripcion) || '')}${x.etiquetaId_etiquetaId !== m.etiquetaId_etiquetaId ? ' <span class="rmd-dif">(otra etiqueta)</span>' : ''}</td><td>${esc((x.tipoDatoId && x.tipoDatoId.contenido) || '')}</td></tr>`).join('')}</tbody></table>` : '';
+      const lista = ordenarSugerencias(hallados, ord.value);
+      const nRec = lista.filter((x) => x.recomendado).length;
+      res.innerHTML = lista.length ? `<table class="rmd-tabla rmd-cp-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th>Etiqueta</th><th>Tipo de dato (maestro)</th><th class="rmd-num" title="Qué tan parecido es el texto al del paso actual">Parecido</th><th class="rmd-num rmd-cp-col-aut" title="Masters Autorizados (vigentes) que usan este paso">Autorizados</th><th class="rmd-num rmd-cp-col-ing" title="Masters Ingresados que usan este paso">Ingresados</th><th class="rmd-num" title="Masters (códigos RMD) que lo usan en cualquier estado">Masters</th><th>Creado</th><th>Creado por</th></tr></thead><tbody>${lista.map((x) => {
+        const i = hallados.indexOf(x), chips = chipsSugerencia(x);
+        return `<tr class="${elegido === x ? 'rmd-cp-sel' : ''}${x.recomendado ? ' rmd-cp-rec' : ''}" data-i="${i}" title="${esc(x.motivos.join(' · '))}"><td><input type="radio" name="rmd-cp" ${elegido === x ? 'checked' : ''} aria-label="Elegir ${esc(x.codigo)}"></td><td>${esc(x.codigo)}</td><td>${esc(x.descripcion)}${chips ? `<div class="rmd-cp-chips">${chips}</div>` : ''}</td><td>${esc((x.etiquetaId && x.etiquetaId.descripcion) || '')}${x.etiquetaId_etiquetaId !== m.etiquetaId_etiquetaId ? ' <span class="rmd-dif">(otra etiqueta)</span>' : ''}</td><td>${esc((x.tipoDatoId && x.tipoDatoId.contenido) || '')}</td>`
+          + `<td class="rmd-num">${Math.round((x.sim || 0) * 100)} %</td><td class="rmd-num rmd-cp-col-aut">${num(x.uso && x.uso.aut)}</td><td class="rmd-num rmd-cp-col-ing">${num(x.uso && x.uso.ing)}</td><td class="rmd-num">${num(x.uso && x.uso.total)}</td><td class="rmd-nowrap">${esc(fechaLimaCorta(x.fechaRegistro))}</td><td>${esc(x.creador || usuarioVisible(x.usuarioRegistro || '') || '')}</td></tr>`; }).join('')}</tbody></table>`
+        + (modo === 'sugeridos' && nRec ? '<p class="rmd-nota">★ Recomendado: el más parecido con más uso en masters Autorizados e Ingresados, del mismo tipo de dato y sin tildes. Pasa el cursor sobre una fila para ver por qué.</p>' : '') : '';
       bCambiar.disabled = !elegido;
     };
     res.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; elegido = hallados[+tr.dataset.i]; pintar(); });
-    const buscar = async () => {
-      const t = norm(q.value); if (t.length < 1) { setTxt(prog, 'Escribe un código o palabras de la descripción.'); return; }
-      setTxt(prog, 'Buscando…'); elegido = null;
-      const f = [new F('estructuraId_estructuraId', 'EQ', destino.estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId)];
-      if (destino.etiquetaId) f.push(new F('etiquetaId_etiquetaId', 'EQ', destino.etiquetaId));
-      if (/^\d+$/.test(t)) f.push(new F('codigo', 'EQ', t)); else t.split(/\s+/).forEach((w) => f.push(new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
-      try {
-        hallados = (await new Promise((ok, mal) => modelo.read('/PASO', { filters: [new F({ filters: f, and: true })], urlParameters: { $expand: 'etiquetaId,tipoDatoId', $top: '60', $orderby: 'codigo' }, success: (r) => ok(r.results || []), error: mal })));
-        const fuera = hallados.filter((x) => !permitido(x)).length; hallados = hallados.filter(permitido).sort((a, c) => (+a.codigo || 0) - (+c.codigo || 0));
-        const donde = nombreLista ? `de la estructura y la etiqueta ${nombreLista}` : 'de la misma estructura';
-        setTxt(prog, (hallados.length ? `${hallados.length} paso(s) ${donde}${hallados.length >= 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : `Ningún paso ${donde} coincide.`) + (fuera ? ` Se omiten ${fuera} de la etiqueta de otra etapa (en Producción no se verían).` : ''));
-      } catch (e) { hallados = []; setTxt(prog, 'No se pudo buscar: ' + ((e && e.message) || e)); }
+    res.addEventListener('dblclick', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr && !bCambiar.disabled) bCambiar.click(); });
+    ord.addEventListener('change', pintar);
+    // uso (masters Autorizados / Ingresados), creador y puntaje; se pinta a medida que llega
+    const completar = async (lista, t) => {
       pintar();
+      const [usos] = await Promise.all([
+        usoDePasos(modelo, [m.pasoId, ...lista.map((x) => x.pasoId)], (id, u) => {
+          if (t !== turno) return;
+          if (id === m.pasoId) { setTxt(v.cuerpo.querySelector('.rmd-cp-uso-actual'), `Se usa en ${u.total.toLocaleString('es-PE')} master(s): ${u.aut.toLocaleString('es-PE')} Autorizado(s) y ${u.ing.toLocaleString('es-PE')} Ingresado(s).`); return; }
+          const x = lista.find((y) => y.pasoId === id); if (x) { x.uso = u; puntuarSugerencias(lista, actual); pintar(); }
+        }),
+        nombresCreadores(modelo, lista.map((x) => x.usuarioRegistro)).then((n) => { if (t === turno) { lista.forEach((x) => { x.creador = n.get(String(x.usuarioRegistro || '').toUpperCase()) || x.creador; }); pintar(); } }).catch(() => {}),
+      ]);
+      if (t !== turno) return;
+      lista.forEach((x) => { if (!x.uso) x.uso = usos.get(x.pasoId) || { aut: 0, ing: 0, total: 0 }; });
+      puntuarSugerencias(lista, actual); pintar();
+    };
+    // regla: el paso nuevo es de la MISMA etiqueta (la de la lista; si la lista no tiene, la del paso actual)
+    const etqObjetivo = destino.etiquetaId || m.etiquetaId_etiquetaId || null;
+    const mismaEtq = (x) => (x.etiquetaId_etiquetaId || null) === etqObjetivo;
+    const filtroBase = () => [new F('estructuraId_estructuraId', 'EQ', destino.estructuraId), new F('activo', 'EQ', true), new F('pasoId', 'NE', m.pasoId), new F('etiquetaId_etiquetaId', 'EQ', etqObjetivo)];
+    const leerPasos = (f, top) => new Promise((ok, mal) => modelo.read('/PASO', { filters: [new F({ filters: f, and: true })], urlParameters: { $expand: 'etiquetaId,tipoDatoId', $top: String(top), $orderby: 'codigo' }, success: (r) => ok(r.results || []), error: mal }));
+    const nomObjetivo = etqObjetivo ? nomEtq.get(etqObjetivo) || nombreLista || (m.etiquetaId && m.etiquetaId.descripcion) || '' : '';
+    const donde = nomObjetivo ? `de la misma estructura y la misma etiqueta (${nomObjetivo})` : 'de la misma estructura y sin etiqueta, como el paso actual';
+    // Al abrir: pasos parecidos al actual (mismas reglas de estructura y etiqueta)
+    const sugerir = async () => {
+      const t = ++turno; modo = 'sugeridos'; bVolver.hidden = true; elegido = null; hallados = sugeridos;
+      if (sugeridos.length) { setTxt(prog, `${sugeridos.length} paso(s) parecido(s) ${donde}. Elige uno y pulsa "Cambiar paso".`); pintar(); return; }
+      const claves = palabrasClavePaso(m.descripcion);
+      if (!claves.length) { setTxt(prog, 'Escribe un código o palabras de la descripción del paso nuevo.'); pintar(); return; }
+      setTxt(prog, 'Buscando pasos parecidos al actual…');
+      try {
+        // todas las palabras clave (lo más parecido) y cualquiera de ellas (para no perder variantes); se juntan sin repetir
+        const contiene = (w) => new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false });
+        const [todas, alguna] = await Promise.all([leerPasos(filtroBase().concat(claves.map(contiene)), 400), claves.length > 1 ? leerPasos(filtroBase().concat([new F({ filters: claves.map(contiene), and: false })]), 400) : Promise.resolve([])]);
+        const vistos = new Set(), r = [...todas, ...alguna].filter((x) => !vistos.has(x.pasoId) && vistos.add(x.pasoId) && permitido(x) && mismaEtq(x));
+        if (t !== turno) return;
+        sugeridos = elegirParecidos(r, m.descripcion, 25); hallados = sugeridos;
+        puntuarSugerencias(hallados, actual);
+        setTxt(prog, hallados.length ? `${hallados.length} paso(s) parecido(s) ${donde}. Elige uno y pulsa "Cambiar paso", o busca otro.` : `No hay pasos parecidos ${donde}: busca por código o palabras.`);
+        if (hallados.length) await completar(hallados, t); else pintar();
+      } catch (e) { if (t === turno) { hallados = []; setTxt(prog, 'No se pudieron buscar pasos parecidos: ' + ((e && e.message) || e) + '. Busca por código o palabras.'); pintar(); } }
+    };
+    const buscar = async () => {
+      const tq = norm(q.value); if (tq.length < 1) { sugerir(); return; }
+      const t = ++turno; modo = 'busqueda'; bVolver.hidden = false;
+      setTxt(prog, 'Buscando…'); elegido = null;
+      const f = filtroBase();
+      if (/^\d+$/.test(tq)) f.push(new F('codigo', 'EQ', tq)); else tq.split(/\s+/).forEach((w) => f.push(new F({ path: 'descripcion', operator: FO.Contains, value1: w, caseSensitive: false })));
+      try {
+        let r = await leerPasos(f, 60);
+        if (t !== turno) return;
+        const total = r.length, fuera = r.filter((x) => !permitido(x) || !mismaEtq(x)).length; r = r.filter((x) => permitido(x) && mismaEtq(x));
+        r.forEach((x) => { x.sim = similitudPaso(m.descripcion, x.descripcion); });
+        hallados = r; puntuarSugerencias(hallados, actual);
+        setTxt(prog, (hallados.length ? `${hallados.length} paso(s) ${donde}${total >= 60 ? ' (primeros 60: afina la búsqueda)' : ''}. Elige uno y pulsa "Cambiar paso".` : `Ningún paso ${donde} coincide.`) + (fuera ? ` Se omiten ${fuera} de otra etiqueta.` : ''));
+        if (hallados.length) await completar(hallados, t); else pintar();
+      } catch (e) { if (t === turno) { hallados = []; setTxt(prog, 'No se pudo buscar: ' + ((e && e.message) || e)); pintar(); } }
     };
     v.cuerpo.querySelector('.rmd-cp-buscar').addEventListener('click', buscar);
+    bVolver.addEventListener('click', () => { q.value = ''; sugerir(); });
     q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); buscar(); } });
     v.pie.append(botonModal('Cancelar', '', () => v.cerrar()), bCambiar);
     setTimeout(() => q.focus(), 40);
+    sugerir();
   }
   function instalarBotonCambiarPaso(d, tabla) {
     const hdr = d.querySelector('.sapMListHdr'); if (!hdr || hdr.querySelector('.rmd-cambiar-paso')) return;
