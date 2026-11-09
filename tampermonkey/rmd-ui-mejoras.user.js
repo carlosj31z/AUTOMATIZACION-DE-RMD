@@ -18434,13 +18434,13 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
       tipos: Object.fromEntries(Object.entries(cat.tipos || {}).filter(([k]) => +k >= 432 && +k <= 450)), arbol, huella: PPN.huella(arbol),   // tipos: solo tipos de dato 432-450 (430-460 traía estados)
       catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
   }
-  // «Estado / Fecha / Por» como el PDF
+  // «Estado / Fecha / Por» como el PDF. Regla de CINTIA (v1.129.0): aquí va el usuario de SAP tal cual (KMORENOM); «VM» es solo para las Observaciones
   async function ppEstadoFechaPor(modelo, md) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, f = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : ''; };
     let fecha = '', por = '';
-    if (+md.estadoIdRmd_iMaestraId === 465) { fecha = f(md.fechaAutorizacion); por = norm(usuarioVisible(md.usuarioAutorizacion)); }
+    if (+md.estadoIdRmd_iMaestraId === 465) { fecha = f(md.fechaAutorizacion); por = norm(md.usuarioAutorizacion); }
     else { const tr = (await leerTodoDe(modelo, 'MD_TRAZABILIDAD', [new F('mdId_mdId', 'EQ', md.mdId)], { $orderby: 'idTrazabilidad' }).catch(() => [])).filter((x) => x.activo !== false).sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro));
-      if (tr[0]) { fecha = f(tr[0].fechaRegistro); por = norm(usuarioVisible(tr[0].usuarioRegistro)); } }
+      if (tr[0]) { fecha = f(tr[0].fechaRegistro); por = norm(tr[0].usuarioRegistro); } }
     return `${md.estado || ''}/ ${fecha} /${por}`;
   }
   // logo del encabezado (controller/table.js, «var E»)

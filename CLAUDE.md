@@ -271,6 +271,7 @@ cuenta). Escribir y responder siempre en **español**.
   (`responderMensajesPortal`), Deshacer con Observaciones, vista releída al cerrar el ingreso, fuera «Guardar borrador»/«Comentar» y
   duplicados de ⚙ Configuración en la vista; `[hidden]` respetado en el CSS del editor.
   Uso de cada paso sugerido (Aut./Ing.) con `usoDePasosPorCodigo` (`emb.uso`); casilla «Vista completa (DOC)» (pedido de CINTIA).
+  **Regla de CINTIA: «VM» solo en Observaciones; en la Edición rápida y las plantillas («Estado / Fecha / Por», `ppEstadoFechaPor`) va KMORENOM.**
   **La siguiente versión debe ser > 1.129.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
