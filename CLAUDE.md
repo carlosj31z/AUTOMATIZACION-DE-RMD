@@ -290,6 +290,7 @@ cuenta). Escribir y responder siempre en **español**.
   borrador y de la Edición rápida (`PPN.avisos`, con `ctx.planta`) avisa «Por homologar» si el paso está en la tabla (`homologacionPaso`) y
   «Términos por homologar» si el texto trae términos viejos (`homologarTexto`). Bloque `==HOMOLOG==` de `ppNucleo`, generado con
   `analisis/homologacion/generar_homologacion_js.py`: **al cambiar la tabla o las reglas de Python, regenerarlo**. Prueba `qa_homologacion.mjs`.
+  1.132.0 publicada en SharePoint el 2026-11-09 (2 230 682 bytes). PR #90.
   **La siguiente versión debe ser > 1.132.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
