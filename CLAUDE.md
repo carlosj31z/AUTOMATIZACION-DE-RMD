@@ -40,6 +40,9 @@ cuenta). Escribir y responder siempre en **español**.
   pendientes y del listado aplicados, términos homologados en los pasos (sin
   tildes), 1.ª línea de Observaciones con la nomenclatura del usuario SAP que la
   hace y notas con los CC aplicados y lo que quede pendiente.
+- **Antes de subir la versión del userscript**: leer «Para que no se pisen» en
+  «Versiones y publicación del userscript» (`interfaz nueva-version`, línea
+  `// INCLUYE:` y chequeo «Versión del script» en cada PR).
 - Cada persona usa **su cuenta de Claude y su sesión de SAP**; la memoria de
   Claude no se comparte entre cuentas: lo compartido es este repo y la hoja de
   seguimiento (un reclamo por RMD, para no pisarse).
@@ -71,6 +74,28 @@ cuenta). Escribir y responder siempre en **español**.
   pendientes**; si no, las tapa (el cargador solo toma la más alta).
 - Con varios trabajos en paralelo, ponerse de acuerdo en cuál es la versión más
   alta en curso y construir encima de esa.
+- **Para que no se pisen (desde 2026-11-09)**: cada script lleva, debajo de
+  `const VERSION`, la línea `// INCLUYE: 1.132.1 1.133.0 …` con las versiones que
+  trae (hasta 1.132.1 todo está junto en la rama por defecto, por eso la lista
+  empieza ahí). Pasos:
+  1. Antes de tocar el script: actualizar la rama con la rama por defecto
+     (`git fetch` + `git merge origin/<rama por defecto>`).
+  2. Subir la versión **solo** con `rmd-automation interfaz nueva-version`
+     (o `--version x.y.z`): cambia `@version`, `const VERSION` y agrega la
+     versión anterior a INCLUYE. No editar esas líneas a mano.
+  3. Si al fusionar hay conflicto en esas líneas (otro PR subió la versión),
+     resolverlo dejando una versión mayor que ambas y juntar las listas:
+     `rmd-automation interfaz nueva-version --juntar <script de la base>`.
+     Lo mismo si SharePoint tiene una versión que no está en el repo:
+     `--juntar <esa versión>.js` (después de juntar su código).
+  4. El chequeo de GitHub **«Versión del script»** (`.github/workflows/version-script.yml`)
+     falla si el PR cambia el script sin subir la versión o si su INCLUYE no trae
+     todo lo de la rama base. No fusionar con ese chequeo en rojo.
+  5. `interfaz publicar` **no sube** si la versión más alta de SharePoint no
+     está en INCLUYE (aunque el número sea mayor) y dice qué fusionar primero.
+     Como cada versión publicada trae a la anterior, traer la más alta basta.
+  Lógica y pruebas: `src/rmd_automation/versiones.py`, `tests/test_versiones.py`.
+  Sin el CLI instalado: `$env:PYTHONPATH="src"; python -m rmd_automation.cli interfaz nueva-version`.
 - El conector de Microsoft 365 no sirve para subir el script (límite 1 MB; el
   `.js` pesa ~1,8 MB). Se sube con la API de SharePoint desde el Chrome de
   pruebas con la sesión de Carlos.
@@ -295,6 +320,9 @@ cuenta). Escribir y responder siempre en **español**.
   1.132.0 publicada en SharePoint el 2026-11-09 (2 230 682 bytes). PR #90.
 - 2026-11-09, v1.132.1 (1.132.0 + 1.131.2): la 1.131.2 no se pudo publicar porque en SharePoint ya estaba la 1.132.0; esta las junta.
   **La siguiente versión debe ser > 1.132.1.**
+- 2026-11-09: **chequeo para que las versiones no se pisen** (`versiones.py`, `interfaz nueva-version`, chequeo de PR «Versión del
+  script», `interfaz publicar` exige que la versión traiga la más alta de SharePoint). La próxima versión se crea con
+  `interfaz nueva-version`, que agrega `// INCLUYE: 1.132.1`. El script no cambió (sigue 1.132.1).
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

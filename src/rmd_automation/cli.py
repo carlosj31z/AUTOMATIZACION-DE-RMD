@@ -345,6 +345,31 @@ def interfaz_publicar(archivo: str, subir: bool) -> None:
         sys.exit(1)
 
 
+@interfaz_group.command("nueva-version")
+@click.option("--archivo", type=click.Path(exists=True, dir_okay=False), default="tampermonkey/rmd-ui-mejoras.user.js",
+              show_default=True, help="Userscript a cambiar (se reescribe en su lugar).")
+@click.option("--version", "nueva", default=None,
+              help="Versión nueva x.y.z (por defecto sube el número del medio de la más alta que trae).")
+@click.option("--juntar", multiple=True, type=click.Path(exists=True, dir_okay=False),
+              help="Otro script cuyas versiones también trae este (p. ej. el publicado en SharePoint o el de la rama base "
+                   "tras un merge). Se puede repetir.")
+def interfaz_nueva_version(archivo: str, nueva: str | None, juntar: tuple) -> None:
+    """Sube @version y const VERSION, y anota en «// INCLUYE:» lo que trae, para que al publicar no pise otra versión."""
+    from pathlib import Path
+
+    from .versiones import conjunto, nueva_version, version
+
+    ruta = Path(archivo)
+    texto = ruta.read_bytes().decode("utf-8")  # sin tocar los fines de línea
+    otros = [Path(j).read_bytes().decode("utf-8") for j in juntar]
+    try:
+        nuevo = nueva_version(texto, nueva, otros)
+    except ValueError as e:
+        raise click.ClickException(str(e))
+    ruta.write_bytes(nuevo.encode("utf-8"))
+    click.echo(f"✓ {version(texto)} → {version(nuevo)}; trae: {' '.join(conjunto(nuevo))}")
+
+
 @cli.command("vb-mes")
 @click.option("--mes", default=None, help="Mes AAAA-MM (por defecto, el mes en curso).")
 @click.option("--salida", type=click.Path(dir_okay=False), default=None,

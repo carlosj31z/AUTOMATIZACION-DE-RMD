@@ -1,0 +1,27 @@
+# Que una versión del userscript no pise a otra (ver src/rmd_automation/versiones.py y CLAUDE.md).
+# En cada PR que toque el script: la versión debe subir y la línea «// INCLUYE:» debe traer todo lo de la rama base.
+name: Versión del script
+on:
+  pull_request:
+    paths:
+      - tampermonkey/rmd-ui-mejoras.user.js
+      - src/rmd_automation/versiones.py
+      - tests/test_versiones.py
+jobs:
+  no-pisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Script de la rama base
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          git show "origin/${{ github.base_ref }}:tampermonkey/rmd-ui-mejoras.user.js" > "$RUNNER_TEMP/base.js" || : > "$RUNNER_TEMP/base.js"
+      - name: Revisar versión e INCLUYE
+        run: PYTHONPATH=src python -m rmd_automation.versiones revisar --base "$RUNNER_TEMP/base.js" --nuevo tampermonkey/rmd-ui-mejoras.user.js
+      - name: Pruebas del chequeo
+        run: pip install -q pytest && PYTHONPATH=src python -m pytest -q tests/test_versiones.py
