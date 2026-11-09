@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.131.1
+// @version      1.131.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.131.1';                                                       // mantener igual a @version
+  const VERSION = '1.131.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -18706,13 +18706,18 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   const PP_MARCA_PDF = /RMDPDF1\.(\d+)\.(\d+)\.([A-Za-z0-9_-]+)/g;
   async function ppTrozosPdf(bytes) {
     const latin = (u8) => { let t = ''; for (let i = 0; i < u8.length; i += 0x8000) t += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return t; };
-    const buscar = (t, m) => { let x; PP_MARCA_PDF.lastIndex = 0; while ((x = PP_MARCA_PDF.exec(t))) { const i = +x[1], n = +x[2]; if (!m.n) m.n = n; if (n === m.n && !(m.t[i] && m.t[i].length >= x[3].length)) m.t[i] = x[3]; } };
+    // una cadena larga del PDF puede venir partida con «\» + salto de línea (continuación de cadena en PDF, p. ej. al volver a guardarlo): se une antes de buscar
+    const buscar = (t, m) => { let x; t = t.replace(/\\(\r\n|\r|\n)/g, ''); PP_MARCA_PDF.lastIndex = 0; while ((x = PP_MARCA_PDF.exec(t))) { const i = +x[1], n = +x[2]; if (!m.n) m.n = n; if (n === m.n && !(m.t[i] && m.t[i].length >= x[3].length)) m.t[i] = x[3]; } };
     const m = { n: 0, t: [] }, crudo = latin(bytes); buscar(crudo, m);
     if (!m.n) {
       const re = /\/FlateDecode[\s\S]{0,400}?stream\r?\n/g; let x;
       while ((x = re.exec(crudo))) {
         const ini = x.index + x[0].length, fin = crudo.indexOf('endstream', ini); if (fin < 0) break;
-        try { const u = new Uint8Array(await new Response(new Blob([bytes.subarray(ini, fin)]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer()); buscar(latin(u), m); } catch (e) { /* flujo que no es zlib */ }
+        // antes de «endstream» va un salto de línea que no es parte del flujo: DecompressionStream lo toma como basura y falla, así que se quita
+        const eol = crudo.slice(fin - 2, fin) === '\r\n' ? 2 : /[\r\n]/.test(crudo[fin - 1]) ? 1 : 0;
+        for (const f of eol ? [fin - eol, fin] : [fin]) {
+          try { const u = new Uint8Array(await new Response(new Blob([bytes.subarray(ini, f)]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer()); buscar(latin(u), m); break; } catch (e) { /* flujo que no es zlib */ }
+        }
         if (m.n && m.t.filter(Boolean).length === m.n) break;
       }
     }
