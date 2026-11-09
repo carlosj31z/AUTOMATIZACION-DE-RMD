@@ -45,3 +45,14 @@ def test_tabla_de_reemplazos():
     assert reemplazo_de_paso(1655, "Planta 1").codigo_vigente == 182341
     assert reemplazo_de_paso(31840, "ATE").codigo_vigente == 62221
     assert reemplazo_de_paso(999999999, "ATE") is None
+
+
+def test_bloque_del_userscript_al_dia():
+    """El bloque ==HOMOLOG== del userscript debe salir igual de la tabla y las reglas (si falla: correr el generador)."""
+    import importlib.util
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("gen", raiz / "analisis" / "homologacion" / "generar_homologacion_js.py")
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    assert gen.bloque() in (raiz / "tampermonkey" / "rmd-ui-mejoras.user.js").read_bytes().decode("utf-8")

@@ -48,6 +48,8 @@ cuenta). Escribir y responder siempre en **español**.
   paso por el código vigente del maestro**, no editando el texto: tabla `src/rmd_automation/datos/homologacion_pasos.csv`
   y reglas de texto en `rmd_automation.homologacion` (`homologar`, `reemplazo_de_paso`). Ej.: 161493/1655 (PDSG-202) →
   182341 (PDOC-207); 31840 («hagan») → 62221 en ATE, 166452 en LIMA.
+  **Regla permanente (CINTIA): todo ingreso automatizado, borrador o Edición rápida aplica estas reglas** (desde v1.132.0
+  el userscript las avisa siempre). Al crear o editar un paso, primero el código vigente; nunca un paso viejo de la tabla.
 - **Analizar e inferir con evidencia; lo que no quede claro se deja como
   CONSULTA** (columna Consultas de la hoja y sección del reporte) y se sigue con
   lo demás. Nunca se escribe en SAP un supuesto ni sin el OK escrito de la
@@ -284,7 +286,11 @@ cuenta). Escribir y responder siempre en **español**.
   1.130.0 publicada en SharePoint el 2026-11-09 (2 182 892 bytes).
 - 2026-11-09, v1.131.0: flechas y resaltado de Depende en la Edición rápida (pedido de CINTIA).
   1.131.0 publicada en SharePoint el 2026-11-09. v1.131.1: sin flechas ni resaltado (CINTIA los vio innecesarios); queda la etiqueta «↳» con ✕/⚠ y título.
-  **La siguiente versión debe ser > 1.131.1.**
+- 2026-11-09, v1.132.0 (incluye 1.131.1): **pedido de CINTIA: las reglas de homologación se tienen en cuenta siempre.** La revisión del
+  borrador y de la Edición rápida (`PPN.avisos`, con `ctx.planta`) avisa «Por homologar» si el paso está en la tabla (`homologacionPaso`) y
+  «Términos por homologar» si el texto trae términos viejos (`homologarTexto`). Bloque `==HOMOLOG==` de `ppNucleo`, generado con
+  `analisis/homologacion/generar_homologacion_js.py`: **al cambiar la tabla o las reglas de Python, regenerarlo**. Prueba `qa_homologacion.mjs`.
+  **La siguiente versión debe ser > 1.132.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
