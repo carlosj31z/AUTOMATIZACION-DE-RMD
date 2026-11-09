@@ -1505,7 +1505,7 @@ with sync_playwright() as p:
       t1[2].dt = dt(443, { dec: '1', edit: true, dep: 'P10', depTxt: '2001' }); t1[3].dt = dt(436, { edit: true, dep: 'P12', depTxt: '2003' });
       d.arbol.estructuras[2].etiquetas[1].pasos.forEach((p) => { p.dt = dt(+p.tipo); }); d.arbol.estructuras[0].pasos[0].dt = dt(446);
       d.cat.tipos = { 433: 'Texto', 436: 'Fecha y Hora', 438: 'Números', 443: 'Rango', 446: 'Sin tipo de dato', 447: 'Notificación' }; return d; }"""
-    @prueba("LN57 Vista simple de ingreso (v1.123.0): se abre DENTRO del portal a pantalla completa con la vista completa de Documentación Técnica (tipo de dato, decimales, Depende, casillas por paso y Conforme / Proceso menor por etiqueta); ⚙ Configuración cambia tipo, decimales, Clave Modelo, Puesto, color y Depende con sus reglas en vivo; «Copiar para Claude» resume cambios y errores; «Guardar en SAP» entrega el borrador al portal; las escrituras siguen el Guardar de la tabla de Pasos del portal (Clave Modelo / Puesto solo en Notificación, color en formato + colorHex + colorRgb); Cerrar quita la vista sin tocar las ventanas del portal")
+    @prueba("LN57 Vista simple de ingreso (v1.123.0): se abre DENTRO del portal a pantalla completa con la vista completa de Documentación Técnica (tipo de dato, decimales, Depende, casillas por paso y Conforme / Proceso menor por etiqueta); ⚙ Configuración cambia tipo, decimales, Clave Modelo, Puesto, color y Depende con sus reglas en vivo; «Copiar resumen» resume cambios y errores; «Guardar en SAP» entrega el borrador al portal; las escrituras siguen el Guardar de la tabla de Pasos del portal (Clave Modelo / Puesto solo en Notificación, color en formato + colorHex + colorRgb); Cerrar quita la vista sin tocar las ventanas del portal")
     def _():
         d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
         r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, N = P.nucleo, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] });
@@ -1537,7 +1537,7 @@ with sync_playwright() as p:
         fr.evaluate("() => { const c = document.querySelector('#c-color'); c.value = '#152cc1'; c.dispatchEvent(new Event('input', { bubbles: true })); }"); fr.click(".pp-modal [data-a=aceptar]"); fr.wait_for_timeout(250)
         fr.evaluate("() => [...document.querySelectorAll('.pp-etq-tit [data-a=config-etq]')][0].click()"); fr.wait_for_selector("#c-conf"); fr.uncheck("#c-conf"); fr.click(".pp-modal [data-a=aceptar]"); fr.wait_for_timeout(250)
         st = fr.evaluate("""() => { const s = window.__pp.estado(), p = window.__pp.encontrar('P13').item; return { dt: p.dt, edit: p.edit, contar: s.contar, tags: [...document.querySelectorAll('tr[data-id=P13] .pp-tag')].map((t) => t.textContent),
-          chips: [...document.querySelectorAll('tr[data-id=P13] .pp-dt-c')].map((t) => t.textContent + (t.classList.contains('cam') ? '*' : '')), cm: s.CMB.filter((c) => c.accion === 'config').length, claude: window.__pp.textoParaClaude() }; }""")
+          chips: [...document.querySelectorAll('tr[data-id=P13] .pp-dt-c')].map((t) => t.textContent + (t.classList.contains('cam') ? '*' : '')), cm: s.CMB.filter((c) => c.accion === 'config').length, resumen: window.__pp.textoResumen() }; }""")
         fr.click("[data-a=sap]"); pg.wait_for_timeout(200)
         g = pg.evaluate("() => window.__vistaGuardada && { vista: window.__vistaGuardada.vista, dtP13: window.__vistaGuardada.trabajo.estructuras[2].etiquetas[0].pasos[3].dt, conf: window.__vistaGuardada.trabajo.estructuras[2].etiquetas[0].conforme }")
         pg.evaluate("() => window.__rmdStats.vista && window.__rmdStats.vista.cerrar()"); pg.wait_for_timeout(150)
@@ -1549,13 +1549,13 @@ with sync_playwright() as p:
               and r["esc1"] == {"tipoDatoId_iMaestraId": 447, "tipoDatoIdAnterior_iMaestraId": 447, "decimales": 0, "clvModelo": "SETPRE", "puestoTrabajo": "FMENFA01", "automatico": True, "edit": True, "formato": True, "colorHex": "#152cc1", "colorRgb": "rgb(21,44,193)"}
               and r["esc2"] == {"tipoDatoId_iMaestraId": 438, "tipoDatoIdAnterior_iMaestraId": 438, "clvModelo": None, "puestoTrabajo": None, "automatico": None, "formato": False, "colorHex": None, "colorRgb": None}
               and r["esc3"] == {"tab": True} and r["fondo"] == [True, True, "fixed"] and r["ventanas"] == queda["ventanas"]
-              and v["titulo"].startswith("Edición rápida · RMD 2202600001 v3") and v["dt"] and v["chips"] >= 6 and any("Conforme: Sí" in x for x in v["etq"]) and {"sap", "claude", "cerrar-vista"} <= set(v["botones"]) and "Autorizado" in v["aviso"]
+              and v["titulo"].startswith("Edición rápida · RMD 2202600001 v3") and v["dt"] and v["chips"] >= 6 and any("Conforme: Sí" in x for x in v["etq"]) and {"sap", "resumen", "cerrar-vista"} <= set(v["botones"]) and "Autorizado" in v["aviso"]
               and "Clave Modelo" in av1 and notif and "Decimales: un número entero" in av2 and sigue
               and st["dt"]["tipo"] == 447 and st["dt"]["clv"] == "SETPRE" and st["dt"]["puesto"] == "FMENFA01" and st["dt"]["dep"] == "P11" and st["dt"]["depFijo"] and st["dt"]["color"] == "#152cc1" and st["edit"]
               and "Configuración" in st["tags"] and any(c.startswith("Notificación") and c.endswith("*") for c in st["chips"]) and any("Depende: 2.1.2.- 2002*" == c for c in st["chips"]) and st["cm"] == 2
-              and "CAMBIOS" in st["claude"] and "Configuración" in st["claude"] and "Tipo de dato: Fecha y Hora → Notificación" in st["claude"]
+              and "CAMBIOS" in st["resumen"] and "Configuración" in st["resumen"] and "Tipo de dato: Fecha y Hora → Notificación" in st["resumen"]
               and g and g["vista"] == "dt" and g["dtP13"]["tipo"] == 447 and g["conf"] is False and not queda["vista"] and not queda["emb"])
-        return ok, json.dumps({ "r": {k: r[k] for k in ("avSin", "ventanas", "fondo")}, "claude": st["claude"][:900], "av": avs, "v": v, "av1": av1, "av2": av2, "notif": notif, "sigue": sigue, "edit": st["edit"], "st": {k: st[k] for k in ("dt", "tags", "chips", "cm")}, "g": g, "queda": queda }, ensure_ascii=False)[:2400]
+        return ok, json.dumps({ "r": {k: r[k] for k in ("avSin", "ventanas", "fondo")}, "resumen": st["resumen"][:900], "av": avs, "v": v, "av1": av1, "av2": av2, "notif": notif, "sigue": sigue, "edit": st["edit"], "st": {k: st[k] for k in ("dt", "tags", "chips", "cm")}, "g": g, "queda": queda }, ensure_ascii=False)[:2400]
 
     @prueba("LN58 Edición rápida (v1.124.0): los pasos de RENDIMIENTO / CONDICIONES AMBIENTALES no piden predecesor (y se avisa si lo traen); en un RMD Ingresado la vista muestra las Observaciones en lugar de «Cómo se usa»: avisa la 1.ª línea copiada de la versión anterior y la arma con la fecha de hoy, avisa el CC pendiente de la versión anterior y lo anota como aplicado, y «Guardar en SAP» lleva las Observaciones nuevas")
     def _():
@@ -1582,7 +1582,7 @@ with sync_playwright() as p:
         v1 = fr.evaluate("() => ({ ayuda: !!document.querySelector('.pp-ayuda'), rev: document.querySelector('.pp-obs-der').textContent, ta: document.querySelector('#pp-obs-ta').value, gen: !!document.querySelector('.pp-obs-gen') })")
         fr.click("[data-a=obs-aplicar]"); fr.wait_for_timeout(150)
         fr.fill("#pp-obs-ini", "CJ"); fr.select_option("#pp-obs-fase", "F3"); fr.click("[data-a=obs-nom]"); fr.wait_for_timeout(150)
-        v2 = fr.evaluate("() => ({ ta: document.querySelector('#pp-obs-ta').value, rev: document.querySelector('.pp-obs-der').textContent, total: window.__pp.estado().contar.total, claude: window.__pp.textoParaClaude() })")
+        v2 = fr.evaluate("() => ({ ta: document.querySelector('#pp-obs-ta').value, rev: document.querySelector('.pp-obs-der').textContent, total: window.__pp.estado().contar.total, resumen: window.__pp.textoResumen() })")
         fr.click("[data-a=ayuda]"); fr.wait_for_timeout(100); ayuda = fr.evaluate("() => !!document.querySelector('.pp-ayuda')")
         fr.click("[data-a=sap]"); pg.wait_for_timeout(200)
         g = pg.evaluate("() => window.__vistaGuardada && window.__vistaGuardada.trabajo.obs")
@@ -1593,7 +1593,7 @@ with sync_playwright() as p:
         ok = (r["normal"] >= 1 and r["rend"] == 0 and r["conDep"] >= 1 and r["amb"] == 0
               and not v1["ayuda"] and v1["gen"] and "misma de la v2" in v1["rev"] and "Falta aplicar 26-200-CC" in v1["rev"]
               and ls[0] == hoy + "CJ-1-C2.0-FI1.0-FA1.0-F3" and any(x.startswith("26-200-CC/") for x in ls) and "Falta aplicar 26-200-CC" not in v2["rev"] and "1.ª línea" in v2["rev"]
-              and v2["total"] == 1 and "OBSERVACIONES (cambiadas en la vista)" in v2["claude"] and ayuda and g == v2["ta"])
+              and v2["total"] == 1 and "OBSERVACIONES (cambiadas en la vista)" in v2["resumen"] and ayuda and g == v2["ta"])
         return ok, json.dumps({"r": r, "v1": v1, "v2": {k: v2[k] for k in ("ta", "rev", "total")}, "ayuda": ayuda, "g": g}, ensure_ascii=False)[:2400]
 
     PP_CTX.close()
