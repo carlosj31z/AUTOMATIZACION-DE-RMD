@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.129.1
+// @version      1.130.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.129.1';                                                       // mantener igual a @version
+  const VERSION = '1.130.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17187,7 +17187,7 @@
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
       if (OBS) { partes.push(htmlObs()); ver = true; }                     // en la vista del portal: Observaciones en lugar de «Cómo se usa» (que queda en «Ayuda»)
-      if (EMB && ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa la Edición rápida</b><ol><li><b>Haz clic en una fila</b>: a su derecha aparecen <b>Editar</b>, <b>⚙ Configuración</b> (tipo de dato, decimales, Depende, casillas, rango y color), <b>Paso debajo</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Duplicar</b>, <b>Copiar</b> y <b>Quitar</b>. Doble clic edita el texto.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> marca pasos y <b>Shift+clic</b> un tramo; abajo aparece la barra para duplicarlos, copiarlos, moverlos o quitarlos juntos.</li><li>Al escribir aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe queda <b>★</b> y se crea en el catálogo al guardar.</li><li><b>✕ por corregir</b> frena el guardado: son errores de lo que cambiaste. Lo que ya venía así de SAP sale aparte y no frena.</li><li><b>Guardar en SAP…</b> muestra cada escritura y pide confirmación; al terminar puedes volver a la vista o <b>Deshacer ingreso</b>. Hasta entonces lo editado se guarda solo en este navegador.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      if (EMB && ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa la Edición rápida</b><ol><li><b>Haz clic en una fila</b>: a su derecha aparecen <b>Editar</b>, <b>⚙ Configuración</b> (tipo de dato, decimales, Depende, casillas, rango y color), <b>Paso debajo</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Duplicar</b>, <b>Copiar</b> y <b>Quitar</b>. Doble clic edita el texto.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> marca pasos y <b>Shift+clic</b> un tramo; abajo aparece la barra para duplicarlos, copiarlos, moverlos o quitarlos juntos.</li><li>Al escribir aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe queda <b>★</b> y se crea en el catálogo al guardar.</li><li><b>✕ por corregir</b> frena el guardado: son errores de lo que cambiaste. Lo que ya venía así de SAP sale aparte y no frena.</li><li><b>Guardar en SAP…</b> (o <b>Ctrl+Enter</b>) muestra cada escritura y pide confirmación; al terminar puedes volver a la vista o <b>Deshacer ingreso</b>. Hasta entonces lo editado se guarda solo en este navegador.</li><li><b>Teclado</b>, con un paso seleccionado: <b>↑/↓</b> el anterior o el siguiente, <b>Alt+↑/↓</b> subirlo o bajarlo, <b>Enter</b> editar el texto, <b>T</b> tipo de dato y valores, <b>D</b> Depende, <b>Supr</b> quitar, <b>Ctrl+Z</b> deshacer.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       else if (!EMB && (!ver || ayudaAbierta)) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> (o <b>☑ Seleccionar</b>) marca pasos y <b>Shift+clic</b> marca un tramo. Abajo aparece una barra para <b>duplicarlos</b> (p. ej. para otro lote), <b>copiarlos</b> y pegarlos en otra parte, <b>subirlos</b>, <b>bajarlos</b>, <b>moverlos</b> o <b>quitarlos</b> juntos. También puedes <b>arrastrarlos</b>; si mantienes <b>Ctrl</b> al soltar, se copian. Una copia lleva el paso con sus procesos menores e insumos.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>: ingrésalo por solicitud o envíalo por correo a <b>Documentación Técnica</b>; lleva los datos para importar tus cambios, así que es el único archivo que hay que enviar. <b>Guardar borrador</b> es opcional: descarga un archivo para seguir editando otro día.</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
@@ -17434,7 +17434,7 @@
       const out = [chip('tipo', esc(tipoNom(d.tipo)), 'Tipo de dato')];
       if (d.dec != null && d.dec !== '') out.push(chip('dec', `Dec. ${esc(d.dec)}`, 'Decimales'));
       if ([x.vi, x.vf].some((v) => v != null && v !== '')) out.push(rapido(b && valoresCambiados(x, b) ? ' cam' : '', `Rango ${esc(x.vi == null ? '—' : x.vi)} a ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ` ± ${esc(x.margen)}` : ''}`, 'Valor inicial, final y margen'));
-      if (!pm) out.push(chip('dep', `Depende: ${esc(depEtiqueta(x))}`, 'Paso predecesor (Depende)'));
+      if (!pm && !EMB) out.push(chip('dep', `Depende: ${esc(depEtiqueta(x))}`, 'Paso predecesor (Depende)'));   // v1.130.0: en la Edición rápida va a la izquierda
       if (!pm && +d.tipo === PPN.DT_NOTIF) out.push(chip('clv', `Clave: ${esc(d.clv || '—')}`, 'Clave Modelo'), chip('puesto', `Puesto: ${esc(d.puesto || '—')}`, 'Puesto de trabajo'));
       DT_FLAGS.forEach(([k, n]) => { if (d[k]) out.push(chip(k, esc(n))); else if (cam.has(k)) out.push(chip(k, `<s>${esc(n)}</s>`, 'Se desmarca')); });
       if (!pm && (x.rpor || x.vb)) out.push(`<span class="pp-dt-c">${[x.rpor ? 'R. Por' : '', x.vb ? 'V.B.' : ''].filter(Boolean).join(' + ')}</span>`);
@@ -17626,7 +17626,7 @@
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="resumen" title="Copia en texto los cambios, errores y avisos para compartirlos o revisarlos más rápido">Copiar resumen</button>
         <button type="button" data-a="cerrar-vista" title="Volver al portal (lo editado queda guardado en este navegador)">Cerrar</button>
-        <button type="button" data-a="sap" class="primario" title="Revisa los cambios con las reglas del portal, muestra cada escritura y pide confirmación antes de escribir en SAP">Guardar en SAP…</button></div>
+        <button type="button" data-a="sap" class="primario" title="Revisa los cambios con las reglas del portal, muestra cada escritura y pide confirmación antes de escribir en SAP (Ctrl+Enter)">Guardar en SAP…</button></div>
         <div class="pp-resumen"><span class="pp-pend-btn">${n.total} cambio${n.total === 1 ? '' : 's'}</span>${(() => { const pr = erroresPropios().reduce((k, [, l]) => k + l.filter((x) => x.nivel === 'error').length, 0), her = n.errores - pr;   // v1.129.0: lo que ya venía de SAP aparte (no frena)
           return (pr ? `<button type="button" class="pp-pend-btn err" data-a="pendientes">✕ ${pr} por corregir</button>` : '') + (her > 0 ? `<button type="button" class="pp-pend-btn avi" data-a="pendientes" title="Errores que el RMD ya tenía en SAP: no frenan «Guardar en SAP»">${her} de SAP por revisar</button>` : ''); })()}${n.avisos ? `<span class="pp-pend-btn avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</span>` : ''}${n.nuevos ? `<span class="pp-pend-btn crea">★ ${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'}</span>` : ''}</div></header>`;
     }
@@ -18214,6 +18214,24 @@
     app.addEventListener('change', (ev) => { const sel = ev.target.closest('select.pp-ir'); if (!sel || !sel.value) return; const id = sel.value; sel.value = ''; irA(id); });
     app.addEventListener('dblclick', (ev) => { const tr = ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target.closest('button') || MARCADOS.size) return; const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { const s2 = window.getSelection && window.getSelection(); if (s2) s2.removeAllRanges(); editar({ id: tr.dataset.id }); } });
     app.addEventListener('focusin', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (tr && ev.target === tr) seleccionar(tr.dataset.id); });
+    // v1.130.0: atajos de la Edición rápida sobre el paso seleccionado (↑/↓ elegir, Alt+↑/↓ mover, Enter editar, T tipo de dato, D Depende, Supr quitar; Ctrl+Enter guardar)
+    if (EMB) document.addEventListener('keydown', (e) => {
+      if (e.defaultPrevented || document.querySelector('.pp-modal-fondo, .pp-dt-pop')) return;
+      const enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); setTimeout(guardarEnSap, 0); return; }
+      if (enCampo || e.ctrlKey || e.metaKey || !SELECCION) return;
+      const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (!tr) return;
+      const pulsar = (a) => { const b = tr.querySelector(`[data-a="${a}"]`); if (b) { e.preventDefault(); b.click(); return true; } return false; };
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.altKey) { pulsar(e.key === 'ArrowUp' ? 'subir' : 'bajar'); setTimeout(() => { const t2 = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION || '')}"]`); if (t2) { t2.classList.add('sel'); t2.scrollIntoView({ block: 'nearest' }); } }, 60); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { const filas = $$('.pp-doc tr[data-id]').filter((y) => y.offsetParent), i = filas.indexOf(tr), sig = filas[i + (e.key === 'ArrowDown' ? 1 : -1)];
+        if (sig) { e.preventDefault(); seleccionar(sig.dataset.id); sig.scrollIntoView({ block: 'nearest' }); } return; }
+      if (e.altKey) return;
+      if (e.key === 'Enter' || e.key === 'F2') { if (tr.matches('.pp-paso, .pp-pm')) { e.preventDefault(); editar({ id: SELECCION }); } return; }
+      if (e.key === 'Delete') { pulsar('quitar'); return; }
+      const k = e.key.toLowerCase();
+      if (k === 't') { const b = tr.querySelector('[data-a="dt-rapido"]'); if (b) { e.preventDefault(); configRapida(SELECCION, b); } return; }
+      if (k === 'd') { const b = tr.querySelector('[data-a="dep-rapido"]:not(.no)'); if (b) { e.preventDefault(); depRapido(SELECCION, b); } return; }
+    });
     app.addEventListener('keydown', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target !== tr) return;
       if (ev.key === 'Enter') { const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { ev.preventDefault(); editar({ id: tr.dataset.id }); } } });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.pp-modal-fondo')) { if (MARCADOS.size) limpiarMarcados(); else if (SELECCION) seleccionar(null); } });
@@ -19283,8 +19301,11 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   // La vista completa (Documentación Técnica) muestra y edita la configuración de cada paso (tipo de dato, decimales, Depende, casillas, Clave Modelo,
   // Puesto de trabajo, color) y de cada etiqueta (Conforme, Proceso menor).
   let VISTA = null;
+  // v1.130.0: las Claves Modelo casi no cambian: se leen una vez por sesión (abre más rápido la Edición rápida)
+  let PP_CLAVES = null;
   async function ppClavesModelo(ctrl) {
-    try { return (await leerErp(ctrl.oModelErpNec, 'ClaveModeloSet', [])).map((x) => [norm(x.Vlsch), norm(x.Txt)]).filter((x) => x[0]); } catch (e) { return []; }
+    if (PP_CLAVES && Date.now() - PP_CLAVES.t < 30 * 60000) return PP_CLAVES.l;
+    try { const l = (await leerErp(ctrl.oModelErpNec, 'ClaveModeloSet', [])).map((x) => [norm(x.Vlsch), norm(x.Txt)]).filter((x) => x[0]); if (l.length) PP_CLAVES = { t: Date.now(), l }; return l; } catch (e) { return []; }
   }
   async function ppPuestosRmd(ctrl, recetas) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, rutas = new Map(); (recetas || []).forEach((r) => { if (r.plnnr) rutas.set(`${r.plnnr}|${r.alnal}`, r); });
@@ -19547,11 +19568,16 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     window.__rmdStats.plantilla.rehacer = () => bRehacer.click();
     v.pie.append(...(an.enSap.length && !errores ? [bRehacer] : []));
     // v1.123.0: el borrador (de Producción o de la vista) en la vista simple dentro del portal, con la vista completa de Documentación Técnica
+    // v1.130.0 (pedido de CINTIA): el borrador se abre en la misma Edición rápida del portal (con Observaciones, Depende, configuración y uso de pasos);
+    // reemplaza a «Abrir como HTML», que abría el editor de Producción y daba otra interfaz
     const bVista = extra.desdeVista ? botonModal('Volver a la vista', '', () => v.cerrar()) : botonModal('Abrir en Edición rápida', '', async () => {
-      bVista.disabled = true; try { const ctrl = controladorPrincipal(); const [claves, puestos] = await Promise.all([ppClavesModelo(ctrl), ppPuestosRmd(ctrl, [])]); v.cerrar(); await montarVista(datos, { ...prop, guardado: prop.guardado || new Date().toISOString() }, { claves, puestos }); }
+      bVista.disabled = true; try { const ctrl = controladorPrincipal(), md = an.destino || datos.rmd, rmdV = { ...datos.rmd, mdId: md.mdId, codigo: String(md.codigo), version: md.version, estado: md.estado || datos.rmd.estado, observacion: md.observacion != null ? md.observacion : datos.rmd.observacion };
+        const previa = await (async () => { try { const vA = +rmdV.version || 0; return (await versionesConPlanta(ctrl.getView().getModel('mainModelv2'), rmdV.principal)).filter((m) => m.mdId !== rmdV.mdId && !/cancel/i.test(m.estado) && (+m.version || 0) < vA).sort((a, b) => (+b.version || 0) - (+a.version || 0))[0] || null; } catch (e) { return null; } })();
+        const [claves, puestos] = await Promise.all([ppClavesModelo(ctrl), ppPuestosRmd(ctrl, (datos.arbol && datos.arbol.recetas) || [])]); v.cerrar();
+        await montarVista({ ...datos, rmd: rmdV }, { ...prop, guardado: prop.guardado || new Date().toISOString() }, { claves, puestos, obs: /ingresad/i.test(rmdV.estado || ''), previa }); }
       catch (e) { toast('No se pudo abrir la vista: ' + e.message, true); bVista.disabled = false; } });
     bVista.title = extra.desdeVista ? 'Cierra esta revisión y vuelve a la vista para seguir editando' : 'Abre este borrador en la vista simple, aquí en el portal (con la vista completa de Documentación Técnica), para hacer los ajustes y guardar en SAP';
-    v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), ...(extra.desdeVista ? [] : [botonModal('Exportar Excel', '', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } })]), ...(extra.desdeVista ? [] : [bHtml]), bVista, bIngresar);
+    v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), ...(extra.desdeVista ? [] : [botonModal('Exportar Excel', '', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } })]), bVista, bIngresar);
     v.__pp = { datos, prop, an };
     window.__rmdStats.plantilla.ultimo = { datos, prop, an };
   }
