@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.130.0
+// @version      1.131.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.130.0';                                                       // mantener igual a @version
+  const VERSION = '1.131.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17452,7 +17452,8 @@
       else if (!d.dep) t = 'ninguno';
       else { const y = IDXP.get(d.dep); t = y ? (NUMW.get(y.p.id) || y.p.codigo || '(nuevo)') : (d.depTxt || 'otra parte'); }
       const b = BI.get(p.id), cam = b && b.dt && p.dt && String(b.dt.dep || '') !== String(p.dt.dep || '');
-      return `<button type="button" class="pp-dep-izq${mal ? ' mal' : falta ? ' falta' : ''}${cam ? ' cam' : ''}${sinPred ? ' no' : ''}" data-a="dep-rapido" data-id="${esc(p.id)}" title="${sinPred ? 'Los pasos de esta lista no llevan predecesor' : 'Depende de (paso predecesor) · clic para cambiarlo'}">↳ ${esc(t)}</button>`;
+      const y = d.dep ? IDXP.get(d.dep) : null, de = y ? `${NUMW.get(y.p.id) ? NUMW.get(y.p.id) + '.- ' : ''}${y.p.codigo ? '(' + y.p.codigo + ') ' : ''}${String(y.p.texto || '').slice(0, 120)}` : '';
+      return `<button type="button" class="pp-dep-izq${mal ? ' mal' : falta ? ' falta' : ''}${cam ? ' cam' : ''}${sinPred ? ' no' : ''}" data-a="dep-rapido" data-id="${esc(p.id)}" title="${sinPred ? 'Los pasos de esta lista no llevan predecesor' : de ? `Depende de ${esc(de)} · clic para cambiarlo` : 'Depende de (paso predecesor) · clic para cambiarlo'}">${mal ? '✕' : falta ? '⚠' : '↳'} ${esc(t)}</button>`;
     }
     function depRapido(id, ancla) {
       document.querySelectorAll('.pp-dt-pop').forEach((p2) => p2.remove());
@@ -18444,7 +18445,7 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor: pointer; border-style: dashed; } .pp-dt-c.pp-dt-btn:hover { border-color: var(--acento); color: var(--acento); }
 .pp-dt-pop { position: absolute; z-index: 60; width: 330px; padding: 10px 12px; background: #fff; border: 1px solid var(--bd); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12.5px "Segoe UI", Arial, sans-serif; }
 .pp-dt-pop .pp-campo { margin: 6px 0; } .pp-dt-pop .pp-pie { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; } .pp-dt-pop .pp-cfg-av:empty { display: none; }
-.pp-vista .pp-doc { padding-left: 120px; } .pp-vista tr.pp-paso { position: relative; }
+.pp-vista .pp-doc { position: relative; padding-left: 120px; } .pp-vista tr.pp-paso { position: relative; }
 .pp-dep-izq { position: absolute; left: -112px; top: 3px; width: 98px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 6px; border: 1px dashed var(--bd); border-radius: 9px; background: #f6f8fa; color: var(--mov); font: 11px/16px "Segoe UI", Arial, sans-serif; text-align: left; cursor: pointer; }
 .pp-dep-izq:hover { border-color: var(--acento); } .pp-dep-izq.cam { border-style: solid; border-color: #e0c27a; background: var(--cam-f); } .pp-dep-izq.falta { border-color: var(--cam); color: var(--cam); } .pp-dep-izq.mal { border: 1px solid var(--qui); color: var(--qui); background: var(--qui-f); } .pp-dep-izq.no { color: var(--ap); cursor: default; }
 .pp-dep-pop { width: 520px; } .pp-dep-rapidos { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .pp-dep-rapidos button { padding: 4px 10px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; cursor: pointer; } .pp-dep-rapidos button.primario { background: var(--acento); color: #fff; border-color: var(--acento); } .pp-dep-rapidos button.act { outline: 2px solid var(--agr); }
