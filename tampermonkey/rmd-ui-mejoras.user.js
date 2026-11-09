@@ -19754,7 +19754,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     PPN.detectarTildes(on('detectartildes')); PPN.tildes(!!(prop0.trabajo && prop0.trabajo.tildes));
     const manual = [], prop = { ...prop0, trabajo: ppSinInsumosNuevos(prop0.trabajo, manual) };
     prop.trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (PPN.cantRecetaCambiada(x)) manual.push(`Cambiar en la Lista de Materiales la cantidad del insumo ${x.comp || ''} — ${String(x.desc || '').slice(0, 50)}: ${x.cant == null ? '(vacía)' : x.cant} → ${x.cantNueva} ${x.um || ''} (receta del RMD). En el RMD no se puede editar.`); }));
-    const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
+    const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId && !an.mapa, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);
     if (an.enSap.length) { bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
