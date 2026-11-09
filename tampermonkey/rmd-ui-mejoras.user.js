@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.128.0
+// @version      1.128.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.128.0';                                                       // mantener igual a @version
+  const VERSION = '1.128.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17510,7 +17510,7 @@
         <label class="pp-detectar" title="Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde). Apagada por defecto"><input type="checkbox" id="pp-detectar"${PPN.detectarTildes() ? ' checked' : ''}> Detectar tildes</label>
         ${(() => { const nt = conTilde().length; return nt ? `<button type="button" data-a="quitar-tildes" class="pp-quitar-tildes">Quitar tildes (${nt})</button>` : ''; })()}
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
-        <button type="button" data-a="claude" title="Copia en texto los cambios, errores y avisos para pegarlos en el chat de Claude y revisarlos más rápido">Copiar para Claude</button>
+        <button type="button" data-a="resumen" title="Copia en texto los cambios, errores y avisos para compartirlos o revisarlos más rápido">Copiar resumen</button>
         <button type="button" data-a="guardar" title="Descarga el borrador (.html) para seguir otro día o enviarlo">Guardar borrador</button>
         <button type="button" data-a="cerrar-vista" title="Volver al portal (lo editado queda guardado en este navegador)">Cerrar</button>
         <button type="button" data-a="sap" class="primario" title="Revisa los cambios con las reglas del portal, muestra cada escritura y pide confirmación antes de escribir en SAP">Guardar en SAP…</button></div>
@@ -17526,7 +17526,7 @@
       EMB.guardar(clon(propActual()));
     }
     function cerrarVista() { if (!EMB || typeof EMB.cerrar !== 'function') return; if (sucio && !confirm('Lo editado no se guardó en SAP. Queda guardado en este navegador y se ofrece recuperarlo al volver a abrir la vista. ¿Cerrar?')) return; sucio = false; EMB.cerrar(); }
-    function textoParaClaude() {
+    function textoResumen() {
       const r = PQ.rmd, n = contar(), etiqueta = (id) => { const f = encontrar(id); return f ? `${NUMW.get(id) || PPN.numerar(W.estructuras, BASE.estructuras).get(id) || ''} ${String(f.item.texto || f.item.nombre || f.item.desc || '').slice(0, 70)}`.trim() : id; };
       const lineas = [`RMD ${r.codigo} v${r.version} · ${r.descripcion} · ${r.etapa} · ${r.planta} · ${r.estado || ''}`, `Vista ${DT ? 'completa (DT)' : 'simple'} · ${n.total} cambio(s), ${n.errores} error(es), ${n.avisos} aviso(s), ${n.nuevos} paso(s) nuevo(s)`, '', 'CAMBIOS'];
       CMB.forEach((c) => lineas.push(`- ${c.numero || ''} ${ETQ_ACCION[c.accion] || c.accion}${c.clase === 'pm' ? ' (proceso menor)' : ''} · ${c.lugar || ''}: ${c.accion === 'quitar' ? c.antes : c.campos ? `${String(c.texto || '').slice(0, 60)} — ${c.campos.map((y) => `${y.campo}: ${y.antes} → ${y.despues}`).join('; ')}` : `${c.antes ? c.antes + ' → ' : ''}${c.despues || c.texto || ''}`}${c.codigo ? ` (paso ${c.codigo})` : ''}${c.nuevo ? ' ★ nuevo' : ''}${c.comentario ? ` · comentario: ${c.comentario}` : ''}`));
@@ -17599,7 +17599,7 @@
         const R = OBS.revisar(obsTexto()); obsPoner(OBS.nomenclatura(obsTexto(), { ini, pri: v('pp-obs-pri'), com: v('pp-obs-com'), fase: v('pp-obs-fase') }, R.sugerida.reemplazar));
       }
     }
-    function copiarParaClaude() { const t = textoParaClaude(); const ok = () => aviso('Copiado: pégalo en el chat de Claude.'); try { navigator.clipboard.writeText(t).then(ok, () => { fallback(t); ok(); }); } catch (e) { fallback(t); ok(); } }
+    function copiarResumen() { const t = textoResumen(); const ok = () => aviso('Resumen copiado.'); try { navigator.clipboard.writeText(t).then(ok, () => { fallback(t); ok(); }); } catch (e) { fallback(t); ok(); } }
     function fallback(t) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) { /* sin portapapeles */ } ta.remove(); }
     if (EMB && EMB.dt == null) { let g = null; try { g = localStorage.getItem(CLAVE_DT); } catch (e) { g = null; } DT = g == null ? true : g === '1'; }   // desde el portal: vista completa salvo que se haya apagado
 
@@ -18008,7 +18008,7 @@
       else if (a === 'config') editarConfig(id);
       else if (a === 'config-etq') editarConfigEtiqueta(b.dataset.id);
       else if (a === 'sap') guardarEnSap();
-      else if (a === 'claude') copiarParaClaude();
+      else if (a === 'resumen') copiarResumen();
       else if (a.startsWith('obs-')) obsAccion(a, b);
       else if (a === 'cerrar-vista') cerrarVista();
       else if (a === 'comentar') comentar(id);
@@ -18084,7 +18084,7 @@
     function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
     window.addEventListener('beforeprint', () => { if (MARCADOS.size) { MARCADOS = new Set(); ANCLA = null; pintarTodo(); } const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion() + htmlDatosPdf(); });
     window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar(), seleccion: SELECCION, pdfHecho, guardadoUna, marcados: marcados(), porta: PORTA }), editar, quitar, mover, moverA, comentar, guardar, encontrar, buscador: () => BUS, irA, seleccionar,
-      marcar, duplicar, copiar, pegar, colocar, moverGrupo, quitarGrupo, listasDoc, editarConfig, editarConfigEtiqueta, textoParaClaude, propActual, guardarEnSap, dt: (v) => { if (v !== undefined) { DT = !!v; pintarTodo(); } return DT; } };   // pruebas
+      marcar, duplicar, copiar, pegar, colocar, moverGrupo, quitarGrupo, listasDoc, editarConfig, editarConfigEtiqueta, textoResumen, propActual, guardarEnSap, dt: (v) => { if (v !== undefined) { DT = !!v; pintarTodo(); } return DT; } };   // pruebas
     iniciar();
   }
   // Estilos de la plantilla (pdfMake, Roboto 9 pt; 1 pt ≈ 1,4 px en pantalla).

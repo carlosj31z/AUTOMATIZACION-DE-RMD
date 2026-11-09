@@ -1,0 +1,71 @@
+<!--
+  App nueva «Borradores de RMD» para Producción (no es Excel: se edita en pantalla).
+  DÓNDE: app/borrador-produccion/webapp/view/Editor.view.xml. Se publica como tile en el sitio
+  portalprd de SAP Build Work Zone, visible solo con la colección «RMD Borrador - Producción».
+  La hoja se ve como el PDF del master: encabezado, Equipos, Insumos y el Procedimiento con su numeración.
+  Cada fila tiene sus acciones a la derecha; los cambios se guardan solos en MD_BORRADOR_CAMBIO.
+-->
+<mvc:View controllerName="rmd.borrador.produccion.controller.Editor"
+  xmlns="sap.m" xmlns:mvc="sap.ui.core.mvc" xmlns:t="sap.ui.table" xmlns:f="sap.f" xmlns:core="sap.ui.core">
+
+  <f:DynamicPage id="pagina" showFooter="true">
+    <f:title>
+      <f:DynamicPageTitle>
+        <f:heading><Title text="Borrador N° {borrador>numero} · RMD {borrador>mdCodigo} v{borrador>mdVersion}" /></f:heading>
+        <f:actions>
+          <Button text="Ir a sección…" icon="sap-icon://navigation-down-arrow" press=".onIrASeccion" />
+          <Button text="Deshacer" icon="sap-icon://undo" press=".onDeshacer" />
+          <Button text="Vista PDF" icon="sap-icon://pdf-attachment" press=".onVistaPdf" />
+        </f:actions>
+      </f:DynamicPageTitle>
+    </f:title>
+
+    <f:header>
+      <f:DynamicPageHeader>
+        <!-- Pasos del trabajo, como una barra de avance -->
+        <HBox class="sapUiSmallMargin" alignItems="Center">
+          <ObjectStatus text="1. Cambios ({vista>/totalCambios})" state="{= ${vista>/totalCambios} > 0 ? 'Success' : 'None'}" class="sapUiSmallMarginEnd" />
+          <ObjectStatus text="2. Solicitud" state="{= ${borrador>motivo} ? 'Success' : 'Warning'}" class="sapUiSmallMarginEnd" />
+          <ObjectStatus text="3. Enviar al equipo RMD" state="{= ${borrador>estado} === 'ENVIADO' ? 'Success' : 'None'}" />
+        </HBox>
+      </f:DynamicPageHeader>
+    </f:header>
+
+    <f:content>
+      <!-- Procedimiento: árbol estructura › etiqueta › paso › proceso menor / insumo -->
+      <t:TreeTable id="arbol" rows="{path: 'hoja>/nodos', parameters: {arrayNames: ['hijos']}}"
+        selectionMode="Single" visibleRowCountMode="Auto" rowActionCount="3">
+        <t:columns>
+          <t:Column width="7rem"><Label text="N°" /><t:template><Text text="{hoja>numeracion}" /></t:template></t:Column>
+          <t:Column><Label text="Descripción" />
+            <t:template>
+              <HBox>
+                <Text text="{hoja>texto}" class="{= ${hoja>marca} ? 'rmdMarca' + ${hoja>marca} : ''}" />
+                <ObjectStatus visible="{= !!${hoja>aviso}}" text="{hoja>aviso}" state="Warning" class="sapUiTinyMarginBegin" />
+              </HBox>
+            </t:template>
+          </t:Column>
+          <t:Column width="9rem"><Label text="Código" /><t:template><Text text="{hoja>codigo}" /></t:template></t:Column>
+          <t:Column width="10rem"><Label text="Rango" /><t:template><Text text="{hoja>rangoTexto}" /></t:template></t:Column>
+          <t:Column width="8rem"><Label text="R. Por / V.B." /><t:template><Text text="{= (${hoja>rpor} ? 'R. Por ' : '') + (${hoja>vb} ? 'V.B.' : '')}" /></t:template></t:Column>
+        </t:columns>
+        <t:rowActionTemplate>
+          <t:RowAction>
+            <t:RowActionItem icon="sap-icon://edit" text="Editar" press=".onEditar" />
+            <t:RowActionItem icon="sap-icon://add" text="Paso debajo" press=".onAgregarDebajo" />
+            <t:RowActionItem icon="sap-icon://overflow" text="Más" press=".onMasAcciones" />
+          </t:RowAction>
+        </t:rowActionTemplate>
+      </t:TreeTable>
+    </f:content>
+
+    <f:footer>
+      <OverflowToolbar>
+        <ToolbarSpacer />
+        <Button text="Solicitud" icon="sap-icon://request" press=".onSolicitud" />
+        <Button text="Enviar al equipo RMD" type="Emphasized" icon="sap-icon://paper-plane" press=".onEnviar"
+          enabled="{= ${borrador>estado} === 'BORRADOR' &amp;&amp; ${vista>/totalCambios} > 0 }" />
+      </OverflowToolbar>
+    </f:footer>
+  </f:DynamicPage>
+</mvc:View>

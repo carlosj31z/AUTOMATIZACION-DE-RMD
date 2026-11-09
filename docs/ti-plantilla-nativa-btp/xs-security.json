@@ -1,0 +1,18 @@
+{
+  "_comentario": "DÓNDE: unir estos scopes y roles al xs-security.json que ya tiene el portal RMD (no reemplazar el archivo). Luego, en BTP Cockpit > Subcuenta > Security > Role Collections, crear las colecciones y asignarlas por grupos del IdP.",
+  "scopes": [
+    { "name": "$XSAPPNAME.RMD_Borrador_Produccion", "description": "Producción: generar, editar y enviar borradores" },
+    { "name": "$XSAPPNAME.RMD_Equipo", "description": "Equipo RMD: revisar, ingresar, rechazar y revertir borradores" },
+    { "name": "$XSAPPNAME.RMD_Calidad", "description": "Calidad: leer borradores, escrituras y audit trail" }
+  ],
+  "role-templates": [
+    { "name": "RMD_Borrador_Produccion", "scope-references": ["$XSAPPNAME.RMD_Borrador_Produccion"] },
+    { "name": "RMD_Equipo", "scope-references": ["$XSAPPNAME.RMD_Equipo"] },
+    { "name": "RMD_Calidad", "scope-references": ["$XSAPPNAME.RMD_Calidad"] }
+  ],
+  "role-collections": [
+    { "name": "RMD Borrador - Producción", "role-template-references": ["$XSAPPNAME.RMD_Borrador_Produccion"] },
+    { "name": "RMD Borrador - Equipo RMD", "role-template-references": ["$XSAPPNAME.RMD_Equipo"] },
+    { "name": "RMD Borrador - Calidad (lectura)", "role-template-references": ["$XSAPPNAME.RMD_Calidad"] }
+  ]
+}
