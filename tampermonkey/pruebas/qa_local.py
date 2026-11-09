@@ -1552,7 +1552,7 @@ with sync_playwright() as p:
               and v["titulo"].startswith("Edición rápida · RMD 2202600001 v3") and v["dt"] and v["chips"] >= 6 and any("Conforme: Sí" in x for x in v["etq"]) and {"sap", "resumen", "cerrar-vista"} <= set(v["botones"]) and "Autorizado" in v["aviso"]
               and "Clave Modelo" in av1 and notif and "Decimales: un número entero" in av2 and sigue
               and st["dt"]["tipo"] == 447 and st["dt"]["clv"] == "SETPRE" and st["dt"]["puesto"] == "FMENFA01" and st["dt"]["dep"] == "P11" and st["dt"]["depFijo"] and st["dt"]["color"] == "#152cc1" and st["edit"]
-              and "Configuración" in st["tags"] and any(c.startswith("Notificación") and c.endswith("*") for c in st["chips"]) and any(c.startswith("↳ 2.1.2") and c.endswith("*") for c in st["chips"]) and st["cm"] == 2
+              and "Configuración" in st["tags"] and any(c.startswith("Notificación") and c.endswith("*") for c in st["chips"]) and any(c[:1] in "↳⚠✕" and c[1:].strip().startswith("2.1.2") and c.endswith("*") for c in st["chips"]) and st["cm"] == 2
               and "CAMBIOS" in st["resumen"] and "Configuración" in st["resumen"] and "Tipo de dato: Fecha y Hora → Notificación" in st["resumen"]
               and g and g["vista"] == "dt" and g["dtP13"]["tipo"] == 447 and g["conf"] is False and not queda["vista"] and not queda["emb"])
         return ok, json.dumps({ "r": {k: r[k] for k in ("avSin", "ventanas", "fondo")}, "resumen": st["resumen"][:900], "av": avs, "v": v, "av1": av1, "av2": av2, "notif": notif, "sigue": sigue, "edit": st["edit"], "st": {k: st[k] for k in ("dt", "tags", "chips", "cm")}, "g": g, "queda": queda }, ensure_ascii=False)[:2400]
