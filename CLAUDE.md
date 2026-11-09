@@ -43,6 +43,11 @@ cuenta). Escribir y responder siempre en **español**.
 - Cada persona usa **su cuenta de Claude y su sesión de SAP**; la memoria de
   Claude no se comparte entre cuentas: lo compartido es este repo y la hoja de
   seguimiento (un reclamo por RMD, para no pisarse).
+- **Homologación de pasos: `docs/homologacion_rmd.md`** (2026-11-09, de comparar 136 autorizados de fase 2 de ATE y
+  LIMA con sus versiones anteriores y los 411 F2 de Envase y Acondicionado). La homologación se hace **cambiando el
+  paso por el código vigente del maestro**, no editando el texto: tabla `src/rmd_automation/datos/homologacion_pasos.csv`
+  y reglas de texto en `rmd_automation.homologacion` (`homologar`, `reemplazo_de_paso`). Ej.: 161493/1655 (PDSG-202) →
+  182341 (PDOC-207); 31840 («hagan») → 62221 en ATE, 166452 en LIMA.
 - **Analizar e inferir con evidencia; lo que no quede claro se deja como
   CONSULTA** (columna Consultas de la hoja y sección del reporte) y se sigue con
   lo demás. Nunca se escribe en SAP un supuesto ni sin el OK escrito de la
