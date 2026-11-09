@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.129.0
+// @version      1.129.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.129.0';                                                       // mantener igual a @version
+  const VERSION = '1.129.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17170,6 +17170,7 @@
         <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${contar().total}</b>`}</button>${htmlMulti()}`;
       window.scrollTo(0, y);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
+      pintarSel();
       document.title = `${sucio ? '● ' : ''}${PPN.nombreArchivo('Borrador', PQ.rmd, new Date()).replace(/ \d{4}-\d\d-\d\d$/, '')}`;   // también nombre sugerido del PDF
     }
     // v1.129.0: en la Edición rápida quien edita es el equipo RMD: los avisos no hablan de «el equipo RMD lo creará»
@@ -17380,7 +17381,7 @@
       if (filtro === 'avisos') cuerpo = conAviso.length ? conAviso.map(([id, l]) => { const f = encontrar(id); return `<button type="button" class="pp-cmb" data-ir="${esc(id)}"><b>${esc(f ? (f.item.texto || f.item.nombre || f.item.desc || '') : '').slice(0, 70)}</b>${l.filter((a) => a.nivel !== 'info').map((a) => `<span class="pp-cmb-av ${a.nivel}">${esc(a.texto)}</span>`).join('')}</button>`; }).join('') : '<p class="pp-nota">Sin avisos.</p>';
       else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ' <span class="pp-tag crea">★ se creará</span>' : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.accion === 'config' ? `${c.texto ? String(c.texto).slice(0, 40) + ': ' : ''}${(c.campos || []).map((y) => `${y.campo} ${y.antes} → ${y.despues}`).join('; ')}` : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
       if (filtro === 'todos' && obsCambiada()) cuerpo = `<button type="button" class="pp-cmb cambiar" data-a="ir-obs"><b>Observaciones</b><br><span>Cambiadas: se guardan con «Guardar en SAP»</span></button>` + (lista.length ? cuerpo : '');   // v1.129.0: cuentan en «Cambios»
-      return `<div class="pp-panel-cab"><b>${EMB ? 'Cambios por guardar' : 'Cambios del borrador'}</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
+      return `<div id="pp-sel-cfg">${htmlSelCfg()}</div><div class="pp-panel-cab"><b>${EMB ? 'Cambios por guardar' : 'Cambios del borrador'}</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
     }
     const htmlPegarFinal = (ref) => (PORTA ? `<button type="button" class="pp-mas pp-pegar" data-a="pegar-final" data-lista="${esc(ref)}">📋 Pegar aquí al final ${PORTA.length === 1 ? 'el paso copiado' : `los ${PORTA.length} pasos copiados`}</button>` : '');
     // Barra de varios pasos: aparece con pasos marcados o copiados
@@ -17993,6 +17994,45 @@
       SELECCION = id || null; $$('.pp-doc tr.sel').forEach((x) => x.classList.remove('sel'));
       const doc = $('#pp-doc'); if (doc) doc.classList.toggle('con-sel', !!SELECCION);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
+      pintarSel();
+    }
+    // v1.129.0 (pedido de CINTIA): la configuración del paso seleccionado, siempre a la vista en el panel y editable ahí mismo
+    const pintarSel = () => { const c = document.getElementById('pp-sel-cfg'); if (c) c.innerHTML = htmlSelCfg(); };
+    function htmlSelCfg() {
+      if (!EMB || !DT) return '';
+      const f = SELECCION && encontrar(SELECCION);
+      if (!f || (f.clase !== 'paso' && f.clase !== 'pm') || f.item.insumo) return '';
+      const x = f.item, pm = f.clase === 'pm', num = NUMW.get(x.id) || '';
+      if (x.quitado) return '';
+      const d = x.dt || dtInicial(x, pm), t = +d.tipo, v = (y) => esc(y == null ? '' : y), b = BI.get(x.id), cam = new Set(b && b.dt && x.dt ? PPN.dtCambios(b, x, pm ? 'pm' : 'paso').map((c) => c.k) : []);
+      const tipos = Object.entries(TIPOS()).sort((a2, b2) => +a2[0] - +b2[0]); if (t && !TIPOS()[t]) tipos.push([String(t), `Tipo ${t}`]);
+      const conDec = t === PPN.DT_RANGO || t === 434 || t === 438 || (d.dec != null && d.dec !== ''), conRango = t === PPN.DT_RANGO || [x.vi, x.vf, x.margen].some((y) => y != null && y !== '');
+      const ck = (k, n, val) => `<label class="${cam.has(k) ? 'cam' : ''}"><input type="checkbox" data-sc="${k}"${val ? ' checked' : ''}> ${n}</label>`;
+      const r = IDXP.get(x.id), sinPred = r && PPN.listaSinPredecesor(r.e, r.t);
+      const l = (AV.get(x.id) || []).filter((a) => a.nivel !== 'info'), avs = l.length ? `<div class="pp-sel-av ${l.some((a) => a.nivel === 'error') ? 'error' : 'aviso'}" title="${esc(l.map((a) => a.texto).join('\n'))}">${l.some((a) => a.nivel === 'error') ? '✕' : '⚠'} ${esc(l[0].texto.split(':')[0])}${l.length > 1 ? ` (+${l.length - 1})` : ''}</div>` : '';
+      // compacta (pedido de CINTIA): una línea por grupo, sin títulos largos
+      return `<div class="pp-sel"><div class="pp-sel-tit" title="${esc(x.texto || '')}"><b>${esc(num ? num + '.-' : '')}${x.codigo ? ' ' + esc(x.codigo) : ' nuevo'}</b> ${esc(String(x.texto || '').slice(0, 60))}</div>
+        <div class="pp-sel-f"><select data-sc="tipo" class="${cam.has('tipo') ? 'cam' : ''}" title="Tipo de dato">${tipos.map(([k, n]) => `<option value="${esc(k)}"${+k === t ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>${conDec ? `<input data-sc="dec" class="pp-sel-n${cam.has('dec') ? ' cam' : ''}" inputmode="numeric" placeholder="Dec." title="Decimales (0 a 6)" value="${v(d.dec)}">` : ''}</div>
+        ${conRango ? `<div class="pp-sel-f"><input data-sc="vi" inputmode="decimal" placeholder="Inicial" title="Valor inicial" value="${v(x.vi)}"><input data-sc="vf" inputmode="decimal" placeholder="Final" title="Valor final" value="${v(x.vf)}"><input data-sc="mg" inputmode="decimal" placeholder="±" title="Margen" value="${v(x.margen)}"></div>` : ''}
+        ${!pm && t === PPN.DT_NOTIF ? `<div class="pp-sel-f"><input data-sc="clv" class="${cam.has('clv') ? 'cam' : ''}" list="pp-sel-clv" autocomplete="off" placeholder="Clave Modelo" title="Clave Modelo" value="${v(d.clv)}"><datalist id="pp-sel-clv">${((EMB && EMB.claves) || []).map(([k, n]) => `<option value="${esc(k)}">${esc(n || '')}</option>`).join('')}</datalist><input data-sc="puesto" class="${cam.has('puesto') ? 'cam' : ''}" list="pp-sel-pu" autocomplete="off" placeholder="Puesto" title="Puesto de trabajo" value="${v(d.puesto)}"><datalist id="pp-sel-pu">${((EMB && EMB.puestos) || []).map((k) => `<option value="${esc(k)}"></option>`).join('')}</datalist></div>` : ''}
+        ${pm || sinPred ? '' : `<div class="pp-sel-f">Depende ${htmlDepIzq(x).replace('pp-dep-izq', 'pp-dep-izq pp-dep-panel')}</div>`}
+        <div class="pp-sel-cas">${ck('edit', 'Edit', d.edit)}${ck('cc', 'CC', d.cc)}${ck('mov', 'Mov.', d.mov)}${ck('genpp', 'Gen PP', d.genpp)}${pm ? ck('tab', 'Tab', d.tab) : ck('pmop', 'PM OP', d.pmop) + `<label><input type="checkbox" data-sc="rpor"${x.rpor ? ' checked' : ''}> R.Por</label><label><input type="checkbox" data-sc="vb"${x.vb ? ' checked' : ''}> V.B.</label>`}<button type="button" class="pp-sel-mas" data-a="config" data-id="${esc(x.id)}" title="Todas las opciones, con el color">⚙</button></div>${avs}</div>`;
+    }
+    function cambioSel(el) {
+      const id = SELECCION, f = id && encontrar(id); if (!f) return;
+      const x = f.item, pm = f.clase === 'pm', k = el.dataset.sc, val = el.type === 'checkbox' ? el.checked : String(el.value).trim();
+      if (k === 'dec' && val !== '' && (!/^\d+$/.test(val) || +val > 6)) { aviso('Decimales: un número entero de 0 a 6.'); pintarSel(); return; }
+      if (['vi', 'vf', 'mg'].includes(k) && val !== '' && Number.isNaN(Number(String(val).replace(',', '.')))) { aviso('Rango: usa solo números (con punto o coma para los decimales).'); pintarSel(); return; }
+      cambio(() => { const v = encontrar(id).item, d = { ...(v.dt || dtInicial(v, pm)) };
+        if (k === 'tipo') { const t = +val; if (t !== +d.tipo) { d.edit = PPN.DT_TIPOS_CON_EDIT.has(t); if (!pm && [439, 440, 441].includes(t)) { v.rpor = t !== 440; v.vb = t !== 439; } } d.tipo = t; v.tipo = t; }
+        else if (k === 'dec') d.dec = val === '' ? null : String(+val);
+        else if (k === 'vi' || k === 'vf') v[k] = val === '' ? null : val;
+        else if (k === 'mg') v.margen = val === '' ? null : val;
+        else if (k === 'clv') d.clv = val || null;
+        else if (k === 'puesto') d.puesto = val ? val.toUpperCase() : null;
+        else if (k === 'rpor' || k === 'vb') v[k] = val;
+        else d[k] = val;
+        v.dt = d; v.edit = d.edit; });
     }
     function quitar(id) {
       cambio(() => { const f = encontrar(id); if (!BI.has(id)) { f.lista.splice(f.lista.findIndex((y) => y.id === id), 1); return; } f.item.quitado = true; });
@@ -18113,7 +18153,8 @@
     app.addEventListener('focusin', (ev) => { if (ev.target.id === 'pp-obs-ta') obsAntes = clon({ W, SOL }); });
     app.addEventListener('input', (ev) => { if (ev.target.id !== 'pp-obs-ta' || !OBS || !OBS.editable) return; if (obsAntes) { deshacer.push(obsAntes); if (deshacer.length > 60) deshacer.shift(); obsAntes = null; } W.obs = ev.target.value; sucio = true; pdfHecho = false; clearTimeout(obsT);
       obsT = setTimeout(() => { guardarLocal(); const d = document.querySelector('.pp-obs-der'); if (d) d.innerHTML = htmlObsRevision(); }, 250); });
-    app.addEventListener('change', (ev) => { if (ev.target.id === 'pp-obs-ta') { clearTimeout(obsT); guardarLocal(); pintarTodo(); return; }
+    app.addEventListener('change', (ev) => { if (ev.target.dataset && ev.target.dataset.sc && ev.target.closest('#pp-sel-cfg')) { cambioSel(ev.target); return; }
+      if (ev.target.id === 'pp-obs-ta') { clearTimeout(obsT); guardarLocal(); pintarTodo(); return; }
       if (ev.target.id === 'pp-vista-dt') { DT = ev.target.checked; try { localStorage.setItem(CLAVE_DT, DT ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } pintarTodo(); return; }
       if (ev.target.id === 'pp-detectar') { const v = ev.target.checked; PPN.detectarTildes(v); try { if (v) localStorage.setItem(CLAVE_DETECTAR, '1'); else localStorage.removeItem(CLAVE_DETECTAR); } catch (e) { /* sin almacenamiento */ } pintarTodo(); return; }
       if (ev.target.id === 'pp-tildes') { const v = ev.target.checked; cambio(() => { if (v) W.tildes = true; else delete W.tildes; }); } });   // Shift+clic marca un tramo sin seleccionar texto
@@ -18125,7 +18166,7 @@
       const fb = ev.target.closest('[data-filtro]'); if (fb) { filtro = fb.dataset.filtro; $('#pp-panel').innerHTML = htmlPanel(); return; }
       const ir = ev.target.closest('[data-ir]'); if (ir) { if (panelAbierto && window.matchMedia('(max-width: 1340px)').matches) { panelAbierto = false; pintarTodo(); } irA(ir.dataset.ir); seleccionar(ir.dataset.ir); return; }
       const b = ev.target.closest('button[data-a]');
-      if (!b) { if (ev.target.closest('select, input, textarea, a')) return; const tr = ev.target.closest('.pp-doc tr[data-id]');
+      if (!b) { if (ev.target.closest('select, input, textarea, a, label, .pp-panel')) return; const tr = ev.target.closest('.pp-doc tr[data-id]');
         if (tr && tr.matches('.pp-paso:not(.qui)') && (ev.ctrlKey || ev.metaKey || ev.shiftKey || MARCADOS.size)) { marcar(tr.dataset.id, ev.shiftKey); seleccionar(tr.dataset.id); return; }
         seleccionar(tr ? tr.dataset.id : null); return; }
       const a = b.dataset.a, fila = b.closest('[data-id]'), id = b.dataset.id || (fila && fila.dataset.id);
@@ -18393,6 +18434,14 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
 .pp-dep-op { display: flex; gap: 6px; align-items: baseline; width: 100%; padding: 4px 6px; border: 1px solid transparent; border-radius: 5px; background: none; text-align: left; cursor: pointer; } .pp-dep-op:hover { border-color: var(--acento); } .pp-dep-op.act { background: var(--agr-f); border-color: var(--agr); } .pp-dep-op.sug { border-color: var(--mov); }
 .pp-dep-op b { flex: 0 0 52px; } .pp-dep-op .cod { flex: 0 0 52px; color: var(--ap); } .pp-dep-op .tx { flex: 1 1 auto; } .pp-dep-op .tp { flex: 0 0 auto; font-size: 11px; color: var(--mov); } .pp-dep-op .tp.sin { color: var(--ap); }
 @media print { .pp-dep-izq { display: none !important; } }
+#pp-sel-cfg { flex: 0 0 auto; border-bottom: 1px solid var(--bd2); } #pp-sel-cfg:empty { display: none; }
+.pp-sel { padding: 7px 10px; font-size: 11.5px; } .pp-sel-tit { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ap); margin-bottom: 4px; } .pp-sel-tit b { color: var(--tx); }
+.pp-sel-f { display: flex; gap: 4px; align-items: center; margin: 3px 0; } .pp-sel-f select, .pp-sel-f input { flex: 1 1 0; min-width: 0; padding: 2px 5px; height: 24px; border: 1px solid var(--bd); border-radius: 5px; font: inherit; }
+.pp-sel-f .pp-sel-n { flex: 0 0 52px; } .pp-sel .cam, .pp-sel-cas label.cam { border-color: #e0c27a; background: var(--cam-f); }
+.pp-sel-cas { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 3px 0 0; } .pp-sel-cas label { white-space: nowrap; } .pp-sel-cas input { margin: 0 2px 0 0; vertical-align: -2px; }
+.pp-dep-izq.pp-dep-panel { position: static; flex: 1 1 auto; width: auto; padding: 1px 6px; }
+.pp-sel-mas { margin-left: auto; padding: 0 7px; height: 20px; border: 1px solid var(--bd); border-radius: 5px; background: #fff; cursor: pointer; font-size: 12px; }
+.pp-sel-av { margin-top: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: help; } .pp-sel-av.error { color: var(--qui); } .pp-sel-av.aviso { color: var(--cam); }
 .pp-dt-color { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; }
 .pp-cfg .pp-campo select, .pp-cfg .pp-campo input:not([type]) { width: 100%; } .pp-cfg-fila { display: flex; gap: 6px; } .pp-cfg-fila select { flex: 1; min-width: 0; } .pp-cfg-fila button { flex: none; height: 30px; padding: 0 10px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; }
 .pp-cfg-notif { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; } .pp-cfg-notif .pp-nota { grid-column: 1 / -1; } .pp-cfg-notif.apagado { opacity: .5; } .pp-cfg input[type=color] { width: 44px; height: 26px; padding: 0 2px; vertical-align: middle; }

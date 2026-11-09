@@ -274,7 +274,8 @@ cuenta). Escribir y responder siempre en **español**.
   **Regla de CINTIA: «VM» solo en Observaciones; en la Edición rápida y las plantillas («Estado / Fecha / Por», `ppEstadoFechaPor`) va KMORENOM.**
   Configuración rápida del tipo de dato (clic en su etiqueta) y «Depende» visible a la izquierda con selector (pedidos de CINTIA).
   1.129.0 publicada en SharePoint el 2026-11-09 (2 192 463 bytes). PR #88.
-  **La siguiente versión debe ser > 1.129.0.**
+- 2026-11-09, v1.129.1: configuración del paso seleccionado fija en el panel de la Edición rápida (`htmlSelCfg`/`cambioSel`), pedido de CINTIA.
+  **La siguiente versión debe ser > 1.129.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
