@@ -265,7 +265,18 @@ cuenta). Escribir y responder siempre en **español**.
   regla de CINTIA) con uso en masters Autorizados/Ingresados (`usoDePasos`), fecha y creador (`nombresCreadores`) y orden «Sugerido»
   (`puntuarSugerencias`: parecido 55 %, uso 30 %, mismo tipo de dato, sin tildes). Encaje de ventanas: `encajarEnPantalla` (clase
   `rmd-encajada` en `.rmd-modal` que no cabe; menús flotantes se corren). Prueba `pruebas/qa_pasos_similares.py`.
-  **La siguiente versión debe ser > 1.128.0.**
+- 2026-11-09, v1.129.0 (incluye la 1.128.1): **pedido de CINTIA: Edición rápida más limpia**, probada en el portal (RMD 2202609013):
+  «Guardar en SAP…» directo a «Ingresar en SAP» (`vistaGuardar`; revisión solo si hay algo que decidir), errores heredados de SAP no
+  frenan (`erroresIniciales`/`erroresPropios` en el editor, `ppErroresDeCambios` en el portal), aviso de éxito del portal aceptado solo
+  (`responderMensajesPortal`), Deshacer con Observaciones, vista releída al cerrar el ingreso, fuera «Guardar borrador»/«Comentar» y
+  duplicados de ⚙ Configuración en la vista; `[hidden]` respetado en el CSS del editor.
+  Uso de cada paso sugerido (Aut./Ing.) con `usoDePasosPorCodigo` (`emb.uso`); casilla «Vista completa (DOC)» (pedido de CINTIA).
+  **Regla de CINTIA: «VM» solo en Observaciones; en la Edición rápida y las plantillas («Estado / Fecha / Por», `ppEstadoFechaPor`) va KMORENOM.**
+  Configuración rápida del tipo de dato (clic en su etiqueta) y «Depende» visible a la izquierda con selector (pedidos de CINTIA).
+  1.129.0 publicada en SharePoint el 2026-11-09 (2 192 463 bytes). PR #88 (también lleva 1.129.1 y 1.130.0).
+- 2026-11-09, v1.129.1: configuración del paso seleccionado fija en el panel de la Edición rápida (`htmlSelCfg`/`cambioSel`), pedido de CINTIA.
+- 2026-11-09, v1.130.0 (incluye 1.129.x): atajos de teclado en la Edición rápida, sin chip «Depende» repetido, caché de Claves Modelo y borrador importado abierto en la Edición rápida (sin «Abrir como HTML»), pedidos de CINTIA.
+  **La siguiente versión debe ser > 1.130.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
