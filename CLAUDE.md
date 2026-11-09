@@ -265,7 +265,13 @@ cuenta). Escribir y responder siempre en **español**.
   regla de CINTIA) con uso en masters Autorizados/Ingresados (`usoDePasos`), fecha y creador (`nombresCreadores`) y orden «Sugerido»
   (`puntuarSugerencias`: parecido 55 %, uso 30 %, mismo tipo de dato, sin tildes). Encaje de ventanas: `encajarEnPantalla` (clase
   `rmd-encajada` en `.rmd-modal` que no cabe; menús flotantes se corren). Prueba `pruebas/qa_pasos_similares.py`.
-  **La siguiente versión debe ser > 1.128.0.**
+- 2026-11-09, v1.129.0 (incluye la 1.128.1): **pedido de CINTIA: Edición rápida más limpia**, probada en el portal (RMD 2202609013):
+  «Guardar en SAP…» directo a «Ingresar en SAP» (`vistaGuardar`; revisión solo si hay algo que decidir), errores heredados de SAP no
+  frenan (`erroresIniciales`/`erroresPropios` en el editor, `ppErroresDeCambios` en el portal), aviso de éxito del portal aceptado solo
+  (`responderMensajesPortal`), Deshacer con Observaciones, vista releída al cerrar el ingreso, fuera «Guardar borrador»/«Comentar» y
+  duplicados de ⚙ Configuración en la vista; `[hidden]` respetado en el CSS del editor.
+  Uso de cada paso sugerido (Aut./Ing.) con `usoDePasosPorCodigo` (`emb.uso`); casilla «Vista completa (DOC)» (pedido de CINTIA).
+  **La siguiente versión debe ser > 1.129.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
