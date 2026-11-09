@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.131.0
+// @version      1.131.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.131.0';                                                       // mantener igual a @version
+  const VERSION = '1.131.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17170,7 +17170,7 @@
         <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${contar().total}</b>`}</button>${htmlMulti()}`;
       window.scrollTo(0, y);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
-      pintarSel(); dibujarDeps();
+      pintarSel();
       document.title = `${sucio ? '● ' : ''}${PPN.nombreArchivo('Borrador', PQ.rmd, new Date()).replace(/ \d{4}-\d\d-\d\d$/, '')}`;   // también nombre sugerido del PDF
     }
     // v1.129.0: en la Edición rápida quien edita es el equipo RMD: los avisos no hablan de «el equipo RMD lo creará»
@@ -17454,48 +17454,6 @@
       const b = BI.get(p.id), cam = b && b.dt && p.dt && String(b.dt.dep || '') !== String(p.dt.dep || '');
       const y = d.dep ? IDXP.get(d.dep) : null, de = y ? `${NUMW.get(y.p.id) ? NUMW.get(y.p.id) + '.- ' : ''}${y.p.codigo ? '(' + y.p.codigo + ') ' : ''}${String(y.p.texto || '').slice(0, 120)}` : '';
       return `<button type="button" class="pp-dep-izq${mal ? ' mal' : falta ? ' falta' : ''}${cam ? ' cam' : ''}${sinPred ? ' no' : ''}" data-a="dep-rapido" data-id="${esc(p.id)}" title="${sinPred ? 'Los pasos de esta lista no llevan predecesor' : de ? `Depende de ${esc(de)} · clic para cambiarlo` : 'Depende de (paso predecesor) · clic para cambiarlo'}">${mal ? '✕' : falta ? '⚠' : '↳'} ${esc(t)}</button>`;
-    }
-    // v1.131.0 (pedido de CINTIA): a la izquierda, una flecha de cada paso a su predecesor. Al pasar el mouse o seleccionar un paso se
-    // resaltan su flecha, el paso del que depende («◀ predecesor de …») y los que dependen de él, sin abrir nada ni saber códigos.
-    let HOVER = null, DEPS = [];
-    function predDe(p) {                                                 // id del predecesor vivo (o el automático de un paso nuevo) y si es automático
-      const d = p.dt; if (!d) return null;
-      if (d.dep === null || d.dep === undefined) { if (!String(p.id).startsWith('n:')) return null; const s2 = depSugerido(p); return s2 ? { id: s2, auto: true } : null; }
-      return d.dep && IDXP.has(d.dep) && !IDXP.get(d.dep).p.quitado ? { id: d.dep, auto: false } : null;
-    }
-    function dibujarDeps() {
-      const doc = $('#pp-doc'); if (!doc) return; const vieja = doc.querySelector('svg.pp-deps'); if (vieja) vieja.remove(); DEPS = [];
-      if (!EMB || !DT) return;
-      const rd = doc.getBoundingClientRect(), filas = new Map($$('.pp-doc tr.pp-paso[data-id]').map((tr) => [tr.dataset.id, tr]));
-      let borde = 0; const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); sv.setAttribute('class', 'pp-deps');
-      const caminos = [];
-      IDXP.forEach((r) => { const p = r.p; if (p.quitado || p.insumo) return; const pr = predDe(p); if (!pr) return; const a = filas.get(pr.id), b = filas.get(p.id); if (!a || !b) return;
-        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); if (!ra.height || !rb.height) return;
-        borde = borde || ra.left - rd.left;
-        const y1 = ra.top - rd.top + 11, y2 = rb.top - rd.top + 11, misma = IDXP.get(pr.id).lista === r.lista, mal = (AV.get(p.id) || []).some((x) => x.nivel === 'error' && /Depende|predecesor/i.test(x.texto));
-        caminos.push({ de: pr.id, a: p.id, y1, y2, misma, auto: pr.auto, mal }); });
-      if (!borde) return;
-      const x = borde - 3;
-      sv.setAttribute('width', String(Math.ceil(borde))); sv.setAttribute('height', String(Math.ceil(doc.scrollHeight)));
-      sv.innerHTML = `<defs><marker id="pp-fl" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 8 4 0 8z" class="pp-fl-p"/></marker><marker id="pp-fl-a" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path d="M0 0 8 4 0 8z" class="pp-fl-pa"/></marker></defs>` +
-        caminos.map((c, i) => { const h = Math.abs(c.y2 - c.y1), lane = Math.min(38, 7 + Math.sqrt(h) * 1.3);
-          return `<path class="pp-dl${c.misma ? '' : ' larga'}${c.auto ? ' auto' : ''}${c.mal ? ' mal' : ''}" data-i="${i}" d="M${x} ${c.y1} C${x - lane} ${c.y1} ${x - lane} ${c.y2} ${x} ${c.y2}" marker-end="url(#pp-fl)"/>`; }).join('');
-      doc.prepend(sv); DEPS = caminos; marcarDeps();
-    }
-    // clases de resaltado sin volver a dibujar (selección o mouse)
-    function marcarDeps() {
-      const doc = $('#pp-doc'); if (!doc) return; const foco = HOVER || SELECCION;
-      $$('.pp-doc .pp-es-pred, .pp-doc .pp-es-dep').forEach((tr) => tr.classList.remove('pp-es-pred', 'pp-es-dep')); $$('.pp-doc .pp-pred-tag').forEach((t) => t.remove());
-      const sv = doc.querySelector('svg.pp-deps'); if (!sv) return;
-      sv.querySelectorAll('.pp-dl').forEach((el) => { const c = DEPS[+el.dataset.i], act = !!foco && (c.a === foco || c.de === foco); el.classList.toggle('act', act); el.setAttribute('marker-end', act ? 'url(#pp-fl-a)' : 'url(#pp-fl)'); if (act) el.parentNode.appendChild(el); });
-      if (!foco) return;
-      const tag = (id, cls, txt) => { const tr = document.querySelector(`.pp-doc tr.pp-paso[data-id="${CSS.escape(id)}"]`); if (!tr) return; tr.classList.add(cls); const td = tr.querySelector('.pp-c-tx'); if (td) td.insertAdjacentHTML('beforeend', `<span class="pp-pred-tag ${cls}">${txt}</span>`); };
-      const num = (id) => NUMW.get(id) || ((IDXP.get(id) || {}).p || {}).codigo || 'este paso';
-      DEPS.filter((c) => c.a === foco).forEach((c) => tag(c.de, 'pp-es-pred', `◀ predecesor de ${esc(num(foco))}${c.auto ? ' (automático)' : ''}`));
-      DEPS.filter((c) => c.de === foco).forEach((c) => tag(c.a, 'pp-es-dep', `depende de ${esc(num(foco))} ▶`));
-      // en el mismo paso: de cuál depende, con su texto (sin tener que buscarlo)
-      const mio = DEPS.find((c) => c.a === foco), yp = mio && IDXP.get(mio.de);
-      if (yp) tag(foco, 'pp-es-foco', `▲ depende de ${esc(num(mio.de))} · ${esc(String(yp.p.texto || '').slice(0, 48))}${String(yp.p.texto || '').length > 48 ? '…' : ''}`);
     }
     function depRapido(id, ancla) {
       document.querySelectorAll('.pp-dt-pop').forEach((p2) => p2.remove());
@@ -18037,7 +17995,7 @@
       SELECCION = id || null; $$('.pp-doc tr.sel').forEach((x) => x.classList.remove('sel'));
       const doc = $('#pp-doc'); if (doc) doc.classList.toggle('con-sel', !!SELECCION);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
-      pintarSel(); marcarDeps();
+      pintarSel();
     }
     // v1.129.0 (pedido de CINTIA): la configuración del paso seleccionado, siempre a la vista en el panel y editable ahí mismo
     const pintarSel = () => { const c = document.getElementById('pp-sel-cfg'); if (c) c.innerHTML = htmlSelCfg(); };
@@ -18257,14 +18215,6 @@
     app.addEventListener('change', (ev) => { const sel = ev.target.closest('select.pp-ir'); if (!sel || !sel.value) return; const id = sel.value; sel.value = ''; irA(id); });
     app.addEventListener('dblclick', (ev) => { const tr = ev.target.closest('.pp-doc tr[data-id]'); if (!tr || ev.target.closest('button') || MARCADOS.size) return; const b = tr.querySelector('.pp-acc [data-a="editar"]'); if (b) { const s2 = window.getSelection && window.getSelection(); if (s2) s2.removeAllRanges(); editar({ id: tr.dataset.id }); } });
     app.addEventListener('focusin', (ev) => { const tr = ev.target.closest && ev.target.closest('.pp-doc tr[data-id]'); if (tr && ev.target === tr) seleccionar(tr.dataset.id); });
-    // v1.131.0: resaltado de dependencias al pasar el mouse por un paso o por su «Depende»
-    if (EMB) {
-      app.addEventListener('mouseover', (e) => { const tr = e.target.closest && e.target.closest('.pp-doc tr.pp-paso[data-id]'), id = tr ? tr.dataset.id : null; if (id !== HOVER) { HOVER = id; marcarDeps(); } });
-      app.addEventListener('mouseleave', () => { if (HOVER) { HOVER = null; marcarDeps(); } });
-      let tR = 0; window.addEventListener('resize', () => { clearTimeout(tR); tR = setTimeout(dibujarDeps, 150); });
-      app.addEventListener('toggle', () => setTimeout(dibujarDeps, 30), true);
-      setTimeout(dibujarDeps, 400);
-    }
     // v1.130.0: atajos de la Edición rápida sobre el paso seleccionado (↑/↓ elegir, Alt+↑/↓ mover, Enter editar, T tipo de dato, D Depende, Supr quitar; Ctrl+Enter guardar)
     if (EMB) document.addEventListener('keydown', (e) => {
       if (e.defaultPrevented || document.querySelector('.pp-modal-fondo, .pp-dt-pop')) return;
@@ -18495,16 +18445,8 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor: pointer; border-style: dashed; } .pp-dt-c.pp-dt-btn:hover { border-color: var(--acento); color: var(--acento); }
 .pp-dt-pop { position: absolute; z-index: 60; width: 330px; padding: 10px 12px; background: #fff; border: 1px solid var(--bd); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12.5px "Segoe UI", Arial, sans-serif; }
 .pp-dt-pop .pp-campo { margin: 6px 0; } .pp-dt-pop .pp-pie { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; } .pp-dt-pop .pp-cfg-av:empty { display: none; }
-.pp-vista .pp-doc { position: relative; padding-left: 150px; } .pp-vista tr.pp-paso { position: relative; }
-svg.pp-deps { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 1; }
-.pp-dl { fill: none; stroke: #7a9cc6; stroke-width: 1.3; opacity: .45; transition: opacity .15s, stroke-width .15s; } .pp-dl.larga { display: none; } .pp-dl.auto { stroke-dasharray: 3 3; } .pp-dl.mal { stroke: var(--qui); opacity: .8; }
-.pp-dl.act { display: inline; stroke: var(--acento); stroke-width: 2.6; opacity: 1; filter: drop-shadow(0 0 2px rgba(10,102,194,.45)); } .pp-fl-p { fill: #7a9cc6; } .pp-fl-pa { fill: var(--acento); }
-.pp-doc tr.pp-es-pred > td { background: #e8f1fd !important; } .pp-doc tr.pp-es-pred > td:first-child { box-shadow: inset 4px 0 0 var(--acento); }
-.pp-doc tr.pp-es-dep > td { background: #f2f7ee !important; } .pp-doc tr.pp-es-dep > td:first-child { box-shadow: inset 4px 0 0 var(--agr); }
-.pp-pred-tag { position: absolute; left: 44px; top: -9px; max-width: 70%; overflow: hidden; text-overflow: ellipsis; z-index: 3; padding: 1px 8px; border-radius: 9px; font: 600 10.5px/15px "Segoe UI", Arial, sans-serif; color: #fff; background: var(--acento); box-shadow: 0 1px 4px rgba(0,0,0,.2); pointer-events: none; white-space: nowrap; }
-.pp-pred-tag.pp-es-dep { background: var(--agr); } .pp-pred-tag.pp-es-foco { background: #fff; color: var(--acento); border: 1px solid var(--acento); }
-@media print { svg.pp-deps, .pp-pred-tag { display: none !important; } }
-.pp-dep-izq { position: absolute; left: -142px; top: 3px; width: 98px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 6px; border: 1px dashed var(--bd); border-radius: 9px; background: #f6f8fa; color: var(--mov); font: 11px/16px "Segoe UI", Arial, sans-serif; text-align: left; cursor: pointer; }
+.pp-vista .pp-doc { position: relative; padding-left: 120px; } .pp-vista tr.pp-paso { position: relative; }
+.pp-dep-izq { position: absolute; left: -112px; top: 3px; width: 98px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 6px; border: 1px dashed var(--bd); border-radius: 9px; background: #f6f8fa; color: var(--mov); font: 11px/16px "Segoe UI", Arial, sans-serif; text-align: left; cursor: pointer; }
 .pp-dep-izq:hover { border-color: var(--acento); } .pp-dep-izq.cam { border-style: solid; border-color: #e0c27a; background: var(--cam-f); } .pp-dep-izq.falta { border-color: var(--cam); color: var(--cam); } .pp-dep-izq.mal { border: 1px solid var(--qui); color: var(--qui); background: var(--qui-f); } .pp-dep-izq.no { color: var(--ap); cursor: default; }
 .pp-dep-pop { width: 520px; } .pp-dep-rapidos { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .pp-dep-rapidos button { padding: 4px 10px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; cursor: pointer; } .pp-dep-rapidos button.primario { background: var(--acento); color: #fff; border-color: var(--acento); } .pp-dep-rapidos button.act { outline: 2px solid var(--agr); }
 .pp-dep-q { width: 100%; padding: 6px 8px; border: 1px solid var(--bd); border-radius: 6px; } .pp-dep-lista { max-height: 300px; overflow: auto; margin-top: 6px; } .pp-dep-g { margin: 6px 0 2px; font-weight: 700; color: var(--ap); font-size: 11.5px; }
