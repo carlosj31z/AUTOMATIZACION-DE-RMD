@@ -13,6 +13,7 @@ from typing import List, Optional, Tuple
 from playwright.sync_api import sync_playwright
 
 from .sharepoint import partir_url
+from .versiones import revisar_publicar
 
 CARPETA_URL = (
     "https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/"
@@ -91,8 +92,12 @@ def publicar(cdp_url: str, archivo: str, subir: bool, url_carpeta: str = CARPETA
             if any(f["nombre"].lower() == nombre.lower() for f in hay):
                 avisar(f"Ya existe {nombre}: no se sube (nunca se sobrescribe). Sube la versión del script.")
                 return False
-            if actual and _clave(nombre) <= _clave(actual + ".js"):
-                avisar(f"{version} no es mayor que {actual}: el cargador no la usaría. No se sube.")
+            # Que no pise: debe ser mayor que la más alta y traerla (línea «// INCLUYE:», ver versiones.py).
+            problemas = revisar_publicar(datos.decode("utf-8"), actual)
+            if problemas:
+                for p in problemas:
+                    avisar(f"✗ {p}")
+                avisar("No se sube.")
                 return False
             if not subir:
                 avisar(f"Subiría {nombre} ({len(datos):,} bytes). Repite con --subir para publicarlo a todos.")
