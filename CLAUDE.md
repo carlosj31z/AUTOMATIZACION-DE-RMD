@@ -43,6 +43,13 @@ cuenta). Escribir y responder siempre en **español**.
 - Cada persona usa **su cuenta de Claude y su sesión de SAP**; la memoria de
   Claude no se comparte entre cuentas: lo compartido es este repo y la hoja de
   seguimiento (un reclamo por RMD, para no pisarse).
+- **Homologación de pasos: `docs/homologacion_rmd.md`** (2026-11-09, de comparar 136 autorizados de fase 2 de ATE y
+  LIMA con sus versiones anteriores y los 411 F2 de Envase y Acondicionado). La homologación se hace **cambiando el
+  paso por el código vigente del maestro**, no editando el texto: tabla `src/rmd_automation/datos/homologacion_pasos.csv`
+  y reglas de texto en `rmd_automation.homologacion` (`homologar`, `reemplazo_de_paso`). Ej.: 161493/1655 (PDSG-202) →
+  182341 (PDOC-207); 31840 («hagan») → 62221 en ATE, 166452 en LIMA.
+  **Regla permanente (CINTIA): todo ingreso automatizado, borrador o Edición rápida aplica estas reglas** (desde v1.132.0
+  el userscript las avisa siempre). Al crear o editar un paso, primero el código vigente; nunca un paso viejo de la tabla.
 - **Analizar e inferir con evidencia; lo que no quede claro se deja como
   CONSULTA** (columna Consultas de la hoja y sección del reporte) y se sigue con
   lo demás. Nunca se escribe en SAP un supuesto ni sin el OK escrito de la
@@ -280,8 +287,14 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-09, v1.131.0: flechas y resaltado de Depende en la Edición rápida (pedido de CINTIA).
   1.131.0 publicada en SharePoint el 2026-11-09. v1.131.1: sin flechas ni resaltado (CINTIA los vio innecesarios); queda la etiqueta «↳» con ✕/⚠ y título.
 - 2026-11-09, v1.131.2: «Importar borrador» lee PDFs vueltos a guardar (flujo comprimido con salto de línea antes de `endstream` y
-  direcciones `RMDPDF1` partidas con «\» + salto de línea). Caso: SINCOL NF 2202505045 v5. PR #90 (1.132.0, CINTIA) debe incluirla.
-  **La siguiente versión debe ser > 1.131.2.**
+  direcciones `RMDPDF1` partidas con «\» + salto de línea). Caso: SINCOL NF 2202505045 v5. PR #91.
+- 2026-11-09, v1.132.0 (incluye 1.131.1): **pedido de CINTIA: las reglas de homologación se tienen en cuenta siempre.** La revisión del
+  borrador y de la Edición rápida (`PPN.avisos`, con `ctx.planta`) avisa «Por homologar» si el paso está en la tabla (`homologacionPaso`) y
+  «Términos por homologar» si el texto trae términos viejos (`homologarTexto`). Bloque `==HOMOLOG==` de `ppNucleo`, generado con
+  `analisis/homologacion/generar_homologacion_js.py`: **al cambiar la tabla o las reglas de Python, regenerarlo**. Prueba `qa_homologacion.mjs`.
+  1.132.0 publicada en SharePoint el 2026-11-09 (2 230 682 bytes). PR #90.
+- 2026-11-09, v1.132.1 (1.132.0 + 1.131.2): la 1.131.2 no se pudo publicar porque en SharePoint ya estaba la 1.132.0; esta las junta.
+  **La siguiente versión debe ser > 1.132.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
