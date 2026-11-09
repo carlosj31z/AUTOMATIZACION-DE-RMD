@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.132.1
+// @version      1.133.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.132.1';                                                       // mantener igual a @version
+  const VERSION = '1.133.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -16978,17 +16978,19 @@
       const grupos = { texto: (x) => claveTexto(x.texto) + '|' + String(x.codigo || ''), rango: (x) => ['vi', 'vf', 'margen'].map((k) => txtValor(x[k])).join('|'), firma: (x) => (x.rpor ? 1 : 0) + '|' + (x.vb ? 1 : 0), cant: (x) => fmtCant(x.cant),
         dt: (x) => (x.dt ? DT_CAMPOS.map((c) => dtValor(c, x.dt[c[0]])).join('|') + (x.dt.depFijo ? '|dep:' + String(x.dt.dep || '') : '') : '') };   // el «Depende» de SAP lleva ids de su versión: solo cuenta el elegido a mano
       const campos = { texto: ['texto', 'codigo', 'pasoId', 'nuevo', 'etqCat', 'tipo'], rango: ['vi', 'vf', 'margen'], firma: ['rpor', 'vb'], cant: ['cant'], dt: ['dt'] };
+      // v1.133.0: una plantilla anterior a la 1.123.0 no trae la configuración (dt): sin ella en los dos lados no se compara (si no, todo «quitó» chocaba)
+      const gruposDe = (a, b) => Object.keys(grupos).filter((g) => g !== 'dt' || (a && b && a.dt && b.dt));
       const mezclar = (b, w, r, donde) => {
         const bId = new Map(b.map((x) => [x.id, x])), mapR = new Map(r.map((x) => [x.id, x])), nuevoClon = new Map(), vivos = w.filter((x) => !x.quitado), posB = new Map(b.map((x, i) => [x.id, i]));
         const delActual = (x) => mapR.get(M(x.id)) || null;
         w.forEach((x) => {
           const b0 = bId.get(x.id); if (!b0) return; const ra = delActual(x);
-          if (x.quitado) { if (!ra) return; if (Object.keys(grupos).some((g) => grupos[g](ra) !== grupos[g](b0))) conflictos.push(`${donde}: Producción quitó «${nombre(b0)}» pero en SAP cambió; se deja como está en SAP.`); else { ra.quitado = true; aplicados++; } return; }
-          if (!ra) { if (Object.keys(grupos).some((g) => grupos[g](x) !== grupos[g](b0))) conflictos.push(`${donde}: «${nombre(b0)}» ya no está en SAP; se omite el cambio de Producción.`); return; }
+          if (x.quitado) { if (!ra) return; if (gruposDe(ra, b0).some((g) => grupos[g](ra) !== grupos[g](b0))) conflictos.push(`${donde}: Producción quitó «${nombre(b0)}» pero en SAP cambió; se deja como está en SAP.`); else { ra.quitado = true; aplicados++; } return; }
+          if (!ra) { if (gruposDe(x, b0).some((g) => grupos[g](x) !== grupos[g](b0))) conflictos.push(`${donde}: «${nombre(b0)}» ya no está en SAP; se omite el cambio de Producción.`); return; }
           Object.keys(grupos).forEach((g) => {
             if (grupos[g](x) === grupos[g](b0)) return;
             if (grupos[g](ra) === grupos[g](x)) return;
-            if (grupos[g](ra) !== grupos[g](b0)) { conflictos.push(`${donde}: «${nombre(b0)}» (${g === 'texto' ? 'texto' : g === 'rango' ? 'rango' : g === 'cant' ? 'cantidad' : 'firmas'}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
+            if (grupos[g](ra) !== grupos[g](b0) && (g !== 'dt' || (ra.dt && b0.dt))) { conflictos.push(`${donde}: «${nombre(b0)}» (${g === 'texto' ? 'texto' : g === 'rango' ? 'rango' : g === 'cant' ? 'cantidad' : 'firmas'}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
             campos[g].forEach((k) => { if (x[k] === undefined) delete ra[k]; else ra[k] = x[k]; }); aplicados++;
             if (g === 'dt' && ra.dt && ra.dt.dep && mapa) ra.dt = { ...ra.dt, dep: M(ra.dt.dep) || ra.dt.dep };
           });
@@ -18810,7 +18812,10 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     let actual = null, enSap = [], mapa = null;
     if (destino) {
       actual = await ppLeerArbol(modelo, destino);
-      if (destino.mdId === datos.rmd.mdId) { if (PPN.huella(actual) !== datos.huella) enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, actual)); }
+      // v1.133.0 (SINCOL NF 2202609408 v6): el mismo RMD puede volver de SAP con TODOS los ids de filas nuevos (secciones, etiquetas, pasos);
+      // entonces se empareja por estructura, etiqueta y código de paso, igual que con otra versión
+      const mismosIds = () => { const ids = (a) => new Set(a.estructuras.flatMap((e) => [e.id, ...(e.pasos || []).map((p) => p.id), ...(e.etiquetas || []).flatMap((t) => [t.id, ...(t.pasos || []).map((p) => p.id)])])); const b = ids(datos.arbol), w = ids(actual); let n = 0; b.forEach((id) => { if (w.has(id)) n++; }); return !b.size || n / b.size >= 0.5; };
+      if (destino.mdId === datos.rmd.mdId && (PPN.huella(actual) === datos.huella || mismosIds())) { if (PPN.huella(actual) !== datos.huella) enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, actual)); }
       else { mapa = ppMapear(datos.arbol, actual); enSap = PPN.cambios(datos.arbol, ppConQuitados(datos.arbol, ppTraducir(actual, mapa))); }
     }
     // rebúsqueda de pasos nuevos (texto, estructura, etiqueta)
@@ -19520,6 +19525,14 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   // Revisión del borrador
   function pintarImportacion(v, datos, prop, an, extra) {
     v.pie.innerHTML = '';
+    // v1.133.0 (pedido de Carlos, SINCOL NF 2202609408 v6): si el RMD cambió en SAP desde la plantilla, el borrador se rehace solo
+    // sobre el RMD actual y se ofrece «Ingresar en SAP…» (antes había que pulsar «Rehacer sobre el RMD actual» y el ingreso quedaba bloqueado)
+    if (an.destino && an.enSap.length && !extra.desdeVista && !extra.rehecho && !extra.sinAuto) {
+      v.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">El RMD cambió en SAP desde la plantilla: adaptando el borrador al RMD actual…</p>';
+      ppRehacer(datos, prop, an).then((r) => { if (an.cambios.length && !r.an.cambios.length) throw new Error(`no se pudo aplicar ninguno de los ${an.cambios.length} cambios de Producción (${r.rehecho.conflictos.length} choque(s))`); pintarImportacion(v, r.datos, r.prop, r.an, { ...extra, rehecho: r.rehecho }); })
+        .catch((e) => { toast('No se pudo adaptar el borrador al RMD actual: ' + e.message, true); pintarImportacion(v, datos, prop, an, { ...extra, sinAuto: true }); });
+      return;
+    }
     const s = prop.solicitud || {}, r = datos.rmd;
     const cab = extra.desdeVista ? `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}</div></div>` : `<div class="rmd-pp-cab"><div><b>RMD ${esc(r.codigo)} v${esc(r.version)}</b> · ${esc(r.descripcion)}<br><span class="rmd-nota">Plantilla del ${esc(fechaHoraCorta(datos.generado))} · ${datos.desdePdf ? 'PDF generado' : 'borrador guardado'} el ${esc(fechaHoraCorta(prop.guardado))}</span></div>
         <div><b>${esc(s.nombre || '—')}</b> · ${esc(s.area || '')}<br><span class="rmd-nota">${esc(s.motivo || '')}${s.cc ? ' · ' + esc(s.cc) : ''}</span></div></div>`;
@@ -19593,12 +19606,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     // RMD cambiado desde la plantilla: opción de rehacer el borrador
     const bRehacer = botonModal('Rehacer sobre el RMD actual', 'primario', async () => {
       bRehacer.disabled = true; const aviso = document.createElement('p'); aviso.className = 'rmd-progreso'; aviso.textContent = 'Rehaciendo el borrador sobre el RMD actual…'; v.cuerpo.prepend(aviso);
-      try {
-        const rb = PPN.rebase(datos.arbol, prop.trabajo, an.actual, an.mapa), d = an.destino;
-        const datos2 = { ...datos, arbol: an.actual, huella: PPN.huella(an.actual), rmd: { ...datos.rmd, mdId: d.mdId, codigo: String(d.codigo), version: d.version, estado: d.estado || datos.rmd.estado } };
-        const prop2 = { ...prop, base: { mdId: d.mdId, codigo: String(d.codigo), version: d.version, huella: datos2.huella }, trabajo: rb.trabajo };
-        const an2 = await ppAnalizar(datos2, prop2); pintarImportacion(v, datos2, prop2, an2, { rehecho: { aplicados: rb.aplicados, conflictos: rb.conflictos, de: `${datos.rmd.codigo} v${datos.rmd.version}` } });
-      } catch (e) { toast('No se pudo rehacer el borrador: ' + e.message, true); bRehacer.disabled = false; aviso.remove(); }
+      try { const r2 = await ppRehacer(datos, prop, an); pintarImportacion(v, r2.datos, r2.prop, r2.an, { rehecho: r2.rehecho }); } catch (e) { toast('No se pudo rehacer el borrador: ' + e.message, true); bRehacer.disabled = false; aviso.remove(); }
     });
     window.__rmdStats.plantilla.rehacer = () => bRehacer.click();
     v.pie.append(...(an.enSap.length && !errores ? [bRehacer] : []));
@@ -19615,6 +19623,14 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     v.pie.append(botonModal('Cerrar', '', () => v.cerrar()), ...(extra.desdeVista ? [] : [botonModal('Exportar Excel', '', async () => { try { const x = ppExcel(datos, prop, an); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } })]), bVista, bIngresar);
     v.__pp = { datos, prop, an };
     window.__rmdStats.plantilla.ultimo = { datos, prop, an };
+  }
+  // borrador rehecho sobre el RMD como está hoy en SAP (los cambios de Producción se vuelven a aplicar; lo que choca se deja como en SAP)
+  async function ppRehacer(datos, prop, an) {
+    const rb = PPN.rebase(datos.arbol, prop.trabajo, an.actual, an.mapa), d = an.destino;
+    const datos2 = { ...datos, arbol: an.actual, huella: PPN.huella(an.actual), rmd: { ...datos.rmd, mdId: d.mdId, codigo: String(d.codigo), version: d.version, estado: d.estado || datos.rmd.estado } };
+    const prop2 = { ...prop, base: { mdId: d.mdId, codigo: String(d.codigo), version: d.version, huella: datos2.huella }, trabajo: rb.trabajo };
+    const an2 = await ppAnalizar(datos2, prop2);
+    return { datos: datos2, prop: prop2, an: an2, rehecho: { aplicados: rb.aplicados, conflictos: rb.conflictos, de: `${datos.rmd.codigo} v${datos.rmd.version}` } };
   }
   // paso del borrador por id (también procesos menores)
   function ppItemDe(arbol, id) {
@@ -19738,7 +19754,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     PPN.detectarTildes(on('detectartildes')); PPN.tildes(!!(prop0.trabajo && prop0.trabajo.tildes));
     const manual = [], prop = { ...prop0, trabajo: ppSinInsumosNuevos(prop0.trabajo, manual) };
     prop.trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (PPN.cantRecetaCambiada(x)) manual.push(`Cambiar en la Lista de Materiales la cantidad del insumo ${x.comp || ''} — ${String(x.desc || '').slice(0, 50)}: ${x.cant == null ? '(vacía)' : x.cant} → ${x.cantNueva} ${x.um || ''} (receta del RMD). En el RMD no se puede editar.`); }));
-    const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId, ahora = new Date();
+    const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId && !an.mapa, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
     if (+dest.estadoIdRmd_iMaestraId !== 467) bloqueos.push(`El RMD de destino (${dest.codigo} v${dest.version}) no está Ingresado.`);
     if (an.enSap.length) { bloqueos.push(`El RMD cambió en SAP desde que se generó la plantilla (${an.enSap.length} cambio${an.enSap.length > 1 ? 's' : ''}). Genera la plantilla otra vez y que Producción repita el borrador sobre ella.`);
