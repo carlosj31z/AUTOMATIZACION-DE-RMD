@@ -17112,7 +17112,7 @@
         });
       });
     }
-    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } if (!EMB) armarDatosPdf().catch(() => {}); }, 400); }   // en la Edición rápida no hay PDF
+    function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { if (EMB && !contar().total) localStorage.removeItem(CLAVE()); else localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } if (!EMB) armarDatosPdf().catch(() => {}); }, 400); }   // en la Edición rápida no hay PDF
     // Datos del borrador dentro del PDF: enlaces invisibles al final del resumen. «Guardar como PDF» de Chrome y Edge guarda cada dirección tal cual,
     // y el portal la lee al importar el PDF (no hace falta el .html). Se arman tras cada cambio para que también sirva Ctrl+P.
     let DATOS_PDF = '';
@@ -17287,7 +17287,7 @@
     // ---- procedimiento: una etiqueta ----
     function filaPaso(p, numero, conforme, conPm) {
       const b = BI.get(p.id), r = tipoFila(p, false, conforme), num = p.quitado ? `<s>${esc(NUM_BASE.get(p.id) || '')}${NUM_BASE.get(p.id) ? '.-' : ''}</s>` : `${esc(numero || '')}${numero ? '.-' : ''}`;
-      const tx = celdaTexto(p, b, txt(p.texto)), acc = acciones('paso', p.quitado, false, conPm, p.id);
+      const tx = htmlDepIzq(p) + celdaTexto(p, b, txt(p.texto)), acc = acciones('paso', p.quitado, false, conPm, p.id);
       let celdas;
       if (r === 'T') celdas = [`<td colspan="5" class="pp-c-tx">${tx}</td>`];
       else if (r === 'I') celdas = [`<td colspan="3" class="pp-c-tx">${tx}</td>`, `<td colspan="2" class="pp-c-caja">${CAJA}</td>`];
@@ -17321,7 +17321,7 @@
     // ---- cuadros (Precauciones, Notas, Condiciones) ----
     function htmlCuadro(e, lista) {
       const filas = lista.map((p) => { const b = BI.get(p.id), acc = acciones('paso', p.quitado, false, false, p.id);
-        return `<tr class="pp-paso ${estadoCl(p, b)}${MARCADOS.has(p.id) ? ' marc' : ''}" data-id="${esc(p.id)}" tabindex="0"${p.quitado ? '' : ' draggable="true"'}><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${celdaTexto(p, b, txt(p.texto))}${acc}</td></tr>`
+        return `<tr class="pp-paso ${estadoCl(p, b)}${MARCADOS.has(p.id) ? ' marc' : ''}" data-id="${esc(p.id)}" tabindex="0"${p.quitado ? '' : ' draggable="true"'}><td class="pp-c-guion">-</td><td colspan="3" class="pp-c-tx ult">${htmlDepIzq(p)}${celdaTexto(p, b, txt(p.texto))}${acc}</td></tr>`
           + (p.quitado ? '' : (p.pm || []).map((m) => { const bm = BI.get(m.id); return `<tr class="pp-pm ${estadoCl(m, bm)}" data-id="${esc(m.id)}" tabindex="0"><td></td><td colspan="3" class="pp-c-pm ult">${celdaTexto(m, bm, m.insumo ? esc(`${m.mat || m.texto} (${m.comp}) ${fmtDec(m.cant)} ${m.um || ''}`) : txt(m.texto), true)}${acciones('pm', m.quitado, m.insumo ? 'insumo' : false)}</td></tr>`; }).join('')); }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td colspan="2">FECHA:</td></tr>' : '';
       return `<table class="pp-t pp-cuadro">${cols([8, 365, 110, 25])}${filas || '<tr><td></td><td colspan="3" class="pp-vacio">(sin pasos)</td></tr>'}${ver}</table><button type="button" class="pp-mas" data-a="agregar-final" data-lista="est:${esc(e.id)}">＋ Agregar paso al final de «${esc(e.nombre)}»</button>${htmlPegarFinal(`est:${e.id}`)}`;
@@ -17425,17 +17425,62 @@
     function htmlDt(x, b) {
       if (!DT || x.insumo || x.quitado) return '';
       const pm = esPmItem(x), d = x.dt;
-      if (!d) return `<div class="pp-dt"><span class="pp-dt-c vac" title="Paso nuevo: al ingresarlo toma el tipo de dato, decimales y casillas del catálogo de SAP (o de un paso parecido). Con ⚙ Configuración los eliges tú">Configuración del catálogo · ${esc(tipoNom(x.tipo))}</span></div>`;
+      // v1.129.0: tipo de dato, decimales y rango se cambian con un clic en su etiqueta (ventanita junto al paso)
+      const rapido = (cls, t, tit) => `<button type="button" class="pp-dt-c pp-dt-btn${cls}" data-a="dt-rapido" data-id="${esc(x.id)}" title="${esc(tit)} · clic para cambiarlo">${t}</button>`;
+      if (!d) return `<div class="pp-dt">${rapido(' vac', `Configuración del catálogo · ${esc(tipoNom(x.tipo))}`, 'Paso nuevo: al ingresarlo toma el tipo de dato, decimales y casillas del catálogo de SAP (o de un paso parecido)')}</div>`;
       const cam = new Set(b && b.dt ? PPN.dtCambios(b, x, pm ? 'pm' : 'paso').map((c) => c.k) : []);
-      const chip = (k, t, tit) => `<span class="pp-dt-c${cam.has(k) ? ' cam' : ''}"${tit ? ` title="${esc(tit)}"` : ''}>${t}</span>`;
+      const chip = (k, t, tit) => (k === 'tipo' || k === 'dec' ? rapido(cam.has(k) ? ' cam' : '', t, tit) : `<span class="pp-dt-c${cam.has(k) ? ' cam' : ''}"${tit ? ` title="${esc(tit)}"` : ''}>${t}</span>`);
       const out = [chip('tipo', esc(tipoNom(d.tipo)), 'Tipo de dato')];
       if (d.dec != null && d.dec !== '') out.push(chip('dec', `Dec. ${esc(d.dec)}`, 'Decimales'));
+      if ([x.vi, x.vf].some((v) => v != null && v !== '')) out.push(rapido(b && valoresCambiados(x, b) ? ' cam' : '', `Rango ${esc(x.vi == null ? '—' : x.vi)} a ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ` ± ${esc(x.margen)}` : ''}`, 'Valor inicial, final y margen'));
       if (!pm) out.push(chip('dep', `Depende: ${esc(depEtiqueta(x))}`, 'Paso predecesor (Depende)'));
       if (!pm && +d.tipo === PPN.DT_NOTIF) out.push(chip('clv', `Clave: ${esc(d.clv || '—')}`, 'Clave Modelo'), chip('puesto', `Puesto: ${esc(d.puesto || '—')}`, 'Puesto de trabajo'));
       DT_FLAGS.forEach(([k, n]) => { if (d[k]) out.push(chip(k, esc(n))); else if (cam.has(k)) out.push(chip(k, `<s>${esc(n)}</s>`, 'Se desmarca')); });
       if (!pm && (x.rpor || x.vb)) out.push(`<span class="pp-dt-c">${[x.rpor ? 'R. Por' : '', x.vb ? 'V.B.' : ''].filter(Boolean).join(' + ')}</span>`);
       if (d.color) out.push(chip('color', `<i class="pp-dt-color" style="background:${esc(d.color)}"></i>${esc(d.color)}`, 'Color (Formato)')); else if (cam.has('color')) out.push(chip('color', '<s>Color</s>', 'Se quita el color'));
       return `<div class="pp-dt">${out.join('')}</div>`;
+    }
+    // v1.129.0 (pedido de CINTIA): el «Depende» de cada paso siempre a la vista, a la izquierda, y se cambia con un clic
+    function htmlDepIzq(p) {
+      if (!DT || !EMB || p.quitado || p.insumo) return '';
+      const r = IDXP.get(p.id), sinPred = r && PPN.listaSinPredecesor(r.e, r.t), d = p.dt || {}, l = AV.get(p.id) || [];
+      const mal = l.some((a) => a.nivel === 'error' && /Depende|predecesor/i.test(a.texto)), falta = l.some((a) => a.nivel !== 'info' && /predecesor/i.test(a.texto));
+      let t;
+      if (sinPred) t = 'no lleva';
+      else if (d.dep === null || d.dep === undefined) t = String(p.id).startsWith('n:') ? 'automático' : (d.depTxt || 'ninguno');
+      else if (!d.dep) t = 'ninguno';
+      else { const y = IDXP.get(d.dep); t = y ? (NUMW.get(y.p.id) || y.p.codigo || '(nuevo)') : (d.depTxt || 'otra parte'); }
+      const b = BI.get(p.id), cam = b && b.dt && p.dt && String(b.dt.dep || '') !== String(p.dt.dep || '');
+      return `<button type="button" class="pp-dep-izq${mal ? ' mal' : falta ? ' falta' : ''}${cam ? ' cam' : ''}${sinPred ? ' no' : ''}" data-a="dep-rapido" data-id="${esc(p.id)}" title="${sinPred ? 'Los pasos de esta lista no llevan predecesor' : 'Depende de (paso predecesor) · clic para cambiarlo'}">↳ ${esc(t)}</button>`;
+    }
+    function depRapido(id, ancla) {
+      document.querySelectorAll('.pp-dt-pop').forEach((p2) => p2.remove());
+      const f = encontrar(id); if (!f || f.clase !== 'paso') return; indexarDt();
+      const x = f.item, r0 = IDXP.get(x.id); if (r0 && PPN.listaSinPredecesor(r0.e, r0.t)) { aviso('Los pasos de esta lista no llevan predecesor.'); return; }
+      const nuevo = String(x.id).startsWith('n:'), d0 = x.dt ? { ...x.dt } : dtInicial(x, false), actual = d0.dep === null || d0.dep === undefined ? (nuevo ? 'auto' : '') : d0.dep, sug = depSugerido(x);
+      const grupos = []; W.estructuras.forEach((e) => [[null, e.pasos || []], ...(e.etiquetas || []).map((t) => [t, t.pasos || []])].forEach(([t, l]) => { const ps = l.filter((y) => !y.quitado && y.id !== x.id); if (ps.length) grupos.push({ nombre: `${e.nombre}${t ? ' › ' + t.nombre : ''}`, l, ps }); }));
+      grupos.sort((a2, b2) => (a2.l === (r0 && r0.lista) ? -1 : b2.l === (r0 && r0.lista) ? 1 : 0));
+      const item = (y) => { const n = NUMW.get(y.id), tp = +(y.dt ? y.dt.tipo : y.tipo); return `<button type="button" class="pp-dep-op${y.id === actual ? ' act' : ''}${y.id === sug ? ' sug' : ''}" data-dep="${esc(y.id)}" data-busca="${esc(PPN.normalizar ? PPN.normalizar(`${n || ''} ${y.codigo || ''} ${y.texto || ''}`) : `${n || ''} ${y.codigo || ''} ${y.texto || ''}`.toUpperCase())}"><b>${esc(n ? n + '.-' : '')}</b> <span class="cod">${esc(y.codigo || 'nuevo')}</span> <span class="tx">${esc(String(y.texto || '').slice(0, 70))}</span> <span class="tp${!tp || tp === PPN.DT_SIN_TIPO ? ' sin' : ''}">${esc(tipoNom(tp))}</span></button>`; };
+      const pop = document.createElement('div'); pop.className = 'pp-dt-pop pp-dep-pop'; pop.setAttribute('role', 'dialog');
+      const ys = sug ? IDXP.get(sug) : null;
+      pop.innerHTML = `<b>Depende de</b> <span class="pp-nota">${esc(String(x.texto || '').slice(0, 60))}</span>
+        <div class="pp-dep-rapidos">${sug ? `<button type="button" class="primario" data-dep="${esc(sug)}">Paso anterior: ${esc(NUMW.get(sug) || (ys && ys.p.codigo) || '')}</button>` : ''}<button type="button" data-dep="">Sin predecesor</button>${nuevo ? `<button type="button" data-dep="auto"${actual === 'auto' ? ' class="act"' : ''}>Automático</button>` : ''}${d0.dep && IDXP.get(d0.dep) ? '<button type="button" data-ir="1">Ir al predecesor</button>' : ''}</div>
+        <input type="search" class="pp-dep-q" placeholder="Buscar por número, código o texto">
+        <div class="pp-dep-lista">${grupos.map((g) => `<div class="pp-dep-g">${esc(g.nombre)}</div>${g.ps.map(item).join('')}`).join('')}</div>`;
+      document.body.appendChild(pop);
+      const rc = ancla.getBoundingClientRect(); pop.style.left = `${Math.max(8, window.scrollX + rc.left)}px`; pop.style.top = `${window.scrollY + rc.bottom + 4}px`;
+      const cerrar = () => { pop.remove(); document.removeEventListener('mousedown', fuera, true); document.removeEventListener('keydown', tecla, true); };
+      const fuera = (e) => { if (!pop.contains(e.target)) cerrar(); }, tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(); } };
+      const elegir = (dv) => {
+        cerrar(); if (dv === actual) return;
+        if (dv === x.id) { aviso('No puede depender de sí mismo.'); return; }
+        const d = { ...d0 }; if (dv === 'auto') { d.dep = null; d.depFijo = false; } else { d.dep = dv; d.depFijo = true; const y = IDXP.get(dv); d.depTxt = y ? String(y.p.codigo || '') : ''; }
+        cambio(() => { const v = encontrar(id).item; v.dt = d; if (!x.dt) { v.edit = d.edit; v.tipo = d.tipo; } });
+      };
+      pop.addEventListener('click', (e) => { const bt = e.target.closest('[data-dep]'); if (bt) { elegir(bt.dataset.dep); return; } if (e.target.closest('[data-ir]')) { cerrar(); irA(d0.dep); seleccionar(d0.dep); } });
+      const q = pop.querySelector('.pp-dep-q'); q.addEventListener('input', () => { const k = (PPN.normalizar ? PPN.normalizar(q.value) : q.value.toUpperCase()).trim();
+        pop.querySelectorAll('.pp-dep-op').forEach((o) => { o.hidden = !!k && !o.dataset.busca.includes(k); }); });
+      setTimeout(() => { document.addEventListener('mousedown', fuera, true); document.addEventListener('keydown', tecla, true); const a = pop.querySelector('.pp-dep-op.act') || pop.querySelector('.pp-dep-op.sug'); if (a) a.scrollIntoView({ block: 'center' }); q.focus(); }, 0);
     }
     function htmlDtEtiqueta(t) {
       if (!DT) return ''; const b = BI.get(t.id), cam = (k) => (b && !!b[k] !== !!t[k] ? ' cam' : '');
@@ -17467,22 +17512,26 @@
       const depSel = d0.dep === null || d0.dep === undefined ? (nuevo ? 'auto' : '') : d0.dep;
       modal(`<h3>Configuración del ${pm ? 'proceso menor' : 'paso'} ${esc(num)}<span>${esc(String(x.texto || '').slice(0, 90))}${x.codigo ? ` · paso ${esc(x.codigo)}` : ' · paso nuevo'}</span></h3>
         <div class="pp-cfg">
-          <label class="pp-campo">Tipo de dato<select id="c-tipo">${tipos.map(([k, n]) => `<option value="${esc(k)}"${+k === +d0.tipo ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
-          <label class="pp-campo">Decimales<input id="c-dec" inputmode="numeric" value="${esc(d0.dec == null ? '' : d0.dec)}"></label>
-          <div class="pp-rango-ed"><label>Valor inicial <input id="c-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="c-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="c-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label></div>
+          <div class="pp-cfg-sec">Tipo de dato y valores</div>
+          <div class="pp-cfg-fila2"><label class="pp-campo">Tipo de dato<select id="c-tipo">${tipos.map(([k, n]) => `<option value="${esc(k)}"${+k === +d0.tipo ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+          <label class="pp-campo pp-cfg-dec">Decimales<input id="c-dec" inputmode="numeric" placeholder="0 a 6" value="${esc(d0.dec == null ? '' : d0.dec)}"></label></div>
+          <div class="pp-rango-ed pp-cfg-rango"><label>Valor inicial <input id="c-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="c-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="c-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label></div>
           ${pm ? '' : `<label class="pp-campo">Depende (paso predecesor)<span class="pp-cfg-fila"><select id="c-dep"><option value="">Sin predecesor</option>${nuevo ? `<option value="auto"${depSel === 'auto' ? ' selected' : ''}>Automático: el paso anterior con tipo de dato</option>` : ''}${opcionesDep(x, depSel)}</select><button type="button" data-a="dep-sug" title="Elige el paso anterior de la lista que tiene tipo de dato">Paso anterior</button></span></label>
           <div class="pp-cfg-notif"><label class="pp-campo">Clave Modelo<input id="c-clv" list="c-clv-l" value="${esc(d0.clv || '')}" autocomplete="off"><datalist id="c-clv-l">${claves.map(([k, n]) => `<option value="${esc(k)}">${esc(n || '')}</option>`).join('')}</datalist></label>
             <label class="pp-campo">Puesto de trabajo<input id="c-puesto" list="c-puesto-l" value="${esc(d0.puesto || '')}" autocomplete="off"><datalist id="c-puesto-l">${puestos.map((k) => `<option value="${esc(k)}"></option>`).join('')}</datalist></label>
             <span class="pp-nota">Solo en «Notificación» (con otro tipo de dato el portal los graba vacíos).</span></div>`}
           <fieldset class="pp-cas"><legend>Casillas</legend>${chk('edit', 'Edit', 'El operario registra un valor')}${chk('cc', 'Estado CC', 'Paso de Calidad en Operaciones')}${chk('mov', 'Estado Mov.')}${pm ? '' : chk('pmop', 'PM OP', 'No se marca en ningún paso (indicación del equipo)')}${chk('genpp', 'Gen PP')}${pm ? chk('tab', 'Tab', 'Sangría del proceso menor') : ''}
             ${pm ? '' : `<label><input type="checkbox" id="c-rpor"${x.rpor ? ' checked' : ''}> R. Por</label><label><input type="checkbox" id="c-vb"${x.vb ? ' checked' : ''}> V.B.</label>`}</fieldset>
+          <details class="pp-cfg-mas"${d0.color ? ' open' : ''}><summary>Formato (color) y más opciones</summary>
           <fieldset class="pp-cas"><legend>Formato</legend><label><input type="checkbox" id="c-con-color"${d0.color ? ' checked' : ''}> Con color</label><input type="color" id="c-color" value="${esc(d0.color && /^#[0-9a-f]{6}$/i.test(d0.color) ? d0.color : '#000000')}"></fieldset>
-          <label class="pp-nota"><input type="checkbox" id="c-auto" checked> Al cambiar el tipo de dato, ajustar Edit, R. Por y V.B. como manda ese tipo</label>
+          <label class="pp-nota"><input type="checkbox" id="c-auto" checked> Al cambiar el tipo de dato, ajustar Edit, R. Por y V.B. como manda ese tipo</label></details>
           <div id="c-av" class="pp-cfg-av"></div>
         </div>
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
         const q = (s2) => $(s2, m), tipoSel = q('#c-tipo');
         const pintar = () => { const t = +tipoSel.value, notif = q('.pp-cfg-notif'); if (notif) notif.classList.toggle('apagado', t !== PPN.DT_NOTIF);
+          // v1.129.0: solo se ven los valores que pide el tipo (o los que ya traía el paso)
+          q('.pp-cfg-rango').hidden = !(t === PPN.DT_RANGO || [x.vi, x.vf, x.margen].some((v2) => v2 != null && v2 !== '') || ['#c-vi', '#c-vf', '#c-mg'].some((k) => String(q(k).value).trim()));
           const av = [], dec = q('#c-dec').value.trim(), vacio = (v) => !String(v).trim();
           if (t === PPN.DT_RANGO && ['#c-vi', '#c-vf', '#c-mg'].some((k) => vacio(q(k).value))) av.push('Tipo «Rango»: completa el valor inicial, el final y el margen.');
           if ((t === PPN.DT_RANGO || t === 434 || t === 438) && !dec) av.push('Este tipo de dato pide los decimales.');
@@ -17514,6 +17563,51 @@
         pintar(); setTimeout(() => tipoSel.focus(), 20);
       });
     }
+    // v1.129.0: lo más frecuente sin abrir la ventana completa: tipo de dato y los valores que pide (decimales, rango, Clave Modelo)
+    function configRapida(id, ancla) {
+      document.querySelectorAll('.pp-dt-pop').forEach((p2) => p2.remove());
+      const f = encontrar(id); if (!f || f.item.insumo) return; indexarDt();
+      const x = f.item, pm = f.clase === 'pm', d0 = x.dt ? { ...x.dt } : dtInicial(x, pm);
+      const tipos = Object.entries(TIPOS()).sort((a2, b2) => +a2[0] - +b2[0]); if (d0.tipo && !TIPOS()[d0.tipo]) tipos.push([String(d0.tipo), `Tipo ${d0.tipo}`]);
+      const claves = (EMB && EMB.claves) || [], val = (v) => esc(v == null ? '' : v);
+      const pop = document.createElement('div'); pop.className = 'pp-dt-pop'; pop.setAttribute('role', 'dialog');
+      pop.innerHTML = `<label class="pp-campo">Tipo de dato<select data-k="tipo">${tipos.map(([k, n]) => `<option value="${esc(k)}"${+k === +d0.tipo ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+        <label class="pp-campo" data-ver="dec">Decimales<input data-k="dec" inputmode="numeric" placeholder="0 a 6" value="${val(d0.dec)}"></label>
+        <div class="pp-rango-ed" data-ver="rango"><label>Valor inicial <input data-k="vi" inputmode="decimal" value="${val(x.vi)}"></label><label>Valor final <input data-k="vf" inputmode="decimal" value="${val(x.vf)}"></label><label>Margen <input data-k="mg" inputmode="decimal" value="${val(x.margen)}"></label></div>
+        ${pm ? '' : `<label class="pp-campo" data-ver="clv">Clave Modelo<input data-k="clv" list="pp-pop-clv" autocomplete="off" value="${val(d0.clv)}"><datalist id="pp-pop-clv">${claves.map(([k, n]) => `<option value="${esc(k)}">${esc(n || '')}</option>`).join('')}</datalist></label>`}
+        <div class="pp-cfg-av"></div>
+        <div class="pp-pie"><button type="button" data-p="mas" title="Depende, casillas, Puesto de trabajo y color">Más opciones…</button><span><button type="button" data-p="no">Cancelar</button> <button type="button" class="primario" data-p="si">Aplicar</button></span></div>`;
+      document.body.appendChild(pop);
+      const r = ancla.getBoundingClientRect(); pop.style.left = `${Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - 346))}px`; pop.style.top = `${window.scrollY + r.bottom + 4}px`;
+      const q = (k) => pop.querySelector(`[data-k="${k}"]`);
+      const cerrar = () => { pop.remove(); document.removeEventListener('mousedown', fuera, true); document.removeEventListener('keydown', tecla, true); };
+      const fuera = (e) => { if (!pop.contains(e.target)) cerrar(); };
+      const tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(); } else if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); aplicar(); } };
+      const pintar = () => {
+        const t = +q('tipo').value, av = [], dec = q('dec').value.trim(), vacio = (k) => !String(q(k).value).trim(), num = (k) => { const v2 = String(q(k).value).trim().replace(',', '.'); return v2 === '' ? null : Number(v2); };
+        pop.querySelector('[data-ver="dec"]').hidden = !(t === PPN.DT_RANGO || t === 434 || t === 438 || dec);
+        pop.querySelector('[data-ver="rango"]').hidden = !(t === PPN.DT_RANGO || !vacio('vi') || !vacio('vf') || !vacio('mg'));
+        const c = pop.querySelector('[data-ver="clv"]'); if (c) c.hidden = t !== PPN.DT_NOTIF;
+        if (t === PPN.DT_RANGO && ['vi', 'vf', 'mg'].some(vacio)) av.push('Tipo «Rango»: completa el valor inicial, el final y el margen.');
+        if ((t === PPN.DT_RANGO || t === 434 || t === 438) && !dec) av.push('Este tipo de dato pide los decimales.');
+        if (dec && (!/^\d+$/.test(dec) || +dec > 6)) av.push('Decimales: un número entero de 0 a 6.');
+        if (['vi', 'vf', 'mg'].some((k) => num(k) !== null && Number.isNaN(num(k)))) av.push('Rango: usa solo números (con punto o coma para los decimales).');
+        else if (num('vi') !== null && num('vf') !== null && num('vi') > num('vf')) av.push('Rango: el valor inicial es mayor que el final.');
+        if (c && t === PPN.DT_NOTIF && vacio('clv')) av.push('Tipo «Notificación»: falta la Clave Modelo.');
+        pop.querySelector('.pp-cfg-av').innerHTML = av.map((a2) => `<div class="pp-aviso error">✕ ${esc(a2)}</div>`).join('');
+        return !av.some((a2) => /Decimales: un|Rango: /.test(a2));
+      };
+      const aplicar = () => {
+        if (!pintar()) return; const t = +q('tipo').value, dec = q('dec').value.trim(), vi = q('vi').value.trim(), vf = q('vf').value.trim(), mg = q('mg').value.trim();
+        const d = { ...d0, tipo: t, dec: dec === '' ? null : String(+dec) }; if (t !== +d0.tipo) d.edit = PPN.DT_TIPOS_CON_EDIT.has(t); if (!pm && q('clv')) d.clv = q('clv').value.trim() || null;
+        cerrar(); cambio(() => { const v = encontrar(id).item; v.dt = d; v.edit = d.edit; v.tipo = d.tipo; v.vi = vi === '' ? null : vi; v.vf = vf === '' ? null : vf; v.margen = mg === '' ? null : mg;
+          if (!pm && t !== +d0.tipo && [439, 440, 441].includes(t)) { v.rpor = t !== 440; v.vb = t !== 439; } });
+      };
+      pop.addEventListener('input', pintar); pop.addEventListener('change', pintar);
+      pop.addEventListener('click', (e) => { const k = e.target.dataset.p; if (k === 'no') cerrar(); else if (k === 'si') aplicar(); else if (k === 'mas') { cerrar(); editarConfig(id); } });
+      setTimeout(() => { document.addEventListener('mousedown', fuera, true); document.addEventListener('keydown', tecla, true); }, 0);
+      pintar(); setTimeout(() => q('tipo').focus(), 20);
+    }
     function editarConfigEtiqueta(id) {
       const f = encontrar(id); if (!f || f.clase !== 'etiqueta') return; const t = f.item;
       modal(`<h3>Etiqueta<span>${esc(t.nombre)}</span></h3><fieldset class="pp-cas"><legend>Configuración</legend><label><input type="checkbox" id="c-conf"${t.conforme ? ' checked' : ''}> Conforme (columna de check de conformidad)</label><label><input type="checkbox" id="c-pmen"${t.procesoMenor ? ' checked' : ''}> Proceso menor</label></fieldset>
@@ -17523,7 +17617,7 @@
     }
     function htmlBarraVista(r, n) {
       return `<header class="pp-barra pp-barra-vista"><div class="pp-titulo"><b>Edición rápida · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)} · ${esc(r.estado || '')}</span></div>
-        <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador; nada se escribe en SAP hasta «Guardar en SAP»">${sucio ? '● Sin guardar en SAP' : ''}</span>${htmlIrA()}
+        <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador; nada se escribe en SAP hasta «Guardar en SAP»">${sucio && n.total ? '● Sin guardar en SAP' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
         <label class="pp-detectar" title="Muestra y deja editar la configuración de cada paso: tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto de trabajo y color"><input type="checkbox" id="pp-vista-dt"${DT ? ' checked' : ''}> Vista completa (DOC)</label>
         <label class="pp-detectar" title="Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde). Apagada por defecto"><input type="checkbox" id="pp-detectar"${PPN.detectarTildes() ? ' checked' : ''}> Detectar tildes</label>
@@ -17544,7 +17638,7 @@
       if (erroresPropios().length) { pendientes(n, null, true); return; }   // v1.129.0: solo frenan los errores de lo que se cambió; lo que ya venía así de SAP no
       EMB.guardar(clon(propActual()));
     }
-    function cerrarVista() { if (!EMB || typeof EMB.cerrar !== 'function') return; if (sucio && !confirm('Lo editado no se guardó en SAP. Queda guardado en este navegador y se ofrece recuperarlo al volver a abrir la vista. ¿Cerrar?')) return; sucio = false; EMB.cerrar(); }
+    function cerrarVista() { if (!EMB || typeof EMB.cerrar !== 'function') return; if (sucio && contar().total && !confirm('Lo editado no se guardó en SAP. Queda guardado en este navegador y se ofrece recuperarlo al volver a abrir la vista. ¿Cerrar?')) return; sucio = false; EMB.cerrar(); }
     function textoResumen() {
       const r = PQ.rmd, n = contar(), etiqueta = (id) => { const f = encontrar(id); return f ? `${NUMW.get(id) || PPN.numerar(W.estructuras, BASE.estructuras).get(id) || ''} ${String(f.item.texto || f.item.nombre || f.item.desc || '').slice(0, 70)}`.trim() : id; };
       const lineas = [`RMD ${r.codigo} v${r.version} · ${r.descripcion} · ${r.etapa} · ${r.planta} · ${r.estado || ''}`, `Vista ${DT ? 'completa (DOC)' : 'simple'} · ${n.total} cambio(s), ${n.errores} error(es), ${n.avisos} aviso(s), ${n.nuevos} paso(s) nuevo(s)`, '', 'CAMBIOS'];
@@ -18044,6 +18138,8 @@
       else if (a === 'deshacer') deshacerUno();
       else if (a === 'editar') editar({ id });
       else if (a === 'config') editarConfig(id);
+      else if (a === 'dt-rapido') configRapida(id, b);
+      else if (a === 'dep-rapido') depRapido(id, b);
       else if (a === 'config-etq') editarConfigEtiqueta(b.dataset.id);
       else if (a === 'sap') guardarEnSap();
       else if (a === 'resumen') copiarResumen();
@@ -18283,6 +18379,20 @@ tr.pp-soltar-antes > td { box-shadow: inset 0 3px 0 var(--acento) !important; } 
 /* v1.123.0: vista completa de Documentación Técnica (configuración de cada paso) */
 .pp-dt { display: flex; flex-wrap: wrap; gap: 3px 4px; margin: 3px 0 1px; font: 11px/16px "Segoe UI", Arial, sans-serif; } .pp-dt-etq { display: inline-flex; margin: 0 0 0 8px; vertical-align: middle; font-weight: 400; }
 .pp-dt-c { padding: 0 6px; border: 1px solid var(--bd2); border-radius: 8px; background: #f6f8fa; color: var(--ap); white-space: nowrap; } .pp-dt-c.cam { border-color: #e0c27a; background: var(--cam-f); color: var(--cam); font-weight: 600; } .pp-dt-c.vac { font-style: italic; }
+.pp-cfg-sec { margin: 4px 0 -2px; font-weight: 700; font-size: 12px; color: var(--ap); text-transform: uppercase; letter-spacing: .03em; }
+.pp-cfg-fila2 { display: flex; gap: 10px; } .pp-cfg-fila2 > .pp-campo:first-child { flex: 1 1 auto; } .pp-cfg-fila2 .pp-cfg-dec { flex: 0 0 110px; }
+.pp-cfg-notif.apagado { display: none; } .pp-cfg-mas { margin: 6px 0; } .pp-cfg-mas summary { cursor: pointer; color: var(--acento); font-size: 12.5px; }
+button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor: pointer; border-style: dashed; } .pp-dt-c.pp-dt-btn:hover { border-color: var(--acento); color: var(--acento); }
+.pp-dt-pop { position: absolute; z-index: 60; width: 330px; padding: 10px 12px; background: #fff; border: 1px solid var(--bd); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12.5px "Segoe UI", Arial, sans-serif; }
+.pp-dt-pop .pp-campo { margin: 6px 0; } .pp-dt-pop .pp-pie { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; } .pp-dt-pop .pp-cfg-av:empty { display: none; }
+.pp-vista .pp-doc { padding-left: 120px; } .pp-vista tr.pp-paso { position: relative; }
+.pp-dep-izq { position: absolute; left: -112px; top: 3px; width: 98px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 6px; border: 1px dashed var(--bd); border-radius: 9px; background: #f6f8fa; color: var(--mov); font: 11px/16px "Segoe UI", Arial, sans-serif; text-align: left; cursor: pointer; }
+.pp-dep-izq:hover { border-color: var(--acento); } .pp-dep-izq.cam { border-style: solid; border-color: #e0c27a; background: var(--cam-f); } .pp-dep-izq.falta { border-color: var(--cam); color: var(--cam); } .pp-dep-izq.mal { border: 1px solid var(--qui); color: var(--qui); background: var(--qui-f); } .pp-dep-izq.no { color: var(--ap); cursor: default; }
+.pp-dep-pop { width: 520px; } .pp-dep-rapidos { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .pp-dep-rapidos button { padding: 4px 10px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; cursor: pointer; } .pp-dep-rapidos button.primario { background: var(--acento); color: #fff; border-color: var(--acento); } .pp-dep-rapidos button.act { outline: 2px solid var(--agr); }
+.pp-dep-q { width: 100%; padding: 6px 8px; border: 1px solid var(--bd); border-radius: 6px; } .pp-dep-lista { max-height: 300px; overflow: auto; margin-top: 6px; } .pp-dep-g { margin: 6px 0 2px; font-weight: 700; color: var(--ap); font-size: 11.5px; }
+.pp-dep-op { display: flex; gap: 6px; align-items: baseline; width: 100%; padding: 4px 6px; border: 1px solid transparent; border-radius: 5px; background: none; text-align: left; cursor: pointer; } .pp-dep-op:hover { border-color: var(--acento); } .pp-dep-op.act { background: var(--agr-f); border-color: var(--agr); } .pp-dep-op.sug { border-color: var(--mov); }
+.pp-dep-op b { flex: 0 0 52px; } .pp-dep-op .cod { flex: 0 0 52px; color: var(--ap); } .pp-dep-op .tx { flex: 1 1 auto; } .pp-dep-op .tp { flex: 0 0 auto; font-size: 11px; color: var(--mov); } .pp-dep-op .tp.sin { color: var(--ap); }
+@media print { .pp-dep-izq { display: none !important; } }
 .pp-dt-color { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; }
 .pp-cfg .pp-campo select, .pp-cfg .pp-campo input:not([type]) { width: 100%; } .pp-cfg-fila { display: flex; gap: 6px; } .pp-cfg-fila select { flex: 1; min-width: 0; } .pp-cfg-fila button { flex: none; height: 30px; padding: 0 10px; border: 1px solid var(--bd); border-radius: 6px; background: #fff; }
 .pp-cfg-notif { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; } .pp-cfg-notif .pp-nota { grid-column: 1 / -1; } .pp-cfg-notif.apagado { opacity: .5; } .pp-cfg input[type=color] { width: 44px; height: 26px; padding: 0 2px; vertical-align: middle; }
