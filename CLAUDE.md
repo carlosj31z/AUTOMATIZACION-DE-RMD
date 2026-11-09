@@ -272,6 +272,8 @@ cuenta). Escribir y responder siempre en **español**.
   duplicados de ⚙ Configuración en la vista; `[hidden]` respetado en el CSS del editor.
   Uso de cada paso sugerido (Aut./Ing.) con `usoDePasosPorCodigo` (`emb.uso`); casilla «Vista completa (DOC)» (pedido de CINTIA).
   **Regla de CINTIA: «VM» solo en Observaciones; en la Edición rápida y las plantillas («Estado / Fecha / Por», `ppEstadoFechaPor`) va KMORENOM.**
+  Configuración rápida del tipo de dato (clic en su etiqueta) y «Depende» visible a la izquierda con selector (pedidos de CINTIA).
+  1.129.0 publicada en SharePoint el 2026-11-09 (2 192 463 bytes). PR #88.
   **La siguiente versión debe ser > 1.129.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
