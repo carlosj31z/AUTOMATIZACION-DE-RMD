@@ -279,7 +279,9 @@ cuenta). Escribir y responder siempre en **español**.
   1.130.0 publicada en SharePoint el 2026-11-09 (2 182 892 bytes).
 - 2026-11-09, v1.131.0: flechas y resaltado de Depende en la Edición rápida (pedido de CINTIA).
   1.131.0 publicada en SharePoint el 2026-11-09. v1.131.1: sin flechas ni resaltado (CINTIA los vio innecesarios); queda la etiqueta «↳» con ✕/⚠ y título.
-  **La siguiente versión debe ser > 1.131.1.**
+- 2026-11-09, v1.131.2: «Importar borrador» lee PDFs vueltos a guardar (flujo comprimido con salto de línea antes de `endstream` y
+  direcciones `RMDPDF1` partidas con «\» + salto de línea). Caso: SINCOL NF 2202505045 v5. PR #90 (1.132.0, CINTIA) debe incluirla.
+  **La siguiente versión debe ser > 1.131.2.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
