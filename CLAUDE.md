@@ -294,7 +294,14 @@ cuenta). Escribir y responder siempre en **español**.
   `analisis/homologacion/generar_homologacion_js.py`: **al cambiar la tabla o las reglas de Python, regenerarlo**. Prueba `qa_homologacion.mjs`.
   1.132.0 publicada en SharePoint el 2026-11-09 (2 230 682 bytes). PR #90.
 - 2026-11-09, v1.132.1 (1.132.0 + 1.131.2): la 1.131.2 no se pudo publicar porque en SharePoint ya estaba la 1.132.0; esta las junta.
-  **La siguiente versión debe ser > 1.132.1.**
+- 2026-11-10, v1.133.0 (PR #94): importar un borrador cuando SAP regeneró los ids del mismo RMD.
+- 2026-11-11, v1.134.0 (incluye 1.133.0): **pedido de Carlos: plantilla para Producción más simple.** En la plantilla (`PROD = !EMB` en
+  `ppEditorApp`) `PPN.avisos` va con `ctx.modo = 'produccion'`: solo errores y avisos de `AVISOS_PRODUCCION` (existe, dup, ceo, doc,
+  registro, cant, rango); sin homologación salvo Calidad en Operaciones (`pasosCeo`, botón «Usar paso homologado»), sin info ni tildes.
+  **Paso nuevo: Producción elige qué anota** (`REGISTROS`/`registroDe`/`registroDeTipo`; campo `registro` + `tipo`/`decN`/rango): obligatorio
+  en la plantilla, el ingreso crea el paso con ese tipo. **Documentos vencidos** (`mapaDocs`/`docVencido`): la lista de Reglas de revisión
+  viaja en el paquete (`paq.docs`). Importación: filtros por partes y «Producción anota». Prueba `qa_plantilla_produccion.mjs`.
+  **La siguiente versión debe ser > 1.134.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

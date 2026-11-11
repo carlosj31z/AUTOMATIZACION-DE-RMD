@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.133.0
+// @version      1.134.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.133.0';                                                       // mantener igual a @version
+  const VERSION = '1.134.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -465,6 +465,10 @@
   .rmd-pp-cab { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; } .rmd-pp-checks { margin: 6px 0 10px; padding-left: 4px; list-style: none; } .rmd-pp-checks li { margin: 3px 0; }
   .rmd-pp-t { font-size: 12.5px; } .rmd-pp-t td { vertical-align: top; } .rmd-pp-agregar td:first-child { box-shadow: inset 3px 0 0 var(--rmd-verde); } .rmd-pp-quitar td:first-child { box-shadow: inset 3px 0 0 var(--rmd-rojo); }
   .rmd-pp-cambiar td:first-child, .rmd-pp-valores td:first-child { box-shadow: inset 3px 0 0 var(--rmd-ambar); } .rmd-pp-mover td:first-child { box-shadow: inset 3px 0 0 var(--rmd-acento); }
+  .rmd-pp-filtros { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; } .rmd-pp-filtros button { padding: 2px 10px; border: 1px solid var(--rmd-borde, #8886); border-radius: 12px; background: transparent; color: inherit; font: 12px var(--rmd-fuente); cursor: pointer; }
+  .rmd-pp-filtros button.activo { background: var(--rmd-acento, #0a6ed1); border-color: var(--rmd-acento, #0a6ed1); color: #fff; } .rmd-pp-filtros button[disabled] { opacity: .45; cursor: default; }
+  .rmd-pp-t[data-f] tbody tr { display: none; } .rmd-pp-t[data-f="nuevo"] tbody tr.f-nuevo, .rmd-pp-t[data-f="aviso"] tbody tr.f-aviso, .rmd-pp-t[data-f="com"] tbody tr.f-com, .rmd-pp-t[data-f="ceo"] tbody tr.f-ceo, .rmd-pp-t[data-f="doc"] tbody tr.f-doc, .rmd-pp-t[data-f="homolog"] tbody tr.f-homolog { display: table-row; }
+  .rmd-pp-anota { display: inline-block; margin: 2px 0 0 4px; padding: 0 7px; border-radius: 9px; background: rgba(46,125,50,.15); font: 600 11px/18px var(--rmd-fuente); }
   .rmd-pp-crea { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 9px; background: rgba(122,63,191,.16); color: #b48cf0; font: 700 11px/18px var(--rmd-fuente); }
   html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-pp-crea { color: #7a3fbf; } .rmd-pp-av { margin-top: 3px; font-size: 12px; } .rmd-pp-av.error { color: var(--rmd-rojo); } .rmd-pp-av.aviso { color: var(--rmd-ambar); }
   .rmd-modal.rmd-pp-ing { width: min(1100px, 96vw); height: min(860px, 94vh); }
@@ -16648,6 +16652,58 @@
     const HOMOLOG_REGLAS = [["pdoc-207", "\\bPDSG-202\\b", "PDOC-207", "POE de buenas prácticas de documentación: PDSG-202 pasó a PDOC-207 (nota de los vistos buenos)."], ["vb", "\\(V\\.? ?B\\.?\\)|\\(V\\s?°\\s?B\\s?°\\)", "(VB)", "Vistos buenos se escriben (VB)."], ["realicen", "\\bHAGAN\\b", "REALICEN", "«Hagan» se reemplaza por «realicen» (CONTROLAR QUE SUS COMPAÑEROS REALICEN LO MISMO)."], ["contramuestra", "\\bCONTRAMUESTRA\\b", "CANTIDAD MUESTREADA", "«Contramuestra (unidad):» pasa a «CANTIDAD MUESTREADA (unidad):»."], ["tabla-muestreo", "\\bSEGUN (?:LA )?TABLA DE MUESTREO DEL (POE|INSTRUCTIVO)\\b", "SEGUN EL $1", "Se quita «la tabla de muestreo del»: «SEGUN EL POE PCPR-202 VIGENTE»."], ["plataforma", "\\bPARIHUELA(S?)\\b", "PLATAFORMA$1", "«Parihuela» pasa a «plataforma»."], ["hoja-inspeccion", "\\bLA HOJA DE INSPECCION(?: EN LINEAS DE PRODUCCION)?\\b", "EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION (FPRO-250 VIGENTE)", "«Hoja de inspección» pasa a «formato de inspección en líneas de producción (FPRO-250 vigente)»."], ["maquinas-equipos", "\\bPREPARACION DE MAQUINAS\\.", "PREPARACION DE MAQUINAS O EQUIPOS.", "«…indicados en la preparación de máquinas o equipos.»"], ["salas", "\bIDENTIFICACION DE AREAS\b", "IDENTIFICACION DE SALAS", "Rótulos de identificación de «salas» (no «áreas»)."], ["esterilizado", "\bAUTOCLAVADO\b", "ESTERILIZADO", "Producto «esterilizado» (no «autoclavado»)."], ["producto-terminado", "\bALMACEN DE PRODUCTOS TERMINADOS\b", "ALMACEN DE PRODUCTO TERMINADO", "«Almacén de producto terminado», en singular."], ["envasado", "\bMERMA DE ENVASE\b", "MERMA DE ENVASADO", "«Merma de envasado»."], ["hay-cambio", "\bY/O CAMBIO DE TURNO\b", "Y/O HAY CAMBIO DE TURNO", "«…de la línea y/o hay cambio de turno»."], ["ppro-243", "\\bPBEB-200\\b", "PPRO-243", "Uniforme de ingreso a planta: PBEB-200 pasó a PPRO-243 (ATE)."], ["instructivo", "\\bSEGUN (I[A-Z]{3}-[A-Z]\\d{3})\\b", "SEGUN INSTRUCTIVO $1", "Un código que empieza con I (IPRO-P212, IACO-P202…) va precedido de «INSTRUCTIVO»."], ["procedimiento", "\\bSEGUN (P[A-Z]{3}-\\d{3})\\b", "SEGUN POE $1", "Un código que empieza con P (PPRO-200, PACO-214…) va precedido de «POE» (o «PROCEDIMIENTO» en LIMA)."], ["vigente", "\\b([A-Z]{4}-[A-Z]?\\d{3})\\.(?=\\s|$)", "$1 VIGENTE.", "Todo código de documento termina en «VIGENTE»."], ["fecha-hora", "\\bFECHA / HORA (INICIO|FINAL) :", "FECHA / HORA $1:", "Sin espacio antes de los dos puntos."]];
     // ==/HOMOLOG==
     const HOMOLOG_RX = HOMOLOG_REGLAS.map(([k, p, r, d]) => [k, new RegExp(p, 'g'), r, d]);
+    // v1.134.0 (pedido de Carlos): la plantilla para Producción muestra los pasos homologados de Calidad en Operaciones (el resto lo ve DOC al importar)
+    const RX_CEO = /\bCALIDAD EN OPERACIONES\b/;
+    // pasos vigentes de Calidad en Operaciones de la tabla de homologación para la planta: [{ codigo, texto }]
+    function pasosCeo(planta) {
+      const p = plantaHomolog(planta), vistos = new Map();
+      Object.values(HOMOLOG_PASOS).forEach((d) => (p ? [d[p]] : [d.A, d.L]).forEach((v) => { if (v && RX_CEO.test(v[1]) && !vistos.has(String(v[0]))) vistos.set(String(v[0]), { codigo: String(v[0]), texto: v[1] }); }));
+      return [...vistos.values()];
+    }
+    // v1.134.0 (pedido de Carlos): qué anota Producción en un paso nuevo, en palabras de Producción, con el tipo de dato del portal que le corresponde.
+    // [clave, texto, tipo de dato, grupo, ayuda, R. Por, V.B.]; «dato» es de plantillas anteriores (sin tipo)
+    const REGISTROS = [
+      ['leer', 'Nada: solo es una instrucción', 446, 'nada', 'El operario lo lee; no lleva casilla.'],
+      ['rpor', 'Firma «Realizado por»', 439, 'firma', 'Quien hace el paso firma que lo realizó.', true, false],
+      ['rpvb', 'Firmas «Realizado por» y «Visto bueno»', 441, 'firma', 'Firma quien lo hace y el jefe o supervisor da su visto bueno.', true, true],
+      ['vb', 'Solo «Visto bueno»', 440, 'firma', 'Solo el jefe o supervisor firma su visto bueno.', false, true],
+      ['check', 'Un check de conformidad', 432, 'firma', 'Marca ✓ si está conforme.'],
+      ['fecha', 'Fecha y hora', 436, 'dato', 'Por ejemplo, la hora de inicio o fin.'],
+      ['solofecha', 'Solo la fecha', 435, 'dato', 'Día, mes y año.'],
+      ['hora', 'Solo la hora', 437, 'dato', 'Hora y minutos.'],
+      ['numero', 'Un número o cantidad', 438, 'dato', 'Peso, volumen, unidades… Pon la unidad en el texto, p. ej. «PESO (KG):».'],
+      ['rango', 'Un valor que debe estar en un rango', 443, 'dato', 'Indica el mínimo y el máximo (p. ej. temperatura de 20 a 25).'],
+      ['texto', 'Un texto corto', 433, 'dato', 'Código de equipo, nombre, observación…'],
+      ['lote', 'Un número de lote', 444, 'dato', 'El lote del insumo o del producto.'],
+      ['vence', 'Una fecha de vencimiento', 449, 'dato', 'Fecha de expiración.'],
+    ];
+    const REGISTRO_TXT = Object.assign({ dato: 'Anotar un dato (número o texto)' }, Object.fromEntries(REGISTROS.map((r) => [r[0], r[1]])));
+    const registroDe = (k) => REGISTROS.find((r) => r[0] === k) || null;
+    // tipo de dato (y firmas) del catálogo -> clave de REGISTROS (para mostrarlo en palabras de Producción)
+    function registroDeTipo(tipo, rpor, vb) {
+      const t = +tipo || 0;
+      if (rpor && vb) return 'rpvb'; if (rpor && (!t || t === 446 || t === 439)) return 'rpor'; if (vb && (!t || t === 446 || t === 440)) return 'vb';
+      const r = REGISTROS.find((y) => y[2] === t); if (r) return r[0];
+      return { 434: 'numero', 442: 'check', 445: 'numero', 447: 'fecha', 448: 'numero', 450: 'numero' }[t] || '';
+    }
+    // v1.134.0: documentos citados en un paso (POE, instructivos, formatos, manuales, políticas) y si están vencidos según la lista de documentos vigentes.
+    // docs: texto «código\trevisión\testado\tvalidez\ttítulo» por línea (lo arma el portal al generar la plantilla) o un Map ya armado
+    const RX_DOC = /\b(?:POL-[A-Z]{3}-\d{3}|M[A-Z]{3}-\d{3}|[IPF][A-Z0-9]{3}-[A-Z]?\d{3})\b/g;
+    const codigosDoc = (t) => [...new Set(String(t == null ? '' : t).toUpperCase().match(RX_DOC) || [])];
+    function mapaDocs(docs) {
+      if (!docs) return null; if (typeof docs.get === 'function') return docs.size ? docs : null;   // Map (también de otra ventana)
+      const m = new Map(); String(docs.lineas || docs).split('\n').forEach((l) => { const [c, rev, est, val, tit] = l.split('\t'); if (c) m.set(c.toUpperCase(), { revision: rev || '', estado: est || '', validez: val || '', titulo: tit || '' }); });
+      return m.size ? m : null;
+    }
+    const RX_DOC_NO_VIGENTE = /OBSOLET|VENCID|ANULAD|NO VIGENTE|DE BAJA|INACTIV|DEROGAD|CADUC/i;
+    // -> null (vigente o sin lista) | { codigo, motivo }
+    function docVencido(cod, docs, hoy) {
+      if (!docs) return null; const i = docs.get(cod);
+      if (!i) { const pre = cod.split('-')[0]; for (const k of docs.keys()) if (k.split('-')[0] === pre) return { codigo: cod, motivo: 'no figura en la lista de documentos vigentes' }; return null; }   // sin documentos de ese tipo en la lista: no se sabe
+      if (RX_DOC_NO_VIGENTE.test(i.estado || '')) return { codigo: cod, motivo: `figura como «${String(i.estado).toLowerCase()}» en la lista de documentos vigentes` };
+      const v = /^(\d{4})-(\d{2})-(\d{2})/.exec(i.validez || ''); if (v) { const d = new Date(+v[1], +v[2] - 1, +v[3]), h = hoy || new Date(); if (d.getTime() < new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime()) return { codigo: cod, motivo: `venció el ${v[3]}/${v[2]}/${v[1]}` }; }
+      return null;
+    }
     const plantaHomolog = (pl) => { const t = normalizar(pl); return /\bATE\b|\bPLANTA 1\b|^P1$/.test(t) ? 'A' : /\bLIMA\b|\bPLANTA 2\b|^P2$/.test(t) ? 'L' : ''; };
     // paso viejo -> { codigo, texto } vigente en la planta (sin planta conocida: solo si las dos plantas usan el mismo)
     function homologacionPaso(codigo, planta) {
@@ -16848,9 +16904,12 @@
       grupos.forEach((g) => g.ids.forEach((id) => out.set(id, { clave: g.clave, primero: g.primero, padre: g.padre, n: g.ids.length })));
       return out;
     }
-    // Avisos: id -> [{ nivel, texto }]. ctx.buscador, ctx.etiquetas.
+    // Avisos: id -> [{ nivel, texto, k?, usar? }]. ctx.buscador, ctx.etiquetas, ctx.docs (Map de mapaDocs), ctx.modo ('produccion': solo lo que sirve a Producción).
+    // k = tipo de aviso; usar = código de un paso del catálogo que lo resuelve («Usar paso homologado»)
+    const AVISOS_PRODUCCION = new Set(['existe', 'dup', 'ceo', 'doc', 'registro', 'cant', 'rango']);
     function avisos(trabajo, ctx = {}) {
-      const out = new Map(), add = (id, nivel, texto) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto }); };
+      const out = new Map(), prod = ctx.modo === 'produccion', add = (id, nivel, texto, k, usar) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto, ...(k ? { k } : {}), ...(usar ? { usar: String(usar) } : {}) }); };
+      const enCatalogo = (cod, estr) => { const f = cod && bus && bus.porCodigo(cod); return f && (!estr || f.estr === estr) ? f : null; }, hoy = new Date();
       const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base);
       const enBase = new Map(), cantBase = new Map();                          // id -> código en la base; insumo -> cantidad en la base
       (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => { enBase.set(m.id, String(m.codigo || '')); if (m.insumo) cantBase.set(m.id, m.cant); }); })));
@@ -16865,18 +16924,28 @@
         // mismas excepciones de Calidad que en el portal
         const n = normalizar(t), cc = esPm || !/\bBIOCARGA\b/.test(n) ? n.replace(/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES O CONTROL DE CALIDAD/g, 'CALIDAD EN OPERACIONES')
           .replace(/FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION FPRO \d+(?: VIGENTE)? A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA/g, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION') : '';
-        if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(cc)) {
+        const hp = !x.insumo && !x.nuevo && homologacionPaso(x.codigo, ctx.planta), hpCeo = hp && RX_CEO.test(hp.texto) && enCatalogo(hp.codigo, estr);
+        if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(cc) && !hpCeo) {
           const ya = igualQueSap(x), muestra = /MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(cc);
-          add(x.id, ya ? 'info' : 'aviso', `${ya ? 'Ya está así en SAP: d' : 'D'}ebe decir «${muestra ? 'CANTIDAD MUESTREADA (kg):' : 'CALIDAD EN OPERACIONES'}» en lugar de «${muestra ? 'MUESTRA PARA CONTROL DE CALIDAD' : 'CONTROL DE CALIDAD'}».`);
+          // v1.134.0: el paso homologado de Calidad en Operaciones que lo reemplaza (mismo texto con «CALIDAD EN OPERACIONES», o uno de la tabla muy parecido)
+          let usar = null; if (!muestra && bus) { const q = n.replace(/\bCONTROL DE CALIDAD\b/g, 'CALIDAD EN OPERACIONES'), ex = bus.exactos(q).filter((f) => f.estr === estr && (!etq || f.etq === etq));
+            if (ex[0]) usar = ex[0]; else { const ceo = new Set(pasosCeo(ctx.planta).map((y) => y.codigo)), par = bus.parecidos(q, { estr, etq, max: 6, minimo: 0.8 }).find((y) => ceo.has(String(y.f.codigo))); if (par) usar = par.f; } }
+          add(x.id, ya && !prod ? 'info' : 'aviso', `${ya && !prod ? 'Ya está así en SAP: d' : 'D'}ebe decir «${muestra ? 'CANTIDAD MUESTREADA (kg):' : 'CALIDAD EN OPERACIONES'}» en lugar de «${muestra ? 'MUESTRA PARA CONTROL DE CALIDAD' : 'CONTROL DE CALIDAD'}».${usar ? ` Paso homologado: ${usar.codigo} «${usar.texto}».` : ''}`, 'ceo', usar && usar.codigo);
         }
         if (!x.insumo) {                                                       // v1.132.0: homologación (docs/homologacion_rmd.md)
-          const hp = !x.nuevo && homologacionPaso(x.codigo, ctx.planta);
-          if (hp) add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${hp.codigo} «${hp.texto}». Usa «Cambiar paso».`);
-          else { const h = homologarTexto(t); if (h.reglas.length) add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; busca un paso con ese texto antes de crear otro.`); }
+          if (hpCeo) add(x.id, 'aviso', `Paso homologado de Calidad en Operaciones: se reemplaza por el ${hp.codigo} «${hp.texto}».`, 'ceo', hp.codigo);
+          else if (hp) add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${hp.codigo} «${hp.texto}». Usa «Cambiar paso».`, 'homolog');
+          else if (!prod) { const h = homologarTexto(t); if (h.reglas.length) add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; busca un paso con ese texto antes de crear otro.`, 'terminos'); }
+          // v1.134.0 (pedido de Carlos): documentos vencidos o que ya no figuran como vigentes
+          if (ctx.docs) codigosDoc(t).forEach((cod) => { const v = docVencido(cod, ctx.docs, hoy); if (v) add(x.id, 'aviso', `Documento ${v.codigo}: ${v.motivo}. Revisa el código o la versión vigente antes de enviarlo.`, 'doc'); });
+          // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción indica qué se anota (la casilla del RMD)
+          if (prod && x.nuevo) { const r = registroDe(x.registro);
+            if (!x.registro) add(x.id, 'error', `Falta indicar qué anota Producción en este ${esPm ? 'proceso menor' : 'paso'} (casilla para firmar, fecha, número…): usa «✎ Editar».`, 'registro');
+            else if (r && r[0] === 'rango' && (num(x.vi) == null || num(x.vf) == null)) add(x.id, 'error', 'Indica el valor mínimo y el máximo del rango (✎ Editar).', 'rango'); }
         }
         if (x.nuevo && bus) {
           const ex = bus.exactos(t).filter((f) => f.estr === estr), aqui = ex.filter((f) => !etq || f.etq === etq);
-          if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`);
+          if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`, 'existe', aqui[0].codigo);
           else if (ex.length) add(x.id, 'info', `Existe con el mismo texto en ${nomEtq(ex[0].etq)} (paso ${ex[0].codigo}). Usarlo en otra etiqueta puede hacer que no aparezca en su lugar en producción.`);
           else { const g = iguales.get(x.id);
             if (!g || g.n < 2) add(x.id, 'info', 'Paso nuevo: el equipo RMD lo creará en SAP.');
@@ -16886,25 +16955,25 @@
         if (!x.nuevo && x.etqCat && etq && x.etqCat !== etq && (!esPm || !igualQueSap(x))) add(x.id, igualQueSap(x) ? 'info' : 'aviso', `${igualQueSap(x) ? 'Ya está así en SAP: e' : 'E'}n el catálogo este paso es de ${nomEtq(x.etqCat)}, no de esta etiqueta; en producción podría no aparecer en su lugar.`);
         if (x.tipo === RANGO || x.vi != null || x.vf != null) {
           const a = num(x.vi), b = num(x.vf), m = num(x.margen);
-          if ([a, b, m].some((v) => Number.isNaN(v))) add(x.id, 'error', 'El rango debe tener números (usa punto o coma para los decimales).');
-          else if (a != null && b != null && a > b) add(x.id, 'error', 'El valor inicial es mayor que el final.');
+          if ([a, b, m].some((v) => Number.isNaN(v))) add(x.id, 'error', 'El rango debe tener números (usa punto o coma para los decimales).', 'rango');
+          else if (a != null && b != null && a > b) add(x.id, 'error', 'El valor inicial es mayor que el final.', 'rango');
         }
       };
       const vivos = (l) => (l || []).filter((x) => !x.quitado);
       trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (x.cantNueva == null || x.cantNueva === '') return; const c = num(x.cantNueva);
-        if (c == null || Number.isNaN(c) || c <= 0) add(insClave(x), 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); else if (cantRecetaCambiada(x)) add(insClave(x), 'aviso', AVISO_CANT_LM); }));
+        if (c == null || Number.isNaN(c) || c <= 0) add(insClave(x), 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); else if (cantRecetaCambiada(x)) add(insClave(x), 'aviso', AVISO_CANT_LM, 'cant'); }));
       // insumos: cantidad válida y lo repartido en los pasos frente a la receta
       const receta = new Map(), asignado = new Map(), insumosPm = [];
       trabajo.estructuras.forEach((e) => { (e.insumos || []).forEach((i) => { if (i.comp && !receta.has(i.comp)) receta.set(i.comp, i); });
         [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => vivos(l).forEach((p) => vivos(p.pm).forEach((m) => { if (!m.insumo) return; insumosPm.push(m); asignado.set(m.comp, (asignado.get(m.comp) || 0) + (num(m.cant) || 0)); }))); });
       insumosPm.forEach((m) => {
         const c = num(m.cant); if (c == null || Number.isNaN(c) || c <= 0) { add(m.id, 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); return; }
-        if (cantBase.has(m.id) && fmtCant(cantBase.get(m.id)) !== fmtCant(m.cant)) add(m.id, 'aviso', AVISO_CANT_LM);
-        const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`);
+        if (cantBase.has(m.id) && fmtCant(cantBase.get(m.id)) !== fmtCant(m.cant)) add(m.id, 'aviso', AVISO_CANT_LM, 'cant');
+        const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`, 'cant');
       });
       const revisarLista = (l, estr, etq) => {
         const vistos = new Map(), copias = new Set(vivos(l).filter((y) => y.copiaDe).map((y) => y.id));   // copias de pasos (duplicar un lote): repetir el código es lo esperado
-        vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) { const copia = copias.has(x.id) || copias.has(otro); add(x.id, copia ? 'info' : 'aviso', `${copia ? 'Copia: e' : 'E'}l paso ${x.codigo} ${copia ? 'también' : 'ya'} está en esta lista (${numeros.get(otro) || 'más arriba'}).`); } else if (!otro) vistos.set(String(x.codigo), x.id); }
+        vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const otro = vistos.get(String(x.codigo)); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) { const copia = copias.has(x.id) || copias.has(otro); add(x.id, copia ? 'info' : 'aviso', `${copia ? 'Copia: e' : 'E'}l paso ${x.codigo} ${copia ? 'también' : 'ya'} está en esta lista (${numeros.get(otro) || 'más arriba'}).`, 'dup'); } else if (!otro) vistos.set(String(x.codigo), x.id); }
           vivos(x.pm).filter((m) => !m.insumo).forEach((m) => revisar(m, estr, etq, true)); });
         // paso quitado con dependientes
         (l || []).filter((x) => x.quitado && x.codigo).forEach((x) => { const dep = vivos(l).filter((y) => String(y.depende || '') === String(x.codigo)); if (dep.length) add(x.id, 'aviso', `${dep.map((y) => numeros.get(y.id) || y.texto.slice(0, 30)).join(', ')} depende${dep.length > 1 ? 'n' : ''} de este paso: el equipo RMD revisará los predecesores.`); });
@@ -16912,9 +16981,12 @@
       trabajo.estructuras.forEach((e) => {
         revisarLista(e.pasos, e.estructuraId, null);
         (e.etiquetas || []).forEach((t) => revisarLista(t.pasos, e.estructuraId, t.etiquetaId));
-        ['equipos', 'utensilios'].forEach((k) => { const vistos = new Set(); vivos(e[k]).forEach((x) => { const c = x.equipoId || x.utensilioId || x.agrupadorId; if (c && vistos.has(c)) add(x.id, 'aviso', 'Está repetido en esta lista.'); vistos.add(c); }); });
+        ['equipos', 'utensilios'].forEach((k) => { const vistos = new Set(); vivos(e[k]).forEach((x) => { const c = x.equipoId || x.utensilioId || x.agrupadorId; if (c && vistos.has(c)) add(x.id, 'aviso', 'Está repetido en esta lista.', 'dup'); vistos.add(c); }); });
       });
       if (ctx.dt) avisosDt(trabajo, add, numeros);
+      // v1.134.0 (pedido de Carlos): a Producción solo le llega lo que le sirve (errores, pasos que ya existen, repetidos, Calidad en Operaciones,
+      // documentos vencidos, qué se anota en un paso nuevo, cantidades); Documentación Técnica ve el detalle completo al importar
+      if (prod) out.forEach((l, id) => { const f = l.filter((a) => a.nivel === 'error' || (a.nivel === 'aviso' && AVISOS_PRODUCCION.has(a.k))); if (f.length) out.set(id, f); else out.delete(id); });
       return out;
     }
     // ---- v1.123.0: configuración de Documentación Técnica (vista completa) ----
@@ -17047,7 +17119,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, homologacionPaso, homologarTexto, listaSinPredecesor, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO };
+    return { TIPO, RANGO, homologacionPaso, homologarTexto, pasosCeo, REGISTROS, REGISTRO_TXT, registroDe, registroDeTipo, codigosDoc, mapaDocs, docVencido, listaSinPredecesor, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -17061,7 +17133,7 @@
     const fmtDec = (v) => { if (v == null || v === '') return ''; const n = parseFloat(String(v).replace(',', '.')); if (isNaN(n)) return String(v); const [e, d] = n.toFixed(3).split('.'); return e.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + '.' + d; };
     const cols = (ws) => { const t = ws.reduce((a, b) => a + b, 0); return `<colgroup>${ws.map((w) => `<col style="width:${(w / t * 100).toFixed(2)}%">`).join('')}</colgroup>`; };
     const { TIPO, RANGO } = PPN;
-    const CON_CAJA = new Set([433, 434, 435, 436, 437, 438, 443, 444, 445]), CON_CHECK = new Set([432, 442]);   // tipos con casilla de dato / de check
+    const CON_CAJA = new Set([433, 434, 435, 436, 437, 438, 443, 444, 445, 449]), CON_CHECK = new Set([432, 442]);   // tipos con casilla de dato / de check
     const CAJA = '<span class="pp-caja"></span>', CHECK = '<span class="pp-check"></span>';
     const ICO_CHECK = '<svg class="pp-ico-check" viewBox="0 0 16 16" aria-label="check"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.2 8.3l2.6 2.6 5-5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const app = $('#app');
@@ -17074,7 +17146,9 @@
     let avisoInicial = '', pdfHecho = false, guardadoUna = false, imprimiendo = false, SELECCION = null, panelAbierto = false;
     let MARCADOS = new Set(), ANCLA = null, PORTA = null;               // varios pasos marcados (Ctrl/Shift+clic) y pasos copiados para pegar
     const CLAVE_PERSONA = 'rmdPlantillaPersona';                       // nombre y área de la última solicitud (este navegador)
-    const REGISTRO = { leer: 'Solo leerlo (instrucción)', dato: 'Anotar un dato (número o texto)', check: 'Marcar un check de conformidad', rango: 'Anotar un rango (valor inicial y final)', fecha: 'Anotar fecha y hora' };
+    const PROD = !EMB;                                                  // v1.134.0: plantilla para Producción (sin avisos de Documentación Técnica ni tildes)
+    const REGISTRO = PPN.REGISTRO_TXT;                                  // qué anota Producción en un paso nuevo (v1.134.0: con su tipo de dato)
+    let DOCS = null;                                                    // documentos vigentes (lista de Reglas de revisión al generar la plantilla)
     const CLAVE = () => `rmdPlantilla:${PQ.rmd.codigo}:${PQ.huella}`;
     const scriptBorrador = () => $('#rmd-borrador') || $('#rmd-propuesta');
 
@@ -17085,13 +17159,14 @@
     }
     const CLAVE_AYUDA = 'rmdPlantillaAyuda';
     const CLAVE_DETECTAR = 'rmdPlantillaDetectarTildes';               // v1.119.0: «Detectar tildes» apagada por defecto; la preferencia queda en este navegador
-    try { PPN.detectarTildes(localStorage.getItem(CLAVE_DETECTAR) === '1'); } catch (e) { PPN.detectarTildes(false); }
+    // v1.134.0 (pedido de Carlos): la plantilla para Producción no tiene «Detectar tildes»; solo la Edición rápida del portal la ofrece
+    try { PPN.detectarTildes(!PROD && localStorage.getItem(CLAVE_DETECTAR) === '1'); } catch (e) { PPN.detectarTildes(false); }
     async function iniciar() {
       app.innerHTML = '<div class="pp-cargando">Abriendo la plantilla…</div>';
       try {
         if (!window.DecompressionStream || !window.Blob || !Blob.prototype.stream) throw new Error('este navegador es demasiado antiguo');
         try { PQ = await desempacar($('#rmd-datos').textContent.replace(/\s+/g, '')); } catch (e) { throw new Error('el archivo está incompleto o dañado (¿se cortó la descarga o lo modificó el correo?). Pide que te lo envíen otra vez'); }
-        BASE = PQ.arbol; NUM_BASE = PPN.numerar(BASE.estructuras);
+        BASE = PQ.arbol; NUM_BASE = PPN.numerar(BASE.estructuras); DOCS = PPN.mapaDocs(PQ.docs || (EMB && EMB.docs) || null);
         const filas = PPN.desempacarPasos(PQ.catalogo); BUS = PPN.crearBuscador(filas);
         ETQ = new Map(PQ.catalogo.etq.map(([id, n]) => [id, n]));
         EQ = [].concat(
@@ -17194,7 +17269,7 @@
     // ---------- dibujo ----------
     function pintarTodo() {
       PPN.tildes(!!W.tildes);
-      CMB = PPN.cambios(BASE, W, { tipos: PQ.tipos }); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras, dt: DT, planta: PQ.rmd.planta }); if (EMB) AV.forEach((l) => l.forEach(textoVista)); UNI = PPN.nuevosIguales(W); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
+      CMB = PPN.cambios(BASE, W, { tipos: PQ.tipos }); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras, dt: DT, planta: PQ.rmd.planta, docs: DOCS, modo: PROD ? 'produccion' : '' }); if (EMB) AV.forEach((l) => l.forEach(textoVista)); UNI = PPN.nuevosIguales(W); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
       indexarDt();
       const y = window.scrollY; podarMarcados();
       app.innerHTML = `${htmlBarra()}${htmlAvisosGenerales()}<div class="pp-cuerpo"><main class="pp-doc${SELECCION ? ' con-sel' : ''}${MARCADOS.size ? ' multi' : ''}" id="pp-doc">${htmlDoc()}</main><aside class="pp-panel${panelAbierto ? ' abierto' : ''}" id="pp-panel">${htmlPanel()}</aside></div><section class="pp-solo-impresion">${htmlImpresion()}</section>
@@ -17216,10 +17291,13 @@
     function htmlAvisosGenerales() {
       const partes = [];
       if (avisoInicial) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${esc(avisoInicial)}</div>`);
+      // v1.134.0 (pedido de Carlos): documentos citados vencidos, a la vista desde el inicio
+      { const docs = new Set(); AV.forEach((l) => l.forEach((a) => { if (a.k === 'doc') { const m = /^Documento (\S+):/.exec(a.texto); if (m) docs.add(m[1]); } }));
+        if (docs.size) partes.push(`<div class="pp-aviso-gen aviso">⚠ ${docs.size === 1 ? 'Un documento citado está vencido o ya no figura' : `${docs.size} documentos citados están vencidos o ya no figuran`} como vigente${docs.size === 1 ? '' : 's'}: <b>${[...docs].sort().map(esc).join(', ')}</b>. <button type="button" data-a="siguiente-aviso" data-k="doc">Ver dónde</button></div>`); }
       let ver = false; try { ver = localStorage.getItem(CLAVE_AYUDA) === '1'; } catch (e) { ver = false; }
       if (OBS) { partes.push(htmlObs()); ver = true; }                     // en la vista del portal: Observaciones en lugar de «Cómo se usa» (que queda en «Ayuda»)
       if (EMB && ayudaAbierta) partes.push(`<div class="pp-ayuda"><b>Cómo se usa la Edición rápida</b><ol><li><b>Haz clic en una fila</b>: a su derecha aparecen <b>Editar</b>, <b>⚙ Configuración</b> (tipo de dato, decimales, Depende, casillas, rango y color), <b>Paso debajo</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Duplicar</b>, <b>Copiar</b> y <b>Quitar</b>. Doble clic edita el texto.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> marca pasos y <b>Shift+clic</b> un tramo; abajo aparece la barra para duplicarlos, copiarlos, moverlos o quitarlos juntos.</li><li>Al escribir aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe queda <b>★</b> y se crea en el catálogo al guardar.</li><li><b>✕ por corregir</b> frena el guardado: son errores de lo que cambiaste. Lo que ya venía así de SAP sale aparte y no frena.</li><li><b>Guardar en SAP…</b> (o <b>Ctrl+Enter</b>) muestra cada escritura y pide confirmación; al terminar puedes volver a la vista o <b>Deshacer ingreso</b>. Hasta entonces lo editado se guarda solo en este navegador.</li><li><b>Teclado</b>, con un paso seleccionado: <b>↑/↓</b> el anterior o el siguiente, <b>Alt+↑/↓</b> subirlo o bajarlo, <b>Enter</b> editar el texto, <b>T</b> tipo de dato y valores, <b>D</b> Depende, <b>Supr</b> quitar, <b>Ctrl+Z</b> deshacer.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
-      else if (!EMB && (!ver || ayudaAbierta)) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Haz clic (o toca) una fila</b>: a su derecha aparecen <b>Editar</b>, <b>Paso debajo</b>, <b>Proceso menor</b>, <b>Mover a…</b>, <b>Subir</b>/<b>Bajar</b>, <b>Quitar</b> y <b>Comentar</b>. Doble clic en una fila la edita. Al final de cada lista está <b>+ Agregar paso al final</b>; con <b>Ir a sección</b> saltas a cualquier parte.</li><li><b>Varios pasos a la vez</b>: <b>Ctrl+clic</b> (o <b>☑ Seleccionar</b>) marca pasos y <b>Shift+clic</b> marca un tramo. Abajo aparece una barra para <b>duplicarlos</b> (p. ej. para otro lote), <b>copiarlos</b> y pegarlos en otra parte, <b>subirlos</b>, <b>bajarlos</b>, <b>moverlos</b> o <b>quitarlos</b> juntos. También puedes <b>arrastrarlos</b>; si mantienes <b>Ctrl</b> al soltar, se copian. Una copia lleva el paso con sus procesos menores e insumos.</li><li>Al escribir, aparecen los pasos que ya existen en SAP: elige uno para no duplicar. Si no existe, queda marcado <b>★ Se creará</b> y puedes indicar qué se anota en él.</li><li>Sigue los pasos de la barra: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>: ingrésalo por solicitud o envíalo por correo a <b>Documentación Técnica</b>; lleva los datos para importar tus cambios, así que es el único archivo que hay que enviar. <b>Guardar borrador</b> es opcional: descarga un archivo para seguir editando otro día.</li><li>Tus cambios se guardan solos en este navegador mientras trabajas: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
+      else if (!EMB && (!ver || ayudaAbierta)) partes.push(`<div class="pp-ayuda"><b>Cómo se usa</b><ol><li><b>Toca una fila</b> para ver sus botones: <b>✎ Editar</b>, <b>＋ Paso debajo</b>, <b>✕ Quitar</b>, <b>💬 Comentar</b> y más (subir, bajar, mover, duplicar, copiar). Doble clic edita el texto. Al final de cada lista está <b>＋ Agregar paso al final</b>.</li><li><b>Al escribir un paso</b> aparecen los que ya existen en SAP: elige uno si dice lo mismo. Si es nuevo (<b>★</b>), <b>indica qué se anota</b>: nada, una firma, un check, fecha y hora, un número… Así sabemos qué casilla lleva en el RMD.</li><li><b>⚠ por revisar</b> te lleva a lo que conviene mirar: pasos homologados de Calidad en Operaciones, documentos vencidos o pasos que ya existen. <b>✕ por corregir</b> es lo que falta completar.</li><li>Para terminar: <b>Solicitud</b> (quién pide el cambio y por qué) y <b>Generar PDF</b>; el PDF se ingresa por solicitud o se envía a <b>Documentación Técnica</b> y lleva todo para importar tus cambios. <b>Guardar borrador</b> es opcional, para seguir otro día.</li><li>Tus cambios se guardan solos en este navegador: si se cierra la página, al abrir el archivo otra vez puedes recuperarlos.</li></ol><button type="button" data-a="ayuda-ok">Entendido</button></div>`);
       return partes.join('');
     }
     let ayudaAbierta = false;
@@ -17229,13 +17307,10 @@
       return `<header class="pp-barra"><div class="pp-titulo"><b>Borrador de Producción · RMD ${esc(r.codigo)} v${esc(r.version)}</b><span>${esc(r.descripcion)} · ${esc(r.etapa)} · ${esc(r.planta)}</span></div>
         <div class="pp-botones"><span class="pp-sucio" title="Hay una copia automática en este navegador, pero el archivo para enviar aún no se descargó">${sucio ? '● Sin guardar en archivo' : ''}</span>${htmlIrA()}
         <button type="button" data-a="deshacer" ${deshacer.length ? '' : 'disabled'} title="Deshacer el último cambio (Ctrl+Z)">Deshacer</button>
-        <label class="pp-detectar" title="Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde) y ofrece «Quitar tildes». Apagada por defecto; se recuerda en este navegador"><input type="checkbox" id="pp-detectar"${PPN.detectarTildes() ? ' checked' : ''}> Detectar tildes</label>
-        <label class="pp-tildes"${PPN.detectarTildes() || W.tildes ? '' : ' hidden'} title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" id="pp-tildes"${W.tildes ? ' checked' : ''}> Distinguir tildes</label>
-        ${(() => { const nt = conTilde().length; return nt ? `<button type="button" data-a="quitar-tildes" class="pp-quitar-tildes" title="En los pasos ninguna palabra lleva tilde: quita las tildes de los ${nt} textos marcados en rojo">Quitar tildes (${nt})</button>` : ''; })()}
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="guardar" title="Descarga un archivo con tu borrador para seguir editándolo otro día">Guardar borrador</button>
         <button type="button" data-a="pdf" class="primario" title="Genera el PDF con los cambios marcados: es lo que se envía a Documentación Técnica (lleva los datos para importarlo)">Generar PDF</button></div>
-        <div class="pp-resumen">${htmlFlujo(n)}${n.errores ? `<button type="button" class="pp-pend-btn err" data-a="pendientes">✕ ${n.errores} por corregir</button>` : ''}${n.avisos ? `<span class="pp-pend-btn avi">${n.avisos} aviso${n.avisos === 1 ? '' : 's'}</span>` : ''}${n.nuevos ? `<span class="pp-pend-btn crea">★ ${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'}</span>` : ''}</div></header>`;
+        <div class="pp-resumen">${htmlFlujo(n)}${n.errores ? `<button type="button" class="pp-pend-btn err" data-a="pendientes">✕ ${n.errores} por corregir</button>` : ''}${n.avisos ? `<button type="button" class="pp-pend-btn avi" data-a="siguiente-aviso" title="Ir al siguiente paso con un aviso (⚠)">⚠ ${n.avisos} por revisar</button>` : ''}${n.nuevos ? `<span class="pp-pend-btn crea">★ ${n.nuevos} paso${n.nuevos === 1 ? '' : 's'} nuevo${n.nuevos === 1 ? '' : 's'}</span>` : ''}</div></header>`;
     }
     // Los cuatro pasos del trabajo, con su estado
     function htmlFlujo(n) {
@@ -17285,13 +17360,16 @@
       else { if (cambiado(x, b)) out.push('<span class="pp-tag cam">Cambiado</span>'); if (cantCambiada(x, b)) out.push('<span class="pp-tag cam">Cantidad</span>'); if (valoresCambiados(x, b)) out.push('<span class="pp-tag cam">Rango</span>'); if (casillasCambiadas(x, b)) out.push('<span class="pp-tag cam">Casillas</span>'); if (dtCambiada(x, b)) out.push('<span class="pp-tag cam" title="Cambió su configuración (tipo de dato, decimales, Depende, casillas o color)">Configuración</span>'); if (MOV.has(x.id)) out.push('<span class="pp-tag mov">Movido</span>'); }
       const igual = !x.quitado && x.nuevo && UNI.get(x.id);
       if (igual && igual.n > 1 && igual.primero !== x.id) out.push(`<span class="pp-tag crea" title="Es idéntico a otro paso nuevo: en SAP se crea uno solo y se usa también aquí">★ Usa el mismo paso nuevo</span>`);
+      else if (!x.quitado && x.nuevo && PROD && typeof x.texto === 'string') { const r = PPN.registroDe(x.registro);   // v1.134.0: en palabras de Producción, con la casilla que pidió
+        out.push(`<span class="pp-tag crea" title="No existe en SAP con este texto: Documentación Técnica lo creará${igual && igual.n > 1 ? `. Se crea una sola vez y se usa en los ${igual.n} lugares donde está igual` : ''}">★ Paso nuevo${igual && igual.n > 1 ? ` · ${igual.n} lugares` : ''}</span>${x.registro ? `<span class="pp-tag reg" title="Qué anota Producción en este paso">${x.registro === 'leer' ? 'Sin casilla: solo instrucción' : 'Anota: ' + esc(r ? r[1] : REGISTRO[x.registro] || x.registro)}${r && r[0] === 'numero' && x.decN != null && x.decN !== '' ? ` · ${esc(x.decN)} decimal${+x.decN === 1 ? '' : 'es'}` : ''}</span>` : `<button type="button" class="pp-tag falta" data-a="editar" title="Indica qué se anota en este paso (casilla)">Falta: qué se anota</button>`}`); }
       else if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo${igual && igual.n > 1 ? `. Se crea una sola vez y se usa en los ${igual.n} lugares donde está igual` : ''}">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}${igual && igual.n > 1 ? ` · ${igual.n} lugares` : ''}</span>${x.registro && REGISTRO[x.registro] ? `<span class="pp-tag reg" title="Qué anota Producción en este paso (lo indica quien pide el cambio)">${esc(REGISTRO[x.registro])}</span>` : ''}`);
       else if (!x.quitado && x.insumo && !b) out.push('<span class="pp-tag ok" title="Insumo de la receta del RMD">Insumo de la receta</span>');
       else if (!x.quitado && x.codigo && x.texto != null && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
       return out.length ? `<span class="pp-tags">${out.join('')}</span>` : '';
     }
     const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || cantCambiada(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b) || dtCambiada(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
-    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}</div>`).join('');
+    // v1.134.0: un aviso que se resuelve con un paso del catálogo (homologado de Calidad en Operaciones, o el que ya existe) trae su botón
+    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${a.usar && BUS.porCodigo(a.usar) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
     const htmlAntes = (x, b) => (b && !x.quitado && cambiado(x, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '');
     function htmlRango(x) {
@@ -17406,11 +17484,11 @@
     function htmlPanel() {
       const n = contar(), conAviso = [...AV.entries()].filter(([, l]) => l.some((a) => a.nivel !== 'info'));
       const lista = filtro === 'nuevos' ? CMB.filter((c) => c.nuevo || (c.pm && c.pm.some((m) => m.nuevo))) : filtro === 'avisos' ? [] : CMB;
-      const chips = [['todos', `Cambios ${n.total}`], ['nuevos', `A crear ${n.nuevos}`], ['avisos', `Avisos ${conAviso.length}`]].map(([k, t]) => `<button type="button" data-filtro="${k}" class="${filtro === k ? 'activo' : ''}">${t}</button>`).join('');
+      const chips = [['todos', `Cambios ${n.total}`], ['nuevos', `${PROD ? 'Pasos nuevos' : 'A crear'} ${n.nuevos}`], ['avisos', `Avisos ${conAviso.length}`]].map(([k, t]) => `<button type="button" data-filtro="${k}" class="${filtro === k ? 'activo' : ''}">${t}</button>`).join('');
       const corto = (t) => { t = String(t || ''); return t.length > 90 ? t.slice(0, 90) + '…' : t; };
       let cuerpo;
       if (filtro === 'avisos') cuerpo = conAviso.length ? conAviso.map(([id, l]) => { const f = encontrar(id); return `<button type="button" class="pp-cmb" data-ir="${esc(id)}"><b>${esc(f ? (f.item.texto || f.item.nombre || f.item.desc || '') : '').slice(0, 70)}</b>${l.filter((a) => a.nivel !== 'info').map((a) => `<span class="pp-cmb-av ${a.nivel}">${esc(a.texto)}</span>`).join('')}</button>`; }).join('') : '<p class="pp-nota">Sin avisos.</p>';
-      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ' <span class="pp-tag crea">★ se creará</span>' : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.accion === 'config' ? `${c.texto ? String(c.texto).slice(0, 40) + ': ' : ''}${(c.campos || []).map((y) => `${y.campo} ${y.antes} → ${y.despues}`).join('; ')}` : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
+      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ` <span class="pp-tag crea">${PROD ? '★ nuevo' : '★ se creará'}</span>` : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.accion === 'config' ? `${c.texto ? String(c.texto).slice(0, 40) + ': ' : ''}${(c.campos || []).map((y) => `${y.campo} ${y.antes} → ${y.despues}`).join('; ')}` : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
       if (filtro === 'todos' && obsCambiada()) cuerpo = `<button type="button" class="pp-cmb cambiar" data-a="ir-obs"><b>Observaciones</b><br><span>Cambiadas: se guardan con «Guardar en SAP»</span></button>` + (lista.length ? cuerpo : '');   // v1.129.0: cuentan en «Cambios»
       return `<div id="pp-sel-cfg">${htmlSelCfg()}</div><div class="pp-panel-cab"><b>${EMB ? 'Cambios por guardar' : 'Cambios del borrador'}</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
     }
@@ -17431,7 +17509,7 @@
       const r = PQ.rmd, s = SOL || {};
       return `<h2>Resumen del borrador · RMD ${esc(r.codigo)} v${esc(r.version)}</h2><table class="pp-tabla"><tbody><tr><td>Solicitado por</td><td>${esc(s.nombre || '')}</td><td>Área</td><td>${esc(s.area || '')}</td></tr><tr><td>Motivo</td><td colspan="3">${esc(s.motivo || '')}</td></tr><tr><td>Control de cambio</td><td>${esc(s.cc || '')}</td><td>Fecha</td><td>${esc(fechaHora(Date.now()))}</td></tr>${s.observacion ? `<tr><td>Observación</td><td colspan="3">${esc(s.observacion)}</td></tr>` : ''}</tbody></table>
         <table class="pp-tabla"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${CMB.map((c) => `<tr><td>${esc(c.numero || '')}</td><td>${ETQ_ACCION[c.accion]}${c.nuevo ? ' ★' : ''}<br><span class="pp-nota">${esc(c.lugar)}</span></td><td>${esc(c.antes || '')}</td><td>${esc(c.accion === 'comentario' ? '' : c.despues || (c.campos ? c.campos.map((x) => `${x.campo}: ${x.antes || '—'} → ${x.despues || '—'}`).join('; ') : c.accion === 'mover' ? 'después de: ' + ((c.trasDe && c.trasDe.texto) || 'al inicio') : c.texto || ''))}</td><td>${esc([c.comentario, c.registro && REGISTRO[c.registro] ? 'Anota: ' + REGISTRO[c.registro] : ''].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table>
-        <p class="pp-nota">★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.</p>
+        <p class="pp-nota">${PROD ? '★ = paso nuevo (no existe en SAP con ese texto): Documentación Técnica lo creará con la casilla que dice «Anota».' : '★ = paso que no existe en el catálogo de SAP con ese texto: el equipo RMD lo creará.'}</p>
         <p class="pp-nota">Este PDF lleva los datos del borrador: en el portal se importa directamente (Exportar › Plantilla para Producción › Importar un borrador).</p>`;
     }
 
@@ -17772,6 +17850,23 @@
     }
     const USO = new Map();                                              // código de paso -> { aut, ing, total } (Edición rápida)
     const htmlUso = (c) => { if (!EMB || !EMB.uso) return ''; const u = USO.get(String(c)); return u ? `<span class="uso${u.total ? '' : ' sin'}" title="Masters que usan este paso hoy">${u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso'}</span>` : '<span class="uso cargando">…</span>'; };
+    // v1.134.0: cómo se ve la casilla de cada opción en el RMD
+    function previaRegistro(k) {
+      const caja = (t) => `<span class="pp-prev-caja">${t}</span>`;
+      return { leer: '<span class="pp-prev-nada">sin casilla</span>', rpor: mini(['Realizado Por'], 1), rpvb: mini(['Realizado Por', 'VB'], 1), vb: mini(['VB'], 1), check: CHECK, fecha: caja('__/__/____ __:__'), solofecha: caja('__/__/____'), hora: caja('__:__'),
+        numero: caja('0.00'), rango: caja('mín. – máx.'), texto: caja('Aa'), lote: caja('Lote'), vence: caja('__/__/____') }[k] || '';
+    }
+    // v1.134.0: en la plantilla para Producción el rango va junto a «¿Qué anota?» (arriba de las sugerencias)
+    const htmlRangoEd = (x) => `<div id="m-rango" class="pp-rango-ed" hidden><label>${PROD ? 'Mínimo' : 'Valor inicial'} <input id="m-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>${PROD ? 'Máximo' : 'Valor final'} <input id="m-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen${PROD ? ' (opcional)' : ''} <input id="m-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label><span id="m-rango-av" class="pp-rango-av"></span></div>`;
+    function htmlRegistro(x, b, clase) {
+      const ini = x.registro || (b ? PPN.registroDeTipo(b.tipo, b.rpor, b.vb) : ''), ops = PPN.REGISTROS.filter((r) => clase === 'paso' || !r[5] && !r[6]);
+      const ico = { leer: '¶', rpor: '✍', rpvb: '✍✍', vb: 'VB', check: '☑', fecha: '📅', solofecha: '📅', hora: '🕒', numero: '123', rango: '↔', texto: 'Aa', lote: '#', vence: '⌛' };
+      const grupo = (g, tit) => { const l = ops.filter((r) => r[3] === g); return l.length ? `<div class="pp-reg-g"><span class="pp-reg-gt">${tit}</span>${l.map((r) => `<button type="button" class="pp-reg-op" data-reg="${r[0]}" title="${esc(r[4])}"><i aria-hidden="true">${ico[r[0]] || ''}</i>${esc(r[1])}</button>`).join('')}</div>` : ''; };
+      return `<div id="m-reg-l" class="pp-reg" hidden><div class="pp-reg-tit">¿Qué anota Producción en este ${clase === 'pm' ? 'proceso menor' : 'paso'}? <small>obligatorio en un paso nuevo</small></div>
+        <select id="m-reg" hidden><option value=""></option>${PPN.REGISTROS.map((r) => `<option value="${r[0]}"${ini === r[0] ? ' selected' : ''}>${esc(r[1])}</option>`).join('')}${x.registro === 'dato' ? '<option value="dato" selected>Anotar un dato (número o texto)</option>' : ''}</select>
+        ${grupo('nada', 'No anota nada')}${grupo('firma', clase === 'pm' ? 'Marca' : 'Firma o marca')}${grupo('dato', 'Anota un dato')}<div id="m-reg-det" class="pp-reg-det"></div><div class="pp-reg-falta">Elige qué se anota en este paso.</div></div>
+        <div id="m-reg-info" class="pp-reg-info" hidden></div>`;
+    }
     function editar(ref) {
       // ref: { id } | { nuevo: true, lista, despuesDe, clase, e, t, padre }
       const f = ref.id ? encontrar(ref.id) : ref, x = ref.id ? f.item : { texto: '' }, b = ref.id ? BI.get(ref.id) : null, clase = ref.id ? f.clase : ref.clase;
@@ -17783,10 +17878,9 @@
       modal(`<h3>${titulo}<span>${esc(donde)}${ref.padre ? ' › ' + esc(ref.padre.texto).slice(0, 60) : ''}</span></h3>
         <label class="pp-campo">Texto<textarea id="m-texto" rows="3" spellcheck="true">${esc(x.texto)}</textarea></label>
         <div id="m-tilde" class="pp-tilde-av" hidden></div>
-        <div id="m-estado" class="pp-estado"></div>${EMB && b && b.codigo ? '<div id="m-uso-actual" class="pp-nota">Leyendo en cuántos masters se usa el paso actual…</div>' : ''}<div id="m-sug" class="pp-sug"></div>
-        <div id="m-rango" class="pp-rango-ed" hidden><label>Valor inicial <input id="m-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>Valor final <input id="m-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen <input id="m-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label><span id="m-rango-av" class="pp-rango-av"></span></div>
-        <label id="m-reg-l" class="pp-campo" hidden>${EMB ? '¿Qué se anota en este paso nuevo? (opcional)' : '¿Qué anota Producción en este paso nuevo? (opcional)'}<select id="m-reg"><option value="">${EMB ? 'Sin indicar: la del catálogo o ⚙ Configuración' : 'Sin indicar: lo decide el equipo RMD'}</option>${Object.entries(REGISTRO).map(([k, t]) => `<option value="${k}"${x.registro === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
-        <label class="pp-campo pp-com-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
+        <div id="m-estado" class="pp-estado"></div>${EMB && b && b.codigo ? '<div id="m-uso-actual" class="pp-nota">Leyendo en cuántos masters se usa el paso actual…</div>' : ''}${PROD ? htmlRegistro(x, b, clase) + htmlRangoEd(x) : ''}<div id="m-sug" class="pp-sug"></div>
+        ${PROD ? '' : htmlRangoEd(x) + `<label id="m-reg-l" class="pp-campo" hidden>¿Qué se anota en este paso nuevo? (opcional)<select id="m-reg"><option value="">Sin indicar: la del catálogo o ⚙ Configuración</option>${Object.entries(REGISTRO).map(([k, t]) => `<option value="${k}"${x.registro === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`}
+        <label class="pp-campo pp-com-campo">${PROD ? 'Comentario para Documentación Técnica (opcional)' : 'Comentario para el equipo RMD (opcional)'}<textarea id="m-com" rows="2">${esc(x.comentario || '')}</textarea></label>
         <div class="pp-fijo">${clase === 'paso' && !(EMB && DT) ? `<fieldset class="pp-cas"><legend>Quién firma este paso</legend><label><input type="checkbox" id="m-rpor"${x.rpor ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Realizado por»</label><label><input type="checkbox" id="m-vb"${x.vb ? ' checked' : ''}${x.edit ? ' disabled' : ''}> Lleva «Visto bueno»</label>${x.edit ? '<span class="pp-nota">Este paso pide un dato: lleva su caja de dato.</span>' : '<span class="pp-nota">Márcalo solo cuando el paso lo amerite.</span>'}</fieldset>` : ''}
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
         const ta = $('#m-texto', m), est = $('#m-estado', m), sug = $('#m-sug', m), rango = $('#m-rango', m);
@@ -17803,12 +17897,26 @@
           if (!t) est.innerHTML = '<span class="err">Escribe el texto del paso o elige uno de la lista.</span>';
           else if (igualBase && (!elegido || String(elegido.codigo) === String(b.codigo))) est.innerHTML = '<span class="ok">Sin cambios en el texto.</span>';
           else if (elegido) est.innerHTML = `<span class="ok">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${etq && elegido.etq && elegido.etq !== etq ? `<br><span class="avi">⚠ En el catálogo es de ${esc(ETQ.get(elegido.etq) || 'otra etiqueta')}: en producción podría no aparecer en su lugar. ${EMB ? 'Al guardar se usa un paso de esta etiqueta con el mismo texto.' : 'Al ingresarlo, el equipo RMD lo pasa a un paso de esta etiqueta.'}</span>` : ''}`;
-          else est.innerHTML = `<span class="crea">★ Paso nuevo: no existe en SAP con este texto. ${EMB ? 'Se crea en el catálogo de SAP al guardar.' : 'El equipo RMD lo creará.'}</span>`;
-          rango.hidden = !conRango() || !!(EMB && DT);                  // v1.129.0: en la vista completa el rango está en ⚙ Configuración
+          else est.innerHTML = `<span class="crea">★ Paso nuevo: no existe en SAP con este texto. ${EMB ? 'Se crea en el catálogo de SAP al guardar.' : 'Documentación Técnica lo creará; indica abajo qué se anota en él.'}</span>`;
           $('#m-reg-l', m).hidden = !(t && !elegido && !(igualBase && b && b.codigo));
+          if (PROD) pintarRegistro(t, elegido, igualBase);
+          rango.hidden = !(conRango() || (PROD && !$('#m-reg-l', m).hidden && $('#m-reg', m).value === 'rango')) || !!(EMB && DT);   // v1.129.0: en la vista completa el rango está en ⚙ Configuración
           PPN.tildes(tPrev);
           validarRango();
         };
+        // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción elige qué se anota (la casilla del RMD); en uno que ya existe se le muestra cuál lleva
+        const pintarRegistro = (t, eleg, igualBase) => {
+          const box = $('#m-reg-l', m), info = $('#m-reg-info', m), sel = $('#m-reg', m), cas = m.querySelector('.pp-fijo .pp-cas');
+          m.querySelectorAll('.pp-reg-op').forEach((o) => o.classList.toggle('activo', o.dataset.reg === sel.value));
+          const r = PPN.registroDe(sel.value), det = $('#m-reg-det', m);
+          det.innerHTML = r ? `<span class="pp-reg-ayuda">${esc(r[4])}</span><span class="pp-reg-prev">Así se verá: ${previaRegistro(r[0])}</span>${r[0] === 'numero' || r[0] === 'rango' ? `<label class="pp-reg-dec">Decimales <select id="m-dec">${['0', '1', '2', '3'].map((d) => `<option${String(x.decN != null ? x.decN : r[0] === 'rango' ? 1 : 0) === d ? ' selected' : ''}>${d}</option>`).join('')}</select></label>` : ''}` : '<span class="pp-reg-ayuda">Elige una opción: con eso Documentación Técnica sabe qué casilla lleva el paso en el RMD.</span>';
+          const fuente = !box.hidden ? null : eleg ? eleg : igualBase && b ? b : null;
+          if (fuente) { const k = PPN.registroDeTipo(fuente.tipo, clase === 'paso' && ($('#m-rpor', m) ? $('#m-rpor', m).checked : x.rpor), clase === 'paso' && ($('#m-vb', m) ? $('#m-vb', m).checked : x.vb)), y = PPN.registroDe(k);
+            info.hidden = !y; if (y) info.innerHTML = `En el RMD este ${clase === 'pm' ? 'proceso menor' : 'paso'} lleva: <b>${esc(y[1])}</b> <span class="pp-reg-prev">${previaRegistro(y[0])}</span>`; }
+          else info.hidden = true;
+          if (cas) cas.hidden = !box.hidden;                              // las firmas las decide la opción elegida
+        };
+        m.addEventListener('click', (e) => { const o = e.target.closest('.pp-reg-op'); if (!o) return; $('#m-reg', m).value = o.dataset.reg; $('#m-reg-l', m).classList.remove('falta'); pintarEstado(); });
         const numero = (v) => { v = String(v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
         const validarRango = () => { const av = $('#m-rango-av', m); if (rango.hidden) { av.textContent = ''; return true; }
           const [a, b2, g] = ['#m-vi', '#m-vf', '#m-mg'].map((k) => numero($(k, m).value)), malo = [a, b2, g].some((v) => Number.isNaN(v)), alreves = !malo && a != null && b2 != null && a > b2;
@@ -17820,7 +17928,10 @@
           if (mas) lim += 20; else lim = 12;
           const t = ta.value.trim(); if (t.length < 2) { sug.innerHTML = '<div class="pp-sug-tit">Escribe parte de una palabra (limp, agit, balanz…) y aparecen los pasos que ya existen.</div>'; return; }
           const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true });
-          sug.innerHTML = r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${etq && y.f.etq && y.f.etq !== etq ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}${htmlUso(y.f.codigo)}</button>`).join('')}${r.total > r.length ? '<button type="button" class="pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="pp-sug-tit">Ningún paso de esta estructura coincide: si lo dejas así, queda «★ Se creará».</div>';
+          // v1.134.0 (pedido de Carlos): si el paso habla de Calidad en Operaciones o de muestreo, primero los pasos homologados de Calidad en Operaciones
+          const ceo = PROD && /CALIDAD|MUESTR|INSPECTIV|CONTROL DE PROCESO/.test(PPN.normalizar(t)) ? PPN.pasosCeo(PQ.rmd.planta).map((y) => BUS.porCodigo(y.codigo)).filter((f) => f && f.estr === estr).sort((a, b2) => ((b2.etq === etq) - (a.etq === etq)) || (PPN.similitud(PPN.normalizar(t), b2.n || PPN.normalizar(b2.texto)) - PPN.similitud(PPN.normalizar(t), a.n || PPN.normalizar(a.texto)))).slice(0, 6) : [];
+          const htmlCeo = ceo.length ? `<div class="pp-sug-tit ceo">Pasos homologados de Calidad en Operaciones</div>${ceo.map((f) => `<button type="button" class="pp-sug-it ceo${elegido && String(elegido.codigo) === String(f.codigo) ? ' elegido' : ''}" data-codigo="${esc(f.codigo)}"><span class="pct">CEO</span><span class="cod">${esc(f.codigo)}</span><span class="tx">${esc(f.texto)}</span>${etq && f.etq && f.etq !== etq ? `<span class="otra">${esc(ETQ.get(f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}` : '';
+          sug.innerHTML = htmlCeo + (r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${etq && y.f.etq && y.f.etq !== etq ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}${htmlUso(y.f.codigo)}</button>`).join('')}${r.total > r.length ? '<button type="button" class="pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : `<div class="pp-sug-tit">Ningún paso de esta estructura coincide: si lo dejas así, queda como ${PROD ? '«★ Paso nuevo»' : '«★ Se creará»'}.</div>`);
         };
         // v1.129.0: uso de cada sugerencia (y del paso actual) en masters Autorizados e Ingresados, como en «Cambiar paso» del portal
         const pintarUso = () => { if (!EMB || !EMB.uso) return; const cods = [...sug.querySelectorAll('[data-codigo]')].map((y) => y.dataset.codigo), act = b && b.codigo ? String(b.codigo) : '';
@@ -17834,6 +17945,9 @@
           const t = ta.value.trim(); if (!t) { ta.focus(); return; }
           if (!validarRango()) { $('#m-vi', m).focus(); return; }
           const vi = $('#m-vi', m).value.trim(), vf = $('#m-vf', m).value.trim(), mg = $('#m-mg', m).value.trim(), com = $('#m-com', m).value.trim(), reg = $('#m-reg-l', m).hidden ? '' : $('#m-reg', m).value;
+          if (PROD && !$('#m-reg-l', m).hidden && !reg) { const bx = $('#m-reg-l', m); bx.classList.add('falta'); bx.scrollIntoView({ block: 'nearest' }); return; }
+          if (PROD && reg === 'rango' && (numero(vi) == null || numero(vf) == null)) { $('#m-rango-av', m).textContent = 'Indica el valor mínimo y el máximo.'; $(numero(vi) == null ? '#m-vi' : '#m-vf', m).focus(); return; }
+          const dec = $('#m-dec', m) ? $('#m-dec', m).value : null;
           cambio(() => {
             // al quitar tildes el texto debe contar como distinto al de SAP (con tilde): se activa «Distinguir tildes»
             if (quitoTildes) { W.tildes = true; PPN.tildes(true); }
@@ -17848,6 +17962,11 @@
             if (clase === 'paso' && $('#m-rpor', m) && !$('#m-rpor', m).disabled) { viva.rpor = $('#m-rpor', m).checked; viva.vb = $('#m-vb', m).checked; }
             if (!rango.hidden) { viva.vi = vi === '' ? null : vi; viva.vf = vf === '' ? null : vf; viva.margen = mg === '' ? null : mg; }
             if (viva.nuevo && reg) viva.registro = reg; else delete viva.registro;
+            // v1.134.0: la opción elegida por Producción define el tipo de dato, las firmas y los decimales del paso nuevo (DOC los confirma al importar)
+            const rg = PROD && viva.nuevo ? PPN.registroDe(viva.registro) : null;
+            if (rg) { viva.tipo = rg[2]; viva.edit = PPN.DT_TIPOS_CON_EDIT.has(rg[2]); if (clase === 'paso') { viva.rpor = !!rg[5]; viva.vb = !!rg[6]; } if (rg[0] === 'numero' || rg[0] === 'rango') viva.decN = dec; else delete viva.decN;
+              if (rg[0] !== 'rango') { viva.vi = null; viva.vf = null; viva.margen = null; } }
+            else if (PROD) { delete viva.decN; if (!viva.nuevo && !viva.insumo) viva.edit = igualBase ? !!b.edit : PPN.DT_TIPOS_CON_EDIT.has(+viva.tipo); }   // la casilla que se ve sigue al paso elegido
           });
           cerrar(); setTimeout(() => irA(ref.id || `n:${seq - 1}`), 30);
         };
@@ -18008,7 +18127,7 @@
     // un error cuenta como «heredado» si el RMD ya lo tenía al abrirse (mismo paso y mismo texto); los que nacen de un cambio (p. ej. quitar el predecesor de otro) sí frenan
     let ERR0 = null;
     function erroresIniciales() { const k = `${DT ? 1 : 0}${W.tildes ? 1 : 0}`; if (!ERR0 || ERR0.k !== k) { const s = new Set();
-      try { PPN.avisos(clon(BASE), { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras, dt: DT }).forEach((l, id) => l.forEach((a) => { if (a.nivel === 'error') s.add(id + '|' + a.texto); })); } catch (e) { /* sin base */ }
+      try { PPN.avisos(clon(BASE), { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras, dt: DT, planta: PQ.rmd.planta, docs: DOCS, modo: PROD ? 'produccion' : '' }).forEach((l, id) => l.forEach((a) => { if (a.nivel === 'error') s.add(id + '|' + a.texto); })); } catch (e) { /* sin base */ }
       ERR0 = { k, s }; } return ERR0.s; }
     function erroresPropios() { const ini = erroresIniciales(); return [...AV.entries()].filter(([id, l]) => l.some((a) => a.nivel === 'error' && !ini.has(id + '|' + a.texto))).map(([id, l]) => [id, l.filter((a) => a.nivel !== 'error' || !ini.has(id + '|' + a.texto))]); }
     function pendientes(n, seguir, soloPropios) {
@@ -18021,6 +18140,21 @@
         m.addEventListener('click', (e) => { const ir = e.target.closest('[data-ir2]'); if (ir) { cerrar(); irA(ir.dataset.ir2); seleccionar(ir.dataset.ir2); return; }
           const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'seguir') { cerrar(); seguir(); } });
       });
+    }
+    // v1.134.0: pasa al paso del catálogo indicado (homologado de Calidad en Operaciones o el que ya existe con el mismo texto)
+    function usarPaso(id, codigo) {
+      const f = encontrar(id), c = BUS.porCodigo(codigo); if (!f || !c) { aviso('Ese paso no está en el catálogo de esta plantilla.'); return; }
+      if (c.estr !== f.e.estructuraId) { aviso('Ese paso es de otra sección del RMD.'); return; }
+      cambio(() => { const v = encontrar(id).item, b = BI.get(id); v.texto = c.texto; v.codigo = String(c.codigo); v.nuevo = false; v.etqCat = c.etq; v.tipo = c.tipo; delete v.registro; delete v.decN;
+        v.pasoId = b && String(b.codigo) === String(c.codigo) ? b.pasoId : null; if (PROD) v.edit = b && String(b.codigo) === String(c.codigo) ? !!b.edit : PPN.DT_TIPOS_CON_EDIT.has(+c.tipo); });
+      setTimeout(() => { irA(id); seleccionar(id); }, 30);
+    }
+    // v1.134.0: «⚠ por revisar» recorre en orden los pasos con un aviso (o solo los de un tipo, p. ej. documentos vencidos)
+    let ultAviso = null;
+    function siguienteAviso(k) {
+      const filas = $$('.pp-doc [data-id]').map((el) => el.dataset.id).filter((id, i, a) => a.indexOf(id) === i && (AV.get(id) || []).some((x) => x.nivel === 'aviso' && (!k || x.k === k)));
+      if (!filas.length) { aviso('No hay avisos por revisar.'); return; }
+      const i = filas.indexOf(ultAviso), sig = filas[(i + 1) % filas.length]; ultAviso = sig; irA(sig); seleccionar(sig);
     }
     function seleccionar(id) {
       SELECCION = id || null; $$('.pp-doc tr.sel').forEach((x) => x.classList.remove('sel'));
@@ -18241,6 +18375,8 @@
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ir-obs') { const o = document.getElementById('pp-obs-ta'); if (o) { o.scrollIntoView({ block: 'center' }); o.focus(); } }
       else if (a === 'quitar-tildes') quitarTildesTodo();
+      else if (a === 'usar-paso') usarPaso(id, b.dataset.codigo);
+      else if (a === 'siguiente-aviso') siguienteAviso(b.dataset.k || '');
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
     app.addEventListener('change', (ev) => { const sel = ev.target.closest('select.pp-ir'); if (!sel || !sel.value) return; const id = sel.value; sel.value = ''; irA(id); });
@@ -18315,6 +18451,27 @@
   }
   // Estilos de la plantilla (pdfMake, Roboto 9 pt; 1 pt ≈ 1,4 px en pantalla).
   const PP_EDITOR_CSS = `
+.pp-reg{margin:8px 0;padding:8px 10px;border:1px solid #c9b8ea;border-radius:8px;background:#faf7ff}
+.pp-reg.falta{border-color:#c62828;background:#fff5f5}
+.pp-reg-tit{font-weight:600;margin-bottom:6px}.pp-reg-tit small{font-weight:400;color:#6b6b6b;margin-left:6px}
+.pp-reg-g{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:3px 0}
+.pp-reg-gt{flex:0 0 100%;font-size:11px;color:#6b6b6b;text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
+.pp-reg-op{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid #cfcfcf;border-radius:14px;background:#fff;cursor:pointer;font:inherit;font-size:12.5px}
+.pp-reg-op i{font-style:normal;font-size:11px;color:#5b3fa0;min-width:14px;text-align:center}
+.pp-reg-op:hover{border-color:#7c5cc4}.pp-reg-op.activo{background:#5b3fa0;border-color:#5b3fa0;color:#fff}.pp-reg-op.activo i{color:#fff}
+.pp-reg-det{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:6px;font-size:12.5px}
+.pp-reg-ayuda{color:#444}.pp-reg-prev{display:inline-flex;align-items:center;gap:6px;color:#6b6b6b}
+.pp-reg-prev .pp-mini{width:auto;min-width:90px}.pp-prev-caja{display:inline-block;min-width:70px;padding:1px 6px;border:1px solid #888;background:#fff;color:#999;font-size:11px}
+.pp-prev-nada{font-style:italic}.pp-reg-dec select{margin-left:4px}
+.pp-reg-falta{display:none;color:#c62828;font-size:12px;margin-top:4px}.pp-reg.falta .pp-reg-falta{display:block}
+.pp-reg-info{margin:6px 0;padding:6px 10px;border-radius:6px;background:#f4f4f4;font-size:12.5px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.pp-reg-info[hidden],.pp-reg[hidden]{display:none}
+.pp-sug-tit.ceo{color:#1b5e20;font-weight:600}.pp-sug-it.ceo{border-left:3px solid #2e7d32}.pp-sug-it.ceo .pct{color:#2e7d32;font-weight:600}
+.pp-tag.falta{background:#fdecea;color:#b71c1c;border:1px dashed #e57373;cursor:pointer;font:inherit;font-size:inherit}
+.pp-usar{margin-left:6px;padding:1px 8px;border:1px solid #2e7d32;border-radius:10px;background:#fff;color:#1b5e20;cursor:pointer;font:inherit;font-size:11.5px}
+.pp-usar:hover{background:#e8f5e9}
+.pp-aviso-gen button{margin-left:6px;font:inherit;font-size:12px;cursor:pointer}
+@media print{.pp-usar,.pp-tag.falta{display:none}}
 :root { --tx: #1f2328; --ap: #59636e; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
   --cam: #9a6700; --cam-f: #fff4d6; --mov: #2f5fb3; --mov-f: #e8effb; --crea: #7a3fbf; --crea-f: #f3ebfc; color-scheme: light; }
 * { box-sizing: border-box; }
@@ -18630,6 +18787,13 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     return c;
   }
   // Paquete del archivo: RMD, nombres y catálogo empacado
+  // v1.134.0 (pedido de Carlos): la lista de documentos vigentes (Reglas de revisión) viaja en la plantilla para avisar a Producción los documentos vencidos.
+  // «código\trevisión\testado\tvalidez\ttítulo» por línea
+  function ppDocsVigentes() {
+    const V = RR.vigentes; if (!V || !Array.isArray(V.docs) || !V.docs.length) return null;
+    const limpio = (x) => String(x == null ? '' : x).replace(/[\t\r\n]+/g, ' ').trim();
+    return { archivo: limpio(V.archivo), cargado: limpio(V.cargado), lineas: V.docs.map((d) => [d[0], d[2], d[3], d[6], String(d[1] || '').slice(0, 70)].map(limpio).join('\t')).join('\n') };
+  }
   function ppPaquete(md, arbol, cat, usuario, extra = {}) {
     const estrRmd = new Set(arbol.estructuras.map((e) => e.estructuraId)), pasos = cat.pasos.filter((p) => estrRmd.has(p[1]));
     const iE = new Map(), iT = new Map(), estr = [], etq = [];
@@ -18641,7 +18805,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     return { formato: 1, tipo: 'plantilla-rmd', generado: new Date().toISOString(), por: usuario || '', script: VERSION,
       rmd: { mdId: md.mdId, codigo: String(md.codigo), version: md.version, descripcion: norm(md.descripcion), etapa: norm(md.nivelTxt), area: norm(md.areaRmdTxt), planta: norm(md.sucursalId && md.sucursalId.contenido), estado: md.estado || norm(md.estadoIdRmd && md.estadoIdRmd.contenido), observacion: md.observacion || '', rptaValidacion: norm(md.rptaValidacion), areas: extra.areas || [], principal: md.codigoversionprincipal || String(md.codigo), estadoFechaPor: extra.estadoFechaPor || '', logo: extra.logo || null, ...(extra.receta ? { receta: { matnr: extra.receta.matnr, verid: extra.receta.verid, nombre: extra.receta.nombre, hojaRuta: extra.receta.hojaRuta, puesto: extra.receta.puesto } } : {}) },
       tipos: Object.fromEntries(Object.entries(cat.tipos || {}).filter(([k]) => +k >= 432 && +k <= 450)), arbol, huella: PPN.huella(arbol),   // tipos: solo tipos de dato 432-450 (430-460 traía estados)
-      catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores } };
+      catalogo: { estr, etq, pasos: lineas, equipos: cat.equipos.map((x) => x.join('\t')).join('\n'), utensilios: cat.utensilios.map((x) => x.join('\t')).join('\n'), agrupadores: cat.agrupadores }, ...(extra.docs ? { docs: extra.docs } : {}) };
   }
   // «Estado / Fecha / Por» como el PDF. Regla de CINTIA (v1.129.0): aquí va el usuario de SAP tal cual (KMORENOM); «VM» es solo para las Observaciones
   async function ppEstadoFechaPor(modelo, md) {
@@ -18693,11 +18857,11 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     if (receta) arbol.estructuras.forEach((e) => { e.insumos = e.insumos.filter((i) => String(arbol.insRec.get(i.id)) === String(receta.mdRecetaId)); });
     else { const def = norm(md.codDefectoReceta); if (def) arbol.estructuras.forEach((e) => { if (e.insumos.some((i) => i.matnr === def)) e.insumos = e.insumos.filter((i) => i.matnr === def); }); }
     avisar('Armando el archivo…');
-    const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas, receta }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
+    const areas = (((ctrl.getView().getModel('localModel') || { getProperty: () => [] }).getProperty('/aListaSecciones')) || []).map((a) => norm(a.Atwrt)).filter(Boolean), docs = ppDocsVigentes(), paq = ppPaquete(md, arbol, cat, codigoUsuario(ctrl), { estadoFechaPor, logo, areas, receta, docs }), b64 = await ppEmpacar(paq), d = new Date(), dd2 = (n) => String(n).padStart(2, '0');
     const nombre = PPN.nombreArchivo('Plantilla', paq.rmd, d, 'html');
     const html = ppHtml(b64, null, PPN.nombreArchivo('Borrador', paq.rmd, d).replace(/ \d{4}-\d\d-\d\d$/, ''));
     const cuenta = (f) => arbol.estructuras.reduce((s, e) => s + f(e), 0);
-    return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length, recetas: recetas.length, receta } };
+    return { nombre, html, paquete: paq, resumen: { pasos: cuenta((e) => e.pasos.length + e.etiquetas.reduce((s, t) => s + t.pasos.length, 0)), pm: cuenta((e) => [e.pasos, ...e.etiquetas.map((t) => t.pasos)].reduce((s, l) => s + l.reduce((s2, p) => s2 + p.pm.length, 0), 0)), catalogo: paq.catalogo.pasos.split('\n').length, bytes: html.length, recetas: recetas.length, receta, docs: docs ? docs.lineas.split('\n').length : 0 } };
   }
   // ---- Lectura del archivo del borrador ----
   // contenido de <script id="…"> independiente del orden de atributos
@@ -18808,7 +18972,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const lin = await tzLinaje(modelo, datos.rmd.codigo, cat), base = lin.versiones.find((m) => m.mdId === datos.rmd.mdId) || lin.actual;
     const destino = ppDestino(lin.versiones, base);
     const filas = PPN.desempacarPasos(datos.catalogo), bus = PPN.crearBuscador(filas), etqNom = new Map(datos.catalogo.etq);
-    const cambiosP = PPN.cambios(datos.arbol, prop.trabajo, { tipos: datos.tipos }), avisosP = PPN.avisos(prop.trabajo, { buscador: bus, etiquetas: etqNom, base: datos.arbol.estructuras, planta: datos.rmd.planta });
+    const cambiosP = PPN.cambios(datos.arbol, prop.trabajo, { tipos: datos.tipos }), avisosP = PPN.avisos(prop.trabajo, { buscador: bus, etiquetas: etqNom, base: datos.arbol.estructuras, planta: datos.rmd.planta, docs: RR.mapa || PPN.mapaDocs(datos.docs) });
     let actual = null, enSap = [], mapa = null;
     if (destino) {
       actual = await ppLeerArbol(modelo, destino);
@@ -18846,7 +19010,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const inv = new Map([...mapa.entries()].map(([a, b]) => [b, a])), t = (x) => ({ ...x, id: inv.get(x.id) || ('otra:' + x.id), ...(x.dt && x.dt.dep ? { dt: { ...x.dt, dep: inv.get(x.dt.dep) || ('otra:' + x.dt.dep) } } : {}) });
     return { estructuras: arbol.estructuras.map((e) => ({ ...t(e), pasos: (e.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })), etiquetas: (e.etiquetas || []).map((x) => ({ ...t(x), pasos: (x.pasos || []).map((p) => ({ ...t(p), pm: (p.pm || []).map(t) })) })), equipos: (e.equipos || []).map(t), utensilios: (e.utensilios || []).map(t), espec: (e.espec || []).map(t) })) };
   }
-  const PP_REGISTRO = { leer: 'Solo leerlo (instrucción)', dato: 'Anotar un dato (número o texto)', check: 'Marcar un check de conformidad', rango: 'Anotar un rango (valor inicial y final)', fecha: 'Anotar fecha y hora' };   // igual que REGISTRO del editor
+  const PP_REGISTRO = PPN.REGISTRO_TXT;   // igual que REGISTRO del editor (v1.134.0: con su tipo de dato en PPN.REGISTROS)
   const ppComentario = (c) => [c.comentario, c.registro ? 'Anota: ' + (PP_REGISTRO[c.registro] || c.registro) : ''].filter(Boolean).join(' · ');
   const PP_ACCION = { agregar: 'Agregar', quitar: 'Quitar', cambiar: 'Cambiar texto', valores: 'Rango', casillas: 'Casillas', mover: 'Mover', comentario: 'Comentario', cantidad: 'Cantidad', config: 'Configuración' };
   const ppQue = (c) => `${PP_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ` (${c.clase})` : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}`;
@@ -19327,7 +19491,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         const r = await ppGenerar(c, { forzar: v.cuerpo.querySelector('.rmd-pp-forzar').checked, avisar: (t) => setTxt(est, t), elegirReceta: (recs, md) => { setTxt(est, `El RMD tiene ${recs.length} recetas asociadas: elige con cuál se emite la plantilla.`); return ppElegirReceta(recs, md); } });
         descargarArchivo(r.nombre, r.html, 'text/html;charset=utf-8');
         const rec = r.resumen.recetas > 1 && r.resumen.receta ? ` · receta ${r.resumen.receta.matnr} / ${r.resumen.receta.verid}${r.resumen.receta.nombre ? ` (${r.resumen.receta.nombre})` : ''}` : '';
-        setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores${rec} · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos. Envíalo a Producción.`);
+        setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores${rec} · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos · ${r.resumen.docs ? `${r.resumen.docs.toLocaleString('es-PE')} documentos vigentes (avisa los vencidos)` : 'sin lista de documentos vigentes: cárgala en Reglas de revisión para que avise los vencidos'}. Envíalo a Producción.`);
       } catch (e) { if (e.cancelado) setTxt(est, 'No se generó la plantilla: falta elegir la receta.'); else { setTxt(est, 'No se pudo generar: ' + e.message); est.classList.add('error'); } }
       finally { ocupado = false; bGen.disabled = bImp.disabled = false; }
     });
@@ -19461,7 +19625,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   async function montarVista(datos, prop, extra = {}) {
     if (VISTA) VISTA.cerrar();
     const ctrl = controladorPrincipal(), paq = { ...datos }; delete paq.desdePdf;
-    const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado,
+    const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado, docs: RR.mapa || null,
       obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa) : null,
       uso: (cods, cb) => usoDePasosPorCodigo(cods, cb).catch(() => {}),          // v1.129.0: en cuántos masters Autorizados / Ingresados está cada paso
       guardar: (p2) => { vistaGuardar(paq, p2).catch((e) => toast('No se pudo revisar: ' + e.message, true)); }, cerrar: () => { if (VISTA) VISTA.cerrar(); } };
@@ -19560,21 +19724,31 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       `<li>✓ ${estadoDestino}</li>`,
       `<li>${an.enSap.length ? (an.conflictos.length ? '⚠' : 'ℹ') : '✓'} ${an.enSap.length ? `En SAP hubo ${an.enSap.length} cambio(s) desde que se ${extra.desdeVista ? 'abrió la vista' : 'generó la plantilla'}${an.conflictos.length ? `, <b>${an.conflictos.length} en lo mismo que toca el borrador</b>` : ' (ninguno en lo que toca el borrador)'}` : `El RMD no cambió en SAP desde que se ${extra.desdeVista ? 'abrió la vista' : 'generó la plantilla'}`}</li>`,
       extra.desdeVista && !an.cambios.length ? '' : `<li>${nNuevos ? '★' : '✓'} ${nNuevos ? `${nNuevos} paso(s) nuevo(s) a crear${yaExisten ? `; <b>${yaExisten} ya existe(n) ahora en SAP</b>` : ''}` : 'Todos los pasos ya existen en SAP'}</li>`,
-      errores ? `<li>✕ ${errores} dato(s) por corregir que Producción dejó marcados</li>` : ''];
+      errores ? `<li>✕ ${errores} dato(s) por corregir que Producción dejó marcados</li>` : '',
+      an.cambios.length ? `<li>✎ ${(() => { const k = new Map(); an.cambios.forEach((c) => { const t = PP_ACCION[c.accion] || c.accion; k.set(t, (k.get(t) || 0) + 1); }); return [...k].map(([t, n2]) => `${n2} ${esc(t.toLowerCase())}`).join(' · '); })()}</li>` : ''];
+    const cuentaF = (f) => an.cambios.filter((c) => marcasF(c).includes(f)).length;
+    const filtros = an.cambios.length > 4 ? `<div class="rmd-pp-filtros" role="toolbar" aria-label="Ver por partes">${[['', `Todos (${an.cambios.length})`], ['nuevo', `★ Pasos nuevos (${cuentaF('f-nuevo')})`], ['aviso', `⚠ Con avisos (${cuentaF('f-aviso')})`], ['ceo', `Calidad en Operaciones (${cuentaF('f-ceo')})`], ['doc', `Documentos vencidos (${cuentaF('f-doc')})`], ['homolog', `Por homologar (${cuentaF('f-homolog')})`], ['com', `💬 Comentarios de Producción (${cuentaF('f-com')})`]]
+      .map(([k, t]) => `<button type="button" data-pf="${k}"${k ? (cuentaF('f-' + k) ? '' : ' disabled') : ' class="activo"'}>${t}</button>`).join('')}</div>` : '';
     const avisoDe = (id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info').map((a) => `<div class="rmd-pp-av ${a.nivel}">${a.nivel === 'error' ? '✕' : '⚠'} ${esc(a.texto)}</div>`).join('');
     const nuevoDe = new Map(an.nuevos.filter((n) => !n.pm).map((n) => [n.c, n]));
     const editable = (c) => (c.accion === 'agregar' || c.accion === 'cambiar') && (c.clase === 'paso' || c.clase === 'pm') && !c.insumo;
     const corregido = (id) => { const f = ppItemDe(prop.trabajo, id), e = f && f.item.editadoRmd; return e ? `<div class="rmd-nota rmd-pp-corr">✎ Corregido aquí · Producción escribió: «${esc(e.antes)}»</div>` : ''; };
+    // v1.134.0 (pedido de Carlos): filtros para revisar por partes y lo que Producción indicó que se anota en cada paso nuevo
+    const avDe = (c) => [c.id, ...(c.pm || []).map((m) => m.id)].flatMap((id) => (an.avisos.get(id) || []).filter((a) => a.nivel !== 'info'));
+    const marcasF = (c) => { const l = avDe(c), f = []; if (c.nuevo || (c.pm || []).some((m) => m.nuevo)) f.push('f-nuevo'); if (l.length) f.push('f-aviso'); if (c.comentario) f.push('f-com');
+      if (l.some((a) => a.k === 'ceo')) f.push('f-ceo'); if (l.some((a) => a.k === 'doc')) f.push('f-doc'); if (l.some((a) => a.k === 'homolog' || a.k === 'terminos')) f.push('f-homolog'); return f; };
+    const anota = (c) => { const r = c.registro && PPN.registroDe(c.registro), f = r && ppItemDe(prop.trabajo, c.id), x = f && f.item;
+      return r ? `<span class="rmd-pp-anota" title="Lo indicó Producción en la plantilla">Producción anota: ${esc(r[1])} → ${esc((datos.tipos || {})[r[2]] || r[2])}${x && x.decN != null && x.decN !== '' ? ` · ${esc(x.decN)} dec.` : ''}${x && r[0] === 'rango' ? ` · ${esc(x.vi == null ? '—' : x.vi)} a ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ' ± ' + esc(x.margen) : ''}` : ''}</span>` : c.registro ? `<span class="rmd-pp-anota">Producción anota: ${esc(PP_REGISTRO[c.registro] || c.registro)}</span>` : ''; };
     const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
-      return `<tr class="rmd-pp-${c.accion}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
-        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>` : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av aviso">⚠ Se agrega a mano en el portal: «Agregar Insumo» del paso, con esta cantidad.</div>' : ''}${c.accion === 'cantidad' ? ` <div class="rmd-pp-av aviso">⚠ No se escribe en SAP. ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av aviso">insumo: se agrega a mano</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
-        <td>${esc(ppComentario(c))}</td></tr>`; }).join('');
+      return `<tr class="rmd-pp-${c.accion} ${marcasF(c).join(' ')}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
+        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>${anota(c)}` : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av aviso">⚠ Se agrega a mano en el portal: «Agregar Insumo» del paso, con esta cantidad.</div>' : ''}${c.accion === 'cantidad' ? ` <div class="rmd-pp-av aviso">⚠ No se escribe en SAP. ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av aviso">insumo: se agrega a mano</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
+        <td>${esc(c.comentario || '')}</td></tr>`; }).join('');
     const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
     v.cuerpo.innerHTML = `${cab}${creada}${rehecho}
       ${s.observacion ? `<p class="rmd-nota">Observación: ${esc(s.observacion)}</p>` : ''}<ul class="rmd-pp-checks">${lineas.join('')}</ul>
       <label class="rmd-pp-tildes"${on('detectartildes') || prop.trabajo.tildes ? '' : ' hidden'} title="Con esta opción, un texto con otras tildes cuenta como distinto (FRACCION ≠ FRACCIÓN): agregar o quitar una tilde queda como cambio y no se toma el paso sin tilde que ya existe en SAP"><input type="checkbox" class="rmd-pp-tildes-c"${prop.trabajo.tildes ? ' checked' : ''}> Distinguir tildes${prop.trabajo.tildes ? ' <span class="rmd-nota">(activada en el borrador)</span>' : ''}</label>
-      ${an.cambios.length || extra.desdeVista ? '' : '<p class="rmd-nota">El borrador no trae cambios.</p>'}${an.cambios.length ? `<table class="rmd-tabla rmd-pp-t"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>` : ''}
+      ${an.cambios.length || extra.desdeVista ? '' : '<p class="rmd-nota">El borrador no trae cambios.</p>'}${an.cambios.length ? `${filtros}<table class="rmd-tabla rmd-pp-t rmd-pp-tc"><thead><tr><th>N.°</th><th>Cambio</th><th>Antes</th><th>Después</th><th>Comentario de Producción</th></tr></thead><tbody>${filas}</tbody></table>` : ''}
       ${an.enSap.length ? `<details class="rmd-pp-sap"><summary>Cambios hechos en SAP desde la plantilla (${an.enSap.length})</summary><table class="rmd-tabla rmd-pp-t"><tbody>${an.enSap.map((c) => `<tr><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}</td><td>${esc(ppDespues(c))}</td></tr>`).join('')}</tbody></table></details>` : ''}
       ${extra.desdeVista && !an.cambios.length ? '' : '<p class="rmd-nota">«Ingresar en SAP…» escribe estos cambios en el RMD con las mismas escrituras del portal; antes muestra cada operación y pide confirmación.</p>'}`;
     // v1.124.0: Observaciones escritas en la vista: se guardan al final del ingreso (o solas si no hay otros cambios)
@@ -19602,7 +19776,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       } catch (e) { toast('No se pudo armar el .html: ' + e.message, true); } finally { bHtml.disabled = false; } });
     bHtml.title = 'Descarga el borrador como .html (el editor de Producción, con todos sus cambios) para hacer los últimos ajustes con esa vista; después se guarda y se vuelve a importar';
     window.__rmdStats.plantilla.abrirHtml = () => bHtml.click();
-    v.__ppEd = { datos, prop, extra, bIngresar }; if (!v.__ppEdOn) { v.__ppEdOn = true; v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-ed]'); if (b) ppEditarNuevo(v, b.dataset.ed); }); }
+    v.__ppEd = { datos, prop, extra, bIngresar }; if (!v.__ppEdOn) { v.__ppEdOn = true; v.cuerpo.addEventListener('click', (e) => { const b = e.target.closest('[data-ed]'); if (b) ppEditarNuevo(v, b.dataset.ed);
+      const pf = e.target.closest('[data-pf]'); if (pf) { const t = v.cuerpo.querySelector('.rmd-pp-tc'); if (!t) return; if (pf.dataset.pf) t.dataset.f = pf.dataset.pf; else delete t.dataset.f; v.cuerpo.querySelectorAll('[data-pf]').forEach((y) => y.classList.toggle('activo', y === pf)); } }); }
     // RMD cambiado desde la plantilla: opción de rehacer el borrador
     const bRehacer = botonModal('Rehacer sobre el RMD actual', 'primario', async () => {
       bRehacer.disabled = true; const aviso = document.createElement('p'); aviso.className = 'rmd-progreso'; aviso.textContent = 'Rehaciendo el borrador sobre el RMD actual…'; v.cuerpo.prepend(aviso);
@@ -19822,10 +19997,12 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         const sp0 = (sim && sim.paso) || {}, pick = (a, b) => (a != null && a !== '' ? a : b == null ? null : b);
         n = { key, texto, estr: L.e.estructuraId, etq: etqL, estrNombre: L.e.nombre, etqNombre: L.t ? L.t.nombre : '', pasoId: ppUuid(), tipo, items: [], codigo: null,
           fila: { terminal: null, usuarioRegistro: usuario, fechaRegistro: ahora, activo: true, descripcion: texto, numeracion: !!m.numeracion, tipoDatoId_iMaestraId: tipo, estadoId_iMaestraId: m.estadoId_iMaestraId, estructuraId_estructuraId: L.e.estructuraId, etiquetaId_etiquetaId: etqL,
-            valorInicial: pick(ppNum(x.vi), sp0.valorInicial), valorFinal: pick(ppNum(x.vf), sp0.valorFinal), margen: pick(ppNum(x.margen), sp0.margen), decimales: sp0.decimales == null ? 0 : sp0.decimales, clvModelo: sp0.clvModelo || null, automatico: !!sp0.automatico, tipoLapsoId_motivoLapsoId: sp0.tipoLapsoId_motivoLapsoId || null, tipoCondicionId_iMaestraId: sp0.tipoCondicionId_iMaestraId || null }, cfg: sim && sim.md, simCodigo: inferido ? inferido.codigo : null };
+            valorInicial: pick(ppNum(x.vi), sp0.valorInicial), valorFinal: pick(ppNum(x.vf), sp0.valorFinal), margen: pick(ppNum(x.margen), sp0.margen), decimales: x.decN != null && x.decN !== '' && !isNaN(+x.decN) ? +x.decN : sp0.decimales == null ? 0 : sp0.decimales, clvModelo: sp0.clvModelo || null, automatico: !!sp0.automatico, tipoLapsoId_motivoLapsoId: sp0.tipoLapsoId_motivoLapsoId || null, tipoCondicionId_iMaestraId: sp0.tipoCondicionId_iMaestraId || null }, cfg: sim && sim.md, simCodigo: inferido ? inferido.codigo : null };
         n.fila.pasoId = n.pasoId; nuevosPaso.set(key, n);
         if (inferido) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» copia del paso parecido ${inferido.codigo} su tipo de dato «${(datos.tipos || {})[tipo] || tipo}», decimales${sim && sim.md ? ' y casillas' : ''}${rango ? ' y rango' : ''}: confírmalo en SAP.`);
-        if (!inferido && +tipo === PP_SIN_TIPO) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) se crea como «Sin tipo de dato»: revisa su tipo de dato y casillas en SAP.`);
+        const rgP = PPN.registroDe(x.registro);   // v1.134.0: lo que indicó Producción en la plantilla
+        if (rgP && +rgP[2] === +tipo) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» se crea como «${(datos.tipos || {})[tipo] || tipo}»${x.decN != null && x.decN !== '' ? ` con ${x.decN} decimal(es)` : ''}: Producción indicó que anota «${rgP[1]}».`);
+        else if (!inferido && +tipo === PP_SIN_TIPO) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) se crea como «Sin tipo de dato»: revisa su tipo de dato y casillas en SAP.`);
         else if (rango && (n.fila.valorInicial == null || n.fila.valorFinal == null)) avisos.push(`El paso nuevo «${texto.slice(0, 60)}» es de tipo Rango sin todos sus valores: complétalos en SAP.`);
       }
       n.items.push(x); catNuevo.set(x.id, n);
