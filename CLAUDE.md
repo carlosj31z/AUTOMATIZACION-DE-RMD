@@ -310,7 +310,10 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-11, v1.135.2 (encima de la 1.135.1): **INACTIVO a la vista con los 1 336 de la decisión final** (ATE 900 / LIMA 436, hoja «3 Suspendidos vs
   INACTIVOS» del Excel de backlog de noviembre). Antes eran 1 313 (CSV del 07/11). Nuevo listado `docs/rmd_a_inactivo_2026-11-09.csv`; los 10 sin
   `md_id` salieron de la lectura del portal del 09/11 (`mes_de_pendientes_v2.csv`); MEJORAL MIGRAÑA 2202505691 v2 tiene dos MD en el portal: va el Suspendido.
-  **La siguiente versión debe ser > 1.135.2.**
+- 2026-11-11, v1.135.3: **pedido de Carlos: INACTIVO = los 1 328 del análisis de suspendidos (ATE 892 / LIMA 436)**; del análisis solo valen los
+  INACTIVO (los suspendidos son los de hoy en SAP). Se quitan de la 1.135.2 los 8 de ATE que REVISAR 8 había sumado (15013, 17154, 17196, 17470,
+  18195, 18396, 19238, 19290). Listado `docs/rmd_a_inactivo_2026-11-11.csv`. status-rmd usa la misma lista (PR #61).
+  **La siguiente versión debe ser > 1.135.3.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
