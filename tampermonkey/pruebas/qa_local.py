@@ -1041,7 +1041,7 @@ with sync_playwright() as p:
         w = pg.evaluate("() => { const f = window.__rmdStats.plantilla.dtEscritura; return f({ tipo: 432, edit: false, solo: ['tipo', 'edit'] }, ['tipo', 'edit'], false); }")
         ok = (not errs and visible and "ya existe en SAP" in nota and iconos == 0 and r["it"] and r["it"]["codigo"] and not r["it"]["nuevo"] and r["it"]["registro"] == "check" and r["it"]["dt"] == {"tipo": 432, "edit": False, "solo": ["tipo", "edit"]}
               and any("Anota: Un check" in t for t in r["tags"]) and r["errores"] == 0 and p0 == "0" and p2 == "0.00" and pr == "20.0 – 25.5"
-              and w.get("tipoDatoId_iMaestraId") == 432 and w.get("edit") is False and "decimales" not in w and "estadoCC" not in w)
+              and w.get("tipoDatoId_iMaestraId") == 432 and w.get("edit") is False and "decimales" not in w and "estadoCC" not in w and "clvModelo" not in w and "automatico" not in w)
         return ok, json.dumps({"visible": visible, "nota": nota, "iconos": iconos, "r": r, "prev": [p0, p2, pr], "w": w, "errores": errs[:3]}, ensure_ascii=False)[:1500]
     @prueba("LN59 Importar borrador · por partes (v1.134.0): con más de 4 cambios la revisión del portal muestra los filtros (Todos, Pasos nuevos, Con avisos, Comentarios…) que dejan ver solo esas filas, y en el paso nuevo lo que Producción indicó que se anota («Producción anota: … → tipo · rango»)")
     def _():

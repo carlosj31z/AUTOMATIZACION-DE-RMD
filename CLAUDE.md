@@ -305,7 +305,9 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-11, v1.135.0 (encima de la 1.134.0): **pedidos de Carlos para la plantilla de Producción**: un paso que ya existe en SAP y se agrega al RMD
   también se configura («¿Qué anota?»; el ingreso escribe solo una operación «Configuración» de esa fila con `x.dt.solo`, ver `dtNuevo`);
   sin íconos en los botones de tipo de dato; la vista previa «Así se verá» usa los decimales elegidos (`previaRegistro(k, dec, vi, vf)`). Prueba `qa_local.py` LN60.
-  **La siguiente versión debe ser > 1.135.0.**
+- 2026-11-11, v1.135.1 (probada en el portal en solo lectura con 2202609013): la importación también muestra «Producción anota» en el paso existente
+  configurado; la operación «Configuración» de un paso agregado dice «agregado» y con `x.dt.solo` no toca Clave Modelo/Puesto/Automático salvo tipo 447.
+  **La siguiente versión debe ser > 1.135.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
