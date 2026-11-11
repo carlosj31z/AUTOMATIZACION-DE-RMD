@@ -254,7 +254,13 @@ un cambio de status masivo.
   del equipo). La página status-rmd ya no cuenta estos códigos como suspendidos
   ni backlog (REGISTRO-DE-MANUFACTURA-DIGITAL PR #52).
 
-### Listado final 2026-11-09 (userscript v1.135.2)
+### Listado vigente 2026-11-11 (userscript v1.135.3)
+
+Pedido de Carlos (11/11/2026): del análisis solo valen los INACTIVO, que no cambian: **1 328 (ATE 892, LIMA 436)**,
+`docs/rmd_a_inactivo_2026-11-11.csv`. Los suspendidos son los que hoy están Suspendidos en SAP. Los 8 de ATE que REVISAR 8
+había sumado (lista de abajo, 1 336) ya no son INACTIVO.
+
+### Listado final 2026-11-09 (userscript v1.135.2, reemplazado)
 
 `docs/rmd_a_inactivo_2026-11-09.csv`: los **1 336** «Pasa a INACTIVO» de la decisión final (ATE 900, LIMA 436; hoja «3 Suspendidos vs
 INACTIVOS» del Excel de backlog de noviembre), todos con `md_id`. Desde la v1.135.2 el userscript usa este listado (antes los 1 313 de abajo).

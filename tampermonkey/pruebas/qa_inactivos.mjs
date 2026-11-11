@@ -1,5 +1,5 @@
 // Pruebas de «INACTIVO solo a la vista» (bloque ==INACTIVOS== del userscript, v1.127.0): la lista embebida es la del repo
-// (docs/rmd_a_inactivo_2026-11-09.csv: los 1 336 de la decisión final, v1.135.2) y solo se muestra INACTIVO si el RMD sigue Suspendido. Sin portal: solo Node 18+.
+// (docs/rmd_a_inactivo_2026-11-11.csv: los 1 328 del análisis de suspendidos, v1.135.3) y solo se muestra INACTIVO si el RMD sigue Suspendido. Sin portal: solo Node 18+.
 //     node tampermonkey/pruebas/qa_inactivos.mjs
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,13 +17,13 @@ const ok = (nombre, cond, detalle = '') => { console.log((cond ? 'PASA  ' : 'FAL
 
 const leerCsv = (n) => fs.readFileSync(path.join(aqui, '..', '..', 'docs', n), 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean).map((l) => l.split(';'));
 const viejo = leerCsv('rmd_a_inactivo_2026-11-07.csv');
-const csv = fs.readFileSync(path.join(aqui, '..', '..', 'docs', 'rmd_a_inactivo_2026-11-09.csv'), 'utf8').replace(/^﻿/, '').split(/\r?\n/).filter(Boolean).map((l) => l.split(';'));
+const csv = fs.readFileSync(path.join(aqui, '..', '..', 'docs', 'rmd_a_inactivo_2026-11-11.csv'), 'utf8').replace(/^﻿/, '').split(/\r?\n/).filter(Boolean).map((l) => l.split(';'));
 const cab = csv[0], iL = cab.indexOf('listo'), iId = cab.indexOf('md_id'), filas = csv.slice(1);
 const si = filas.filter((c) => /^S[IÍ]$/.test(c[iL])), idsNuevos = new Set(si.map((c) => c[iId]));
 // del CSV del 07/11, los listo = NO que la decisión final no pasa a INACTIVO (Cancelado, el MD Autorizado duplicado de MEJORAL MIGRAÑA)
 const no = viejo.slice(1).filter((c) => !/^S[IÍ]$/.test(c[0]) && c[4] && !idsNuevos.has(c[4])).map((c) => { const r = []; r[iId] = c[4]; return r; });
 
-ok('I1 La lista embebida tiene los 1 336 md_id de la decisión final (ATE 900, LIMA 436), con la fecha del listado', I.INACTIVO_IDS.size === si.length && si.length === 1336 && si.filter((c) => c[1] === 'ATE').length === 900 && I.INACTIVO_FECHA === '2026-11-09', `${I.INACTIVO_IDS.size} / ${si.length} ${I.INACTIVO_FECHA}`);
+ok('I1 La lista embebida tiene los 1 328 md_id del análisis (ATE 892, LIMA 436), con la fecha del listado', I.INACTIVO_IDS.size === si.length && si.length === 1328 && si.filter((c) => c[1] === 'ATE').length === 892 && I.INACTIVO_FECHA === '2026-11-11', `${I.INACTIVO_IDS.size} / ${si.length} ${I.INACTIVO_FECHA}`);
 ok('I2 Cada md_id listo = SÍ se ve INACTIVO si sigue Suspendido (con o sin guiones, mayúsculas)', si.every((c) => I.esInactivo(c[iId], 'Suspendido') && I.esInactivo(c[iId].toUpperCase(), ' Suspendido ') && I.esInactivo(c[iId].replace(/-/g, ''), 'suspendido')));
 ok('I3 Los 2 del CSV del 07/11 que no están en la decisión final (Cancelado y MD Autorizado duplicado) no se marcan', no.length === 2 && no.every((c) => !I.esInactivo(c[iId], 'Suspendido')), String(no.length));
 const id = si[0][iId];
