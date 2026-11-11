@@ -1020,6 +1020,29 @@ with sync_playwright() as p:
               and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
               and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
         return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN60 Plantilla para Producción · v1.135.0: un paso que ya existe en SAP y se agrega aquí también se configura (Check de conformidad → «Configuración» tipo 432 sin tocar lo demás); la vista previa usa los decimales elegidos; los botones no llevan íconos")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        e.evaluate("() => document.querySelector('tr[data-id=\"P10\"] [data-a=agregar]').click()"); e.wait_for_selector("#m-texto")
+        e.fill("#m-texto", "AGITAR DURANTE 15 MINUTOS."); e.wait_for_timeout(500)
+        visible = e.evaluate("() => { const l = document.querySelector('#m-reg-l'); return !!l && !l.hidden && !!l.offsetParent; }")
+        nota = e.inner_text("#m-reg-nota"); iconos = e.evaluate("() => document.querySelectorAll('.pp-reg-op i').length")
+        e.click(".pp-reg-op[data-reg=check]"); e.wait_for_timeout(100)
+        e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        r = e.evaluate("""() => { const s = window.__pp.estado(), l = s.W.estructuras[2].etiquetas[0].pasos, it = l.find((y) => y.id.startsWith('n:')); return { it: it && { codigo: it.codigo, nuevo: it.nuevo, registro: it.registro, tipo: it.tipo, dt: it.dt }, tags: [...document.querySelectorAll('tr[data-id="' + it.id + '"] .pp-tag')].map((t) => t.textContent.trim()), errores: s.contar.errores }; }""")
+        # número con 2 decimales: la casilla de ejemplo los muestra
+        e.evaluate("() => document.querySelector('tr[data-id=\"P10\"] [data-a=agregar]').click()"); e.wait_for_selector("#m-texto"); e.fill("#m-texto", "PESO DEL GRANEL (KG):"); e.wait_for_timeout(500)
+        e.click(".pp-reg-op[data-reg=numero]"); e.wait_for_timeout(100); p0 = e.inner_text("#m-reg-prev"); e.select_option("#m-dec", "2"); e.wait_for_timeout(100); p2 = e.inner_text("#m-reg-prev")
+        e.click(".pp-reg-op[data-reg=rango]"); e.wait_for_timeout(100); e.fill("#m-vi", "20"); e.fill("#m-vf", "25.5"); e.select_option("#m-dec", "1"); e.wait_for_timeout(100); pr = e.inner_text("#m-reg-prev")
+        e.close()
+        w = pg.evaluate("() => { const f = window.__rmdStats.plantilla.dtEscritura; return f({ tipo: 432, edit: false, solo: ['tipo', 'edit'] }, ['tipo', 'edit'], false); }")
+        ok = (not errs and visible and "ya existe en SAP" in nota and iconos == 0 and r["it"] and r["it"]["codigo"] and not r["it"]["nuevo"] and r["it"]["registro"] == "check" and r["it"]["dt"] == {"tipo": 432, "edit": False, "solo": ["tipo", "edit"]}
+              and any("Anota: Un check" in t for t in r["tags"]) and r["errores"] == 0 and p0 == "0" and p2 == "0.00" and pr == "20.0 – 25.5"
+              and w.get("tipoDatoId_iMaestraId") == 432 and w.get("edit") is False and "decimales" not in w and "estadoCC" not in w)
+        return ok, json.dumps({"visible": visible, "nota": nota, "iconos": iconos, "r": r, "prev": [p0, p2, pr], "w": w, "errores": errs[:3]}, ensure_ascii=False)[:1500]
     @prueba("LN59 Importar borrador · por partes (v1.134.0): con más de 4 cambios la revisión del portal muestra los filtros (Todos, Pasos nuevos, Con avisos, Comentarios…) que dejan ver solo esas filas, y en el paso nuevo lo que Producción indicó que se anota («Producción anota: … → tipo · rango»)")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
