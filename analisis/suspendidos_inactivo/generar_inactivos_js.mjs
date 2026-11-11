@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const raiz = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const csv = process.argv[2] || path.join(raiz, 'docs', 'rmd_a_inactivo_2026-11-07.csv');
+const csv = process.argv[2] || path.join(raiz, 'docs', 'rmd_a_inactivo_2026-11-09.csv');
 const js = path.join(raiz, 'tampermonkey', 'rmd-ui-mejoras.user.js');
 
 const lineas = fs.readFileSync(csv, 'utf8').replace(/^﻿/, '').split(/\r?\n/).filter(Boolean);
