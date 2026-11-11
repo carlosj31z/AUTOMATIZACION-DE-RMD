@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.135.3
+// @version      1.135.4
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.135.3';                                                       // mantener igual a @version
+  const VERSION = '1.135.4';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -7296,7 +7296,7 @@
   }
   // Máximo 1000 filas por lectura (sin __next): $count y páginas de 1000 por mdId, 4 en paralelo; se sigue si la última vino llena.
   const EXPAND_MD = 'estadoIdRmd,sucursalId,motivoId,aReceta/recetaId';
-  const SELECT_MD = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'nivelTxt', 'codAgrupadorReceta', 'codDefectoReceta', 'codigoversionprincipal', 'estadoIdProceso_iMaestraId',
+  const SELECT_MD = ['mdId', 'mdIdVersionAnt', 'sucursalId_iMaestraId', 'codigo', 'codigoSolicitud', 'version', 'nivelTxt', 'codAgrupadorReceta', 'codDefectoReceta', 'codigoversionprincipal', 'estadoIdProceso_iMaestraId',
     'descripcion', 'observacion', 'fechaRegistro', 'usuarioRegistro', 'fechaActualiza', 'fechaAutorizacion', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'areaRmdTxt',
     'estadoIdRmd/contenido', 'sucursalId/contenido', 'motivoId/descripcion',
     'aReceta/recetaId/Matnr', 'aReceta/recetaId/Verid', 'aReceta/recetaId/Atwrt', 'aReceta/recetaId/Text1', 'aReceta/recetaId/Mdv01',
@@ -7343,12 +7343,13 @@
   const COLUMNAS_PUENTE = ['codigo', 'codigoSolicitud', 'version', 'estado', 'codDefecto', 'codAgrupador', 'descripcion', 'etapa', 'fechaRegistro',
     'usuarioRegistro', 'fechaAut', 'usuarioAutorizacion', 'af', 'fechaSolicitud', 'planta', 'seccion', 'motivo', 'observacion', 'linaje', 'recetas',
     'fechaRegistroHora', 'fechaSolicitudHora', 'produccionEstado'];
-  // mapaProd: texto de «Producción Estado» por id (mapaProduccionEstado).
-  function filaPuente(md, mapaProd) {
+  // mapaProd: texto de «Producción Estado» por id (mapaProduccionEstado). masterDe (v1.135.4): mdId → «M:<código>» del master como lo arma
+  // «Última versión de cada master» (ultimasVersiones); va en la columna linaje para que el Resumen de Status RMD cuente igual que ese Excel.
+  function filaPuente(md, mapaProd, masterDe) {
     const f = datosBaseDeMD(md);
     const recetas = ((md.aReceta && md.aReceta.results) || []).map((r) => { const rc = r.recetaId || {}; return [rc.Matnr || '', rc.Verid || '', rc.Atwrt || '', (rc.Text1 || '').trim(), rc.Mdv01 || '', rc.Plnnr || '', rc.Alnal || '']; });
     const fechaHoraIso = (x) => (x instanceof Date && !isNaN(x) ? x.toISOString() : '');
-    const v = { ...f, recetas, fechaRegistro: fechaIso(f.fechaRegistro), fechaSolicitud: fechaIso(f.fechaSolicitud),
+    const v = { ...f, linaje: (masterDe && masterDe.get(md.mdId)) || f.linaje, recetas, fechaRegistro: fechaIso(f.fechaRegistro), fechaSolicitud: fechaIso(f.fechaSolicitud),
       fechaRegistroHora: fechaHoraIso(f.fechaRegistro), fechaSolicitudHora: fechaHoraIso(f.fechaSolicitud),
       produccionEstado: (mapaProd && md.estadoIdProceso_iMaestraId != null && mapaProd[md.estadoIdProceso_iMaestraId]) || '' };
     return COLUMNAS_PUENTE.map((c) => v[c]);
@@ -7462,7 +7463,15 @@
       // Textos de «Producción Estado»; sin ellos la columna va vacía y el maestro se envía igual.
       let mapaProd = {};
       try { mapaProd = await mapaProduccionEstado(controladorPrincipal()); } catch (e) { /* sin Producción Estado */ }
-      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map((md) => filaPuente(md, mapaProd)), usuarioSap, opSap, trazabilidad,
+      // v1.135.4 (pedido de Carlos): el master de cada MD como en «Última versión de cada master», para que Status RMD cuadre con ese Excel.
+      const masterDe = new Map();
+      try {
+        ultimasVersiones(datos).linajes.forEach((l) => {
+          const ult = l.vs[l.vs.length - 1], k = 'M:' + (String((l.u && l.u.codigoversionprincipal) || '').trim() || String(ult.codigo || ult.codigoSolicitud || l.k).trim());
+          l.vs.forEach((m) => masterDe.set(m.mdId, k));
+        });
+      } catch (e) { masterDe.clear(); }
+      const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map((md) => filaPuente(md, mapaProd, masterDe)), usuarioSap, opSap, trazabilidad,
         caracterizacion: { v: 1, generado: CARACT_LISTADO_FECHA, items: listadoCaract.items } };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);

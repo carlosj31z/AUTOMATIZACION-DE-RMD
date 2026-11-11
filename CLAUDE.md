@@ -313,7 +313,10 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-11, v1.135.3: **pedido de Carlos: INACTIVO = los 1 328 del análisis de suspendidos (ATE 892 / LIMA 436)**; del análisis solo valen los
   INACTIVO (los suspendidos son los de hoy en SAP). Se quitan de la 1.135.2 los 8 de ATE que REVISAR 8 había sumado (15013, 17154, 17196, 17470,
   18195, 18396, 19238, 19290). Listado `docs/rmd_a_inactivo_2026-11-11.csv`. status-rmd usa la misma lista (PR #61).
-  **La siguiente versión debe ser > 1.135.3.**
+- 2026-11-11, v1.135.4: «Enviar a Status RMD» manda en la columna linaje el master como lo arma «Última versión de cada master»
+  (`M:<código>`, `ultimasVersiones`; SELECT_MD con `mdIdVersionAnt` y `sucursalId_iMaestraId`), para que el Resumen del Excel de status-rmd
+  cuadre exacto con ese exportado (status-rmd PR #63).
+  **La siguiente versión debe ser > 1.135.4.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
