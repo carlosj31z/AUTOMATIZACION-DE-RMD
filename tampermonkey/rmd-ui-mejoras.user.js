@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.134.0
+// @version      1.135.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.134.0';                                                       // mantener igual a @version
+  const VERSION = '1.135.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17364,7 +17364,8 @@
         out.push(`<span class="pp-tag crea" title="No existe en SAP con este texto: Documentación Técnica lo creará${igual && igual.n > 1 ? `. Se crea una sola vez y se usa en los ${igual.n} lugares donde está igual` : ''}">★ Paso nuevo${igual && igual.n > 1 ? ` · ${igual.n} lugares` : ''}</span>${x.registro ? `<span class="pp-tag reg" title="Qué anota Producción en este paso">${x.registro === 'leer' ? 'Sin casilla: solo instrucción' : 'Anota: ' + esc(r ? r[1] : REGISTRO[x.registro] || x.registro)}${r && r[0] === 'numero' && x.decN != null && x.decN !== '' ? ` · ${esc(x.decN)} decimal${+x.decN === 1 ? '' : 'es'}` : ''}${r && r[0] === 'rango' && (x.vi != null || x.vf != null) ? ` · ${esc(x.vi == null ? '—' : x.vi)} a ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ' ± ' + esc(x.margen) : ''}` : ''}</span>` : `<button type="button" class="pp-tag falta" data-a="editar" title="Indica qué se anota en este paso (casilla)">Falta: qué se anota</button>`}`); }
       else if (!x.quitado && x.nuevo) out.push(`<span class="pp-tag crea" title="No existe en el catálogo de SAP: el equipo RMD lo creará en SAP antes de agregarlo${igual && igual.n > 1 ? `. Se crea una sola vez y se usa en los ${igual.n} lugares donde está igual` : ''}">★ Se creará en SAP${x.tipoNuevo ? ' (' + esc(x.tipoNuevo.toLowerCase()) + ')' : ''}${igual && igual.n > 1 ? ` · ${igual.n} lugares` : ''}</span>${x.registro && REGISTRO[x.registro] ? `<span class="pp-tag reg" title="Qué anota Producción en este paso (lo indica quien pide el cambio)">${esc(REGISTRO[x.registro])}</span>` : ''}`);
       else if (!x.quitado && x.insumo && !b) out.push('<span class="pp-tag ok" title="Insumo de la receta del RMD">Insumo de la receta</span>');
-      else if (!x.quitado && x.codigo && x.texto != null && (!b || cambiado(x, b))) out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>`);
+      else if (!x.quitado && x.codigo && x.texto != null && (!b || cambiado(x, b))) { const r = PROD && !b && x.registro && PPN.registroDe(x.registro);
+        out.push(`<span class="pp-tag ok" title="Paso que ya existe en SAP">Paso ${esc(x.codigo)}</span>${r ? `<span class="pp-tag reg" title="Producción pide dejarlo configurado así en este RMD">Anota: ${esc(r[1])}${(r[0] === 'numero' || r[0] === 'rango') && x.decN != null && x.decN !== '' ? ` · ${esc(x.decN)} decimal${+x.decN === 1 ? '' : 'es'}` : ''}</span>` : ''}`); }
       return out.length ? `<span class="pp-tags">${out.join('')}</span>` : '';
     }
     const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || cantCambiada(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b) || dtCambiada(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
@@ -17851,18 +17852,19 @@
     const USO = new Map();                                              // código de paso -> { aut, ing, total } (Edición rápida)
     const htmlUso = (c) => { if (!EMB || !EMB.uso) return ''; const u = USO.get(String(c)); return u ? `<span class="uso${u.total ? '' : ' sin'}" title="Masters que usan este paso hoy">${u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso'}</span>` : '<span class="uso cargando">…</span>'; };
     // v1.134.0: cómo se ve la casilla de cada opción en el RMD
-    function previaRegistro(k) {
-      const caja = (t) => `<span class="pp-prev-caja">${t}</span>`;
+    // dec: decimales elegidos; vi/vf: rango escrito. La casilla de ejemplo muestra exactamente esos decimales.
+    function previaRegistro(k, dec, vi, vf) {
+      const caja = (t) => `<span class="pp-prev-caja">${t}</span>`, d = dec == null || dec === '' || isNaN(+dec) ? null : Math.max(0, Math.min(6, +dec)), ej = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return String(v == null ? '' : v).trim() === '' || isNaN(n) ? null : n.toFixed(d == null ? 0 : d); };
+      const num = d == null ? 'número' : (0).toFixed(d), a = ej(vi), z = ej(vf);
       return { leer: '<span class="pp-prev-nada">sin casilla</span>', rpor: mini(['Realizado Por'], 1), rpvb: mini(['Realizado Por', 'VB'], 1), vb: mini(['VB'], 1), check: CHECK, fecha: caja('__/__/____ __:__'), solofecha: caja('__/__/____'), hora: caja('__:__'),
-        numero: caja('0.00'), rango: caja('mín. – máx.'), texto: caja('Aa'), lote: caja('Lote'), vence: caja('__/__/____') }[k] || '';
+        numero: caja(num), rango: caja(`${a == null ? 'mín.' : a} – ${z == null ? 'máx.' : z}`), texto: caja('texto'), lote: caja('Lote'), vence: caja('__/__/____') }[k] || '';
     }
     // v1.134.0: en la plantilla para Producción el rango va junto a «¿Qué anota?» (arriba de las sugerencias)
     const htmlRangoEd = (x) => `<div id="m-rango" class="pp-rango-ed" hidden><label>${PROD ? 'Mínimo' : 'Valor inicial'} <input id="m-vi" inputmode="decimal" value="${esc(x.vi == null ? '' : x.vi)}"></label><label>${PROD ? 'Máximo' : 'Valor final'} <input id="m-vf" inputmode="decimal" value="${esc(x.vf == null ? '' : x.vf)}"></label><label>Margen${PROD ? ' (opcional)' : ''} <input id="m-mg" inputmode="decimal" value="${esc(x.margen == null ? '' : x.margen)}"></label><span id="m-rango-av" class="pp-rango-av"></span></div>`;
     function htmlRegistro(x, b, clase) {
       const ini = x.registro || (b ? PPN.registroDeTipo(b.tipo, b.rpor, b.vb) : ''), ops = PPN.REGISTROS.filter((r) => clase === 'paso' || !r[5] && !r[6]);
-      const ico = { leer: '¶', rpor: '✍', rpvb: '✍✍', vb: 'VB', check: '☑', fecha: '📅', solofecha: '📅', hora: '🕒', numero: '123', rango: '↔', texto: 'Aa', lote: '#', vence: '⌛' };
-      const grupo = (g, tit) => { const l = ops.filter((r) => r[3] === g); return l.length ? `<div class="pp-reg-g"><span class="pp-reg-gt">${tit}</span>${l.map((r) => `<button type="button" class="pp-reg-op" data-reg="${r[0]}" title="${esc(r[4])}"><i aria-hidden="true">${ico[r[0]] || ''}</i>${esc(r[1])}</button>`).join('')}</div>` : ''; };
-      return `<div id="m-reg-l" class="pp-reg" hidden><div class="pp-reg-tit">¿Qué anota Producción en este ${clase === 'pm' ? 'proceso menor' : 'paso'}? <small>obligatorio en un paso nuevo</small></div>
+      const grupo = (g, tit) => { const l = ops.filter((r) => r[3] === g); return l.length ? `<div class="pp-reg-g"><span class="pp-reg-gt">${tit}</span>${l.map((r) => `<button type="button" class="pp-reg-op" data-reg="${r[0]}" title="${esc(r[4])}">${esc(r[1])}</button>`).join('')}</div>` : ''; };
+      return `<div id="m-reg-l" class="pp-reg" hidden><div class="pp-reg-tit">¿Qué anota Producción en este ${clase === 'pm' ? 'proceso menor' : 'paso'}? <small id="m-reg-nota">obligatorio en un paso nuevo</small></div>
         <select id="m-reg" hidden><option value=""></option>${PPN.REGISTROS.map((r) => `<option value="${r[0]}"${ini === r[0] ? ' selected' : ''}>${esc(r[1])}</option>`).join('')}${x.registro === 'dato' ? '<option value="dato" selected>Anotar un dato (número o texto)</option>' : ''}</select>
         ${grupo('nada', 'No anota nada')}${grupo('firma', clase === 'pm' ? 'Marca' : 'Firma o marca')}${grupo('dato', 'Anota un dato')}<div id="m-reg-det" class="pp-reg-det"></div><div class="pp-reg-falta">Elige qué se anota en este paso.</div></div>
         <div id="m-reg-info" class="pp-reg-info" hidden></div>`;
@@ -17898,30 +17900,39 @@
           else if (igualBase && (!elegido || String(elegido.codigo) === String(b.codigo))) est.innerHTML = '<span class="ok">Sin cambios en el texto.</span>';
           else if (elegido) est.innerHTML = `<span class="ok">✓ Se usará el paso ${esc(elegido.codigo)}, que ya existe en SAP.</span>${etq && elegido.etq && elegido.etq !== etq ? `<br><span class="avi">⚠ En el catálogo es de ${esc(ETQ.get(elegido.etq) || 'otra etiqueta')}: en producción podría no aparecer en su lugar. ${EMB ? 'Al guardar se usa un paso de esta etiqueta con el mismo texto.' : 'Al ingresarlo, el equipo RMD lo pasa a un paso de esta etiqueta.'}</span>` : ''}`;
           else est.innerHTML = `<span class="crea">★ Paso nuevo: no existe en SAP con este texto. ${EMB ? 'Se crea en el catálogo de SAP al guardar.' : 'Documentación Técnica lo creará; indica abajo qué se anota en él.'}</span>`;
-          $('#m-reg-l', m).hidden = !(t && !elegido && !(igualBase && b && b.codigo));
+          // v1.135.0 (pedido de Carlos): un paso que ya existe en SAP y se agrega aquí también se puede configurar (a veces se creó sin tipo de dato)
+          const existeAgregado = !!(PROD && t && elegido && !b && clase !== 'insumo');
+          $('#m-reg-l', m).hidden = !(t && !elegido && !(igualBase && b && b.codigo)) && !existeAgregado;
+          if (PROD) { const sel = $('#m-reg', m);
+            if (!regTocado) { if (existeAgregado) sel.value = PPN.registroDeTipo(+elegido.tipo, false, false) || ''; else if (!b) sel.value = ''; }
+            const nota = $('#m-reg-nota', m); if (nota) nota.textContent = existeAgregado ? `ya existe en SAP${PPN.registroDe(PPN.registroDeTipo(+elegido.tipo, false, false)) ? ' (hoy: ' + PPN.registroDe(PPN.registroDeTipo(+elegido.tipo, false, false))[1].toLowerCase() + ')' : ' y no tiene tipo de dato'}: cámbialo solo si debe anotar otra cosa` : 'obligatorio en un paso nuevo'; }
           if (PROD) pintarRegistro(t, elegido, igualBase);
           rango.hidden = !(conRango() || (PROD && !$('#m-reg-l', m).hidden && $('#m-reg', m).value === 'rango')) || !!(EMB && DT);   // v1.129.0: en la vista completa el rango está en ⚙ Configuración
           PPN.tildes(tPrev);
           validarRango();
         };
         // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción elige qué se anota (la casilla del RMD); en uno que ya existe se le muestra cuál lleva
+        let regTocado = !!x.registro;
+        const pintarPrevia = () => { const sel = $('#m-reg', m), pv = $('#m-reg-prev', m); if (!pv) return; const dec = $('#m-dec', m) ? $('#m-dec', m).value : null; pv.innerHTML = previaRegistro(sel.value, dec, $('#m-vi', m).value, $('#m-vf', m).value); };
         const pintarRegistro = (t, eleg, igualBase) => {
           const box = $('#m-reg-l', m), info = $('#m-reg-info', m), sel = $('#m-reg', m), cas = m.querySelector('.pp-fijo .pp-cas');
           m.querySelectorAll('.pp-reg-op').forEach((o) => o.classList.toggle('activo', o.dataset.reg === sel.value));
           const r = PPN.registroDe(sel.value), det = $('#m-reg-det', m);
-          det.innerHTML = r ? `<span class="pp-reg-ayuda">${esc(r[4])}</span><span class="pp-reg-prev">Así se verá: ${previaRegistro(r[0])}</span>${r[0] === 'numero' || r[0] === 'rango' ? `<label class="pp-reg-dec">Decimales <select id="m-dec">${['0', '1', '2', '3'].map((d) => `<option${String(x.decN != null ? x.decN : r[0] === 'rango' ? 1 : 0) === d ? ' selected' : ''}>${d}</option>`).join('')}</select></label>` : ''}` : '<span class="pp-reg-ayuda">Elige una opción: con eso Documentación Técnica sabe qué casilla lleva el paso en el RMD.</span>';
+          det.innerHTML = r ? `<span class="pp-reg-ayuda">${esc(r[4])}</span><span class="pp-reg-prev">Así se verá: <span id="m-reg-prev">${previaRegistro(r[0], r[0] === 'numero' || r[0] === 'rango' ? String(x.decN != null ? x.decN : r[0] === 'rango' ? 1 : 0) : null, x.vi, x.vf)}</span></span>${r[0] === 'numero' || r[0] === 'rango' ? `<label class="pp-reg-dec">Decimales <select id="m-dec">${['0', '1', '2', '3'].map((d) => `<option${String(x.decN != null ? x.decN : r[0] === 'rango' ? 1 : 0) === d ? ' selected' : ''}>${d}</option>`).join('')}</select></label>` : ''}` : '<span class="pp-reg-ayuda">Elige una opción: con eso Documentación Técnica sabe qué casilla lleva el paso en el RMD.</span>';
           const fuente = !box.hidden ? null : eleg ? eleg : igualBase && b ? b : null;
           if (fuente) { const k = PPN.registroDeTipo(fuente.tipo, clase === 'paso' && ($('#m-rpor', m) ? $('#m-rpor', m).checked : x.rpor), clase === 'paso' && ($('#m-vb', m) ? $('#m-vb', m).checked : x.vb)), y = PPN.registroDe(k);
             info.hidden = !y; if (y) info.innerHTML = `En el RMD este ${clase === 'pm' ? 'proceso menor' : 'paso'} lleva: <b>${esc(y[1])}</b> <span class="pp-reg-prev">${previaRegistro(y[0])}</span>`; }
           else info.hidden = true;
           if (cas) cas.hidden = !box.hidden;                              // las firmas las decide la opción elegida
         };
-        m.addEventListener('click', (e) => { const o = e.target.closest('.pp-reg-op'); if (!o) return; $('#m-reg', m).value = o.dataset.reg; $('#m-reg-l', m).classList.remove('falta'); pintarEstado(); });
+        m.addEventListener('click', (e) => { const o = e.target.closest('.pp-reg-op'); if (!o) return; regTocado = true; $('#m-reg', m).value = o.dataset.reg; $('#m-reg-l', m).classList.remove('falta'); pintarEstado(); });
         const numero = (v) => { v = String(v).trim(); if (!v) return null; const n = Number(v.replace(',', '.')); return isNaN(n) ? NaN : n; };
         const validarRango = () => { const av = $('#m-rango-av', m); if (rango.hidden) { av.textContent = ''; return true; }
           const [a, b2, g] = ['#m-vi', '#m-vf', '#m-mg'].map((k) => numero($(k, m).value)), malo = [a, b2, g].some((v) => Number.isNaN(v)), alreves = !malo && a != null && b2 != null && a > b2;
           av.textContent = malo ? 'Usa solo números (con punto o coma para los decimales).' : alreves ? 'El valor inicial es mayor que el final.' : ''; return !malo && !alreves; };
         ['#m-vi', '#m-vf', '#m-mg'].forEach((k) => $(k, m).addEventListener('input', validarRango));
+        ['#m-vi', '#m-vf'].forEach((k) => $(k, m).addEventListener('input', () => { if (PROD) pintarPrevia(); }));
+        m.addEventListener('change', (e) => { if (PROD && e.target.id === 'm-dec') pintarPrevia(); });
         let lim = 12;
         const marcado = (t, tk) => PPN.resaltar(t, tk).map(([x, m]) => (m ? `<mark>${esc(x)}</mark>` : esc(x))).join('');
         const pintarSug = (mas) => {
@@ -17945,7 +17956,7 @@
           const t = ta.value.trim(); if (!t) { ta.focus(); return; }
           if (!validarRango()) { $('#m-vi', m).focus(); return; }
           const vi = $('#m-vi', m).value.trim(), vf = $('#m-vf', m).value.trim(), mg = $('#m-mg', m).value.trim(), com = $('#m-com', m).value.trim(), reg = $('#m-reg-l', m).hidden ? '' : $('#m-reg', m).value;
-          if (PROD && !$('#m-reg-l', m).hidden && !reg) { const bx = $('#m-reg-l', m); bx.classList.add('falta'); bx.scrollIntoView({ block: 'nearest' }); return; }
+          if (PROD && !$('#m-reg-l', m).hidden && !reg && !elegido) { const bx = $('#m-reg-l', m); bx.classList.add('falta'); bx.scrollIntoView({ block: 'nearest' }); return; }
           if (PROD && reg === 'rango' && (numero(vi) == null || numero(vf) == null)) { $('#m-rango-av', m).textContent = 'Indica el valor mínimo y el máximo.'; $(numero(vi) == null ? '#m-vi' : '#m-vf', m).focus(); return; }
           const dec = $('#m-dec', m) ? $('#m-dec', m).value : null;
           cambio(() => {
@@ -17961,11 +17972,18 @@
             else { viva.codigo = null; viva.pasoId = null; viva.nuevo = true; viva.etqCat = null; viva.tipo = b ? b.tipo : (viva.tipo || null); }
             if (clase === 'paso' && $('#m-rpor', m) && !$('#m-rpor', m).disabled) { viva.rpor = $('#m-rpor', m).checked; viva.vb = $('#m-vb', m).checked; }
             if (!rango.hidden) { viva.vi = vi === '' ? null : vi; viva.vf = vf === '' ? null : vf; viva.margen = mg === '' ? null : mg; }
-            if (viva.nuevo && reg) viva.registro = reg; else delete viva.registro;
+            // un paso que ya existe en SAP y se agrega aquí: solo se guarda si Producción lo cambió respecto a como está en SAP
+            const catReg = elegido ? PPN.registroDeTipo(+elegido.tipo, false, false) : '', cfgPaso = PROD && !viva.nuevo && !b && elegido && reg && (reg !== catReg || regTocado && PPN.registroDe(reg) && (PPN.registroDe(reg)[0] === 'numero' || PPN.registroDe(reg)[0] === 'rango') && dec != null);
+            if ((viva.nuevo && reg) || cfgPaso) viva.registro = reg; else delete viva.registro;
+            if (!cfgPaso) { if (viva.dt && viva.dt.solo) delete viva.dt; }
             // v1.134.0: la opción elegida por Producción define el tipo de dato, las firmas y los decimales del paso nuevo (DOC los confirma al importar)
             const rg = PROD && viva.nuevo ? PPN.registroDe(viva.registro) : null;
             if (rg) { viva.tipo = rg[2]; viva.edit = PPN.DT_TIPOS_CON_EDIT.has(rg[2]); if (clase === 'paso') { viva.rpor = !!rg[5]; viva.vb = !!rg[6]; } if (rg[0] === 'numero' || rg[0] === 'rango') viva.decN = dec; else delete viva.decN;
               if (rg[0] !== 'rango') { viva.vi = null; viva.vf = null; viva.margen = null; } }
+            else if (cfgPaso) { const r2 = PPN.registroDe(viva.registro), conDec = r2[0] === 'numero' || r2[0] === 'rango';
+              viva.tipo = r2[2]; viva.edit = PPN.DT_TIPOS_CON_EDIT.has(r2[2]); if (clase === 'paso') { viva.rpor = !!r2[5]; viva.vb = !!r2[6]; } if (conDec) viva.decN = dec; else delete viva.decN;
+              if (r2[0] !== 'rango') { viva.vi = null; viva.vf = null; viva.margen = null; }
+              viva.dt = { tipo: r2[2], edit: viva.edit, ...(conDec ? { dec } : {}), solo: ['tipo', 'edit', ...(conDec ? ['dec'] : [])] }; }   // se escribe como «Configuración» al ingresar
             else if (PROD) { delete viva.decN; if (!viva.nuevo && !viva.insumo) viva.edit = igualBase ? !!b.edit : PPN.DT_TIPOS_CON_EDIT.has(+viva.tipo); }   // la casilla que se ve sigue al paso elegido
           });
           cerrar(); setTimeout(() => irA(ref.id || `n:${seq - 1}`), 30);
@@ -18457,7 +18475,6 @@
 .pp-reg-g{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:3px 0}
 .pp-reg-gt{flex:0 0 100%;font-size:11px;color:#6b6b6b;text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
 .pp-reg-op{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid #cfcfcf;border-radius:14px;background:#fff;cursor:pointer;font:inherit;font-size:12.5px}
-.pp-reg-op i{font-style:normal;font-size:11px;color:#5b3fa0;min-width:14px;text-align:center}
 .pp-reg-op:hover{border-color:#7c5cc4}.pp-reg-op.activo{background:#5b3fa0;border-color:#5b3fa0;color:#fff}.pp-reg-op.activo i{color:#fff}
 .pp-reg-det{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:6px;font-size:12.5px}
 .pp-reg-ayuda{color:#444}.pp-reg-prev{display:inline-flex;align-items:center;gap:6px;color:#6b6b6b}
@@ -20042,7 +20059,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const fechaUsuario = { usuarioActualiza: usuario, fechaActualiza: ahora }, baja = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: false }, alta = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: true };
     const lugar = (L) => `${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}${L.padre ? ' › paso ' + (L.padre.codigo || '') : ''}`;
     const quitados = new Set(), seqPasos = [], locNuevo = new Map(), revisar = [], equiposRev = [], depManual = new Map(), verifDt = [];   // v1.123.0: «Depende» elegido en la vista completa; configuración a comprobar
-    const dtNuevo = (x, esPm, ruta, lugarTxt) => { if (!x.dt || x.insumo) return; const claves = PPN.dtCampos(esPm ? 'pm' : 'paso').map((c) => c[0]), w = ppDtEscritura(x.dt, claves, esPm);
+    const dtNuevo = (x, esPm, ruta, lugarTxt) => { if (!x.dt || x.insumo) return; const todas = PPN.dtCampos(esPm ? 'pm' : 'paso').map((c) => c[0]), claves = Array.isArray(x.dt.solo) ? todas.filter((k) => x.dt.solo.includes(k)) : todas, w = ppDtEscritura(x.dt, claves, esPm);
+      if (!claves.length) return;
       op(4, { lugar: lugarTxt, accion: 'Configuración', clase: esPm ? 'pm' : 'paso', desc: `configuración del ${esPm ? 'proceso menor' : 'paso'} nuevo ${codVer(x)} — ${String(x.texto || '').slice(0, 40)}: ${ppDtTexto(x.dt, claves.filter((k) => k !== 'color' || x.dt.color), datos.tipos)}`, ruta, datos: { ...w, ...fechaUsuario }, inv: null });
       verifDt.push({ x, esPm, claves, id: (/\('([^']+)'\)$/.exec(ruta) || [])[1] }); };                                           // [{ L, seq: [{ id, x, nuevo }] }]
     for (const L of listas) {

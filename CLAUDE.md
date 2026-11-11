@@ -301,7 +301,11 @@ cuenta). Escribir y responder siempre en **español**.
   **Paso nuevo: Producción elige qué anota** (`REGISTROS`/`registroDe`/`registroDeTipo`; campo `registro` + `tipo`/`decN`/rango): obligatorio
   en la plantilla, el ingreso crea el paso con ese tipo. **Documentos vencidos** (`mapaDocs`/`docVencido`): la lista de Reglas de revisión
   viaja en el paquete (`paq.docs`). Importación: filtros por partes y «Producción anota». Prueba `qa_plantilla_produccion.mjs`.
-  **La siguiente versión debe ser > 1.134.0.**
+  1.134.0 publicada en SharePoint el 2026-11-10 (2 238 783 bytes).
+- 2026-11-11, v1.135.0 (encima de la 1.134.0): **pedidos de Carlos para la plantilla de Producción**: un paso que ya existe en SAP y se agrega al RMD
+  también se configura («¿Qué anota?»; el ingreso escribe solo una operación «Configuración» de esa fila con `x.dt.solo`, ver `dtNuevo`);
+  sin íconos en los botones de tipo de dato; la vista previa «Así se verá» usa los decimales elegidos (`previaRegistro(k, dec, vi, vf)`). Prueba `qa_local.py` LN60.
+  **La siguiente versión debe ser > 1.135.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
