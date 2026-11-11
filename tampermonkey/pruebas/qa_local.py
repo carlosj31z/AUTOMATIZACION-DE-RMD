@@ -912,7 +912,7 @@ with sync_playwright() as p:
         nums = e.evaluate("() => [...document.querySelectorAll('.pp-c-num, .pp-c-guion')].map(x => x.textContent.trim()).filter(Boolean)")
         acc = lambda n, a: e.evaluate("([n, a]) => { const tr = [...document.querySelectorAll('tr.pp-paso')].find(tr => (tr.querySelector('.pp-c-num') || {}).textContent === n + '.-'); tr.querySelector('.pp-acc [data-a=' + a + ']').click(); }", [n, a])
         acc("2.1.3", "editar"); e.wait_for_timeout(120); e.fill("#m-texto", "agitar durante 15 minutos."); e.wait_for_timeout(500); est1 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
-        acc("2.1.1", "agregar"); e.wait_for_timeout(120); e.fill("#m-texto", "ENJUAGAR CON AGUA PURIFICADA."); e.wait_for_timeout(500); est2 = e.inner_text("#m-estado"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(300)
+        acc("2.1.1", "agregar"); e.wait_for_timeout(120); e.fill("#m-texto", "ENJUAGAR CON AGUA PURIFICADA."); e.wait_for_timeout(500); est2 = e.inner_text("#m-estado"); e.click(".pp-reg-op[data-reg=leer]"); e.click(".pp-modal [data-a=aceptar]")   # v1.134.0: qué anota Producción; e.wait_for_timeout(300)
         acc("2.1.5", "quitar"); e.wait_for_timeout(200); quitados1 = e.evaluate("document.querySelectorAll('.pp-paso.qui').length")
         e.click("[data-a=deshacer]"); e.wait_for_timeout(200); quitados2 = e.evaluate("document.querySelectorAll('.pp-paso.qui').length")
         acc("2.1.5", "subir"); e.wait_for_timeout(200)
@@ -924,7 +924,7 @@ with sync_playwright() as p:
         with e.expect_download() as dl: e.click(".pp-modal [data-a=aceptar]")
         ruta = dl.value.path(); guardado = open(ruta, encoding="utf-8").read(); nombre = dl.value.suggested_filename
         e2 = PP_CTX.new_page(); e2.set_content(guardado); e2.wait_for_selector(".pp-doc", timeout=15000); otra = e2.evaluate("() => ({ contar: window.__pp.estado().contar, sol: window.__pp.estado().SOL.nombre })"); e2.close(); e.close()
-        ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and any(t.startswith("★ Se creará") for t in estado["tags"]) and "Paso 2010" in estado["tags"]
+        ok = (not errs and "2.1.4.-" in nums and "Se usará el paso 2010" in est1 and "Paso nuevo" in est2 and quitados1 == 1 and quitados2 == 0 and any(t.startswith("★ Se creará") or t.startswith("★ Paso nuevo") for t in estado["tags"]) and "Paso 2010" in estado["tags"]
               and estado["contar"]["total"] >= 5 and estado["contar"]["nuevos"] == 1 and "Solicitud" in pide and nombre.startswith("Borrador RMD 2202600001 v3 ") and otra["contar"] == estado["contar"] and otra["sol"] == "Ana Prueba")
         PP_GUARDADO.append(guardado)
         return ok, json.dumps({ "nums": nums[:8], "est1": est1, "est2": est2, "quitados": [quitados1, quitados2], "estado": estado, "nombre": nombre, "reabierta": otra, "errores": errs[:3] }, ensure_ascii=False)[:1800]
@@ -994,7 +994,8 @@ with sync_playwright() as p:
         titulo = e.title()
         e.evaluate("() => window.__pp.editar({ id: 'P11' })"); e.wait_for_selector("#m-texto"); e.fill("#m-texto", "verificar"); e.wait_for_timeout(500)
         vista = e.evaluate("""() => { const m = document.querySelector('.pp-modal'), r = m.getBoundingClientRect(), dentro = (s) => { const b = document.querySelector(s).getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2, h = document.elementFromPoint(x, y); return b.top >= r.top && b.bottom <= r.bottom + 1 && !!h && (h === document.querySelector(s) || document.querySelector(s).contains(h)); };
-          return { desborda: m.scrollHeight > m.clientHeight + 20, aceptar: dentro('.pp-modal [data-a=aceptar]'), cancelar: dentro('.pp-modal [data-a=cancelar]'), rpor: dentro('#m-rpor'), vb: dentro('#m-vb') }; }""")
+          const reg = () => { const l = document.querySelector('#m-reg-l'); return !!l && !l.closest('[hidden]'); }, arribaDeSug = (s) => { const o = document.querySelector(s), g = document.querySelector('#m-sug'); return !!o && !!g && !!o.offsetParent && o.getBoundingClientRect().bottom <= g.getBoundingClientRect().top + 1; };
+          return { desborda: m.scrollHeight > m.clientHeight + 20, aceptar: dentro('.pp-modal [data-a=aceptar]'), cancelar: dentro('.pp-modal [data-a=cancelar]'), rpor: reg() ? arribaDeSug('.pp-reg-op[data-reg=rpor]') : dentro('#m-rpor'), vb: reg() ? arribaDeSug('.pp-reg-op[data-reg=vb]') : dentro('#m-vb') }; }""")
         e.evaluate("() => { document.querySelector('.pp-modal').scrollTop = 0; }"); e.wait_for_timeout(100)
         arriba = e.evaluate("() => { const b = document.querySelector('.pp-modal [data-a=aceptar]').getBoundingClientRect(), h = document.elementFromPoint(b.left + 5, b.top + 5); return h && h.dataset.a === 'aceptar'; }")
         e.click(".pp-modal [data-a=cancelar]"); e.close()
@@ -1019,6 +1020,23 @@ with sync_playwright() as p:
               and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
               and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
         return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN59 Importar borrador · por partes (v1.134.0): con más de 4 cambios la revisión del portal muestra los filtros (Todos, Pasos nuevos, Con avisos, Comentarios…) que dejan ver solo esas filas, y en el paso nuevo lo que Producción indicó que se anota («Producción anota: … → tipo · rango»)")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        r = pg.evaluate("""async (d) => { try { const P = window.__rmdStats.plantilla, N = P.nucleo, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA'), W = JSON.parse(JSON.stringify(d.arbol)), T = W.estructuras[2].etiquetas;
+          Object.assign(T[0].pasos[2], { texto: 'TEMPERATURA DEL GRANEL AL FINALIZAR (C):', codigo: null, pasoId: null, nuevo: true, etqCat: null, registro: 'rango', tipo: 443, vi: '20', vf: '25', decN: '1' });
+          T[0].pasos[0].quitado = true; T[0].pasos[1].quitado = true; T[1].comentario = 'Revisar con el jefe.'; T[1].pasos.push({ id: 'n:50', texto: 'PESO DEL GRANEL (KG):', codigo: null, nuevo: true, registro: 'numero', tipo: 438, decN: '2', pm: [] });
+          const an = (dt, pr) => { const c = N.cambios(dt.arbol, pr.trabajo); return { destino: { mdId: 'MD1', codigo: '2202600001', version: 3, estado: 'Ingresado' }, base: { estado: 'Ingresado' }, lin: { versiones: [] }, cambios: c, avisos: N.avisos(pr.trabajo, {}), enSap: [], conflictos: [], nuevos: c.filter((x) => x.nuevo).map((x) => ({ c: x, texto: x.despues })) }; };
+          const prop = { solicitud: { nombre: 'Ana' }, guardado: new Date().toISOString(), trabajo: W }, v = P.revisar(paq, prop, an(paq, prop), async (dt, pr) => an(dt, pr));
+          await new Promise((ok) => setTimeout(ok, 200));
+          const visibles = () => [...v.cuerpo.querySelectorAll('.rmd-pp-tc tbody tr')].filter((tr) => getComputedStyle(tr).display !== 'none').length;
+          const bots = [...v.cuerpo.querySelectorAll('.rmd-pp-filtros [data-pf]')].map((b) => b.dataset.pf + ':' + b.textContent.trim() + (b.disabled ? ':off' : ''));
+          const todos = visibles(); v.cuerpo.querySelector('[data-pf="nuevo"]').click(); const nuevos = visibles(); v.cuerpo.querySelector('[data-pf="com"]').click(); const coms = visibles(); v.cuerpo.querySelector('[data-pf=""]').click(); const otraVez = visibles();
+          const anota = [...v.cuerpo.querySelectorAll('.rmd-pp-anota')].map((x) => x.textContent); v.cerrar();
+          return { bots, todos, nuevos, coms, otraVez, anota }; } catch (e) { return { error: String(e) }; } }""", d0)
+        ok = (not r.get("error") and len(r["bots"]) == 7 and r["todos"] >= 5 and r["nuevos"] == 2 and r["coms"] == 1 and r["otraVez"] == r["todos"]
+              and any("Rango" in a and "20 a 25" in a for a in r["anota"]) and any("2 dec." in a for a in r["anota"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
     @prueba("LN50 Borrador de Producción · insumos (v1.102): «＋ Insumo» en un paso de fabricación lista los insumos de la receta, propone lo que falta repartir y queda como «Agregar (insumo)»; «✎ Cantidad» ajusta un insumo ya puesto (cambio «Cantidad», con el aviso de que se cambia en la Lista de Materiales, v1.104.1), una cantidad inválida es error y pasarse de la receta avisa; en el portal el insumo nuevo sale «a mano» y el plan lo saca de lo que escribe")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
@@ -1120,14 +1138,14 @@ with sync_playwright() as p:
         e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
         e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
         r = e.evaluate("""() => { const s = window.__pp.estado(), p = s.W.estructuras[2].etiquetas[0].pasos[1];
-          p.pm = [{ id: 'n:900', pasoId: null, codigo: null, texto: 'VELOCIDAD  INICIAL (NIVEL 40 - 80):', orden: 1, tipo: 443, vi: '40', vf: '80', margen: '10', nuevo: true }];
+          p.pm = [{ id: 'n:900', pasoId: null, codigo: null, texto: 'VELOCIDAD  INICIAL (NIVEL 40 - 80):', orden: 1, tipo: 443, registro: 'rango', vi: '40', vf: '80', margen: '10', nuevo: true }];
           window.__pp.duplicar([p.id]); const s2 = window.__pp.estado(), l = s2.W.estructuras[2].etiquetas[0].pasos, c = l.find((y) => y.copiaDe === p.id), m2 = c.pm[0];
           const tag = (id) => [...document.querySelectorAll(`tr[data-id="${id}"] .pp-tag.crea`)].map((x) => x.textContent).join('|');
           const av = (id) => (s2.AV.find(([k]) => k === id) || [, []])[1].map((a) => a.texto).join('|');
           return { t1: tag('n:900'), t2: tag(m2.id), a1: av('n:900'), a2: av(m2.id), nuevos: s2.contar.nuevos, mismo: m2.texto }; }""")
         N = pg.evaluate("""() => { const N = window.__rmdStats.plantilla.nucleo; return [N.claveNueva('E1', null, ' Velocidad  inicial:'), N.claveNueva('E1', null, 'VELOCIDAD INICIAL:'), N.claveNueva('E2', null, 'VELOCIDAD INICIAL:')]; }""")
         e.close()
-        ok = (not errs and "· 2 lugares" in r["t1"] and r["t2"] == "★ Usa el mismo paso nuevo" and "una sola vez" in r["a1"] and "se usa ese mismo paso, no se crea otro" in r["a2"] and r["nuevos"] == 1
+        ok = (not errs and "· 2 lugares" in r["t1"] and r["t2"] == "★ Usa el mismo paso nuevo" and not r["a1"] and not r["a2"] and r["nuevos"] == 1
               and N[0] == N[1] and N[1] != N[2])
         return ok, json.dumps({"r": r, "N": N, "errores": errs[:3]}, ensure_ascii=False)[:1500]
     @prueba("LN53 Borrador de Producción · insumo como proceso menor (v1.105.0): cada proceso menor e insumo de un paso tiene «＋ Insumo debajo»; el diálogo elige la posición dentro del paso (por defecto debajo de esa fila), la lista sale de la sección INSUMOS con la cantidad cambiada allí (✎) y propone lo que falta repartir; el insumo nuevo queda justo debajo")
@@ -1184,7 +1202,7 @@ with sync_playwright() as p:
         n = lambda l: [x for x in l if not x.startswith("n:")]
         c = dup["ids"][2] if len(dup["ids"]) > 2 else ""
         ok = (not errs and dup["ids"][:2] == ["P10", "P11"] and c.startswith("n:") and dup["ids"][3:] == ["P12", "P13"] and dup["copia"]["codigo"] == "2002" and dup["copia"]["copiaDe"] == "P11"
-              and dup["copia"]["pm"] == [[True, "3001", "N° DE REPORTE:"]] and dup["marc"] == [c] and dup["barra"] and any(a.startswith("info:Copia") for a in dup["av"]) and dup["cmb"] == [["agregar", ["3001"]]]
+              and dup["copia"]["pm"] == [[True, "3001", "N° DE REPORTE:"]] and dup["marc"] == [c] and dup["barra"] and not any(a.startswith("info:") for a in dup["av"]) and dup["cmb"] == [["agregar", ["3001"]]]
               and trasEsc == [] and marc["marc"] == ["P10", "P11", c, "P12"] and cajas == 4
               and bajado == ["P13", "P10", "P11", c, "P12"] and subido == ["P10", "P11", c, "P12", "P13"] and porta == 4
               and pegado["t2"][:2] == ["P20", "P21"] and len(pegado["t2"]) == 6 and all(x.startswith("n:") for x in pegado["t2"][2:]) and len(pegado["marc"]) == 4
