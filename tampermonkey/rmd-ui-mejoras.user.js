@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.135.4
+// @version      1.136.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.135.4';                                                       // mantener igual a @version
+  const VERSION = '1.136.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -16978,7 +16978,7 @@
         [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => vivos(l).forEach((p) => vivos(p.pm).forEach((m) => { if (!m.insumo) return; insumosPm.push(m); asignado.set(m.comp, (asignado.get(m.comp) || 0) + (num(m.cant) || 0)); }))); });
       insumosPm.forEach((m) => {
         const c = num(m.cant); if (c == null || Number.isNaN(c) || c <= 0) { add(m.id, 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); return; }
-        if (cantBase.has(m.id) && fmtCant(cantBase.get(m.id)) !== fmtCant(m.cant)) add(m.id, 'aviso', AVISO_CANT_LM, 'cant');
+        // v1.136.0: la cantidad dentro de un paso del procedimiento sí se cambia en el RMD (sin aviso de la Lista de Materiales)
         const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`, 'cant');
       });
       const revisarLista = (l, estr, etq) => {
@@ -17353,7 +17353,7 @@
       return `<table class="pp-pagina"><thead><tr><td>${htmlEncabezadoPdf()}</td></tr></thead><tbody><tr><td class="pp-hoja">${cuerpo}</td></tr></tbody></table>`;
     }
     // botón ✎ siempre visible junto a una cantidad de insumo
-    const btCant = (a, id) => `<button type="button" class="pp-cant-ed" data-a="${a}" data-id="${esc(id)}" title="Cambiar la cantidad. El cambio se realiza en la Lista de Materiales (en el RMD no se edita)">✎</button>`;
+    const btCant = (a, id) => `<button type="button" class="pp-cant-ed" data-a="${a}" data-id="${esc(id)}" title="${a === 'editar-ins' ? 'Cambiar la cantidad de este insumo en el paso' : 'Cambiar la cantidad. El cambio se realiza en la Lista de Materiales (en el RMD no se edita)'}">✎</button>`;
     // un insumo de la receta va dentro del paso como un proceso menor más: se puede poner debajo de cualquier fila del paso
     const btInsDebajo = () => (insumosReceta().length ? bt('agregar-ins', '＋ Insumo debajo', 'Agregar debajo de esta fila un insumo de la receta (va como un proceso menor del paso), con su cantidad', 'w') : '');
     const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
@@ -17469,7 +17469,7 @@
         return `<tr class="${cam ? 'cam' : ''}" data-id="${esc(k)}"><td>${esc(x.desc)}${x.txtadic ? ' ' + esc(x.txtadic) : ''}${cam ? '<span class="pp-tags"><span class="pp-tag cam">Cantidad</span></span>' : ''}${htmlAvisos(k)}${htmlComentario(x)}</td><td class="c">${esc(x.comp)}</td><td class="d">${cant}${btCant('cant-receta', k)}</td><td class="c">${esc(x.um)}</td><td></td><td></td><td></td><td></td></tr>`; }).join('');
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="4">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
       return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid pp-ins">${cols([172, 55, 68, 28, 68, 34, 30, 22])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Cantidad</th><th>UM</th><th>Cant. Recib.</th><th>UM (CP)</th><th>Bulto</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
-        <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para cambiar una cantidad, pulsa <b>✎</b> junto a ella (aquí o en el insumo dentro de un paso): queda en el pedido, pero <b>ese cambio se realiza en la Lista de Materiales</b>, porque en el RMD no se edita. Para poner un insumo en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
+        <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para cambiar la cantidad de la receta pulsa <b>✎</b> junto a ella: queda en el pedido, pero <b>ese cambio se realiza en la Lista de Materiales</b>. La cantidad de un insumo dentro de un paso sí se cambia en el RMD (✎ junto al insumo en el paso). Para poner un insumo en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
     }
     function htmlEspec(e) {
       const grupos = []; (e.espec || []).forEach((x) => { const k = x.grupoId == null ? x.grupo || '' : x.grupoId; let g = grupos.find((y) => y.k === k); if (!g) grupos.push((g = { k, nombre: x.grupo || '', filas: [] })); g.filas.push(x); });
@@ -18019,7 +18019,7 @@
       modal(`<h3>${x ? 'Insumo' : 'Agregar insumo'}<span>${esc(e.nombre)}${t ? ' › ' + esc(t.nombre) : ''} › ${esc(String(padre.texto || '').slice(0, 60))}</span></h3>
         ${x ? '' : `<p class="pp-nota">El insumo va dentro del paso como un proceso menor más: elige debajo de qué fila va.</p><label class="pp-campo">Posición dentro del paso<select id="m-pos">${posiciones()}</select></label><label class="pp-campo">Buscar en los insumos de la receta<input id="m-q" placeholder="código o descripción (p. ej. CAFEINA, 1100002760)"></label>`}<div id="m-res" class="pp-sug"></div>
         <label class="pp-campo pp-com-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc((x && x.comentario) || '')}</textarea></label>
-        <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>${x && BI.has(x.id) ? `<div class="pp-aviso-lm">⚠ ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}
+        <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>
         <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
         const q = $('#m-q', m), res = $('#m-res', m), cant = $('#m-cant', m), av = $('#m-ins-av', m);
         const pintar = () => {
@@ -19768,7 +19768,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       return r ? `<span class="rmd-pp-anota" title="Lo indicó Producción en la plantilla">Producción anota: ${esc(r[1])} → ${esc((datos.tipos || {})[r[2]] || r[2])}${x && x.decN != null && x.decN !== '' ? ` · ${esc(x.decN)} dec.` : ''}${x && r[0] === 'rango' ? ` · ${esc(x.vi == null ? '—' : x.vi)} a ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ' ± ' + esc(x.margen) : ''}` : ''}</span>` : c.registro ? `<span class="rmd-pp-anota">Producción anota: ${esc(PP_REGISTRO[c.registro] || c.registro)}</span>` : ''; };
     const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
       return `<tr class="rmd-pp-${c.accion} ${marcasF(c).join(' ')}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
-        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>${anota(c)}` : c.registro && c.accion === 'agregar' ? anota(c) : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av aviso">⚠ Se agrega a mano en el portal: «Agregar Insumo» del paso, con esta cantidad.</div>' : ''}${c.accion === 'cantidad' ? ` <div class="rmd-pp-av aviso">⚠ No se escribe en SAP. ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av aviso">insumo: se agrega a mano</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
+        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>${anota(c)}` : c.registro && c.accion === 'agregar' ? anota(c) : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av info">Se graba en el paso como «Agregar Insumo», con esta cantidad (insumo de la receta del RMD).</div>' : ''}${c.accion === 'cantidad' && c.receta ? ` <div class="rmd-pp-av aviso">⚠ No se escribe en SAP. ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av info">insumo: se graba en el paso</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
         <td>${esc(c.comentario || '')}</td></tr>`; }).join('');
     const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
@@ -19927,7 +19927,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     return new Promise((ok) => modelo.read('/' + entidad, { filters: filtros, urlParameters: { $top: '1', ...(select ? { $select: select } : {}) }, success: (r) => ok((r.results || [])[0] || null), error: () => ok(null) }));
   }
   // Arma las escrituras sin ejecutarlas: { ops, bloqueos, avisos, manual, nuevos, finales, resumen, D, … }
-  // insumos agregados en el borrador: todavía a mano («Agregar Insumo» del portal); se sacan de la copia que se planifica
+  // Hasta la v1.135.x los insumos agregados en el borrador quedaban a mano; desde la v1.136.0 el ingreso los graba como «Agregar Insumo» del portal.
+  // Se deja la función (sin uso en el ingreso) por si otra herramienta la llama.
   function ppSinInsumosNuevos(trabajo, manual) {
     const t = JSON.parse(JSON.stringify(trabajo));
     t.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((x) => x.pasos || [])].forEach((l, k) => l.forEach((p) => {
@@ -19954,7 +19955,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     if (k === 'puesto') return `Puesto ${d.puesto || '(vacío)'}`; if (k === 'color') return d.color ? `color ${d.color}` : 'sin color'; const n = { edit: 'Edit', cc: 'Estado CC', mov: 'Estado Mov.', pmop: 'PM OP', genpp: 'Gen PP', tab: 'Tab' }[k]; return n ? `${n} ${d[k] ? 'sí' : 'no'}` : k; }).join(', ');
   async function ppPlanEscritura(datos, prop0, an, modelo, usuario) {
     PPN.detectarTildes(on('detectartildes')); PPN.tildes(!!(prop0.trabajo && prop0.trabajo.tildes));
-    const manual = [], prop = { ...prop0, trabajo: ppSinInsumosNuevos(prop0.trabajo, manual) };
+    const manual = [], prop = { ...prop0, trabajo: JSON.parse(JSON.stringify(prop0.trabajo)) };   // v1.136.0: los insumos agregados se graban (antes ppSinInsumosNuevos)
     prop.trabajo.estructuras.forEach((e) => (e.insumos || []).forEach((x) => { if (PPN.cantRecetaCambiada(x)) manual.push(`Cambiar en la Lista de Materiales la cantidad del insumo ${x.comp || ''} — ${String(x.desc || '').slice(0, 50)}: ${x.cant == null ? '(vacía)' : x.cant} → ${x.cantNueva} ${x.um || ''} (receta del RMD). En el RMD no se puede editar.`); }));
     const plan0 = {}, bloqueos = [], avisos = [], ops = [], finales = new Map(), nuevosPaso = new Map(), dest = an.destino, mismo = dest.mdId === datos.rmd.mdId && !an.mapa, ahora = new Date();
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
@@ -19980,10 +19981,10 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     listas.forEach((L) => L.w.forEach((x) => { const b0 = L.b.find((y) => y.id === x.id); if (b0 && !x.quitado && ((x.pm || []).length || (b0.pm || []).length)) conPm.push({ kind: 'pm', w: x.pm || [], b: b0.pm || [], e: L.e, t: L.t, padre: x }); }));
     listas.push(...conPm);
     // pasos del catálogo: por código; los nuevos se rebuscan por texto o se crean
-    const pide = (x, b0) => !b0 || String(x.codigo || '') !== String(b0.codigo || '') || x.nuevo;
+    const pide = (x, b0) => !x.insumo && (!b0 || String(x.codigo || '') !== String(b0.codigo || '') || x.nuevo);   // un insumo no es un paso del catálogo
     const codigos = new Set(), buscarTexto = [];
     listas.forEach((L) => { const bId = new Map(L.b.map((y) => [y.id, y])); L.w.filter((x) => !x.quitado).forEach((x) => { if (!pide(x, bId.get(x.id))) return; if (x.codigo && !x.nuevo) codigos.add(String(x.codigo)); else buscarTexto.push({ x, L, tipoBase: (bId.get(x.id) || {}).tipo }); }); });
-    listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach((m) => { if (m.codigo && !m.nuevo) codigos.add(String(m.codigo)); else buscarTexto.push({ x: m, L: { e: L.e, t: L.t, pmDe: x }, pm: true }); })); });
+    listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado && !m.insumo).forEach((m) => { if (m.codigo && !m.nuevo) codigos.add(String(m.codigo)); else buscarTexto.push({ x: m, L: { e: L.e, t: L.t, pmDe: x }, pm: true }); })); });
     const porCodigo = new Map(), lee = async (filtros) => leerTodoDe(modelo, 'PASO', filtros, { $select: PP_PASO_SEL });
     const lista = [...codigos]; for (let i = 0; i < lista.length; i += 40) (await lee([new F({ filters: lista.slice(i, i + 40).map((c) => new F('codigo', 'EQ', c)), and: false })])).forEach((p) => { if (p.activo !== false) porCodigo.set(String(p.codigo), p); });
     const cfgCache = new Map(), configDe = async (pasoId) => { if (!cfgCache.has(pasoId)) { cfgCache.set(pasoId, (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('mdId_mdId', 'EQ', dest.mdId), new F('activo', 'EQ', true)], PP_CFG_SEL)) || (await ppLeerUno(modelo, 'MD_ES_PASO', [new F('pasoId_pasoId', 'EQ', pasoId), new F('activo', 'EQ', true)], PP_CFG_SEL))); } return cfgCache.get(pasoId); };
@@ -20000,7 +20001,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     listas.forEach((L) => {
       const bId = new Map(L.b.map((y) => [y.id, y]));
       L.w.filter((x) => !x.quitado && pide(x, bId.get(x.id))).forEach((x) => pasarDeOtra(x, L, (bId.get(x.id) || {}).tipo, L.kind === 'pm'));
-      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach((m) => pasarDeOtra(m, { e: L.e, t: L.t, pmDe: x }, null, true)));
+      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado && !m.insumo).forEach((m) => pasarDeOtra(m, { e: L.e, t: L.t, pmDe: x }, null, true)));
     });
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
@@ -20058,12 +20059,24 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       const revisa = (x) => { const c = !catNuevo.has(x.id) && porCodigo.get(cod(x)); if (c && !vale(etqL, c.etiquetaId_etiquetaId))
         bloqueos.push(`El paso ${cod(x)} es de la etiqueta ${nomEtq.get(c.etiquetaId_etiquetaId) || 'sin etiqueta'} y su lista (${L.e.nombre}${L.t ? ' › ' + L.t.nombre : ''}) es de otra: en Producción no se vería. Usa un paso de la etiqueta de la lista.`); };
       L.w.filter((x) => !x.quitado && pide(x, L.b.find((y) => y.id === x.id))).forEach(revisa);
-      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado).forEach(revisa));   // procesos menores de un paso nuevo
+      if (L.kind === 'paso') L.w.filter((x) => !x.quitado && !bId.has(x.id)).forEach((x) => (x.pm || []).filter((m) => !m.quitado && !m.insumo).forEach(revisa));   // procesos menores de un paso nuevo
     });
     if (bloqueos.length) return { ops, bloqueos, avisos, manual, finales, nuevos: [], resumen: {} };
     const cfgPorPaso = new Map(); { const ids = new Set(); listas.forEach((L) => { if (L.kind !== 'paso') return; const bId = new Set(L.b.map((y) => y.id)); L.w.filter((x) => !x.quitado && !bId.has(x.id) && !catNuevo.has(x.id)).forEach((x) => { const p = catDe(x); if (p) ids.add(p.pasoId); }); }); for (const id of [...ids].slice(0, 60)) cfgPorPaso.set(id, await configDe(id)); }
     // predecesores de las listas modificadas
     const rowsMd = new Map(), leerRowsMd = async () => { if (rowsMd.size) return; (await leerTodoDe(modelo, 'MD_ES_PASO', [new F('mdId_mdId', 'EQ', dest.mdId)], { $select: 'mdEstructuraPasoId,orden,depende,dependeMdEstructuraPasoId,mdEstructuraPasoIdDepende,tipoDatoId_iMaestraId,activo' })).filter((p) => p.activo !== false).forEach((p) => rowsMd.set(p.mdEstructuraPasoId, p)); };
+    // v1.136.0: insumos agregados en un paso = «Agregar Insumo» del portal (onAsignInsumoToPaso): fila de MD_ES_PASO_INSUMO_PASO con el insumo de la receta
+    // del RMD (MD_ES_RE_INSUMO) y su cantidad; luego, como onSaveCantidadRm, la receta guarda en cantidadRm la suma de lo usado en los pasos
+    const hayIns = prop.trabajo.estructuras.some((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].some((l) => l.some((p) => (p.pm || []).some((m) => m.insumo))));
+    const reIns = hayIns ? (await leerTodoDe(modelo, 'MD_ES_RE_INSUMO', [new F('mdId_mdId', 'EQ', dest.mdId)], {}).catch(() => [])).filter((r) => r.activo !== false) : [];
+    const reInsPorId = new Map(reIns.map((r) => [r.estructuraRecetaInsumoId, r]));
+    const tipoIns = (() => { for (const f of idx.values()) if (f && f.insumo && f.tipo != null) return +f.tipo; return 438; })();   // IDTIPODATONUMERO del portal: el de los insumos del RMD
+    const insDeReceta = (m) => { const porId = m.insId && (mismo ? reInsPorId.get(m.insId) : null); if (porId) return porId;
+      const c = reIns.filter((r) => String(r.Component || '').replace(/^0+/, '') === String(m.comp || '').replace(/^0+/, ''));
+      if (c.length > 1) { const usados = new Map(); idx.forEach((f) => { if (f && f.insumo && reInsPorId.has(f.insId)) { const k = reInsPorId.get(f.insId).mdRecetaId_mdRecetaId; usados.set(k, (usados.get(k) || 0) + 1); } });
+        c.sort((a, b) => (usados.get(b.mdRecetaId_mdRecetaId) || 0) - (usados.get(a.mdRecetaId_mdRecetaId) || 0)); }
+      return c[0] || null; };
+    const cantFinal = new Map(), pmFuera = new Set(), insNuevos = [];                    // para recalcular cantidadRm de la receta
     // ---- Operaciones ----
     let n = 0; const op = (fase, o) => { ops.push({ fase, ...o }); };
     const fechaUsuario = { usuarioActualiza: usuario, fechaActualiza: ahora }, baja = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: false }, alta = { usuarioActualiza: usuario, fechaActualiza: ahora, activo: true };
@@ -20073,12 +20086,25 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       if (!claves.length) return;
       op(4, { lugar: lugarTxt, accion: 'Configuración', clase: esPm ? 'pm' : 'paso', desc: `configuración del ${esPm ? 'proceso menor' : 'paso'} ${x.dt.solo && !x.nuevo ? 'agregado' : 'nuevo'} ${codVer(x)} — ${String(x.texto || '').slice(0, 40)}: ${ppDtTexto(x.dt, claves.filter((k) => k !== 'color' || x.dt.color), datos.tipos)}`, ruta, datos: { ...w, ...fechaUsuario }, inv: null });
       verifDt.push({ x, esPm, claves, id: (/\('([^']+)'\)$/.exec(ruta) || [])[1] }); };                                           // [{ L, seq: [{ id, x, nuevo }] }]
+    const agregarInsumo = (m, L, ord, padre, mdE, mdT) => {
+      const r = insDeReceta(m), cant = ppNum(m.cant), nombre = `${m.comp || ''} — ${String(m.mat || m.texto || '').slice(0, 50)}`;
+      if (!r) { bloqueos.push(`El insumo ${nombre} no está en la receta del RMD ${dest.codigo} v${dest.version}: en un paso solo se agregan insumos de su receta (${lugar(L)}).`); return; }
+      if (cant == null || isNaN(cant)) { bloqueos.push(`El insumo ${nombre} agregado en ${lugar(L)} no tiene cantidad.`); return; }
+      if (m.um && r.CompUnit && String(m.um).trim().toUpperCase() !== String(r.CompUnit).trim().toUpperCase()) avisos.push(`El insumo ${nombre} viene en ${m.um} en el borrador y en la receta está en ${r.CompUnit}: se graba ${cant} ${r.CompUnit}.`);
+      const id = D(m.id); insNuevos.push({ rId: r.estructuraRecetaInsumoId, cant }); locNuevo.set(id, { estr: mdE, etq: mdT, padre });
+      op(3, { lugar: lugar(L), accion: 'Agregar', clase: 'pm', desc: `agregar el insumo ${r.Component || m.comp || ''} — ${String(r.Maktx || m.mat || '').slice(0, 50)} ${cant} ${r.CompUnit || m.um || ''} (posición ${ord}, como «Agregar Insumo»)`, ruta: `/MD_ESTRUCTURA('${mdE}')`,
+        datos: { mdEstructuraId: mdE, aPasoInsumoPaso: [{ terminal: null, fechaRegistro: ahora, usuarioRegistro: usuario, activo: true, mdEstructuraPasoInsumoPasoId: id, estructuraId_estructuraId: L.e.estructuraId, mdEstructuraId_mdEstructuraId: mdE, mdId_mdId: dest.mdId,
+          pasoId_mdEstructuraPasoId: padre, estructuraRecetaInsumoId_estructuraRecetaInsumoId: r.estructuraRecetaInsumoId, etiquetaId_etiquetaId: L.t ? L.t.etiquetaId : null, mdEsEtiquetaId_mdEsEtiquetaId: mdT, cantidadInsumo: cant, tipoDatoId_iMaestraId: tipoIns, decimales: 3, orden: ord,
+          Component: r.Component, Matnr: r.Matnr, Maktx: r.Maktx, CompUnit: r.CompUnit, tipoDatoIdAnterior_iMaestraId: tipoIns }] },
+        inv: { ruta: `/MD_ES_PASO_INSUMO_PASO('${id}')`, datos: { ...baja } }, marca: { id, tipo: 'agregado' } });
+    };
     for (const L of listas) {
       const esPm = L.kind === 'pm', tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO', campo = esPm ? 'pasoHijoId_pasoId' : 'pasoId_pasoId', clase = esPm ? 'pm' : 'paso', bId = new Map(L.b.map((y) => [y.id, y]));
       const quien = (x, b0) => `${esPm ? 'proceso menor' : 'paso'} ${cod(x) || (b0 && b0.codigo) || '(nuevo)'} — ${String(x.texto || (b0 && b0.texto) || '').slice(0, 60)}`;
       let estructural = false;
       L.w.filter((x) => x.quitado && bId.has(x.id)).forEach((x) => {
         estructural = true; const b0 = bId.get(x.id), fila = idx.get(D(x.id)); if (!fila) { bloqueos.push(`No se encontró en SAP ${quien(x, b0)} (${lugar(L)}).`); return; }
+        if (esPm) pmFuera.add(fila.id); else (fila.pm || []).forEach((m) => pmFuera.add(m.id));
         if (!esPm) { quitados.add(fila.id); (fila.pm || []).forEach((m) => op(1, { lugar: lugar(L), accion: 'Quitar', clase: 'pm', desc: `quitar proceso menor ${m.codigo || ''} — ${String(m.texto || '').slice(0, 50)} (del paso que se quita)`, ruta: `/MD_ES_PASO_INSUMO_PASO('${m.id}')`, datos: { ...baja }, inv: { ruta: `/MD_ES_PASO_INSUMO_PASO('${m.id}')`, datos: { ...alta } } })); }
         op(1, { lugar: lugar(L), accion: 'Quitar', clase, desc: `quitar ${quien(x, b0)}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...baja }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { ...alta } } });
       });
@@ -20100,9 +20126,14 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
           if (cambiaTipo === PP_SIN_TIPO) avisos.push(`El paso ${b0.codigo} queda «Sin tipo de dato» al quitarle todas sus firmas: revisa su «Depende».`);
         }
         const dv = {}, dvAntes = {}; [['vi', 'valorInicial'], ['vf', 'valorFinal'], ['margen', 'margen']].forEach(([k, c]) => { if (String(x[k] == null ? '' : x[k]) !== String(b0[k] == null ? '' : b0[k])) { dv[c] = ppNum(x[k]); dvAntes[c] = fila[k] == null ? null : fila[k]; } });
-        // la cantidad de un insumo no se edita en el RMD: queda como tarea en la Lista de Materiales (no se escribe)
-        if (esPm && b0.insumo && x.insumo && ppNum(x.cant) != null && ppNum(x.cant) !== ppNum(b0.cant))
-          manual.push(`Cambiar en la Lista de Materiales la cantidad del insumo ${b0.comp || ''} — ${String(b0.mat || b0.texto || '').slice(0, 50)}: ${fila.cant == null ? '(vacía)' : fila.cant} → ${ppNum(x.cant)} ${b0.um || ''} (${lugar(L)}). En el RMD no se puede editar.`);
+        // v1.136.0 (regla de Carlos): la cantidad de un insumo dentro de un paso del PROCEDIMIENTO sí se cambia en el RMD (cantidadInsumo de su fila);
+        // la de la receta (sección INSUMOS) sigue en la Lista de Materiales
+        if (esPm && b0.insumo && x.insumo && ppNum(x.cant) != null && ppNum(x.cant) !== ppNum(b0.cant)) {
+          cantFinal.set(fila.id, ppNum(x.cant));
+          const cantSap = (v) => (typeof fila.cant === 'number' ? v : v == null ? null : ppNum(v).toFixed(3));
+          op(2, { lugar: lugar(L), accion: 'Cantidad', clase: 'pm', desc: `cantidad del insumo ${b0.comp || ''} — ${String(b0.mat || b0.texto || '').slice(0, 50)}: ${fila.cant == null ? '(vacía)' : ppNum(fila.cant)} → ${ppNum(x.cant)} ${b0.um || ''}`,
+            ruta: `/MD_ES_PASO_INSUMO_PASO('${fila.id}')`, datos: { cantidadInsumo: cantSap(ppNum(x.cant)), ...fechaUsuario }, inv: { ruta: `/MD_ES_PASO_INSUMO_PASO('${fila.id}')`, datos: { cantidadInsumo: fila.cant == null ? null : cantSap(ppNum(fila.cant)), ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
+        }
         { const ks = dtc.map((c) => c.k).filter((k) => k !== 'dep');
           if (ks.length) { const w = ppDtEscritura(x.dt, ks, esPm), inv = ppDtEscritura(b0.dt, ks, esPm);
             op(2, { lugar: lugar(L), accion: 'Configuración', clase, desc: `configuración de ${quien(x, b0)}: ${ppDtTexto(x.dt, ks, datos.tipos)}`, ruta: `/${tabla}('${fila.id}')`, datos: { ...w, ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { ...inv, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
@@ -20117,6 +20148,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       if (estructural) vivos.forEach((x, i) => { if (!bId.has(x.id)) return; const fila = idx.get(D(x.id)); if (fila && +fila.orden !== i + 1) op(4, { lugar: lugar(L), accion: 'Orden', clase, desc: `${quien(x, bId.get(x.id))}: orden ${fila.orden} → ${i + 1}`, ruta: `/${tabla}('${fila.id}')`, datos: { orden: i + 1 }, paralelo: true, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { orden: fila.orden } }, marca: movidos ? { id: fila.id, tipo: 'movido' } : null }); });
       vivos.forEach((x, i) => {
         if (bId.has(x.id)) return;
+        if (x.insumo) { if (esPm) agregarInsumo(x, L, i + 1, D(L.padre.id), D(L.e.id), L.t ? D(L.t.id) : null); return; }
         const p = catDe(x), id = D(x.id), mdE = D(L.e.id), mdT = L.t ? D(L.t.id) : null, padreId = esPm ? D(L.padre.id) : null; finales.set(x.id, cod(x)); locNuevo.set(id, { estr: mdE, etq: mdT, padre: padreId }); revisar.push({ x, p, esPm, L, que: 'nuevo' });
         const ini = x.vi != null && x.vi !== '' ? ppNum(x.vi) : p.valorInicial, fin = x.vf != null && x.vf !== '' ? ppNum(x.vf) : p.valorFinal, mar = x.margen != null && x.margen !== '' ? ppNum(x.margen) : p.margen;
         const vDe = (v, cat) => (v != null && v !== '' ? ppNum(v) : cat);                 // rango del borrador (p. ej. de un paso copiado) o el del catálogo
@@ -20134,6 +20166,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
           dtNuevo(x, false, `/MD_ES_PASO('${id}')`, lugar(L));
           if (x.dt && x.dt.depFijo) depManual.set(id, { x, L, pred: x.dt.dep || '' });
           (x.pm || []).filter((m) => !m.quitado).forEach((m, j) => {
+            if (m.insumo) { agregarInsumo(m, L, j + 1, id, mdE, mdT); return; }
             const pm = catDe(m); if (!pm) { bloqueos.push(`El proceso menor «${String(m.texto).slice(0, 60)}» del paso nuevo no está en el catálogo de SAP.`); return; }
             finales.set(m.id, cod(m)); locNuevo.set(D(m.id), { estr: mdE, etq: mdT, padre: id }); revisar.push({ x: m, p: pm, esPm: true, L, que: 'nuevo' });
             op(3, { lugar: lugar(L), accion: 'Agregar', clase: 'pm', desc: `agregar proceso menor ${codVer(m)} — ${String(m.texto || '').slice(0, 50)} al paso nuevo`, ruta: `/MD_ESTRUCTURA('${mdE}')`, datos: { mdEstructuraId: mdE, aPasoInsumoPaso: [filaPm(m, pm, j + 1, id)] },
@@ -20274,6 +20307,14 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     an.cambios.filter((c) => c.accion === 'comentario' && c.comentario && c.clase !== 'especificacion').forEach((c) => manual.push(`Comentario de Producción en ${c.lugar}${c.texto ? ' › ' + String(c.texto).slice(0, 50) : ''}: ${c.comentario}`));
     const loc = new Map(); an.actual.estructuras.forEach((e) => { const reg = (l, t) => (l || []).forEach((p) => { loc.set(p.id, { estr: e.id, etq: t ? t.id : null }); (p.pm || []).forEach((m) => loc.set(m.id, { estr: e.id, etq: t ? t.id : null, padre: p.id })); }); reg(e.pasos, null); (e.etiquetas || []).forEach((t) => reg(t.pasos, t)); (e.equipos || []).concat(e.utensilios || []).forEach((q) => loc.set(q.id, { estr: e.id, equipo: true })); });
     ops.forEach((o) => { const id = o.marca ? o.marca.id : ((/\('([^']+)'\)$/.exec(o.ruta) || [])[1]), u = locNuevo.get(id) || loc.get(id); o.ver = u && o.accion !== 'Crear' ? { ...u, id } : null; o.verNuevo = locNuevo.has(id); });
+    // v1.136.0: cantidadRm de la receta = suma de cantidadInsumo de sus filas activas en los pasos (onSaveCantidadRm del portal)
+    { const tocados = new Set(insNuevos.map((y) => y.rId)); idx.forEach((f) => { if (f && f.insumo && f.insId && (cantFinal.has(f.id) || pmFuera.has(f.id))) tocados.add(f.insId); });
+      tocados.forEach((rId) => { const r = reInsPorId.get(rId); if (!r) return; let suma = 0;
+        idx.forEach((f) => { if (f && f.insumo && f.insId === rId && !pmFuera.has(f.id)) suma += cantFinal.has(f.id) ? cantFinal.get(f.id) : (ppNum(f.cant) || 0); });
+        insNuevos.filter((y) => y.rId === rId).forEach((y) => { suma += y.cant; }); suma = parseFloat(suma.toFixed(3));
+        const antes = r.cantidadRm == null ? null : parseFloat(r.cantidadRm); if (antes === suma) return;
+        op(6, { lugar: 'Receta', accion: 'Cantidad', clase: 'insumo', desc: `cantidad usada en los pasos del insumo ${r.Component || ''} — ${String(r.Maktx || '').slice(0, 50)}: ${antes == null ? '(vacía)' : antes} → ${suma} ${r.CompUnit || ''} (como «Agregar Insumo» del portal; la receta no cambia)`,
+          ruta: `/MD_ES_RE_INSUMO('${rId}')`, datos: { cantidadRm: suma, ...fechaUsuario }, inv: { ruta: `/MD_ES_RE_INSUMO('${rId}')`, datos: { cantidadRm: antes, ...fechaUsuario } } }); }); }
     ops.sort((a, b) => a.fase - b.fase); ops.forEach((o) => { o.n = ++n; });
     const cuenta = (f) => ops.filter(f).length;
     const resumen = { crear: cuenta((o) => o.accion === 'Crear'), agregarPasos: cuenta((o) => o.accion === 'Agregar' && o.clase === 'paso'), agregarPm: cuenta((o) => o.accion === 'Agregar' && o.clase === 'pm'), agregarEquipos: cuenta((o) => o.accion === 'Agregar' && (o.clase === 'equipo' || o.clase === 'utensilio') && !/copiar/.test(o.desc)),
@@ -20315,7 +20356,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         const quiere = w.filter((x) => !x.quitado), tiene = nl || [];
         if (quiere.map(cod).join('|') !== tiene.map((p) => String(p.codigo || '')).join('|')) dif.push(`${etiqueta}: esperaba ${quiere.length} pasos [${quiere.map(cod).slice(0, 8).join(', ')}…] y hay ${tiene.length} [${tiene.map((p) => p.codigo).slice(0, 8).join(', ')}…].`);
         quiere.forEach((x) => { const p = tiene.find((y) => y.id === D(x.id)); if (!p) return; const q = x.pm || []; if (!q.length && !(p.pm || []).length) return;
-          const a = q.filter((m) => !m.quitado).map(cod).join('|'), b = (p.pm || []).map((m) => String(m.codigo || m.comp || '')).join('|'); if (a !== b) dif.push(`${etiqueta} › paso ${cod(x)}: procesos menores distintos (esperaba ${q.filter((m) => !m.quitado).length}, hay ${(p.pm || []).length}).`); });
+          const a = q.filter((m) => !m.quitado).map(cod).join('|'), b = (p.pm || []).map((m) => String(m.codigo || m.comp || '')).join('|'); if (a !== b) dif.push(`${etiqueta} › paso ${cod(x)}: procesos menores distintos (esperaba ${q.filter((m) => !m.quitado).length}, hay ${(p.pm || []).length}).`);
+          q.filter((m) => !m.quitado && m.insumo && ppNum(m.cant) != null).forEach((m) => { const y = (p.pm || []).find((z) => z.id === D(m.id)); if (y && ppNum(y.cant) !== ppNum(m.cant)) dif.push(`${etiqueta} › paso ${cod(x)}: el insumo ${m.comp || ''} quedó con ${y.cant} y se pidió ${m.cant}.`); }); });
       };
       cmp(e.pasos || [], ne.pasos, e.nombre);
       (e.etiquetas || []).forEach((t) => { const nt = (ne.etiquetas || []).find((x) => x.id === D(t.id)); if (!nt) { dif.push(`Falta la etiqueta ${t.nombre}.`); return; } cmp(t.pasos || [], nt.pasos, `${e.nombre} › ${t.nombre}`); });
