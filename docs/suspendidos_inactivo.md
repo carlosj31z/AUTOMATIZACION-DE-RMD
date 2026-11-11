@@ -254,6 +254,11 @@ un cambio de status masivo.
   del equipo). La página status-rmd ya no cuenta estos códigos como suspendidos
   ni backlog (REGISTRO-DE-MANUFACTURA-DIGITAL PR #52).
 
+### Listado final 2026-11-09 (userscript v1.135.2)
+
+`docs/rmd_a_inactivo_2026-11-09.csv`: los **1 336** «Pasa a INACTIVO» de la decisión final (ATE 900, LIMA 436; hoja «3 Suspendidos vs
+INACTIVOS» del Excel de backlog de noviembre), todos con `md_id`. Desde la v1.135.2 el userscript usa este listado (antes los 1 313 de abajo).
+
 ### INACTIVO a la vista en el portal (userscript v1.127.0)
 
 Mientras TI no crea el status, el userscript muestra como **INACTIVO** (solo a la vista) los 1 313 `md_id` con

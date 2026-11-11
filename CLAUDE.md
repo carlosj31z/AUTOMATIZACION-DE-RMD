@@ -307,7 +307,10 @@ cuenta). Escribir y responder siempre en **español**.
   sin íconos en los botones de tipo de dato; la vista previa «Así se verá» usa los decimales elegidos (`previaRegistro(k, dec, vi, vf)`). Prueba `qa_local.py` LN60.
 - 2026-11-11, v1.135.1 (probada en el portal en solo lectura con 2202609013): la importación también muestra «Producción anota» en el paso existente
   configurado; la operación «Configuración» de un paso agregado dice «agregado» y con `x.dt.solo` no toca Clave Modelo/Puesto/Automático salvo tipo 447.
-  **La siguiente versión debe ser > 1.135.1.**
+- 2026-11-11, v1.135.2 (encima de la 1.135.1): **INACTIVO a la vista con los 1 336 de la decisión final** (ATE 900 / LIMA 436, hoja «3 Suspendidos vs
+  INACTIVOS» del Excel de backlog de noviembre). Antes eran 1 313 (CSV del 07/11). Nuevo listado `docs/rmd_a_inactivo_2026-11-09.csv`; los 10 sin
+  `md_id` salieron de la lectura del portal del 09/11 (`mes_de_pendientes_v2.csv`); MEJORAL MIGRAÑA 2202505691 v2 tiene dos MD en el portal: va el Suspendido.
+  **La siguiente versión debe ser > 1.135.2.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
