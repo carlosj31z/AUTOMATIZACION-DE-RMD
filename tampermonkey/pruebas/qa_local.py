@@ -1020,6 +1020,23 @@ with sync_playwright() as p:
               and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
               and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
         return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN59 Importar borrador · por partes (v1.134.0): con más de 4 cambios la revisión del portal muestra los filtros (Todos, Pasos nuevos, Con avisos, Comentarios…) que dejan ver solo esas filas, y en el paso nuevo lo que Producción indicó que se anota («Producción anota: … → tipo · rango»)")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        r = pg.evaluate("""async (d) => { try { const P = window.__rmdStats.plantilla, N = P.nucleo, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA'), W = JSON.parse(JSON.stringify(d.arbol)), T = W.estructuras[2].etiquetas;
+          Object.assign(T[0].pasos[2], { texto: 'TEMPERATURA DEL GRANEL AL FINALIZAR (C):', codigo: null, pasoId: null, nuevo: true, etqCat: null, registro: 'rango', tipo: 443, vi: '20', vf: '25', decN: '1' });
+          T[0].pasos[0].quitado = true; T[0].pasos[1].quitado = true; T[1].comentario = 'Revisar con el jefe.'; T[1].pasos.push({ id: 'n:50', texto: 'PESO DEL GRANEL (KG):', codigo: null, nuevo: true, registro: 'numero', tipo: 438, decN: '2', pm: [] });
+          const an = (dt, pr) => { const c = N.cambios(dt.arbol, pr.trabajo); return { destino: { mdId: 'MD1', codigo: '2202600001', version: 3, estado: 'Ingresado' }, base: { estado: 'Ingresado' }, lin: { versiones: [] }, cambios: c, avisos: N.avisos(pr.trabajo, {}), enSap: [], conflictos: [], nuevos: c.filter((x) => x.nuevo).map((x) => ({ c: x, texto: x.despues })) }; };
+          const prop = { solicitud: { nombre: 'Ana' }, guardado: new Date().toISOString(), trabajo: W }, v = P.revisar(paq, prop, an(paq, prop), async (dt, pr) => an(dt, pr));
+          await new Promise((ok) => setTimeout(ok, 200));
+          const visibles = () => [...v.cuerpo.querySelectorAll('.rmd-pp-tc tbody tr')].filter((tr) => getComputedStyle(tr).display !== 'none').length;
+          const bots = [...v.cuerpo.querySelectorAll('.rmd-pp-filtros [data-pf]')].map((b) => b.dataset.pf + ':' + b.textContent.trim() + (b.disabled ? ':off' : ''));
+          const todos = visibles(); v.cuerpo.querySelector('[data-pf="nuevo"]').click(); const nuevos = visibles(); v.cuerpo.querySelector('[data-pf="com"]').click(); const coms = visibles(); v.cuerpo.querySelector('[data-pf=""]').click(); const otraVez = visibles();
+          const anota = [...v.cuerpo.querySelectorAll('.rmd-pp-anota')].map((x) => x.textContent); v.cerrar();
+          return { bots, todos, nuevos, coms, otraVez, anota }; } catch (e) { return { error: String(e) }; } }""", d0)
+        ok = (not r.get("error") and len(r["bots"]) == 7 and r["todos"] >= 5 and r["nuevos"] == 2 and r["coms"] == 1 and r["otraVez"] == r["todos"]
+              and any("Rango" in a and "20 a 25" in a for a in r["anota"]) and any("2 dec." in a for a in r["anota"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
     @prueba("LN50 Borrador de Producción · insumos (v1.102): «＋ Insumo» en un paso de fabricación lista los insumos de la receta, propone lo que falta repartir y queda como «Agregar (insumo)»; «✎ Cantidad» ajusta un insumo ya puesto (cambio «Cantidad», con el aviso de que se cambia en la Lista de Materiales, v1.104.1), una cantidad inválida es error y pasarse de la receta avisa; en el portal el insumo nuevo sale «a mano» y el plan lo saca de lo que escribe")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
