@@ -97,9 +97,12 @@ cuenta). Escribir y responder siempre en **español**.
     `1.-CC-NC-DES`, cargado en Reglas de revisión) o «Escribir otro».
   - El cuadro de Observaciones no debe pasar el alto de las otras columnas ni
     dejar espacios de sobra.
-- **Insumos**: la cantidad de insumos **no se edita en el RMD** (se hace en la
-  Lista de Materiales). La plantilla/borrador la permite con el aviso «se debe
-  realizar en la Lista de Materiales» y no escribe en SAP.
+- **Insumos**: la cantidad de la **receta** (sección INSUMOS) **no se edita en el
+  RMD** (se hace en la Lista de Materiales): la plantilla/borrador la permite con
+  el aviso «se debe realizar en la Lista de Materiales» y no escribe en SAP.
+  **Regla de Carlos (2026-11-11): la cantidad de un insumo dentro de un paso del
+  PROCEDIMIENTO sí se cambia en el RMD** (`cantidadInsumo`), y los insumos
+  agregados a un paso se graban como «Agregar Insumo» del portal (v1.136.0).
 - **Cambio de material**: Carlos no quiere versión nueva; el selector arranca
   en «Misma versión».
 - **Contingencia** (SharePoint `.../04.-RMD/3.-CONTINGENCIA`): un PDF por RMD
@@ -316,7 +319,13 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-11, v1.135.4: «Enviar a Status RMD» manda en la columna linaje el master como lo arma «Última versión de cada master»
   (`M:<código>`, `ultimasVersiones`; SELECT_MD con `mdIdVersionAnt` y `sucursalId_iMaestraId`), para que el Resumen del Excel de status-rmd
   cuadre exacto con ese exportado (status-rmd PR #63).
-  **La siguiente versión debe ser > 1.135.4.**
+- 2026-11-11, v1.136.0 (encima de la 1.135.4): **pedido de Carlos (ACNOMEL CRM 2202609431): el ingreso del borrador graba los insumos de los pasos.**
+  El cambio de cantidad de un insumo en un paso escribe `cantidadInsumo` de su fila (antes quedaba a mano con el aviso de Lista de Materiales);
+  el insumo agregado (en un paso existente o nuevo) se graba como `onAsignInsumoToPaso` del portal: MERGE a `MD_ESTRUCTURA('<id>')` con
+  `aPasoInsumoPaso` (insumo de la receta del RMD destino de `MD_ES_RE_INSUMO` por id o componente, `Component/Matnr/Maktx/CompUnit`, tipo de dato
+  de los insumos del RMD o 438, 3 decimales) y luego, como `onSaveCantidadRm`, `MD_ES_RE_INSUMO.cantidadRm` = suma de lo usado en los pasos.
+  Un insumo que no está en la receta bloquea. `ppSinInsumosNuevos` ya no se usa en el ingreso. Prueba `qa_local.py` LN61.
+  **La siguiente versión debe ser > 1.136.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
@@ -354,10 +363,8 @@ cuenta). Escribir y responder siempre en **español**.
     ~72 de LIMA).
   - Futuro: marcar los masivos en SAP (acuerdo con Vanesa y Ximena) y quitar la
     marca al autorizar.
-  - **Insumo NUEVO en SAP**: en el Borrador de Producción el insumo nuevo
-    queda «a mano» hasta capturar qué guarda «Agregar Insumo» del portal (probar
-    en 2202609013). En SAP un insumo de paso es `MD_ES_PASO_INSUMO_PASO` con
-    `estructuraRecetaInsumoId` + `Component/Maktx/CompUnit/cantidadInsumo`.
+  - Insumo agregado desde el borrador (v1.136.0): falta la primera prueba real con
+    escritura (ACNOMEL CRM 2202609431, alcohol en 4.4.23/24/31/32).
   - Probar la tabla INSUMOS con un RMD de Fabricación.
   - Probar «Actualizar» real de Cambio de material en un Autorizado (DMS).
   - Contingencia «Por código» sin prueba real.

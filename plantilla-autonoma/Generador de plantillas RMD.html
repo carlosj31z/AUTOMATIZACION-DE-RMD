@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="Plantilla RMD desde PDF 1.0.0 (editor 1.135.1)">
+<meta name="generator" content="Plantilla RMD desde PDF 1.0.0 (editor 1.136.0)">
 <title>Plantilla para Producción</title>
 <style>
 :root { --tx: #1f2328; --ap: #59636e; --bd: #d0d7de; --fondo: #f3f4f6; --carta: #fff; --ac: #0b5cad; --ac-f: #e8f1fb; --ok: #1a7f37; --ok-f: #e6f4ea; --av: #9a6700; --av-f: #fff4d6; --er: #b42318; --er-f: #fdecea; color-scheme: light; }
@@ -94,7 +94,7 @@ details ul { margin: 6px 0 0; padding-left: 20px; font-size: 12.5px; }
     </div>
     <iframe id="vista" title="Vista de la plantilla"></iframe>
   </section>
-  <p class="pie">Generador de plantillas · versión 1.0.0 · editor de la plantilla 1.135.1 · catálogo de equipos y utensilios: Plantilla RMD 2202608733 v6 (catalogo de SAP leido el 2026-10-29)</p>
+  <p class="pie">Generador de plantillas · versión 1.0.0 · editor de la plantilla 1.136.0 · catálogo de equipos y utensilios: Plantilla RMD 2202608733 v6 (catalogo de SAP leido el 2026-10-29)</p>
 </main>
 
 <script id="base-datos" type="application/octet-stream">H4sICMyx62oC/2NhdGFsb2dvLWJhc2UuanNvbgC0useS69iWJfgrbjGqNKQXtPIegQRBgJCEJtJyAElCa8WyHvQntPWn1Kym78f60O8NdSMin0dWpV+75iQI
@@ -7676,7 +7676,7 @@ function ppNucleo() {
       [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => vivos(l).forEach((p) => vivos(p.pm).forEach((m) => { if (!m.insumo) return; insumosPm.push(m); asignado.set(m.comp, (asignado.get(m.comp) || 0) + (num(m.cant) || 0)); }))); });
     insumosPm.forEach((m) => {
       const c = num(m.cant); if (c == null || Number.isNaN(c) || c <= 0) { add(m.id, 'error', 'La cantidad del insumo debe ser un número mayor que cero.'); return; }
-      if (cantBase.has(m.id) && fmtCant(cantBase.get(m.id)) !== fmtCant(m.cant)) add(m.id, 'aviso', AVISO_CANT_LM, 'cant');
+      // v1.136.0: la cantidad dentro de un paso del procedimiento sí se cambia en el RMD (sin aviso de la Lista de Materiales)
       const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`, 'cant');
     });
     const revisarLista = (l, estr, etq) => {
@@ -8050,7 +8050,7 @@ function ppEditorApp(PPN) {
     return `<table class="pp-pagina"><thead><tr><td>${htmlEncabezadoPdf()}</td></tr></thead><tbody><tr><td class="pp-hoja">${cuerpo}</td></tr></tbody></table>`;
   }
   // botón ✎ siempre visible junto a una cantidad de insumo
-  const btCant = (a, id) => `<button type="button" class="pp-cant-ed" data-a="${a}" data-id="${esc(id)}" title="Cambiar la cantidad. El cambio se realiza en la Lista de Materiales (en el RMD no se edita)">✎</button>`;
+  const btCant = (a, id) => `<button type="button" class="pp-cant-ed" data-a="${a}" data-id="${esc(id)}" title="${a === 'editar-ins' ? 'Cambiar la cantidad de este insumo en el paso' : 'Cambiar la cantidad. El cambio se realiza en la Lista de Materiales (en el RMD no se edita)'}">✎</button>`;
   // un insumo de la receta va dentro del paso como un proceso menor más: se puede poner debajo de cualquier fila del paso
   const btInsDebajo = () => (insumosReceta().length ? bt('agregar-ins', '＋ Insumo debajo', 'Agregar debajo de esta fila un insumo de la receta (va como un proceso menor del paso), con su cantidad', 'w') : '');
   const bt = (a, tx, tit, cl) => `<button type="button" data-a="${a}"${cl ? ` class="${cl}"` : ''} title="${tit}">${tx}</button>`;
@@ -8166,7 +8166,7 @@ function ppEditorApp(PPN) {
       return `<tr class="${cam ? 'cam' : ''}" data-id="${esc(k)}"><td>${esc(x.desc)}${x.txtadic ? ' ' + esc(x.txtadic) : ''}${cam ? '<span class="pp-tags"><span class="pp-tag cam">Cantidad</span></span>' : ''}${htmlAvisos(k)}${htmlComentario(x)}</td><td class="c">${esc(x.comp)}</td><td class="d">${cant}${btCant('cant-receta', k)}</td><td class="c">${esc(x.um)}</td><td></td><td></td><td></td><td></td></tr>`; }).join('');
     const ver = e.verificadoPor ? '<tr class="pp-ver"><td colspan="4">VERIFICADO POR:</td><td colspan="4">FECHA:</td></tr>' : '';
     return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid pp-ins">${cols([172, 55, 68, 28, 68, 34, 30, 22])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Cantidad</th><th>UM</th><th>Cant. Recib.</th><th>UM (CP)</th><th>Bulto</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
-      <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para cambiar una cantidad, pulsa <b>✎</b> junto a ella (aquí o en el insumo dentro de un paso): queda en el pedido, pero <b>ese cambio se realiza en la Lista de Materiales</b>, porque en el RMD no se edita. Para poner un insumo en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
+      <p class="pp-nota pp-pantalla">Los insumos vienen de la receta en SAP: para cambiar esta lista se actualiza la receta. Para cambiar la cantidad de la receta pulsa <b>✎</b> junto a ella: queda en el pedido, pero <b>ese cambio se realiza en la Lista de Materiales</b>. La cantidad de un insumo dentro de un paso sí se cambia en el RMD (✎ junto al insumo en el paso). Para poner un insumo en un paso de la fabricación usa <b>＋ Insumo</b> en ese paso. Puedes dejar un comentario en la sección (💬 junto al título).</p>`;
   }
   function htmlEspec(e) {
     const grupos = []; (e.espec || []).forEach((x) => { const k = x.grupoId == null ? x.grupo || '' : x.grupoId; let g = grupos.find((y) => y.k === k); if (!g) grupos.push((g = { k, nombre: x.grupo || '', filas: [] })); g.filas.push(x); });
@@ -8716,7 +8716,7 @@ function ppEditorApp(PPN) {
     modal(`<h3>${x ? 'Insumo' : 'Agregar insumo'}<span>${esc(e.nombre)}${t ? ' › ' + esc(t.nombre) : ''} › ${esc(String(padre.texto || '').slice(0, 60))}</span></h3>
       ${x ? '' : `<p class="pp-nota">El insumo va dentro del paso como un proceso menor más: elige debajo de qué fila va.</p><label class="pp-campo">Posición dentro del paso<select id="m-pos">${posiciones()}</select></label><label class="pp-campo">Buscar en los insumos de la receta<input id="m-q" placeholder="código o descripción (p. ej. CAFEINA, 1100002760)"></label>`}<div id="m-res" class="pp-sug"></div>
       <label class="pp-campo pp-com-campo">Comentario para el equipo RMD (opcional)<textarea id="m-com" rows="2">${esc((x && x.comentario) || '')}</textarea></label>
-      <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>${x && BI.has(x.id) ? `<div class="pp-aviso-lm">⚠ ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}
+      <div class="pp-fijo"><div class="pp-ins-ed"><label class="pp-campo">Cantidad en este paso<input id="m-cant" inputmode="decimal" value="${esc(x ? x.cant == null ? '' : x.cant : '')}"></label><span id="m-um" class="pp-ins-um"></span><span id="m-ins-av" class="pp-rango-av"></span></div>
       <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div></div>`, (m, cerrar) => {
       const q = $('#m-q', m), res = $('#m-res', m), cant = $('#m-cant', m), av = $('#m-ins-av', m);
       const pintar = () => {
@@ -9179,7 +9179,7 @@ const PP_EDITOR_CSS = "\n.pp-reg{margin:8px 0;padding:8px 10px;border:1px solid 
 <script>
 (function () {
   'use strict';
-  const VERSION_GEN = '1.0.0', VERSION_EDITOR = '1.135.1';
+  const VERSION_GEN = '1.0.0', VERSION_EDITOR = '1.136.0';
   const $ = (s) => document.querySelector(s);
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const PPN = ppNucleo();

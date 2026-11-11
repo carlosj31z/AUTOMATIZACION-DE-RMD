@@ -1020,6 +1020,45 @@ with sync_playwright() as p:
               and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
               and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
         return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN61 Ingreso del borrador · insumos en los pasos (v1.136.0, regla de Carlos): el cambio de cantidad de un insumo dentro de un paso se graba (cantidadInsumo de su fila); el insumo agregado (en un paso existente o en uno nuevo) se graba como «Agregar Insumo» del portal (aPasoInsumoPaso con el insumo de la receta del RMD, tipo de dato de los insumos, 3 decimales) y la receta recalcula cantidadRm; un insumo que no está en la receta bloquea")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        r = pg.evaluate("""async (d) => { const antes = window.sap; try {
+          function F(a, b, c) { if (a && typeof a === 'object') { this.filters = a.filters; this.and = a.and; } else { this.path = a; this.op = b; this.value = c; } }
+          const val = (fs, path) => { let v = null; (fs || []).forEach((f) => { if (f.path === path) v = f.value; (f.filters || []).forEach((g) => { if (g.path === path) v = v == null ? [g.value] : [].concat(v, g.value); }); }); return v; };
+          const RE = [{ estructuraRecetaInsumoId: 'RI1', mdId_mdId: 'MD1', mdRecetaId_mdRecetaId: 71, Component: '1000000846', Matnr: '1000000846', Maktx: 'BROMURO DE ROCURONIO APIROGENO', CompQty: '0.300', CompUnit: 'KGP', cantidadRm: null, activo: true },
+            { estructuraRecetaInsumoId: 'RI2', mdId_mdId: 'MD1', mdRecetaId_mdRecetaId: 71, Component: '2500000010', Matnr: '2500000010', Maktx: 'AGUA PARA INYECCION CSP', CompQty: '30', CompUnit: 'L', cantidadRm: '10.000', activo: true }];
+          const PASOS = [{ pasoId: 'X2011', codigo: 2011, descripcion: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', estructuraId_estructuraId: 'S-PROC', etiquetaId_etiquetaId: 'G-FAB', tipoDatoId_iMaestraId: 446, activo: true, estadoId_iMaestraId: 2 }];
+          const leidas = [];
+          const modelo = { read: (ruta, o) => { const e = ruta.replace(/^\\//, ''); leidas.push(e); let res = [];
+            if (e === 'MD_ES_RE_INSUMO') res = RE; else if (e === 'ETIQUETA') res = [{ etiquetaId: 'G-DOC', descripcion: 'DOCUMENTACION' }, { etiquetaId: 'G-FAB', descripcion: 'FABRICACION' }];
+            else if (e === 'PASO') { const c = val(o.filters, 'codigo'); res = PASOS.filter((p) => c != null && [].concat(c).map(String).includes(String(p.codigo))); }
+            setTimeout(() => o.success({ results: res }), 2); } };
+          window.sap = { ui: { require: (n) => (n === 'sap/ui/model/Filter' ? F : n === 'sap/ui/model/FilterOperator' ? { EQ: 'EQ' } : null), getCore: () => ({ byId: () => null }) } };
+          const P = window.__rmdStats.plantilla, N = P.nucleo, arbol = d.arbol;
+          arbol.estructuras[2].etiquetas[1].pasos[1].pm = [{ id: 'MI1', pasoId: null, codigo: null, texto: 'AGUA PARA INYECCION CSP', orden: 1, tipo: 438, insumo: true, comp: '2500000010', mat: 'AGUA PARA INYECCION CSP', cant: '10', um: 'L', insId: 'RI2' }];
+          const paq = P.paquete(d.md, arbol, d.cat, 'PRUEBA'), datos = { ...paq, rmd: { ...paq.rmd, mdId: 'MD1' }, tipos: { 438: 'Número' } };
+          const plan = async (W) => { const an = { destino: { mdId: 'MD1', codigo: '2202600001', version: 3, estadoIdRmd_iMaestraId: 467, nivelTxt: 'FABRICACION' }, enSap: [], avisos: new Map(), cambios: N.cambios(datos.arbol, W), actual: JSON.parse(JSON.stringify(datos.arbol)), mapa: null };
+            return P.plan(datos, { trabajo: W, guardado: 'x' }, an, modelo, 'PRUEBA'); };
+          const W = JSON.parse(JSON.stringify(datos.arbol)), L = W.estructuras[2].etiquetas[1].pasos;
+          L[1].pm[0].cant = '12.5';
+          L[1].pm.push({ id: 'n:1', insumo: true, comp: '2500000010', mat: 'AGUA PARA INYECCION CSP', texto: 'AGUA PARA INYECCION CSP', cant: 20, um: 'L', insId: 'RI2', codigo: null, pasoId: null, nuevo: false, tipo: null });
+          L.push({ id: 'n:2', texto: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', codigo: '2011', pasoId: 'X2011', nuevo: false, tipo: 446, etqCat: 'G-FAB', pm: [{ id: 'n:3', insumo: true, comp: '1000000846', mat: 'BROMURO DE ROCURONIO APIROGENO', texto: 'BROMURO DE ROCURONIO APIROGENO', cant: '0.1', um: 'KGP', insId: 'RI1', codigo: null, pasoId: null }] });
+          const r1 = await plan(W);
+          const ops = r1.ops.map((o) => ({ accion: o.accion, clase: o.clase, ruta: o.ruta, fase: o.fase, d: o.datos.aPasoInsumoPaso ? (({ cantidadInsumo, Component, Matnr, CompUnit, tipoDatoId_iMaestraId, decimales, orden, estructuraRecetaInsumoId_estructuraRecetaInsumoId: ins, pasoId_mdEstructuraPasoId: padre, mdId_mdId }) => ({ cantidadInsumo, Component, Matnr, CompUnit, tipoDatoId_iMaestraId, decimales, orden, ins, padreNuevo: String(padre) !== 'P21', mdId_mdId }))(o.datos.aPasoInsumoPaso[0]) : o.datos.cantidadInsumo !== undefined ? { cantidadInsumo: o.datos.cantidadInsumo } : o.datos.cantidadRm !== undefined ? { cantidadRm: o.datos.cantidadRm, inv: o.inv.datos.cantidadRm } : null }));
+          const W2 = JSON.parse(JSON.stringify(datos.arbol)); W2.estructuras[2].etiquetas[1].pasos[1].pm.push({ id: 'n:9', insumo: true, comp: '7777777', mat: 'OTRO', texto: 'OTRO', cant: 1, um: 'KG', insId: null, codigo: null, pasoId: null });
+          const r2 = await plan(W2);
+          return { bloqueos: r1.bloqueos, manual: r1.manual, avisos: r1.avisos, ops, crear: r1.ops.filter((o) => o.accion === 'Crear').length, bloq2: r2.bloqueos, leidas: [...new Set(leidas)] };
+        } catch (e) { return { error: String(e && e.stack || e).slice(0, 600) }; } finally { window.sap = antes; } }""", d0)
+        if r.get("error"): return False, r["error"]
+        ops = r["ops"]; ins = [o for o in ops if o["d"] and "Component" in o["d"]]; cant = [o for o in ops if o["d"] and list(o["d"].keys()) == ["cantidadInsumo"]]; rm = {o["ruta"]: o["d"] for o in ops if o["d"] and "cantidadRm" in o["d"]}
+        ok = (not r["bloqueos"] and not r["manual"] and r["crear"] == 0
+              and cant == [{"accion": "Cantidad", "clase": "pm", "ruta": "/MD_ES_PASO_INSUMO_PASO('MI1')", "fase": 2, "d": {"cantidadInsumo": "12.500"}}]
+              and len(ins) == 2 and next(o for o in ins if o["d"]["ins"] == "RI2")["d"] == {"cantidadInsumo": 20, "Component": "2500000010", "Matnr": "2500000010", "CompUnit": "L", "tipoDatoId_iMaestraId": 438, "decimales": 3, "orden": 2, "ins": "RI2", "padreNuevo": False, "mdId_mdId": "MD1"}
+              and [(o["d"]["cantidadInsumo"], o["d"]["padreNuevo"], o["d"]["orden"]) for o in ins if o["d"]["ins"] == "RI1"] == [(0.1, True, 1)]
+              and rm == {"/MD_ES_RE_INSUMO('RI2')": {"cantidadRm": 32.5, "inv": 10}, "/MD_ES_RE_INSUMO('RI1')": {"cantidadRm": 0.1, "inv": None}}
+              and any("7777777" in b and "receta" in b for b in r["bloq2"]))
+        return ok, json.dumps(r, ensure_ascii=False)[:2500]
     @prueba("LN60 Plantilla para Producción · v1.135.0: un paso que ya existe en SAP y se agrega aquí también se configura (Check de conformidad → «Configuración» tipo 432 sin tocar lo demás); la vista previa usa los decimales elegidos; los botones no llevan íconos")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
@@ -1060,7 +1099,7 @@ with sync_playwright() as p:
         ok = (not r.get("error") and len(r["bots"]) == 7 and r["todos"] >= 5 and r["nuevos"] == 2 and r["coms"] == 1 and r["otraVez"] == r["todos"]
               and any("Rango" in a and "20 a 25" in a for a in r["anota"]) and any("2 dec." in a for a in r["anota"]))
         return ok, json.dumps(r, ensure_ascii=False)[:1500]
-    @prueba("LN50 Borrador de Producción · insumos (v1.102): «＋ Insumo» en un paso de fabricación lista los insumos de la receta, propone lo que falta repartir y queda como «Agregar (insumo)»; «✎ Cantidad» ajusta un insumo ya puesto (cambio «Cantidad», con el aviso de que se cambia en la Lista de Materiales, v1.104.1), una cantidad inválida es error y pasarse de la receta avisa; en el portal el insumo nuevo sale «a mano» y el plan lo saca de lo que escribe")
+    @prueba("LN50 Borrador de Producción · insumos (v1.102): «＋ Insumo» en un paso de fabricación lista los insumos de la receta, propone lo que falta repartir y queda como «Agregar (insumo)»; «✎ Cantidad» ajusta un insumo ya puesto (cambio «Cantidad»; desde la v1.136.0 sin el aviso de la Lista de Materiales: en un paso se graba), una cantidad inválida es error y pasarse de la receta avisa; ppSinInsumosNuevos (ya sin uso en el ingreso, ver LN61) sigue sacando el insumo nuevo")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
         d0["arbol"]["estructuras"][2]["etiquetas"][1]["pasos"][1]["pm"] = [{"id": "MI1", "pasoId": None, "codigo": None, "texto": "AGUA PARA INYECCION CSP", "orden": 1, "tipo": 433, "insumo": True, "comp": "2500000010", "mat": "AGUA PARA INYECCION CSP", "cant": "10", "um": "L", "insId": "RI2"}]
@@ -1082,7 +1121,7 @@ with sync_playwright() as p:
         r = pg.evaluate("""(W) => { const P = window.__rmdStats.plantilla, man = [], t = P.sinInsumosNuevos(W, man), p = t.estructuras[2].etiquetas[1].pasos; return { pm: p.map((x) => (x.pm || []).map((m) => m.id)), man }; }""", st["W"])
         ok = (not errs and botones == {"paso": True, "cuadro": False, "ins": ["editar-ins", "agregar", "agregar-ins", "subir", "bajar", "quitar", "comentar"]} and todos == ["1000000846", "2500000010", "9999999"] and filtro == ["2500000010"]
               and propuesta == "20" and "suman 35" in pasa and sigue
-              and st["cmb"] == [["agregar", "AGUA PARA INYECCION CSP (2500000010) 20 L"], ["cantidad", "10 L>12.5 L"]] and "Cantidad" in st["tags"] and lm and st["lmAv"]
+              and st["cmb"] == [["agregar", "AGUA PARA INYECCION CSP (2500000010) 20 L"], ["cantidad", "10 L>12.5 L"]] and "Cantidad" in st["tags"] and not lm and not st["lmAv"]   # v1.136.0: la cantidad en un paso sí se cambia en el RMD (sin aviso de Lista de Materiales)
               and r["pm"] == [[], ["MI1"]] and len(r["man"]) == 1 and "2500000010" in r["man"][0])
         return ok, json.dumps({"botones": botones, "todos": todos, "filtro": filtro, "propuesta": propuesta, "pasa": pasa, "sigue": sigue, "lm": lm, "st": {k: v for k, v in st.items() if k != "W"}, "plan": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
     @prueba("LN52 Borrador de Producción · cantidad de insumos visible (v1.104.2): junto a cada cantidad (tabla de Insumos y el insumo dentro de un paso) hay un ✎ siempre visible; en la tabla de Insumos cambia la cantidad de la receta con el aviso de la Lista de Materiales (cambio «Cantidad (insumo)», fila marcada, antes tachado), «Dejar la de SAP» lo deshace y el rehacer sobre SAP conserva la cantidad")
