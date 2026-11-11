@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.135.0
+// @version      1.135.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.135.0';                                                       // mantener igual a @version
+  const VERSION = '1.135.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -19758,7 +19758,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       return r ? `<span class="rmd-pp-anota" title="Lo indicó Producción en la plantilla">Producción anota: ${esc(r[1])} → ${esc((datos.tipos || {})[r[2]] || r[2])}${x && x.decN != null && x.decN !== '' ? ` · ${esc(x.decN)} dec.` : ''}${x && r[0] === 'rango' ? ` · ${esc(x.vi == null ? '—' : x.vi)} a ${esc(x.vf == null ? '—' : x.vf)}${x.margen != null && x.margen !== '' ? ' ± ' + esc(x.margen) : ''}` : ''}</span>` : c.registro ? `<span class="rmd-pp-anota">Producción anota: ${esc(PP_REGISTRO[c.registro] || c.registro)}</span>` : ''; };
     const filas = an.cambios.map((c) => { const n = nuevoDe.get(c), conf = an.enSap.some((x) => x.id === c.id && an.conflictos.includes(x));
       return `<tr class="rmd-pp-${c.accion} ${marcasF(c).join(' ')}"><td class="rmd-nowrap">${esc(c.numero || '')}</td><td>${esc(ppQue(c))}<br><span class="rmd-nota">${esc(c.lugar || '')}</span></td><td>${esc(c.antes || '')}${c.codigoAntes ? ` <span class="rmd-nota">(${esc(c.codigoAntes)})</span>` : ''}</td>
-        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>${anota(c)}` : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av aviso">⚠ Se agrega a mano en el portal: «Agregar Insumo» del paso, con esta cantidad.</div>' : ''}${c.accion === 'cantidad' ? ` <div class="rmd-pp-av aviso">⚠ No se escribe en SAP. ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av aviso">insumo: se agrega a mano</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
+        <td data-celda="${esc(c.id)}">${esc(ppDespues(c))}${c.codigo && c.accion !== 'mover' ? ` <span class="rmd-nota">(${esc(c.codigo)})</span>` : ''}${c.nuevo ? ` <span class="rmd-pp-crea">★ crear${n && n.existe && n.existe.length ? ` · ya existe: ${esc(n.existe.join(', '))}` : ''}</span>${anota(c)}` : c.registro && c.accion === 'agregar' ? anota(c) : ''}${c.insumo && c.accion === 'agregar' ? ' <div class="rmd-pp-av aviso">⚠ Se agrega a mano en el portal: «Agregar Insumo» del paso, con esta cantidad.</div>' : ''}${c.accion === 'cantidad' ? ` <div class="rmd-pp-av aviso">⚠ No se escribe en SAP. ${esc(PPN.AVISO_CANT_LM)}</div>` : ''}${editable(c) ? ` <button type="button" class="rmd-pp-editar" data-ed="${esc(c.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>` : ''}${corregido(c.id)}${c.pm && c.pm.length ? `<div class="rmd-nota">Procesos menores: ${c.pm.map((m) => `<span data-celda="${esc(m.id)}">${esc(m.texto)}${m.codigo ? ` (${esc(m.codigo)})` : ''}${m.nuevo ? ' ★' : ''}${m.insumo ? ' <span class="rmd-pp-av aviso">insumo: se agrega a mano</span>' : ` <button type="button" class="rmd-pp-editar" data-ed="${esc(m.id)}" title="Corregir el texto o usar un paso que ya existe en SAP">Editar</button>`}${corregido(m.id)}</span>`).join(' · ')}</div>` : ''}${avisoDe(c.id)}${conf ? '<div class="rmd-pp-av aviso">⚠ Cambió en SAP desde la plantilla</div>' : ''}</td>
         <td>${esc(c.comentario || '')}</td></tr>`; }).join('');
     const creada = extra.versionCreada ? `<div class="rmd-ing-nota"><b>Versión creada: RMD ${esc(extra.versionCreada.codigo)} v${esc(extra.versionCreada.version)} (${esc(extra.versionCreada.estado || 'Ingresado')})</b>. El borrador se revisó sobre esa versión.</div>` : '';
     const rehecho = extra.rehecho ? `<div class="rmd-ing-nota ${extra.rehecho.conflictos.length ? 'ambar' : ''}"><b>Rehecho sobre el RMD actual (${esc(extra.rehecho.de)} → ${esc(r.codigo)} v${esc(r.version)})</b>: se volvieron a aplicar ${extra.rehecho.aplicados} cambio(s) de Producción sobre lo que hay hoy en SAP.${extra.rehecho.conflictos.length ? `<ul>${extra.rehecho.conflictos.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ' Sin choques con lo que cambió en SAP.'}</div>` : '';
@@ -19933,7 +19933,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const o = {}, k = new Set(claves), tipo = d.tipo == null || d.tipo === '' ? null : +d.tipo;
     if (k.has('tipo')) { o.tipoDatoId_iMaestraId = tipo; o.tipoDatoIdAnterior_iMaestraId = tipo; }
     if (k.has('dec')) o.decimales = d.dec == null || d.dec === '' ? null : parseInt(d.dec, 10);
-    if (!esPm && (k.has('tipo') || k.has('clv') || k.has('puesto'))) { const notif = tipo === PPN.DT_NOTIF, clv = notif ? (d.clv || null) : null;
+    if (!esPm && (k.has('tipo') || k.has('clv') || k.has('puesto')) && !(Array.isArray(d.solo) && tipo !== PPN.DT_NOTIF)) { const notif = tipo === PPN.DT_NOTIF, clv = notif ? (d.clv || null) : null;
       o.clvModelo = clv; o.puestoTrabajo = notif ? (d.puesto || null) : null; o.automatico = notif ? (clv === 'SETPOST' || clv === 'SETPRE') : null; }
     Object.entries(PP_DT_BOOL).forEach(([c, campo]) => { if (k.has(c) && !(esPm && c === 'pmop') && !(!esPm && c === 'tab')) o[campo] = !!d[c]; });
     if (k.has('color')) { const h = ppColor(d.color), m = h && /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/.exec(h);
@@ -20061,7 +20061,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const quitados = new Set(), seqPasos = [], locNuevo = new Map(), revisar = [], equiposRev = [], depManual = new Map(), verifDt = [];   // v1.123.0: «Depende» elegido en la vista completa; configuración a comprobar
     const dtNuevo = (x, esPm, ruta, lugarTxt) => { if (!x.dt || x.insumo) return; const todas = PPN.dtCampos(esPm ? 'pm' : 'paso').map((c) => c[0]), claves = Array.isArray(x.dt.solo) ? todas.filter((k) => x.dt.solo.includes(k)) : todas, w = ppDtEscritura(x.dt, claves, esPm);
       if (!claves.length) return;
-      op(4, { lugar: lugarTxt, accion: 'Configuración', clase: esPm ? 'pm' : 'paso', desc: `configuración del ${esPm ? 'proceso menor' : 'paso'} nuevo ${codVer(x)} — ${String(x.texto || '').slice(0, 40)}: ${ppDtTexto(x.dt, claves.filter((k) => k !== 'color' || x.dt.color), datos.tipos)}`, ruta, datos: { ...w, ...fechaUsuario }, inv: null });
+      op(4, { lugar: lugarTxt, accion: 'Configuración', clase: esPm ? 'pm' : 'paso', desc: `configuración del ${esPm ? 'proceso menor' : 'paso'} ${x.dt.solo && !x.nuevo ? 'agregado' : 'nuevo'} ${codVer(x)} — ${String(x.texto || '').slice(0, 40)}: ${ppDtTexto(x.dt, claves.filter((k) => k !== 'color' || x.dt.color), datos.tipos)}`, ruta, datos: { ...w, ...fechaUsuario }, inv: null });
       verifDt.push({ x, esPm, claves, id: (/\('([^']+)'\)$/.exec(ruta) || [])[1] }); };                                           // [{ L, seq: [{ id, x, nuevo }] }]
     for (const L of listas) {
       const esPm = L.kind === 'pm', tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO', campo = esPm ? 'pasoHijoId_pasoId' : 'pasoId_pasoId', clase = esPm ? 'pm' : 'paso', bId = new Map(L.b.map((y) => [y.id, y]));
