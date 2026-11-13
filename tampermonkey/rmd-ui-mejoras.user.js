@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.136.0
+// @version      1.137.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.136.0';                                                       // mantener igual a @version
+  const VERSION = '1.137.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -19968,6 +19968,23 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     // estado del destino y mapa de ids
     const idx = new Map(), estD = new Map();
     an.actual.estructuras.forEach((e) => { estD.set(e.id, e); const rec = (l) => (l || []).forEach((p) => { idx.set(p.id, p); (p.pm || []).forEach((m) => idx.set(m.id, m)); }); rec(e.pasos); (e.etiquetas || []).forEach((t) => rec(t.pasos)); (e.equipos || []).forEach((q) => idx.set(q.id, q)); (e.utensilios || []).forEach((q) => idx.set(q.id, q)); });
+    // v1.137.0: fórmulas del RMD de destino (MD_ES_FORMULA_PASO). El portal empareja cada término por fila + código del paso (valor): si el borrador
+    // cambia el paso de una fila que usa una fórmula, el término se actualiza; los pasos que usa una fórmula quedan con tipo de dato numérico.
+    const FX_NUM = new Set([434, 438, 443, 445, 448, 450]), fxTerm = new Map(), fxOwner = new Map(), fxCambiado = new Set();
+    { const owners = []; idx.forEach((f) => { if (f && Array.isArray(f.pm) && +f.tipo === 445) owners.push(f.id); });
+      const fp = owners.length ? await leerPorIds(modelo, 'MD_ES_FORMULA_PASO', 'pasoPadreId_mdEstructuraPasoId', owners, { $select: 'mdFormulaPaso,pasoPadreId_mdEstructuraPasoId,orden,activo,esPaso,bFlagPM,valor,pasoFormulaId_mdEstructuraPasoId,pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId' }).catch(() => null) : [];
+      if (fp == null) avisos.push('No se pudieron leer las fórmulas del RMD de destino: revisa en SAP las fórmulas (p. ej. RENDIMIENTO) después del ingreso.');
+      (fp || []).filter((g) => g.activo !== false).forEach((g) => { const o = idx.get(g.pasoPadreId_mdEstructuraPasoId); if (!o) return; fxOwner.set(o.id, o);
+        if (!g.esPaso) return; const id = g.bFlagPM ? g.pasoFormulaIdPM_mdEstructuraPasoInsumoPasoId : g.pasoFormulaId_mdEstructuraPasoId; if (!id) return;
+        if (!fxTerm.has(id)) fxTerm.set(id, []); fxTerm.get(id).push({ g, owner: o, pm: !!g.bFlagPM }); }); }
+    const fxNombre = (o) => `«${String((o && o.texto) || '').slice(0, 50)}»${o && o.codigo ? ' (' + o.codigo + ')' : ''}`;
+    // tipo de dato que debe tener la fila: la fórmula sigue siendo «Fórmula»; un paso que usa una fórmula, numérico (si no lo es, «Números»)
+    const fxTipo = (x, fila, esPm, quien) => { if (!x.dt || x.insumo || !fila) return; const owner = !esPm && fxOwner.has(fila.id), term = fxTerm.has(fila.id); if (!owner && !term) return;
+      const t = x.dt.tipo == null || x.dt.tipo === '' ? null : +x.dt.tipo; if (owner ? t === 445 : FX_NUM.has(t)) return;
+      const t0 = +fila.tipo, nuevo = owner ? 445 : FX_NUM.has(t0) ? t0 : 438, usa = term ? [...new Set(fxTerm.get(fila.id).map((y) => fxNombre(y.owner)))].join(', ') : '';
+      x.dt = { ...x.dt, tipo: nuevo }; if (nuevo !== 445 && (x.dt.dec == null || x.dt.dec === '' || (!FX_NUM.has(t0) && String(x.dt.dec) === '0'))) x.dt.dec = '3';
+      avisos.push(owner ? `${quien} es una fórmula: queda con tipo de dato «Fórmula»${t != null ? ` (el borrador pedía «${(datos.tipos || {})[t] || t}»)` : ''}.`
+        : `${quien} lo usa la fórmula ${usa}: queda con tipo de dato «${(datos.tipos || {})[nuevo] || nuevo}» y ${x.dt.dec} decimal(es)${t != null && t !== t0 ? ` (el borrador pedía «${(datos.tipos || {})[t] || t}»)` : ` (en SAP estaba como «${(datos.tipos || {})[t0] || t0}»: con texto la fórmula no puede usarlo)`}.`); };
     const nuevosIds = new Map(), D = (id) => (String(id).startsWith('n:') ? (nuevosIds.get(id) || (nuevosIds.set(id, ppUuid()), nuevosIds.get(id))) : mismo ? id : (an.mapa && an.mapa.get(id)) || null);
     const bEst = new Map(datos.arbol.estructuras.map((e) => [e.id, e]));
     // listas a procesar
@@ -20115,7 +20132,11 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
           if (esPm && b0.insumo) { bloqueos.push(`${quien(b0, b0)} es un insumo de la receta: no se cambia desde el borrador.`); return; }
           revisar.push({ x, p: catDe(x), esPm, L, que: 'cambiado' });
           op(2, { lugar: lugar(L), accion: 'Cambiar', clase, desc: `cambiar ${esPm ? 'el proceso menor' : 'el paso'} ${b0.codigo || ''} por el ${codVer(x)} — ${String(x.texto || '').slice(0, 60)}`, ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: catDe(x).pasoId, ...fechaUsuario }, inv: { ruta: `/${tabla}('${fila.id}')`, datos: { [campo]: fila.pasoId, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' } });
+          (fxTerm.get(fila.id) || []).filter((y) => y.pm === esPm).forEach((y) => { fxCambiado.add(fila.id);
+            op(2, { lugar: lugar(L), accion: 'Fórmula', clase, desc: `término de la fórmula ${fxNombre(y.owner)}: ${y.g.valor} → ${codVer(x)} (${esPm ? 'el proceso menor' : 'el paso'} que usa cambia de código)`, ruta: `/MD_ES_FORMULA_PASO('${y.g.mdFormulaPaso}')`,
+              datos: { valor: cod(x) }, valorItem: catNuevo.has(x.id) ? x : null, inv: { ruta: `/MD_ES_FORMULA_PASO('${y.g.mdFormulaPaso}')`, datos: { valor: String(y.g.valor == null ? '' : y.g.valor) } }, marca: { id: y.owner.id, tipo: 'cambiado' } }); });
         }
+        if (!(esPm && b0.insumo)) fxTipo(x, fila, esPm, quien(x, b0));
         const dtc = !(esPm && b0.insumo) ? PPN.dtCambios(b0, x, clase) : [], dtTipo = dtc.some((c) => c.k === 'tipo');
         if (!esPm && (!!x.rpor !== !!b0.rpor || !!x.vb !== !!b0.vb)) {
           const t0 = +fila.tipo, nuevoTipo = x.rpor && x.vb ? 441 : x.rpor ? 439 : x.vb ? 440 : ([439, 440, 441].includes(t0) ? PP_SIN_TIPO : null), cambiaTipo = !dtTipo && nuevoTipo && [PP_SIN_TIPO, 439, 440, 441, 432].includes(t0) && nuevoTipo !== t0 ? nuevoTipo : null;
@@ -20181,6 +20202,29 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       });
     }
     // pasos nuevos del catálogo primero
+    // v1.137.0: fórmulas: pasos que usan una fórmula y se quitan, términos con el código desactualizado, pasos nuevos del catálogo para esas filas e insumos agregados
+    { const fueraFx = (id) => quitados.has(id) || pmFuera.has(id);
+      fxTerm.forEach((ts, id) => { const f = idx.get(id); ts.forEach((y) => { if (fueraFx(y.owner.id)) return;
+        if (fueraFx(id)) { bloqueos.push(`Se quita ${y.pm ? 'el proceso menor' : 'el paso'} ${f && f.codigo || ''} — ${String((f && f.texto) || '').slice(0, 50)}, que usa la fórmula ${fxNombre(y.owner)}: la fórmula quedaría con error. Corrígela en SAP primero o no quites ese paso en el borrador.`); return; }
+        if (!f) { bloqueos.push(`La fórmula ${fxNombre(y.owner)} usa una fila que ya no está en el RMD: corrígela en «Fórmulas» antes de ingresar.`); return; }
+        const c = f.codigo; if (fxCambiado.has(id) || c == null || String(c) === String(y.g.valor)) return;
+        op(2, { lugar: 'Fórmulas', accion: 'Fórmula', clase: y.pm ? 'pm' : 'paso', desc: `término de la fórmula ${fxNombre(y.owner)}: ${y.g.valor} → ${c} (código actual del ${y.pm ? 'proceso menor' : 'paso'} «${String(f.texto || '').slice(0, 40)}»)`, ruta: `/MD_ES_FORMULA_PASO('${y.g.mdFormulaPaso}')`,
+          datos: { valor: String(c) }, inv: { ruta: `/MD_ES_FORMULA_PASO('${y.g.mdFormulaPaso}')`, datos: { valor: String(y.g.valor == null ? '' : y.g.valor) } }, marca: { id: y.owner.id, tipo: 'cambiado' } }); }); });
+      // filas que usa una fórmula y que el borrador no toca, con tipo de dato no numérico
+      fxTerm.forEach((ts, id) => { const f = idx.get(id); if (!f || f.insumo || fueraFx(id) || FX_NUM.has(+f.tipo) || ops.some((o) => (o.accion === 'Configuración' || (o.datos && o.datos.tipoDatoId_iMaestraId != null)) && o.ruta && o.ruta.endsWith(`('${id}')`))) return;
+        const esPm = !Array.isArray(f.pm), dec = f.dt && f.dt.dec != null && f.dt.dec !== '' && String(f.dt.dec) !== '0' ? parseInt(f.dt.dec, 10) : 3, tabla = esPm ? 'MD_ES_PASO_INSUMO_PASO' : 'MD_ES_PASO';
+        avisos.push(`${esPm ? 'El proceso menor' : 'El paso'} ${f.codigo || ''} — ${String(f.texto || '').slice(0, 50)} lo usa la fórmula ${[...new Set(ts.map((y) => fxNombre(y.owner)))].join(', ')} y estaba como «${(datos.tipos || {})[f.tipo] || f.tipo}»: queda como «Números» con ${dec} decimal(es) (con texto la fórmula no puede usarlo).`);
+        op(2, { lugar: 'Fórmulas', accion: 'Configuración', clase: esPm ? 'pm' : 'paso', desc: `tipo de dato de ${esPm ? 'el proceso menor' : 'el paso'} ${f.codigo || ''} — ${String(f.texto || '').slice(0, 40)} (lo usa una fórmula): «${(datos.tipos || {})[f.tipo] || f.tipo}» → «Números», ${dec} decimal(es)`, ruta: `/${tabla}('${id}')`,
+          datos: { tipoDatoId_iMaestraId: 438, tipoDatoIdAnterior_iMaestraId: 438, decimales: dec, ...fechaUsuario }, inv: { ruta: `/${tabla}('${id}')`, datos: { tipoDatoId_iMaestraId: +f.tipo, tipoDatoIdAnterior_iMaestraId: +f.tipo, decimales: f.dt && f.dt.dec != null && f.dt.dec !== '' ? parseInt(f.dt.dec, 10) : null, ...fechaUsuario } }, marca: { id, tipo: 'cambiado' } }); });
+      // paso nuevo del catálogo que reemplaza a una fila de una fórmula: con el tipo numérico de esa fila
+      nuevosPaso.forEach((np) => { const filas = np.items.map((it) => idx.get(D(it.id))).filter((f) => f && (fxTerm.has(f.id) || fxOwner.has(f.id))); if (!filas.length) return;
+        const t = fxOwner.has(filas[0].id) ? 445 : FX_NUM.has(+filas[0].tipo) ? +filas[0].tipo : 438; if (+np.fila.tipoDatoId_iMaestraId === t) return;
+        np.tipo = t; np.fila.tipoDatoId_iMaestraId = t; if (np.fila.decimales == null || (t !== 445 && !np.fila.decimales)) np.fila.decimales = 3;
+        avisos.push(`El paso nuevo «${np.texto.slice(0, 60)}» reemplaza a uno que usa una fórmula: se crea como «${(datos.tipos || {})[t] || t}».`); });
+      // insumos agregados en un paso cuyos insumos suma una fórmula
+      const insFx = new Map(); fxTerm.forEach((ts, id) => { const f = idx.get(id); if (f && f.insumo && f.comp) ts.forEach((y) => { const k = String(f.comp).replace(/^0+/, ''); if (!insFx.has(k)) insFx.set(k, new Set()); insFx.get(k).add(fxNombre(y.owner)); }); });
+      if (insFx.size) ops.filter((o) => o.accion === 'Agregar' && o.clase === 'pm' && o.datos && o.datos.aPasoInsumoPaso && o.datos.aPasoInsumoPaso[0].Component).forEach((o) => { const r = o.datos.aPasoInsumoPaso[0], k = String(r.Component).replace(/^0+/, '');
+        if (insFx.has(k)) manual.push(`Agregar a la fórmula ${[...insFx.get(k)].join(', ')} el insumo nuevo ${r.Component} — ${String(r.Maktx || '').slice(0, 40)} ${r.cantidadInsumo} ${r.CompUnit || ''} (${o.lugar}): esa fórmula ya suma el mismo insumo en otro paso.`); }); }
     nuevosPaso.forEach((np) => op(0, { lugar: `${np.estrNombre}${np.etqNombre ? ' › ' + np.etqNombre : ''}`, accion: 'Crear', clase: 'catalogo', desc: `crear en SAP el paso nuevo «${np.texto.slice(0, 80)}»${np.items.length > 1 ? ` (uno solo, se usa en ${np.items.length} lugares)` : ''}`, ruta: '/PASO', tipo: 'create', crearPaso: np, datos: np.fila, inv: { ruta: `/PASO('${np.pasoId}')`, datos: { activo: false } } }));
     // equipos y utensilios: quitar, agregar y renumerar
     const catEq = new Map(); const ids = []; prop.trabajo.estructuras.forEach((e) => (e.equipos || []).forEach((x) => { if (!String(x.id).startsWith('n:') || x.quitado || !x.equipoId) return; ids.push(x.equipoId); }));
@@ -20394,6 +20438,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       let datos = x.datos, codigo = null;
       if (x.crearPaso) { codigo = o.simular ? 'NUEVO' : await correlativo(); if (!/^\d+$/.test(codigo) && !o.simular) throw new Error('el portal no devolvió un código de paso válido'); datos = { ...x.datos, codigo }; x.crearPaso.codigo = codigo; x.crearPaso.items.forEach((it) => { it.__codigo = codigo; plan.finales.set(it.id, codigo); }); }
       if (x.predItem) datos = { ...datos, depende: String(plan.finales.get(x.predItem.id) || x.predItem.__codigo || x.predItem.codigo || '') };
+      if (x.valorItem) { const v = String(plan.finales.get(x.valorItem.id) || x.valorItem.__codigo || x.valorItem.codigo || ''); if (!v && !o.simular) throw new Error('no se conoce el código del paso nuevo para la fórmula'); datos = { ...datos, valor: v || 'NUEVO' }; }
       if (!o.simular) await modeloEscribir(modelo, x.tipo || 'update', x.ruta, datos);
       return codigo;
     };
