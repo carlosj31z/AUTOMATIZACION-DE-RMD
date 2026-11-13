@@ -326,6 +326,12 @@ cuenta). Escribir y responder siempre en **español**.
   de los insumos del RMD o 438, 3 decimales) y luego, como `onSaveCantidadRm`, `MD_ES_RE_INSUMO.cantidadRm` = suma de lo usado en los pasos.
   Un insumo que no está en la receta bloquea. `ppSinInsumosNuevos` ya no se usa en el ingreso. Prueba `qa_local.py` LN61.
   **La siguiente versión debe ser > 1.136.0.**
+- 2026-11-13, v1.137.0 (encima de la 1.136.0): **pedido de Carlos: no debe haber error en las fórmulas (RENDIMIENTO 4.5.1 en adelante) al importar
+  un borrador.** `ppPlanEscritura` lee `MD_ES_FORMULA_PASO` de los pasos «Fórmula» (445) del destino: un «Cambiar» de una fila que es término agrega
+  op «Fórmula» que actualiza `valor` al código nuevo (`valorItem` si el paso se crea en el mismo ingreso); términos con `valor` viejo se corrigen;
+  filas término con tipo no numérico pasan a 438 (3 decimales) y la fórmula se queda en 445 (`fxTipo`); quitar un término bloquea; insumo agregado
+  del mismo material que suma una fórmula va a tareas manuales.
+  Prueba `tampermonkey/pruebas/qa_formulas_ingreso.mjs`. **La siguiente versión debe ser > 1.137.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
