@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.138.0
+// @version      1.139.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.138.0';                                                       // mantener igual a @version
+  const VERSION = '1.139.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -17779,13 +17779,36 @@
             else if (x.comentario) out.push({ clase, accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: nombre, comentario: x.comentario });
           });
         });
+        // v1.139.0: orden de equipos y utensilios (una sola numeración en SAP): los que salen del orden de la base van como «Mover»
+        { const sb = eqSecuencia(be).map((y) => y.x.id), posB = new Map(sb.map((id, i) => [id, i])), sw = eqSecuencia(e).filter((y) => !y.x.quitado), vivos = sw.filter((y) => posB.has(y.x.id)), ok = enOrden(vivos.map((y) => posB.get(y.x.id)));
+          vivos.forEach((y, i) => { if (ok.has(i)) return; const j = sw.indexOf(y), prev = j > 0 ? sw[j - 1].x : null, nom = (q) => [q.desc, q.codigo, q.ref].filter(Boolean).join(' · ');
+            out.push({ clase: y.k === 'equipos' ? 'equipo' : 'utensilio', accion: 'mover', lugar: e.nombre, numero: nW.get(e.id) || '', id: y.x.id, estructura: e.id, texto: nom(y.x), comentario: '', trasDe: prev ? { id: prev.id, texto: nom(prev) } : null }); }); }
         (e.insumos || []).forEach((x) => { if (!cantRecetaCambiada(x)) return;          // cantidad de la receta: va a la Lista de Materiales
           out.push({ clase: 'insumo', accion: 'cantidad', insumo: true, receta: true, lugar: e.nombre, numero: nW.get(e.id) || '', id: insClave(x), estructura: e.id, texto: `${x.desc || ''} (${x.comp || ''})`, comentario: x.comentario || '',
             campos: [{ campo: 'Cantidad en la receta', antes: `${fmtCant(x.cant)} ${x.um || ''}`.trim(), despues: `${fmtCant(x.cantNueva)} ${x.um || ''}`.trim() }] }); });
-        (e.espec || []).forEach((x) => { if (x.comentario) out.push({ clase: 'especificacion', accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: [x.ensayo, x.especificacion].filter(Boolean).join(': '), comentario: x.comentario }); });
+        // v1.139.0: especificaciones: textos (Descripción del ensayo y Especificaciones) y orden dentro de su grupo
+        { const bl = be.espec || [], bId = new Map(bl.map((y) => [y.id, y])), posB = new Map(bl.map((y, i) => [y.id, i])), wl = e.espec || [], vivos = wl.filter((y) => bId.has(y.id)), ok = enOrden(vivos.map((y) => posB.get(y.id)));
+          wl.forEach((x) => { const b0 = bId.get(x.id), base0 = { clase: 'especificacion', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, comentario: '' }; if (!b0) return;
+            const campos = ESPEC_CAMPOS.filter(([k]) => txtEsp(x[k]) !== txtEsp(b0[k])).map(([k, n]) => ({ k, campo: n, antes: txtEsp(b0[k]), despues: txtEsp(x[k]) }));
+            if (campos.length) out.push({ ...base0, accion: 'cambiar', antes: textoEsp(b0), despues: textoEsp(x), campos });
+            const i = vivos.indexOf(x); if (i >= 0 && !ok.has(i)) { const j = wl.indexOf(x), prev = j > 0 ? wl[j - 1] : null; out.push({ ...base0, accion: 'mover', texto: textoEsp(x), trasDe: prev ? { id: prev.id, texto: textoEsp(prev) } : null }); } });
+          wl.forEach((x) => { if (x.comentario) out.push({ clase: 'especificacion', accion: 'comentario', lugar: e.nombre, numero: nW.get(e.id) || '', id: x.id, estructura: e.id, texto: textoEsp(x), comentario: x.comentario }); }); }
       });
       return out;
     }
+    // v1.139.0: equipos y utensilios en el orden de SAP (una sola numeración, «orden»); sin orden van al final, equipos antes que utensilios
+    function eqSecuencia(e) {
+      const l = []; ['equipos', 'utensilios'].forEach((k) => (e[k] || []).forEach((x) => l.push({ x, k, i: l.length })));
+      const o = (y) => { const v = Number(y.x.orden); return y.x.orden == null || y.x.orden === '' || !isFinite(v) ? Infinity : v; };
+      return l.sort((a, b) => (o(a) - o(b)) || (a.i - b.i));
+    }
+    // v1.139.0: especificaciones. Las que vienen de SAP (ensayoPadreSAP) el portal las ordena por característica: no se reordenan.
+    const ESPEC_CAMPOS = [['ensayo', 'Descripción'], ['especificacion', 'Especificaciones']];
+    const ESPEC_MAX = { ensayo: 150, especificacion: 500 };
+    const txtEsp = (v) => (v == null ? '' : String(v).replace(/\s+/g, ' ').trim());
+    const textoEsp = (x) => [txtEsp(x.ensayo), txtEsp(x.especificacion)].filter(Boolean).join(': ');
+    const grupoEsp = (x) => (x.grupoId == null ? 'g:' + (x.grupo || '') : 'i:' + x.grupoId);
+    const especReordenable = (e) => (e.espec || []).length > 1 && (e.espec || []).every((x) => !x.padre);
     // Pasos nuevos idénticos (mismo texto, misma sección y etiqueta de la lista): en SAP se crea uno solo y se usa en todos sus lugares.
     // id -> { clave, primero, padre (del primero, si es proceso menor), n }. La clave es la misma con la que el portal los junta al crearlos.
     const claveNueva = (estr, etq, texto) => `${estr}|${etq || ''}|${String(texto || '').trim().replace(/\s+/g, ' ').toLowerCase()}`;
@@ -17989,9 +18012,22 @@
             lista.push(clon(x)); aplicados++;
           });
         });
+        // v1.139.0: orden de equipos y utensilios del borrador (los de SAP que el borrador no conoce se quedan en su lugar)
+        { const sb = eqSecuencia(be).map((y) => y.x.id), posB = new Map(sb.map((id, i) => [id, i])), sw = eqSecuencia(e).filter((y) => !y.x.quitado), conB = sw.filter((y) => posB.has(y.x.id));
+          if (enOrden(conB.map((y) => posB.get(y.x.id))).size < conB.length || sw.some((y) => !posB.has(y.x.id))) {
+            const sa = eqSecuencia(ae), porId = new Map(sa.map((y) => [y.x.id, y])), quiere = sw.map((y) => porId.get(posB.has(y.x.id) ? M(y.x.id) : y.x.id)).filter((y) => y && !y.x.quitado), pos = quiere.map((y) => sa.indexOf(y)).sort((a, b) => a - b);
+            const fin = sa.slice(); quiere.forEach((y, i) => { fin[pos[i]] = y; }); fin.forEach((y, i) => { y.x.orden = i + 1; }); } }
         (e.insumos || []).forEach((x) => { if (!cantRecetaCambiada(x) && !x.comentario) return; const ra = (ae.insumos || []).find((y) => y.comp === x.comp); if (!ra) { conflictos.push(`${e.nombre}: el insumo ${x.comp} ya no está en la receta; se omite su cantidad.`); return; }
           if (cantRecetaCambiada(x)) { ra.cantNueva = x.cantNueva; aplicados++; } if (x.comentario) ra.comentario = x.comentario; });
         (e.espec || []).forEach((x) => { if (x.comentario) { const ra = (ae.espec || []).find((y) => y.id === M(x.id)); if (ra) ra.comentario = x.comentario; } });
+        // v1.139.0: textos y orden de las especificaciones
+        { const bl = be.espec || [], bId = new Map(bl.map((y) => [y.id, y])), posB = new Map(bl.map((y, i) => [y.id, i])), al = ae.espec || [], deA = (x) => al.find((y) => y.id === M(x.id)) || null;
+          (e.espec || []).forEach((x) => { const b0 = bId.get(x.id); if (!b0) return; const ra = deA(x);
+            ESPEC_CAMPOS.forEach(([k, n]) => { if (txtEsp(x[k]) === txtEsp(b0[k])) return; if (!ra) { conflictos.push(`${e.nombre}: la especificación «${textoEsp(b0).slice(0, 60)}» ya no está en SAP; se omite el cambio.`); return; }
+              if (txtEsp(ra[k]) === txtEsp(x[k])) return; if (txtEsp(ra[k]) !== txtEsp(b0[k])) { conflictos.push(`${e.nombre}: la especificación «${textoEsp(b0).slice(0, 60)}» (${n}) cambió en SAP y en el borrador; se deja lo de SAP.`); return; }
+              ra[k] = x[k]; aplicados++; }); });
+          const conB = (e.espec || []).filter((x) => bId.has(x.id));
+          if (enOrden(conB.map((x) => posB.get(x.id))).size < conB.length) { const quiere = conB.map(deA).filter(Boolean), pos = quiere.map((y) => al.indexOf(y)).sort((a, b) => a - b); quiere.forEach((y, i) => { al[pos[i]] = y; }); aplicados++; } }
       });
       return { trabajo: R, conflictos, aplicados };
     }
@@ -18012,7 +18048,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, homologacionPaso, homologarTexto, pasosCeo, REGISTROS, REGISTRO_TXT, registroDe, registroDeTipo, codigosDoc, mapaDocs, docVencido, listaSinPredecesor, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO };
+    return { TIPO, RANGO, homologacionPaso, homologarTexto, pasosCeo, REGISTROS, REGISTRO_TXT, registroDe, registroDeTipo, codigosDoc, mapaDocs, docVencido, listaSinPredecesor, normalizar, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO, enOrden, eqSecuencia, ESPEC_CAMPOS, ESPEC_MAX, txtEsp, textoEsp, grupoEsp, especReordenable };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -18337,10 +18373,10 @@
       return `<div class="pp-miembros" title="${esc(ms.map(([c, d]) => `${c} · ${d}`).join('\n'))}"><b>Contiene ${ms.length} utensilio${ms.length === 1 ? '' : 's'}:</b> ${vis.map(([c, d]) => `<span>${esc(c)}${d ? ' · ' + esc(d) : ''}</span>`).join('')}${resto ? `<span>y ${resto} más</span>` : ''}</div>`;
     }
     function htmlEquipos(e) {
-      const fila = (k, x) => { const b = BI.get(x.id), acc = x.quitado ? `<span class="pp-acc">${bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w')}</span>` : `<span class="pp-acc">${bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui')}${bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
+      const fila = (k, x) => { const b = BI.get(x.id), acc = x.quitado ? `<span class="pp-acc">${bt('restaurar', '↺ Volver a poner', 'Deshace el quitado', 'w')}</span>` : `<span class="pp-acc">${bt('mover-a', 'Mover a…', 'Elegir en qué posición del listado va', 'w')}${bt('subir', 'Subir', 'Subir una posición')}${bt('bajar', 'Bajar', 'Bajar una posición')}${bt('quitar', '✕ Quitar', 'Quitar esta fila', 'qui')}${bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
         const codigo = x.nuevo ? (x.codigo || '—') : k === 'utensilios' && !x.utensilioId ? 'AGRUPADOR' : x.codigo;
-        return `<tr class="${estadoCl(x, b)}" data-id="${esc(x.id)}"><td class="pp-c-tx"><span class="pp-tx">${esc(x.desc)}</span>${htmlMiembros(x)}${marcasDe(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}</td><td class="c">${esc(codigo)}</td><td class="c">${esc(k === 'equipos' ? (x.ref || '-') : '-')}</td><td class="ult">${acc}</td></tr>`; };
-      const filas = [...(e.equipos || []).map((x) => fila('equipos', x)), ...(e.utensilios || []).map((x) => fila('utensilios', x))].join('');
+        return `<tr class="${estadoCl(x, b)}" data-id="${esc(x.id)}" tabindex="0"><td class="pp-c-tx"><span class="pp-tx">${esc(x.desc)}</span>${htmlMiembros(x)}${marcasDe(x, b)}${htmlAvisos(x.id)}${htmlComentario(x)}</td><td class="c">${esc(codigo)}</td><td class="c">${esc(k === 'equipos' ? (x.ref || '-') : '-')}</td><td class="ult">${acc}</td></tr>`; };
+      const filas = PPN.eqSecuencia(e).map((y) => fila(y.k, y.x)).join('');   // v1.139.0: en el orden de SAP (se puede mover)
       const ver = e.verificadoPor ? '<tr class="pp-ver"><td>VERIFICADO POR:</td><td colspan="3">FECHA:</td></tr>' : '';
       return `<div class="pp-nota-der fila">(Colocar check en caso de conformidad)</div><table class="pp-t pp-grid">${cols([300, 80, 105, 25])}<tr class="pp-th"><th>Descripción</th><th>Código</th><th>Código de referencia</th><th>${ICO_CHECK}</th></tr>${filas}${ver}</table>
         <button type="button" class="pp-mas" data-a="agregar-equipo" data-est="${esc(e.id)}">＋ Agregar equipo o utensilio</button>`;
@@ -18356,8 +18392,16 @@
     }
     function htmlEspec(e) {
       const grupos = []; (e.espec || []).forEach((x) => { const k = x.grupoId == null ? x.grupo || '' : x.grupoId; let g = grupos.find((y) => y.k === k); if (!g) grupos.push((g = { k, nombre: x.grupo || '', filas: [] })); g.filas.push(x); });
-      const filas = grupos.map((g) => `<tr class="pp-grupo"><td>${esc(g.nombre)}</td><td></td><td></td></tr>` + g.filas.map((x) => `<tr data-id="${esc(x.id)}"><td class="pp-c-tx"><span class="pp-tx">${esc(x.ensayo)}</span>${htmlComentario(x)}</td><td>${esc(x.especificacion || [x.vi, x.vf].filter((v) => v != null && v !== '').join(' - '))}</td><td class="ult"><span class="pp-acc"><button type="button" data-a="comentar" title="Comentario">💬</button></span></td></tr>`).join('')).join('');
-      return `<table class="pp-t pp-grid pp-esp">${cols([170, 170, 170])}<tr class="pp-th"><th>ENSAYO</th><th>ESPECIFICACIONES</th><th>RESULTADOS</th></tr>${filas}<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td>FECHA:</td></tr></table>`;
+      // v1.139.0: cada especificación se edita (Descripción y Especificaciones) y se mueve dentro de su grupo
+      const mueve = PPN.especReordenable(e), enGrupo = (x) => (e.espec || []).filter((y) => PPN.grupoEsp(y) === PPN.grupoEsp(x)).length > 1;
+      const fila = (x) => { const b = BI.get(x.id), cam = b && PPN.ESPEC_CAMPOS.some(([k]) => PPN.txtEsp(x[k]) !== PPN.txtEsp(b[k])), mov = MOV.has(x.id);
+        const tags = (cam ? '<span class="pp-tag cam">Cambiado</span>' : '') + (mov ? '<span class="pp-tag mov">Movido</span>' : '');
+        const antes = cam ? PPN.ESPEC_CAMPOS.filter(([k]) => PPN.txtEsp(x[k]) !== PPN.txtEsp(b[k])).map(([k, n]) => `<div class="pp-antes">${esc(n)} antes: ${esc(PPN.txtEsp(b[k]) || '(vacío)')}</div>`).join('') : '';
+        const acc = `<span class="pp-acc">${bt('editar-esp', 'Editar', 'Cambiar la descripción del ensayo y su especificación', 'w')}${mueve && enGrupo(x) ? bt('mover-a', 'Mover a…', 'Elegir en qué posición del grupo va', 'w') + bt('subir', 'Subir', 'Subir una posición dentro de su grupo') + bt('bajar', 'Bajar', 'Bajar una posición dentro de su grupo') : ''}${bt('comentar', '💬 Comentar', 'Comentario para el equipo RMD')}</span>`;
+        return `<tr class="${[cam ? 'cam' : '', mov ? 'mov' : ''].filter(Boolean).join(' ')}" data-id="${esc(x.id)}" tabindex="0"><td class="pp-c-tx"><span class="pp-tx">${esc(x.ensayo)}</span>${tags ? `<span class="pp-tags">${tags}</span>` : ''}${antes}${htmlComentario(x)}</td><td>${esc(x.especificacion || [x.vi, x.vf].filter((v) => v != null && v !== '').join(' - '))}</td><td class="ult">${acc}</td></tr>`; };
+      const filas = grupos.map((g) => `<tr class="pp-grupo"><td>${esc(g.nombre)}</td><td></td><td></td></tr>` + g.filas.map(fila).join('')).join('');
+      const nota = (e.espec || []).length > 1 && !mueve ? '<p class="pp-nota pp-pantalla">Estas especificaciones vienen de SAP y el portal las ordena por su número de característica: se pueden editar, pero no cambiar de posición.</p>' : '';
+      return `<table class="pp-t pp-grid pp-esp">${cols([170, 170, 170])}<tr class="pp-th"><th>ENSAYO</th><th>ESPECIFICACIONES</th><th>RESULTADOS</th></tr>${filas}<tr class="pp-ver"><td colspan="2">VERIFICADO POR:</td><td>FECHA:</td></tr></table>${nota}`;
     }
     function htmlFirmas() {
       const t = `<table class="pp-t pp-grid pp-firma">${cols([25, 25, 130, 50])}<tr class="pp-th"><th>R</th><th>S</th><th>Nombre y Apellidos</th><th>Firma</th></tr>${'<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>'.repeat(5)}</table>`;
@@ -18382,7 +18426,7 @@
       const corto = (t) => { t = String(t || ''); return t.length > 90 ? t.slice(0, 90) + '…' : t; };
       let cuerpo;
       if (filtro === 'avisos') cuerpo = conAviso.length ? conAviso.map(([id, l]) => { const f = encontrar(id); return `<button type="button" class="pp-cmb" data-ir="${esc(id)}"><b>${esc(f ? (f.item.texto || f.item.nombre || f.item.desc || '') : '').slice(0, 70)}</b>${l.filter((a) => a.nivel !== 'info').map((a) => `<span class="pp-cmb-av ${a.nivel}">${esc(a.texto)}</span>`).join('')}</button>`; }).join('') : '<p class="pp-nota">Sin avisos.</p>';
-      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : ''}</b>${c.nuevo ? ` <span class="pp-tag crea">${PROD ? '★ nuevo' : '★ se creará'}</span>` : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.accion === 'config' ? `${c.texto ? String(c.texto).slice(0, 40) + ': ' : ''}${(c.campos || []).map((y) => `${y.campo} ${y.antes} → ${y.despues}`).join('; ')}` : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
+      else cuerpo = lista.length ? lista.map((c) => `<button type="button" class="pp-cmb ${c.accion}" data-ir="${esc(c.id)}"><span class="pp-cmb-n">${esc(c.numero || '')}</span> <b>${ETQ_ACCION[c.accion]}${c.insumo ? ' (insumo)' : c.clase === 'pm' ? ' (proceso menor)' : c.clase === 'equipo' || c.clase === 'utensilio' ? ' (' + c.clase + ')' : c.clase === 'etiqueta' || c.clase === 'estructura' ? ' (sección)' : c.clase === 'especificacion' ? ' (especificación)' : ''}</b>${c.nuevo ? ` <span class="pp-tag crea">${PROD ? '★ nuevo' : '★ se creará'}</span>` : ''}<br><span>${esc(corto(c.accion === 'quitar' ? c.antes : c.accion === 'comentario' ? c.comentario : c.accion === 'config' ? `${c.texto ? String(c.texto).slice(0, 40) + ': ' : ''}${(c.campos || []).map((y) => `${y.campo} ${y.antes} → ${y.despues}`).join('; ')}` : c.despues || c.texto))}</span></button>`).join('') : `<p class="pp-nota">${filtro === 'nuevos' ? 'No hay pasos nuevos a crear.' : 'Todavía no hay cambios.'}</p>`;
       if (filtro === 'todos' && obsCambiada()) cuerpo = `<button type="button" class="pp-cmb cambiar" data-a="ir-obs"><b>Observaciones</b><br><span>Cambiadas: se guardan con «Guardar en SAP»</span></button>` + (lista.length ? cuerpo : '');   // v1.129.0: cuentan en «Cambios»
       return `<div id="pp-sel-cfg">${htmlSelCfg()}</div><div class="pp-panel-cab"><b>${EMB ? 'Cambios por guardar' : 'Cambios del borrador'}</b><div class="pp-chips">${chips}</div></div><div class="pp-panel-lista">${cuerpo}</div>`;
     }
@@ -19014,11 +19058,63 @@
       const el = document.querySelector(`[data-id="${CSS.escape(id)}"]`); if (!el) return;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('pp-destello'); void el.offsetWidth; el.classList.add('pp-destello');
     }
+    // v1.139.0: equipos y utensilios (una sola numeración «orden») y especificaciones (dentro de su grupo) también se mueven
+    const esOtraLista = (f) => f && (f.clase === 'equipo' || f.clase === 'utensilio' || f.clase === 'especificacion');
+    const textoOtro = (x) => (x.ensayo != null || x.especificacion != null ? PPN.textoEsp(x) : [x.desc, x.codigo, x.ref].filter(Boolean).join(' · '));
+    function secuenciaOtra(id) {                                                  // -> { todos, mov: los que se pueden mover, aplicar(nuevaMov) }
+      const f = encontrar(id); if (!esOtraLista(f)) return null;
+      if (f.clase === 'especificacion') {
+        if (!PPN.especReordenable(f.e)) return null; const l = f.e.espec, g = PPN.grupoEsp(f.item), mov = l.filter((y) => PPN.grupoEsp(y) === g);
+        return { mov, aplicar: (nueva) => { const pos = mov.map((y) => l.indexOf(y)).sort((a, b) => a - b); nueva.forEach((y, i) => { l[pos[i]] = y; }); } };
+      }
+      const todos = PPN.eqSecuencia(f.e).map((y) => y.x), mov = todos.filter((y) => !y.quitado);
+      return { mov, aplicar: (nueva) => { const pos = mov.map((y) => todos.indexOf(y)).sort((a, b) => a - b), fin = todos.slice(); nueva.forEach((y, i) => { fin[pos[i]] = y; }); fin.forEach((y, i) => { y.orden = i + 1; }); } };
+    }
+    function moverOtro(id, dir) {
+      const sq = secuenciaOtra(id); if (!sq) return; const i = sq.mov.findIndex((y) => y.id === id), j = i + dir; if (i < 0 || j < 0 || j >= sq.mov.length) return;
+      cambio(() => { const s2 = secuenciaOtra(id), l = s2.mov.slice(), [x] = l.splice(i, 1); l.splice(j, 0, x); s2.aplicar(l); });
+      setTimeout(() => { irA(id); seleccionar(id); }, 30);
+    }
+    function moverOtroA(id) {
+      const f = encontrar(id), sq = secuenciaOtra(id); if (!sq) return; const esp = f.clase === 'especificacion', i = sq.mov.findIndex((y) => y.id === id), previo = i > 0 ? sq.mov[i - 1].id : '';
+      const ops = sq.mov.filter((y) => y.id !== id).map((y, k) => `<option value="${esc(y.id)}"${y.id === previo ? ' selected' : ''}>${esc(`${k + 1}. ${textoOtro(y).slice(0, 100)}`)}</option>`).join('');
+      modal(`<h3>Mover ${esp ? 'especificación' : f.clase}<span>${esc(textoOtro(f.item).slice(0, 100))}</span></h3>
+        <label class="pp-campo">Colocarlo después de<select id="m-pos"><option value="">— Al inicio ${esp ? 'del grupo' : 'del listado'} —</option>${ops}</select></label>
+        <p class="pp-nota">${esp ? `Se mueve dentro de su grupo${f.item.grupo ? ` (${esc(f.item.grupo)})` : ''}.` : 'Equipos y utensilios comparten un mismo orden en SAP.'}</p>
+        <div class="pp-pie"><button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Mover</button></div>`, (m, cerrar) => {
+        const sel = $('#m-pos', m); setTimeout(() => sel.focus(), 20);
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'aceptar') {
+          const dest = sel.value; if (dest === previo) { cerrar(); return; }
+          cambio(() => { const s2 = secuenciaOtra(id), l = s2.mov.filter((y) => y.id !== id), it = s2.mov.find((y) => y.id === id), j = dest ? l.findIndex((y) => y.id === dest) + 1 : 0; l.splice(j, 0, it); s2.aplicar(l); });
+          cerrar(); setTimeout(() => { irA(id); seleccionar(id); }, 30); } });
+      });
+    }
+    // v1.139.0: editar una especificación (Descripción del ensayo y Especificaciones), como «Modificar Especificaciones» del portal
+    function editarEsp(id) {
+      const f = encontrar(id); if (!f || f.clase !== 'especificacion') return; const x = f.item, b = BI.get(id) || {}, M = PPN.ESPEC_MAX;
+      modal(`<h3>Editar especificación<span>${esc((f.item.grupo ? f.item.grupo + ' › ' : '') + (x.ensayo || ''))}</span></h3>
+        <label class="pp-campo">Descripción<input id="m-ens" maxlength="${M.ensayo}" value="${esc(x.ensayo || '')}"></label>
+        <label class="pp-campo">Especificaciones<textarea id="m-esp" rows="4" maxlength="${M.especificacion}">${esc(x.especificacion || '')}</textarea></label>
+        ${b.id && PPN.ESPEC_CAMPOS.some(([k]) => PPN.txtEsp(x[k]) !== PPN.txtEsp(b[k])) ? `<p class="pp-nota">En SAP: ${esc(PPN.textoEsp(b))}</p>` : ''}
+        <p class="pp-nota" id="m-err" hidden></p>
+        <div class="pp-pie">${b.id ? '<button type="button" data-a="original">Restaurar original</button>' : ''}<button type="button" data-a="cancelar">Cancelar</button><button type="button" class="primario" data-a="aceptar">Aceptar</button></div>`, (m, cerrar) => {
+        const iE = $('#m-ens', m), tE = $('#m-esp', m), err = $('#m-err', m); setTimeout(() => iE.focus(), 20);
+        m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar();
+          else if (a === 'original') { iE.value = b.ensayo || ''; tE.value = b.especificacion || ''; }
+          else if (a === 'aceptar') {
+            const ens = iE.value.replace(/\s+/g, ' ').trim(), esp = tE.value.trim();
+            if (!ens) { err.hidden = false; err.textContent = 'La Descripción no puede quedar vacía.'; iE.focus(); return; }
+            if (ens === PPN.txtEsp(x.ensayo) && esp === PPN.txtEsp(x.especificacion)) { cerrar(); return; }
+            cambio(() => { const it = encontrar(id).item; it.ensayo = ens; it.especificacion = esp; }); cerrar(); setTimeout(() => { irA(id); seleccionar(id); }, 30); } });
+      });
+    }
     function mover(id, dir) {
+      if (esOtraLista(encontrar(id))) { moverOtro(id, dir); return; }
       cambio(() => { const f = encontrar(id), l = f.lista, i = l.findIndex((y) => y.id === id); let j = i + dir; while (j >= 0 && j < l.length && l[j].quitado) j += dir; if (j < 0 || j >= l.length) return; const [x] = l.splice(i, 1); l.splice(j, 0, x); });
       setTimeout(() => irA(id), 30);
     }
     function moverA(id) {
+      if (esOtraLista(encontrar(id))) { moverOtroA(id); return; }
       const f = encontrar(id); if (!f || !f.lista) return; const x = f.item, num = PPN.numerar(W.estructuras, BASE.estructuras), vivos = f.lista.filter((y) => !y.quitado);
       const previo = (() => { const i = vivos.findIndex((y) => y.id === id); return i > 0 ? vivos[i - 1].id : ''; })();
       const ops = vivos.filter((y) => y.id !== id).map((y, k) => `<option value="${esc(y.id)}"${y.id === previo ? ' selected' : ''}>${esc(`${f.clase === 'pm' ? `${k + 1}.` : num.get(y.id) ? num.get(y.id) + '.-' : '-'} ${String(y.texto || '').slice(0, 100)}`)}</option>`).join('');
@@ -19255,6 +19351,7 @@
       else if (a === 'solicitud') abrirSolicitud('');
       else if (a === 'deshacer') deshacerUno();
       else if (a === 'editar') editar({ id });
+      else if (a === 'editar-esp') editarEsp(id);
       else if (a === 'config') editarConfig(id);
       else if (a === 'dt-rapido') configRapida(id, b);
       else if (a === 'dep-rapido') depRapido(id, b);
@@ -19860,6 +19957,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         const lista = (l, pref) => l.forEach((p) => { const kp = sig(`${pref}|${p.codigo}`); m.set(kp, p.id); (p.pm || []).forEach((x) => m.set(sig(`${kp}|${x.codigo || x.comp}`), x.id)); });
         lista(e.pasos || [], ke); (e.etiquetas || []).forEach((t) => { const kt = sig(`${ke}|T${t.etiquetaId}`); m.set(kt, t.id); lista(t.pasos || [], kt); });
         (e.equipos || []).forEach((q) => m.set(sig(`${ke}|Q${q.equipoId}`), q.id)); (e.utensilios || []).forEach((u) => m.set(sig(`${ke}|U${u.utensilioId || u.agrupadorId}`), u.id));
+        (e.espec || []).forEach((x) => m.set(sig(`${ke}|S${PPN.grupoEsp(x)}|${PPN.txtEsp(x.padre || x.ensayo).toUpperCase()}`), x.id));   // v1.139.0
       });
       return m;
     };
@@ -21141,12 +21239,36 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
             ...(x.agrupadorId ? { agrupadorId_clasificacionUtensilioId: x.agrupadorId } : { utensilioId_utensilioId: x.utensilioId }), orden: ++nuevoOrden + 1000 }] }, inv: { ruta: `/MD_ES_UTENSILIO('${id}')`, datos: { ...baja } }, marca: { id, tipo: 'agregado' }, ordenDe: { estr: e.id, id, tabla: 'MD_ES_UTENSILIO' } });
         }
       }
+      // v1.139.0: el borrador movió equipos o utensilios (orden distinto al de la base)
+      { const sb = PPN.eqSecuencia(be).map((y) => y.x.id), posB = new Map(sb.map((id, i) => [id, i])), conB = PPN.eqSecuencia(e).filter((y) => !y.x.quitado && posB.has(y.x.id));
+        if (PPN.enOrden(conB.map((y) => posB.get(y.x.id))).size < conB.length) cambiaListas = true; }
       if (cambiaListas) {                                                                 // numeración compartida 1..n (updateOrderEquipment)
         const quita = new Set((e.equipos || []).concat(e.utensilios || []).filter((x) => x.quitado).map((x) => D(x.id)));
         const finalL = [...(ed.equipos || []).concat(ed.utensilios || [])].filter((y) => !quita.has(y.id)).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).map((y) => ({ id: y.id, orden: y.orden, existente: true, tabla: (ed.equipos || []).includes(y) ? 'MD_ES_EQUIPO' : 'MD_ES_UTENSILIO' }));
         ops.filter((o) => o.ordenDe && o.ordenDe.estr === e.id).forEach((o) => finalL.push({ id: o.ordenDe.id, existente: false, tabla: o.ordenDe.tabla, op: o }));
+        // v1.139.0: en el orden del borrador; los de SAP que el borrador no conoce se quedan en su lugar
+        { const porId = new Map(finalL.map((y) => [y.id, y])), quiere = PPN.eqSecuencia(e).filter((y) => !y.x.quitado).map((y) => porId.get(D(y.x.id))).filter(Boolean), pos = quiere.map((y) => finalL.indexOf(y)).sort((a, b) => a - b);
+          quiere.forEach((y, i) => { finalL[pos[i]] = y; }); }
         finalL.forEach((y, i) => { if (!y.existente) { const campoOrden = y.op.datos.aEquipo || y.op.datos.aUtensilio; campoOrden[0].orden = i + 1; return; } if (+y.orden !== i + 1) op(4, { lugar: e.nombre, accion: 'Orden', clase: y.tabla === 'MD_ES_EQUIPO' ? 'equipo' : 'utensilio', desc: `equipos y utensilios: orden ${y.orden} → ${i + 1}`, ruta: `/${y.tabla}('${y.id}')`, datos: { orden: i + 1 }, paralelo: true, inv: { ruta: `/${y.tabla}('${y.id}')`, datos: { orden: y.orden } } }); });
       }
+    }
+    // v1.139.0: especificaciones: textos (MERGE MD_ES_ESPECIFICACION con ensayoHijo / especificacion) y orden (valores de orden que ya tenía la
+    // estructura, repartidos en el orden del borrador, como el Guardar de «Especificaciones» con las mejoras). Las de SAP (ensayoPadreSAP) no se reordenan.
+    for (const e of prop.trabajo.estructuras) {
+      const be = bEst.get(e.id) || {}, ed = estD.get(D(e.id)) || {}, bl = be.espec || [], al = ed.espec || [], bId = new Map(bl.map((y) => [y.id, y])), aId = new Map(al.map((y) => [y.id, y]));
+      (e.espec || []).forEach((x) => { const b0 = bId.get(x.id); if (!b0) return; const campos = PPN.ESPEC_CAMPOS.filter(([k]) => PPN.txtEsp(x[k]) !== PPN.txtEsp(b0[k])); if (!campos.length) return;
+        const fila = aId.get(D(x.id)); if (!fila) { bloqueos.push(`No se encontró en SAP la especificación «${PPN.textoEsp(b0).slice(0, 60)}» (${e.nombre}).`); return; }
+        if (!PPN.txtEsp(x.ensayo)) { bloqueos.push(`La especificación «${PPN.textoEsp(b0).slice(0, 60)}» (${e.nombre}) quedó sin Descripción.`); return; }
+        const datosE = {}, invE = {}; campos.forEach(([k]) => { const c = k === 'ensayo' ? 'ensayoHijo' : 'especificacion'; datosE[c] = PPN.txtEsp(x[k]).slice(0, PPN.ESPEC_MAX[k]); invE[c] = fila[k] == null ? null : fila[k]; });
+        op(4, { lugar: e.nombre, accion: 'Cambiar', clase: 'especificacion', desc: `especificación «${PPN.textoEsp(fila).slice(0, 60)}»: ${campos.map(([k, n]) => `${n} → «${PPN.txtEsp(x[k]).slice(0, 60)}»`).join('; ')}`,
+          ruta: `/MD_ES_ESPECIFICACION('${fila.id}')`, datos: { ...datosE, ...fechaUsuario }, inv: { ruta: `/MD_ES_ESPECIFICACION('${fila.id}')`, datos: { ...invE, ...fechaUsuario } }, marca: { id: fila.id, tipo: 'cambiado' }, espec: { id: fila.id, ...datosE } }); });
+      const posB = new Map(bl.map((y, i) => [y.id, i])), conB = (e.espec || []).filter((x) => posB.has(x.id));
+      if (PPN.enOrden(conB.map((x) => posB.get(x.id))).size === conB.length) continue;
+      if (al.some((y) => y.padre)) { avisos.push(`«${e.nombre}»: sus especificaciones vienen de SAP y el portal las ordena por su número de característica; no se cambia su orden.`); continue; }
+      const quiere = conB.map((x) => aId.get(D(x.id))).filter(Boolean), pos = quiere.map((y) => al.indexOf(y)).sort((a, b) => a - b), fin = al.slice(); quiere.forEach((y, i) => { fin[pos[i]] = y; });
+      const previos = al.map((y) => Number(y.orden)), validos = previos.every(Number.isFinite) && new Set(previos).size === previos.length, valores = validos ? previos.slice().sort((a, b) => a - b) : al.map((_, i) => i + 1);
+      fin.forEach((y, i) => { if (Number(y.orden) === valores[i]) return; op(4, { lugar: e.nombre, accion: 'Orden', clase: 'especificacion', desc: `especificación «${PPN.textoEsp(y).slice(0, 60)}»: orden ${y.orden == null ? '(vacío)' : y.orden} → ${valores[i]}`, ruta: `/MD_ES_ESPECIFICACION('${y.id}')`, datos: { orden: valores[i], ...fechaUsuario }, paralelo: true,
+        inv: { ruta: `/MD_ES_ESPECIFICACION('${y.id}')`, datos: { orden: y.orden == null ? null : y.orden, ...fechaUsuario } }, espec: { id: y.id, orden: valores[i] } }); });
     }
     // predecesores: reenlazar lo afectado por quitados o insertados; movidos se avisan
     if (seqPasos.length && !bloqueos.length) {
@@ -21289,6 +21411,12 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       cmp(e.pasos || [], ne.pasos, e.nombre);
       (e.etiquetas || []).forEach((t) => { const nt = (ne.etiquetas || []).find((x) => x.id === D(t.id)); if (!nt) { dif.push(`Falta la etiqueta ${t.nombre}.`); return; } cmp(t.pasos || [], nt.pasos, `${e.nombre} › ${t.nombre}`); });
       ['equipos', 'utensilios'].forEach((k) => { const quiere = (e[k] || []).filter((x) => !x.quitado).length, hay = (ne[k] || []).length; if (quiere !== hay) dif.push(`${e.nombre}: ${k} esperados ${quiere}, hay ${hay}.`); });
+      // v1.139.0: orden de equipos y utensilios, y textos de las especificaciones
+      { const sec = PPN.eqSecuencia(ne).map((y) => y.x.id), quiere = PPN.eqSecuencia(e).filter((y) => !y.x.quitado).map((y) => D(y.x.id)).filter((id) => sec.includes(id)), hay = sec.filter((id) => quiere.includes(id));
+        if (quiere.join('|') !== hay.join('|')) dif.push(`${e.nombre}: los equipos y utensilios no quedaron en el orden pedido.`); }
+      (plan.ops || []).filter((o) => o.espec && o.clase === 'especificacion' && o.accion === 'Cambiar').forEach((o) => { const y = (ne.espec || []).find((z) => z.id === o.espec.id); if (!y) return;
+        const malos = [['ensayoHijo', 'ensayo', 'Descripción'], ['especificacion', 'especificacion', 'Especificaciones']].filter(([c, k]) => c in o.espec && PPN.txtEsp(o.espec[c]) !== PPN.txtEsp(y[k]));
+        if (malos.length) dif.push(`${e.nombre}: la especificación «${PPN.textoEsp(y).slice(0, 50)}» no quedó como se pidió (${malos.map((c) => c[2]).join(', ')}).`); });
     });
     // v1.123.0: la configuración escrita desde la vista completa
     const filas = new Map(), etqs = new Map(); nuevo.estructuras.forEach((e) => { (e.etiquetas || []).forEach((t) => etqs.set(t.id, t)); [e.pasos, ...(e.etiquetas || []).map((t) => t.pasos)].forEach((l) => (l || []).forEach((p) => { filas.set(p.id, p); (p.pm || []).forEach((m) => filas.set(m.id, m)); })); });
