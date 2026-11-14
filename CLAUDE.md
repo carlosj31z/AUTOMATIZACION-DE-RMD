@@ -332,6 +332,12 @@ cuenta). Escribir y responder siempre en **español**.
   filas término con tipo no numérico pasan a 438 (3 decimales) y la fórmula se queda en 445 (`fxTipo`); quitar un término bloquea; insumo agregado
   del mismo material que suma una fórmula va a tareas manuales.
   Prueba `tampermonkey/pruebas/qa_formulas_ingreso.mjs`. **La siguiente versión debe ser > 1.137.0.**
+- 2026-11-14, v1.138.0 (encima de la 1.137.0): **pedido de Carlos: campanita con bandeja de solicitudes y un ícono aparte para buscar por lote.**
+  Módulo `crearBandeja(D)` entre `// ==BANDEJA-INICIO==` y `// ==BANDEJA-FIN==`. Usa el modelo `mainModelv2` de Configuración (es el mismo backend que la app Solicitud).
+  Lista paginada de 40 (`$orderby fechaRegistro desc`, búsqueda con Contains). «Por atender» filtra con `puedoAtender`: destinatario más rol, o aprobador de RolAppAcciones.
+  Aprobar y rechazar son un port de `onAprobarSolicitud`/`onRechazar`, incluido `registrarEstructurasNuevaVersion` cuando la versión es distinta de 1. La tarea del workflow se completa con `bpmworkflowruntime` del approuter.
+  Buscar por lote: `NECESIDADESRMD_SRV/OrdenSet`, luego RMD por productoId + ordenSAP, solo lectura.
+  Prueba `tampermonkey/pruebas/qa_bandeja.py` (SAP simulado, 37 pruebas). El hilo de especificaciones y equipos usa la 1.139.0. **La siguiente versión debe ser > 1.138.0** (o > 1.139.0 si ya se fusionó).
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
