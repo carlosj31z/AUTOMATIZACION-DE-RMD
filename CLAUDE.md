@@ -350,6 +350,9 @@ cuenta). Escribir y responder siempre en **español**.
   que ya tenía la estructura, repartidos en el orden del borrador); equipos y utensilios renumerados 1..n en el orden del borrador (`updateOrderEquipment`).
   `ppVerificarIngreso` comprueba orden de equipos y textos. Botones nuevos solo con texto. Insumos dentro de los pasos del PROCEDIMIENTO (v1.136.0): revalidados
   (LN50/LN61). Prueba `qa_local.py` LN62. **La siguiente versión debe ser > 1.139.0.**
+- 2026-11-14, v1.140.0 (encima de la 1.139.0): el proyecto Supabase de status-rmd `mlmsympewmxfcqoyowxs` se borró por
+  error; el script apunta al nuevo `govkmqahpvnlmllboqsh` (status-rmd PR #66 hace lo mismo en la página y agrega
+  «Restaurar la copia de este equipo»). **La siguiente versión debe ser > 1.140.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
