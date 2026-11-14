@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (cargador)
 // @namespace    medifarma.rmd
-// @version      1.1.0
+// @version      1.2.0
 // @description  Usa siempre la versión más reciente de «RMD · mejoras de interfaz» que haya en la carpeta MEJORAS DE INTERFAZ de SharePoint, con cualquier nombre de archivo (por ejemplo 1.56.0.js).
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-start
@@ -19,9 +19,11 @@
 // Puente de la contingencia (v1.1.0): la página pide con window.postMessage({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras, cuerpo }) y recibe
 // { tipo: 'rmd-sp-respuesta', id, estado, texto }. Solo se permiten la API REST del sitio DOCUMENTACIONMEDIFARMA (contexto, búsqueda,
 // carpetas y archivos) y solo dentro de 04.-RMD/3.-CONTINGENCIA para escribir.
+// v1.2.0: lectura (GET) de la carpeta 04.-RMD/10.- RMD DE CARACTERIZACION (lista y archivos, para el Excel «CARACTERIZACIÓN LISTADO» que pide
+// Status RMD). Con { binario: true } la respuesta trae además bytes (ArrayBuffer) con el archivo tal cual.
 (function () {
   'use strict';
-  const CARGADOR = '1.1.0';
+  const CARGADOR = '1.2.0';
   const SITIO = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA';
   const CARPETA = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';
   const CADA = 10 * 60 * 1000;                                       // como máximo una revisión cada 10 min (valor compartido entre pestañas)
@@ -111,10 +113,17 @@
   document.addEventListener('rmd-cargador-revisar', () => { revisar(true); });
   const API = SITIO + '/_api/';
   const CONTINGENCIA = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA/';
+  const CARACTERIZACION = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/10.- RMD DE CARACTERIZACION/';
   function permitido(metodo, url) {
     if (typeof url !== 'string' || !url.startsWith(API)) return false;
     const resto = url.slice(API.length);
-    if (metodo === 'GET') return /^search\/query\?/.test(resto);
+    if (metodo === 'GET') {
+      if (/^search\/query\?/.test(resto)) return true;
+      // solo lectura de la carpeta de caracterización: su lista de archivos o el contenido de un archivo de ella
+      if (!/^web\/(GetFolderByServerRelativePath\(DecodedUrl=@a\)\/Files|GetFileByServerRelativePath\(DecodedUrl=@a\)\/\$value)\?@a='[^']*'(&\$select=[A-Za-z,]+)?$/.test(resto)) return false;
+      const r = (() => { try { return decodeURIComponent(/@a='([^']*)'/.exec(resto)[1]).replace(/''/g, "'"); } catch (e) { return ''; } })();
+      return (r + '/').toLowerCase().startsWith(CARACTERIZACION.toLowerCase()) && !r.includes('/../') && !r.includes('/..');
+    }
     if (metodo !== 'POST') return false;
     if (resto === 'contextinfo') return true;
     // escrituras: todas las rutas citadas (@a, @b, @n con la carpeta) dentro de 3.-CONTINGENCIA
@@ -124,12 +133,13 @@
   }
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.origin !== location.origin || !d || d.tipo !== 'rmd-sp-pedido') return;   // (en el sandbox de Tampermonkey, window no es e.source)
-    const responder = (estado, texto) => window.postMessage({ tipo: 'rmd-sp-respuesta', id: d.id, estado, texto }, location.origin);
+    const responder = (estado, texto, bytes) => window.postMessage({ tipo: 'rmd-sp-respuesta', id: d.id, estado, texto, bytes: bytes || null }, location.origin);
     if (!permitido(d.metodo, d.url)) { responder(400, 'pedido no permitido por el cargador'); return; }
     const cab = {}; Object.entries(d.cabeceras || {}).forEach(([k, v]) => { if (/^(Accept|Content-Type|X-RequestDigest)$/i.test(k)) cab[k] = String(v); });
     GM_xmlhttpRequest({
       method: d.metodo, url: d.url, headers: cab, timeout: 120000, data: d.cuerpo ? new Blob([d.cuerpo], { type: cab['Content-Type'] || 'application/octet-stream' }) : undefined,
-      onload: (r) => responder(r.status, r.responseText), onerror: () => responder(0, 'sin conexión con SharePoint'), ontimeout: () => responder(0, 'SharePoint no respondió a tiempo'),
+      responseType: d.binario && d.metodo === 'GET' ? 'arraybuffer' : undefined,
+      onload: (r) => (d.binario && d.metodo === 'GET' ? responder(r.status, r.status >= 200 && r.status < 300 ? '' : 'SharePoint respondió ' + r.status, r.response) : responder(r.status, r.responseText)), onerror: () => responder(0, 'sin conexión con SharePoint'), ontimeout: () => responder(0, 'SharePoint no respondió a tiempo'),
     });
   });
   revisar(false).then(() => { if (!inyectada) { const q = GM_getValue('paquete', null); if (q && q.codigo) inyectar(q); } });
