@@ -338,6 +338,9 @@ cuenta). Escribir y responder siempre en **español**.
   Aprobar y rechazar son un port de `onAprobarSolicitud`/`onRechazar`, incluido `registrarEstructurasNuevaVersion` cuando la versión es distinta de 1. La tarea del workflow se completa con `bpmworkflowruntime` del approuter.
   Buscar por lote: `NECESIDADESRMD_SRV/OrdenSet`, luego RMD por productoId + ordenSAP, solo lectura.
   Prueba `tampermonkey/pruebas/qa_bandeja.py` (SAP simulado, 37 pruebas). El hilo de especificaciones y equipos usa la 1.139.0. **La siguiente versión debe ser > 1.138.0** (o > 1.139.0 si ya se fusionó).
+- 2026-11-14, v1.138.1 (encima de la 1.138.0): **pedidos de Carlos.** La bandeja es solo de solicitudes: sin flujo de revisión ni en la interfaz ni en el código. Quitar lo que parezca hecho con IA: estilo de lista Fiori, sin tarjetas, píldoras, animaciones ni barras de carga.
+  Buscar por lote trae los documentos del reporte original: OPP (`pdfDeOrden`: IMPRESIONORD con `modeloErp.getHeaders()`), RMO y Descargar RMO (`generarRmo`: carga `table.onGeneratePdf` de Registro con `sap.ui.loader.config`; `datosRmo` es el port de `onGetPdfViewerRmo`; 'BASE64' para abrir en una pestaña).
+  Mecanismos probados en el portal real en solo lectura (RMD 2202608488 v8, órdenes 2100033070 y 2100033188). **La siguiente versión debe ser > 1.138.1** (o > 1.139.x si ya se fusionó).
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

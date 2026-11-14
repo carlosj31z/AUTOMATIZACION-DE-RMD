@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.138.0
+// @version      1.138.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.138.0';                                                       // mantener igual a @version
+  const VERSION = '1.138.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1672,88 +1672,75 @@
   .rmd-beam[data-beam="rmdc"][data-paused] .rmd-bloom {
     animation-play-state: paused !important;
   }
-  /* ── v1.138.0 Bandeja de solicitudes y Buscar por lote ── */
-  html.rmd-ui .rmd-btn.rmd-bs-lanza { position: relative; width: auto; min-width: var(--rmd-btn-alto, 36px); height: var(--rmd-btn-alto, 36px); padding: 0 8px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--rmd-ico-portal, var(--rmd-acento-texto)); }
-  html.rmd-ui .rmd-btn.rmd-bs-lanza:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
-  html.rmd-ui .rmd-bs-lanza svg { width: calc(var(--rmd-ico-tam, 16px) + 3px); height: calc(var(--rmd-ico-tam, 16px) + 3px); fill: none; stroke: currentColor; stroke-width: 1.45; stroke-linecap: round; stroke-linejoin: round; }
-  html.rmd-ui .rmd-bs-lanza > span { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #e2553f; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; box-shadow: 0 0 0 2px var(--rmd-barra); }
+  /* ── v1.138.0 Bandeja de solicitudes y Buscar por lote (estilo de lista Fiori, sin tarjetas ni animaciones) ── */
+  html.rmd-ui .rmd-btn.rmd-bs-lanza { position: relative; width: auto; min-width: var(--rmd-btn-alto, 36px); height: var(--rmd-btn-alto, 36px); padding: 0 8px; justify-content: center; border: 0; border-radius: 4px; background: transparent; color: var(--rmd-ico-portal, var(--rmd-acento-texto)); }
+  html.rmd-ui .rmd-btn.rmd-bs-lanza:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+  html.rmd-ui .rmd-bs-lanza svg { width: calc(var(--rmd-ico-tam, 16px) + 2px); height: calc(var(--rmd-ico-tam, 16px) + 2px); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  html.rmd-ui .rmd-bs-lanza > span { position: absolute; top: 4px; right: 1px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 3px; background: #d04343; color: #fff; font: 700 10px/15px var(--rmd-fuente); text-align: center; }
   html.rmd-ui .rmd-bs-lanza > span:empty { display: none; }
-  .rmd-bs-campana.rmd-bs-suena svg { transform-origin: 50% 12%; animation: rmd-bs-suena .9s ease-in-out 1; }
-  @keyframes rmd-bs-suena { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(13deg); } 35% { transform: rotate(-10deg); } 55% { transform: rotate(6deg); } 75% { transform: rotate(-3deg); } }
-  .rmd-bs-fondo { position: fixed; inset: 0; z-index: 99990; background: rgba(10,14,18,0); transition: background .18s ease; font: 14px/1.4 var(--rmd-fuente); color: var(--rmd-texto); }
-  .rmd-bs-fondo.rmd-bs-entra { background: rgba(10,14,18,.32); } .rmd-bs-fondo.rmd-bs-sale { background: rgba(10,14,18,0); }
-  .rmd-bs { position: absolute; top: 0; right: 0; bottom: 0; width: min(1120px, 96vw); display: flex; flex-direction: column; background: var(--rmd-barra); border-left: 1px solid var(--rmd-borde); box-shadow: -18px 0 40px rgba(0,0,0,.28); transform: translateX(24px); opacity: 0; transition: transform .2s cubic-bezier(.2,.8,.2,1), opacity .16s ease; }
-  .rmd-bs-entra .rmd-bs { transform: none; opacity: 1; } .rmd-bs-sale .rmd-bs { transform: translateX(24px); opacity: 0; }
+  .rmd-bs-fondo { position: fixed; inset: 0; z-index: 99990; background: rgba(0,0,0,.3); font: 14px/1.4 var(--rmd-fuente); color: var(--rmd-texto); }
+  .rmd-bs { position: absolute; top: 0; right: 0; bottom: 0; width: min(1120px, 96vw); display: flex; flex-direction: column; background: var(--rmd-barra); border-left: 1px solid var(--rmd-borde); }
   .rmd-bs.rmd-lt { width: min(860px, 96vw); }
-  .rmd-bs-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px 8px; }
-  .rmd-bs-tit h3 { margin: 0; font: 600 19px var(--rmd-fuente); letter-spacing: -.01em; } .rmd-bs-sub { color: var(--rmd-apagado); font-size: 12.5px; }
+  .rmd-bs-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-bs-tit h3 { margin: 0; font: 400 16px var(--rmd-fuente); } .rmd-bs-sub { color: var(--rmd-apagado); font-size: 12px; } .rmd-bs-sub:empty { display: none; }
   .rmd-bs-acc { display: flex; gap: 4px; }
-  .rmd-bs-txt { padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--rmd-acento-texto); font: 600 13px var(--rmd-fuente); cursor: pointer; text-decoration: none; }
-  .rmd-bs-txt:hover { background: color-mix(in srgb, var(--rmd-acento) 12%, transparent); } .rmd-bs-txt:disabled { opacity: .5; cursor: default; }
-  .rmd-bs-btn { padding: 7px 16px; border: 1px solid transparent; border-radius: 8px; font: 600 13.5px var(--rmd-fuente); cursor: pointer; }
-  .rmd-bs-btn.si { background: var(--rmd-verde); color: #0d1f14; } html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-bs-btn.si { color: #fff; }
-  .rmd-bs-btn.no { background: transparent; border-color: var(--rmd-rojo); color: var(--rmd-rojo); }
-  .rmd-bs-btn:disabled { opacity: .45; cursor: default; } .rmd-bs-btn:not(:disabled):hover { filter: brightness(1.08); }
-  .rmd-bs-pestanas { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--rmd-borde); }
-  .rmd-bs-pestanas button { position: relative; padding: 9px 12px 10px; border: 0; background: none; color: var(--rmd-apagado); font: 600 13.5px var(--rmd-fuente); cursor: pointer; }
-  .rmd-bs-pestanas button[aria-selected="true"] { color: var(--rmd-texto); } .rmd-bs-pestanas button[aria-selected="true"]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--rmd-acento); }
-  .rmd-bs-num { margin-left: 7px; padding: 0 6px; border-radius: 9px; background: color-mix(in srgb, var(--rmd-apagado) 22%, transparent); font-size: 11.5px; } .rmd-bs-num.hay { background: #e2553f; color: #fff; }
-  .rmd-bs-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 20px; }
-  .rmd-bs-buscar, .rmd-lt-form input { flex: 1 1 260px; min-width: 0; height: 34px; padding: 0 12px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
-  .rmd-bs-buscar:focus, .rmd-lt-form input:focus { outline: 2px solid color-mix(in srgb, var(--rmd-acento) 55%, transparent); outline-offset: 0; border-color: var(--rmd-acento); }
-  .rmd-bs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; } .rmd-bs-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--rmd-borde); }
-  .rmd-bs-chips button { padding: 4px 10px; border: 1px solid var(--rmd-borde); border-radius: 999px; background: transparent; color: var(--rmd-texto); font: 500 12.5px var(--rmd-fuente); cursor: pointer; }
-  .rmd-bs-chips button[aria-pressed="true"] { border-color: var(--rmd-acento); background: color-mix(in srgb, var(--rmd-acento) 16%, transparent); color: var(--rmd-acento-texto); }
+  .rmd-bs-txt { padding: 4px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--rmd-acento-texto); font: 400 14px var(--rmd-fuente); cursor: pointer; text-decoration: none; }
+  .rmd-bs-txt:hover { text-decoration: underline; } .rmd-bs-txt:disabled { opacity: .5; cursor: default; text-decoration: none; }
+  .rmd-bs-btn { min-width: 80px; height: 30px; padding: 0 12px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: transparent; color: var(--rmd-texto); font: 400 14px var(--rmd-fuente); cursor: pointer; }
+  .rmd-bs-btn.si { border-color: var(--rmd-verde); color: var(--rmd-verde); } .rmd-bs-btn.no { border-color: var(--rmd-rojo); color: var(--rmd-rojo); }
+  .rmd-bs-btn:disabled { opacity: .45; cursor: default; } .rmd-bs-btn:not(:disabled):hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+  .rmd-bs-pestanas { display: flex; gap: 0; padding: 0 16px; border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-bs-pestanas button { position: relative; padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--rmd-texto); font: 400 14px var(--rmd-fuente); cursor: pointer; }
+  .rmd-bs-pestanas button[aria-selected="true"] { border-bottom-color: var(--rmd-acento); color: var(--rmd-acento-texto); }
+  .rmd-bs-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; }
+  .rmd-bs-buscar, .rmd-lt-form input { flex: 1 1 260px; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
+  .rmd-bs-buscar:focus, .rmd-lt-form input:focus { outline: 1px dotted var(--rmd-texto); outline-offset: -3px; }
+  .rmd-bs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .rmd-bs-sep { width: 4px; }
+  .rmd-bs-chips button { height: 30px; margin-left: -1px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 0; background: transparent; color: var(--rmd-texto); font: 400 13px var(--rmd-fuente); cursor: pointer; }
+  .rmd-bs-chips button:first-child, .rmd-bs-sep + button { border-radius: 4px 0 0 4px; } .rmd-bs-chips button:last-child, .rmd-bs-chips button:has(+ .rmd-bs-sep) { border-radius: 0 4px 4px 0; }
+  .rmd-bs-chips button[aria-pressed="true"] { position: relative; background: color-mix(in srgb, var(--rmd-acento) 22%, transparent); border-color: var(--rmd-acento); }
   .rmd-bs-cuerpo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(340px, 44%) 1fr; border-top: 1px solid var(--rmd-borde); }
-  .rmd-bs-lista { overflow: auto; padding: 8px 10px 24px; border-right: 1px solid var(--rmd-borde); overscroll-behavior: contain; }
-  .rmd-bs-t { display: grid; gap: 3px; width: 100%; margin: 0 0 6px; padding: 10px 12px 10px 14px; border: 1px solid var(--rmd-borde); border-left: 3px solid var(--e, var(--rmd-borde)); border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); text-align: left; font: inherit; cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .12s; content-visibility: auto; contain-intrinsic-size: auto 104px; }
-  .rmd-bs-t:hover { border-color: color-mix(in srgb, var(--rmd-acento) 45%, var(--rmd-borde)); } .rmd-bs-t:active { transform: scale(.995); }
-  .rmd-bs-t.sel { border-color: var(--rmd-acento); box-shadow: 0 0 0 1px var(--rmd-acento) inset; }
-  .rmd-bs-t.pendiente, .rmd-bs-dcab.pendiente { --e: #b58ce6; } .rmd-bs-t.aprobada, .rmd-bs-dcab.aprobada { --e: var(--rmd-acento-texto); } .rmd-bs-t.rechazada, .rmd-bs-dcab.rechazada, .rmd-bs-t.cancelada, .rmd-bs-dcab.cancelada { --e: var(--rmd-apagado); }
-  .rmd-bs-t.revision, .rmd-bs-dcab.revision { --e: var(--rmd-ambar); } .rmd-bs-t.autorizado, .rmd-bs-dcab.autorizado, .rmd-bs-t.ingresado, .rmd-bs-dcab.ingresado { --e: var(--rmd-verde); }
-  .rmd-bs-t1 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--rmd-apagado); }
-  .rmd-bs-cod { color: var(--rmd-texto); font-weight: 600; font-variant-numeric: tabular-nums; } .rmd-bs-tipo { font-size: 12px; color: var(--rmd-apagado); }
-  .rmd-bs-est { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 32%, transparent); background: color-mix(in srgb, currentColor 10%, transparent); font-size: 11.5px; font-weight: 600; color: var(--rmd-apagado); }
-  .rmd-bs-est.pendiente { color: #b58ce6; } .rmd-bs-est.aprobada { color: var(--rmd-acento-texto); } .rmd-bs-est.revision { color: var(--rmd-ambar); } .rmd-bs-est.autorizado, .rmd-bs-est.ingresado { color: var(--rmd-verde); }
-  .rmd-bs-destr dd { font-size: 12px; color: var(--rmd-apagado); }
-  .rmd-bs-nom { font-weight: 600; font-size: 14px; line-height: 1.3; }
-  .rmd-bs-t3, .rmd-bs-t4 { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-bs-t3 span + span::before, .rmd-bs-t4 span + span:not(:empty)::before { content: '·'; margin-right: 12px; opacity: .6; }
-  .rmd-bs-t3 { color: var(--rmd-texto); opacity: .88; }
-  .rmd-bs-vacio { padding: 28px 12px; color: var(--rmd-apagado); text-align: center; } .rmd-bs-vacio p { margin: 0 0 10px; }
-  .rmd-bs-esq { height: 84px; margin: 0 0 6px; border-radius: 10px; background: linear-gradient(90deg, var(--rmd-superficie) 0%, color-mix(in srgb, var(--rmd-superficie) 70%, var(--rmd-borde)) 50%, var(--rmd-superficie) 100%); background-size: 200% 100%; animation: rmd-bs-brillo 1.3s linear infinite; }
-  @keyframes rmd-bs-brillo { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-  .rmd-bs-mas, .rmd-bs-fin { padding: 10px; text-align: center; font-size: 12.5px; color: var(--rmd-apagado); min-height: 20px; }
-  .rmd-bs-det { overflow: auto; padding: 18px 24px 32px; overscroll-behavior: contain; }
-  .rmd-bs-nada { margin-top: 18vh; text-align: center; color: var(--rmd-apagado); } .rmd-bs-ayuda { font-size: 12px; opacity: .8; }
-  .rmd-bs-dcab { padding-left: 12px; border-left: 3px solid var(--e, var(--rmd-borde)); } .rmd-bs-volver { display: none; margin: 0 0 6px -9px; }
-  .rmd-bs-dcod { font-size: 12.5px; color: var(--rmd-apagado); font-variant-numeric: tabular-nums; } .rmd-bs-dcod span { margin-left: 6px; }
-  .rmd-bs-dcab h4 { margin: 2px 0 8px; font: 600 18px/1.3 var(--rmd-fuente); } .rmd-bs-dchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .rmd-bs-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 6px; } .rmd-bs-acciones a { margin-left: auto; }
+  .rmd-bs-lista { overflow: auto; padding: 0 0 24px; border-right: 1px solid var(--rmd-borde); overscroll-behavior: contain; }
+  .rmd-bs-t { display: grid; gap: 2px; width: 100%; margin: 0; padding: 9px 16px; border: 0; border-bottom: 1px solid var(--rmd-borde); border-radius: 0; background: transparent; color: var(--rmd-texto); text-align: left; font: inherit; cursor: pointer; content-visibility: auto; contain-intrinsic-size: auto 72px; }
+  .rmd-bs-t:hover { background: color-mix(in srgb, var(--rmd-texto) 5%, transparent); }
+  .rmd-bs-t.sel { background: color-mix(in srgb, var(--rmd-acento) 16%, transparent); box-shadow: inset 3px 0 0 var(--rmd-acento); }
+  .rmd-bs-t1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .rmd-bs-nom { font-weight: 700; font-size: 14px; line-height: 1.3; }
+  .rmd-bs-est { flex: none; font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-bs-est.pendiente { color: var(--rmd-ambar); } .rmd-bs-est.aprobada, .rmd-bs-est.autorizado, .rmd-bs-est.ingresado { color: var(--rmd-verde); } .rmd-bs-est.rechazada { color: var(--rmd-rojo); }
+  .rmd-bs-t3, .rmd-bs-t4 { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-bs-t3 span + span::before, .rmd-bs-t4 span + span:not(:empty)::before { content: '/'; margin-right: 6px; opacity: .5; }
+  .rmd-bs-destr dd { font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-bs-vacio { padding: 24px 16px; color: var(--rmd-apagado); text-align: center; } .rmd-bs-vacio p { margin: 0 0 10px; }
+  .rmd-bs-mas, .rmd-bs-fin { padding: 10px; text-align: center; font-size: 13px; color: var(--rmd-apagado); min-height: 20px; }
+  .rmd-bs-det { overflow: auto; padding: 14px 20px 32px; overscroll-behavior: contain; }
+  .rmd-bs-volver { display: none; margin: 0 0 6px -8px; }
+  .rmd-bs-dcab h4 { margin: 0 0 2px; font: 400 18px/1.3 var(--rmd-fuente); } .rmd-bs-dcod { font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-bs-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; } .rmd-bs-acciones a { margin-left: auto; }
   .rmd-bs-zona.activa { margin: 8px 0 12px; }
-  .rmd-bs-confirma { padding: 12px 14px; border: 1px solid var(--rmd-borde); border-radius: 10px; background: var(--rmd-superficie); } .rmd-bs-confirma > p { margin: 0 0 6px; }
-  .rmd-bs-confirma.trabajando, .rmd-bs-zona.trabajando .rmd-bs-confirma { border-color: var(--rmd-acento); }
+  .rmd-bs-confirma { padding: 10px 12px; border: 1px solid var(--rmd-borde); border-radius: 4px; background: var(--rmd-superficie); } .rmd-bs-confirma > p { margin: 0 0 6px; }
   .rmd-bs-fila { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
-  .rmd-bs-motivo { display: grid; gap: 4px; margin-top: 6px; font-size: 12.5px; color: var(--rmd-apagado); }
-  .rmd-bs-motivo textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-barra); color: var(--rmd-texto); font: 14px/1.4 var(--rmd-fuente); resize: vertical; }
-  .rmd-bs-dest { display: grid; gap: 4px; margin: 6px 0 0; padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; max-height: 180px; overflow: auto; } .rmd-bs-dest legend { padding: 0 4px; font-size: 12px; }
+  .rmd-bs-motivo { display: grid; gap: 4px; margin-top: 6px; font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-bs-motivo textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--rmd-borde-campo); border-radius: 4px; background: var(--rmd-barra); color: var(--rmd-texto); font: 14px/1.4 var(--rmd-fuente); resize: vertical; }
+  .rmd-bs-dest { display: grid; gap: 4px; margin: 6px 0 0; padding: 6px 8px; border: 1px solid var(--rmd-borde); border-radius: 4px; max-height: 180px; overflow: auto; } .rmd-bs-dest legend { padding: 0 4px; font-size: 12px; }
   .rmd-bs-dest label { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--rmd-texto); }
-  .rmd-bs-pasos { margin: 10px 0 0; padding-left: 20px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-bs-pasos:empty { display: none; }
-  .rmd-bs-pasos li.va { color: var(--rmd-texto); } .rmd-bs-pasos li.va::after { content: '…'; } .rmd-bs-pasos li.hecho { color: var(--rmd-verde); } .rmd-bs-pasos li.mal { color: var(--rmd-rojo); }
-  .rmd-bs-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 20px; margin: 16px 0 0; }
-  .rmd-bs-c { margin: 0; } .rmd-bs-c.ancho { grid-column: 1 / -1; } .rmd-bs-c dt { font-size: 11.5px; letter-spacing: .02em; text-transform: uppercase; color: var(--rmd-apagado); }
-  .rmd-bs-c dd { margin: 2px 0 0; font-size: 13.5px; word-break: break-word; } .rmd-bs-c.pre dd { white-space: pre-wrap; } .rmd-bs-c.rechazo dd { color: var(--rmd-rojo); }
+  .rmd-bs-pasos { margin: 10px 0 0; padding-left: 20px; font-size: 13px; color: var(--rmd-apagado); } .rmd-bs-pasos:empty { display: none; }
+  .rmd-bs-pasos li.va { color: var(--rmd-texto); } .rmd-bs-pasos li.hecho { color: var(--rmd-verde); } .rmd-bs-pasos li.mal { color: var(--rmd-rojo); }
+  .rmd-bs-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 20px; margin: 14px 0 0; }
+  .rmd-bs-c { margin: 0; } .rmd-bs-c.ancho { grid-column: 1 / -1; } .rmd-bs-c dt { font-size: 13px; color: var(--rmd-apagado); } .rmd-bs-c dt::after { content: ':'; }
+  .rmd-bs-c dd { margin: 1px 0 0; font-size: 14px; word-break: break-word; } .rmd-bs-c.pre dd { white-space: pre-wrap; } .rmd-bs-c.rechazo dd { color: var(--rmd-rojo); }
   .rmd-bs-c ul, .rmd-bs-c ol { margin: 0; padding-left: 18px; } .rmd-bs-c small { color: var(--rmd-apagado); }
   .rmd-bs-hist li { margin-bottom: 4px; } .rmd-bs-hist div { color: var(--rmd-apagado); white-space: pre-wrap; }
   .rmd-bs-adjl { list-style: none; padding: 0 !important; } .rmd-bs-adjl .rmd-bs-txt { padding-left: 0; text-align: left; }
-  .rmd-bs-tenue { color: var(--rmd-apagado); font-size: 12.5px; } .rmd-bs-error { color: var(--rmd-rojo); font-size: 13px; }
-  .rmd-lt-form { display: flex; gap: 8px; padding: 10px 20px 4px; } .rmd-lt-recientes { padding: 2px 20px 8px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-lt-recientes .rmd-bs-txt { padding: 2px 6px; }
-  .rmd-lt-res { flex: 1 1 auto; overflow: auto; padding: 0 20px 24px; } .rmd-lt-cuenta { margin: 6px 0 8px; font-size: 13px; color: var(--rmd-apagado); }
-  .rmd-lt-tabla { width: 100%; border-collapse: collapse; font-size: 13px; } .rmd-lt-tabla th { position: sticky; top: 0; padding: 6px 8px; background: var(--rmd-barra); border-bottom: 1px solid var(--rmd-borde); text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .02em; color: var(--rmd-apagado); }
-  .rmd-lt-tabla td { padding: 7px 8px; border-bottom: 1px solid var(--rmd-borde); } .rmd-lt-tabla tr[data-i] { cursor: pointer; } .rmd-lt-tabla tr[data-i]:hover, .rmd-lt-tabla tr.abierta { background: color-mix(in srgb, var(--rmd-acento) 9%, transparent); }
-  .rmd-lt-ord { font-weight: 600; font-variant-numeric: tabular-nums; } .rmd-lt-sub td { background: var(--rmd-superficie); padding: 8px 12px 10px 24px; }
-  .rmd-lt-rmd { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; } .rmd-lt-rmd li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  @media (max-width: 899px) { .rmd-bs-cuerpo { grid-template-columns: 1fr; } .rmd-bs .rmd-bs-det { display: none; } .rmd-bs.con-det .rmd-bs-lista { display: none; } .rmd-bs.con-det .rmd-bs-det { display: block; } .rmd-bs-volver { display: inline-block; } .rmd-bs-cab, .rmd-bs-filtros { padding-left: 14px; padding-right: 14px; } .rmd-lt-tabla th:nth-child(1), .rmd-lt-tabla td:nth-child(1), .rmd-lt-tabla th:nth-child(7), .rmd-lt-tabla td:nth-child(7) { display: none; } }
-  @media (prefers-reduced-motion: reduce) { .rmd-bs, .rmd-bs-fondo, .rmd-bs-t { transition: none; } .rmd-bs-campana.rmd-bs-suena svg, .rmd-bs-esq { animation: none; } }
+  .rmd-bs-tenue { color: var(--rmd-apagado); font-size: 13px; } .rmd-bs-error { color: var(--rmd-rojo); font-size: 13px; }
+  .rmd-lt-form { display: flex; gap: 8px; padding: 10px 16px 4px; } .rmd-lt-recientes { padding: 2px 16px 8px; font-size: 13px; color: var(--rmd-apagado); } .rmd-lt-recientes .rmd-bs-txt { padding: 2px 6px; }
+  .rmd-lt-res { flex: 1 1 auto; overflow: auto; padding: 0 16px 24px; } .rmd-lt-cuenta { margin: 6px 0 8px; font-size: 14px; }
+  .rmd-lt-tabla { width: 100%; border-collapse: collapse; font-size: 13px; } .rmd-lt-tabla th { position: sticky; top: 0; padding: 6px 8px; background: var(--rmd-barra); border-bottom: 1px solid var(--rmd-borde); text-align: left; font-weight: 400; color: var(--rmd-apagado); }
+  .rmd-lt-tabla td { padding: 7px 8px; border-bottom: 1px solid var(--rmd-borde); vertical-align: top; } .rmd-lt-tabla tr[data-i] { cursor: pointer; } .rmd-lt-tabla tr[data-i]:hover, .rmd-lt-tabla tr.abierta { background: color-mix(in srgb, var(--rmd-texto) 5%, transparent); }
+  .rmd-lt-ord { font-weight: 700; font-variant-numeric: tabular-nums; } .rmd-lt-sub td { background: var(--rmd-superficie); padding: 8px 12px 10px 24px; }
+  .rmd-lt-rmd { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; } .rmd-lt-rmd li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .rmd-lt-docs { display: inline-flex; flex-wrap: wrap; gap: 0 2px; margin-left: auto; }
+  @media (max-width: 899px) { .rmd-bs-cuerpo { grid-template-columns: 1fr; } .rmd-bs .rmd-bs-det { display: none; } .rmd-bs.con-det .rmd-bs-lista { display: none; } .rmd-bs.con-det .rmd-bs-det { display: block; } .rmd-bs-volver { display: inline-block; } .rmd-bs-cab, .rmd-bs-filtros { padding-left: 12px; padding-right: 12px; } .rmd-lt-tabla th:nth-child(1), .rmd-lt-tabla td:nth-child(1), .rmd-lt-tabla th:nth-child(7), .rmd-lt-tabla td:nth-child(7) { display: none; } }
   `;
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
@@ -9010,13 +8997,13 @@
       SOLICITADO: 464, AUTORIZADO: 465, CANCELADO: 466, INICIADO: 467, APROBADA: 469, RECHAZADA: 470,
       P_PROCESO: 456, P_PROD_JEFE: 457, P_PROD_GERENTE: 458, P_DEV_JEFE: 459, P_DEV_GERENTE: 460, P_APROB_GERENTE: 461, P_APROB_JEFEDT: 462, P_DEV_JEFEDT: 463,
       ROL_JEFEPROD: 'RMD_JEFE_DE_PRODUCCION', ROL_GERENTEPROD: 'RMD_GERENTE_DE_PRODUCCION', ROL_JEFEDT: 'RMD_JEFATURA_DOCUMENTACION',
-      TIPO_GERENTE: 'DGERPROD', TIPO_JEFEDT: 'DJEFDOCT', SISTEMA: 'RMD',
+      TIPO_GERENTE: 'DGERPROD', TIPO_JEFEDT: 'DJEFDOCT', SISTEMA: 'RMD', TIPO_ESPEC: 0,
       APP_SOLICITUD: '3b5fc15f-3dcb-4c0f-8927-8ba26964da38', APP_REVISION: '295fd633-d654-49b6-86a0-674611a3b783',
     };
     const MAPA_CONST = { IDESTRMDAUTORIZADO: 'AUTORIZADO', IDESTRMDINICIADO: 'INICIADO', IDESTRMDSOLICITADO: 'SOLICITADO', IDESTRMDSOLICITUDAPROBADA: 'APROBADA',
       IDESTPRCPROCESO: 'P_PROCESO', IDESTPRCENPRODUCCION: 'P_PROD_JEFE', IDESTPRCPRODGERENTE: 'P_PROD_GERENTE', IDESTPRCDEVUELVEJEFE: 'P_DEV_JEFE',
       IDESTPRCDEVUELVEGERENTE: 'P_DEV_GERENTE', IDESTPRCAPROBACIONGERENTE: 'P_APROB_GERENTE', IDESTPRCDEVUELVEJEFEDT: 'P_DEV_JEFEDT', IDESTPRCAPROBACIONJEFEDT: 'P_APROB_JEFEDT',
-      CODROLJEFEPROD: 'ROL_JEFEPROD', CODROLGERENTEPROD: 'ROL_GERENTEPROD', CODROLJEFEDT: 'ROL_JEFEDT', TXTTIPOGERENTEPROD: 'TIPO_GERENTE', TXTTIPOJEFATURADT: 'TIPO_JEFEDT', IDSISTEMARMD: 'SISTEMA' };
+      CODROLJEFEPROD: 'ROL_JEFEPROD', CODROLGERENTEPROD: 'ROL_GERENTEPROD', CODROLJEFEDT: 'ROL_JEFEDT', TXTTIPOGERENTEPROD: 'TIPO_GERENTE', TXTTIPOJEFATURADT: 'TIPO_JEFEDT', IDSISTEMARMD: 'SISTEMA', IDTIPOESTESPECIFICACIONES: 'TIPO_ESPEC' };
     const POR_PAGINA = 40;
     const EXPAND_LISTA = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,destinatariosMD,destinatariosMD/usuarioId';
     const SELECT_LISTA = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'descripcion', 'nivelTxt', 'areaRmdTxt', 'sucursalId_iMaestraId', 'estadoIdRmd_iMaestraId', 'estadoIdProceso_iMaestraId',
@@ -9080,10 +9067,8 @@
           acc.forEach((a) => { const t = a.oMaestraAccion && a.oMaestraAccion.contenido; if (t === 'SOLICITUD') f.registrador = true; if (t === 'APROBAR') f.aprobador = true; if (t === 'APROBAR NIVEL 1') f.nivel1 = true; if (t === 'APROBAR NIVEL 2') f.nivel2 = true; if (t === 'APROBAR NIVEL 3') f.nivel3 = true; });
           return f;
         };
-        const rolesTodos = await api.leer('ROL', [o([K.ROL_JEFEPROD, K.ROL_GERENTEPROD, K.ROL_JEFEDT].map((c) => eq('codigo', c)))]).catch(() => []);
-        const idRol = (c) => (rolesTodos.find((r) => r.codigo === c) || {}).rolId || null;
-        const [fs, fr] = await Promise.all([funciones(K.APP_SOLICITUD), funciones(K.APP_REVISION)]);
-        yo = { data: u, roles, rol: roles[0] || null, sistemaId, fs, fr, rolJefe: idRol(K.ROL_JEFEPROD), rolGerente: idRol(K.ROL_GERENTEPROD), rolJefeDT: idRol(K.ROL_JEFEDT) };
+        const fs = await funciones(K.APP_SOLICITUD);
+        yo = { data: u, roles, rol: roles[0] || null, sistemaId, fs };
         return yo;
       })().catch((e) => { yoCargando = null; throw e; });
       return yoCargando;
@@ -9091,39 +9076,30 @@
 
     // ---------- reglas de la app original ----------
     const esSolicitud = (md) => +md.estadoIdRmd_iMaestraId === K.SOLICITADO;
-    const enRevision = (md) => +md.estadoIdRmd_iMaestraId === K.INICIADO && +md.estadoIdProceso_iMaestraId !== K.P_PROCESO;
     const destinatarios = (md) => ((md.destinatariosMD && md.destinatariosMD.results) || []);
     const soyDestinatario = (md) => !!yo && destinatarios(md).some((d) => d.usuarioId_usuarioId === yo.data.usuarioId);
     // debeAprobar (onPressMD) + visibilidad de los botones (DetailRMD.fragment.xml)
     function puedoAtender(md) {
       if (!yo || !soyDestinatario(md)) return false;
       // Solo las solicitudes en estado Solicitado se aprueban o rechazan desde aqui (pedido de Carlos).
-      return esSolicitud(md) && +md.estadoIdRmd_iMaestraId === K.SOLICITADO && !!yo.fs.aprobador;
+      return esSolicitud(md) && !!yo.fs.aprobador;
     }
-    const tipoMD = (md) => (+md.version === 1 ? 'Nuevo RMD' : 'Nueva versión');
     const planta = (md) => (md.sucursalId && md.sucursalId.contenido) || '';
     const plantaCorta = (md) => planta(md).replace(/^PLANTA\s+/i, '');
     const motivo = (md) => (md.motivoId && md.motivoId.descripcion) || '';
     const estadoTxt = (md) => (md.estadoIdRmd && md.estadoIdRmd.contenido) || '';
-    const procesoTxt = (md) => (md.estadoIdProceso && md.estadoIdProceso.contenido) || '';
     function claseEstado(md) {
       const e = +md.estadoIdRmd_iMaestraId;
-      return e === K.SOLICITADO ? 'pendiente' : e === K.APROBADA ? 'aprobada' : e === K.RECHAZADA ? 'rechazada' : e === K.CANCELADO ? 'cancelada' : e === K.AUTORIZADO ? 'autorizado' : e === K.INICIADO ? (enRevision(md) ? 'revision' : 'ingresado') : 'otro';
+      return e === K.SOLICITADO ? 'pendiente' : e === K.APROBADA ? 'aprobada' : e === K.RECHAZADA ? 'rechazada' : e === K.CANCELADO ? 'cancelada' : e === K.AUTORIZADO ? 'autorizado' : e === K.INICIADO ? 'ingresado' : 'otro';
     }
     const fecha = (v) => { if (!v) return null; const d = v instanceof Date ? v : new Date(typeof v === 'string' && /\/Date\((\d+)/.test(v) ? +/\/Date\((\d+)/.exec(v)[1] : v); return isNaN(d) ? null : d; };
     const fechaTxt = (v, conHora) => { const d = fecha(v); if (!d) return ''; const s = d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }); return conHora ? s + ' ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : s; };
-    function haceTxt(v) {
-      const d = fecha(v); if (!d) return ''; const min = Math.round((Date.now() - d.getTime()) / 60000);
-      if (min < 1) return 'recién'; if (min < 60) return `hace ${min} min`; const h = Math.round(min / 60); if (h < 24) return `hace ${h} h`;
-      const dias = Math.round(h / 24); if (dias === 1) return 'ayer'; if (dias < 7) return `hace ${dias} días`; return fechaTxt(d);
-    }
 
     // ---------- datos ----------
     const S = {
-      vista: 'atender', // atender | todas | revision
+      vista: 'atender', // atender | todas
       atender: { filas: [], listo: false, t: 0, cargando: null, error: '' },
       todas: { filas: [], fin: false, skip: 0, cargando: null, error: '', clave: '' },
-      revision: { filas: [], fin: false, skip: 0, cargando: null, error: '', clave: '' },
       buscar: '', estado: '', planta: '', sel: null, detalle: new Map(), adjuntos: new Map(),
     };
     function filtrosBusqueda() {
@@ -9152,17 +9128,17 @@
       })().catch((e) => { A.error = e.message || String(e); throw e; }).finally(() => { A.cargando = null; });
       return A.cargando;
     }
-    // Todas / En revisión: por partes, la más nueva primero. Quien no es aprobador ve las suyas (registrador) o en las que es destinatario.
+    // Todas: por partes, la más nueva primero. Quien no es aprobador ve las suyas (registrador) o en las que es destinatario.
     async function cargarPagina(cual) {
       const L = S[cual], clave = [S.buscar, S.estado, S.planta].join('|');
       if (L.clave !== clave) { L.filas = []; L.skip = 0; L.fin = false; L.clave = clave; L.error = ''; }
       if (L.cargando || L.fin) return L.cargando;
       L.cargando = (async () => {
         await quienSoy();
-        const base = cual === 'revision' ? [eq('estadoIdRmd_iMaestraId', K.INICIADO), new (F())('estadoIdProceso_iMaestraId', 'NE', K.P_PROCESO)] : [new (F())('codigoSolicitud', 'NE', null)];
-        if (cual === 'todas' && S.estado) base.push(eq('estadoIdRmd_iMaestraId', +S.estado));
-        const f = cual === 'todas' ? yo.fs : yo.fr, todoVisible = f.aprobador;
-        if (!todoVisible && cual === 'todas' && f.registrador && !(f.nivel1 || f.nivel2 || f.nivel3)) base.push(eq('usuarioRegistro', yo.data.usuario));
+        const base = [new (F())('codigoSolicitud', 'NE', null)];
+        if (S.estado) base.push(eq('estadoIdRmd_iMaestraId', +S.estado));
+        const f = yo.fs, todoVisible = f.aprobador;
+        if (!todoVisible && f.registrador && !(f.nivel1 || f.nivel2 || f.nivel3)) base.push(eq('usuarioRegistro', yo.data.usuario));
         let agregadas = 0, vueltas = 0;
         while (!L.fin && agregadas < 12 && vueltas < 6) {
           vueltas++;
@@ -9183,11 +9159,11 @@
       if (!md) throw new Error('la solicitud ya no está en SAP');
       S.detalle.set(mdId, md); return md;
     }
-    // Adjuntos: sharepointGet (origen Solicitud; en el flujo de revisión también Configuracion), como onPressMD.
+    // Adjuntos: sharepointGet con origen Solicitud, como onPressMD.
     function leerAdjuntos(md) {
       const k = md.mdId; if (S.adjuntos.has(k)) return S.adjuntos.get(k);
       const uno = (origen) => api.funcion('sharepointGet', { idMd: JSON.stringify({ idMd: k, origen }) }).then((r) => { const j = JSON.parse(r.sharepointGet); return ((j && j.d && j.d.results) || []).map((x) => ({ Name: x.Name, origen, codigoRM: k, tam: x.Length || x.length || null })); }).catch(() => []);
-      const p = Promise.all(enRevision(md) ? [uno('Solicitud'), uno('Configuracion')] : [uno('Solicitud')]).then((l) => l.flat());
+      const p = uno('Solicitud');
       S.adjuntos.set(k, p); p.catch(() => S.adjuntos.delete(k));
       return p;
     }
@@ -9229,18 +9205,13 @@
         : 'La solicitud no tiene una tarea pendiente en SAP Workflow (puede que ya la hayan atendido). No se hizo ningún cambio.');
       err.yaAtendida = true; throw err;
     }
-    // Destinatarios que muestra la app original al abrir la solicitud (ROLAPPWF del rol que corresponde)
-    async function destinatariosPosibles(md) {
-      const revision = !esSolicitud(md), p = +md.estadoIdProceso_iMaestraId;
-      let rol = null;
-      if (!revision) rol = yo.rol && yo.rol.rolId;
-      else if (p === K.P_PROD_JEFE || p === K.P_DEV_JEFE) rol = yo.rolJefe;
-      else if (p === K.P_PROD_GERENTE || p === K.P_DEV_GERENTE || p === K.P_APROB_GERENTE || p === K.P_DEV_JEFEDT) rol = yo.rolGerente;
+    // Destinatarios que muestra la app original al abrir la solicitud (ROLAPPWF del rol del usuario, app SOLICITUD)
+    async function destinatariosPosibles() {
+      const rol = yo.rol && yo.rol.rolId;
       if (!rol) return { lista: [], marcados: [] };
-      const r = await api.todo('ROLAPPWF', [eq('oAplicacion_aplicacionId', revision ? K.APP_REVISION : K.APP_SOLICITUD), eq('oRol_rolId', rol)], { $expand: 'oRolWorkflow/aRolUsuarios/oUsuario' });
+      const r = await api.todo('ROLAPPWF', [eq('oAplicacion_aplicacionId', K.APP_SOLICITUD), eq('oRol_rolId', rol)], { $expand: 'oRolWorkflow/aRolUsuarios/oUsuario' });
       const lista = []; if (r.length) ((r[0].oRolWorkflow && r[0].oRolWorkflow.aRolUsuarios && r[0].oRolWorkflow.aRolUsuarios.results) || []).forEach((x) => { if (x.oUsuario && x.oUsuario.activo) lista.push(x.oUsuario); });
-      const marcados = !revision || p === K.P_APROB_GERENTE ? lista.map((u) => u.usuarioId) : [];
-      return { lista, marcados };
+      return { lista, marcados: lista.map((u) => u.usuarioId) };
     }
 
     // ---------- Aprobar (onAprobarSolicitud) ----------
@@ -9251,49 +9222,24 @@
       if (!puedoAtender(t)) throw new Error('Esta solicitud ya no está para que la atiendas (cambió de estado o no eres su destinatario).');
       if (!destinos || !destinos.length) throw new Error('Selecciona al menos un destinatario.');
       const s = yo.data, ahora = () => new Date();
-      let d, act, tipoDest = null;
-      if (esSolicitud(t)) {
-        d = { usuarioActualiza: s.usuario, fechaActualiza: ahora(), mdId: t.mdId, estadoIdRmd_iMaestraId: K.APROBADA, wfInstanceId: null, estadoIdProceso_iMaestraId: K.P_PROCESO, motivoId_motivoId: t.motivoId_motivoId };
-        act = 'usertask2';
-        paso('Revisando que la solicitud siga pendiente en SAP Workflow');
-        await validarTarea(t, act);
-        paso('Registrando el estado del proceso');
-        await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: s.usuario, activo: true, idProceso: uuid(), mdId_mdId: t.mdId, tipo: 'SOLICITUD' });
-      } else {
-        d = { usuarioActualiza: s.usuario, fechaActualiza: ahora(), mdId: t.mdId };
-        const m = { fechaRegistro: ahora(), usuarioRegistro: s.usuario, activo: true, idProceso: uuid(), mdId_mdId: t.mdId, mensajeDT: t.mensajeDT, observacion: t.observacion, tipo: 'CONFIGURACION' };
-        const p = +t.estadoIdProceso_iMaestraId;
-        if (p === K.P_PROD_JEFE) { act = 'usertask6'; d.estadoIdProceso_iMaestraId = m.estadoIdProceso_iMaestraId = K.P_PROD_GERENTE; tipoDest = K.TIPO_GERENTE; }
-        else if (p === K.P_PROD_GERENTE) { act = 'usertask7'; d.estadoIdProceso_iMaestraId = m.estadoIdProceso_iMaestraId = K.P_APROB_GERENTE; tipoDest = K.TIPO_JEFEDT; }
-        else if (p === K.P_APROB_GERENTE) { act = 'usertask8'; d.estadoIdRmd_iMaestraId = K.AUTORIZADO; d.estadoIdProceso_iMaestraId = m.estadoIdProceso_iMaestraId = K.P_APROB_JEFEDT; d.fechaAutorizacion = ahora(); d.usuarioAutorizacion = s.usuario; }
-        else throw new Error('Esta solicitud no está en un paso del flujo de revisión que se pueda aprobar.');
-        paso('Revisando que la tarea siga pendiente en SAP Workflow');
-        await validarTarea(t, act);
-        if (act === 'usertask8') { paso('Registrando la trazabilidad (Autorizado)'); await api.crear('/MD_TRAZABILIDAD', { activo: true, usuarioRegistro: s.usuario, fechaRegistro: ahora(), idTrazabilidad: uuid(), mdId_mdId: t.mdId, estadoTrazab_iMaestraId: K.AUTORIZADO }); }
-        paso('Registrando el estado del proceso');
-        await api.crear('/MD_ESTATUSPROCESO', m);
-        if (act !== 'usertask8') { paso('Registrando los destinatarios'); for (const u of destinos) await api.crear('/MD_DESTINATARIOS', { usuarioRegistro: s.usuario, fechaRegistro: ahora(), activo: true, idMdDestinatarios: uuid(), mdId_mdId: t.mdId, tipo: tipoDest, usuarioId_usuarioId: u }); }
-      }
+      const d = { usuarioActualiza: s.usuario, fechaActualiza: ahora(), mdId: t.mdId, estadoIdRmd_iMaestraId: K.APROBADA, wfInstanceId: null, estadoIdProceso_iMaestraId: K.P_PROCESO, motivoId_motivoId: t.motivoId_motivoId };
+      const act = 'usertask2';
+      paso('Revisando que la solicitud siga pendiente en SAP Workflow');
+      await validarTarea(t, act);
+      paso('Registrando el estado del proceso');
+      await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: s.usuario, activo: true, idProceso: uuid(), mdId_mdId: t.mdId, tipo: 'SOLICITUD' });
       paso('Actualizando la solicitud');
       await api.actualizar(`/MD('${t.mdId}')`, d);
       paso('Completando la tarea en SAP Workflow');
       const tarea = await tareaDe(t.wfInstanceId, act), ctx = Object.assign({}, await contextoDe(tarea.id));
-      if (esSolicitud(t)) {
-        const mot = d.motivoId_motivoId != null ? await api.leer('MOTIVO', [eq('motivoId', d.motivoId_motivoId)]).catch(() => []) : [];
-        ctx.bpRequestData = ctx.bpRequestData || {};
-        mot.forEach((x) => { ctx.bpRequestData.motivoId_motivoId = d.motivoId_motivoId; ctx.bpRequestData.motivoMDWF = x.descripcion; });
-        ctx.action = 'A'; ctx.NameUserAprob = s.nombre; ctx.LastNameUserAprob = s.apellidoPaterno;
-        await completarTarea(tarea.id, ctx);
-        if (+t.version !== 1) { paso('Creando la versión nueva con la estructura de la versión anterior'); await registrarEstructurasNuevaVersion(t, paso); }
-      } else {
-        const us = await api.leer('USUARIO', [o(destinos.map((u) => eq('usuarioId', u)))]).catch(() => []);
-        const enSistema = yo.sistemaId ? await api.leer('USUARIO_SISTEMA', [eq('oSistema_sistemaId', yo.sistemaId), o(destinos.map((u) => eq('oUsuario_usuarioId', u)))]).catch(() => null) : null;
-        const correos = us.filter((u) => !enSistema || enSistema.some((x) => x.oUsuario_usuarioId === u.usuarioId)).map((u) => u.correo);
-        ctx.approverUserData = { EMAIL: correos.join(',') }; ctx.actionChange = ''; ctx.action = 'A'; ctx.NameUserAprob = s.nombre; ctx.LastNameUserAprob = s.apellidoPaterno;
-        await completarTarea(tarea.id, ctx);
-      }
+      const mot = d.motivoId_motivoId != null ? await api.leer('MOTIVO', [eq('motivoId', d.motivoId_motivoId)]).catch(() => []) : [];
+      ctx.bpRequestData = ctx.bpRequestData || {};
+      mot.forEach((x) => { ctx.bpRequestData.motivoId_motivoId = d.motivoId_motivoId; ctx.bpRequestData.motivoMDWF = x.descripcion; });
+      ctx.action = 'A'; ctx.NameUserAprob = s.nombre; ctx.LastNameUserAprob = s.apellidoPaterno;
+      await completarTarea(tarea.id, ctx);
+      if (+t.version !== 1) { paso('Creando la versión nueva con la estructura de la versión anterior'); await registrarEstructurasNuevaVersion(t, paso); }
       S.detalle.delete(t.mdId);
-      return { mdId: t.mdId, nueva: esSolicitud(t) && +t.version !== 1 };
+      return { mdId: t.mdId, nueva: +t.version !== 1 };
     }
 
     // ---------- Rechazar (onRechazarSolicitud) ----------
@@ -9306,34 +9252,20 @@
       const r = await leerDetalle(mdId, true);
       if (!puedoAtender(r)) throw new Error('Esta solicitud ya no está para que la atiendas (cambió de estado o no eres su destinatario).');
       const a = yo.data, ahora = () => new Date();
-      let s, act;
-      if (esSolicitud(r)) {
-        s = { usuarioActualiza: a.usuario, fechaActualiza: ahora(), mdId: r.mdId, estadoIdRmd_iMaestraId: K.RECHAZADA, motivoRechazo: texto, motivoId_motivoId: r.motivoId_motivoId };
-        act = 'usertask2';
-        paso('Revisando que la solicitud siga pendiente en SAP Workflow');
-        await validarTarea(r, act);
-        paso('Registrando el estado del proceso');
-        await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: a.usuario, activo: true, idProceso: uuid(), mdId_mdId: r.mdId, tipo: 'SOLICITUD' });
-      } else {
-        const p = +r.estadoIdProceso_iMaestraId, nuevo = p === K.P_PROD_JEFE ? K.P_DEV_JEFE : p === K.P_PROD_GERENTE ? K.P_DEV_GERENTE : p === K.P_APROB_GERENTE ? K.P_DEV_JEFEDT : null;
-        act = p === K.P_PROD_JEFE ? 'usertask6' : p === K.P_PROD_GERENTE ? 'usertask7' : p === K.P_APROB_GERENTE ? 'usertask8' : null;
-        if (!act) throw new Error('Esta solicitud no está en un paso del flujo de revisión que se pueda rechazar.');
-        s = { usuarioActualiza: a.usuario, fechaActualiza: ahora(), mdId: r.mdId, estadoIdProceso_iMaestraId: nuevo };
-        paso('Revisando que la tarea siga pendiente en SAP Workflow');
-        await validarTarea(r, act);
-        paso('Registrando el estado del proceso');
-        await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: a.usuario, activo: true, idProceso: uuid(), mdId_mdId: r.mdId, mensajeDT: r.mensajeDT, observacion: texto, estadoIdProceso_iMaestraId: nuevo, tipo: 'CONFIGURACION' });
-      }
+      const s = { usuarioActualiza: a.usuario, fechaActualiza: ahora(), mdId: r.mdId, estadoIdRmd_iMaestraId: K.RECHAZADA, motivoRechazo: texto, motivoId_motivoId: r.motivoId_motivoId };
+      const act = 'usertask2';
+      paso('Revisando que la solicitud siga pendiente en SAP Workflow');
+      await validarTarea(r, act);
+      paso('Registrando el estado del proceso');
+      await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: a.usuario, activo: true, idProceso: uuid(), mdId_mdId: r.mdId, tipo: 'SOLICITUD' });
       paso('Actualizando la solicitud');
       await api.actualizar(`/MD('${r.mdId}')`, s);
       paso('Completando la tarea en SAP Workflow');
       const tarea = await tareaDe(r.wfInstanceId, act), ctx = Object.assign({}, await contextoDe(tarea.id));
       ctx.NameUserAprob = a.nombre; ctx.LastNameUserAprob = a.apellidoPaterno;
-      if (esSolicitud(r)) {
-        const mot = s.motivoId_motivoId != null ? await api.leer('MOTIVO', [eq('motivoId', s.motivoId_motivoId)]).catch(() => []) : [];
-        ctx.bpRequestData = ctx.bpRequestData || {};
-        mot.forEach((x) => { ctx.bpRequestData.motivoId_motivoId = s.motivoId_motivoId; ctx.bpRequestData.motivoMDWF = x.descripcion; });
-      } else { ctx.approverUserData = { EMAIL: '' }; ctx.actionChange = ''; }
+      const mot = s.motivoId_motivoId != null ? await api.leer('MOTIVO', [eq('motivoId', s.motivoId_motivoId)]).catch(() => []) : [];
+      ctx.bpRequestData = ctx.bpRequestData || {};
+      mot.forEach((x) => { ctx.bpRequestData.motivoId_motivoId = s.motivoId_motivoId; ctx.bpRequestData.motivoMDWF = x.descripcion; });
       ctx.action = 'R';
       await completarTarea(tarea.id, ctx);
       S.detalle.delete(r.mdId);
@@ -9461,7 +9393,7 @@
     let panel = null, io = null, ioAdj = null;
     const $ = (s) => panel && panel.querySelector(s);
     function abierto() { return !!panel && panel.isConnected; }
-    function cerrar() { if (!panel) return; const p = panel; panel = null; p.classList.add('rmd-bs-sale'); document.removeEventListener('keydown', teclas, true); setTimeout(() => p.remove(), 180); if (io) io.disconnect(); if (ioAdj) ioAdj.disconnect(); }
+    function cerrar() { if (!panel) return; const p = panel; panel = null; document.removeEventListener('keydown', teclas, true); p.remove(); if (io) io.disconnect(); if (ioAdj) ioAdj.disconnect(); }
     function teclas(ev) {
       if (!abierto()) return;
       if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); if ($('.rmd-bs-confirma')) { pintarDetalle(); return; } if (S.sel && window.innerWidth < 900) { S.sel = null; pintar(); return; } cerrar(); return; }
@@ -9488,7 +9420,7 @@
       if (abierto()) { if (vista) { S.vista = vista; pintar(); } return; }
       panel = document.createElement('div'); panel.className = 'rmd-bs-fondo';
       panel.innerHTML = `<aside class="rmd-bs" role="dialog" aria-modal="true" aria-label="Solicitudes de Manufactura Digital">
-        <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Solicitudes</h3><span class="rmd-bs-sub"></span></div>
+        <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Solicitudes de Manufactura Digital</h3><span class="rmd-bs-sub"></span></div>
           <div class="rmd-bs-acc"><button type="button" class="rmd-bs-txt" data-a="refrescar">Actualizar</button><button type="button" class="rmd-bs-txt" data-a="cerrar">Cerrar</button></div></header>
         <nav class="rmd-bs-pestanas" role="tablist"></nav>
         <div class="rmd-bs-filtros"><input type="search" class="rmd-bs-buscar" placeholder="Buscar por nombre o código" aria-label="Buscar solicitudes"><div class="rmd-bs-chips" role="group" aria-label="Filtros"></div></div>
@@ -9506,10 +9438,9 @@
       ioAdj = new IntersectionObserver((ents) => ents.forEach((x) => { if (!x.isIntersecting) return; ioAdj.unobserve(x.target); const md = buscarFila(x.target.dataset.id); if (md) leerAdjuntos(md).then((l) => pintarAdjCount(md.mdId, l)); }), { root: $('.rmd-bs-lista') });
       pintar();
       recargarVista(false);
-      requestAnimationFrame(() => panel && panel.classList.add('rmd-bs-entra'));
       setTimeout(() => { const b = $('.rmd-bs-buscar'); if (b && window.innerWidth >= 900) b.focus({ preventScroll: true }); }, 60);
     }
-    function buscarFila(id) { return [S.atender.filas, S.todas.filas, S.revision.filas].flat().find((x) => x.mdId === id) || S.detalle.get(id) || null; }
+    function buscarFila(id) { return [S.atender.filas, S.todas.filas].flat().find((x) => x.mdId === id) || S.detalle.get(id) || null; }
     function recargarVista(forzar) {
       const v = S.vista;
       const p = v === 'atender' ? cargarAtender(forzar) : (forzar && (S[v].clave = '__'), cargarPagina(v));
@@ -9519,26 +9450,25 @@
     function pintar() { if (!abierto()) return; pintarCabecera(); pintarLista(); pintarDetalle(); }
     function pintarCabecera() {
       const n = S.atender.filas.length;
-      $('.rmd-bs-sub').textContent = yo ? D.usuarioVisible(yo.data.usuario) : 'Conectando con SAP…';
-      const tabs = [['atender', 'Por aprobar', S.atender.listo ? String(n) : '…'], ['todas', 'Todas', '']];
-      $('.rmd-bs-pestanas').innerHTML = tabs.map(([k, t, c]) => `<button type="button" role="tab" data-v="${k}" aria-selected="${S.vista === k}">${esc(t)}${c ? `<span class="rmd-bs-num${k === 'atender' && n ? ' hay' : ''}">${esc(c)}</span>` : ''}</button>`).join('');
+      $('.rmd-bs-sub').textContent = yo ? '' : 'Conectando con SAP…';
+      const tabs = [['atender', S.atender.listo ? `Por aprobar (${n})` : 'Por aprobar'], ['todas', 'Todas']];
+      $('.rmd-bs-pestanas').innerHTML = tabs.map(([k, t]) => `<button type="button" role="tab" data-v="${k}" aria-selected="${S.vista === k}">${esc(t)}</button>`).join('');
       const chips = [];
       if (S.vista === 'todas') [['', 'Todos'], [K.SOLICITADO, 'Solicitado'], [K.APROBADA, 'Aprobada'], [K.RECHAZADA, 'Rechazada']].forEach(([k, t]) => chips.push(`<button type="button" data-est="${k}" aria-pressed="${String(S.estado) === String(k)}">${t}</button>`));
-      [S.atender.filas, S.todas.filas, S.revision.filas].flat().forEach((md) => { if (md.sucursalId_iMaestraId != null && planta(md)) plantasVistas.set(String(md.sucursalId_iMaestraId), plantaCorta(md)); });
+      [S.atender.filas, S.todas.filas].flat().forEach((md) => { if (md.sucursalId_iMaestraId != null && planta(md)) plantasVistas.set(String(md.sucursalId_iMaestraId), plantaCorta(md)); });
       if (plantasVistas.size) { chips.push('<span class="rmd-bs-sep"></span>'); [['', 'Ambas plantas'], ...[...plantasVistas].sort((a, b) => a[1].localeCompare(b[1]))].forEach(([k, t]) => chips.push(`<button type="button" data-pl="${esc(k)}" aria-pressed="${S.planta === k}">${esc(t)}</button>`)); }
       $('.rmd-bs-chips').innerHTML = chips.join('');
     }
     function tarjeta(md) {
       const c = claseEstado(md), adj = S.adjuntos.get(md.mdId);
-      return `<button type="button" class="rmd-bs-t ${c}${S.sel === md.mdId ? ' sel' : ''}" role="option" aria-selected="${S.sel === md.mdId}" data-id="${esc(md.mdId)}">
-        <span class="rmd-bs-t1"><span class="rmd-bs-cod">${esc(md.codigo || md.codigoSolicitud || '—')}</span><span class="rmd-bs-ver">v${esc(md.version)}</span><span class="rmd-bs-tipo">${esc(tipoMD(md))}</span>
-          <span class="rmd-bs-est ${c}">${esc(enRevision(md) ? procesoTxt(md) : estadoTxt(md))}</span></span>
-        <span class="rmd-bs-nom">${esc(md.descripcion || '')}</span>
-        <span class="rmd-bs-t3"><span>${esc(md.areaRmdTxt || '—')}</span><span>${esc(plantaCorta(md) || '—')}</span><span>${esc(motivo(md) || 'Sin motivo')}</span>${md.nivelTxt ? `<span>${esc(md.nivelTxt)}</span>` : ''}</span>
-        <span class="rmd-bs-t4"><span title="${esc(fechaTxt(md.fechaRegistro, true))}">${esc(haceTxt(md.fechaRegistro))}</span><span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
+      const datos = [md.codigo || md.codigoSolicitud, 'Versión ' + md.version, md.areaRmdTxt, plantaCorta(md), motivo(md)].filter(Boolean);
+      return `<button type="button" class="rmd-bs-t${S.sel === md.mdId ? ' sel' : ''}" role="option" aria-selected="${S.sel === md.mdId}" data-id="${esc(md.mdId)}">
+        <span class="rmd-bs-t1"><span class="rmd-bs-nom">${esc(md.descripcion || '')}</span><span class="rmd-bs-est ${c}">${esc(estadoTxt(md))}</span></span>
+        <span class="rmd-bs-t3">${datos.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
+        <span class="rmd-bs-t4"><span>${esc(fechaTxt(md.fechaRegistro, true))}</span><span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
       </button>`;
     }
-    const adjTxt = (n) => (n ? `${n} adjunto${n === 1 ? '' : 's'}` : 'sin adjuntos');
+    const adjTxt = (n) => (n ? `${n} adjunto${n === 1 ? '' : 's'}` : '');
     function pintarAdjCount(id, l) {
       const p = S.adjuntos.get(id); if (p) p.__n = l.length;
       if (!abierto()) return; const el = panel.querySelector(`.rmd-bs-adj[data-adj="${escAttr(id)}"]`); if (el) el.textContent = adjTxt(l.length);
@@ -9547,7 +9477,7 @@
       const caja = $('.rmd-bs-lista'), v = S.vista, L = v === 'atender' ? S.atender : S[v], filas = filasVista();
       const cargando = !!L.cargando || (v === 'atender' && !L.listo && !L.error);
       let html = filas.map(tarjeta).join('');
-      if (!filas.length && cargando) html = '<div class="rmd-bs-vacio"><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div></div>';
+      if (!filas.length && cargando) html = '<div class="rmd-bs-vacio">Cargando…</div>';
       else if (!filas.length && L.error) html = `<div class="rmd-bs-vacio"><p>No se pudo leer de SAP: ${esc(L.error)}</p><button type="button" class="rmd-bs-txt" data-a="refrescar">Intentar otra vez</button></div>`;
       else if (!filas.length) html = `<div class="rmd-bs-vacio"><p>${v === 'atender' ? 'No hay solicitudes por aprobar.' : 'No hay solicitudes con este filtro.'}</p></div>`;
       if (v !== 'atender' && filas.length) html += L.fin ? '' : `<div class="rmd-bs-mas">${L.cargando ? 'Cargando más…' : L.error ? `No se pudo seguir: ${esc(L.error)} <button type="button" class="rmd-bs-txt" data-a="mas">Reintentar</button>` : ''}</div>`;
@@ -9572,9 +9502,8 @@
       const recetas = completo ? ((md.aReceta && md.aReceta.results) || []).filter((r) => r.activo !== false).map((r) => r.recetaId ? `${esc(r.recetaId.Matnr || '')}${r.recetaId.Verid ? ' · ver. ' + esc(r.recetaId.Verid) : ''}${r.recetaId.Text1 ? ' · ' + esc(r.recetaId.Text1) : ''}` : '').filter(Boolean) : [];
       const dest = [...new Set(destinatarios(md).map((d) => d.usuarioId && D.usuarioVisible(d.usuarioId.usuario || '')).filter(Boolean))];
       caja.innerHTML = `<div class="rmd-bs-dcab ${c}"><button type="button" class="rmd-bs-txt rmd-bs-volver" data-a="volver">Volver a la lista</button>
-          <div class="rmd-bs-dcod">${esc(md.codigoSolicitud || '')}${md.codigo ? ` <span>RMD ${esc(md.codigo)}</span>` : ''} <span>v${esc(md.version)}</span></div>
           <h4>${esc(md.descripcion || '')}</h4>
-          <div class="rmd-bs-dchips"><span class="rmd-bs-est ${c}">${esc(estadoTxt(md))}</span>${procesoTxt(md) && +md.estadoIdProceso_iMaestraId !== K.P_PROCESO ? `<span class="rmd-bs-est revision">${esc(procesoTxt(md))}</span>` : ''}<span class="rmd-bs-tipo">${esc(tipoMD(md))}</span></div></div>
+          <div class="rmd-bs-dcod">Solicitud ${esc(md.codigoSolicitud || '')}${md.codigo ? ` · RMD ${esc(md.codigo)}` : ''} · Versión ${esc(md.version)} · <span class="rmd-bs-est ${c}">${esc(estadoTxt(md))}</span></div></div>
         ${err ? `<p class="rmd-bs-error">No se pudo leer el detalle: ${esc(err.message || err)}</p>` : ''}
         <div class="rmd-bs-acciones">${atender ? `<button type="button" class="rmd-bs-btn si" data-a="aprobar">Aprobar</button><button type="button" class="rmd-bs-btn no" data-a="rechazar">Rechazar</button>` : ''}
           ${md.codigo && +md.estadoIdRmd_iMaestraId !== K.SOLICITADO ? '<button type="button" class="rmd-bs-txt" data-a="abrirrmd">Abrir el RMD</button>' : ''}
@@ -9583,7 +9512,7 @@
         <dl class="rmd-bs-campos">
           ${campo('Sección', esc(md.areaRmdTxt || ''))}${campo('Planta', esc(planta(md)))}${campo('Motivo', esc(motivo(md)))}${campo('Etapa', esc(md.nivelTxt || (md.nivelId && md.nivelId.contenido) || ''))}
           ${campo('Usuario creador', esc(D.usuarioVisible(md.usuarioRegistro || '')))}${campo('Fecha de creación', esc(fechaTxt(md.fechaRegistro, true)))}${campo('Fecha de solicitud', esc(fechaTxt(md.fechaSolicitud)))}
-          ${primeroSol && !esSolicitud(md) ? campo('Fecha aprob. / rech.', esc(fechaTxt(primeroSol.fechaRegistro, true)) + ` <small>${esc(D.usuarioVisible(primeroSol.usuarioRegistro || ''))}</small>`) : ''}
+          ${primeroSol && +md.estadoIdRmd_iMaestraId !== K.SOLICITADO ? campo('Fecha aprob. / rech.', esc(fechaTxt(primeroSol.fechaRegistro, true)) + ` <small>${esc(D.usuarioVisible(primeroSol.usuarioRegistro || ''))}</small>`) : ''}
           ${campo('Código por defecto', esc(md.codDefectoReceta || ''))}${campo('Código agrupador', esc(md.codAgrupadorReceta || ''))}${campo('Fecha de autorización', esc(fechaTxt(md.fechaAutorizacion, true)))}
           ${campo('Observación', esc(md.observacion || ''), 'ancho pre')}${campo('Motivo de rechazo', esc(md.motivoRechazo || ''), 'ancho pre rechazo')}${campo('Motivo de cancelación', esc(md.motivoCancelado || ''), 'ancho pre')}
           ${recetas.length ? campo('Recetas', `<ul>${recetas.map((r) => `<li>${r}</li>`).join('')}</ul>`, 'ancho') : ''}
@@ -9620,12 +9549,10 @@
     function zona(html) { const z = $('.rmd-bs-zona'); if (z) { z.innerHTML = html; z.classList.toggle('activa', !!html); } return z; }
     async function confirmarAprobar(md) {
       const z = zona('<div class="rmd-bs-confirma"><p class="rmd-bs-tenue">Preparando…</p></div>');
-      let dp; try { dp = await destinatariosPosibles(md); } catch (e) { zona(`<div class="rmd-bs-confirma"><p class="rmd-bs-error">${esc(e.message || e)}</p></div>`); return; }
-      const sol = esSolicitud(md), nueva = sol && +md.version !== 1;
-      const que = sol ? (nueva ? `Pasa a <b>Solicitud aprobada</b> y se crea la <b>versión ${esc(md.version)}</b> como <b>Ingresado</b>, con la estructura, recetas, pasos y fórmulas de la versión anterior.` : 'Pasa a <b>Solicitud aprobada</b>: queda lista para crear el RMD nuevo en Configuración.')
-        : +md.estadoIdProceso_iMaestraId === K.P_APROB_GERENTE ? 'Queda <b>Autorizado</b>.' : 'Pasa al siguiente paso del flujo de revisión.';
+      let dp; try { dp = await destinatariosPosibles(); } catch (e) { zona(`<div class="rmd-bs-confirma"><p class="rmd-bs-error">${esc(e.message || e)}</p></div>`); return; }
+      const que = +md.version !== 1 ? `Pasa a Solicitud aprobada y la versión ${esc(md.version)} queda como Ingresado, con la estructura de la versión anterior.` : 'Pasa a Solicitud aprobada.';
       const lista = dp.lista.length ? `<fieldset class="rmd-bs-dest"><legend>Destinatarios</legend>${dp.lista.map((u) => `<label><input type="checkbox" value="${esc(u.usuarioId)}"${dp.marcados.includes(u.usuarioId) ? ' checked' : ''}> ${esc(D.usuarioVisible(u.usuario || ''))}${u.nombre ? ' · ' + esc(u.nombre + ' ' + (u.apellidoPaterno || '')) : ''}</label>`).join('')}</fieldset>` : '<p class="rmd-bs-error">No hay destinatarios disponibles para tu rol: la app original tampoco deja aprobar sin ellos.</p>';
-      z.innerHTML = `<div class="rmd-bs-confirma"><p>¿Aprobar <b>${esc(md.codigoSolicitud || md.codigo)}</b> · ${esc(md.descripcion || '')}?</p><p class="rmd-bs-tenue">${que}</p>${sol ? `<details class="rmd-bs-tenue"><summary>Destinatarios (${dp.marcados.length})</summary>${lista}</details>` : lista}
+      z.innerHTML = `<div class="rmd-bs-confirma"><p>¿Aprobar <b>${esc(md.codigoSolicitud || md.codigo)}</b> · ${esc(md.descripcion || '')}?</p><p class="rmd-bs-tenue">${que}</p><details class="rmd-bs-tenue"><summary>Destinatarios (${dp.marcados.length})</summary>${lista}</details>
         <div class="rmd-bs-fila"><button type="button" class="rmd-bs-btn si" data-ok="1"${dp.lista.length ? '' : ' disabled'}>Sí, aprobar</button><button type="button" class="rmd-bs-txt" data-no="1">Cancelar</button></div><ol class="rmd-bs-pasos"></ol></div>`;
       z.querySelector('[data-no]').onclick = () => zona('');
       z.querySelector('[data-ok]').onclick = async (ev) => {
@@ -9636,7 +9563,7 @@
     }
     function confirmarRechazar(md) {
       const z = zona(`<div class="rmd-bs-confirma"><p>¿Rechazar <b>${esc(md.codigoSolicitud || md.codigo)}</b> · ${esc(md.descripcion || '')}?</p>
-        <label class="rmd-bs-motivo">Motivo del rechazo<textarea maxlength="1000" rows="3" placeholder="Obligatorio: queda en la solicitud y le llega a quien la hizo"></textarea></label>
+        <label class="rmd-bs-motivo">Motivo del rechazo<textarea maxlength="1000" rows="3"></textarea></label>
         <div class="rmd-bs-fila"><button type="button" class="rmd-bs-btn no" data-ok="1" disabled>Rechazar</button><button type="button" class="rmd-bs-txt" data-no="1">Cancelar</button></div><ol class="rmd-bs-pasos"></ol></div>`);
       const ta = z.querySelector('textarea'), ok = z.querySelector('[data-ok]');
       ta.addEventListener('input', () => { ok.disabled = !ta.value.trim(); }); setTimeout(() => ta.focus(), 30);
@@ -9651,7 +9578,7 @@
         const r = await fn();
         z.querySelectorAll('.rmd-bs-pasos li.va').forEach((x) => x.classList.replace('va', 'hecho'));
         D.toast(msg(r));
-        S.atender.listo = false; S.todas.clave = '__'; S.revision.clave = '__';
+        S.atender.listo = false; S.todas.clave = '__';
         await cargarAtender(true).catch(() => {});
         recargarVista(false);
         setTimeout(() => { if (abierto()) seleccionar(r.mdId); }, 50);
@@ -9683,16 +9610,118 @@
       const vistos = new Set(), masters = mr.map((x) => x.mdId).filter((m) => m && !vistos.has(m.mdId) && vistos.add(m.mdId)).sort((a, b) => (+b.version || 0) - (+a.version || 0));
       return { registros: [], masters };
     }
+
+    // ---------- Documentos del reporte por lote (diálogo «Manufactura Digital» de la app Registro) ----------
+    // OPP: PDF de la orden de SAP (Z_PP_IMPRESIONORD_SRV/OrdenSet.Pdf64, como onGetPdfViewerOpp).
+    const pdfOpp = new Map();
+    function pdfDeOrden(aufnr) {
+      if (pdfOpp.has(aufnr)) return pdfOpp.get(aufnr);
+      const p = (async () => {
+        const erp = D.modeloErp(); if (!erp || !erp.sServiceUrl) throw new Error('el servicio de órdenes de SAP aún no está listo');
+        const url = erp.sServiceUrl.replace(/Z_PP_NECESIDADESRMD_SRV/i, 'Z_PP_IMPRESIONORD_SRV').replace(/\/$/, '') + `/OrdenSet?$filter=${encodeURIComponent(`Aufnr eq '${aufnr}'`)}&$format=json`;
+        const r = await D.fetch(url, { credentials: 'include', headers: Object.assign({}, (erp.getHeaders && erp.getHeaders()) || erp.mCustomHeaders || {}, { Accept: 'application/json' }) });
+        if (!r.ok) throw new Error(`SAP no devolvió el PDF de la orden (${r.status}). Revisar la Tx. ZPPPT_003 con la orden ${aufnr}.`);
+        const j = await r.json(), l = (j && j.d && (j.d.results || [j.d])) || [], x = l.find((z) => String(z.Aufnr) === String(aufnr)) || l[0];
+        if (!x || !x.Pdf64) throw new Error(`SAP no tiene el PDF de la orden ${aufnr}. Revisar la Tx. ZPPPT_003.`);
+        const bin = atob(x.Pdf64), u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+        return new Blob([u8], { type: 'application/pdf' });
+      })();
+      pdfOpp.set(aufnr, p); p.catch(() => pdfOpp.delete(aufnr));
+      return p;
+    }
+    // RMO: el RMD en PDF armado por la misma función de la app Registro (controller/table.onGeneratePdf con pdfMake), con los datos que junta onGetPdfViewerRmo.
+    let registroListo = null;
+    function baseRegistro() {
+      const m = api.modelo(), u = (m && m.sServiceUrl) || '';
+      const i = u.indexOf('/dest-apigateway'); if (i < 0) return null;
+      return u.slice(0, i).replace(/mifrmdconfiguracion/i, 'mifrmdregistro');
+    }
+    function cargarScript(src) {
+      return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = () => ok(); s.onerror = () => mal(new Error('no se pudo cargar ' + src.split('/').pop())); document.head.appendChild(s); });
+    }
+    function moduloRegistro() {
+      if (D.generarPdfRmd) return Promise.resolve({ onGeneratePdf: D.generarPdfRmd });
+      if (registroListo) return registroListo;
+      registroListo = (async () => {
+        const base = baseRegistro(); if (!base) throw new Error('no se encontró la app Registro en el portal');
+        if (!window.pdfMake) await cargarScript(base + '/libs/pdfmaker/pdfmake.min.js');
+        if (!window.pdfMake || !window.pdfMake.vfs || !Object.keys(window.pdfMake.vfs).length) await cargarScript(base + '/libs/pdfmaker/fonts/Roboto.js');
+        sap.ui.loader.config({ paths: { 'mif/rmd/registro': base } });
+        return new Promise((ok, mal) => sap.ui.require(['mif/rmd/registro/controller/table'], (t) => (t && t.onGeneratePdf ? ok(t) : mal(new Error('la app Registro no trae el generador del RMD'))), mal));
+      })();
+      registroListo.catch(() => { registroListo = null; });
+      return registroListo;
+    }
+    const EXPAND_RMO = 'mdId/estadoIdRmd,aReceta/recetaId,aEstructura/estructuraId,aEstructura/aEquipo/equipoId,aEstructura/aPaso/pasoId,aEstructura/aUtensilio/utensilioId,aEstructura/aUtensilio/agrupadorId,aEstructura/aEspecificacion/ensayoPadreId,aEstructura/aInsumo,aEstructura/aEtiqueta/etiquetaId,aEstructura/aPasoInsumoPaso/pasoHijoId,aEstructura/aPasoInsumoPaso/rmdEstructuraRecetaInsumoId';
+    const res_ = (x) => (x && x.results) || [];
+    async function imagenPaso(ruta) {
+      const l = JSON.parse((await api.funcion('sharepointGet', { idMd: JSON.stringify({ idMd: ruta, origen: 'ImagenMD' }) })).sharepointGet);
+      const a = ((l && l.d && l.d.results) || [])[0]; if (!a) return null;
+      const txt = (await api.funcion('sharepointDownload', { data: JSON.stringify({ origen: 'ImagenMD', codigoRM: ruta, Name: a.Name }) })).sharepointDownload;
+      let b = ''; for (let k = 0; k < txt.length; k++) b += String.fromCharCode(txt.charCodeAt(k) & 255);
+      return (a.Name.indexOf('jpg') !== -1 ? 'data:image/jpg;base64,' : 'data:image/png;base64,') + btoa(b);
+    }
+    async function datosRmo(rmdId, orden) {
+      const [r] = await api.leer('RMD', [eq('rmdId', rmdId)], { $expand: EXPAND_RMO });
+      if (!r) throw new Error('el registro ya no está en SAP');
+      const d = r.aEstructura || { results: [] };
+      r.loteVistaRMD = !r.loteAnt ? (!r.loteProv ? ' ' : r.loteProv) : r.loteAnt;
+      const recetaOrden = res_(r.aReceta).filter((e) => e.recetaId && e.recetaId.Matnr === r.productoId && e.recetaId.Verid === r.verid);
+      const espec = res_(d).find((e) => e.estructuraId && e.estructuraId.tipoEstructuraId_iMaestraId === K.TIPO_ESPEC);
+      if (espec && res_(espec.aEspecificacion).length) {
+        const l = res_(espec.aEspecificacion), conSap = l.some((e) => e.ensayoPadreSAP !== null), sinSap = l.some((e) => e.ensayoPadreSAP === null);
+        if (sinSap && !conSap) l.sort((a, b) => a.fechaRegistro - b.fechaRegistro); else if (conSap && !sinSap) l.sort((a, b) => a.Merknr - b.Merknr); else if (conSap && sinSap) l.sort((a, b) => a.Merknr - b.Merknr && a.fechaRegistro - b.fechaRegistro);
+      }
+      const fracciones = []; res_(d).reduce((ant, e) => (ant != e.fraccion ? fracciones.push(e.fraccion) : e.fraccion), []);   // (igual que la app: sin ordenar)
+      const firmas = [];
+      for (const fr of fracciones) firmas.push(...await api.leer('RMD_VERIFICACION_FIRMAS', [eq('rmdId_rmdId', rmdId), eq('fraccion', fr)], { $expand: 'usuarioId' }).catch(() => []));
+      d.results = res_(d).sort((a, b) => a.orden - b.orden);
+      for (const e of d.results) {
+        res_(e.aEtiqueta).sort((a, b) => a.orden - b.orden);
+        for (const t of res_(e.aPaso)) if (t.imagen) { try { const img = await imagenPaso(t.imagenRuta); if (img) t.imagenBase64 = img; } catch (er) { /* sin imagen, como la app si SharePoint no responde */ } }
+        res_(e.aPaso).sort((a, b) => a.orden - b.orden);
+        res_(e.aPasoInsumoPaso).sort((a, b) => a.orden - b.orden);
+        res_(e.aEquipo).sort((a, b) => a.orden - b.orden);
+        res_(e.aUtensilio).sort((a, b) => a.orden - b.orden);
+        if (res_(e.aInsumo).length) {
+          const rec = recetaOrden.find((x) => x.fraccion === e.aInsumo.results[0].fraccion);
+          e.aInsumo.results = e.aInsumo.results.filter((x) => rec && x.rmdRecetaId_rmdRecetaId == rec.rmdRecetaId && x.visibleInsumo).sort((a, b) => a.ItemNo - b.ItemNo);
+        }
+      }
+      d.results.sort((a, b) => a.fraccion - b.fraccion);
+      const todas = res_(r.aReceta);
+      r.aReceta.results = todas.filter((e) => e.recetaId && e.recetaId.Matnr == orden.Matnr && e.recetaId.Verid === orden.Verid).concat(todas.filter((e) => e.recetaId && e.recetaId.Matnr !== orden.Matnr && e.recetaId.Verid === orden.Verid));
+      const historial = await api.todo('RMD_ES_HISTORIAL', [eq('rmdId_rmdId', rmdId)], { $expand: 'rmdEstructuraPasoInsumoPasoId' }).catch(() => []);
+      return { r, firmas, fracciones, historial: { results: historial } };
+    }
+    async function generarRmo(rmdId, orden, descargar) {
+      const [t, x] = await Promise.all([moduloRegistro(), datosRmo(rmdId, orden)]);
+      if (descargar) { await t.onGeneratePdf(x.r, true, null, orden, x.firmas, x.fracciones, x.historial); return null; }
+      const b64 = await t.onGeneratePdf(x.r, false, null, orden, x.firmas, 'BASE64', x.historial);   // (la app abre el PDF con pdfMake; aquí se pide en base64 para abrirlo en una pestaña)
+      const bin = atob(decodeURI(b64)), u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      return new Blob([u8], { type: 'application/pdf' });
+    }
+    async function abrirDocumento(b, orden) {
+      if (!orden || b.disabled) return;
+      const doc = b.dataset.doc, txt = b.textContent, ventana = doc === 'rmopdf' ? null : window.open('', '_blank');
+      if (ventana) { try { ventana.document.title = doc === 'opp' ? 'OPP ' + orden.Aufnr : 'RMO'; ventana.document.body.style.cssText = 'font:14px sans-serif;color:#555;padding:24px'; ventana.document.body.textContent = 'Generando el documento…'; } catch (e) { /* otra ventana */ } }
+      b.disabled = true; b.textContent = 'Generando…';
+      try {
+        const blob = doc === 'opp' ? await pdfDeOrden(orden.Aufnr) : await generarRmo(b.dataset.rmd, orden, doc === 'rmopdf');
+        if (blob) { const u = URL.createObjectURL(blob); if (ventana && !ventana.closed) ventana.location.href = u; else window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 120000); }
+      } catch (e) { if (ventana) try { ventana.close(); } catch (er) { /* ya cerrada */ } D.toast('No se pudo abrir el documento: ' + (e.message || e), true); }
+      finally { b.disabled = false; b.textContent = txt; }
+    }
     let lotePanel = null;
     function abrirLote() {
       if (lotePanel && lotePanel.isConnected) { const i = lotePanel.querySelector('input'); if (i) i.focus(); return; }
       const f = document.createElement('div'); f.className = 'rmd-bs-fondo rmd-lt-fondo'; lotePanel = f;
       f.innerHTML = `<aside class="rmd-bs rmd-lt" role="dialog" aria-modal="true" aria-label="Buscar por lote">
-        <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Buscar por lote</h3><span class="rmd-bs-sub">Órdenes de SAP del lote y los RMD de cada una</span></div><div class="rmd-bs-acc"><button type="button" class="rmd-bs-txt" data-a="cerrar">Cerrar</button></div></header>
-        <form class="rmd-lt-form"><input type="search" placeholder="Lote, p. ej. 2601234" aria-label="Lote" autocomplete="off" spellcheck="false"><button type="submit" class="rmd-bs-btn si">Buscar</button></form>
+        <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Buscar por lote</h3></div><div class="rmd-bs-acc"><button type="button" class="rmd-bs-txt" data-a="cerrar">Cerrar</button></div></header>
+        <form class="rmd-lt-form"><input type="search" placeholder="Lote" aria-label="Lote" autocomplete="off" spellcheck="false"><button type="submit" class="rmd-bs-btn">Buscar</button></form>
         <div class="rmd-lt-recientes"></div><div class="rmd-lt-res"></div></aside>`;
       document.body.appendChild(f); D.externos();
-      const salir = () => { document.removeEventListener('keydown', tec, true); f.classList.add('rmd-bs-sale'); setTimeout(() => f.remove(), 180); lotePanel = null; };
+      const salir = () => { document.removeEventListener('keydown', tec, true); f.remove(); lotePanel = null; };
       const tec = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); salir(); } };
       document.addEventListener('keydown', tec, true);
       f.addEventListener('mousedown', (ev) => { if (ev.target === f) salir(); });
@@ -9702,12 +9731,13 @@
       let ordenes = [], vuelta = 0;
       const buscar = async (lote) => {
         const l = String(lote || '').trim().toUpperCase(); if (!l) return; inp.value = l; const mia = ++vuelta;
-        res.innerHTML = '<div class="rmd-bs-vacio"><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div></div>';
+        res.innerHTML = '<div class="rmd-bs-vacio">Buscando…</div>';
         try {
           ordenes = await ordenesDeLote(l); if (mia !== vuelta) return;
+          pdfOpp.clear();
           recordarLote(l); pintarRecientes();
           if (!ordenes.length) { res.innerHTML = `<div class="rmd-bs-vacio"><p>No hay órdenes con el lote ${esc(l)}.</p></div>`; return; }
-          res.innerHTML = `<p class="rmd-lt-cuenta">${ordenes.length} orden${ordenes.length === 1 ? '' : 'es'} con el lote <b>${esc(l)}</b></p><table class="rmd-lt-tabla"><thead><tr><th>Centro</th><th>Orden</th><th>Etapa</th><th>Código</th><th>Versión</th><th>Artículo</th><th>Lote</th><th>Expira</th><th>Status</th></tr></thead><tbody>${
+          res.innerHTML = `<p class="rmd-lt-cuenta">Registros de Manufactura Digital (${ordenes.length})</p><table class="rmd-lt-tabla"><thead><tr><th>Centro</th><th>Orden</th><th>Etapa</th><th>Código</th><th>Versión</th><th>Artículo</th><th>Lote</th><th>Expira</th><th>Status</th></tr></thead><tbody>${
             ordenes.map((x, i) => `<tr data-i="${i}" tabindex="0"><td>${esc(x.Pwerk)}</td><td class="rmd-lt-ord">${esc(String(x.Aufnr || '').replace(/^0+/, ''))}</td><td>${esc(x.Dauat)}</td><td>${esc(String(x.Matnr || '').replace(/^0+/, ''))}</td><td>${esc(x.Verid)}</td><td>${esc(x.Text1 || x.Maktx || '')}</td><td>${esc(x.Charg)}</td><td>${esc(fechaTxt(x.Vfdat))}</td><td>${esc(x.Stats || '')}</td></tr><tr class="rmd-lt-sub" hidden><td colspan="9"></td></tr>`).join('')}</tbody></table>`;
           if (ordenes.length === 1) abrirOrden(0);
         } catch (e) { if (mia === vuelta) res.innerHTML = `<div class="rmd-bs-vacio"><p class="rmd-bs-error">${esc(e.message || e)}</p></div>`; }
@@ -9718,25 +9748,27 @@
         sub.hidden = false; tr.classList.add('abierta'); const td = sub.firstElementChild; td.innerHTML = '<span class="rmd-bs-tenue">Buscando los RMD de esta orden…</span>';
         try {
           const r = await rmdDeOrden(ordenes[i]);
-          const fila = (m, estadoReg) => `<li><button type="button" class="rmd-bs-txt" data-cod="${esc(m.codigo || '')}" data-ver="${esc(m.version)}"${m.codigo ? '' : ' disabled'}>${esc(m.codigo || m.codigoSolicitud || '—')} v${esc(m.version)}</button> <span>${esc(m.descripcion || '')}</span> <span class="rmd-bs-est ${claseEstado(m)}">${esc((m.estadoIdRmd && m.estadoIdRmd.contenido) || '')}</span>${estadoReg ? ` <small>Registro: ${esc(estadoReg)}</small>` : ''}</li>`;
-          if (r.registros.length) td.innerHTML = `<ul class="rmd-lt-rmd">${r.registros.map((x) => fila(x.mdId || {}, (x.estadoIdRmd && x.estadoIdRmd.contenido) || (x.activo === false ? 'inactivo' : ''))).join('')}</ul>`;
-          else if (r.masters.length) td.innerHTML = `<p class="rmd-bs-tenue">Esta orden aún no tiene registro de manufactura. Master de su receta:</p><ul class="rmd-lt-rmd">${r.masters.map((m) => fila(m)).join('')}</ul>`;
-          else td.innerHTML = '<span class="rmd-bs-tenue">Sin RMD para esta orden ni master con su receta.</span>';
+          // Como el diálogo «Manufactura Digital» de Registro: OPP siempre; RMO (ver / descargar) solo si la orden ya tiene registro.
+          const docs = (rmdId) => `<span class="rmd-lt-docs"><button type="button" class="rmd-bs-txt" data-doc="opp" data-o="${i}">OPP</button>${rmdId ? `<button type="button" class="rmd-bs-txt" data-doc="rmo" data-o="${i}" data-rmd="${esc(rmdId)}">RMO</button><button type="button" class="rmd-bs-txt" data-doc="rmopdf" data-o="${i}" data-rmd="${esc(rmdId)}">Descargar RMO</button>` : ''}</span>`;
+          const fila = (m, estadoReg, rmdId) => `<li><button type="button" class="rmd-bs-txt" data-cod="${esc(m.codigo || '')}" data-ver="${esc(m.version)}"${m.codigo ? '' : ' disabled'}>${esc(m.codigo || m.codigoSolicitud || '')} v${esc(m.version)}</button><span>${esc(m.descripcion || '')}</span><span class="rmd-bs-est ${claseEstado(m)}">${esc((m.estadoIdRmd && m.estadoIdRmd.contenido) || '')}</span>${estadoReg ? `<span class="rmd-bs-tenue">Registro: ${esc(estadoReg)}</span>` : ''}${docs(rmdId)}</li>`;
+          if (r.registros.length) td.innerHTML = `<ul class="rmd-lt-rmd">${r.registros.map((x) => fila(x.mdId || {}, (x.estadoIdRmd && x.estadoIdRmd.contenido) || (x.activo === false ? 'Inactivo' : ''), x.rmdId)).join('')}</ul>`;
+          else if (r.masters.length) td.innerHTML = `<p class="rmd-bs-tenue">La orden aún no tiene registro. Master de su receta:</p><ul class="rmd-lt-rmd">${r.masters.map((m) => fila(m)).join('')}</ul>`;
+          else td.innerHTML = `<span class="rmd-bs-tenue">Sin RMD para esta orden.</span>${docs('')}`;
         } catch (e) { td.innerHTML = `<span class="rmd-bs-error">${esc(e.message || e)}</span>`; }
       };
       f.querySelector('form').addEventListener('submit', (ev) => { ev.preventDefault(); buscar(inp.value); });
       f.addEventListener('click', (ev) => {
         const b = ev.target.closest('button'); if (b && b.dataset.a === 'cerrar') return salir();
         if (b && b.dataset.lote) return buscar(b.dataset.lote);
+        if (b && b.dataset.doc) { abrirDocumento(b, ordenes[+b.dataset.o]); return; }
         if (b && b.dataset.cod) { salir(); D.abrirRmd(b.dataset.cod, b.dataset.ver); return; }
         const tr = ev.target.closest('tr[data-i]'); if (tr) abrirOrden(+tr.dataset.i);
       });
       f.addEventListener('keydown', (ev) => { const tr = ev.target.closest && ev.target.closest('tr[data-i]'); if (tr && ev.key === 'Enter') { ev.preventDefault(); abrirOrden(+tr.dataset.i); } });
-      requestAnimationFrame(() => f.classList.add('rmd-bs-entra'));
       setTimeout(() => inp.focus(), 40);
     }
 
-    return { abrir, cerrar, abierto, abrirLote, cargarAtender, cargarPagina, quienSoy, aprobar, rechazar, puedoAtender, registrarEstructurasNuevaVersion, ordenesDeLote, rmdDeOrden, K, S, api,
+    return { abrir, cerrar, abierto, abrirLote, cargarAtender, cargarPagina, quienSoy, aprobar, rechazar, puedoAtender, registrarEstructurasNuevaVersion, ordenesDeLote, rmdDeOrden, pdfDeOrden, datosRmo, generarRmo, K, S, api,
       pendientes: () => S.atender.filas.length, listo: () => S.atender.listo, reiniciar: () => { yo = null; yoCargando = null; S.atender = { filas: [], listo: false, t: 0, cargando: null, error: '' }; S.detalle.clear(); S.adjuntos.clear(); } };
   }
   // ==BANDEJA-FIN==
@@ -9763,7 +9795,6 @@
     const b = document.querySelector('.rmd-bs-campana'); if (!b) return;
     const s = b.querySelector('span'); s.textContent = n > 99 ? '99+' : n > 0 ? String(n) : '';
     b.title = n > 0 ? `Solicitudes: ${n} por atender` : 'Solicitudes de Manufactura Digital'; b.setAttribute('aria-label', b.title);
-    if (bandejaUltimo >= 0 && n > bandejaUltimo) { b.classList.remove('rmd-bs-suena'); void b.offsetWidth; b.classList.add('rmd-bs-suena'); }
     bandejaUltimo = n;
   }
   function gestionarBandeja() {
