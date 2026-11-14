@@ -1715,7 +1715,7 @@
   .rmd-bs-cod { color: var(--rmd-texto); font-weight: 600; font-variant-numeric: tabular-nums; } .rmd-bs-tipo { font-size: 12px; color: var(--rmd-apagado); }
   .rmd-bs-est { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 32%, transparent); background: color-mix(in srgb, currentColor 10%, transparent); font-size: 11.5px; font-weight: 600; color: var(--rmd-apagado); }
   .rmd-bs-est.pendiente { color: #b58ce6; } .rmd-bs-est.aprobada { color: var(--rmd-acento-texto); } .rmd-bs-est.revision { color: var(--rmd-ambar); } .rmd-bs-est.autorizado, .rmd-bs-est.ingresado { color: var(--rmd-verde); }
-  .rmd-bs-tuyo { margin-left: auto; padding: 1px 7px; border-radius: 6px; background: #e2553f; color: #fff; font-size: 11px; font-weight: 700; }
+  .rmd-bs-destr dd { font-size: 12px; color: var(--rmd-apagado); }
   .rmd-bs-nom { font-weight: 600; font-size: 14px; line-height: 1.3; }
   .rmd-bs-t3, .rmd-bs-t4 { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-bs-t3 span + span::before, .rmd-bs-t4 span + span:not(:empty)::before { content: '·'; margin-right: 12px; opacity: .6; }
   .rmd-bs-t3 { color: var(--rmd-texto); opacity: .88; }
@@ -9097,9 +9097,8 @@
     // debeAprobar (onPressMD) + visibilidad de los botones (DetailRMD.fragment.xml)
     function puedoAtender(md) {
       if (!yo || !soyDestinatario(md)) return false;
-      if (esSolicitud(md)) return yo.fs.aprobador;
-      const p = +md.estadoIdProceso_iMaestraId, rol = yo.rol && yo.rol.rolId;
-      return +md.estadoIdRmd_iMaestraId === K.INICIADO && ((p === K.P_PROD_JEFE && rol === yo.rolJefe) || (p === K.P_PROD_GERENTE && rol === yo.rolGerente) || (p === K.P_APROB_GERENTE && rol === yo.rolJefeDT));
+      // Solo las solicitudes en estado Solicitado se aprueban o rechazan desde aqui (pedido de Carlos).
+      return esSolicitud(md) && +md.estadoIdRmd_iMaestraId === K.SOLICITADO && !!yo.fs.aprobador;
     }
     const tipoMD = (md) => (+md.version === 1 ? 'Nuevo RMD' : 'Nueva versión');
     const planta = (md) => (md.sucursalId && md.sucursalId.contenido) || '';
@@ -9145,8 +9144,6 @@
       A.cargando = (async () => {
         await quienSoy();
         const pedidos = [api.todo('MD', [eq('estadoIdRmd_iMaestraId', K.SOLICITADO)], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $orderby: 'fechaRegistro desc' })];
-        if (yo.rol && [yo.rolJefe, yo.rolGerente, yo.rolJefeDT].includes(yo.rol.rolId))
-          pedidos.push(api.todo('MD', [eq('estadoIdRmd_iMaestraId', K.INICIADO), o([K.P_PROD_JEFE, K.P_PROD_GERENTE, K.P_APROB_GERENTE].map((p) => eq('estadoIdProceso_iMaestraId', p)))], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $orderby: 'fechaRegistro desc' }));
         const res = (await Promise.all(pedidos)).flat();
         const vistos = new Set(); A.filas = res.filter((md) => !vistos.has(md.mdId) && vistos.add(md.mdId) && puedoAtender(md));
         A.listo = true; A.t = Date.now(); A.error = '';
@@ -9494,7 +9491,7 @@
         <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Solicitudes</h3><span class="rmd-bs-sub"></span></div>
           <div class="rmd-bs-acc"><button type="button" class="rmd-bs-txt" data-a="refrescar">Actualizar</button><button type="button" class="rmd-bs-txt" data-a="cerrar">Cerrar</button></div></header>
         <nav class="rmd-bs-pestanas" role="tablist"></nav>
-        <div class="rmd-bs-filtros"><input type="search" class="rmd-bs-buscar" placeholder="Buscar por nombre o código  ( / )" aria-label="Buscar solicitudes"><div class="rmd-bs-chips" role="group" aria-label="Filtros"></div></div>
+        <div class="rmd-bs-filtros"><input type="search" class="rmd-bs-buscar" placeholder="Buscar por nombre o código" aria-label="Buscar solicitudes"><div class="rmd-bs-chips" role="group" aria-label="Filtros"></div></div>
         <div class="rmd-bs-cuerpo"><div class="rmd-bs-lista" role="listbox" tabindex="-1" aria-label="Solicitudes"></div><section class="rmd-bs-det" aria-live="polite"></section></div>
       </aside>`;
       document.body.appendChild(panel); D.externos();
@@ -9522,8 +9519,8 @@
     function pintar() { if (!abierto()) return; pintarCabecera(); pintarLista(); pintarDetalle(); }
     function pintarCabecera() {
       const n = S.atender.filas.length;
-      $('.rmd-bs-sub').textContent = yo ? `${D.usuarioVisible(yo.data.usuario)}${yo.fs.aprobador ? ' · aprobador de solicitudes' : ''}` : 'Conectando con SAP…';
-      const tabs = [['atender', 'Por atender', S.atender.listo ? String(n) : '…'], ['todas', 'Todas', ''], ['revision', 'Flujo de revisión', '']];
+      $('.rmd-bs-sub').textContent = yo ? D.usuarioVisible(yo.data.usuario) : 'Conectando con SAP…';
+      const tabs = [['atender', 'Por aprobar', S.atender.listo ? String(n) : '…'], ['todas', 'Todas', '']];
       $('.rmd-bs-pestanas').innerHTML = tabs.map(([k, t, c]) => `<button type="button" role="tab" data-v="${k}" aria-selected="${S.vista === k}">${esc(t)}${c ? `<span class="rmd-bs-num${k === 'atender' && n ? ' hay' : ''}">${esc(c)}</span>` : ''}</button>`).join('');
       const chips = [];
       if (S.vista === 'todas') [['', 'Todos'], [K.SOLICITADO, 'Solicitado'], [K.APROBADA, 'Aprobada'], [K.RECHAZADA, 'Rechazada']].forEach(([k, t]) => chips.push(`<button type="button" data-est="${k}" aria-pressed="${String(S.estado) === String(k)}">${t}</button>`));
@@ -9532,10 +9529,10 @@
       $('.rmd-bs-chips').innerHTML = chips.join('');
     }
     function tarjeta(md) {
-      const c = claseEstado(md), atender = puedoAtender(md), adj = S.adjuntos.get(md.mdId);
+      const c = claseEstado(md), adj = S.adjuntos.get(md.mdId);
       return `<button type="button" class="rmd-bs-t ${c}${S.sel === md.mdId ? ' sel' : ''}" role="option" aria-selected="${S.sel === md.mdId}" data-id="${esc(md.mdId)}">
         <span class="rmd-bs-t1"><span class="rmd-bs-cod">${esc(md.codigo || md.codigoSolicitud || '—')}</span><span class="rmd-bs-ver">v${esc(md.version)}</span><span class="rmd-bs-tipo">${esc(tipoMD(md))}</span>
-          <span class="rmd-bs-est ${c}">${esc(enRevision(md) ? procesoTxt(md) : estadoTxt(md))}</span>${atender ? '<span class="rmd-bs-tuyo">te toca</span>' : ''}</span>
+          <span class="rmd-bs-est ${c}">${esc(enRevision(md) ? procesoTxt(md) : estadoTxt(md))}</span></span>
         <span class="rmd-bs-nom">${esc(md.descripcion || '')}</span>
         <span class="rmd-bs-t3"><span>${esc(md.areaRmdTxt || '—')}</span><span>${esc(plantaCorta(md) || '—')}</span><span>${esc(motivo(md) || 'Sin motivo')}</span>${md.nivelTxt ? `<span>${esc(md.nivelTxt)}</span>` : ''}</span>
         <span class="rmd-bs-t4"><span title="${esc(fechaTxt(md.fechaRegistro, true))}">${esc(haceTxt(md.fechaRegistro))}</span><span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
@@ -9552,8 +9549,8 @@
       let html = filas.map(tarjeta).join('');
       if (!filas.length && cargando) html = '<div class="rmd-bs-vacio"><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div></div>';
       else if (!filas.length && L.error) html = `<div class="rmd-bs-vacio"><p>No se pudo leer de SAP: ${esc(L.error)}</p><button type="button" class="rmd-bs-txt" data-a="refrescar">Intentar otra vez</button></div>`;
-      else if (!filas.length) html = `<div class="rmd-bs-vacio"><p>${v === 'atender' ? 'No tienes solicitudes por atender.' : 'No hay solicitudes con este filtro.'}</p></div>`;
-      if (v !== 'atender' && filas.length) html += L.fin ? '<p class="rmd-bs-fin">No hay más.</p>' : `<div class="rmd-bs-mas">${L.cargando ? 'Cargando más…' : L.error ? `No se pudo seguir: ${esc(L.error)} <button type="button" class="rmd-bs-txt" data-a="mas">Reintentar</button>` : ''}</div>`;
+      else if (!filas.length) html = `<div class="rmd-bs-vacio"><p>${v === 'atender' ? 'No hay solicitudes por aprobar.' : 'No hay solicitudes con este filtro.'}</p></div>`;
+      if (v !== 'atender' && filas.length) html += L.fin ? '' : `<div class="rmd-bs-mas">${L.cargando ? 'Cargando más…' : L.error ? `No se pudo seguir: ${esc(L.error)} <button type="button" class="rmd-bs-txt" data-a="mas">Reintentar</button>` : ''}</div>`;
       const top = caja.scrollTop; caja.innerHTML = html; caja.scrollTop = top;
       const mas = caja.querySelector('.rmd-bs-mas'); if (mas && io) { io.disconnect(); io.observe(mas); }
       if (ioAdj) caja.querySelectorAll('.rmd-bs-t').forEach((b) => { const p = S.adjuntos.get(b.dataset.id); if (!p || p.__n == null) ioAdj.observe(b); });
@@ -9567,13 +9564,13 @@
     const campo = (t, v, cls) => (v == null || v === '' ? '' : `<div class="rmd-bs-c${cls ? ' ' + cls : ''}"><dt>${esc(t)}</dt><dd>${v}</dd></div>`);
     function pintarDetalle(err) {
       const caja = $('.rmd-bs-det'); if (!caja) return;
-      if (!S.sel) { caja.innerHTML = `<div class="rmd-bs-nada"><p>Elige una solicitud para ver su detalle.</p><p class="rmd-bs-ayuda">Flechas o j / k para moverte, / para buscar, Esc para cerrar.</p></div>`; return; }
+      if (!S.sel) { caja.innerHTML = ''; return; }
       const base = buscarFila(S.sel), md = S.detalle.get(S.sel) || base; if (!md) { caja.innerHTML = ''; return; }
       const completo = S.detalle.has(S.sel), c = claseEstado(md), atender = puedoAtender(md);
       const hist = completo ? ((md.aStatusProceso && md.aStatusProceso.results) || []).slice().sort((a, b) => fecha(a.fechaRegistro) - fecha(b.fechaRegistro)) : [];
       const primeroSol = hist.find((h) => h.tipo === 'SOLICITUD');
       const recetas = completo ? ((md.aReceta && md.aReceta.results) || []).filter((r) => r.activo !== false).map((r) => r.recetaId ? `${esc(r.recetaId.Matnr || '')}${r.recetaId.Verid ? ' · ver. ' + esc(r.recetaId.Verid) : ''}${r.recetaId.Text1 ? ' · ' + esc(r.recetaId.Text1) : ''}` : '').filter(Boolean) : [];
-      const dest = destinatarios(md).map((d) => d.usuarioId ? `<li>${esc(D.usuarioVisible(d.usuarioId.usuario || ''))}${d.usuarioId.nombre ? ' · ' + esc(d.usuarioId.nombre + ' ' + (d.usuarioId.apellidoPaterno || '')) : ''}${d.tipo ? ` <small>${esc(d.tipo)}</small>` : ''}</li>` : '').join('');
+      const dest = [...new Set(destinatarios(md).map((d) => d.usuarioId && D.usuarioVisible(d.usuarioId.usuario || '')).filter(Boolean))];
       caja.innerHTML = `<div class="rmd-bs-dcab ${c}"><button type="button" class="rmd-bs-txt rmd-bs-volver" data-a="volver">Volver a la lista</button>
           <div class="rmd-bs-dcod">${esc(md.codigoSolicitud || '')}${md.codigo ? ` <span>RMD ${esc(md.codigo)}</span>` : ''} <span>v${esc(md.version)}</span></div>
           <h4>${esc(md.descripcion || '')}</h4>
@@ -9590,8 +9587,8 @@
           ${campo('Código por defecto', esc(md.codDefectoReceta || ''))}${campo('Código agrupador', esc(md.codAgrupadorReceta || ''))}${campo('Fecha de autorización', esc(fechaTxt(md.fechaAutorizacion, true)))}
           ${campo('Observación', esc(md.observacion || ''), 'ancho pre')}${campo('Motivo de rechazo', esc(md.motivoRechazo || ''), 'ancho pre rechazo')}${campo('Motivo de cancelación', esc(md.motivoCancelado || ''), 'ancho pre')}
           ${recetas.length ? campo('Recetas', `<ul>${recetas.map((r) => `<li>${r}</li>`).join('')}</ul>`, 'ancho') : ''}
-          ${campo('Destinatarios', dest ? `<ul>${dest}</ul>` : '<span class="rmd-bs-tenue">Ninguno</span>', 'ancho')}
           <div class="rmd-bs-c ancho"><dt>Documentos adjuntos</dt><dd class="rmd-bs-adjs"><span class="rmd-bs-tenue">Buscando en SharePoint…</span></dd></div>
+          ${dest.length ? `<div class="rmd-bs-c ancho rmd-bs-destr"><dt>Destinatarios</dt><dd>${esc(dest.slice(0, 3).join(', '))}${dest.length > 3 ? ` <span class="rmd-bs-tenue">y ${dest.length - 3} más</span>` : ''}</dd></div>` : ''}
           ${hist.length ? campo('Historial', `<ol class="rmd-bs-hist">${hist.map((h) => `<li><b>${esc(h.tipo || '')}</b> ${esc(fechaTxt(h.fechaRegistro, true))} · ${esc(D.usuarioVisible(h.usuarioRegistro || ''))}${h.observacion ? `<div>${esc(h.observacion)}</div>` : ''}</li>`).join('')}</ol>`, 'ancho') : (completo ? '' : '<div class="rmd-bs-c ancho"><dd class="rmd-bs-tenue">Cargando el detalle completo…</dd></div>')}
         </dl>`;
       leerAdjuntos(md).then((l) => {
