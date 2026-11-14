@@ -1020,6 +1020,61 @@ with sync_playwright() as p:
               and "★ crear" in r["antes"] and r["bloqueado"] and "2010" in r["sug"] and "2010" in r["estado"] and "(2010)" in r["despues"] and "★ crear" not in r["despues"] and "AGITAR 15 MIN." in r["despues"]
               and r["item"] == {"codigo": "2010", "nuevo": False, "texto": "AGITAR DURANTE 15 MINUTOS.", "ed": {"antes": "AGITAR 15 MIN."}} and r["ingresar"] and r["sigue"])
         return ok, json.dumps({"vista": vista, "arriba": arriba, "titulo": titulo, "nombres": nombres, "rev": r, "errores": errs[:3]}, ensure_ascii=False)[:1800]
+    @prueba("LN62 Plantilla para Producción y Edición rápida · especificaciones y equipos (v1.139.0, pedido de Carlos): las especificaciones se editan (Descripción y Especificaciones) y se mueven dentro de su grupo; equipos y utensilios salen en el orden de SAP y se mueven (Subir, Bajar, Mover a…); el ingreso escribe MD_ES_ESPECIFICACION (ensayoHijo / especificacion y orden) y renumera equipos y utensilios; el rehacer sobre SAP conserva textos y orden; botones solo con texto")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        E2 = d0["arbol"]["estructuras"][1]; E5 = d0["arbol"]["estructuras"][4]
+        E2["equipos"] = [{"id": "Q1", "equipoId": "EQ1", "codigo": "10000675", "ref": "PL1-SEL-E013", "desc": "REACTOR DE 400 L", "orden": 1}, {"id": "Q2", "equipoId": "EQ2", "codigo": "40100796", "ref": "SEL-BAL-08", "desc": "BALANZA-OHAUS-R31P30", "orden": 3}]
+        E2["utensilios"] = [{"id": "U1", "utensilioId": "U1", "agrupadorId": None, "codigo": "SEL-U005", "desc": "BALDE DE ACERO INOXIDABLE DE 10 L", "orden": 2}]
+        E5["espec"] = [{"id": "S1", "ensayo": "pH (25 °C):", "grupoId": 1, "grupo": "PRUEBAS ESPECIFICAS", "especificacion": "3.80 - 4.20", "orden": 1, "padre": ""},
+                       {"id": "S3", "ensayo": "DENSIDAD:", "grupoId": 1, "grupo": "PRUEBAS ESPECIFICAS", "especificacion": "1.00 - 1.10 g/mL", "orden": 2, "padre": ""},
+                       {"id": "S2", "ensayo": "DESCRIPCION (Aspecto):", "grupoId": 2, "grupo": "CARACTERISTICAS FISICAS", "especificacion": "Solucion transparente.", "orden": 3, "padre": ""}]
+        html = pg.evaluate("async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); return P.html(await P.empacar(paq), null, 'Prueba'); }", d0)
+        e = PP_CTX.new_page(); e.set_viewport_size({"width": 1400, "height": 900}); errs = []; e.on("pageerror", lambda x: errs.append(str(x)[:200]))
+        e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000)
+        filasEq = lambda: e.evaluate("() => [...document.querySelectorAll('section[data-id=\"E2\"] tr[data-id]')].map((t) => t.dataset.id)")
+        filasEsp = lambda: e.evaluate("() => [...document.querySelectorAll('section[data-id=\"E5\"] tr[data-id]')].map((t) => t.dataset.id)")
+        eq0 = filasEq(); esp0 = filasEsp()
+        btn = e.evaluate("() => ({ q: [...document.querySelectorAll('tr[data-id=\"Q1\"] .pp-acc [data-a]')].map((b) => b.textContent), s1: [...document.querySelectorAll('tr[data-id=\"S1\"] .pp-acc [data-a]')].map((b) => b.dataset.a), s2: [...document.querySelectorAll('tr[data-id=\"S2\"] .pp-acc [data-a]')].map((b) => b.dataset.a) })")
+        clic = lambda id, a: e.evaluate("([id, a]) => document.querySelector(`tr[data-id=\"${id}\"] [data-a=${a}]`).click()", [id, a])
+        clic("Q1", "bajar"); e.wait_for_timeout(120); eq1 = filasEq()
+        clic("Q2", "mover-a"); e.wait_for_selector("#m-pos"); e.select_option("#m-pos", ""); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(150); eq2 = filasEq()
+        clic("S3", "editar-esp"); e.wait_for_selector("#m-ens"); e.fill("#m-ens", ""); e.click(".pp-modal [data-a=aceptar]"); vacia = e.evaluate("() => !!document.querySelector('#m-ens') && !document.querySelector('#m-err').hidden")
+        e.fill("#m-ens", "DENSIDAD (20 C):"); e.fill("#m-esp", "1.02 - 1.08 g/mL"); e.click(".pp-modal [data-a=aceptar]"); e.wait_for_timeout(150)
+        clic("S3", "subir"); e.wait_for_timeout(150); esp1 = filasEsp()
+        st = e.evaluate("""() => { const s = window.__pp.estado(); return { cmb: s.CMB.filter((c) => ['equipo', 'utensilio', 'especificacion'].includes(c.clase)).map((c) => [c.clase, c.accion, c.id, c.accion === 'cambiar' ? c.campos.map((x) => x.campo + ':' + x.despues).join('|') : '']),
+          tags: [...document.querySelectorAll('tr[data-id="S3"] .pp-tag')].map((x) => x.textContent), antes: [...document.querySelectorAll('tr[data-id="S3"] .pp-antes')].length, W: s.W }; }""")
+        e.close()
+        r = pg.evaluate("""async ([d, W]) => { const antes = window.sap; try {
+          function F(a, b, c) { if (a && typeof a === 'object') { this.filters = a.filters; this.and = a.and; } else { this.path = a; this.op = b; this.value = c; } }
+          const modelo = { read: (ruta, o) => setTimeout(() => o.success({ results: ruta.includes('ETIQUETA') ? [] : [] }), 1) };
+          window.sap = { ui: { require: (n) => (n === 'sap/ui/model/Filter' ? F : n === 'sap/ui/model/FilterOperator' ? { EQ: 'EQ' } : null), getCore: () => ({ byId: () => null }) } };
+          const P = window.__rmdStats.plantilla, N = P.nucleo, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA'), datos = { ...paq, rmd: { ...paq.rmd, mdId: 'MD1' }, tipos: {} };
+          const an = { destino: { mdId: 'MD1', codigo: '2202600001', version: 3, estadoIdRmd_iMaestraId: 467, nivelTxt: 'FABRICACION' }, enSap: [], avisos: new Map(), cambios: N.cambios(datos.arbol, W), actual: JSON.parse(JSON.stringify(datos.arbol)), mapa: null };
+          const plan = await P.plan(datos, { trabajo: W, guardado: 'x' }, an, modelo, 'PRUEBA');
+          const ops = plan.ops.map((o) => [o.accion, o.clase, o.ruta, JSON.stringify(Object.fromEntries(Object.entries(o.datos).filter(([k]) => !/Actualiza$/.test(k))))]);
+          // verificación: SAP quedó como se pidió
+          const nuevo = JSON.parse(JSON.stringify(datos.arbol)), ne2 = nuevo.estructuras[1], ne5 = nuevo.estructuras[4];
+          ne2.equipos.find((x) => x.id === 'Q2').orden = 1; ne2.utensilios[0].orden = 2; ne2.equipos.find((x) => x.id === 'Q1').orden = 3;
+          Object.assign(ne5.espec.find((x) => x.id === 'S3'), { ensayo: 'DENSIDAD (20 C):', especificacion: '1.02 - 1.08 g/mL' });
+          // rehacer sobre SAP: en SAP cambió el texto de S1 y se agregó un equipo
+          const actual = JSON.parse(JSON.stringify(datos.arbol)); actual.estructuras[4].espec[0].especificacion = '3.90 - 4.10'; actual.estructuras[1].equipos.push({ id: 'Q9', equipoId: 'EQ9', codigo: '999', desc: 'OTRO', orden: 4 });
+          const rb = N.rebase(datos.arbol, W, actual, null), re2 = rb.trabajo.estructuras[1], re5 = rb.trabajo.estructuras[4];
+          return { ops, bloqueos: plan.bloqueos, avisos: plan.avisos, rbEq: N.eqSecuencia(re2).map((y) => y.x.id), rbEsp: re5.espec.map((x) => x.id + ':' + x.ensayo + ':' + x.especificacion), rbConf: rb.conflictos,
+            reorden: N.cambios(datos.arbol, W).filter((c) => c.accion === 'mover').map((c) => c.id) };
+        } catch (e) { return { error: String(e && e.stack || e).slice(0, 600) }; } finally { window.sap = antes; } }""", [d0, st["W"]])
+        if r.get("error"): return False, r["error"]
+        ops = r["ops"]
+        okUi = (not errs and eq0 == ["Q1", "U1", "Q2"] and esp0 == ["S1", "S3", "S2"] and eq1 == ["U1", "Q1", "Q2"] and eq2 == ["Q2", "U1", "Q1"] and esp1 == ["S3", "S1", "S2"] and vacia
+                and btn["q"][:3] == ["Mover a…", "Subir", "Bajar"] and "subir" in btn["s1"] and "editar-esp" in btn["s1"] and "subir" not in btn["s2"] and "editar-esp" in btn["s2"]
+                and ["especificacion", "cambiar", "S3", "Descripción:DENSIDAD (20 C):|Especificaciones:1.02 - 1.08 g/mL"] in st["cmb"] and any(c[0] == "especificacion" and c[1] == "mover" for c in st["cmb"])
+                and any(c[0] in ("equipo", "utensilio") and c[1] == "mover" for c in st["cmb"]) and "Cambiado" in st["tags"] and "Movido" in st["tags"] and st["antes"] == 2)
+        okPlan = (not r["bloqueos"]
+                  and ["Cambiar", "especificacion", "/MD_ES_ESPECIFICACION('S3')", json.dumps({"ensayoHijo": "DENSIDAD (20 C):", "especificacion": "1.02 - 1.08 g/mL"}, ensure_ascii=False, separators=(",", ":"))] in ops
+                  and ["Orden", "especificacion", "/MD_ES_ESPECIFICACION('S3')", '{"orden":1}'] in ops and ["Orden", "especificacion", "/MD_ES_ESPECIFICACION('S1')", '{"orden":2}'] in ops
+                  and ["Orden", "equipo", "/MD_ES_EQUIPO('Q2')", '{"orden":1}'] in ops and ["Orden", "equipo", "/MD_ES_EQUIPO('Q1')", '{"orden":3}'] in ops and not any(o[2] == "/MD_ES_UTENSILIO('U1')" for o in ops))
+        okRb = r["rbEq"] == ["Q2", "U1", "Q1", "Q9"] and r["rbEsp"][:2] == ["S3:DENSIDAD (20 C)::1.02 - 1.08 g/mL", "S1:pH (25 °C)::3.90 - 4.10"] and not r["rbConf"]
+        return okUi and okPlan and okRb, json.dumps({"ui": okUi, "plan": okPlan, "rb": okRb, "eq": [eq0, eq1, eq2], "esp": [esp0, esp1], "btn": btn, "vacia": vacia, "st": {k: v for k, v in st.items() if k != "W"}, "r": r, "errores": errs[:3]}, ensure_ascii=False)[:3000]
     @prueba("LN61 Ingreso del borrador · insumos en los pasos (v1.136.0, regla de Carlos): el cambio de cantidad de un insumo dentro de un paso se graba (cantidadInsumo de su fila); el insumo agregado (en un paso existente o en uno nuevo) se graba como «Agregar Insumo» del portal (aPasoInsumoPaso con el insumo de la receta del RMD, tipo de dato de los insumos, 3 decimales) y la receta recalcula cantidadRm; un insumo que no está en la receta bloquea")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
