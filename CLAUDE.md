@@ -353,6 +353,11 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-14, v1.140.0 (encima de la 1.139.0): el proyecto Supabase de status-rmd `mlmsympewmxfcqoyowxs` se borró por
   error; el script apunta al nuevo `govkmqahpvnlmllboqsh` (status-rmd PR #66 hace lo mismo en la página y agrega
   «Restaurar la copia de este equipo»). **La siguiente versión debe ser > 1.140.0.**
+- 2026-11-14, v1.141.0 + **cargador 1.2.0**: «Enviar a Status RMD» lleva además el Excel «CARACTERIZACIÓN LISTADO.xlsx»
+  (SharePoint `04.-RMD/10.- RMD DE CARACTERIZACION`) como `caracterizacionExcel: { nombre, modificado, bytes }`, y el botón
+  «Traer Excel de caracterización» de status-rmd lo pide con `STATUS_RMD_PEDIR_CARACT` → `RMD_CARACT_EXCEL` (status-rmd PR #67:
+  Ruta 2 y PPT con el formato de STATUS_RMD_2026-11-13_final.pptx). El cargador 1.2.0 permite solo LEER esa carpeta y devuelve
+  los bytes con `binario: true`; sin él, el envío sigue y avisa que hay que actualizar el cargador. **La siguiente versión debe ser > 1.141.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

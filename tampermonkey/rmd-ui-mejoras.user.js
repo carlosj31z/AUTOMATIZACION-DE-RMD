@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.140.0
+// @version      1.141.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.140.0';                                                       // mantener igual a @version
+  const VERSION = '1.141.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -7542,8 +7542,12 @@
           l.vs.forEach((m) => masterDe.set(m.mdId, k));
         });
       } catch (e) { masterDe.clear(); }
+      // v1.141.0: Excel «CARACTERIZACIÓN LISTADO» de SharePoint (Ruta 2 y PPT de Status RMD); si no se puede leer, el envío sigue.
+      let caracterizacionExcel = null, avisoCaract = '';
+      try { setTxt(span, 'Leyendo el Excel de caracterización…'); caracterizacionExcel = await leerExcelCaractSp(); }
+      catch (e) { avisoCaract = ` No se trajo el Excel de caracterización (${e.message}).`; }
       const payload = { type: 'RMD_SAP_MAESTRO', v: 1, generado: new Date().toISOString(), columnas: COLUMNAS_PUENTE, filas: datos.map((md) => filaPuente(md, mapaProd, masterDe)), usuarioSap, opSap, trazabilidad,
-        caracterizacion: { v: 1, generado: CARACT_LISTADO_FECHA, items: listadoCaract.items } };
+        caracterizacion: { v: 1, generado: CARACT_LISTADO_FECHA, items: listadoCaract.items }, caracterizacionExcel };
       setTxt(span, 'Esperando a Status RMD…');
       await hasta(() => listo || win.closed, 60000, 250);
       if (win.closed) throw new Error('se cerró la pestaña de Status RMD antes de enviarle los datos');
@@ -7554,7 +7558,7 @@
       await hasta(() => respuesta || win.closed, 300000, 300);
       if (!respuesta) throw new Error(usuarioSap ? 'no llegó la confirmación de Status RMD (¿se cerró la pestaña?)' : 'no llegó la confirmación de Status RMD (¿se canceló el DNI o se cerró la pestaña?)');
       if (!respuesta.ok) throw new Error(respuesta.motivo || 'Status RMD no aceptó los datos');
-      toast(`Enviado a Status RMD: ${datos.length} RMD${opSap ? ` y ${opSap.ops.length} órdenes de producción` : ''} leídos de SAP. ${respuesta.resumen || ''}${avisoOps}${avisoTraz}`.trim(), !!(avisoOps || avisoTraz));
+      toast(`Enviado a Status RMD: ${datos.length} RMD${opSap ? ` y ${opSap.ops.length} órdenes de producción` : ''} leídos de SAP. ${respuesta.resumen || ''}${avisoOps}${avisoTraz}${avisoCaract}`.trim(), !!(avisoOps || avisoTraz));
     } catch (e) { toast('No se pudo enviar a Status RMD: ' + e.message, true); }
     finally { clearInterval(ping); window.removeEventListener('message', alMensaje); btn.disabled = false; setTxt(span, texto0); window.__rmdEnviandoStatus = false; btn.classList.remove('rmd-enviando'); btn.querySelectorAll('canvas.rmd-orbe').forEach((x) => x.remove()); }
   }
@@ -7646,7 +7650,7 @@
       const fin = (e) => { const d = e.data || {}; if (e.origin !== location.origin || d.tipo !== 'rmd-sp-respuesta' || d.id !== id) return; window.removeEventListener('message', fin); clearTimeout(t); ok(d); };
       const t = setTimeout(() => { window.removeEventListener('message', fin); mal(new Error('el cargador de Tampermonkey no respondió: actualízalo a la versión 1.1.0 o superior (carpeta MEJORAS DE INTERFAZ)')); }, opciones.espera || 90000);
       window.addEventListener('message', fin);
-      window.postMessage({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras: opciones.cabeceras || {}, cuerpo: opciones.cuerpo || null }, location.origin);
+      window.postMessage({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras: opciones.cabeceras || {}, cuerpo: opciones.cuerpo || null, binario: !!opciones.binario }, location.origin);
     });
   }
   const spQ = (s) => encodeURIComponent(String(s).replace(/'/g, "''"));
@@ -7659,6 +7663,39 @@
       await esperar(1000 * 2 ** i);
     }
     throw new Error('SharePoint no respondió');
+  }
+  // v1.141.0: Excel «CARACTERIZACIÓN LISTADO» (04.-RMD/10.- RMD DE CARACTERIZACION) para Status RMD (Ruta 2 y PPT). Lo lee el cargador
+  // (1.2.0 o superior) con la sesión de SharePoint; devuelve { nombre, modificado, bytes (ArrayBuffer) }.
+  const CARACT_CARPETA_SP = CONT_RAIZ.replace(/3\.-CONTINGENCIA$/, '10.- RMD DE CARACTERIZACION');
+  const SIN_CARGADOR_12 = 'actualiza el cargador de Tampermonkey a la versión 1.2.0 (carpeta MEJORAS DE INTERFAZ) para traer el Excel de caracterización';
+  async function leerExcelCaractSp() {
+    const a = spQ(CARACT_CARPETA_SP);
+    const r0 = await spPedir('GET', `${CONT_SITIO}/_api/web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files?@a='${a}'&$select=Name,ServerRelativeUrl,TimeLastModified`,
+      { cabeceras: { Accept: 'application/json;odata=nometadata' } });
+    if (r0.estado === 400 && /no permitido/.test(r0.texto || '')) throw new Error(SIN_CARGADOR_12);
+    if (r0.estado === 401 || r0.estado === 403) throw new Error('sin permiso o sin sesión de SharePoint en este navegador');
+    if (r0.estado < 200 || r0.estado >= 300) throw new Error(`SharePoint respondió ${r0.estado}`);
+    let j = null; try { j = JSON.parse(r0.texto); } catch (e) { /* sin lista */ }
+    const plano = (n) => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const fs = ((j && (j.value || (j.d && j.d.results))) || []).filter((f) => /^CARACTERIZACION\s*LISTADO.*\.XLSX$/.test(plano(f.Name)) && !/^~\$/.test(f.Name));
+    if (!fs.length) throw new Error('no está el Excel «CARACTERIZACIÓN LISTADO.xlsx» en la carpeta 10.- RMD DE CARACTERIZACION');
+    const f = fs.find((x) => plano(x.Name) === 'CARACTERIZACION LISTADO.XLSX') || fs.sort((x, y) => Date.parse(y.TimeLastModified) - Date.parse(x.TimeLastModified))[0];
+    const r = await spPedir('GET', `${CONT_SITIO}/_api/web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='${spQ(f.ServerRelativeUrl)}'`, { binario: true, espera: 120000 });
+    if (r.estado === 401 || r.estado === 403) throw new Error('sin permiso o sin sesión de SharePoint en este navegador');
+    if (r.estado < 200 || r.estado >= 300) throw new Error(`SharePoint respondió ${r.estado}`);
+    if (!r.bytes || !r.bytes.byteLength) throw new Error(SIN_CARGADOR_12);
+    return { nombre: f.Name, modificado: f.TimeLastModified || null, bytes: r.bytes };
+  }
+  // Botón «Traer Excel de caracterización» de Status RMD: la pestaña que abrió «Enviar a Status RMD» lo pide aquí.
+  if (!window.__rmdEscuchaCaract) {
+    window.__rmdEscuchaCaract = true;
+    window.addEventListener('message', async (ev) => {
+      const d = ev.data || {};
+      if (ev.origin !== ORIGEN_STATUS_RMD || d.type !== 'STATUS_RMD_PEDIR_CARACT' || !ev.source) return;
+      let res;
+      try { res = Object.assign({ ok: true }, await leerExcelCaractSp()); } catch (e) { res = { ok: false, motivo: (e && e.message) || String(e) }; }
+      try { ev.source.postMessage(Object.assign({ type: 'RMD_CARACT_EXCEL', id: d.id }, res), ORIGEN_STATUS_RMD); } catch (e) { /* pestaña cerrada */ }
+    });
   }
   async function spBuscar(codigos) {
     const base = 'https://medifarmape.sharepoint.com' + CONT_RAIZ + '/', rutas = new Set();

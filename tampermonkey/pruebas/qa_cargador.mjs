@@ -29,6 +29,7 @@ function cargar({ pathname = '/cp.portal/ui5appruntime.html', conBody = true } =
       if (modo === 'login') return o.onload({ status: 200, responseText: '<html>Iniciar sesión</html>' });
       if (modo === 'red') return o.onerror({});
       if (o.method === 'POST' || /search\/query/.test(o.url)) return o.onload({ status: 200, responseText: JSON.stringify({ url: o.url, metodo: o.method, cab: o.headers, cuerpo: !!o.data }) });
+      if (/10\.-%20RMD%20DE%20CARACTERIZACION/.test(o.url)) return o.onload(o.responseType === 'arraybuffer' ? { status: 200, response: new Uint8Array([80, 75, 3, 4]).buffer } : { status: 200, responseText: '{"value":[]}' });
       if (/\/Files\?/.test(o.url)) {
         if (!/GetFolderByServerRelativePath\(decodedurl='%2Fsites%2FDOCUMENTACIONMEDIFARMA%2FDocumentos%20compartidos%2F.*MEJORAS%20DE%20INTERFAZ'\)/.test(o.url)) return o.onload({ status: 404, responseText: '' });
         return o.onload({ status: 200, responseText: JSON.stringify({ value: [...carpeta].map(([n, f]) => ({ Name: n, ServerRelativeUrl: '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/x/' + n, TimeLastModified: f.fecha, Length: String(f.texto.length) })) }) });
@@ -64,7 +65,7 @@ subir('rmd-ui-mejoras-cargador.user.js', CARGADOR, '2026-10-10T10:00:00Z');
 let c = cargar(); await c.listo(); await pausa(20);
 ok(listados() === 1 && JSON.stringify(bajadas()) === JSON.stringify([`${V}.js`]), `1. primera carga: 1 listado y solo baja ${V}.js (${bajadas()})`);
 ok(c.inyectados.length === 1 && c.inyectados[0].startsWith(`window.__rmdDesdeCargador = "${V}";`) && c.inyectados[0].includes(`const VERSION = '${V}';`), '1. inyecta el script con la marca __rmdDesdeCargador');
-ok(c.attrs['data-rmd-cargador'] === '1.1.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
+ok(c.attrs['data-rmd-cargador'] === '1.2.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
 
 // 2. otra página antes de 10 min: inyecta de la caché sin pedir nada
 pedidos = []; c = cargar(); await pausa(20);
@@ -123,6 +124,7 @@ ok(antes === 0 && c.inyectados.length === 1, '10. sin <body> todavía: inyecta e
 {
   const API = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/_api/';
   const CONT = encodeURIComponent('/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/3.-CONTINGENCIA/1.- PLANTA 1/X/ACONDICIONADO');
+  const CAR = encodeURIComponent('/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/04.-RMD/10.- RMD DE CARACTERIZACION');
   const OTRA = encodeURIComponent('/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/OTRA');
   const casos = [
     ['búsqueda', 'GET', API + "search/query?querytext='x'", 200],
@@ -134,13 +136,18 @@ ok(antes === 0 && c.inyectados.length === 1, '10. sin <body> todavía: inyecta e
     ['borrar', 'POST', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/recycle()?@a='${CONT}%2Fa.pdf'`, 400],
     ['otro sitio', 'GET', "https://otro.sharepoint.com/_api/search/query?querytext='x'", 400],
     ['GET de archivos', 'GET', API + "web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='x'", 400],
+    ['lista de caracterización', 'GET', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files?@a='${CAR}'&$select=Name,ServerRelativeUrl,TimeLastModified`, 200],
+    ['Excel de caracterización', 'GET', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='${CAR}%2FCARACTERIZACI%C3%93N%20LISTADO.xlsx'`, 200],
+    ['salir de caracterización', 'GET', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='${CAR}%2F..%2F..%2Fx.xlsx'`, 400],
+    ['escribir en caracterización', 'POST', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${CAR}'&@n='a.pdf'`, 400],
   ];
   c = cargar();
   for (const [n, metodo, url, esperado] of casos) {
-    const id = 'p' + n; c.enviar({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras: { Accept: 'application/json', Cookie: 'x' }, cuerpo: metodo === 'POST' ? new Uint8Array([1, 2]) : null });
+    const id = 'p' + n; c.enviar({ tipo: 'rmd-sp-pedido', id, metodo, url, cabeceras: { Accept: 'application/json', Cookie: 'x' }, cuerpo: metodo === 'POST' ? new Uint8Array([1, 2]) : null, binario: /^Excel/.test(n) });
     await pausa(5);
     const r = c.mensajes.find((m) => m.id === id);
     ok(r && r.estado === esperado, `11. puente, ${n}: ${r ? r.estado : 'sin respuesta'}`);
+    if (n === 'Excel de caracterización') ok(r && r.bytes && r.bytes.byteLength === 4, '11. puente: el Excel llega en bytes');
     if (r && r.estado === 200 && n === 'contextinfo') ok(!('Cookie' in JSON.parse(r.texto).cab), '11. puente: solo pasa las cabeceras permitidas');
   }
 }
