@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.137.0
+// @version      1.138.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.137.0';                                                       // mantener igual a @version
+  const VERSION = '1.138.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -99,6 +99,8 @@
     ['vistasimple', 'Edición rápida', 'En el menú de cada RMD, debajo de «Configurar el RMD»: abre el RMD en una vista como la del borrador de Producción, aquí en el portal; haces todos los cambios (también las Observaciones) y «Guardar en SAP» los escribe de una vez con revisión y «Deshacer». La vista completa (DOC) edita tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto y color.'],
     ['controlescambio', 'Controles de Cambios', 'Pestaña en Configuración Maestra con las acciones de DOC abiertas (en plazo o vencidas) del registro de controles de cambio que tocan un RMD (Excel cargado a mano), sus RMD asociados según las Observaciones y el envío de evidencia a 4.- EVIDENCIA CC Y NC MASIVOS.'],
     ['seguimientocc', 'Seguimiento de CC', 'Bandera ⚑ en cada CC de «Controles de Cambios» y pestaña «Seguimiento CC» en Configuración Maestra: los RMD impactados de cada CC con bandera (sugeridos por Observaciones, de «Mis movimientos» o buscándolos), si ya ejecutaron el CC, y Excel o copia para el cuadro. Compartido con el equipo a través de status-rmd; no escribe en SAP.'],
+    ['bandejasol', 'Bandeja de solicitudes', 'Campanita en la barra de la lista: las Solicitudes de Manufactura Digital como una ticketera, ya cargadas y por partes (las por atender primero), con su detalle, adjuntos y destinatarios, y Aprobar o Rechazar con las mismas escrituras que la app «Solicitud».'],
+    ['lote', 'Buscar por lote', 'Ícono en la barra de la lista: escribe un lote y ves sus órdenes de SAP y los RMD de cada una (como la app «Registro», sin escribir nada).'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
   const opc = Object.assign(Object.fromEntries(OPC.map(([k]) => [k, true])), leer());
@@ -1670,6 +1672,88 @@
   .rmd-beam[data-beam="rmdc"][data-paused] .rmd-bloom {
     animation-play-state: paused !important;
   }
+  /* ── v1.138.0 Bandeja de solicitudes y Buscar por lote ── */
+  html.rmd-ui .rmd-btn.rmd-bs-lanza { position: relative; width: auto; min-width: var(--rmd-btn-alto, 36px); height: var(--rmd-btn-alto, 36px); padding: 0 8px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--rmd-ico-portal, var(--rmd-acento-texto)); }
+  html.rmd-ui .rmd-btn.rmd-bs-lanza:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+  html.rmd-ui .rmd-bs-lanza svg { width: calc(var(--rmd-ico-tam, 16px) + 3px); height: calc(var(--rmd-ico-tam, 16px) + 3px); fill: none; stroke: currentColor; stroke-width: 1.45; stroke-linecap: round; stroke-linejoin: round; }
+  html.rmd-ui .rmd-bs-lanza > span { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #e2553f; color: #fff; font: 700 10.5px/16px var(--rmd-fuente); text-align: center; box-shadow: 0 0 0 2px var(--rmd-barra); }
+  html.rmd-ui .rmd-bs-lanza > span:empty { display: none; }
+  .rmd-bs-campana.rmd-bs-suena svg { transform-origin: 50% 12%; animation: rmd-bs-suena .9s ease-in-out 1; }
+  @keyframes rmd-bs-suena { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(13deg); } 35% { transform: rotate(-10deg); } 55% { transform: rotate(6deg); } 75% { transform: rotate(-3deg); } }
+  .rmd-bs-fondo { position: fixed; inset: 0; z-index: 99990; background: rgba(10,14,18,0); transition: background .18s ease; font: 14px/1.4 var(--rmd-fuente); color: var(--rmd-texto); }
+  .rmd-bs-fondo.rmd-bs-entra { background: rgba(10,14,18,.32); } .rmd-bs-fondo.rmd-bs-sale { background: rgba(10,14,18,0); }
+  .rmd-bs { position: absolute; top: 0; right: 0; bottom: 0; width: min(1120px, 96vw); display: flex; flex-direction: column; background: var(--rmd-barra); border-left: 1px solid var(--rmd-borde); box-shadow: -18px 0 40px rgba(0,0,0,.28); transform: translateX(24px); opacity: 0; transition: transform .2s cubic-bezier(.2,.8,.2,1), opacity .16s ease; }
+  .rmd-bs-entra .rmd-bs { transform: none; opacity: 1; } .rmd-bs-sale .rmd-bs { transform: translateX(24px); opacity: 0; }
+  .rmd-bs.rmd-lt { width: min(860px, 96vw); }
+  .rmd-bs-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px 8px; }
+  .rmd-bs-tit h3 { margin: 0; font: 600 19px var(--rmd-fuente); letter-spacing: -.01em; } .rmd-bs-sub { color: var(--rmd-apagado); font-size: 12.5px; }
+  .rmd-bs-acc { display: flex; gap: 4px; }
+  .rmd-bs-txt { padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--rmd-acento-texto); font: 600 13px var(--rmd-fuente); cursor: pointer; text-decoration: none; }
+  .rmd-bs-txt:hover { background: color-mix(in srgb, var(--rmd-acento) 12%, transparent); } .rmd-bs-txt:disabled { opacity: .5; cursor: default; }
+  .rmd-bs-btn { padding: 7px 16px; border: 1px solid transparent; border-radius: 8px; font: 600 13.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-bs-btn.si { background: var(--rmd-verde); color: #0d1f14; } html:not(.sapUiTheme-sap_fiori_3_dark) .rmd-bs-btn.si { color: #fff; }
+  .rmd-bs-btn.no { background: transparent; border-color: var(--rmd-rojo); color: var(--rmd-rojo); }
+  .rmd-bs-btn:disabled { opacity: .45; cursor: default; } .rmd-bs-btn:not(:disabled):hover { filter: brightness(1.08); }
+  .rmd-bs-pestanas { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--rmd-borde); }
+  .rmd-bs-pestanas button { position: relative; padding: 9px 12px 10px; border: 0; background: none; color: var(--rmd-apagado); font: 600 13.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-bs-pestanas button[aria-selected="true"] { color: var(--rmd-texto); } .rmd-bs-pestanas button[aria-selected="true"]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--rmd-acento); }
+  .rmd-bs-num { margin-left: 7px; padding: 0 6px; border-radius: 9px; background: color-mix(in srgb, var(--rmd-apagado) 22%, transparent); font-size: 11.5px; } .rmd-bs-num.hay { background: #e2553f; color: #fff; }
+  .rmd-bs-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 20px; }
+  .rmd-bs-buscar, .rmd-lt-form input { flex: 1 1 260px; min-width: 0; height: 34px; padding: 0 12px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-superficie); color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
+  .rmd-bs-buscar:focus, .rmd-lt-form input:focus { outline: 2px solid color-mix(in srgb, var(--rmd-acento) 55%, transparent); outline-offset: 0; border-color: var(--rmd-acento); }
+  .rmd-bs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; } .rmd-bs-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--rmd-borde); }
+  .rmd-bs-chips button { padding: 4px 10px; border: 1px solid var(--rmd-borde); border-radius: 999px; background: transparent; color: var(--rmd-texto); font: 500 12.5px var(--rmd-fuente); cursor: pointer; }
+  .rmd-bs-chips button[aria-pressed="true"] { border-color: var(--rmd-acento); background: color-mix(in srgb, var(--rmd-acento) 16%, transparent); color: var(--rmd-acento-texto); }
+  .rmd-bs-cuerpo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(340px, 44%) 1fr; border-top: 1px solid var(--rmd-borde); }
+  .rmd-bs-lista { overflow: auto; padding: 8px 10px 24px; border-right: 1px solid var(--rmd-borde); overscroll-behavior: contain; }
+  .rmd-bs-t { display: grid; gap: 3px; width: 100%; margin: 0 0 6px; padding: 10px 12px 10px 14px; border: 1px solid var(--rmd-borde); border-left: 3px solid var(--e, var(--rmd-borde)); border-radius: 10px; background: var(--rmd-superficie); color: var(--rmd-texto); text-align: left; font: inherit; cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .12s; content-visibility: auto; contain-intrinsic-size: auto 104px; }
+  .rmd-bs-t:hover { border-color: color-mix(in srgb, var(--rmd-acento) 45%, var(--rmd-borde)); } .rmd-bs-t:active { transform: scale(.995); }
+  .rmd-bs-t.sel { border-color: var(--rmd-acento); box-shadow: 0 0 0 1px var(--rmd-acento) inset; }
+  .rmd-bs-t.pendiente, .rmd-bs-dcab.pendiente { --e: #b58ce6; } .rmd-bs-t.aprobada, .rmd-bs-dcab.aprobada { --e: var(--rmd-acento-texto); } .rmd-bs-t.rechazada, .rmd-bs-dcab.rechazada, .rmd-bs-t.cancelada, .rmd-bs-dcab.cancelada { --e: var(--rmd-apagado); }
+  .rmd-bs-t.revision, .rmd-bs-dcab.revision { --e: var(--rmd-ambar); } .rmd-bs-t.autorizado, .rmd-bs-dcab.autorizado, .rmd-bs-t.ingresado, .rmd-bs-dcab.ingresado { --e: var(--rmd-verde); }
+  .rmd-bs-t1 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--rmd-apagado); }
+  .rmd-bs-cod { color: var(--rmd-texto); font-weight: 600; font-variant-numeric: tabular-nums; } .rmd-bs-tipo { font-size: 12px; color: var(--rmd-apagado); }
+  .rmd-bs-est { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 32%, transparent); background: color-mix(in srgb, currentColor 10%, transparent); font-size: 11.5px; font-weight: 600; color: var(--rmd-apagado); }
+  .rmd-bs-est.pendiente { color: #b58ce6; } .rmd-bs-est.aprobada { color: var(--rmd-acento-texto); } .rmd-bs-est.revision { color: var(--rmd-ambar); } .rmd-bs-est.autorizado, .rmd-bs-est.ingresado { color: var(--rmd-verde); }
+  .rmd-bs-destr dd { font-size: 12px; color: var(--rmd-apagado); }
+  .rmd-bs-nom { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .rmd-bs-t3, .rmd-bs-t4 { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-bs-t3 span + span::before, .rmd-bs-t4 span + span:not(:empty)::before { content: '·'; margin-right: 12px; opacity: .6; }
+  .rmd-bs-t3 { color: var(--rmd-texto); opacity: .88; }
+  .rmd-bs-vacio { padding: 28px 12px; color: var(--rmd-apagado); text-align: center; } .rmd-bs-vacio p { margin: 0 0 10px; }
+  .rmd-bs-esq { height: 84px; margin: 0 0 6px; border-radius: 10px; background: linear-gradient(90deg, var(--rmd-superficie) 0%, color-mix(in srgb, var(--rmd-superficie) 70%, var(--rmd-borde)) 50%, var(--rmd-superficie) 100%); background-size: 200% 100%; animation: rmd-bs-brillo 1.3s linear infinite; }
+  @keyframes rmd-bs-brillo { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  .rmd-bs-mas, .rmd-bs-fin { padding: 10px; text-align: center; font-size: 12.5px; color: var(--rmd-apagado); min-height: 20px; }
+  .rmd-bs-det { overflow: auto; padding: 18px 24px 32px; overscroll-behavior: contain; }
+  .rmd-bs-nada { margin-top: 18vh; text-align: center; color: var(--rmd-apagado); } .rmd-bs-ayuda { font-size: 12px; opacity: .8; }
+  .rmd-bs-dcab { padding-left: 12px; border-left: 3px solid var(--e, var(--rmd-borde)); } .rmd-bs-volver { display: none; margin: 0 0 6px -9px; }
+  .rmd-bs-dcod { font-size: 12.5px; color: var(--rmd-apagado); font-variant-numeric: tabular-nums; } .rmd-bs-dcod span { margin-left: 6px; }
+  .rmd-bs-dcab h4 { margin: 2px 0 8px; font: 600 18px/1.3 var(--rmd-fuente); } .rmd-bs-dchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rmd-bs-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 6px; } .rmd-bs-acciones a { margin-left: auto; }
+  .rmd-bs-zona.activa { margin: 8px 0 12px; }
+  .rmd-bs-confirma { padding: 12px 14px; border: 1px solid var(--rmd-borde); border-radius: 10px; background: var(--rmd-superficie); } .rmd-bs-confirma > p { margin: 0 0 6px; }
+  .rmd-bs-confirma.trabajando, .rmd-bs-zona.trabajando .rmd-bs-confirma { border-color: var(--rmd-acento); }
+  .rmd-bs-fila { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .rmd-bs-motivo { display: grid; gap: 4px; margin-top: 6px; font-size: 12.5px; color: var(--rmd-apagado); }
+  .rmd-bs-motivo textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; background: var(--rmd-barra); color: var(--rmd-texto); font: 14px/1.4 var(--rmd-fuente); resize: vertical; }
+  .rmd-bs-dest { display: grid; gap: 4px; margin: 6px 0 0; padding: 8px 10px; border: 1px solid var(--rmd-borde); border-radius: 8px; max-height: 180px; overflow: auto; } .rmd-bs-dest legend { padding: 0 4px; font-size: 12px; }
+  .rmd-bs-dest label { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--rmd-texto); }
+  .rmd-bs-pasos { margin: 10px 0 0; padding-left: 20px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-bs-pasos:empty { display: none; }
+  .rmd-bs-pasos li.va { color: var(--rmd-texto); } .rmd-bs-pasos li.va::after { content: '…'; } .rmd-bs-pasos li.hecho { color: var(--rmd-verde); } .rmd-bs-pasos li.mal { color: var(--rmd-rojo); }
+  .rmd-bs-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 20px; margin: 16px 0 0; }
+  .rmd-bs-c { margin: 0; } .rmd-bs-c.ancho { grid-column: 1 / -1; } .rmd-bs-c dt { font-size: 11.5px; letter-spacing: .02em; text-transform: uppercase; color: var(--rmd-apagado); }
+  .rmd-bs-c dd { margin: 2px 0 0; font-size: 13.5px; word-break: break-word; } .rmd-bs-c.pre dd { white-space: pre-wrap; } .rmd-bs-c.rechazo dd { color: var(--rmd-rojo); }
+  .rmd-bs-c ul, .rmd-bs-c ol { margin: 0; padding-left: 18px; } .rmd-bs-c small { color: var(--rmd-apagado); }
+  .rmd-bs-hist li { margin-bottom: 4px; } .rmd-bs-hist div { color: var(--rmd-apagado); white-space: pre-wrap; }
+  .rmd-bs-adjl { list-style: none; padding: 0 !important; } .rmd-bs-adjl .rmd-bs-txt { padding-left: 0; text-align: left; }
+  .rmd-bs-tenue { color: var(--rmd-apagado); font-size: 12.5px; } .rmd-bs-error { color: var(--rmd-rojo); font-size: 13px; }
+  .rmd-lt-form { display: flex; gap: 8px; padding: 10px 20px 4px; } .rmd-lt-recientes { padding: 2px 20px 8px; font-size: 12.5px; color: var(--rmd-apagado); } .rmd-lt-recientes .rmd-bs-txt { padding: 2px 6px; }
+  .rmd-lt-res { flex: 1 1 auto; overflow: auto; padding: 0 20px 24px; } .rmd-lt-cuenta { margin: 6px 0 8px; font-size: 13px; color: var(--rmd-apagado); }
+  .rmd-lt-tabla { width: 100%; border-collapse: collapse; font-size: 13px; } .rmd-lt-tabla th { position: sticky; top: 0; padding: 6px 8px; background: var(--rmd-barra); border-bottom: 1px solid var(--rmd-borde); text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .02em; color: var(--rmd-apagado); }
+  .rmd-lt-tabla td { padding: 7px 8px; border-bottom: 1px solid var(--rmd-borde); } .rmd-lt-tabla tr[data-i] { cursor: pointer; } .rmd-lt-tabla tr[data-i]:hover, .rmd-lt-tabla tr.abierta { background: color-mix(in srgb, var(--rmd-acento) 9%, transparent); }
+  .rmd-lt-ord { font-weight: 600; font-variant-numeric: tabular-nums; } .rmd-lt-sub td { background: var(--rmd-superficie); padding: 8px 12px 10px 24px; }
+  .rmd-lt-rmd { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; } .rmd-lt-rmd li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  @media (max-width: 899px) { .rmd-bs-cuerpo { grid-template-columns: 1fr; } .rmd-bs .rmd-bs-det { display: none; } .rmd-bs.con-det .rmd-bs-lista { display: none; } .rmd-bs.con-det .rmd-bs-det { display: block; } .rmd-bs-volver { display: inline-block; } .rmd-bs-cab, .rmd-bs-filtros { padding-left: 14px; padding-right: 14px; } .rmd-lt-tabla th:nth-child(1), .rmd-lt-tabla td:nth-child(1), .rmd-lt-tabla th:nth-child(7), .rmd-lt-tabla td:nth-child(7) { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .rmd-bs, .rmd-bs-fondo, .rmd-bs-t { transition: none; } .rmd-bs-campana.rmd-bs-suena svg, .rmd-bs-esq { animation: none; } }
   `;
   const estilo = document.createElement('style'); estilo.textContent = CSS; document.head.appendChild(estilo);
   const html = document.documentElement;
@@ -3193,7 +3277,7 @@
     if (on('sesion') || on('listapausa')) instalarFiltroLatido();
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) table.sapMListTbl').forEach((t) => aislar('ajustarTabla', () => ajustarTabla(t)));
     // aisladas: un fallo no detiene las demás
-    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarListaPredecesores, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas, gestionarControlesCambio, gestionarPestanaAcuerdos, gestionarPestanaSeguimiento].forEach((f) => {
+    [decorarCabeceras, parchearControlador, gestionarVerOP, gestionarDocumentosCitados, gestionarBotonStatusRmd, gestionarBandeja, gestionarMenuExportar, gestionarBotonesLista, gestionarDependenciasAsociar, gestionarPendientesAsociar, gestionarRecetasAsociar, registrarExternosUI5, gestionarFiltroEquipo, gestionarColumnasLista, gestionarSelectorPasos, gestionarListaPredecesores, gestionarVivo, gestionarFormulas, gestionarFormulasLista, gestionarRevisores, gestionarBajasFilas, gestionarMarcasIngreso, gestionarAlertaRecetas, gestionarTrazabilidad, gestionarRecetasMultiples, gestionarPuestoRecetas, gestionarEdicionPasos, gestionarSaludo, gestionarRmdAbierto, gestionarReglasSelector, gestionarOrbes, gestionarPestanas, gestionarControlesCambio, gestionarPestanaAcuerdos, gestionarPestanaSeguimiento].forEach((f) => {
       try { f(); } catch (e) { anotarError(f.name, e); }
     });
     aislar('gestionarTextosMayusculas', gestionarTextosMayusculas);
@@ -8910,6 +8994,805 @@
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bGen);
     window.__rmdStats.vbVersiones = { armar: vbArmarFilas, excel: vbExcel, generar: () => bGen.click() };
   }
+  // ==BANDEJA-INICIO==
+  // ---- v1.138.0 Bandeja de solicitudes (campanita) y Buscar por lote ----
+  // Pedido de Carlos (2026-11-14): la app «Solicitud de Manufactura Digital» (solicitud-display) trae las ~5 100 solicitudes de golpe, con 10
+  // expansiones (unos 150 MB) y filtra en el navegador. Aquí la lista se pide al servidor por partes (40 por vez, la más nueva primero) con lo justo
+  // para la tarjeta, y el detalle completo se lee al abrir cada una. Aprobar y Rechazar hacen las MISMAS escrituras que la app original
+  // (MainView.controller.js de mif.rmd.solicitud: onAprobarSolicitud, onRechazarSolicitud, onRegistrarEstructurasNuevaVersion), con el mismo
+  // servicio (api/base/rmd/v2/browse, que la app Configuración ya usa con sus cabeceras de auditoría) y el mismo flujo de SAP Workflow
+  // (bpmworkflowruntime, mismas rutas en el xs-app de las dos apps).
+  // «Buscar por lote» es la app Registro (registro-display): Z_PP_NECESIDADESRMD_SRV/OrdenSet por lote y los RMD de cada orden. Solo lee: la app
+  // original, al abrir una orden, desactiva (MERGE RMD activo:false) registros cuyas estructuras no cuadran; aquí eso NO se hace.
+  function crearBandeja(D) {
+    // Constantes de la app Solicitud (api/compuesto/rmd/solicitud/maestro, aConstante). Se confirman al vuelo con la entidad CONSTANTES.
+    const K = {
+      SOLICITADO: 464, AUTORIZADO: 465, CANCELADO: 466, INICIADO: 467, APROBADA: 469, RECHAZADA: 470,
+      P_PROCESO: 456, P_PROD_JEFE: 457, P_PROD_GERENTE: 458, P_DEV_JEFE: 459, P_DEV_GERENTE: 460, P_APROB_GERENTE: 461, P_APROB_JEFEDT: 462, P_DEV_JEFEDT: 463,
+      ROL_JEFEPROD: 'RMD_JEFE_DE_PRODUCCION', ROL_GERENTEPROD: 'RMD_GERENTE_DE_PRODUCCION', ROL_JEFEDT: 'RMD_JEFATURA_DOCUMENTACION',
+      TIPO_GERENTE: 'DGERPROD', TIPO_JEFEDT: 'DJEFDOCT', SISTEMA: 'RMD',
+      APP_SOLICITUD: '3b5fc15f-3dcb-4c0f-8927-8ba26964da38', APP_REVISION: '295fd633-d654-49b6-86a0-674611a3b783',
+    };
+    const MAPA_CONST = { IDESTRMDAUTORIZADO: 'AUTORIZADO', IDESTRMDINICIADO: 'INICIADO', IDESTRMDSOLICITADO: 'SOLICITADO', IDESTRMDSOLICITUDAPROBADA: 'APROBADA',
+      IDESTPRCPROCESO: 'P_PROCESO', IDESTPRCENPRODUCCION: 'P_PROD_JEFE', IDESTPRCPRODGERENTE: 'P_PROD_GERENTE', IDESTPRCDEVUELVEJEFE: 'P_DEV_JEFE',
+      IDESTPRCDEVUELVEGERENTE: 'P_DEV_GERENTE', IDESTPRCAPROBACIONGERENTE: 'P_APROB_GERENTE', IDESTPRCDEVUELVEJEFEDT: 'P_DEV_JEFEDT', IDESTPRCAPROBACIONJEFEDT: 'P_APROB_JEFEDT',
+      CODROLJEFEPROD: 'ROL_JEFEPROD', CODROLGERENTEPROD: 'ROL_GERENTEPROD', CODROLJEFEDT: 'ROL_JEFEDT', TXTTIPOGERENTEPROD: 'TIPO_GERENTE', TXTTIPOJEFATURADT: 'TIPO_JEFEDT', IDSISTEMARMD: 'SISTEMA' };
+    const POR_PAGINA = 40;
+    const EXPAND_LISTA = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,destinatariosMD,destinatariosMD/usuarioId';
+    const SELECT_LISTA = ['mdId', 'codigo', 'codigoSolicitud', 'version', 'descripcion', 'nivelTxt', 'areaRmdTxt', 'sucursalId_iMaestraId', 'estadoIdRmd_iMaestraId', 'estadoIdProceso_iMaestraId',
+      'motivoId_motivoId', 'fechaRegistro', 'usuarioRegistro', 'fechaSolicitud', 'fechaActualiza', 'usuarioActualiza', 'observacion', 'motivoRechazo', 'wfInstanceId', 'mdIdVersionAnt',
+      'estadoIdRmd', 'estadoIdProceso', 'sucursalId', 'motivoId', 'destinatariosMD'].join(',');
+    const EXPAND_DETALLE = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,aStatusProceso,nivelId,destinatariosMD,destinatariosMD/usuarioId,aReceta,aReceta/recetaId';
+    const F = () => D.Filter();
+    const esc = D.esc;
+    const escAttr = (t) => String(t).replace(/["\\]/g, '\\$&');   // (CSS del script tapa al CSS.escape del navegador)
+
+    // ---------- acceso a SAP (el modelo mainModelv2 de la lista principal; en pruebas, uno simulado) ----------
+    const api = {
+      modelo: () => D.modelo(),
+      leer(entidad, filtros, params) {
+        const m = api.modelo(); if (!m) return Promise.reject(new Error('la lista principal del portal aún no está lista'));
+        return D.conLectura(m, (mm) => new Promise((ok, mal) => mm.read('/' + entidad, { filters: filtros || [], urlParameters: params || {},
+          success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no respondió al leer ${entidad} (${(e && e.statusCode) || 'sin código'})`)) })));
+      },
+      todo(entidad, filtros, params) { return D.leerTodoDe(api.modelo(), entidad, filtros || [], params || {}); },
+      crear(ruta, datos) { const m = api.modelo(); return new Promise((ok, mal) => m.create(ruta, datos, { success: ok, error: (e) => mal(new Error(textoError(e) || `no se pudo crear en ${ruta}`)) })); },
+      actualizar(ruta, datos) { const m = api.modelo(); return new Promise((ok, mal) => m.update(ruta, datos, { success: ok, error: (e) => mal(new Error(textoError(e) || `no se pudo guardar ${ruta}`)) })); },
+      funcion(nombre, params) {
+        const m = api.modelo(); if (!m) return Promise.reject(new Error('la lista principal del portal aún no está lista'));
+        return D.conLectura(m, (mm) => new Promise((ok, mal) => mm.callFunction('/' + nombre, { method: 'GET', urlParameters: params, success: ok, error: (e) => mal(e) })));
+      },
+      // Base de la app (…/mif-apps-rmd-bs.mifrmdconfiguracion-1.0.0): de ahí cuelgan bpmworkflowruntime y dest-apigateway (xs-app.json).
+      base() { const m = api.modelo(), u = String((m && m.sServiceUrl) || ''); const i = u.indexOf('/dest-apigateway'); return i >= 0 ? u.slice(0, i) : ''; },
+      wf(ruta, opciones) { return D.fetch(api.base() + '/bpmworkflowruntime/v1' + ruta, Object.assign({ credentials: 'same-origin' }, opciones || {})); },
+    };
+    const textoError = (e) => { if (!e) return ''; try { const j = JSON.parse(e.responseText); return (j.error && j.error.message && (j.error.message.value || j.error.message)) || e.message || ''; } catch (x) { return e.message || e.responseText || ''; } };
+    const eq = (campo, v) => new (F())(campo, 'EQ', v);
+    const o = (lista) => new (F())({ filters: lista, and: false });
+    const y = (lista) => new (F())({ filters: lista, and: true });
+    const uuid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
+
+    // ---------- quién soy (como onInitApp de la app original) ----------
+    let yo = null, yoCargando = null;
+    async function cargarConstantes() {
+      try { (await api.leer('CONSTANTES', [], { $top: '500' })).forEach((c) => { const k = MAPA_CONST[c.codigoSap]; if (!k || c.contenido == null) return; K[k] = typeof K[k] === 'number' ? parseInt(c.contenido, 10) : String(c.contenido); }); } catch (e) { /* se usan las conocidas */ }
+    }
+    function quienSoy() {
+      if (yo) return Promise.resolve(yo);
+      if (!yoCargando) yoCargando = (async () => {
+        await cargarConstantes();
+        const p = D.persona() || {}, correo = String(p.email || '').trim();
+        if (!correo) throw new Error('no se pudo saber tu correo en el portal');
+        const [usuarios, sistemas] = await Promise.all([api.leer('USUARIO', [eq('correo', correo)]), api.leer('SISTEMA', [eq('codigo', K.SISTEMA)]).catch(() => [])]);
+        const sistemaId = sistemas[0] && sistemas[0].sistemaId;
+        let u = usuarios[0] || null;
+        if (usuarios.length > 1 && sistemaId) {   // el usuario de RMD es el que está en USUARIO_SISTEMA del sistema RMD
+          const us = await api.leer('USUARIO_SISTEMA', [eq('oSistema_sistemaId', sistemaId), o(usuarios.map((x) => eq('oUsuario_usuarioId', x.usuarioId)))]).catch(() => []);
+          u = usuarios.find((x) => us.some((s) => s.oUsuario_usuarioId === x.usuarioId)) || u;
+        }
+        if (!u) throw new Error('tu usuario no está registrado en RMD');
+        const ur = await api.leer('UsuarioRol', [eq('oUsuario_usuarioId', u.usuarioId)], { $expand: 'oRol' });
+        const roles = ur.map((x) => x.oRol).filter((r) => r && (!sistemaId || r.oSistema_sistemaId === sistemaId));
+        const funciones = async (app) => {
+          const f = { registrador: false, aprobador: false, nivel1: false, nivel2: false, nivel3: false };
+          if (!roles.length) return f;
+          const acc = await api.leer('RolAppAcciones', [o(roles.map((r) => eq('oRol_rolId', r.rolId))), eq('oAplicacion_aplicacionId', app)], { $expand: 'oMaestraAccion' }).catch(() => []);
+          acc.forEach((a) => { const t = a.oMaestraAccion && a.oMaestraAccion.contenido; if (t === 'SOLICITUD') f.registrador = true; if (t === 'APROBAR') f.aprobador = true; if (t === 'APROBAR NIVEL 1') f.nivel1 = true; if (t === 'APROBAR NIVEL 2') f.nivel2 = true; if (t === 'APROBAR NIVEL 3') f.nivel3 = true; });
+          return f;
+        };
+        const rolesTodos = await api.leer('ROL', [o([K.ROL_JEFEPROD, K.ROL_GERENTEPROD, K.ROL_JEFEDT].map((c) => eq('codigo', c)))]).catch(() => []);
+        const idRol = (c) => (rolesTodos.find((r) => r.codigo === c) || {}).rolId || null;
+        const [fs, fr] = await Promise.all([funciones(K.APP_SOLICITUD), funciones(K.APP_REVISION)]);
+        yo = { data: u, roles, rol: roles[0] || null, sistemaId, fs, fr, rolJefe: idRol(K.ROL_JEFEPROD), rolGerente: idRol(K.ROL_GERENTEPROD), rolJefeDT: idRol(K.ROL_JEFEDT) };
+        return yo;
+      })().catch((e) => { yoCargando = null; throw e; });
+      return yoCargando;
+    }
+
+    // ---------- reglas de la app original ----------
+    const esSolicitud = (md) => +md.estadoIdRmd_iMaestraId === K.SOLICITADO;
+    const enRevision = (md) => +md.estadoIdRmd_iMaestraId === K.INICIADO && +md.estadoIdProceso_iMaestraId !== K.P_PROCESO;
+    const destinatarios = (md) => ((md.destinatariosMD && md.destinatariosMD.results) || []);
+    const soyDestinatario = (md) => !!yo && destinatarios(md).some((d) => d.usuarioId_usuarioId === yo.data.usuarioId);
+    // debeAprobar (onPressMD) + visibilidad de los botones (DetailRMD.fragment.xml)
+    function puedoAtender(md) {
+      if (!yo || !soyDestinatario(md)) return false;
+      // Solo las solicitudes en estado Solicitado se aprueban o rechazan desde aqui (pedido de Carlos).
+      return esSolicitud(md) && +md.estadoIdRmd_iMaestraId === K.SOLICITADO && !!yo.fs.aprobador;
+    }
+    const tipoMD = (md) => (+md.version === 1 ? 'Nuevo RMD' : 'Nueva versión');
+    const planta = (md) => (md.sucursalId && md.sucursalId.contenido) || '';
+    const plantaCorta = (md) => planta(md).replace(/^PLANTA\s+/i, '');
+    const motivo = (md) => (md.motivoId && md.motivoId.descripcion) || '';
+    const estadoTxt = (md) => (md.estadoIdRmd && md.estadoIdRmd.contenido) || '';
+    const procesoTxt = (md) => (md.estadoIdProceso && md.estadoIdProceso.contenido) || '';
+    function claseEstado(md) {
+      const e = +md.estadoIdRmd_iMaestraId;
+      return e === K.SOLICITADO ? 'pendiente' : e === K.APROBADA ? 'aprobada' : e === K.RECHAZADA ? 'rechazada' : e === K.CANCELADO ? 'cancelada' : e === K.AUTORIZADO ? 'autorizado' : e === K.INICIADO ? (enRevision(md) ? 'revision' : 'ingresado') : 'otro';
+    }
+    const fecha = (v) => { if (!v) return null; const d = v instanceof Date ? v : new Date(typeof v === 'string' && /\/Date\((\d+)/.test(v) ? +/\/Date\((\d+)/.exec(v)[1] : v); return isNaN(d) ? null : d; };
+    const fechaTxt = (v, conHora) => { const d = fecha(v); if (!d) return ''; const s = d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }); return conHora ? s + ' ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : s; };
+    function haceTxt(v) {
+      const d = fecha(v); if (!d) return ''; const min = Math.round((Date.now() - d.getTime()) / 60000);
+      if (min < 1) return 'recién'; if (min < 60) return `hace ${min} min`; const h = Math.round(min / 60); if (h < 24) return `hace ${h} h`;
+      const dias = Math.round(h / 24); if (dias === 1) return 'ayer'; if (dias < 7) return `hace ${dias} días`; return fechaTxt(d);
+    }
+
+    // ---------- datos ----------
+    const S = {
+      vista: 'atender', // atender | todas | revision
+      atender: { filas: [], listo: false, t: 0, cargando: null, error: '' },
+      todas: { filas: [], fin: false, skip: 0, cargando: null, error: '', clave: '' },
+      revision: { filas: [], fin: false, skip: 0, cargando: null, error: '', clave: '' },
+      buscar: '', estado: '', planta: '', sel: null, detalle: new Map(), adjuntos: new Map(),
+    };
+    function filtrosBusqueda() {
+      const q = S.buscar.trim(); const out = [];
+      if (q) {
+        const partes = [new (F())({ path: 'descripcion', operator: 'Contains', value1: q, caseSensitive: false })];
+        if (/^\d+$/.test(q)) partes.push(new (F())('codigoSolicitud', 'Contains', q), new (F())('codigo', 'Contains', q));
+        out.push(o(partes));
+      }
+      if (S.planta) out.push(eq('sucursalId_iMaestraId', +S.planta));
+      return out;
+    }
+    // Por atender: solicitudes (464) donde soy destinatario y puedo aprobar; y, si tengo rol de jefe / gerente / jefe DT, las del flujo de revisión que me tocan.
+    async function cargarAtender(forzar) {
+      const A = S.atender;
+      if (A.cargando) return A.cargando;
+      if (!forzar && A.listo && Date.now() - A.t < 120000) return A.filas;
+      A.cargando = (async () => {
+        await quienSoy();
+        const pedidos = [api.todo('MD', [eq('estadoIdRmd_iMaestraId', K.SOLICITADO)], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $orderby: 'fechaRegistro desc' })];
+        const res = (await Promise.all(pedidos)).flat();
+        const vistos = new Set(); A.filas = res.filter((md) => !vistos.has(md.mdId) && vistos.add(md.mdId) && puedoAtender(md));
+        A.listo = true; A.t = Date.now(); A.error = '';
+        D.alCambiarPendientes(A.filas.length);
+        return A.filas;
+      })().catch((e) => { A.error = e.message || String(e); throw e; }).finally(() => { A.cargando = null; });
+      return A.cargando;
+    }
+    // Todas / En revisión: por partes, la más nueva primero. Quien no es aprobador ve las suyas (registrador) o en las que es destinatario.
+    async function cargarPagina(cual) {
+      const L = S[cual], clave = [S.buscar, S.estado, S.planta].join('|');
+      if (L.clave !== clave) { L.filas = []; L.skip = 0; L.fin = false; L.clave = clave; L.error = ''; }
+      if (L.cargando || L.fin) return L.cargando;
+      L.cargando = (async () => {
+        await quienSoy();
+        const base = cual === 'revision' ? [eq('estadoIdRmd_iMaestraId', K.INICIADO), new (F())('estadoIdProceso_iMaestraId', 'NE', K.P_PROCESO)] : [new (F())('codigoSolicitud', 'NE', null)];
+        if (cual === 'todas' && S.estado) base.push(eq('estadoIdRmd_iMaestraId', +S.estado));
+        const f = cual === 'todas' ? yo.fs : yo.fr, todoVisible = f.aprobador;
+        if (!todoVisible && cual === 'todas' && f.registrador && !(f.nivel1 || f.nivel2 || f.nivel3)) base.push(eq('usuarioRegistro', yo.data.usuario));
+        let agregadas = 0, vueltas = 0;
+        while (!L.fin && agregadas < 12 && vueltas < 6) {
+          vueltas++;
+          const p = await api.leer('MD', [y(base.concat(filtrosBusqueda()))], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $orderby: 'fechaRegistro desc', $top: String(POR_PAGINA), $skip: String(L.skip) });
+          if (L.clave !== clave) return L.filas;          // cambió el filtro mientras se leía
+          L.skip += POR_PAGINA; if (p.length < POR_PAGINA) L.fin = true;
+          const ya = new Set(L.filas.map((x) => x.mdId));
+          const visibles = p.filter((md) => !ya.has(md.mdId) && (todoVisible || md.usuarioRegistro === yo.data.usuario || soyDestinatario(md)));
+          L.filas.push(...visibles); agregadas += visibles.length;
+        }
+        return L.filas;
+      })().catch((e) => { L.error = e.message || String(e); throw e; }).finally(() => { L.cargando = null; });
+      return L.cargando;
+    }
+    async function leerDetalle(mdId, forzar) {
+      if (!forzar && S.detalle.has(mdId)) return S.detalle.get(mdId);
+      const [md] = await api.leer('MD', [eq('mdId', mdId)], { $expand: EXPAND_DETALLE });
+      if (!md) throw new Error('la solicitud ya no está en SAP');
+      S.detalle.set(mdId, md); return md;
+    }
+    // Adjuntos: sharepointGet (origen Solicitud; en el flujo de revisión también Configuracion), como onPressMD.
+    function leerAdjuntos(md) {
+      const k = md.mdId; if (S.adjuntos.has(k)) return S.adjuntos.get(k);
+      const uno = (origen) => api.funcion('sharepointGet', { idMd: JSON.stringify({ idMd: k, origen }) }).then((r) => { const j = JSON.parse(r.sharepointGet); return ((j && j.d && j.d.results) || []).map((x) => ({ Name: x.Name, origen, codigoRM: k, tam: x.Length || x.length || null })); }).catch(() => []);
+      const p = Promise.all(enRevision(md) ? [uno('Solicitud'), uno('Configuracion')] : [uno('Solicitud')]).then((l) => l.flat());
+      S.adjuntos.set(k, p); p.catch(() => S.adjuntos.delete(k));
+      return p;
+    }
+    async function descargarAdjunto(a) {
+      const pedir = (origen) => api.funcion('sharepointDownload', { data: JSON.stringify(origen ? { codigoRM: a.codigoRM, Name: a.Name, origen } : { codigoRM: a.codigoRM, Name: a.Name }) });
+      let txt = ((await pedir(a.origen === 'Configuracion' ? 'Configuracion' : null)) || {}).sharepointDownload;   // como onDownloadAdjunto: sin origen y, si no está, «Solicitud»
+      if (txt && txt.statusCode === 404) txt = ((await pedir('Solicitud')) || {}).sharepointDownload;
+      if (typeof txt !== 'string') throw new Error('SharePoint no devolvió el archivo');
+      const u8 = new Uint8Array(txt.length); for (let i = 0; i < txt.length; i++) u8[i] = txt.charCodeAt(i);
+      const ext = (a.Name.split('.').pop() || '').toLowerCase(), tipos = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+      const url = URL.createObjectURL(new Blob([u8], { type: tipos[ext] || 'application/octet-stream' }));
+      if (ext === 'pdf' || tipos[ext] && tipos[ext].startsWith('image/')) { const w = window.open(url, '_blank'); if (w) { setTimeout(() => URL.revokeObjectURL(url), 120000); return; } }
+      const l = document.createElement('a'); l.href = url; l.download = a.Name; l.style.display = 'none'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+
+    // ---------- SAP Workflow (services/external/workflow.js de la app original) ----------
+    async function tareaDe(wfInstanceId, actividad) {
+      if (!wfInstanceId) return {};
+      const r = await api.wf('/task-instances?workflowInstanceId=' + encodeURIComponent(wfInstanceId), { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error(`SAP Workflow no respondió (${r.status})`);
+      const l = await r.json(); let t = {}; (l || []).forEach((x) => { if (x.activityId == actividad) t = x; }); return t;   // la última, como la app
+    }
+    async function contextoDe(id) {
+      const r = await api.wf('/task-instances/' + encodeURIComponent(id) + '/context', { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error(`SAP Workflow no devolvió el contexto de la tarea (${r.status})`);
+      return r.json();
+    }
+    async function completarTarea(id, contexto) {
+      const t = await api.wf('/xsrf-token', { headers: { 'X-CSRF-Token': 'Fetch' } });
+      const token = t.headers.get('X-CSRF-Token'); if (!token) throw new Error('SAP Workflow no dio el token para completar la tarea');
+      const r = await api.wf('/task-instances/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: JSON.stringify({ status: 'COMPLETED', context: contexto }) });
+      if (!r.ok) throw new Error(`SAP Workflow no completó la tarea (${r.status})`);
+    }
+    // onValidateWorkflow: la tarea debe seguir READY; si otro ya la atendió, nada se escribe.
+    async function validarTarea(md, actividad) {
+      const t = await tareaDe(md.wfInstanceId, actividad);
+      if (t.id && t.status === 'READY') return t;
+      const err = new Error(t.id ? `La solicitud creada el ${fechaTxt(t.createdAt, true)} por ${t.createdBy || '—'} ya fue atendida por ${t.processor || '—'} el ${fechaTxt(t.completedAt, true)}. No se hizo ningún cambio.`
+        : 'La solicitud no tiene una tarea pendiente en SAP Workflow (puede que ya la hayan atendido). No se hizo ningún cambio.');
+      err.yaAtendida = true; throw err;
+    }
+    // Destinatarios que muestra la app original al abrir la solicitud (ROLAPPWF del rol que corresponde)
+    async function destinatariosPosibles(md) {
+      const revision = !esSolicitud(md), p = +md.estadoIdProceso_iMaestraId;
+      let rol = null;
+      if (!revision) rol = yo.rol && yo.rol.rolId;
+      else if (p === K.P_PROD_JEFE || p === K.P_DEV_JEFE) rol = yo.rolJefe;
+      else if (p === K.P_PROD_GERENTE || p === K.P_DEV_GERENTE || p === K.P_APROB_GERENTE || p === K.P_DEV_JEFEDT) rol = yo.rolGerente;
+      if (!rol) return { lista: [], marcados: [] };
+      const r = await api.todo('ROLAPPWF', [eq('oAplicacion_aplicacionId', revision ? K.APP_REVISION : K.APP_SOLICITUD), eq('oRol_rolId', rol)], { $expand: 'oRolWorkflow/aRolUsuarios/oUsuario' });
+      const lista = []; if (r.length) ((r[0].oRolWorkflow && r[0].oRolWorkflow.aRolUsuarios && r[0].oRolWorkflow.aRolUsuarios.results) || []).forEach((x) => { if (x.oUsuario && x.oUsuario.activo) lista.push(x.oUsuario); });
+      const marcados = !revision || p === K.P_APROB_GERENTE ? lista.map((u) => u.usuarioId) : [];
+      return { lista, marcados };
+    }
+
+    // ---------- Aprobar (onAprobarSolicitud) ----------
+    async function aprobar(mdId, destinos, avance) {
+      const paso = (t) => { try { avance && avance(t); } catch (e) { /* solo informa */ } };
+      await quienSoy();
+      const t = await leerDetalle(mdId, true);
+      if (!puedoAtender(t)) throw new Error('Esta solicitud ya no está para que la atiendas (cambió de estado o no eres su destinatario).');
+      if (!destinos || !destinos.length) throw new Error('Selecciona al menos un destinatario.');
+      const s = yo.data, ahora = () => new Date();
+      let d, act, tipoDest = null;
+      if (esSolicitud(t)) {
+        d = { usuarioActualiza: s.usuario, fechaActualiza: ahora(), mdId: t.mdId, estadoIdRmd_iMaestraId: K.APROBADA, wfInstanceId: null, estadoIdProceso_iMaestraId: K.P_PROCESO, motivoId_motivoId: t.motivoId_motivoId };
+        act = 'usertask2';
+        paso('Revisando que la solicitud siga pendiente en SAP Workflow');
+        await validarTarea(t, act);
+        paso('Registrando el estado del proceso');
+        await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: s.usuario, activo: true, idProceso: uuid(), mdId_mdId: t.mdId, tipo: 'SOLICITUD' });
+      } else {
+        d = { usuarioActualiza: s.usuario, fechaActualiza: ahora(), mdId: t.mdId };
+        const m = { fechaRegistro: ahora(), usuarioRegistro: s.usuario, activo: true, idProceso: uuid(), mdId_mdId: t.mdId, mensajeDT: t.mensajeDT, observacion: t.observacion, tipo: 'CONFIGURACION' };
+        const p = +t.estadoIdProceso_iMaestraId;
+        if (p === K.P_PROD_JEFE) { act = 'usertask6'; d.estadoIdProceso_iMaestraId = m.estadoIdProceso_iMaestraId = K.P_PROD_GERENTE; tipoDest = K.TIPO_GERENTE; }
+        else if (p === K.P_PROD_GERENTE) { act = 'usertask7'; d.estadoIdProceso_iMaestraId = m.estadoIdProceso_iMaestraId = K.P_APROB_GERENTE; tipoDest = K.TIPO_JEFEDT; }
+        else if (p === K.P_APROB_GERENTE) { act = 'usertask8'; d.estadoIdRmd_iMaestraId = K.AUTORIZADO; d.estadoIdProceso_iMaestraId = m.estadoIdProceso_iMaestraId = K.P_APROB_JEFEDT; d.fechaAutorizacion = ahora(); d.usuarioAutorizacion = s.usuario; }
+        else throw new Error('Esta solicitud no está en un paso del flujo de revisión que se pueda aprobar.');
+        paso('Revisando que la tarea siga pendiente en SAP Workflow');
+        await validarTarea(t, act);
+        if (act === 'usertask8') { paso('Registrando la trazabilidad (Autorizado)'); await api.crear('/MD_TRAZABILIDAD', { activo: true, usuarioRegistro: s.usuario, fechaRegistro: ahora(), idTrazabilidad: uuid(), mdId_mdId: t.mdId, estadoTrazab_iMaestraId: K.AUTORIZADO }); }
+        paso('Registrando el estado del proceso');
+        await api.crear('/MD_ESTATUSPROCESO', m);
+        if (act !== 'usertask8') { paso('Registrando los destinatarios'); for (const u of destinos) await api.crear('/MD_DESTINATARIOS', { usuarioRegistro: s.usuario, fechaRegistro: ahora(), activo: true, idMdDestinatarios: uuid(), mdId_mdId: t.mdId, tipo: tipoDest, usuarioId_usuarioId: u }); }
+      }
+      paso('Actualizando la solicitud');
+      await api.actualizar(`/MD('${t.mdId}')`, d);
+      paso('Completando la tarea en SAP Workflow');
+      const tarea = await tareaDe(t.wfInstanceId, act), ctx = Object.assign({}, await contextoDe(tarea.id));
+      if (esSolicitud(t)) {
+        const mot = d.motivoId_motivoId != null ? await api.leer('MOTIVO', [eq('motivoId', d.motivoId_motivoId)]).catch(() => []) : [];
+        ctx.bpRequestData = ctx.bpRequestData || {};
+        mot.forEach((x) => { ctx.bpRequestData.motivoId_motivoId = d.motivoId_motivoId; ctx.bpRequestData.motivoMDWF = x.descripcion; });
+        ctx.action = 'A'; ctx.NameUserAprob = s.nombre; ctx.LastNameUserAprob = s.apellidoPaterno;
+        await completarTarea(tarea.id, ctx);
+        if (+t.version !== 1) { paso('Creando la versión nueva con la estructura de la versión anterior'); await registrarEstructurasNuevaVersion(t, paso); }
+      } else {
+        const us = await api.leer('USUARIO', [o(destinos.map((u) => eq('usuarioId', u)))]).catch(() => []);
+        const enSistema = yo.sistemaId ? await api.leer('USUARIO_SISTEMA', [eq('oSistema_sistemaId', yo.sistemaId), o(destinos.map((u) => eq('oUsuario_usuarioId', u)))]).catch(() => null) : null;
+        const correos = us.filter((u) => !enSistema || enSistema.some((x) => x.oUsuario_usuarioId === u.usuarioId)).map((u) => u.correo);
+        ctx.approverUserData = { EMAIL: correos.join(',') }; ctx.actionChange = ''; ctx.action = 'A'; ctx.NameUserAprob = s.nombre; ctx.LastNameUserAprob = s.apellidoPaterno;
+        await completarTarea(tarea.id, ctx);
+      }
+      S.detalle.delete(t.mdId);
+      return { mdId: t.mdId, nueva: esSolicitud(t) && +t.version !== 1 };
+    }
+
+    // ---------- Rechazar (onRechazarSolicitud) ----------
+    async function rechazar(mdId, motivoRechazo, avance) {
+      const paso = (t) => { try { avance && avance(t); } catch (e) { /* solo informa */ } };
+      const texto = String(motivoRechazo || '').trim();
+      if (!texto) throw new Error('Escribe el motivo del rechazo.');
+      if (texto.length > 1000) throw new Error('El motivo del rechazo admite hasta 1000 caracteres.');
+      await quienSoy();
+      const r = await leerDetalle(mdId, true);
+      if (!puedoAtender(r)) throw new Error('Esta solicitud ya no está para que la atiendas (cambió de estado o no eres su destinatario).');
+      const a = yo.data, ahora = () => new Date();
+      let s, act;
+      if (esSolicitud(r)) {
+        s = { usuarioActualiza: a.usuario, fechaActualiza: ahora(), mdId: r.mdId, estadoIdRmd_iMaestraId: K.RECHAZADA, motivoRechazo: texto, motivoId_motivoId: r.motivoId_motivoId };
+        act = 'usertask2';
+        paso('Revisando que la solicitud siga pendiente en SAP Workflow');
+        await validarTarea(r, act);
+        paso('Registrando el estado del proceso');
+        await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: a.usuario, activo: true, idProceso: uuid(), mdId_mdId: r.mdId, tipo: 'SOLICITUD' });
+      } else {
+        const p = +r.estadoIdProceso_iMaestraId, nuevo = p === K.P_PROD_JEFE ? K.P_DEV_JEFE : p === K.P_PROD_GERENTE ? K.P_DEV_GERENTE : p === K.P_APROB_GERENTE ? K.P_DEV_JEFEDT : null;
+        act = p === K.P_PROD_JEFE ? 'usertask6' : p === K.P_PROD_GERENTE ? 'usertask7' : p === K.P_APROB_GERENTE ? 'usertask8' : null;
+        if (!act) throw new Error('Esta solicitud no está en un paso del flujo de revisión que se pueda rechazar.');
+        s = { usuarioActualiza: a.usuario, fechaActualiza: ahora(), mdId: r.mdId, estadoIdProceso_iMaestraId: nuevo };
+        paso('Revisando que la tarea siga pendiente en SAP Workflow');
+        await validarTarea(r, act);
+        paso('Registrando el estado del proceso');
+        await api.crear('/MD_ESTATUSPROCESO', { fechaRegistro: ahora(), usuarioRegistro: a.usuario, activo: true, idProceso: uuid(), mdId_mdId: r.mdId, mensajeDT: r.mensajeDT, observacion: texto, estadoIdProceso_iMaestraId: nuevo, tipo: 'CONFIGURACION' });
+      }
+      paso('Actualizando la solicitud');
+      await api.actualizar(`/MD('${r.mdId}')`, s);
+      paso('Completando la tarea en SAP Workflow');
+      const tarea = await tareaDe(r.wfInstanceId, act), ctx = Object.assign({}, await contextoDe(tarea.id));
+      ctx.NameUserAprob = a.nombre; ctx.LastNameUserAprob = a.apellidoPaterno;
+      if (esSolicitud(r)) {
+        const mot = s.motivoId_motivoId != null ? await api.leer('MOTIVO', [eq('motivoId', s.motivoId_motivoId)]).catch(() => []) : [];
+        ctx.bpRequestData = ctx.bpRequestData || {};
+        mot.forEach((x) => { ctx.bpRequestData.motivoId_motivoId = s.motivoId_motivoId; ctx.bpRequestData.motivoMDWF = x.descripcion; });
+      } else { ctx.approverUserData = { EMAIL: '' }; ctx.actionChange = ''; }
+      ctx.action = 'R';
+      await completarTarea(tarea.id, ctx);
+      S.detalle.delete(r.mdId);
+      return { mdId: r.mdId };
+    }
+
+    // ---------- Versión nueva aprobada → Ingresado con la estructura de la anterior (onRegistrarEstructurasNuevaVersion) ----------
+    // Copia fiel de la app original. Diferencias a propósito: (1) el último código se lee con $top=1 de la vista ya ordenada (la app lee la vista
+    // entera y toma la primera fila: es la misma); (2) la copia de imágenes usa el usuario de la sesión (la app usa una variable global que no existe
+    // y ahí se corta la copia).
+    async function registrarEstructurasNuevaVersion(e, paso) {
+      const t = yo.data, ahora = () => new Date();
+      const ult = await api.leer('VIEW_MD_ORDERED_BY_CODIGO_DESC', [], { $top: '1' });
+      let corr;
+      if (!ult.length) corr = '00001';
+      else { let c = ult[0].codigo; if (c === '' || c == null) c = '00000'; c = String(c); corr = String(parseInt(c.substring(c.length - 5), 10) + 1).padStart(5, '0'); }
+      const codigo = '2' + new Date().getFullYear() + corr;
+      await api.actualizar(`/MD('${e.mdId}')`, { fechaRegistro: ahora(), codigo, estadoIdRmd_iMaestraId: K.INICIADO });
+      await api.crear('/MD_TRAZABILIDAD', { activo: true, usuarioRegistro: t.usuario, fechaRegistro: ahora(), idTrazabilidad: uuid(), mdId_mdId: e.mdId, estadoTrazab_iMaestraId: K.INICIADO });
+      paso && paso(`Código ${codigo}: copiando recetas`);
+      const recetas = [], recAnt = await api.todo('MD_RECETA', [eq('mdId_mdId', e.mdIdVersionAnt)], { $expand: 'aInsumos' });
+      for (const a of recAnt) {
+        const id = uuid(); recetas.push({ ant: a.mdRecetaId, act: id });
+        await api.crear('/MD_RECETA', { usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdRecetaId: id, mdId_mdId: e.mdId, recetaId_recetaId: a.recetaId_recetaId, orden: a.orden });
+      }
+      paso && paso(`Código ${codigo}: copiando estructuras`);
+      const est = await api.todo('MD_ESTRUCTURA', [eq('mdId_mdId', e.mdIdVersionAnt)], { $expand: 'aInsumo,aPaso/aFormula,aEquipo,aUtensilio,aEtiqueta,aPasoInsumoPaso/aFormula,aEspecificacion' });
+      const res = (x) => (x && x.results) || [];
+      const nuevaEst = (a) => ({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEstructuraId: uuid(), orden: a.orden, mdId_mdId: e.mdId, estructuraId_estructuraId: a.estructuraId_estructuraId,
+        aInsumo: [], aPaso: [], aEquipo: [], aUtensilio: [], aEtiqueta: [], aPasoInsumoPaso: [], aEspecificacion: [] });
+      const insumos = [];
+      for (const a of est) {
+        if (!res(a.aInsumo).length) continue;
+        const ne = nuevaEst(a);
+        for (const r of res(a.aInsumo)) {
+          const id = uuid(); insumos.push({ ant: r.estructuraRecetaInsumoId, act: id });
+          const rc = r.mdRecetaId_mdRecetaId ? recetas.find((x) => x.ant === r.mdRecetaId_mdRecetaId) : null;
+          ne.aInsumo.push({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, estructuraRecetaInsumoId: id, mdId_mdId: e.mdId, mdEstructuraId_mdEstructuraId: ne.mdEstructuraId,
+            estructuraId_estructuraId: r.estructuraId_estructuraId, mdRecetaId_mdRecetaId: rc ? rc.act : null, cantidadRm: r.cantidadRm, cantidadBarCode: r.cantidadBarCode, Matnr: r.Matnr, Werks: r.Werks,
+            Maktx: r.Maktx, ItemCateg: r.ItemCateg, ItemNo: r.ItemNo, Component: r.Component, CompQty: r.CompQty, CompUnit: r.CompUnit, ItemText1: r.ItemText1, ItemText2: r.ItemText2, Txtadic: r.Txtadic, AiPrio: r.AiPrio });
+        }
+        await api.crear('/MD_ESTRUCTURA', ne);
+      }
+      const pasos = [], pms = [], formulas = { id: uuid(), aFormula: [] };
+      est.sort((a, b) => a.orden - b.orden);
+      for (const a of est) {
+        if (res(a.aInsumo).length) continue;
+        const ne = nuevaEst(a), etiq = [];
+        res(a.aEtiqueta).forEach((x) => { const id = uuid(); etiq.push({ ant: x.mdEsEtiquetaId, act: id });
+          ne.aEtiqueta.push({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEsEtiquetaId: id, mdEstructuraId_mdEstructuraId: ne.mdEstructuraId, estructuraId_estructuraId: x.estructuraId_estructuraId,
+            mdId_mdId: e.mdId, etiquetaId_etiquetaId: x.etiquetaId_etiquetaId, orden: x.orden, conforme: x.conforme, procesoMenor: x.procesoMenor }); });
+        const etiqDe = (id) => { const z = id ? etiq.find((q) => q.ant === id) : null; return z ? z.act : null; };
+        if (res(a.aPaso).length) {
+          for (const i of res(a.aPaso)) {
+            const id = uuid(); pasos.push({ ant: i.mdEstructuraPasoId, act: id });
+            const dd = { usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEstructuraPasoId: id, mdEstructuraId_mdEstructuraId: ne.mdEstructuraId, estructuraId_estructuraId: i.estructuraId_estructuraId,
+              mdEsEtiquetaId_mdEsEtiquetaId: etiqDe(i.mdEsEtiquetaId_mdEsEtiquetaId), mdId_mdId: e.mdId, pasoId_pasoId: i.pasoId_pasoId, orden: i.orden, valorInicial: i.valorInicial, valorFinal: i.valorFinal,
+              margen: i.margen, decimales: i.decimales, mdEstructuraPasoIdDepende: id, depende: i.depende, dependeMdEstructuraPasoId: i.dependeMdEstructuraPasoId, estadoCC: i.estadoCC, estadoMov: i.estadoMov,
+              pmop: i.pmop, genpp: i.genpp, tab: i.tab, edit: i.edit, rpor: i.rpor, vb: i.vb, formato: i.formato, colorHex: i.colorHex, colorRgb: i.colorRgb, imagen: i.imagen, imagenRuta: i.imagenRuta,
+              imagenWidth: i.imagenWidth, imagenPosition: i.imagenPosition, tipoDatoId_iMaestraId: i.tipoDatoId_iMaestraId, flagModif: false, puestoTrabajo: i.puestoTrabajo, clvModelo: i.clvModelo,
+              automatico: i.automatico, aFormula: res(i.aFormula), tipoDatoIdAnterior_iMaestraId: i.tipoDatoId_iMaestraId };
+            ne.aPaso.push(dd);
+            if (i.imagen) await copiarImagenPaso(i, dd).catch((err) => paso && paso('Aviso: no se copió la imagen de un paso (' + (err.message || err) + ')'));
+          }
+          for (const p of ne.aPaso) {
+            if (p.dependeMdEstructuraPasoId) { const z = pasos.find((q) => q.ant === p.dependeMdEstructuraPasoId); if (z) p.dependeMdEstructuraPasoId = z.act; }
+            for (const f of p.aFormula) {
+              Object.assign(f, { usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdFormulaPaso: uuid(), usuarioActualiza: null, fechaActualiza: null });
+              delete f.mdId_mdId;   // la app pone aquí una variable que no existe (queda sin mdId); igual que ella
+              const z = pasos.find((q) => q.ant === f.pasoPadreId_mdEstructuraPasoId); if (z) f.pasoPadreId_mdEstructuraPasoId = z.act;
+              if (f.esPaso) { const w = pasos.find((q) => q.ant === f.pasoFormulaId_mdEstructuraPasoId); if (w) f.pasoFormulaId_mdEstructuraPasoId = w.act; }
+              formulas.aFormula.push(f);
+            }
+            p.aFormula = [];
+          }
+        }
+        res(a.aEquipo).forEach((x) => ne.aEquipo.push({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEstructuraEquipoId: uuid(), mdEstructuraId_mdEstructuraId: ne.mdEstructuraId,
+          estructuraId_estructuraId: x.estructuraId_estructuraId, mdId_mdId: e.mdId, equipoId_equipoId: x.equipoId_equipoId, orden: x.orden }));
+        res(a.aUtensilio).forEach((x) => ne.aUtensilio.push({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEstructuraUtensilioId: uuid(), mdEstructuraId_mdEstructuraId: ne.mdEstructuraId,
+          estructuraId_estructuraId: x.estructuraId_estructuraId, mdId_mdId: e.mdId, utensilioId_utensilioId: x.utensilioId_utensilioId, agrupadorId_clasificacionUtensilioId: x.agrupadorId_clasificacionUtensilioId, orden: x.orden }));
+        if (res(a.aPasoInsumoPaso).length) {
+          for (const i of res(a.aPasoInsumoPaso)) {
+            const id = uuid(); pms.push({ ant: i.mdEstructuraPasoInsumoPasoId, act: id });
+            const ins = i.estructuraRecetaInsumoId_estructuraRecetaInsumoId ? insumos.find((q) => q.ant === i.estructuraRecetaInsumoId_estructuraRecetaInsumoId) : null;
+            const pp = i.pasoId_mdEstructuraPasoId ? pasos.find((q) => q.ant === i.pasoId_mdEstructuraPasoId) : null;
+            ne.aPasoInsumoPaso.push({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEstructuraPasoInsumoPasoId: id, mdEstructuraId_mdEstructuraId: ne.mdEstructuraId,
+              estructuraId_estructuraId: i.estructuraId_estructuraId, mdId_mdId: e.mdId, pasoId_mdEstructuraPasoId: pp ? pp.act : null, pasoHijoId_pasoId: i.pasoHijoId_pasoId !== null ? i.pasoHijoId_pasoId : null,
+              tipoDatoId_iMaestraId: i.tipoDatoId_iMaestraId, estructuraRecetaInsumoId_estructuraRecetaInsumoId: i.estructuraRecetaInsumoId_estructuraRecetaInsumoId !== null ? (ins ? ins.act : null) : null,
+              etiquetaId_etiquetaId: i.etiquetaId_etiquetaId, mdEsEtiquetaId_mdEsEtiquetaId: etiqDe(i.mdEsEtiquetaId_mdEsEtiquetaId), mdEstructuraPasoInsumoPasoIdAct: id, orden: i.orden,
+              valorInicial: i.valorInicial, valorFinal: i.valorFinal, margen: i.margen, cantidadInsumo: i.cantidadInsumo, decimales: i.decimales, estadoCC: i.estadoCC, estadoMov: i.estadoMov, genpp: i.genpp,
+              edit: i.edit, tab: i.tab, formato: i.formato, colorHex: i.colorHex, colorRgb: i.colorRgb, flagModif: i.flagModif, Component: i.Component, Matnr: i.Matnr, Maktx: i.Maktx, CompUnit: i.CompUnit,
+              tipoDatoIdAnterior_iMaestraId: i.tipoDatoId_iMaestraId, aFormula: res(i.aFormula) });
+          }
+          for (const p of ne.aPasoInsumoPaso) {
+            for (const f of p.aFormula) {
+              Object.assign(f, { usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdFormulaPaso: uuid(), usuarioActualiza: null, fechaActualiza: null });
+              delete f.mdId_mdId;
+              const z = pms.find((q) => q.ant === f.mdEstructuraPasoInsumoPasoId_mdEstructuraPasoInsumoPasoId); if (z) f.mdEstructuraPasoInsumoPasoId_mdEstructuraPasoInsumoPasoId = z.act;
+              if (f.esPaso) { const w = pasos.find((q) => q.ant === f.pasoFormulaId_mdEstructuraPasoId); if (w) f.pasoFormulaId_mdEstructuraPasoId = w.act; }
+              formulas.aFormula.push(f);
+            }
+            p.aFormula = [];
+          }
+        }
+        res(a.aEspecificacion).forEach((x) => ne.aEspecificacion.push({ usuarioRegistro: t.usuario, fechaRegistro: ahora(), activo: true, mdEstructuraEspecificacionId: uuid(), mdEstructuraId_mdEstructuraId: ne.mdEstructuraId,
+          estructuraId_estructuraId: x.estructuraId_estructuraId, mdId_mdId: e.mdId, ensayoPadreId_iMaestraId: x.ensayoPadreId_iMaestraId, ensayoHijo: x.ensayoHijo, especificacion: x.especificacion,
+          tipoDatoId_iMaestraId: x.tipoDatoId_iMaestraId, valorInicial: x.valorInicial, valorFinal: x.valorFinal, margen: x.margen, decimales: x.decimales, orden: x.orden }));
+        await api.crear('/MD_ESTRUCTURA', ne);
+      }
+      if (formulas.aFormula.length) { paso && paso(`Código ${codigo}: copiando fórmulas`); await api.crear('/TABLAS_ARRAY_MD_SKIP', formulas); }
+      return codigo;
+    }
+    // onGetImagenSharepointCopiaNueva + onConfirmSelectImagenCopiaNueva
+    async function copiarImagenPaso(viejo, nuevo) {
+      const ruta = (x, pasoId) => x.mdId_mdId + '/' + x.mdEstructuraId_mdEstructuraId + '/' + (x.mdEsEtiquetaId_mdEsEtiquetaId ? x.mdEsEtiquetaId_mdEsEtiquetaId + '/' : '') + pasoId;
+      const url = ruta(viejo, viejo.mdEstructuraPasoId);
+      const g = await api.funcion('sharepointGet', { idMd: JSON.stringify({ idMd: url, origen: 'ImagenMD' }) }); const lista = JSON.parse(g.sharepointGet).d.results;
+      const b = await api.funcion('sharepointDownload', { data: JSON.stringify({ origen: 'ImagenMD', codigoRM: url, Name: lista[0].Name }) }); const s = b.sharepointDownload;
+      const u8 = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+      const archivo = { name: lista[0].Name, fileData: u8, origen: 'ImagenMD', mdId: nuevo.mdId_mdId, estructuraId: nuevo.mdEstructuraId_mdEstructuraId, etiquetaId: nuevo.mdEsEtiquetaId_mdEsEtiquetaId, pasoId: nuevo.mdEstructuraPasoId };
+      await api.actualizar(`/MD('${nuevo.mdId_mdId}')`, { usuarioActualiza: yo.data.usuario, fechaActualiza: new Date(), archivoMD: JSON.stringify(archivo) });
+    }
+
+    // ================= Interfaz =================
+    let panel = null, io = null, ioAdj = null;
+    const $ = (s) => panel && panel.querySelector(s);
+    function abierto() { return !!panel && panel.isConnected; }
+    function cerrar() { if (!panel) return; const p = panel; panel = null; p.classList.add('rmd-bs-sale'); document.removeEventListener('keydown', teclas, true); setTimeout(() => p.remove(), 180); if (io) io.disconnect(); if (ioAdj) ioAdj.disconnect(); }
+    function teclas(ev) {
+      if (!abierto()) return;
+      if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); if ($('.rmd-bs-confirma')) { pintarDetalle(); return; } if (S.sel && window.innerWidth < 900) { S.sel = null; pintar(); return; } cerrar(); return; }
+      const enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || '');
+      if (enCampo) return;
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'j' || ev.key === 'k') {
+        const l = filasVista(); if (!l.length) return; ev.preventDefault();
+        const i = l.findIndex((x) => x.mdId === S.sel), n = ev.key === 'ArrowDown' || ev.key === 'j' ? Math.min(l.length - 1, i + 1) : Math.max(0, i - 1);
+        seleccionar(l[n < 0 ? 0 : n].mdId);
+      }
+      if (ev.key === '/') { ev.preventDefault(); const b = $('.rmd-bs-buscar'); if (b) b.focus(); }
+    }
+    function filasVista() {
+      const v = S.vista; let l = v === 'atender' ? S.atender.filas : S[v].filas;
+      if (v === 'atender') {
+        const q = S.buscar.trim().toUpperCase();
+        if (q) l = l.filter((md) => [md.descripcion, md.codigoSolicitud, md.codigo].some((x) => String(x || '').toUpperCase().includes(q)));
+        if (S.planta) l = l.filter((md) => String(md.sucursalId_iMaestraId) === S.planta);
+      }
+      return l;
+    }
+    const plantasVistas = new Map();
+    function abrir(vista) {
+      if (abierto()) { if (vista) { S.vista = vista; pintar(); } return; }
+      panel = document.createElement('div'); panel.className = 'rmd-bs-fondo';
+      panel.innerHTML = `<aside class="rmd-bs" role="dialog" aria-modal="true" aria-label="Solicitudes de Manufactura Digital">
+        <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Solicitudes</h3><span class="rmd-bs-sub"></span></div>
+          <div class="rmd-bs-acc"><button type="button" class="rmd-bs-txt" data-a="refrescar">Actualizar</button><button type="button" class="rmd-bs-txt" data-a="cerrar">Cerrar</button></div></header>
+        <nav class="rmd-bs-pestanas" role="tablist"></nav>
+        <div class="rmd-bs-filtros"><input type="search" class="rmd-bs-buscar" placeholder="Buscar por nombre o código" aria-label="Buscar solicitudes"><div class="rmd-bs-chips" role="group" aria-label="Filtros"></div></div>
+        <div class="rmd-bs-cuerpo"><div class="rmd-bs-lista" role="listbox" tabindex="-1" aria-label="Solicitudes"></div><section class="rmd-bs-det" aria-live="polite"></section></div>
+      </aside>`;
+      document.body.appendChild(panel); D.externos();
+      if (vista) S.vista = vista;
+      panel.addEventListener('mousedown', (ev) => { if (ev.target === panel) cerrar(); });
+      panel.addEventListener('click', alClic);
+      let tBuscar = 0;
+      $('.rmd-bs-buscar').value = S.buscar;
+      $('.rmd-bs-buscar').addEventListener('input', (ev) => { clearTimeout(tBuscar); tBuscar = setTimeout(() => { S.buscar = ev.target.value; recargarVista(); }, 320); });
+      document.addEventListener('keydown', teclas, true);
+      io = new IntersectionObserver((ents) => { if (ents.some((x) => x.isIntersecting)) masFilas(); }, { root: $('.rmd-bs-lista'), rootMargin: '400px' });
+      ioAdj = new IntersectionObserver((ents) => ents.forEach((x) => { if (!x.isIntersecting) return; ioAdj.unobserve(x.target); const md = buscarFila(x.target.dataset.id); if (md) leerAdjuntos(md).then((l) => pintarAdjCount(md.mdId, l)); }), { root: $('.rmd-bs-lista') });
+      pintar();
+      recargarVista(false);
+      requestAnimationFrame(() => panel && panel.classList.add('rmd-bs-entra'));
+      setTimeout(() => { const b = $('.rmd-bs-buscar'); if (b && window.innerWidth >= 900) b.focus({ preventScroll: true }); }, 60);
+    }
+    function buscarFila(id) { return [S.atender.filas, S.todas.filas, S.revision.filas].flat().find((x) => x.mdId === id) || S.detalle.get(id) || null; }
+    function recargarVista(forzar) {
+      const v = S.vista;
+      const p = v === 'atender' ? cargarAtender(forzar) : (forzar && (S[v].clave = '__'), cargarPagina(v));
+      pintar(); Promise.resolve(p).then(pintar, pintar);
+    }
+    function masFilas() { const v = S.vista; if (v === 'atender' || S[v].fin || S[v].cargando) return; Promise.resolve(cargarPagina(v)).then(pintar, pintar); pintarLista(); }
+    function pintar() { if (!abierto()) return; pintarCabecera(); pintarLista(); pintarDetalle(); }
+    function pintarCabecera() {
+      const n = S.atender.filas.length;
+      $('.rmd-bs-sub').textContent = yo ? D.usuarioVisible(yo.data.usuario) : 'Conectando con SAP…';
+      const tabs = [['atender', 'Por aprobar', S.atender.listo ? String(n) : '…'], ['todas', 'Todas', '']];
+      $('.rmd-bs-pestanas').innerHTML = tabs.map(([k, t, c]) => `<button type="button" role="tab" data-v="${k}" aria-selected="${S.vista === k}">${esc(t)}${c ? `<span class="rmd-bs-num${k === 'atender' && n ? ' hay' : ''}">${esc(c)}</span>` : ''}</button>`).join('');
+      const chips = [];
+      if (S.vista === 'todas') [['', 'Todos'], [K.SOLICITADO, 'Solicitado'], [K.APROBADA, 'Aprobada'], [K.RECHAZADA, 'Rechazada']].forEach(([k, t]) => chips.push(`<button type="button" data-est="${k}" aria-pressed="${String(S.estado) === String(k)}">${t}</button>`));
+      [S.atender.filas, S.todas.filas, S.revision.filas].flat().forEach((md) => { if (md.sucursalId_iMaestraId != null && planta(md)) plantasVistas.set(String(md.sucursalId_iMaestraId), plantaCorta(md)); });
+      if (plantasVistas.size) { chips.push('<span class="rmd-bs-sep"></span>'); [['', 'Ambas plantas'], ...[...plantasVistas].sort((a, b) => a[1].localeCompare(b[1]))].forEach(([k, t]) => chips.push(`<button type="button" data-pl="${esc(k)}" aria-pressed="${S.planta === k}">${esc(t)}</button>`)); }
+      $('.rmd-bs-chips').innerHTML = chips.join('');
+    }
+    function tarjeta(md) {
+      const c = claseEstado(md), adj = S.adjuntos.get(md.mdId);
+      return `<button type="button" class="rmd-bs-t ${c}${S.sel === md.mdId ? ' sel' : ''}" role="option" aria-selected="${S.sel === md.mdId}" data-id="${esc(md.mdId)}">
+        <span class="rmd-bs-t1"><span class="rmd-bs-cod">${esc(md.codigo || md.codigoSolicitud || '—')}</span><span class="rmd-bs-ver">v${esc(md.version)}</span><span class="rmd-bs-tipo">${esc(tipoMD(md))}</span>
+          <span class="rmd-bs-est ${c}">${esc(enRevision(md) ? procesoTxt(md) : estadoTxt(md))}</span></span>
+        <span class="rmd-bs-nom">${esc(md.descripcion || '')}</span>
+        <span class="rmd-bs-t3"><span>${esc(md.areaRmdTxt || '—')}</span><span>${esc(plantaCorta(md) || '—')}</span><span>${esc(motivo(md) || 'Sin motivo')}</span>${md.nivelTxt ? `<span>${esc(md.nivelTxt)}</span>` : ''}</span>
+        <span class="rmd-bs-t4"><span title="${esc(fechaTxt(md.fechaRegistro, true))}">${esc(haceTxt(md.fechaRegistro))}</span><span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
+      </button>`;
+    }
+    const adjTxt = (n) => (n ? `${n} adjunto${n === 1 ? '' : 's'}` : 'sin adjuntos');
+    function pintarAdjCount(id, l) {
+      const p = S.adjuntos.get(id); if (p) p.__n = l.length;
+      if (!abierto()) return; const el = panel.querySelector(`.rmd-bs-adj[data-adj="${escAttr(id)}"]`); if (el) el.textContent = adjTxt(l.length);
+    }
+    function pintarLista() {
+      const caja = $('.rmd-bs-lista'), v = S.vista, L = v === 'atender' ? S.atender : S[v], filas = filasVista();
+      const cargando = !!L.cargando || (v === 'atender' && !L.listo && !L.error);
+      let html = filas.map(tarjeta).join('');
+      if (!filas.length && cargando) html = '<div class="rmd-bs-vacio"><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div></div>';
+      else if (!filas.length && L.error) html = `<div class="rmd-bs-vacio"><p>No se pudo leer de SAP: ${esc(L.error)}</p><button type="button" class="rmd-bs-txt" data-a="refrescar">Intentar otra vez</button></div>`;
+      else if (!filas.length) html = `<div class="rmd-bs-vacio"><p>${v === 'atender' ? 'No hay solicitudes por aprobar.' : 'No hay solicitudes con este filtro.'}</p></div>`;
+      if (v !== 'atender' && filas.length) html += L.fin ? '' : `<div class="rmd-bs-mas">${L.cargando ? 'Cargando más…' : L.error ? `No se pudo seguir: ${esc(L.error)} <button type="button" class="rmd-bs-txt" data-a="mas">Reintentar</button>` : ''}</div>`;
+      const top = caja.scrollTop; caja.innerHTML = html; caja.scrollTop = top;
+      const mas = caja.querySelector('.rmd-bs-mas'); if (mas && io) { io.disconnect(); io.observe(mas); }
+      if (ioAdj) caja.querySelectorAll('.rmd-bs-t').forEach((b) => { const p = S.adjuntos.get(b.dataset.id); if (!p || p.__n == null) ioAdj.observe(b); });
+      panel.querySelector('.rmd-bs').classList.toggle('con-det', !!S.sel);
+    }
+    function seleccionar(id) {
+      S.sel = id; pintarLista(); pintarDetalle();
+      const b = panel && panel.querySelector(`.rmd-bs-t[data-id="${escAttr(id)}"]`); if (b) b.scrollIntoView({ block: 'nearest' });
+      leerDetalle(id).then(() => { if (S.sel === id) pintarDetalle(); }, (e) => { if (S.sel === id) pintarDetalle(e); });
+    }
+    const campo = (t, v, cls) => (v == null || v === '' ? '' : `<div class="rmd-bs-c${cls ? ' ' + cls : ''}"><dt>${esc(t)}</dt><dd>${v}</dd></div>`);
+    function pintarDetalle(err) {
+      const caja = $('.rmd-bs-det'); if (!caja) return;
+      if (!S.sel) { caja.innerHTML = ''; return; }
+      const base = buscarFila(S.sel), md = S.detalle.get(S.sel) || base; if (!md) { caja.innerHTML = ''; return; }
+      const completo = S.detalle.has(S.sel), c = claseEstado(md), atender = puedoAtender(md);
+      const hist = completo ? ((md.aStatusProceso && md.aStatusProceso.results) || []).slice().sort((a, b) => fecha(a.fechaRegistro) - fecha(b.fechaRegistro)) : [];
+      const primeroSol = hist.find((h) => h.tipo === 'SOLICITUD');
+      const recetas = completo ? ((md.aReceta && md.aReceta.results) || []).filter((r) => r.activo !== false).map((r) => r.recetaId ? `${esc(r.recetaId.Matnr || '')}${r.recetaId.Verid ? ' · ver. ' + esc(r.recetaId.Verid) : ''}${r.recetaId.Text1 ? ' · ' + esc(r.recetaId.Text1) : ''}` : '').filter(Boolean) : [];
+      const dest = [...new Set(destinatarios(md).map((d) => d.usuarioId && D.usuarioVisible(d.usuarioId.usuario || '')).filter(Boolean))];
+      caja.innerHTML = `<div class="rmd-bs-dcab ${c}"><button type="button" class="rmd-bs-txt rmd-bs-volver" data-a="volver">Volver a la lista</button>
+          <div class="rmd-bs-dcod">${esc(md.codigoSolicitud || '')}${md.codigo ? ` <span>RMD ${esc(md.codigo)}</span>` : ''} <span>v${esc(md.version)}</span></div>
+          <h4>${esc(md.descripcion || '')}</h4>
+          <div class="rmd-bs-dchips"><span class="rmd-bs-est ${c}">${esc(estadoTxt(md))}</span>${procesoTxt(md) && +md.estadoIdProceso_iMaestraId !== K.P_PROCESO ? `<span class="rmd-bs-est revision">${esc(procesoTxt(md))}</span>` : ''}<span class="rmd-bs-tipo">${esc(tipoMD(md))}</span></div></div>
+        ${err ? `<p class="rmd-bs-error">No se pudo leer el detalle: ${esc(err.message || err)}</p>` : ''}
+        <div class="rmd-bs-acciones">${atender ? `<button type="button" class="rmd-bs-btn si" data-a="aprobar">Aprobar</button><button type="button" class="rmd-bs-btn no" data-a="rechazar">Rechazar</button>` : ''}
+          ${md.codigo && +md.estadoIdRmd_iMaestraId !== K.SOLICITADO ? '<button type="button" class="rmd-bs-txt" data-a="abrirrmd">Abrir el RMD</button>' : ''}
+          <a class="rmd-bs-txt" href="#" data-a="original">Abrir en la app original</a></div>
+        <div class="rmd-bs-zona"></div>
+        <dl class="rmd-bs-campos">
+          ${campo('Sección', esc(md.areaRmdTxt || ''))}${campo('Planta', esc(planta(md)))}${campo('Motivo', esc(motivo(md)))}${campo('Etapa', esc(md.nivelTxt || (md.nivelId && md.nivelId.contenido) || ''))}
+          ${campo('Usuario creador', esc(D.usuarioVisible(md.usuarioRegistro || '')))}${campo('Fecha de creación', esc(fechaTxt(md.fechaRegistro, true)))}${campo('Fecha de solicitud', esc(fechaTxt(md.fechaSolicitud)))}
+          ${primeroSol && !esSolicitud(md) ? campo('Fecha aprob. / rech.', esc(fechaTxt(primeroSol.fechaRegistro, true)) + ` <small>${esc(D.usuarioVisible(primeroSol.usuarioRegistro || ''))}</small>`) : ''}
+          ${campo('Código por defecto', esc(md.codDefectoReceta || ''))}${campo('Código agrupador', esc(md.codAgrupadorReceta || ''))}${campo('Fecha de autorización', esc(fechaTxt(md.fechaAutorizacion, true)))}
+          ${campo('Observación', esc(md.observacion || ''), 'ancho pre')}${campo('Motivo de rechazo', esc(md.motivoRechazo || ''), 'ancho pre rechazo')}${campo('Motivo de cancelación', esc(md.motivoCancelado || ''), 'ancho pre')}
+          ${recetas.length ? campo('Recetas', `<ul>${recetas.map((r) => `<li>${r}</li>`).join('')}</ul>`, 'ancho') : ''}
+          <div class="rmd-bs-c ancho"><dt>Documentos adjuntos</dt><dd class="rmd-bs-adjs"><span class="rmd-bs-tenue">Buscando en SharePoint…</span></dd></div>
+          ${dest.length ? `<div class="rmd-bs-c ancho rmd-bs-destr"><dt>Destinatarios</dt><dd>${esc(dest.slice(0, 3).join(', '))}${dest.length > 3 ? ` <span class="rmd-bs-tenue">y ${dest.length - 3} más</span>` : ''}</dd></div>` : ''}
+          ${hist.length ? campo('Historial', `<ol class="rmd-bs-hist">${hist.map((h) => `<li><b>${esc(h.tipo || '')}</b> ${esc(fechaTxt(h.fechaRegistro, true))} · ${esc(D.usuarioVisible(h.usuarioRegistro || ''))}${h.observacion ? `<div>${esc(h.observacion)}</div>` : ''}</li>`).join('')}</ol>`, 'ancho') : (completo ? '' : '<div class="rmd-bs-c ancho"><dd class="rmd-bs-tenue">Cargando el detalle completo…</dd></div>')}
+        </dl>`;
+      leerAdjuntos(md).then((l) => {
+        pintarAdjCount(md.mdId, l);
+        const z = abierto() && S.sel === md.mdId && $('.rmd-bs-adjs'); if (!z) return;
+        z.innerHTML = l.length ? `<ul class="rmd-bs-adjl">${l.map((a, i) => `<li><button type="button" class="rmd-bs-txt" data-a="adj" data-i="${i}">${esc(a.Name)}</button>${a.origen === 'Configuracion' ? ' <small>Configuración</small>' : ''}</li>`).join('')}</ul>` : '<span class="rmd-bs-tenue">Sin adjuntos</span>';
+        z.__adjs = l;
+      });
+    }
+    async function alClic(ev) {
+      const t = ev.target.closest('button, a'); if (!t || !panel.contains(t)) return;
+      if (t.dataset.v) { S.vista = t.dataset.v; S.sel = null; recargarVista(false); return; }
+      if (t.dataset.est != null) { S.estado = t.dataset.est; recargarVista(false); return; }
+      if (t.dataset.pl != null) { S.planta = t.dataset.pl; if (S.vista !== 'atender') recargarVista(false); else pintar(); return; }
+      if (t.classList.contains('rmd-bs-t')) { seleccionar(t.dataset.id); return; }
+      const a = t.dataset.a; if (!a) return;
+      ev.preventDefault();
+      if (a === 'cerrar') return cerrar();
+      if (a === 'refrescar') { S.detalle.clear(); S.adjuntos.clear(); return recargarVista(true); }
+      if (a === 'mas') return masFilas();
+      if (a === 'volver') { S.sel = null; return pintar(); }
+      if (a === 'original') { D.abrirApp('solicitud-display?sap-ui-app-id-hint=saas_approuter_mif.rmd.solicitud'); return; }
+      const md = S.detalle.get(S.sel) || buscarFila(S.sel); if (!md) return;
+      if (a === 'abrirrmd') { cerrar(); D.abrirRmd(md.codigo, md.version); return; }
+      if (a === 'adj') { const l = $('.rmd-bs-adjs').__adjs || [], x = l[+t.dataset.i]; if (!x) return; t.disabled = true; try { await descargarAdjunto(x); } catch (e) { D.toast('No se pudo descargar: ' + (e.message || e), true); } finally { t.disabled = false; } return; }
+      if (a === 'aprobar') return confirmarAprobar(md);
+      if (a === 'rechazar') return confirmarRechazar(md);
+    }
+    function zona(html) { const z = $('.rmd-bs-zona'); if (z) { z.innerHTML = html; z.classList.toggle('activa', !!html); } return z; }
+    async function confirmarAprobar(md) {
+      const z = zona('<div class="rmd-bs-confirma"><p class="rmd-bs-tenue">Preparando…</p></div>');
+      let dp; try { dp = await destinatariosPosibles(md); } catch (e) { zona(`<div class="rmd-bs-confirma"><p class="rmd-bs-error">${esc(e.message || e)}</p></div>`); return; }
+      const sol = esSolicitud(md), nueva = sol && +md.version !== 1;
+      const que = sol ? (nueva ? `Pasa a <b>Solicitud aprobada</b> y se crea la <b>versión ${esc(md.version)}</b> como <b>Ingresado</b>, con la estructura, recetas, pasos y fórmulas de la versión anterior.` : 'Pasa a <b>Solicitud aprobada</b>: queda lista para crear el RMD nuevo en Configuración.')
+        : +md.estadoIdProceso_iMaestraId === K.P_APROB_GERENTE ? 'Queda <b>Autorizado</b>.' : 'Pasa al siguiente paso del flujo de revisión.';
+      const lista = dp.lista.length ? `<fieldset class="rmd-bs-dest"><legend>Destinatarios</legend>${dp.lista.map((u) => `<label><input type="checkbox" value="${esc(u.usuarioId)}"${dp.marcados.includes(u.usuarioId) ? ' checked' : ''}> ${esc(D.usuarioVisible(u.usuario || ''))}${u.nombre ? ' · ' + esc(u.nombre + ' ' + (u.apellidoPaterno || '')) : ''}</label>`).join('')}</fieldset>` : '<p class="rmd-bs-error">No hay destinatarios disponibles para tu rol: la app original tampoco deja aprobar sin ellos.</p>';
+      z.innerHTML = `<div class="rmd-bs-confirma"><p>¿Aprobar <b>${esc(md.codigoSolicitud || md.codigo)}</b> · ${esc(md.descripcion || '')}?</p><p class="rmd-bs-tenue">${que}</p>${sol ? `<details class="rmd-bs-tenue"><summary>Destinatarios (${dp.marcados.length})</summary>${lista}</details>` : lista}
+        <div class="rmd-bs-fila"><button type="button" class="rmd-bs-btn si" data-ok="1"${dp.lista.length ? '' : ' disabled'}>Sí, aprobar</button><button type="button" class="rmd-bs-txt" data-no="1">Cancelar</button></div><ol class="rmd-bs-pasos"></ol></div>`;
+      z.querySelector('[data-no]').onclick = () => zona('');
+      z.querySelector('[data-ok]').onclick = async (ev) => {
+        const destinos = [...z.querySelectorAll('.rmd-bs-dest input:checked')].map((i) => i.value);
+        if (!destinos.length) { D.toast('Selecciona al menos un destinatario.', true); return; }
+        ejecutar(z, ev.target, () => aprobar(md.mdId, destinos, (p) => anotarPaso(z, p)), (r) => `Aprobada ${md.codigoSolicitud || md.codigo}${r.nueva ? ': la versión nueva ya está como Ingresado' : ''}.`);
+      };
+    }
+    function confirmarRechazar(md) {
+      const z = zona(`<div class="rmd-bs-confirma"><p>¿Rechazar <b>${esc(md.codigoSolicitud || md.codigo)}</b> · ${esc(md.descripcion || '')}?</p>
+        <label class="rmd-bs-motivo">Motivo del rechazo<textarea maxlength="1000" rows="3" placeholder="Obligatorio: queda en la solicitud y le llega a quien la hizo"></textarea></label>
+        <div class="rmd-bs-fila"><button type="button" class="rmd-bs-btn no" data-ok="1" disabled>Rechazar</button><button type="button" class="rmd-bs-txt" data-no="1">Cancelar</button></div><ol class="rmd-bs-pasos"></ol></div>`);
+      const ta = z.querySelector('textarea'), ok = z.querySelector('[data-ok]');
+      ta.addEventListener('input', () => { ok.disabled = !ta.value.trim(); }); setTimeout(() => ta.focus(), 30);
+      z.querySelector('[data-no]').onclick = () => zona('');
+      ok.onclick = () => ejecutar(z, ok, () => rechazar(md.mdId, ta.value, (p) => anotarPaso(z, p)), () => `Rechazada ${md.codigoSolicitud || md.codigo}.`);
+    }
+    function anotarPaso(z, p) { const ol = z.querySelector('.rmd-bs-pasos'); if (!ol) return; ol.querySelectorAll('li.va').forEach((x) => x.classList.replace('va', 'hecho')); const li = document.createElement('li'); li.className = 'va'; li.textContent = p; ol.appendChild(li); }
+    async function ejecutar(z, btn, fn, msg) {
+      z.querySelectorAll('button, textarea, input').forEach((x) => { x.disabled = true; });
+      z.classList.add('trabajando');
+      try {
+        const r = await fn();
+        z.querySelectorAll('.rmd-bs-pasos li.va').forEach((x) => x.classList.replace('va', 'hecho'));
+        D.toast(msg(r));
+        S.atender.listo = false; S.todas.clave = '__'; S.revision.clave = '__';
+        await cargarAtender(true).catch(() => {});
+        recargarVista(false);
+        setTimeout(() => { if (abierto()) seleccionar(r.mdId); }, 50);
+      } catch (e) {
+        z.classList.remove('trabajando');
+        z.querySelectorAll('.rmd-bs-pasos li.va').forEach((x) => x.classList.replace('va', 'mal'));
+        const p = document.createElement('p'); p.className = 'rmd-bs-error'; p.textContent = (e.yaAtendida ? '' : 'No se completó: ') + (e.message || e) + (e.yaAtendida ? '' : ' Revisa la solicitud en la app original antes de reintentar.'); z.querySelector('.rmd-bs-confirma').appendChild(p);
+        const c = z.querySelector('[data-no]'); if (c) { c.disabled = false; c.textContent = 'Cerrar'; }
+        if (e.yaAtendida) { S.atender.listo = false; cargarAtender(true).then(pintarCabecera, () => {}); }
+      }
+    }
+
+    // ================= Buscar por lote (app Registro) =================
+    const CLAVE_LOTES = 'rmdLotesRecientes';
+    const lotesRecientes = () => { try { return JSON.parse(localStorage.getItem(CLAVE_LOTES)) || []; } catch (e) { return []; } };
+    const recordarLote = (l) => { try { localStorage.setItem(CLAVE_LOTES, JSON.stringify([l, ...lotesRecientes().filter((x) => x !== l)].slice(0, 8))); } catch (e) { /* sin almacenamiento */ } };
+    async function ordenesDeLote(lote) {
+      const erp = D.modeloErp(); if (!erp) throw new Error('el servicio de órdenes de SAP aún no está listo');
+      const l = String(lote || '').trim().toUpperCase(); if (!l) return [];
+      return D.conLectura(erp, (m) => new Promise((ok, mal) => m.read('/OrdenSet', { filters: [y([eq('Charg', l), eq('Aufnr', '')])], success: (r) => ok((r && r.results) || []), error: (e) => mal(new Error(`SAP no devolvió las órdenes (${(e && e.statusCode) || 'sin código'})`)) })));
+    }
+    // RMD de una orden (onMdList), sin escribir nada; si no hay registro, el master que le corresponde por su receta.
+    async function rmdDeOrden(orden) {
+      const rmd = await api.leer('RMD', [y([eq('productoId', orden.Matnr), eq('ordenSAP', orden.Aufnr)])], { $expand: 'estadoIdRmd,mdId,mdId/estadoIdRmd' });
+      if (rmd.length) return { registros: rmd, masters: [] };
+      const rec = await api.leer('RECETA', [y([eq('activo', true), eq('Matnr', orden.Matnr), eq('Verid', orden.Verid)])]).catch(() => []);
+      if (!rec.length) return { registros: [], masters: [] };
+      const mr = await api.leer('MD_RECETA', [y([eq('activo', true), o(rec.map((r) => eq('recetaId_recetaId', r.recetaId)))])], { $expand: 'mdId,mdId/estadoIdRmd' }).catch(() => []);
+      const vistos = new Set(), masters = mr.map((x) => x.mdId).filter((m) => m && !vistos.has(m.mdId) && vistos.add(m.mdId)).sort((a, b) => (+b.version || 0) - (+a.version || 0));
+      return { registros: [], masters };
+    }
+    let lotePanel = null;
+    function abrirLote() {
+      if (lotePanel && lotePanel.isConnected) { const i = lotePanel.querySelector('input'); if (i) i.focus(); return; }
+      const f = document.createElement('div'); f.className = 'rmd-bs-fondo rmd-lt-fondo'; lotePanel = f;
+      f.innerHTML = `<aside class="rmd-bs rmd-lt" role="dialog" aria-modal="true" aria-label="Buscar por lote">
+        <header class="rmd-bs-cab"><div class="rmd-bs-tit"><h3>Buscar por lote</h3><span class="rmd-bs-sub">Órdenes de SAP del lote y los RMD de cada una</span></div><div class="rmd-bs-acc"><button type="button" class="rmd-bs-txt" data-a="cerrar">Cerrar</button></div></header>
+        <form class="rmd-lt-form"><input type="search" placeholder="Lote, p. ej. 2601234" aria-label="Lote" autocomplete="off" spellcheck="false"><button type="submit" class="rmd-bs-btn si">Buscar</button></form>
+        <div class="rmd-lt-recientes"></div><div class="rmd-lt-res"></div></aside>`;
+      document.body.appendChild(f); D.externos();
+      const salir = () => { document.removeEventListener('keydown', tec, true); f.classList.add('rmd-bs-sale'); setTimeout(() => f.remove(), 180); lotePanel = null; };
+      const tec = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); salir(); } };
+      document.addEventListener('keydown', tec, true);
+      f.addEventListener('mousedown', (ev) => { if (ev.target === f) salir(); });
+      const inp = f.querySelector('input'), res = f.querySelector('.rmd-lt-res'), rec = f.querySelector('.rmd-lt-recientes');
+      const pintarRecientes = () => { const l = lotesRecientes(); rec.innerHTML = l.length ? 'Recientes: ' + l.map((x) => `<button type="button" class="rmd-bs-txt" data-lote="${esc(x)}">${esc(x)}</button>`).join(' ') : ''; };
+      pintarRecientes();
+      let ordenes = [], vuelta = 0;
+      const buscar = async (lote) => {
+        const l = String(lote || '').trim().toUpperCase(); if (!l) return; inp.value = l; const mia = ++vuelta;
+        res.innerHTML = '<div class="rmd-bs-vacio"><div class="rmd-bs-esq"></div><div class="rmd-bs-esq"></div></div>';
+        try {
+          ordenes = await ordenesDeLote(l); if (mia !== vuelta) return;
+          recordarLote(l); pintarRecientes();
+          if (!ordenes.length) { res.innerHTML = `<div class="rmd-bs-vacio"><p>No hay órdenes con el lote ${esc(l)}.</p></div>`; return; }
+          res.innerHTML = `<p class="rmd-lt-cuenta">${ordenes.length} orden${ordenes.length === 1 ? '' : 'es'} con el lote <b>${esc(l)}</b></p><table class="rmd-lt-tabla"><thead><tr><th>Centro</th><th>Orden</th><th>Etapa</th><th>Código</th><th>Versión</th><th>Artículo</th><th>Lote</th><th>Expira</th><th>Status</th></tr></thead><tbody>${
+            ordenes.map((x, i) => `<tr data-i="${i}" tabindex="0"><td>${esc(x.Pwerk)}</td><td class="rmd-lt-ord">${esc(String(x.Aufnr || '').replace(/^0+/, ''))}</td><td>${esc(x.Dauat)}</td><td>${esc(String(x.Matnr || '').replace(/^0+/, ''))}</td><td>${esc(x.Verid)}</td><td>${esc(x.Text1 || x.Maktx || '')}</td><td>${esc(x.Charg)}</td><td>${esc(fechaTxt(x.Vfdat))}</td><td>${esc(x.Stats || '')}</td></tr><tr class="rmd-lt-sub" hidden><td colspan="9"></td></tr>`).join('')}</tbody></table>`;
+          if (ordenes.length === 1) abrirOrden(0);
+        } catch (e) { if (mia === vuelta) res.innerHTML = `<div class="rmd-bs-vacio"><p class="rmd-bs-error">${esc(e.message || e)}</p></div>`; }
+      };
+      const abrirOrden = async (i) => {
+        const tr = res.querySelector(`tr[data-i="${i}"]`), sub = tr && tr.nextElementSibling; if (!sub) return;
+        if (!sub.hidden) { sub.hidden = true; tr.classList.remove('abierta'); return; }
+        sub.hidden = false; tr.classList.add('abierta'); const td = sub.firstElementChild; td.innerHTML = '<span class="rmd-bs-tenue">Buscando los RMD de esta orden…</span>';
+        try {
+          const r = await rmdDeOrden(ordenes[i]);
+          const fila = (m, estadoReg) => `<li><button type="button" class="rmd-bs-txt" data-cod="${esc(m.codigo || '')}" data-ver="${esc(m.version)}"${m.codigo ? '' : ' disabled'}>${esc(m.codigo || m.codigoSolicitud || '—')} v${esc(m.version)}</button> <span>${esc(m.descripcion || '')}</span> <span class="rmd-bs-est ${claseEstado(m)}">${esc((m.estadoIdRmd && m.estadoIdRmd.contenido) || '')}</span>${estadoReg ? ` <small>Registro: ${esc(estadoReg)}</small>` : ''}</li>`;
+          if (r.registros.length) td.innerHTML = `<ul class="rmd-lt-rmd">${r.registros.map((x) => fila(x.mdId || {}, (x.estadoIdRmd && x.estadoIdRmd.contenido) || (x.activo === false ? 'inactivo' : ''))).join('')}</ul>`;
+          else if (r.masters.length) td.innerHTML = `<p class="rmd-bs-tenue">Esta orden aún no tiene registro de manufactura. Master de su receta:</p><ul class="rmd-lt-rmd">${r.masters.map((m) => fila(m)).join('')}</ul>`;
+          else td.innerHTML = '<span class="rmd-bs-tenue">Sin RMD para esta orden ni master con su receta.</span>';
+        } catch (e) { td.innerHTML = `<span class="rmd-bs-error">${esc(e.message || e)}</span>`; }
+      };
+      f.querySelector('form').addEventListener('submit', (ev) => { ev.preventDefault(); buscar(inp.value); });
+      f.addEventListener('click', (ev) => {
+        const b = ev.target.closest('button'); if (b && b.dataset.a === 'cerrar') return salir();
+        if (b && b.dataset.lote) return buscar(b.dataset.lote);
+        if (b && b.dataset.cod) { salir(); D.abrirRmd(b.dataset.cod, b.dataset.ver); return; }
+        const tr = ev.target.closest('tr[data-i]'); if (tr) abrirOrden(+tr.dataset.i);
+      });
+      f.addEventListener('keydown', (ev) => { const tr = ev.target.closest && ev.target.closest('tr[data-i]'); if (tr && ev.key === 'Enter') { ev.preventDefault(); abrirOrden(+tr.dataset.i); } });
+      requestAnimationFrame(() => f.classList.add('rmd-bs-entra'));
+      setTimeout(() => inp.focus(), 40);
+    }
+
+    return { abrir, cerrar, abierto, abrirLote, cargarAtender, cargarPagina, quienSoy, aprobar, rechazar, puedoAtender, registrarEstructurasNuevaVersion, ordenesDeLote, rmdDeOrden, K, S, api,
+      pendientes: () => S.atender.filas.length, listo: () => S.atender.listo, reiniciar: () => { yo = null; yoCargando = null; S.atender = { filas: [], listo: false, t: 0, cargando: null, error: '' }; S.detalle.clear(); S.adjuntos.clear(); } };
+  }
+  // ==BANDEJA-FIN==
+  // Campanita y lupa de lote en la barra de la lista principal (a la izquierda de Status RMD). No cambian ninguna ventana del portal: la bandeja y la
+  // búsqueda abren su propio panel lateral.
+  const ICONO_CAMPANA = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.6c.7 0 1.2.5 1.2 1.1v.5c2.3.6 3.8 2.6 3.8 5.1v2.6c0 .9.5 1.6 1.4 2.3.3.3.1.8-.3.8H3.9c-.4 0-.6-.5-.3-.8.9-.7 1.4-1.4 1.4-2.3V9.3c0-2.5 1.5-4.5 3.8-5.1v-.5c0-.6.5-1.1 1.2-1.1z"/><path d="M8.2 16.4c.3.8 1 1.3 1.8 1.3s1.5-.5 1.8-1.3"/></svg>';
+  const ICONO_LOTE = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.2 6.2 9 3.3a2 2 0 0 1 1.8 0l6 3v7.4a1 1 0 0 1-.6.9l-5.4 2.7a2 2 0 0 1-1.8 0l-5.2-2.6a1 1 0 0 1-.6-.9z"/><path d="M3.4 6.3 10 9.6l6.6-3.3M10 9.6v7.6"/><path d="M12.6 11.4v3M14.4 10.5v3"/></svg>';
+  let Bandeja = null, bandejaPrecarga = 0, bandejaUltimo = -1;
+  function bandeja() {
+    if (Bandeja) return Bandeja;
+    Bandeja = crearBandeja({
+      Filter: () => sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter,
+      modelo: () => modeloListaPrincipal(),
+      modeloErp: () => { const c = controladorPrincipal(), v = c && c.getView && c.getView(); return (v && v.getModel('NECESIDADESRMD_SRV')) || (c && c.getOwnerComponent && c.getOwnerComponent().getModel('NECESIDADESRMD_SRV')) || null; },
+      conLectura, leerTodoDe, esc, toast, usuarioVisible, persona: personaPortal, fetch: (u, op) => window.fetch(u, op),
+      externos: () => { try { const P = sap.ui.require('sap/ui/core/Popup'); if (P && P.addExternalContent) P.addExternalContent(['.rmd-bs-fondo'], true); } catch (e) { /* sin popup */ } },
+      abrirRmd: (codigo, version) => abrirRmdPorCodigo(String(codigo), 'configurar', version != null && version !== '' ? version : undefined),
+      abrirApp: (hash) => { let ruta = '/site/portalprd'; try { ruta = window.top.location.pathname || ruta; } catch (e) { /* otro origen */ } window.open(location.origin + ruta + '#' + hash, '_blank'); },
+      alCambiarPendientes: (n) => pintarCampana(n),
+    });
+    return Bandeja;
+  }
+  function pintarCampana(n) {
+    const b = document.querySelector('.rmd-bs-campana'); if (!b) return;
+    const s = b.querySelector('span'); s.textContent = n > 99 ? '99+' : n > 0 ? String(n) : '';
+    b.title = n > 0 ? `Solicitudes: ${n} por atender` : 'Solicitudes de Manufactura Digital'; b.setAttribute('aria-label', b.title);
+    if (bandejaUltimo >= 0 && n > bandejaUltimo) { b.classList.remove('rmd-bs-suena'); void b.offsetWidth; b.classList.add('rmd-bs-suena'); }
+    bandejaUltimo = n;
+  }
+  function gestionarBandeja() {
+    const conCampana = on('bandejasol'), conLote = on('lote');
+    if (!conCampana) document.querySelectorAll('.rmd-bs-campana').forEach((e) => e.remove());
+    if (!conLote) document.querySelectorAll('.rmd-bs-lote').forEach((e) => e.remove());
+    if (!conCampana && !conLote) return;
+    document.querySelectorAll('.sapMDialog .rmd-bs-lanza').forEach((e) => e.remove());
+    const btnExportar = botonExportar(); if (!btnExportar) return;
+    const barra = btnExportar.closest('.sapMBar, .sapMOTB, .sapMToolbar') || btnExportar.parentElement; if (!barra) return;
+    const ico = btnExportar.querySelector('.sapUiIcon'), caja = (btnExportar.closest('.sapMBtn') || btnExportar).getBoundingClientRect();
+    const estilo = (b) => { if (ico) { const cs = getComputedStyle(ico); b.style.setProperty('--rmd-ico-portal', cs.color); b.style.setProperty('--rmd-ico-tam', cs.fontSize); } if (caja.height) b.style.setProperty('--rmd-btn-alto', Math.round(caja.height) + 'px'); };
+    if (conLote && !barra.querySelector('.rmd-bs-lote')) {
+      const b = botonIcono(ICONO_LOTE, '', 'rmd-bs-lanza rmd-bs-lote', () => bandeja().abrirLote());
+      b.title = 'Buscar por lote: las órdenes de SAP de un lote y los RMD de cada una'; b.setAttribute('aria-label', 'Buscar por lote'); estilo(b); colocarEnBarra(barra, b);
+    }
+    if (conCampana && !barra.querySelector('.rmd-bs-campana')) {
+      const b = botonIcono(ICONO_CAMPANA, '', 'rmd-bs-lanza rmd-bs-campana', () => bandeja().abrir(bandeja().pendientes() ? 'atender' : undefined));
+      b.title = 'Solicitudes de Manufactura Digital'; b.setAttribute('aria-label', b.title); estilo(b); colocarEnBarra(barra, b);
+      if (Bandeja && Bandeja.listo()) pintarCampana(Bandeja.pendientes());
+    }
+    // ya cargada: las solicitudes por atender se leen en segundo plano al tener la lista, y cada 5 min con la pestaña a la vista
+    if (conCampana && Date.now() - bandejaPrecarga > 300000 && document.visibilityState === 'visible' && modeloListaPrincipal()) {
+      bandejaPrecarga = Date.now();
+      setTimeout(() => { bandeja().cargarAtender(true).catch((e) => anotarError('bandeja', e)); }, 1500);
+    }
+  }
+  window.__rmdStats.bandeja = () => bandeja();   // pruebas
+
   // ---- Mis movimientos: los RMD en los que el usuario del portal hizo algo entre dos fechas, con su status de hoy ----
   // Fuentes (solo lectura): MD (registro, actualización y autorización), MD_TRAZABILIDAD (cambios de estado) y las filas de la estructura
   // (pasos, procesos menores, etiquetas, equipos, utensilios, especificaciones, insumos y recetas) con usuarioRegistro/usuarioActualiza.
@@ -9919,7 +10802,7 @@
     void poner;
   }
   // ---- Botones del script en la barra de la lista principal (a la izquierda del separador) ----
-  const ORDEN_BARRA = ['rmd-status-rmd', 'rmd-buscar-equipo', 'rmd-suspension'];
+  const ORDEN_BARRA = ['rmd-bs-lote', 'rmd-bs-campana', 'rmd-status-rmd', 'rmd-buscar-equipo', 'rmd-suspension'];
   function colocarEnBarra(barra, x) {
     const nativo = [...barra.querySelectorAll('button')].find((y) => visible(y) && /^Nuevo RMD$/i.test(y.title || '')) || botonExportar(); if (!nativo) return;
     const sep = [...barra.querySelectorAll('.sapMTBSeparator')].filter((s) => s.compareDocumentPosition(nativo) & Node.DOCUMENT_POSITION_FOLLOWING).pop();
