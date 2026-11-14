@@ -1070,8 +1070,8 @@ with sync_playwright() as p:
                 and ["especificacion", "cambiar", "S3", "Descripción:DENSIDAD (20 C):|Especificaciones:1.02 - 1.08 g/mL"] in st["cmb"] and any(c[0] == "especificacion" and c[1] == "mover" for c in st["cmb"])
                 and any(c[0] in ("equipo", "utensilio") and c[1] == "mover" for c in st["cmb"]) and "Cambiado" in st["tags"] and "Movido" in st["tags"] and st["antes"] == 2)
         okPlan = (not r["bloqueos"]
-                  and ["Cambiar", "especificacion", "/MD_ES_ESPECIFICACION('S3')", json.dumps({"ensayoHijo": "DENSIDAD (20 C):", "especificacion": "1.02 - 1.08 g/mL"}, ensure_ascii=False, separators=(",", ":"))] in ops
-                  and ["Orden", "especificacion", "/MD_ES_ESPECIFICACION('S3')", '{"orden":1}'] in ops and ["Orden", "especificacion", "/MD_ES_ESPECIFICACION('S1')", '{"orden":2}'] in ops
+                  and ["Cambiar", "especificacion", "/MD_ES_ESPECIFICACION('S3')", json.dumps({"ensayoHijo": "DENSIDAD (20 C):", "especificacion": "1.02 - 1.08 g/mL", "orden": 1}, ensure_ascii=False, separators=(",", ":"))] in ops
+                  and sum(1 for o in ops if o[2] == "/MD_ES_ESPECIFICACION('S3')") == 1 and ["Orden", "especificacion", "/MD_ES_ESPECIFICACION('S1')", '{"orden":2}'] in ops
                   and ["Orden", "equipo", "/MD_ES_EQUIPO('Q2')", '{"orden":1}'] in ops and ["Orden", "equipo", "/MD_ES_EQUIPO('Q1')", '{"orden":3}'] in ops and not any(o[2] == "/MD_ES_UTENSILIO('U1')" for o in ops))
         okRb = r["rbEq"] == ["Q2", "U1", "Q1", "Q9"] and r["rbEsp"][:2] == ["S3:DENSIDAD (20 C)::1.02 - 1.08 g/mL", "S1:pH (25 °C)::3.90 - 4.10"] and not r["rbConf"]
         return okUi and okPlan and okRb, json.dumps({"ui": okUi, "plan": okPlan, "rb": okRb, "eq": [eq0, eq1, eq2], "esp": [esp0, esp1], "btn": btn, "vacia": vacia, "st": {k: v for k, v in st.items() if k != "W"}, "r": r, "errores": errs[:3]}, ensure_ascii=False)[:3000]
