@@ -58,7 +58,7 @@ window.modelo = {
     op.error({ statusCode: 404 });
   },
 };
-window.erp = { read(ruta, op) { lecturas.push({ ent: 'ERP' + ruta, f: op.filters }); const l = (BD.OrdenSet || []).filter((r) => op.filters.every((f) => coincide(r, f))); setTimeout(() => op.success({ results: l }), 5); } };
+window.erp = { sServiceUrl: '/x/dest-apigateway/api/integracion/saperp/rmd/sap/opu/odata/sap/Z_PP_NECESIDADESRMD_SRV', getHeaders: () => ({ token: 'jwt-de-prueba' }), read(ruta, op) { lecturas.push({ ent: 'ERP' + ruta, f: op.filters }); const l = (BD.OrdenSet || []).filter((r) => op.filters.every((f) => coincide(r, f))); setTimeout(() => op.success({ results: l }), 5); } };
 // SAP Workflow
 window.TAREAS = {};
 window.wfLlamadas = [];
@@ -66,6 +66,7 @@ window.fakeFetch = async (url, op) => {
   op = op || {}; wfLlamadas.push({ url, metodo: op.method || 'GET', cuerpo: op.body ? JSON.parse(op.body) : null, cab: op.headers || {} });
   const r = (cuerpo, h) => ({ ok: true, status: 200, json: async () => cuerpo, headers: { get: (k) => (h || {})[k] || null } });
   if (/xsrf-token$/.test(url)) return r({}, { 'X-CSRF-Token': 'tok123' });
+  if (/Z_PP_IMPRESIONORD_SRV\/OrdenSet/.test(url)) return r({ d: { results: [{ Aufnr: '2100033070', Pdf64: btoa('%PDF-1.4 orden') }] } });
   let m = /task-instances\?workflowInstanceId=(.+)$/.exec(url); if (m) return r(TAREAS[decodeURIComponent(m[1])] || []);
   m = /task-instances\/([^/]+)\/context$/.exec(url); if (m) return r({ requestUserData: { a: 1 }, bpRequestData: { motivoId_motivoId: null } });
   m = /task-instances\/([^/?]+)$/.exec(url); if (m && op.method === 'PATCH') return r({});
@@ -114,7 +115,10 @@ BD.MD_ESTRUCTURA = [
     aEquipo: { results: [{ equipoId_equipoId: 'EQ1', orden: 1 }] }, aUtensilio: { results: [] }, aEspecificacion: { results: [] } },
 ];
 BD.OrdenSet = [{ Charg: 'L2601', Aufnr: '', Pwerk: '1020', Dauat: 'FAB', Matnr: '000000006000003412', Verid: '0001', Text1: 'NITROFURANTOINA 100MG', Vfdat: new Date(Date.UTC(2028, 0, 31)), Stats: 'LIB' }];
-BD.RMD = [{ rmdId: 'X1', productoId: '000000006000003412', ordenSAP: '', estadoIdRmd: { contenido: 'En proceso' }, mdId: { mdId: 'M9', codigo: '2202609142', version: 3, descripcion: 'NITROFURANTOINA', estadoIdRmd: { contenido: 'Autorizado' }, estadoIdRmd_iMaestraId: 465 } }];
+BD.RMD = [{ rmdId: 'X1', productoId: '000000006000003412', verid: '0001', ordenSAP: '', aReceta: { results: [{ rmdRecetaId: 'RR1', fraccion: 1, recetaId: { Matnr: '000000006000003412', Verid: '0001' } }] },
+  aEstructura: { results: [{ orden: 2, fraccion: 1, estructuraId: { tipoEstructuraId_iMaestraId: 1 }, aEtiqueta: { results: [] }, aPaso: { results: [{ orden: 2 }, { orden: 1 }] }, aPasoInsumoPaso: { results: [] }, aEquipo: { results: [] }, aUtensilio: { results: [] }, aEspecificacion: { results: [] },
+    aInsumo: { results: [{ fraccion: 1, rmdRecetaId_rmdRecetaId: 'RR1', visibleInsumo: true, ItemNo: 20 }, { fraccion: 1, rmdRecetaId_rmdRecetaId: 'RR1', visibleInsumo: false, ItemNo: 10 }, { fraccion: 1, rmdRecetaId_rmdRecetaId: 'RR1', visibleInsumo: true, ItemNo: 5 }] } },
+    { orden: 1, fraccion: 1, estructuraId: { tipoEstructuraId_iMaestraId: 2 }, aEtiqueta: { results: [] }, aPaso: { results: [] }, aPasoInsumoPaso: { results: [] }, aEquipo: { results: [] }, aUtensilio: { results: [] }, aEspecificacion: { results: [] }, aInsumo: { results: [] } }] }, estadoIdRmd: { contenido: 'En proceso' }, mdId: { mdId: 'M9', codigo: '2202609142', version: 3, descripcion: 'NITROFURANTOINA', estadoIdRmd: { contenido: 'Autorizado' }, estadoIdRmd_iMaestraId: 465 } }];
 """
 
 ARRANQUE = r"""
@@ -124,6 +128,7 @@ window.B = crearBandeja({
   leerTodoDe: (m, ent, filtros, params) => new Promise((ok, mal) => { const out = []; const leer = (skip) => m.read('/' + ent, { filters: filtros, urlParameters: Object.assign({}, params, { $top: '1000', $skip: String(skip) }), success: (r) => { out.push(...r.results); if (r.results.length < 1000) ok(out); else leer(skip + 1000); }, error: mal }); leer(0); }),
   esc: (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
   toast: (t, e) => toasts.push([t, !!e]), usuarioVisible: (u) => (u === 'KMORENOM' ? 'VM' : u), persona: () => ({ email: 'carlos@empresa.pe' }), fetch: fakeFetch,
+  generarPdfRmd: async (A, C, h, y, k, p, E) => { window.gen = { cod: A.rmdId, desc: C, matnr: y.Matnr, p, ordenes: A.aEstructura.results.map((e) => e.orden), pasos: A.aEstructura.results[1].aPaso.results.map((x) => x.orden), ins: A.aEstructura.results[1].aInsumo.results.map((x) => x.ItemNo), lote: A.loteVistaRMD, hist: E && Array.isArray(E.results) }; return encodeURI(btoa('%PDF-1.4 rmd')); },
   externos: () => {}, abrirRmd: (c, v) => { window.abierto = [c, v]; }, abrirApp: (h) => { window.app = h; }, alCambiarPendientes: (n) => { window.pend = n; },
 });
 """
@@ -239,7 +244,19 @@ with sync_playwright() as p:
     pg.evaluate("() => B.abrirLote()"); pg.fill(".rmd-lt-form input", "l2601"); pg.keyboard.press("Enter")
     pg.wait_for_selector(".rmd-lt-rmd li", timeout=5000)
     ok("Buscar por lote: tabla de órdenes y, con una sola, sus RMD abiertos", "2202609142" in pg.locator(".rmd-lt-rmd").inner_text())
+    txt = pg.locator(".rmd-lt-rmd").inner_text()
+    ok("Buscar por lote: cada RMD trae OPP, RMO y Descargar RMO", all(x in txt for x in ["OPP", "RMO", "Descargar RMO"]), txt)
     pg.screenshot(path=os.path.join(CAPTURAS, "bandeja-5-lote.png"))
+    r = pg.evaluate("""async () => { wfLlamadas.length = 0; const b = await B.pdfDeOrden('2100033070'); const c = wfLlamadas.find((x) => /IMPRESIONORD/.test(x.url));
+      return { tipo: b.type, txt: await b.text(), tok: c && c.cab.token, url: c && c.url }; }""")
+    ok("OPP: PDF de la orden desde Z_PP_IMPRESIONORD_SRV con las cabeceras del modelo ERP", r["tipo"] == "application/pdf" and r["txt"] == "%PDF-1.4 orden" and r["tok"] == "jwt-de-prueba" and "Aufnr%20eq%20'2100033070'" in r["url"], r)
+    r = pg.evaluate("""async () => { escrituras.length = 0; const b = await B.generarRmo('X1', { Matnr: '000000006000003412', Verid: '0001', Aufnr: '2100033070' }, false); return { g: window.gen, txt: await b.text(), esc: escrituras.length }; }""")
+    g = r["g"] or {}
+    ok("RMO: arma los datos como Registro (orden, insumos visibles por ItemNo) y genera el PDF sin escribir", g.get("desc") is False and g.get("p") == "BASE64" and g.get("ordenes") == [1, 2] and g.get("pasos") == [1, 2] and g.get("ins") == [5, 20] and g.get("lote") == " " and g.get("hist") and r["txt"] == "%PDF-1.4 rmd" and r["esc"] == 0, r)
+    pg.evaluate("() => { window.abiertas = []; window.open = (u) => { const w = { closed: false, document: { body: { style: {} } }, location: {} }; window.abiertas.push(w); return w; }; }")
+    pg.locator(".rmd-lt-docs button[data-doc=opp]").first.click(); pg.wait_for_timeout(300)
+    r = pg.evaluate("() => window.abiertas.map((w) => String(w.location.href || ''))")
+    ok("al pulsar OPP se abre el PDF en una pestaña", len(r) == 1 and r[0].startswith("blob:"), r)
     # tema claro y móvil
     pg.keyboard.press("Escape"); pg.evaluate("() => document.documentElement.classList.remove('sapUiTheme-sap_fiori_3_dark')")
     pg.evaluate("() => B.abrir('atender')"); pg.wait_for_selector(".rmd-bs-t"); pg.wait_for_timeout(300); pg.locator(".rmd-bs-t").first.click(); pg.wait_for_timeout(300)
