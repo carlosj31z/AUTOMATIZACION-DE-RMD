@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.139.0
+// @version      1.140.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.139.0';                                                       // mantener igual a @version
+  const VERSION = '1.140.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -14389,8 +14389,8 @@
   // Se guardan en Supabase, una fila «acuerdo:<id>» por acuerdo: los escriben la pestaña «Acuerdos» de Configuración Maestra y la de
   // status-rmd (con la clave pública de la página). Si no hay conexión se usa la última copia de este navegador o un Excel exportado.
   // En la ventana raíz del RMD es solo un aviso.
-  const ACU_SUPABASE = 'https://mlmsympewmxfcqoyowxs.supabase.co/rest/v1/rmd_dashboard_kv';
-  const ACU_CLAVE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbXN5bXBld214ZmNxb3lvd3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3Njk0MDEsImV4cCI6MjEwNTM0NTQwMX0.G4D-QkugQ5rMP_rXj4WGf2SaE8mv305QHjPe-171Srg';
+  const ACU_SUPABASE = 'https://govkmqahpvnlmllboqsh.supabase.co/rest/v1/rmd_dashboard_kv';
+  const ACU_CLAVE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmttcWFocHZubG1sbGJvcXNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NTQzMDQsImV4cCI6MjEwMTEzMDMwNH0.eQF54dInVtjsIVZvWQuKmroy9eOmPbGo3pq_qGJJEJE';
   const ACU = { lista: null, fuente: '', leidoEn: 0, error: '', leyendo: null, ver: 0, crudos: new Map() };   // crudos: filas tal cual (campos que solo usa status-rmd)
   const acuCabeceras = (extra) => ({ apikey: ACU_CLAVE_ANON, Authorization: 'Bearer ' + ACU_CLAVE_ANON, Accept: 'application/json', ...extra });
   function guardarCopiaAcuerdos(lista, fuente) {
