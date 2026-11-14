@@ -341,6 +341,15 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-14, v1.138.1 (encima de la 1.138.0): **pedidos de Carlos.** La bandeja es solo de solicitudes: sin flujo de revisión ni en la interfaz ni en el código. Quitar lo que parezca hecho con IA: estilo de lista Fiori, sin tarjetas, píldoras, animaciones ni barras de carga.
   Buscar por lote trae los documentos del reporte original: OPP (`pdfDeOrden`: IMPRESIONORD con `modeloErp.getHeaders()`), RMO y Descargar RMO (`generarRmo`: carga `table.onGeneratePdf` de Registro con `sap.ui.loader.config`; `datosRmo` es el port de `onGetPdfViewerRmo`; 'BASE64' para abrir en una pestaña).
   Mecanismos probados en el portal real en solo lectura (RMD 2202608488 v8, órdenes 2100033070 y 2100033188). **La siguiente versión debe ser > 1.138.1** (o > 1.139.x si ya se fusionó).
+- 2026-11-14, v1.139.0 (encima de la 1.138.1): **pedido de Carlos: en la plantilla para Producción y en la Edición rápida se editan y mueven las especificaciones
+  y se mueve el listado de equipos.** Especificaciones: «Editar» (Descripción = `ensayoHijo`, máx. 150; Especificaciones = `especificacion`, máx. 500; la
+  Descripción no queda vacía) y «Subir / Bajar / Mover a…» **dentro de su grupo**; las que vienen de SAP (`ensayoPadreSAP`) no se reordenan (como la mejora 6c del
+  portal). Equipos y utensilios salen en el **orden de SAP** (una sola numeración `orden`, `PPN.eqSecuencia`) y se mueven con «Subir / Bajar / Mover a…».
+  Núcleo: `cambios` da «Mover» (equipo/utensilio/especificación) y «Cambiar» (especificación con `campos`); `rebase` conserva textos y orden; `ppMapear` empareja
+  especificaciones por grupo + ensayo. Ingreso (`ppPlanEscritura`): MERGE `MD_ES_ESPECIFICACION` con `ensayoHijo`/`especificacion` y `orden` (los valores de orden
+  que ya tenía la estructura, repartidos en el orden del borrador); equipos y utensilios renumerados 1..n en el orden del borrador (`updateOrderEquipment`).
+  `ppVerificarIngreso` comprueba orden de equipos y textos. Botones nuevos solo con texto. Insumos dentro de los pasos del PROCEDIMIENTO (v1.136.0): revalidados
+  (LN50/LN61). Prueba `qa_local.py` LN62. **La siguiente versión debe ser > 1.139.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
