@@ -1,0 +1,1 @@
+https://sapui5.hana.ondemand.com/1.152.0/resources/sap/ushell/services/CommonDataModel/vizTypeDefaults/cardManifest.json?sap-language=ES

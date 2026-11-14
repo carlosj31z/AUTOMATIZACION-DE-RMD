@@ -1,0 +1,1 @@
+https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/UsuarioRol?$expand=oRol&$filter=oUsuario_usuarioId%20eq%20guid%27e150c51a-ace5-46b5-b2bf-8757ca679e3c%27

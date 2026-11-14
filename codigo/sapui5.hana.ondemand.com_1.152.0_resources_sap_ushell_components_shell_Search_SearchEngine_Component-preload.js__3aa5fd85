@@ -1,0 +1,7 @@
+//@ui5-bundle sap/ushell/components/shell/Search/SearchEngine/Component-preload.js
+// Copyright (c) 2009-2026 SAP SE, All Rights Reserved
+sap.ui.predefine("sap/ushell/components/shell/Search/SearchEngine/Component", ["sap/esh/search/ui/appsearch/AppSearch","sap/esh/search/ui/appsearch/JsSearch","sap/ui/core/Component"],(e,a,s)=>{"use strict";return s.extend("sap.ushell.components.shell.Search.SearchEngine.Component",{metadata:{manifest:"json",library:"sap.ushell"},getJsSearch:async function(){return a},getAppSearch:async function(){return e}})});
+sap.ui.require.preload({
+	"sap/ushell/components/shell/Search/SearchEngine/manifest.json":'{"_version":"1.21.0","sap.app":{"id":"sap.ushell.components.shell.Search.SearchEngine","applicationVersion":{"version":"1.152.0"},"ach":"CA-FLP-FE-COR","type":"component","title":"App Search Engine"},"sap.ui":{"technology":"UI5"},"sap.ui5":{"componentName":"sap.ushell.components.shell.Search.SearchEngine","dependencies":{"minUI5Version":"1.72","libs":{"sap.ui.core":{},"sap.esh.search.ui":{}}}}}'
+});
+//# sourceMappingURL=Component-preload.js.map

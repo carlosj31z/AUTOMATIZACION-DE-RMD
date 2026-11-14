@@ -1,0 +1,1 @@
+https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/RolAppAcciones?$expand=oMaestraAccion&$filter=oRol_rolId%20eq%20guid%2732f5f646-bde1-4e40-8f3e-4f71c1f8b5d0%27%20and%20oAplicacion_aplicacionId%20eq%20guid%273b5fc15f-3dcb-4c0f-8927-8ba26964da38%27

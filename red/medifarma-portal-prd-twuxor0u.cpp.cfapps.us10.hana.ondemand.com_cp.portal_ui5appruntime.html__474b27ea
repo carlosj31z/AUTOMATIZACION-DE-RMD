@@ -1,0 +1,73 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>UI5 Fiori Application Runtime</title>
+
+    <link rel="stylesheet" crossorigin="anonymous" href="https&#x3a;&#x2f;&#x2f;sapui5.hana.ondemand.com&#x2f;1.84.62&#x2f;resources&#x2f;sap&#x2f;ui&#x2f;core&#x2f;themes&#x2f;sap_fiori_3_dark&#x2f;library.css" id="sap-ui-theme-sap.ui.core" data-sap-ui-ready="true"/>
+    <link rel="stylesheet" crossorigin="anonymous" href="https&#x3a;&#x2f;&#x2f;sapui5.hana.ondemand.com&#x2f;1.84.62&#x2f;resources&#x2f;sap&#x2f;m&#x2f;themes&#x2f;sap_fiori_3_dark&#x2f;library.css" id="sap-ui-theme-sap.m" data-sap-ui-ready="true"/>
+    
+
+    <meta name="sap-allowedThemeOrigins" content='https://teams.microsoft.com,https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.launchpad.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.launchpad.wz.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.launchpad.wzhtml5.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.launchpad.dbg.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.us10.workzone.cloud.sap,https://medifarma-portal-prd-twuxor0u.workzone.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.workzonehr.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.us10.start.cloud.sap,https://medifarma-portal-prd-twuxor0u.us10.workzone-advanced.cloud.sap,https://medifarma-portal-prd-twuxor0u.us10.workzone-hr.cloud.sap,https://medifarma-portal-prd-twuxor0u.mobile.workzone.cfapps.us10.hana.ondemand.com,https://medifarma-portal-prd-twuxor0u.mobile.workzonehr.cfapps.us10.hana.ondemand.com,https://sapui5.hana.ondemand.com'/>
+    <meta name="sap.flp.cf.Config" content='&#x7b;&quot;fdcId&quot;&#x3a;&quot;b1874dcf_4ff9_4915_897e_69436f7810da&quot;,&quot;subaccountId&quot;&#x3a;&quot;b1874dcf-4ff9-4915-897e-69436f7810da&quot;&#x7d;'/>
+    <meta name="sap.ushellConfig.ui5appruntime" content='{
+            "flpPlatform": "",
+            "modulePaths": {"sap.cf":"https://portal-service.cfapps.us10.hana.ondemand.com/resources/portal/~b81819dd485a4bea58fa9a9d81f2de67a03d3c27~/sap/cf"},
+            "services": {
+                "Personalization": {
+                    "adapter": {
+                        "module": "sap.cf.adapters.PersonalizationAdapter",
+                        "config": {
+                            "storageType": "REMOTE_STORAGE",
+                            "remoteStorageUrl": "portal/rest/v1/personalization?siteId=0384953d-d748-40dd-8fb9-78e622aa93b0&cacheBusterToken=1792201150157",
+                            "isAppRuntime": true
+                        }
+                    }
+                },
+                "Container": {
+                    "adapter": {
+                        "config": {
+                            "userProfile":{
+                                "defaults": &#x7b;&quot;id&quot;&#x3a;&quot;4d45a213-745a-4a74-92cf-34dace6ca6c9&quot;,&quot;email&quot;&#x3a;&quot;cjesusz&#x40;medifarma.com.pe&quot;,&quot;firstName&quot;&#x3a;&quot;CARLOS&#x20;JEAN&#x20;POOL&quot;,&quot;lastName&quot;&#x3a;&quot;JESUS&#x20;ZEGARRA&quot;,&quot;fullName&quot;&#x3a;&quot;CARLOS&#x20;JEAN&#x20;POOL&#x20;JESUS&#x20;ZEGARRA&quot;,&quot;isAdminUser&quot;&#x3a;false&#x7d;
+                             },
+                            "systemProperties": {
+                                "logoutUrl": "/cp.portal/logout",
+                                "sessionKeepAlive": {
+                                    "url": "/cp.portal/sessionKeepAlive",
+                                    "method": "HEAD"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ui5appruntime": {
+                "config": {
+                    "appIndex": {
+                        "module": "sap.cf.modules.tcprovider"
+                    }
+                }
+            }
+        }'>
+
+    <script id="sap-ui-bootstrap"
+            src="https://sapui5.hana.ondemand.com/1.84.62/resources/sap/fiori/appruntime-min-0.js"
+            data-sap-ui-language="es-ES"
+            data-sap-ui-preload="async"
+            data-sap-ui-versionedLibCss=true
+            data-sap-ui-libs="sap.ui.core, sap.ushell, sap.m, sap.ui.layout"
+            data-sap-ui-theme="sap_fiori_3_dark"
+            data-sap-ui-compatVersion="edge"
+            data-sap-ui-oninit="module:sap/ushell/appRuntime/ui5/AppRuntime"
+            data-sap-ui-flexibilityServices="&#x5b;&#x7b;&quot;url&quot;&#x3a;&quot;&#x2f;comsapperso&quot;,&quot;connector&quot;&#x3a;&quot;PersonalizationConnector&quot;&#x7d;&#x5d;">
+    </script>
+
+    <script src="https&#x3a;&#x2f;&#x2f;sapui5.hana.ondemand.com&#x2f;1.84.62/resources/sap/fiori/appruntime-min-1.js"></script>
+    <script src="https&#x3a;&#x2f;&#x2f;sapui5.hana.ondemand.com&#x2f;1.84.62/resources/sap/fiori/appruntime-min-2.js"></script>
+    <script src="https&#x3a;&#x2f;&#x2f;sapui5.hana.ondemand.com&#x2f;1.84.62/resources/sap/fiori/appruntime-min-3.js"></script>
+
+</head>
+<body class="sapUiBody" id="content">
+</body>
+</html>

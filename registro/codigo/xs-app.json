@@ -1,0 +1,87 @@
+{
+  "welcomeFile": "/index.html",
+  "authenticationMethod": "route",
+  "routes": [{
+		"source": "^/bpmworkflowruntime/(.*)$",
+		"target": "/$1",
+		"service": "com.sap.bpm.workflow",
+		"endpoint": "workflow_rest_url",
+		"authenticationType": "xsuaa"
+    },
+    {
+        "source": "^/srv_api/(.*)$",
+        "target": "$1",
+        "authenticationType": "none",
+        "destination": "RMD_BTP_HTTP",
+        "csrfProtection": false
+    },
+    {
+      "source": "^/srv_api_cp/(.*)$",
+      "target": "$1",
+      "authenticationType": "none",
+      "destination": "CP_BTP_HTTP",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/srv_api_admin/(.*)$",
+      "target": "$1",
+      "authenticationType": "none",
+      "destination": "ADM_BTP_HTTP",
+      "csrfProtection": false
+    },
+    {
+        "source": "^/saperp/(.*)$",
+        "target": "$1",
+        "authenticationType": "none",
+        "destination": "RMD_S4H_HTTP_BASIC",
+        "csrfProtection": false
+    },
+    {
+        "source": "^/scimApi/(.*)$",
+        "target": "$1",
+        "authenticationType": "none",
+        "destination": "IAS_SCIM_API",
+        "csrfProtection": false
+    },
+    {
+        "source": "^/IAS_API/(.*)$",
+        "target": "$1",
+        "authenticationType": "none",
+        "destination": "IAS_API",
+        "csrfProtection": false
+    },
+    {
+      "authenticationType": "xsuaa",
+      "csrfProtection": false,
+      "source": "^/dest-apigateway/(.*)$",
+      "destination": "dest-apigateway",
+      "target": "$1"
+    },
+    {
+      "authenticationType": "xsuaa",
+      "csrfProtection": false,
+      "source": "^/dest-apiseguridad/(.*)$",
+      "destination": "dest-apiseguridad",
+      "target": "$1"
+    },
+    {
+      "source": "^/resources/(.*)$",
+      "target": "/resources/$1",
+      "authenticationType": "none",
+      "destination": "ui5"
+    },
+    {
+      "source": "^/test-resources/(.*)$",
+      "target": "/test-resources/$1",
+      "authenticationType": "none",
+      "destination": "ui5"
+    },
+    {
+      "source": "^(.*)$",
+      "target": "$1",
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "xsuaa",
+      "cacheControl": "no-cache, no-store, must-revalidate"
+    }
+  ]
+}

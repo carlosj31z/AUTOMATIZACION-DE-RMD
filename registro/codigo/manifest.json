@@ -1,0 +1,284 @@
+{
+    "_version": "1.32.0",
+    "sap.app": {
+        "id": "mif.rmd.registro",
+        "type": "application",
+        "i18n": "i18n/i18n.properties",
+        "applicationVersion": {
+            "version": "1.0.0"
+        },
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "resources": "resources.json",
+        "ach": "ach",
+        "dataSources": {
+            "mainModelv2": {
+                "uri": "/api/base/rmd/v2/browse/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "2.0",
+                    "localUri": "localService/metadatav2.xml"
+                }
+            },
+            "mainModelv2cp": {
+                "uri": "/api/base/cp/v2/browse/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "2.0",
+                    "localUri": "localService/metadatav2.xml"
+                }
+            },
+            "mainService": {
+                "uri": "/api/base/rmd/browse/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "4.0",
+                    "localUri": "localService/metadatav4.xml"
+                }
+            },
+            "NECESIDADESRMD_SRV": {
+                "uri": "/api/integracion/saperp/rmd/sap/opu/odata/sap/Z_PP_NECESIDADESRMD_SRV/",
+                "type": "OData",
+                "settings": {
+                    "localUri": "localService/Z_PP_NECESIDADESRMD_SRV/metadata.xml"
+                }
+            },
+            "CENTRALPESADAS_SRV": {
+                "uri": "/api/integracion/saperp/rmd/sap/opu/odata/sap/Z_PP_CENTRALPESADAS_SRV/",
+                "type": "OData",
+                "settings": {
+                    "localUri": "localService/Z_PP_CENTRALPESADAS_SRV/metadata.xml"
+                }
+            },
+            "IMPRESIONORD_SRV": {
+                "uri": "/api/integracion/saperp/rmd/sap/opu/odata/sap/Z_PP_IMPRESIONORD_SRV/",
+                "type": "OData",
+                "settings": {
+                    "localUri": "localService/Z_PP_IMPRESIONORD_SRV/metadata.xml"
+                }
+            }
+        },
+        "crossNavigation": {
+            "inbounds": {
+                "mif-rmd-registro-inbound": {
+                    "signature": {
+                        "parameters": {},
+                        "additionalParameters": "allowed"
+                    },
+                    "semanticObject": "registro",
+                    "action": "display",
+                    "title": "{{flpTitle}}",
+                    "subTitle": "{{flpSubtitle}}",
+                    "icon": "sap-icon://add-activity"
+                }
+            }
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "icons": {
+            "icon": "sap-icon://task",
+            "favIcon": "",
+            "phone": "",
+            "phone@2": "",
+            "tablet": "",
+            "tablet@2": ""
+        },
+        "deviceTypes": {
+            "desktop": true,
+            "tablet": true,
+            "phone": true
+        }
+    },
+    "sap.ui5": {
+        "flexEnabled": false,
+        "rootView": {
+            "viewName": "mif.rmd.registro.view.MainView",
+            "type": "XML",
+            "async": true,
+            "id": "MainView"
+        },
+        "dependencies": {
+            "minUI5Version": "1.93.0",
+            "libs": {
+                "sap.ui.core": {},
+                "sap.m": {},
+                "sap.ui.layout": {}
+            }
+        },
+        "contentDensities": {
+            "compact": true,
+            "cozy": true
+        },
+        "models": {
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "mif.rmd.registro.i18n.i18n"
+                }
+            },
+            "modelGeneral": {
+                "type": "sap.ui.model.json.JSONModel",
+                "settings": {},
+                "uri": "model/modelGeneral.json"
+            },
+            "modelEstructura": {
+                "type": "sap.ui.model.json.JSONModel",
+                "settings": {}
+            },
+            "mainModelv2": {
+                "dataSource": "mainModelv2",
+                "preload": true,
+                "settings": {
+                    "operationMode": "Server",
+                    "groupId": "$direct",
+                    "synchronizationMode": "None",
+                    "autoExpandSelect": true,
+                    "updateGroupId": "updateGroup",
+                    "useBatch": false,
+                    "preliminaryContext": true
+                }
+            },
+            "mainModelv2cp": {
+                "dataSource": "mainModelv2cp",
+                "preload": true,
+                "settings": {
+                    "operationMode": "Server",
+                    "groupId": "$direct",
+                    "synchronizationMode": "None",
+                    "autoExpandSelect": true,
+                    "updateGroupId": "updateGroup",
+                    "useBatch": false,
+                    "preliminaryContext": true
+                }
+            },
+            "mainModel": {
+                "dataSource": "mainService",
+                "preload": true,
+                "settings": {
+                    "operationMode": "Server",
+                    "groupId": "$direct",
+                    "synchronizationMode": "None",
+                    "autoExpandSelect": true,
+                    "updateGroupId": "updateGroup"
+                }
+            },
+            "NECESIDADESRMD_SRV": {
+                "type": "sap.ui.model.odata.v2.ODataModel",
+                "settings": {
+                    "defaultOperationMode": "Server",
+                    "defaultBindingMode": "TwoWay",
+                    "defaultCountMode": "Request",
+                    "useBatch": false,
+                    "metadataUrlParams": {
+                        "sap-language": "ES"
+                    }
+                },
+                "dataSource": "NECESIDADESRMD_SRV",
+                "preload": true
+            },
+            "CENTRALPESADAS_SRV": {
+                "type": "sap.ui.model.odata.v2.ODataModel",
+                "settings": {
+                    "defaultOperationMode": "Server",
+                    "defaultBindingMode": "TwoWay",
+                    "defaultCountMode": "Request",
+                    "useBatch": false,
+                    "preliminaryContext": true,
+                    "metadataUrlParams": {
+                        "sap-language": "ES"
+                    }
+                },
+                "dataSource": "CENTRALPESADAS_SRV",
+                "preload": true
+            },
+            "IMPRESIONORD_SRV": {
+                "type": "sap.ui.model.odata.v2.ODataModel",
+                "settings": {
+                    "defaultOperationMode": "Server",
+                    "defaultBindingMode": "TwoWay",
+                    "defaultCountMode": "Request",
+                    "useBatch": false,
+                    "preliminaryContext": true,
+                    "metadataUrlParams": {
+                        "sap-language": "ES"
+                    }
+                },
+                "dataSource": "IMPRESIONORD_SRV",
+                "preload": true
+            }
+        },
+        "resources": {
+            "css": [
+                {
+                    "uri": "css/style.css"
+                }
+            ],
+            "js": [
+                {
+                    "uri": "libs/pdfmaker/pdfmake.min.js"
+                },
+                {
+                    "uri": "libs/pdfmaker/fonts/Roboto.js"
+                },
+                {
+                    "uri": "libs/moment.min.js"
+                },
+                {
+                    "uri": "libs/barcode/jsbarcode.js"
+                },
+                {
+                    "uri": "libs/qrcode/qrcode.js"
+                }
+            ]
+        },
+        "routing": {
+            "config": {
+                "routerClass": "sap.m.routing.Router",
+                "viewType": "XML",
+                "async": true,
+                "viewPath": "mif.rmd.registro.view",
+                "controlAggregation": "pages",
+                "controlId": "app",
+                "clearControlAggregation": true
+            },
+            "routes": [
+                {
+                    "name": "RouteMainView",
+                    "pattern": "",
+                    "target": [
+                        "TargetMainView"
+                    ]
+                },
+                {
+                    "name": "RouteDetailMainView",
+                    "pattern": "routeDetailMainView",
+                    "target": [
+                        "TargetDetailMainView"
+                    ]
+                }
+            ],
+            "targets": {
+                "TargetMainView": {
+                    "viewType": "XML",
+                    "transition": "slide",
+                    "clearControlAggregation": true,
+                    "viewName": "MainView"
+                },
+                "TargetDetailMainView": {
+                    "viewType": "XML",
+                    "transition": "slide",
+                    "clearControlAggregation": true,
+                    "viewName": "DetailMainView"
+                }
+            }
+        }
+    },
+    "sap.cloud": {
+        "public": true,
+        "service": "mif-apps-rmd-bs"
+    },
+    "sap.platform.cf": {
+        "ui5VersionNumber": "1.84"
+    }
+}

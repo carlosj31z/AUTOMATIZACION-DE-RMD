@@ -1,0 +1,221 @@
+{
+    "_version": "1.32.0",
+    "sap.app": {
+        "id": "mif.rmd.solicitud",
+        "type": "application",
+        "i18n": "i18n/i18n.properties",
+        "applicationVersion": {
+            "version": "1.0.0"
+        },
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "resources": "resources.json",
+        "dataSources": {
+            "mainService": {
+                "uri": "/api/base/rmd/browse/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "4.0",
+                    "localUri": "localService/metadata.xml"
+                }
+            },
+            "mainServicev2": {
+                "uri": "/api/base/rmd/v2/browse/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "2.0",
+                    "localUri": "localService/metadata.xml"
+                }
+            },
+            "PRODUCCION_SRV": {
+                "uri": "/api/integracion/saperp/rmd/sap/opu/odata/sap/Z_PP_PRODUCCION_SRV/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "2.0"
+                }
+            },
+            "NECESIDADESRMD_SRV": {
+                "uri": "/api/integracion/saperp/rmd/sap/opu/odata/sap/Z_PP_NECESIDADESRMD_SRV/",
+                "type": "OData",
+                "settings": {
+                    "localUri": "localService/Z_PP_NECESIDADESRMD_SRV/metadata.xml"
+                }
+            }
+        },
+        "crossNavigation": {
+            "inbounds": {
+                "intent1": {
+                    "signature": {
+                        "parameters": {},
+                        "additionalParameters": "allowed"
+                    },
+                    "semanticObject": "solicitud",
+                    "action": "display",
+                    "title": "Solicitud",
+                    "icon": "sap-icon://sales-document",
+                    "subTitle": "solicitud",
+                    "info": "solicitud"
+                }
+            }
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "icons": {
+            "icon": "sap-icon://task",
+            "favIcon": "",
+            "phone": "",
+            "phone@2": "",
+            "tablet": "",
+            "tablet@2": ""
+        },
+        "deviceTypes": {
+            "desktop": true,
+            "tablet": true,
+            "phone": true
+        }
+    },
+    "sap.ui5": {
+        "flexEnabled": false,
+        "rootView": {
+            "viewName": "mif.rmd.solicitud.view.MainView",
+            "type": "XML",
+            "async": true,
+            "id": "MainView"
+        },
+        "dependencies": {
+            "minUI5Version": "1.84.50",
+            "libs": {
+                "sap.ui.core": {},
+                "sap.m": {},
+                "sap.ui.layout": {}
+            }
+        },
+        "contentDensities": {
+            "compact": true,
+            "cozy": true
+        },
+        "models": {
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "mif.rmd.solicitud.i18n.i18n"
+                }
+            },
+            "modelGeneral": {
+                "type": "sap.ui.model.json.JSONModel",
+                "settings": {},
+                "uri": "model/modelGeneral.json"
+            },
+            "mainModel": {
+                "dataSource": "mainService",
+                "preload": true,
+                "settings": {
+                    "operationMode": "Server",
+                    "groupId": "$direct",
+                    "synchronizationMode": "None",
+                    "autoExpandSelect": true,
+                    "updateGroupId": "updateGroup"
+                }
+            },
+            "mainModelv2": {
+                "dataSource": "mainServicev2",
+                "preload": true,
+                "settings": {
+                    "operationMode": "Server",
+                    "groupId": "$direct",
+                    "synchronizationMode": "None",
+                    "autoExpandSelect": true,
+                    "updateGroupId": "updateGroup",
+                    "useBatch": false,
+                    "preliminaryContext": true
+                }
+            },
+            "PRODUCCION_SRV": {
+                "type": "sap.ui.model.odata.v2.ODataModel",
+                "settings": {
+                    "defaultOperationMode": "Server",
+                    "defaultBindingMode": "TwoWay",
+                    "defaultCountMode": "Request",
+                    "useBatch": false,
+                    "metadataUrlParams": {
+                        "sap-language": "ES"
+                    }
+                },
+                "dataSource": "PRODUCCION_SRV",
+                "preload": true
+            },
+            "NECESIDADESRMD_SRV": {
+                "type": "sap.ui.model.odata.v2.ODataModel",
+                "settings": {
+                    "defaultOperationMode": "Server",
+                    "defaultBindingMode": "TwoWay",
+                    "defaultCountMode": "Request",
+                    "useBatch": false,
+                    "metadataUrlParams": {
+                        "sap-language": "ES"
+                    }
+                },
+                "dataSource": "NECESIDADESRMD_SRV",
+                "preload": true
+            }
+        },
+        "resources": {
+            "css": [
+                {
+                    "uri": "css/style.css"
+                }
+            ],
+            "js": [
+                {
+                    "uri": "libs/pdfmaker/pdfmake.min.js"
+                },
+                {
+                    "uri": "libs/pdfmaker/fonts/Roboto.js"
+                },
+                {
+                    "uri": "libs/moment.min.js"
+                }
+            ]
+        },
+        "routing": {
+            "config": {
+                "routerClass": "sap.m.routing.Router",
+                "viewType": "XML",
+                "async": true,
+                "viewPath": "mif.rmd.solicitud.view",
+                "controlAggregation": "pages",
+                "controlId": "app",
+                "clearControlAggregation": false
+            },
+            "routes": [
+                {
+                    "name": "RouteMainView",
+                    "pattern": "RouteMainView",
+                    "target": [
+                        "TargetMainView"
+                    ]
+                }
+            ],
+            "targets": {
+                "TargetMainView": {
+                    "viewType": "XML",
+                    "transition": "slide",
+                    "clearControlAggregation": false,
+                    "viewId": "MainView",
+                    "viewName": "MainView"
+                }
+            }
+        }
+    },
+    "sap.cloud": {
+        "public": true,
+        "service": "mif-apps-rmd-bs"
+    },
+    "sap.platform.cf": {
+        "ui5VersionNumber": "1.84",
+        "oAuthScopes": [
+            "$XSAPPNAME.RMDSolicitation"
+        ]
+    }
+}

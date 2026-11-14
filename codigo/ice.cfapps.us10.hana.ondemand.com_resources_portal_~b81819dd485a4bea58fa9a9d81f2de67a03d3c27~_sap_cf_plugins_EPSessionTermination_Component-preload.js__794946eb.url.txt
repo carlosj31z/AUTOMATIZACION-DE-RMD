@@ -1,0 +1,1 @@
+https://portal-service.cfapps.us10.hana.ondemand.com/resources/portal/~b81819dd485a4bea58fa9a9d81f2de67a03d3c27~/sap/cf/plugins/EPSessionTermination/Component-preload.js

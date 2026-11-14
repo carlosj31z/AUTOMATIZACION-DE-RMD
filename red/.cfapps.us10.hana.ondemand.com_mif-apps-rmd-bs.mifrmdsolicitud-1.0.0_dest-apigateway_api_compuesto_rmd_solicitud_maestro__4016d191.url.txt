@@ -1,0 +1,1 @@
+https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/compuesto/rmd/solicitud/maestro

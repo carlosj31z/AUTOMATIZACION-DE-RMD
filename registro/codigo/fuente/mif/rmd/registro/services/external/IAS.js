@@ -1,0 +1,2 @@
+function(){sap.ui.define(["sap/ui/model/json/JSONModel"],function(n){"use strict";var t;return{setManifestObject:function(n){t=n.getOwnerComponent().getManifestObject()},GetUserValidation:function(n,e){var o=btoa(n+":"+e);return new Promise(function(n,e){$.ajax({type:"POST",url:t.resolveUri("IAS_API/"),headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*",Authorization:"Basic "+o},success:function(t,e,o){n(t)},error:function(n){e(n.statusText)},contentType:"application/json"})})}}});
+}

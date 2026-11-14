@@ -1,0 +1,86 @@
+{	
+	"section": [{
+		"id": "1",
+		"description": "Seccion 1"
+	}, {
+		"id": "2",
+		"description": "Seccion 2"
+	}, {
+		"id": "3",
+		"description": "Seccion 3"
+	}, {
+		"id": "4",
+		"description": "Seccion 4"
+	}, {
+		"id": "5",
+		"description": "Seccion 5"
+  }],
+  "plant": [{
+		"id": "1",
+		"description": "Planta 1"
+	}, {
+		"id": "2",
+		"description": "Planta 2"
+	}, {
+		"id": "3",
+		"description": "Planta 3"
+	}, {
+		"id": "4",
+		"description": "Planta 4"
+	}, {
+		"id": "5",
+		"description": "Planta 5"
+  }],
+  "tblRequestRMD": [{
+		"codeRMD": "1",
+    "nameRMD": "Prueba 1 Nombre",
+    "section": "3",
+    "plant": "1",
+    "reasonRMD": "Prueba 1 Motivo",
+    "observation": "Prueba 1 Observacion",
+    "destination": ["jperez", "ggarcia", "mchavez"],
+    "document": "",
+    "creatorUser": "gpaoli",
+    "creatorDate": "26-08-2021 18:44:15"
+	}, {
+		"codeRMD": "2",
+    "nameRMD": "Prueba 2 Nombre",
+    "section": "2",
+    "plant": "2",
+    "reasonRMD": "Prueba 2 Motivo",
+    "observation": "Prueba 2 Observacion",
+    "destination": ["jperez", "ggarcia", "mchavez"],
+    "document": "",
+    "creatorUser": "gpaoli",
+    "creatorDate": "26-08-2021 18:44:15"
+	}],
+  "destinations": [],
+  "destinationsMD": [],
+  "newRMD": {},
+  "aFilters": {
+    "aplicacionId": ""
+  },
+  "Adjunto": {},
+  "newVersionRMD": {},
+  "aListaSolicitud": [],
+  "lineaSeleccionada": {},
+  "lineaSeleccionadaBackUp": {},
+  "adjuntoEliminado": [],
+  "oInfoUsuario": {},
+  "destinatariosEdit": [],
+  "aListaSecciones": [],
+  "aListaSeccionMD": [],
+  "mdAsociadas": [],
+  "aListaApps": [
+      {
+          "aplicacionId": "3b5fc15f-3dcb-4c0f-8927-8ba26964da38",
+          "descripcion": "SOLICITUD" 
+      },
+      {
+          "aplicacionId": "295fd633-d654-49b6-86a0-674611a3b783",
+          "descripcion": "FLUJO DE REVISIÓN"
+      }
+  ],
+  "aListaArchivos": [],
+  "aListaAutorizado": []
+}

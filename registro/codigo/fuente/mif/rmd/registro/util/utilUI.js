@@ -1,0 +1,2 @@
+function(){sap.ui.define(["sap/m/MessageBox","./utilController"],function(n,o){"use strict";return{console:function(n){},messageBox:function(o,i,t){n.show(o,{icon:n.Icon[i],title:t,actions:[n.Action.OK],emphasizedAction:n.Action.OK})}}});
+}

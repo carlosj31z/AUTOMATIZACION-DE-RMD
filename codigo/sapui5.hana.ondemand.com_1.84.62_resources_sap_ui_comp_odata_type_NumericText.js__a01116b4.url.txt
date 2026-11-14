@@ -1,0 +1,1 @@
+https://sapui5.hana.ondemand.com/1.84.62/resources/sap/ui/comp/odata/type/NumericText.js

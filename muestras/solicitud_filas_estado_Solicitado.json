@@ -1,0 +1,805 @@
+[
+ {
+  "terminal": null,
+  "fechaRegistro": "/Date(1792762084000+0000)/",
+  "usuarioRegistro": "MGUERRERON",
+  "fechaActualiza": "/Date(1792762086000+0000)/",
+  "usuarioActualiza": "MGUERRERON",
+  "activo": true,
+  "mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+  "codigo": null,
+  "codigoSolicitud": "1202604982",
+  "version": 4,
+  "estadoIdRmd_iMaestraId": 464,
+  "productoId": null,
+  "descripcion": "GRAVOL 50mg TAB B4 CJA x 4MM",
+  "nivelId_iMaestraId": null,
+  "sucursalId_iMaestraId": 68,
+  "fechaSolicitud": "/Date(1792762084000+0000)/",
+  "motivoId_motivoId": "6fa87857-6d73-4680-aaa5-7514b19207ca",
+  "observacion": "",
+  "estadoIdProceso_iMaestraId": 456,
+  "fechaAutorizacion": null,
+  "usuarioAutorizacion": null,
+  "motivoRechazo": null,
+  "wfInstanceId": "947787cd-cee5-11f1-81ba-eeee0a9e25a0",
+  "areaRmd": null,
+  "areaRmdTxt": "ACONDICIONADO",
+  "motivoCancelado": null,
+  "masRecetas": false,
+  "rptaValidacion": null,
+  "nivelTxt": "ACONDICIONADO",
+  "codDefectoReceta": "6300000059",
+  "codAgrupadorReceta": "502110",
+  "codigoversionprincipal": "12031",
+  "codigoOriginalCopia": null,
+  "rptaValidacionDate": "/Date(0+0000)/",
+  "mdIdVersionAnt": "b6bf3e4e-70f3-4d5d-8c06-5a453ab04978",
+  "estadoIdRmd": {
+   "terminal": "200.48.84.2",
+   "fechaRegistro": "/Date(1672316347000+0000)/",
+   "usuarioRegistro": "EGARCITI",
+   "fechaActualiza": null,
+   "usuarioActualiza": null,
+   "activo": true,
+   "iMaestraId": 464,
+   "oMaestraTipo_maestraTipoId": 49,
+   "contenido": "Solicitado",
+   "descripcion": "Estado del rmd 1",
+   "orden": 1,
+   "codigo": "S",
+   "codigoSap": null,
+   "campo1": "SOLICITUD",
+   "oAplicacion_aplicacionId": null,
+   "oSistema_sistemaId": "d438bc68-cd56-49c9-997d-a99b8055eb5b",
+   "oMaestraTipo": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(464)/oMaestraTipo"
+    }
+   },
+   "oAplicacion": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(464)/oAplicacion"
+    }
+   },
+   "oSistema": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(464)/oSistema"
+    }
+   },
+   "__metadata": {
+    "type": "CatalogService.MAESTRA",
+    "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(464)"
+   }
+  },
+  "nivelId": null,
+  "sucursalId": {
+   "terminal": "200.48.84.2",
+   "fechaRegistro": "/Date(1672316347000+0000)/",
+   "usuarioRegistro": "EGARCITI",
+   "fechaActualiza": null,
+   "usuarioActualiza": null,
+   "activo": true,
+   "iMaestraId": 68,
+   "oMaestraTipo_maestraTipoId": 18,
+   "contenido": "PLANTA LIMA",
+   "descripcion": "PLANTA LIMA",
+   "orden": 2,
+   "codigo": "1021",
+   "codigoSap": "1021",
+   "campo1": null,
+   "oAplicacion_aplicacionId": null,
+   "oSistema_sistemaId": "d438bc68-cd56-49c9-997d-a99b8055eb5b",
+   "oMaestraTipo": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(68)/oMaestraTipo"
+    }
+   },
+   "oAplicacion": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(68)/oAplicacion"
+    }
+   },
+   "oSistema": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(68)/oSistema"
+    }
+   },
+   "__metadata": {
+    "type": "CatalogService.MAESTRA",
+    "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(68)"
+   }
+  },
+  "motivoId": {
+   "terminal": null,
+   "fechaRegistro": "/Date(1641590084000+0000)/",
+   "usuarioRegistro": "GPAOLI",
+   "fechaActualiza": null,
+   "usuarioActualiza": null,
+   "activo": true,
+   "motivoId": "6fa87857-6d73-4680-aaa5-7514b19207ca",
+   "codigo": 18,
+   "abreviatura": "CCAMBIO",
+   "descripcion": "CONTROL DE CAMBIO",
+   "estadoId_iMaestraId": 2,
+   "estadoId": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MOTIVO('6fa87857-6d73-4680-aaa5-7514b19207ca')/estadoId"
+    }
+   },
+   "__metadata": {
+    "type": "CatalogService.MOTIVO",
+    "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MOTIVO('6fa87857-6d73-4680-aaa5-7514b19207ca')"
+   }
+  },
+  "estadoIdProceso": {
+   "terminal": "200.48.84.2",
+   "fechaRegistro": "/Date(1672316347000+0000)/",
+   "usuarioRegistro": "EGARCITI",
+   "fechaActualiza": null,
+   "usuarioActualiza": null,
+   "activo": true,
+   "iMaestraId": 456,
+   "oMaestraTipo_maestraTipoId": 48,
+   "contenido": "Pendiente",
+   "descripcion": "Estado del proceso 1",
+   "orden": 1,
+   "codigo": "ESTP01",
+   "codigoSap": null,
+   "campo1": null,
+   "oAplicacion_aplicacionId": null,
+   "oSistema_sistemaId": "d438bc68-cd56-49c9-997d-a99b8055eb5b",
+   "oMaestraTipo": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(456)/oMaestraTipo"
+    }
+   },
+   "oAplicacion": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(456)/oAplicacion"
+    }
+   },
+   "oSistema": {
+    "__deferred": {
+     "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(456)/oSistema"
+    }
+   },
+   "__metadata": {
+    "type": "CatalogService.MAESTRA",
+    "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MAESTRA(456)"
+   }
+  },
+  "destinatariosMD": {
+   "results": [
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "a5d25a62-c100-41c1-9a60-bcd0d1f4edc4",
+     "tipo": null,
+     "usuarioId_usuarioId": "299124f1-c6f5-456f-8737-73e1b8f739cf",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.48.84.2",
+      "fechaRegistro": "/Date(1673366400000+0000)/",
+      "usuarioRegistro": "pricaldi@medifarma.com.pe",
+      "fechaActualiza": null,
+      "usuarioActualiza": null,
+      "activo": true,
+      "usuarioId": "299124f1-c6f5-456f-8737-73e1b8f739cf",
+      "usuario": "NCUELLARL",
+      "clave": "67f16627b6f3b971c766a0d4b5ab9e74:da3477c6",
+      "usuarioSap": "10000641",
+      "usuarioIas": "P000635",
+      "nombre": "NOELIA ROSA",
+      "nombreMostrar": null,
+      "correo": "noelia.cuellar@medifarma.com.pe",
+      "apellidoPaterno": "CUELLAR",
+      "apellidoMaterno": "LOYOLA",
+      "tipoDocumento": null,
+      "numeroDocumento": "43189087",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": null,
+      "seccionTxt": null,
+      "loginSap": "",
+      "oMaestraSucursal_codigo": "1020",
+      "oMaestraNivel": "NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1321833600000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'299124f1-c6f5-456f-8737-73e1b8f739cf')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'299124f1-c6f5-456f-8737-73e1b8f739cf')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'299124f1-c6f5-456f-8737-73e1b8f739cf')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'299124f1-c6f5-456f-8737-73e1b8f739cf')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'299124f1-c6f5-456f-8737-73e1b8f739cf')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('a5d25a62-c100-41c1-9a60-bcd0d1f4edc4')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('a5d25a62-c100-41c1-9a60-bcd0d1f4edc4')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "f803249b-59ba-4ffd-b1a8-c7a5276559fc",
+     "tipo": null,
+     "usuarioId_usuarioId": "48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.48.84.2",
+      "fechaRegistro": "/Date(1673366400000+0000)/",
+      "usuarioRegistro": "pricaldi@medifarma.com.pe",
+      "fechaActualiza": null,
+      "usuarioActualiza": null,
+      "activo": true,
+      "usuarioId": "48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa",
+      "usuario": "GBORJAV",
+      "clave": "f27726fd65ab75582e1c0c94935f5040:4839afdb0b",
+      "usuarioSap": "10000716",
+      "usuarioIas": "P000634",
+      "nombre": "GIANNINA ENITH",
+      "nombreMostrar": null,
+      "correo": "giannina.borja@medifarma.com.pe",
+      "apellidoPaterno": "BORJA",
+      "apellidoMaterno": "VEGA",
+      "tipoDocumento": null,
+      "numeroDocumento": "15867402",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": null,
+      "seccionTxt": null,
+      "loginSap": "",
+      "oMaestraSucursal_codigo": "1021",
+      "oMaestraNivel": "NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1343779200000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'48d11b0f-9da3-4f3e-8cf6-78e7aa24deaa')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('f803249b-59ba-4ffd-b1a8-c7a5276559fc')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('f803249b-59ba-4ffd-b1a8-c7a5276559fc')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "14d44919-e91c-4a45-9831-6e24b8c40ff7",
+     "tipo": null,
+     "usuarioId_usuarioId": "7ebd3161-9770-4706-b036-e148c6bd6c21",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.48.84.2",
+      "fechaRegistro": "/Date(1673366400000+0000)/",
+      "usuarioRegistro": "pricaldi@medifarma.com.pe",
+      "fechaActualiza": null,
+      "usuarioActualiza": null,
+      "activo": true,
+      "usuarioId": "7ebd3161-9770-4706-b036-e148c6bd6c21",
+      "usuario": "MFERREYRAM",
+      "clave": "67f16627b6f3b971c766a0d4b5ab9e74:da3477c6",
+      "usuarioSap": "10000491",
+      "usuarioIas": "P000028",
+      "nombre": "MIRIAM",
+      "nombreMostrar": null,
+      "correo": "mferreyra@medifarma.com.pe",
+      "apellidoPaterno": "FERREYRA",
+      "apellidoMaterno": "MEJIA",
+      "tipoDocumento": null,
+      "numeroDocumento": "07245777",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": "GRAN VOLUMEN 2",
+      "seccionTxt": "GRAN VOLUMEN 2",
+      "loginSap": "",
+      "oMaestraSucursal_codigo": "1021",
+      "oMaestraNivel": "FABRICACION",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1275350400000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'7ebd3161-9770-4706-b036-e148c6bd6c21')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'7ebd3161-9770-4706-b036-e148c6bd6c21')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'7ebd3161-9770-4706-b036-e148c6bd6c21')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'7ebd3161-9770-4706-b036-e148c6bd6c21')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'7ebd3161-9770-4706-b036-e148c6bd6c21')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('14d44919-e91c-4a45-9831-6e24b8c40ff7')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('14d44919-e91c-4a45-9831-6e24b8c40ff7')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "9839d311-703b-4017-95ca-b543f04060a3",
+     "tipo": null,
+     "usuarioId_usuarioId": "a25c8740-8c77-446e-8e9d-7f717a51f5d9",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.4.207.19",
+      "fechaRegistro": "/Date(1731019261000+0000)/",
+      "usuarioRegistro": "jsantoss@medifarma.com.pe",
+      "fechaActualiza": null,
+      "usuarioActualiza": null,
+      "activo": true,
+      "usuarioId": "a25c8740-8c77-446e-8e9d-7f717a51f5d9",
+      "usuario": "JQUISPEP",
+      "clave": "1108a810280fb1a9902f7f9def1b8e01:345daef0ad402b1a",
+      "usuarioSap": "10003450",
+      "usuarioIas": "P004605",
+      "nombre": "JIMENA",
+      "nombreMostrar": null,
+      "correo": "jquispep@medifarma.com.pe",
+      "apellidoPaterno": "QUISPE",
+      "apellidoMaterno": "PAUCCA",
+      "tipoDocumento": null,
+      "numeroDocumento": "70055957",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": null,
+      "seccionTxt": null,
+      "loginSap": "10003450",
+      "oMaestraSucursal_codigo": "1020",
+      "oMaestraNivel": "RMD_NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1730419200000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'a25c8740-8c77-446e-8e9d-7f717a51f5d9')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'a25c8740-8c77-446e-8e9d-7f717a51f5d9')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'a25c8740-8c77-446e-8e9d-7f717a51f5d9')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'a25c8740-8c77-446e-8e9d-7f717a51f5d9')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'a25c8740-8c77-446e-8e9d-7f717a51f5d9')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('9839d311-703b-4017-95ca-b543f04060a3')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('9839d311-703b-4017-95ca-b543f04060a3')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "a5d6c626-7f2e-4eea-90e4-261d688cae93",
+     "tipo": null,
+     "usuarioId_usuarioId": "dc94ae36-f2ba-4a9a-8618-634d49f6f47a",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.4.207.19",
+      "fechaRegistro": "/Date(1710341124000+0000)/",
+      "usuarioRegistro": "plopez@hersil.com.pe",
+      "fechaActualiza": "/Date(1711552869000+0000)/",
+      "usuarioActualiza": "jsantoss@medifarma.com.pe",
+      "activo": true,
+      "usuarioId": "dc94ae36-f2ba-4a9a-8618-634d49f6f47a",
+      "usuario": "KMORENOM",
+      "clave": "46acab17031f37b76e15a5cbba91d2ea:94ade13b0fee99f3",
+      "usuarioSap": "10001697",
+      "usuarioIas": "P004279",
+      "nombre": "KARLA VANESSA",
+      "nombreMostrar": null,
+      "correo": "kmorenom@medifarma.com.pe",
+      "apellidoPaterno": "MORENO",
+      "apellidoMaterno": "MORALES",
+      "tipoDocumento": null,
+      "numeroDocumento": "70586247",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": null,
+      "seccionTxt": null,
+      "loginSap": "10001697",
+      "oMaestraSucursal_codigo": "1021",
+      "oMaestraNivel": "RMD_NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1627776000000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'dc94ae36-f2ba-4a9a-8618-634d49f6f47a')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'dc94ae36-f2ba-4a9a-8618-634d49f6f47a')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'dc94ae36-f2ba-4a9a-8618-634d49f6f47a')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'dc94ae36-f2ba-4a9a-8618-634d49f6f47a')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'dc94ae36-f2ba-4a9a-8618-634d49f6f47a')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('a5d6c626-7f2e-4eea-90e4-261d688cae93')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('a5d6c626-7f2e-4eea-90e4-261d688cae93')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "10c8066d-e824-40f1-8373-0a904e4d9175",
+     "tipo": null,
+     "usuarioId_usuarioId": "d18f594c-43c7-4a63-a3d9-9095292d985a",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.48.84.2",
+      "fechaRegistro": "/Date(1673366400000+0000)/",
+      "usuarioRegistro": "pricaldi@medifarma.com.pe",
+      "fechaActualiza": "/Date(1676513898000+0000)/",
+      "usuarioActualiza": "pricaldi@medifarma.com.pe",
+      "activo": true,
+      "usuarioId": "d18f594c-43c7-4a63-a3d9-9095292d985a",
+      "usuario": "DQUIROZT",
+      "clave": "d81191a855e084c3e02e0b180de9d0dd:26b9a92f354f99e7",
+      "usuarioSap": "10001222",
+      "usuarioIas": "P000158",
+      "nombre": "DELIA CRISTINA",
+      "nombreMostrar": null,
+      "correo": "delia.quiroz@medifarma.com.pe",
+      "apellidoPaterno": "QUIROZ",
+      "apellidoMaterno": "TORRES",
+      "tipoDocumento": null,
+      "numeroDocumento": "42291067",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": "201",
+      "seccionTxt": "SOLIDOS",
+      "loginSap": "DQUIROZT",
+      "oMaestraSucursal_codigo": "1021",
+      "oMaestraNivel": "RMD_NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1627776000000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'd18f594c-43c7-4a63-a3d9-9095292d985a')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'd18f594c-43c7-4a63-a3d9-9095292d985a')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'd18f594c-43c7-4a63-a3d9-9095292d985a')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'd18f594c-43c7-4a63-a3d9-9095292d985a')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'd18f594c-43c7-4a63-a3d9-9095292d985a')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('10c8066d-e824-40f1-8373-0a904e4d9175')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('10c8066d-e824-40f1-8373-0a904e4d9175')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "5fac4ada-d5b5-4095-aed4-72a20def7a52",
+     "tipo": null,
+     "usuarioId_usuarioId": "e150c51a-ace5-46b5-b2bf-8757ca679e3c",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "190.187.184.138",
+      "fechaRegistro": "/Date(1760381976000+0000)/",
+      "usuarioRegistro": "jsantoss@medifarma.com.pe",
+      "fechaActualiza": null,
+      "usuarioActualiza": null,
+      "activo": true,
+      "usuarioId": "e150c51a-ace5-46b5-b2bf-8757ca679e3c",
+      "usuario": "CJESUSZ",
+      "clave": "5246a17ba3304fd97af4d1516c16749c:cbcf7eebdece5689",
+      "usuarioSap": "10004241",
+      "usuarioIas": "P005716",
+      "nombre": "CARLOS JEAN POOL",
+      "nombreMostrar": null,
+      "correo": "cjesusz@medifarma.com.pe",
+      "apellidoPaterno": "JESUS",
+      "apellidoMaterno": "ZEGARRA",
+      "tipoDocumento": null,
+      "numeroDocumento": "70507026",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": null,
+      "seccionTxt": null,
+      "loginSap": "10004241",
+      "oMaestraSucursal_codigo": "1021",
+      "oMaestraNivel": "RMD_NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1759708800000+0000)/",
+      "fechaVigFin": "/Date(1774915200000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'e150c51a-ace5-46b5-b2bf-8757ca679e3c')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'e150c51a-ace5-46b5-b2bf-8757ca679e3c')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'e150c51a-ace5-46b5-b2bf-8757ca679e3c')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'e150c51a-ace5-46b5-b2bf-8757ca679e3c')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'e150c51a-ace5-46b5-b2bf-8757ca679e3c')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('5fac4ada-d5b5-4095-aed4-72a20def7a52')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('5fac4ada-d5b5-4095-aed4-72a20def7a52')"
+     }
+    },
+    {
+     "terminal": null,
+     "fechaRegistro": "/Date(1792762084000+0000)/",
+     "usuarioRegistro": "MGUERRERON",
+     "fechaActualiza": null,
+     "usuarioActualiza": null,
+     "activo": true,
+     "idMdDestinatarios": "bc18d73a-ad2d-422a-866b-e5c1a7bc5875",
+     "tipo": null,
+     "usuarioId_usuarioId": "6d783307-84b2-4501-8393-eaeca63e1013",
+     "mdId_mdId": "ff3f398e-9adf-47c8-adca-99dfeff2f20a",
+     "usuarioId": {
+      "terminal": "200.48.84.2",
+      "fechaRegistro": "/Date(1677616823000+0000)/",
+      "usuarioRegistro": "jcornejo@medifarma.com.pe",
+      "fechaActualiza": "/Date(1776713134000+0000)/",
+      "usuarioActualiza": "plopezl@medifarma.com.pe",
+      "activo": true,
+      "usuarioId": "6d783307-84b2-4501-8393-eaeca63e1013",
+      "usuario": "MFERNANDEZO",
+      "clave": "f2545166587f6439d05364b3156b17d8:0706b3d43cc5faa0",
+      "usuarioSap": "10000604",
+      "usuarioIas": "P003141",
+      "nombre": "MONICA CAROLINA",
+      "nombreMostrar": null,
+      "correo": "monica.fernandez@medifarma.com.pe",
+      "apellidoPaterno": "FERNANDEZ",
+      "apellidoMaterno": "OSORES",
+      "tipoDocumento": null,
+      "numeroDocumento": "42163821",
+      "experiencia": null,
+      "telefono": "",
+      "Movil": null,
+      "seccionId": null,
+      "seccionTxt": null,
+      "loginSap": "10000604",
+      "oMaestraSucursal_codigo": "1020",
+      "oMaestraNivel": "CP_NO APLICA,RMD_NO APLICA",
+      "oMaestraTipoUsuario_codigo": null,
+      "fechaVigInicio": "/Date(1627776000000+0000)/",
+      "fechaVigFin": "/Date(253402214400000+0000)/",
+      "oMaestraSucursal": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'6d783307-84b2-4501-8393-eaeca63e1013')/oMaestraSucursal"
+       }
+      },
+      "oMaestraTipoUsuario": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'6d783307-84b2-4501-8393-eaeca63e1013')/oMaestraTipoUsuario"
+       }
+      },
+      "aSistemas": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'6d783307-84b2-4501-8393-eaeca63e1013')/aSistemas"
+       }
+      },
+      "aRolUsuarios": {
+       "__deferred": {
+        "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'6d783307-84b2-4501-8393-eaeca63e1013')/aRolUsuarios"
+       }
+      },
+      "__metadata": {
+       "type": "CatalogService.USUARIOALL",
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIOALL(guid'6d783307-84b2-4501-8393-eaeca63e1013')"
+      }
+     },
+     "mdId": {
+      "__deferred": {
+       "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('bc18d73a-ad2d-422a-866b-e5c1a7bc5875')/mdId"
+      }
+     },
+     "__metadata": {
+      "type": "CatalogService.MD_DESTINATARIOS",
+      "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD_DESTINATARIOS('bc18d73a-ad2d-422a-866b-e5c1a7bc5875')"
+     }
+    }
+   ]
+  },
+  "aReceta": {
+   "results": []
+  },
+  "aStatusProceso": {
+   "results": []
+  },
+  "aEstructura": {
+   "__deferred": {
+    "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD('ff3f398e-9adf-47c8-adca-99dfeff2f20a')/aEstructura"
+   }
+  },
+  "aTrazabilidad": {
+   "__deferred": {
+    "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD('ff3f398e-9adf-47c8-adca-99dfeff2f20a')/aTrazabilidad"
+   }
+  },
+  "__metadata": {
+   "type": "CatalogService.MD",
+   "uri": "https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/MD('ff3f398e-9adf-47c8-adca-99dfeff2f20a')"
+  }
+ }
+]

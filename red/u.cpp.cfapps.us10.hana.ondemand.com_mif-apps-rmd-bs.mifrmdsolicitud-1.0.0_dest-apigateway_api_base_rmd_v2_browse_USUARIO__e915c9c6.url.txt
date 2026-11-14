@@ -1,0 +1,1 @@
+https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/mif-apps-rmd-bs.mifrmdsolicitud-1.0.0/dest-apigateway/api/base/rmd/v2/browse/USUARIO?$filter=correo%20eq%20%27cjesusz%40medifarma.com.pe%27

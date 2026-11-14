@@ -1,0 +1,25 @@
+{
+    "_version": "1.21.0",
+    "sap.app": {
+        "id": "sap.ushell.components.shell.Search.SearchEngine",
+        "applicationVersion": {
+            "version": "1.152.0"
+        },
+        "ach": "CA-FLP-FE-COR",
+        "type": "component",
+        "title": "App Search Engine"
+    },
+    "sap.ui": {
+        "technology": "UI5"
+    },
+    "sap.ui5": {
+        "componentName": "sap.ushell.components.shell.Search.SearchEngine",
+        "dependencies": {
+            "minUI5Version": "1.72",
+            "libs": {
+                "sap.ui.core": {},
+                "sap.esh.search.ui": {}
+            }
+        }
+    }
+}
