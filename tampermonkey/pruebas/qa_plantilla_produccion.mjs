@@ -44,7 +44,8 @@ const txt = (m, id) => (m.get(id) || []).map((x) => `${x.nivel}:${x.texto}`).joi
 
 // 1) diferencia de solo un espacio: a Producción no se le avisa; Documentación Técnica sí lo ve al importar
 ok('Producción: «FECHA / HORA INICIO :» sin aviso de homologar', !/homolog/i.test(txt(prod, 'p1')), txt(prod, 'p1'));
-ok('DOC: sí ve el aviso del paso o los términos', /homolog/i.test(txt(dt, 'p1')), txt(dt, 'p1'));
+// v1.142.0 (pedido de Carlos): la fecha y hora ya no se homologa (saltaba por un espacio): DOC tampoco la ve
+ok('DOC: «FECHA / HORA INICIO :» sin aviso de homologar (v1.142.0)', !/homolog/i.test(txt(dt, 'p1')), txt(dt, 'p1'));
 // 2) Calidad en Operaciones: paso homologado con su botón
 const ceo = (prod.get('p2') || []).find((x) => x.k === 'ceo');
 ok('Producción: paso homologado de Calidad en Operaciones (161915 -> 180901)', ceo && ceo.usar === '180901' && /Calidad en Operaciones/.test(ceo.texto), txt(prod, 'p2'));

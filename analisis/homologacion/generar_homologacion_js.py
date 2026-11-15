@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import Path
 
-from rmd_automation.homologacion import REGLAS, cargar_reemplazos
+from rmd_automation.homologacion import REGLAS, cargar_reemplazos, es_fecha_hora
 
 RAIZ = Path(__file__).resolve().parents[2]
 SCRIPT = RAIZ / "tampermonkey" / "rmd-ui-mejoras.user.js"
@@ -25,7 +25,7 @@ def regla_js(r):
 def bloque():
     pasos = {}
     for f in cargar_reemplazos():
-        if f.clase == "especifico":
+        if f.clase == "especifico" or es_fecha_hora(f):   # 2026-11-15: fecha y hora no se homologa (pedido de Carlos)
             continue
         p = "A" if f.planta == "ATE" else "L"
         d = pasos.setdefault(str(f.codigo_viejo), {})
@@ -44,9 +44,10 @@ def bloque():
 
 
 def main():
-    s = SCRIPT.read_bytes().decode("utf-8")          # el script usa CRLF: se lee y escribe en binario para no tocar el resto
+    s = SCRIPT.read_bytes().decode("utf-8")          # se lee y escribe en binario para respetar el fin de línea del archivo (CRLF o LF)
     i, j = s.index(INI), s.index(FIN) + len(FIN)
-    SCRIPT.write_bytes((s[:i] + bloque() + s[j:]).encode("utf-8"))
+    b = bloque() if "\r\n" in s else bloque().replace("\r\n", "\n")
+    SCRIPT.write_bytes((s[:i] + b + s[j:]).encode("utf-8"))
     print("bloque HOMOLOG actualizado")
 
 
