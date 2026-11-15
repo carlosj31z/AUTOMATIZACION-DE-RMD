@@ -82,7 +82,7 @@ REGLAS: List[Regla] = [
     Regla("procedimiento", r"\bSEGUN (P[A-Z]{3}-\d{3})\b", r"SEGUN POE \1",
           "Un código que empieza con P (PPRO-200, PACO-214…) va precedido de «POE» (o «PROCEDIMIENTO» en LIMA)."),
     Regla("vigente", r"\b([A-Z]{4}-[A-Z]?\d{3})\.(?=\s|$)", r"\1 VIGENTE.", "Todo código de documento termina en «VIGENTE»."),
-    Regla("fecha-hora", r"\bFECHA / HORA (INICIO|FINAL) :", r"FECHA / HORA \1:", "Sin espacio antes de los dos puntos."),
+    # 2026-11-15, pedido de Carlos: sin la regla «fecha-hora» (saltaba por un espacio antes de los dos puntos: no es homologación)
 ]
 
 
@@ -139,4 +139,14 @@ def reemplazo_de_paso(codigo: int, planta: str, incluir_especificos: bool = Fals
     r = _CACHE.get((int(codigo), p))
     if r and not incluir_especificos and r.clase == "especifico":
         return None
+    if r and es_fecha_hora(r):
+        return None
     return r
+
+
+def es_fecha_hora(r: Reemplazo) -> bool:
+    """2026-11-15, pedido de Carlos: los pasos de fecha y hora («FECHA / HORA INICIO:», «FECHA/HORA FINAL:»…) no se homologan.
+
+    Sus filas en la tabla cambiaban un paso por otro con el mismo texto o solo con espacios distintos, y la revisión pedía
+    homologar sin motivo real."""
+    return any(re.match(r"\s*FECHA\s*/\s*HORA\b", t or "") for t in (r.texto_viejo, r.texto_vigente))

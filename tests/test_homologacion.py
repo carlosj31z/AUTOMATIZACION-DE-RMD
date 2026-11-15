@@ -55,4 +55,14 @@ def test_bloque_del_userscript_al_dia():
     spec = importlib.util.spec_from_file_location("gen", raiz / "analisis" / "homologacion" / "generar_homologacion_js.py")
     gen = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gen)
-    assert gen.bloque() in (raiz / "tampermonkey" / "rmd-ui-mejoras.user.js").read_bytes().decode("utf-8")
+    fin = lambda t: t.replace("\r\n", "\n")   # el repo guarda el script con LF y el generador arma el bloque con CRLF
+    assert fin(gen.bloque()) in fin((raiz / "tampermonkey" / "rmd-ui-mejoras.user.js").read_bytes().decode("utf-8"))
+
+
+def test_fecha_hora_no_se_homologa():
+    """2026-11-15, pedido de Carlos: ni la regla «fecha-hora» ni los pasos FECHA / HORA de la tabla."""
+    from rmd_automation.homologacion import REGLAS, homologar
+    assert not any(r.clave == "fecha-hora" for r in REGLAS)
+    assert homologar("FECHA / HORA INICIO :")[1] == []
+    assert reemplazo_de_paso(35476, "ATE") is None and reemplazo_de_paso(13680, "LIMA") is None
+    assert reemplazo_de_paso(31840, "LIMA").codigo_vigente == 166452

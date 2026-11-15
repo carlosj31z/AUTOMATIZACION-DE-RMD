@@ -358,6 +358,13 @@ cuenta). Escribir y responder siempre en **español**.
   «Traer Excel de caracterización» de status-rmd lo pide con `STATUS_RMD_PEDIR_CARACT` → `RMD_CARACT_EXCEL` (status-rmd PR #67:
   Ruta 2 y PPT con el formato de STATUS_RMD_2026-11-13_final.pptx). El cargador 1.2.0 permite solo LEER esa carpeta y devuelve
   los bytes con `binario: true`; sin él, el envío sigue y avisa que hay que actualizar el cargador. **La siguiente versión debe ser > 1.141.0.**
+- 2026-11-15, v1.142.0 (encima de la 1.141.0): **pedidos de Carlos al importar borradores de Producción.** El borrador manda (`PPN.imponer` en
+  `ppRehacer`: el destino queda igual al borrador aunque haya cambiado en SAP); «Importar en otro RMD…» en cualquier RMD Ingresado de la misma etapa
+  (`ppBuscarOtroDestino`, `ppAnalizar(datos, prop, { destino })`); pasos sin saltos de línea (`PPN.sinSaltos`, `corregirTrabajo`, y Enter bloqueado en
+  la plantilla); «HAGAN» → «REALICEN» por defecto (31840 → 62221 ATE / 166452 LIMA); sin homologación de fecha y hora (regla «fecha-hora» y filas
+  FECHA / HORA fuera: `homologacion.es_fecha_hora`, bloque HOMOLOG regenerado); fórmulas acomodadas en `ppPlanEscritura` (fila reutilizada si el paso de
+  una fórmula se reemplaza en el mismo lugar, citas «(4.5.2 + 4.5.3)» renumeradas y términos que siguen a la cita nueva). Prueba
+  `tampermonkey/pruebas/qa_importar_manda.mjs`. **La siguiente versión debe ser > 1.142.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
