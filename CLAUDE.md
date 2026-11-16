@@ -365,6 +365,12 @@ cuenta). Escribir y responder siempre en **español**.
   FECHA / HORA fuera: `homologacion.es_fecha_hora`, bloque HOMOLOG regenerado); fórmulas acomodadas en `ppPlanEscritura` (fila reutilizada si el paso de
   una fórmula se reemplaza en el mismo lugar, citas «(4.5.2 + 4.5.3)» renumeradas y términos que siguen a la cita nueva). Prueba
   `tampermonkey/pruebas/qa_importar_manda.mjs`. **La siguiente versión debe ser > 1.142.0.**
+- 2026-11-16, v1.143.0 (encima de la 1.142.0): **pedido de Carlos: PPT «Seguimiento de V°B° en RMD» en INDICADORES de status-rmd, con los V°B°
+  contados en el portal.** «V°B° última vs. penúltima» (Exportar) cuenta además la **casilla «V.B.»** (`MD_ES_PASO.vb`, pasos activos de
+  PROCEDIMIENTO de cualquier tipo de dato; `casVb` en `vbConteos`, columnas «Últ./Penúlt. casilla V.B.» al final del Excel): es la cuenta que
+  cuadra con su PPT de octubre (Gaseovet CB 500mg 9 → 2, Ulceran 40 9 → 2…), no la de tipo 441. Botón nuevo **«Enviar a Status RMD»** en esa
+  ventana: `vbLeerMes` + `vbParaStatusRmd` → postMessage `RMD_VB_SEGUIMIENTO` (mes, por RMD última y penúltima versión con estado, fecha de
+  autorización y cuentas) a status-rmd, que arma el registro del PPT (status-rmd PR del mismo día). **La siguiente versión debe ser > 1.143.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
