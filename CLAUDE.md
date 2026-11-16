@@ -374,6 +374,10 @@ cuenta). Escribir y responder siempre en **español**.
   cuadra con su PPT de octubre (Gaseovet CB 500mg 9 → 2, Ulceran 40 9 → 2…), no la de tipo 441. Botón nuevo **«Enviar a Status RMD»** en esa
   ventana: `vbLeerMes` + `vbParaStatusRmd` → postMessage `RMD_VB_SEGUIMIENTO` (mes, por RMD última y penúltima versión con estado, fecha de
   autorización y cuentas) a status-rmd, que arma el registro del PPT (status-rmd PR del mismo día). **La siguiente versión debe ser > 1.144.0.**
+- 2026-11-16, v1.145.0 (encima de la 1.144.0): **pedido de Carlos: el PPT de V°B° mide desde el 12/10/2026 y todo sale del portal.** «Enviar a Status RMD»
+  de «V°B° última vs. penúltima» manda el seguimiento (`vbLeerSeguimiento`, `RMD_VB_SEGUIMIENTO` v2 `alcance: 'seguimiento'`): actualizado = versión
+  Autorizada más alta desde esa fecha con menos casillas V.B. que la anterior; por actualizar = última Ingresada con menos V.B.; lotes = registros `RMD`
+  de la versión actualizada con su estado (478 Cerrado → status de lote «Conforme» en status-rmd). **La siguiente versión debe ser > 1.145.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

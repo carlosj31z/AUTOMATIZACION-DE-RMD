@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.144.0
+// @version      1.145.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.144.0';                                                       // mantener igual a @version
+  const VERSION = '1.145.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -9019,6 +9019,56 @@
     return { type: 'RMD_VB_SEGUIMIENTO', v: 1, generado: new Date().toISOString(), mes: `${anio}-${String(mes).padStart(2, '0')}`, usuarioSap: usuarioSapActual(),
       filas: filas.map((x) => ({ principal: x.principal, planta: VB_PLANTAS[x.ult.planta] || '', etapa: x.ult.etapa, producto: x.ult.producto, ult: ver(x.ult), pen: ver(x.pen) })) };
   }
+  // v1.145.0 (pedido de Carlos, 16/11/2026): seguimiento de la disminución de V°B° DESDE el 12/10/2026 (actualización del POE de validaciones).
+  // Por RMD (cadena de versiones con el mismo código principal, sin Canceladas):
+  //  - actualizado = su versión Autorizada más alta, autorizada desde esa fecha, con menos casillas «V.B.» que la versión anterior;
+  //  - por actualizar = su última versión Ingresada con menos casillas «V.B.» que la anterior (si el RMD ya cuenta como actualizado, no se repite).
+  // Lotes del actualizado = registros de producción (entidad RMD, uno por orden y etapa) hechos con esa versión (mdId), con su estado (catálogo
+  // tipo 44: 474 Habilitado, 475 En Proceso, 476 Parada, 477 Reaperturado, 478 Cerrado). Status RMD: «Conforme» si al menos uno está Cerrado (478),
+  // si no «En proceso». Solo lectura.
+  const VB_DESDE = '2026-10-12';
+  function vbArmarSeguimiento(maestro, desde) {
+    const cadenas = new Map(), filas = [];
+    maestro.forEach((x) => { if (x.codigo && VB_PLANTAS[x.planta]) { const k = x.principal || x.codigo; if (!cadenas.has(k)) cadenas.set(k, []); cadenas.get(k).push(x); } });
+    cadenas.forEach((regs, principal) => {
+      const porVer = new Map(); regs.forEach((x) => { if (x.estado !== 'Cancelado') { if (!porVer.has(x.version)) porVer.set(x.version, []); porVer.get(x.version).push(x); } });
+      const vers = [...porVer.keys()].sort((a, b) => a - b); if (vers.length < 2) return;
+      const elegir = (l) => l.reduce((a, b) => ((b.registro || 0) > (a.registro || 0) ? b : a)), de = (i) => elegir(porVer.get(vers[i]));
+      const iAut = vers.map((v, i) => i).filter((i) => porVer.get(vers[i]).some((x) => x.estado === 'Autorizado')).pop();
+      if (iAut > 0) { const a = porVer.get(vers[iAut]).find((x) => x.estado === 'Autorizado'); if (a.autorizacion && a.autorizacion >= desde) filas.push({ principal, tipo: 'actualizado', ult: a, pen: de(iAut - 1) }); }
+      const u = de(vers.length - 1);
+      if (/INGRES/i.test(u.estado)) filas.push({ principal, tipo: 'por actualizar', ult: u, pen: de(vers.length - 2) });
+    });
+    return filas;
+  }
+  async function vbLeerSeguimiento(modelo, desdeIso, avance) {
+    const desde = new Date(desdeIso + 'T00:00:00Z');
+    const md = await leerEntidadCompleta(modelo, 'MD', { $expand: 'estadoIdRmd,sucursalId', $select: 'mdId,codigo,version,descripcion,nivelTxt,areaRmdTxt,codDefectoReceta,fechaRegistro,fechaAutorizacion,observacion,codigoversionprincipal,estadoIdRmd/contenido,sucursalId/codigo' }, 'mdId', (h, t) => avance(`Leyendo los master de SAP… página ${h} de ${t}`));
+    const maestro = md.map((x) => ({ mdId: x.mdId, codigo: x.codigo ? String(x.codigo) : '', version: +x.version || 0, producto: x.descripcion || '', etapa: x.nivelTxt || '', seccion: x.areaRmdTxt || '', material: x.codDefectoReceta || '',
+      registro: vbFecha(x.fechaRegistro), autorizacion: vbFecha(x.fechaAutorizacion), observacion: x.observacion || '', principal: x.codigoversionprincipal ? String(x.codigoversionprincipal) : '', estado: (x.estadoIdRmd && x.estadoIdRmd.contenido) || '', planta: String((x.sucursalId && x.sucursalId.codigo) || '') }));
+    let filas = vbArmarSeguimiento(maestro, desde);
+    const est = await leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' }), proc = new Set(est.filter((e) => String(e.descripcion || '').trim().toUpperCase().startsWith('PROCEDIMIENTO')).map((e) => e.estructuraId));
+    const ids = [...new Set(filas.flatMap((x) => [x.ult.mdId, x.pen.mdId]))];
+    const cnt = await vbConteos(modelo, ids, proc, (h, t) => avance(`Contando las casillas V.B. de ${filas.length} RMD… ${h} de ${t} versiones`));
+    const casilla = (y) => { const c = cnt[y.mdId] || {}; return c.casVb != null ? c.casVb : null; };
+    filas.forEach((x) => ['ult', 'pen'].forEach((k) => { x[k] = { ...x[k], ...(cnt[x[k].mdId] || { vb: 0, soloVb: 0, casVb: null }) }; }));
+    filas = filas.filter((x) => casilla(x.ult) != null && casilla(x.pen) != null && casilla(x.ult) < casilla(x.pen));
+    const act = new Set(filas.filter((x) => x.tipo === 'actualizado').map((x) => x.principal));
+    filas = filas.filter((x) => x.tipo === 'actualizado' || !act.has(x.principal));
+    // Lotes: registros de producción hechos con la versión actualizada.
+    const conLote = filas.filter((x) => x.tipo === 'actualizado').map((x) => x.ult.mdId);
+    const regs = conLote.length ? await leerPorIds(modelo, 'RMD', 'mdId_mdId', conLote, { $expand: 'estadoIdRmd' }, null, (h, t) => avance(`Leyendo los lotes de ${conLote.length} RMD actualizados… ${h} de ${t}`)) : [];
+    const lotes = new Map();
+    regs.forEach((r) => { const k = r.mdId_mdId; if (!lotes.has(k)) lotes.set(k, []);
+      lotes.get(k).push({ orden: r.ordenSAP || '', lote: r.lote || r.loteAnt || r.loteProv || '', cerrado: +r.estadoIdRmd_iMaestraId === 478, estado: (r.estadoIdRmd && r.estadoIdRmd.contenido) || '', estadoId: r.estadoIdRmd_iMaestraId == null ? null : r.estadoIdRmd_iMaestraId, activo: r.activo !== false }); });
+    filas.forEach((x) => { x.lotes = x.tipo === 'actualizado' ? lotes.get(x.ult.mdId) || [] : []; });
+    return filas;
+  }
+  function vbSeguimientoParaStatusRmd(filas, desdeIso) {
+    const ver = (y) => ({ codigo: y.codigo, version: y.version, estado: y.estado, autorizacion: ISO_DIA(y.autorizacion), registro: ISO_DIA(y.registro), vb: y.vb, soloVb: y.soloVb, casVb: y.casVb });
+    return { type: 'RMD_VB_SEGUIMIENTO', v: 2, alcance: 'seguimiento', desde: desdeIso, generado: new Date().toISOString(), usuarioSap: usuarioSapActual(),
+      filas: filas.map((x) => ({ principal: x.principal, tipo: x.tipo, planta: VB_PLANTAS[x.ult.planta] || '', etapa: x.ult.etapa, producto: x.ult.producto, ult: ver(x.ult), pen: ver(x.pen), lotes: x.lotes })) };
+  }
   async function vbEnviarAStatusRmd(win, payload, avance) {
     let listo = false, respuesta = null;
     const alMensaje = (ev) => { if (ev.origin !== ORIGEN_STATUS_RMD || ev.source !== win) return; const d = ev.data || {}; if (d.type === 'STATUS_RMD_LISTO') listo = true; else if (d.type === 'STATUS_RMD_RECIBIDO') respuesta = d; };
@@ -9041,8 +9091,9 @@
     let trabajando = false; const hoy = new Date(), dd2 = (n) => String(n).padStart(2, '0');
     const v = ventana('V°B° de la última versión frente a la penúltima', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
     v.cuerpo.innerHTML = `<p>Excel de los RMD <b>trabajados en el mes</b> (Ate y Lima: alguna versión registrada, ingresada o autorizada en el mes) con los <b>V°B°</b> (pasos de PROCEDIMIENTO con «Realizado por y Visto bueno») de su <b>última versión</b> frente a la <b>penúltima</b>, la diferencia y un resumen por planta y etapa. Sin versiones Canceladas. No cambia nada en SAP.</p>
-      <p>«Enviar a Status RMD» manda los mismos RMD a INDICADORES → «PPT de V°B°» (cuenta la casilla «V.B.» de los pasos) para el PowerPoint «Seguimiento de V°B° en RMD».</p>
-      <label class="rmd-vb-mes">Mes <input type="month" class="rmd-vb-mes-i" value="${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}"></label><p class="rmd-progreso"></p>`;
+      <p>«Enviar a Status RMD» manda a INDICADORES → «PPT de V°B°» los RMD con <b>menos casillas «V.B.»</b> desde la fecha indicada: actualizados (Autorizados desde esa fecha) y por actualizar (Ingresados), con el estado de los lotes hechos con la versión actualizada, para el PowerPoint «Seguimiento de V°B° en RMD».</p>
+      <label class="rmd-vb-mes">Mes del Excel <input type="month" class="rmd-vb-mes-i" value="${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}"></label>
+      <label class="rmd-vb-mes">Seguimiento desde <input type="date" class="rmd-vb-desde-i" value="${VB_DESDE}"></label><p class="rmd-progreso"></p>`;
     const prog = v.cuerpo.querySelector('.rmd-progreso'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
     const leerMesElegido = () => { const [anio, mes] = (v.cuerpo.querySelector('.rmd-vb-mes-i').value || '').split('-').map(Number); return anio && mes ? { anio, mes } : null; };
     const ocupado = (si) => { trabajando = si; bGen.disabled = si; bEnv.disabled = si; };
@@ -9058,20 +9109,21 @@
       finally { ocupado(false); }
     });
     const bEnv = botonModal('Enviar a Status RMD', '', async () => {
-      const m = leerMesElegido(); if (!m) { avance('Elige el mes.', true); return; }
+      const desde = v.cuerpo.querySelector('.rmd-vb-desde-i').value; if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || '')) { avance('Elige la fecha de inicio del seguimiento.', true); return; }
       // La pestaña se abre dentro del clic (tras un await el navegador la bloquearía).
       const win = window.open(`${URL_STATUS_RMD}?desde=sap&vb=1&t=${Date.now()}`, 'status-rmd');
       if (!win) { avance('El navegador bloqueó la ventana de Status RMD: permite ventanas emergentes para este portal.', true); return; }
       ocupado(true);
       try {
-        const filas = await vbLeerMes(modelo, m.anio, m.mes, avance);
-        const r = await vbEnviarAStatusRmd(win, vbParaStatusRmd(filas, m.anio, m.mes), avance);
-        avance(`Enviado a Status RMD: ${filas.length} RMD de ${dd2(m.mes)}/${m.anio}. ${r.resumen || ''}`.trim());
-      } catch (e) { avance(/^No hay RMD/.test(e.message) ? e.message : 'No se pudo enviar a Status RMD: ' + e.message, true); }
+        const filas = await vbLeerSeguimiento(modelo, desde, avance);
+        const r = await vbEnviarAStatusRmd(win, vbSeguimientoParaStatusRmd(filas, desde), avance);
+        const n = (t) => filas.filter((x) => x.tipo === t).length;
+        avance(`Enviado a Status RMD: ${n('actualizado')} RMD actualizados y ${n('por actualizar')} por actualizar con menos V°B° desde el ${desde.split('-').reverse().join('/')}. ${r.resumen || ''}`.trim());
+      } catch (e) { avance('No se pudo enviar a Status RMD: ' + e.message, true); }
       finally { ocupado(false); }
     });
     v.pie.append(botonModal('Cerrar', '', () => { if (!trabajando) v.cerrar(); }), bEnv, bGen);
-    window.__rmdStats.vbVersiones = { armar: vbArmarFilas, excel: vbExcel, paraStatus: vbParaStatusRmd, generar: () => bGen.click(), enviar: () => bEnv.click() };
+    window.__rmdStats.vbVersiones = { armar: vbArmarFilas, excel: vbExcel, paraStatus: vbParaStatusRmd, seguimiento: vbArmarSeguimiento, leerSeguimiento: vbLeerSeguimiento, seguimientoParaStatus: vbSeguimientoParaStatusRmd, generar: () => bGen.click(), enviar: () => bEnv.click() };
   }
   // ==BANDEJA-INICIO==
   // ---- v1.138.0 Bandeja de solicitudes (campanita) y Buscar por lote ----
