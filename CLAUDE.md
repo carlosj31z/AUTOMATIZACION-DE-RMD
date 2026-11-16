@@ -377,7 +377,10 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-16, v1.145.0 (encima de la 1.144.0): **pedido de Carlos: el PPT de V°B° mide desde el 12/10/2026 y todo sale del portal.** «Enviar a Status RMD»
   de «V°B° última vs. penúltima» manda el seguimiento (`vbLeerSeguimiento`, `RMD_VB_SEGUIMIENTO` v2 `alcance: 'seguimiento'`): actualizado = versión
   Autorizada más alta desde esa fecha con menos casillas V.B. que la anterior; por actualizar = última Ingresada con menos V.B.; lotes = registros `RMD`
-  de la versión actualizada con su estado (478 Cerrado → status de lote «Conforme» en status-rmd). **La siguiente versión debe ser > 1.145.0.**
+  de la versión actualizada con su estado (478 Cerrado → status de lote «Conforme» en status-rmd). 1.145.0 publicada en SharePoint el 2026-11-16 (2 435 403 bytes).
+- 2026-11-16, v1.145.1: **pedido de Carlos: todo octubre** («Seguimiento desde» = 01/10/2026 por defecto; la línea de tiempo de status-rmd sigue en 12/10) y
+  cuentan también versiones autorizadas en el periodo que luego quedaron Suspendidas por otra más nueva (fecha real de autorización de `MD_TRAZABILIDAD`;
+  por RMD vale la versión más alta que redujo). **La siguiente versión debe ser > 1.145.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
