@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.145.0
+// @version      1.145.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.145.0';                                                       // mantener igual a @version
+  const VERSION = '1.145.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -9026,7 +9026,7 @@
   // Lotes del actualizado = registros de producción (entidad RMD, uno por orden y etapa) hechos con esa versión (mdId), con su estado (catálogo
   // tipo 44: 474 Habilitado, 475 En Proceso, 476 Parada, 477 Reaperturado, 478 Cerrado). Status RMD: «Conforme» si al menos uno está Cerrado (478),
   // si no «En proceso». Solo lectura.
-  const VB_DESDE = '2026-10-12';
+  const VB_DESDE = '2026-10-01';   // v1.145.1: todo octubre (pedido de Carlos: no perder lo del PPT original)
   function vbArmarSeguimiento(maestro, desde) {
     const cadenas = new Map(), filas = [];
     maestro.forEach((x) => { if (x.codigo && VB_PLANTAS[x.planta]) { const k = x.principal || x.codigo; if (!cadenas.has(k)) cadenas.set(k, []); cadenas.get(k).push(x); } });
@@ -9036,6 +9036,10 @@
       const elegir = (l) => l.reduce((a, b) => ((b.registro || 0) > (a.registro || 0) ? b : a)), de = (i) => elegir(porVer.get(vers[i]));
       const iAut = vers.map((v, i) => i).filter((i) => porVer.get(vers[i]).some((x) => x.estado === 'Autorizado')).pop();
       if (iAut > 0) { const a = porVer.get(vers[iAut]).find((x) => x.estado === 'Autorizado'); if (a.autorizacion && a.autorizacion >= desde) filas.push({ principal, tipo: 'actualizado', ult: a, pen: de(iAut - 1) }); }
+      // v1.145.1: también una versión autorizada en el periodo que después quedó Suspendida por otra más nueva (Rigaminol, Doloral del PPT de
+      // octubre). Al suspender, SAP pone la fecha de suspensión en fechaAutorizacion: aquí solo se preselecciona y la fecha real de autorización
+      // sale de MD_TRAZABILIDAD (vbLeerSeguimiento).
+      vers.forEach((v, i) => { if (i > 0 && i !== iAut) { const s = porVer.get(v).find((x) => x.estado === 'Suspendido'); if (s && s.autorizacion && s.autorizacion >= desde) filas.push({ principal, tipo: 'actualizado', suspendida: true, ult: s, pen: de(i - 1) }); } });
       const u = de(vers.length - 1);
       if (/INGRES/i.test(u.estado)) filas.push({ principal, tipo: 'por actualizar', ult: u, pen: de(vers.length - 2) });
     });
@@ -9047,13 +9051,24 @@
     const maestro = md.map((x) => ({ mdId: x.mdId, codigo: x.codigo ? String(x.codigo) : '', version: +x.version || 0, producto: x.descripcion || '', etapa: x.nivelTxt || '', seccion: x.areaRmdTxt || '', material: x.codDefectoReceta || '',
       registro: vbFecha(x.fechaRegistro), autorizacion: vbFecha(x.fechaAutorizacion), observacion: x.observacion || '', principal: x.codigoversionprincipal ? String(x.codigoversionprincipal) : '', estado: (x.estadoIdRmd && x.estadoIdRmd.contenido) || '', planta: String((x.sucursalId && x.sucursalId.codigo) || '') }));
     let filas = vbArmarSeguimiento(maestro, desde);
+    // Versiones Suspendidas: fecha real de autorización = último «Autorizado» de su trazabilidad; fuera las autorizadas antes del inicio.
+    const susp = filas.filter((x) => x.suspendida).map((x) => x.ult.mdId);
+    if (susp.length) {
+      const tr = await leerPorIds(modelo, 'MD_TRAZABILIDAD', 'mdId_mdId', susp, { $expand: 'estadoTrazab', $select: 'idTrazabilidad,mdId_mdId,fechaRegistro,activo,estadoTrazab/contenido' }, null, (h, t) => avance(`Leyendo la trazabilidad de ${susp.length} versiones suspendidas… ${h} de ${t}`));
+      const aut = new Map();
+      tr.forEach((t) => { if (t.activo === false || !/^autorizado$/i.test(String((t.estadoTrazab && t.estadoTrazab.contenido) || '').trim())) return; const d = t.fechaRegistro ? new Date(t.fechaRegistro) : null; if (d && !isNaN(d) && (!aut.has(t.mdId_mdId) || d > aut.get(t.mdId_mdId))) aut.set(t.mdId_mdId, d); });
+      filas = filas.filter((x) => { if (!x.suspendida) return true; const d = aut.get(x.ult.mdId); if (!d || d < desde) return false; x.ult = { ...x.ult, autorizacion: vbFecha(d) }; return true; });
+    }
     const est = await leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' }), proc = new Set(est.filter((e) => String(e.descripcion || '').trim().toUpperCase().startsWith('PROCEDIMIENTO')).map((e) => e.estructuraId));
     const ids = [...new Set(filas.flatMap((x) => [x.ult.mdId, x.pen.mdId]))];
     const cnt = await vbConteos(modelo, ids, proc, (h, t) => avance(`Contando las casillas V.B. de ${filas.length} RMD… ${h} de ${t} versiones`));
     const casilla = (y) => { const c = cnt[y.mdId] || {}; return c.casVb != null ? c.casVb : null; };
     filas.forEach((x) => ['ult', 'pen'].forEach((k) => { x[k] = { ...x[k], ...(cnt[x[k].mdId] || { vb: 0, soloVb: 0, casVb: null }) }; }));
     filas = filas.filter((x) => casilla(x.ult) != null && casilla(x.pen) != null && casilla(x.ult) < casilla(x.pen));
-    const act = new Set(filas.filter((x) => x.tipo === 'actualizado').map((x) => x.principal));
+    // Un RMD cuenta una sola vez: la versión más alta que redujo V°B°.
+    const mejor = new Map(); filas.filter((x) => x.tipo === 'actualizado').forEach((x) => { const a = mejor.get(x.principal); if (!a || x.ult.version > a.ult.version) mejor.set(x.principal, x); });
+    filas = filas.filter((x) => x.tipo !== 'actualizado' || mejor.get(x.principal) === x);
+    const act = new Set(mejor.keys());
     filas = filas.filter((x) => x.tipo === 'actualizado' || !act.has(x.principal));
     // Lotes: registros de producción hechos con la versión actualizada.
     const conLote = filas.filter((x) => x.tipo === 'actualizado').map((x) => x.ult.mdId);
