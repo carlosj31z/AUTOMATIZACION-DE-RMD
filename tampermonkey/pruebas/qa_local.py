@@ -1731,6 +1731,49 @@ with sync_playwright() as p:
               and v2["total"] == 1 and "OBSERVACIONES (cambiadas en la vista)" in v2["resumen"] and ayuda and g == v2["ta"])
         return ok, json.dumps({"r": r, "v1": v1, "v2": {k: v2[k] for k in ("ta", "rev", "total")}, "ayuda": ayuda, "g": g}, ensure_ascii=False)[:2400]
 
+    @prueba("LN63 Plantilla para Producción · Convertir PDF en HTML (v1.143.0, pedido de Carlos): en la ventana «Plantilla para Producción», el PDF de «Generar PDF» que devolvió Producción se vuelve a armar como borrador .html (mismo RMD, mismos cambios y Solicitud, catálogo de SAP de hoy) que el portal lee igual; un PDF sin datos del borrador se informa en su línea; botón solo con texto; no escribe en SAP. UI5 y el modelo OData simulados (solo lectura)")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        pdf = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA'), r = paq.rmd, rmd = { ...r }; delete rmd.logo;
+          const W = JSON.parse(JSON.stringify(d.arbol)); Object.assign(W.estructuras[2].etiquetas[0].pasos[2], { texto: 'AGITAR DURANTE 15 MINUTOS.', codigo: '2010', pasoId: null, nuevo: false });
+          const datos = { tipo: 'plantilla-rmd', formato: paq.formato, generado: paq.generado, por: paq.por, script: paq.script, rmd, tipos: paq.tipos, arbol: d.arbol, huella: paq.huella };
+          const prop = { formato: 1, tipo: 'borrador-rmd', base: { mdId: r.mdId, codigo: r.codigo, version: r.version, huella: paq.huella }, guardado: '2026-11-16T10:00:00.000Z', solicitud: { nombre: 'Ana Prueba', area: 'PRODUCCION', motivo: 'prueba' }, trabajo: W, resumen: { cambios: 1 } };
+          const gz = new Uint8Array(await new Response(new Blob([JSON.stringify({ v: 1, datos, prop })]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+          let bin = ''; for (let i = 0; i < gz.length; i += 0x8000) bin += String.fromCharCode.apply(null, gz.subarray(i, i + 0x8000));
+          const b64 = btoa(bin).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, ''), T = 3000, n = Math.ceil(b64.length / T);
+          let cuerpo = '%PDF-1.6\\n'; for (let i = 0; i < n; i++) cuerpo += `<</A<</S/URI/Type/Action/URI(https://borrador-rmd.invalid/#RMDPDF1.${i}.${n}.${b64.slice(i * T, (i + 1) * T)})>>/Subtype/Link/Type/Annot>>\\n`;
+          return { cuerpo: cuerpo + '%%EOF\\n', n }; }""", d0)
+        pg.evaluate("""() => {
+          window.__pdfh = { antes: window.sap, escrituras: 0 };
+          function F(a, b, c) { this.path = a; this.op = b; this.value = c; }
+          const filas = { PASO: [{ pasoId: 'X2010', codigo: '2010', descripcion: 'AGITAR DURANTE 15 MINUTOS.', estructuraId_estructuraId: 'S-PROC', etiquetaId_etiquetaId: 'G-DOC', estadoId_iMaestraId: 2, tipoDatoId_iMaestraId: 443, activo: true }],
+            ESTRUCTURA: [{ estructuraId: 'S-PROC', descripcion: 'PROCEDIMIENTO' }], ETIQUETA: [{ etiquetaId: 'G-DOC', descripcion: 'DOCUMENTACION' }], EQUIPO: [], UTENSILIO: [], UTENSILIO_CLASIFICACION: [], MAESTRA: [{ iMaestraId: 443, contenido: 'Rango' }] };
+          const modelo = { read: (ruta, o) => { const m = /^\\/([A-Z_]+)(\\/\\$count)?/.exec(ruta), l = filas[m[1]] || []; setTimeout(() => o.success(m[2] ? String(l.length) : { results: (o.urlParameters || {}).$skip > 0 ? [] : l }), 10); },
+            create: () => { window.__pdfh.escrituras++; }, update: () => { window.__pdfh.escrituras++; }, remove: () => { window.__pdfh.escrituras++; }, getServiceMetadata: () => ({}), metadataLoaded: () => Promise.resolve() };
+          const vista = { getModel: (n) => (n === 'mainModelv2' ? modelo : null) };
+          const reg = { btnExpPdf: { mEventRegistry: { press: [{ oListener: { getView: () => vista } }] } } };
+          window.sap = { ui: { getCore: () => ({ byId: (id) => reg[id] }), require: (n) => (n === 'sap/ui/model/Filter' ? F : null) } };
+          document.getElementById('app').insertAdjacentHTML('afterbegin', '<button id="btnExpPdf" title="Exportar">E</button>');
+        }""")
+        ui = pg.evaluate("""() => { window.__rmdStats.plantilla.abrir('2202600001'); const z = document.querySelector('.rmd-pp-pdfhtml'), b = z && z.querySelector('.rmd-pp-pdfhtml-elegir');
+          return { zona: !!z, titulo: z ? z.querySelector('b').textContent : '', boton: b ? b.textContent : '', html: b ? b.innerHTML : '', pie: [...document.querySelectorAll('.rmd-modal-pie button')].map((x) => x.textContent) }; }""")
+        with pg.expect_download(timeout=20000) as dl:
+            pg.evaluate("""(c) => { const u8 = Uint8Array.from(c, (x) => x.charCodeAt(0)), malo = '%PDF-1.4\\n' + 'x'.repeat(3000) + '\\n%%EOF';
+              window.__pdfh.p = window.__rmdStats.pdfAHtml.convertir([new File([malo], 'escaneado.pdf'), new File([u8], 'Borrador RMD 2202600001 v3.pdf')]); }""", pdf["cuerpo"])
+        pg.wait_for_function("() => [...document.querySelectorAll('.rmd-pp-pdfhtml-res p')].length === 2 && !/convirtiendo|Leyendo/.test(document.querySelector('.rmd-pp-pdfhtml-res').textContent)", timeout=20000)
+        html = open(dl.value.path(), encoding="utf-8").read(); nombre = dl.value.suggested_filename
+        r = pg.evaluate("""async (h) => { const P = window.__rmdStats.plantilla, { datos, prop } = await P.leer(h), lineas = [...document.querySelectorAll('.rmd-pp-pdfhtml-res p')].map((p) => [p.textContent, p.classList.contains('error')]);
+          const t = prop.trabajo.estructuras[2].etiquetas[0].pasos[2]; return { lineas, texto: t.texto, codigo: t.codigo, sol: prop.solicitud.nombre, catalogo: !!(datos.catalogo && datos.catalogo.etq), desdePdf: !!datos.desdePdf, cambios: P.nucleo.cambios(datos.arbol, prop.trabajo).length, escrituras: window.__pdfh.escrituras,
+            libre: !document.querySelector('.rmd-pp-pdfhtml-elegir').disabled }; }""", html)
+        pg.evaluate("() => { document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove()); document.getElementById('btnExpPdf').remove(); window.sap = window.__pdfh.antes; }")
+        e = PP_CTX.new_page(); e.set_content(html); e.wait_for_selector(".pp-doc", timeout=15000); abre = e.evaluate("() => ({ total: window.__pp.estado().contar.total, sol: window.__pp.estado().SOL.nombre })"); e.close()
+        ok = (ui["zona"] and ui["titulo"] == "Convertir PDF en HTML" and ui["boton"] == "Elegir PDF…" and "<" not in ui["html"] and ui["pie"] == ["Cerrar", "Importar un borrador…", "Generar plantilla"]
+              and nombre.startswith("Borrador RMD 2202600001 v3 ") and nombre.endswith(".html") and '<script id="rmd-borrador"' in html
+              and r["texto"] == "AGITAR DURANTE 15 MINUTOS." and r["codigo"] == "2010" and r["sol"] == "Ana Prueba" and r["catalogo"] and not r["desdePdf"] and r["cambios"] >= 1 and r["escrituras"] == 0 and r["libre"] and abre == {"total": 1, "sol": "Ana Prueba"}
+              and r["lineas"][0][1] and "escaneado.pdf" in r["lineas"][0][0] and "no trae los datos del borrador" in r["lineas"][0][0]
+              and not r["lineas"][1][1] and "listo" in r["lineas"][1][0] and "RMD 2202600001 v3" in r["lineas"][1][0])
+        return ok, json.dumps({"ui": ui, "nombre": nombre, "partes": pdf["n"], "r": r, "abre": abre}, ensure_ascii=False)[:1800]
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
