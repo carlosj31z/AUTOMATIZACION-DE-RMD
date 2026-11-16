@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.142.0
+// @version      1.143.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.142.0';                                                       // mantener igual a @version
+  const VERSION = '1.143.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -463,6 +463,7 @@
   /* Plantilla para Producción e importación */
   .rmd-pp-rec-t tbody tr { cursor: pointer; } .rmd-pp-rec-t td { vertical-align: top; } .rmd-pp-rec-bloq td { opacity: .7; } .rmd-pp-rec-t input { margin: 2px 0 0; }
   .rmd-modal.rmd-pp { width: min(760px, 96vw); } .rmd-modal.rmd-pp-imp { width: min(1280px, 97vw); height: min(860px, 94vh); }
+  .rmd-pp-pdfhtml { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rmd-borde-campo); } .rmd-pp-pdfhtml.encima { outline: 2px dashed var(--rmd-borde-campo); outline-offset: 4px; } .rmd-pp-pdfhtml-res p { margin: 6px 0 0; } .rmd-pp-pdfhtml-res p.error { color: var(--rmd-rojo); }
   .rmd-pp-campo { display: block; margin: 12px 0 8px; font-weight: 600; } .rmd-pp-campo input { display: block; width: 260px; height: 32px; margin-top: 4px; padding: 0 10px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 14px var(--rmd-fuente); }
   .rmd-pp-cab { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; } .rmd-pp-checks { margin: 6px 0 10px; padding-left: 4px; list-style: none; } .rmd-pp-checks li { margin: 3px 0; }
   .rmd-pp-t { font-size: 12.5px; } .rmd-pp-t td { vertical-align: top; } .rmd-pp-agregar td:first-child { box-shadow: inset 3px 0 0 var(--rmd-verde); } .rmd-pp-quitar td:first-child { box-shadow: inset 3px 0 0 var(--rmd-rojo); }
@@ -20662,27 +20663,61 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     avisoCaract.alPulsar({ ...asoc }).catch((err) => anotarError('motivoCaracterizacion', err));
   }, true);
   // ---- Ventanas ----
+  // ---- v1.143.0: «Convertir PDF en HTML» en la ventana «Plantilla para Producción» (pedido de Carlos) ----
+  // El PDF que devuelve Producción (el de «Generar PDF» de la plantilla) lleva dentro todos los datos del borrador: se vuelve a armar el .html del borrador
+  // (el editor de Producción con todos sus cambios) sin importar nada, sin tocar SAP y para un RMD en cualquier estado. El catálogo de pasos es el de SAP de hoy.
+  async function ppPdfAHtml(bytes, avisar = () => {}) {
+    const { datos, prop } = await ppLeerPdf(bytes, avisar), paq = { ...datos }; delete paq.desdePdf;
+    const d = new Date(), titulo = PPN.nombreArchivo('Borrador', datos.rmd, d).replace(/ \d{4}-\d\d-\d\d$/, '');
+    const html = ppHtml(await ppEmpacar(paq), { ...prop, guardado: prop.guardado || d.toISOString() }, titulo);
+    let cambios = 0; try { cambios = PPN.cambios(datos.arbol, prop.trabajo, { tipos: datos.tipos }).length; } catch (e) { /* solo para el resumen */ }
+    return { nombre: PPN.nombreArchivo('Borrador', datos.rmd, d, 'html'), html, rmd: datos.rmd, guardado: prop.guardado, cambios };
+  }
   function abrirPlantillaProduccion(codigo) {
     const ctrl = controladorPrincipal(); if (!ctrl) { toast('Abre la lista «Configuración Manufactura Digital».', true); return; }
     const asoc = ctrl.getView().getModel('asociarDatos'), abierto = asoc && asoc.getData() && asoc.getData().codigo;
     const filtro = (ctrl.getView().getModel('oDataFilter') || { getProperty: () => '' }).getProperty('/code');
     const v = ventana('Plantilla para Producción', { cancelar: () => { if (!ocupado) v.cerrar(); } }); let ocupado = false;
     v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-v-pegar');
-    v.cuerpo.innerHTML = `<p class="rmd-nota">Un archivo .html que Producción abre en Chrome o Edge, sin SAP: ve el RMD como en el PDF, deja su borrador de cambios (buscando los pasos que ya existen) y genera un PDF que lleva esos cambios. Ese PDF (o el .html del borrador) se importa aquí, en un RMD Ingresado.</p>
+    v.cuerpo.innerHTML = `<p class="rmd-nota">Un archivo .html que Producción abre en Chrome o Edge, sin SAP: ve el RMD como en el PDF, deja su borrador de cambios (buscando los pasos que ya existen) y genera un PDF que lleva esos cambios. Ese PDF (o el .html del borrador) se importa aquí, en un RMD Ingresado, o se convierte otra vez en .html más abajo.</p>
       <label class="rmd-pp-campo">Código del RMD <input class="rmd-pp-cod" value="${esc(codigo || abierto || filtro || '')}" placeholder="p. ej. 2202609157" inputmode="numeric"></label>
       <label class="rmd-nota"><input type="checkbox" class="rmd-pp-forzar"> Volver a leer el catálogo de SAP (si se crearon pasos hoy)</label>
-      <p class="rmd-progreso rmd-pp-estado"></p>`;
+      <p class="rmd-progreso rmd-pp-estado"></p>
+      <div class="rmd-pp-pdfhtml"><b>Convertir PDF en HTML</b>
+        <p class="rmd-nota">Del PDF que devolvió Producción (el de «Generar PDF» de la plantilla) se descarga el borrador en .html con todos sus cambios, para abrirlo en Chrome o Edge y revisarlo o seguir editándolo. No importa nada ni escribe en SAP, y sirve para un RMD en cualquier estado. Puedes elegir o arrastrar aquí varios PDF. Un PDF escaneado o impreso con otro programa no trae los datos del borrador.</p>
+        <button type="button" class="rmd-btn rmd-pp-pdfhtml-elegir">Elegir PDF…</button><div class="rmd-pp-pdfhtml-res" role="status"></div></div>`;
     const cod = v.cuerpo.querySelector('.rmd-pp-cod'), est = v.cuerpo.querySelector('.rmd-pp-estado');
+    const zona = v.cuerpo.querySelector('.rmd-pp-pdfhtml'), bPdf = zona.querySelector('.rmd-pp-pdfhtml-elegir'), resPdf = zona.querySelector('.rmd-pp-pdfhtml-res');
+    const convertirPdf = async (lista) => {
+      if (ocupado || !lista.length) return; ocupado = true; bGen.disabled = bImp.disabled = bPdf.disabled = true; resPdf.textContent = '';
+      for (const f of lista) {
+        const fila = document.createElement('p'); fila.className = 'rmd-nota'; resPdf.appendChild(fila);
+        const r0 = await ppArchivoValido(f);
+        if (!r0.pdf) { fila.classList.add('error'); setTxt(fila, `${f.name}: ${r0.error || 'no es un PDF'}`); continue; }
+        try {
+          setTxt(fila, `${f.name}: convirtiendo…`);
+          const r = await ppPdfAHtml(r0.pdf, (t) => setTxt(fila, `${f.name}: ${t}`));
+          descargarArchivo(r.nombre, r.html, 'text/html;charset=utf-8');
+          setTxt(fila, `${f.name}: listo, se descargó «${r.nombre}» · RMD ${r.rmd.codigo} v${r.rmd.version} · ${r.cambios} cambio(s) de Producción${r.guardado ? ` · PDF del ${fechaHoraCorta(r.guardado)}` : ''}`);
+        } catch (e) { fila.classList.add('error'); setTxt(fila, `${f.name}: no se pudo convertir: ${e.message}`); }
+      }
+      ocupado = false; bGen.disabled = bImp.disabled = bPdf.disabled = false;
+    };
+    bPdf.addEventListener('click', () => { if (ocupado) return; const i = document.createElement('input'); i.type = 'file'; i.multiple = true; i.accept = '.pdf,application/pdf'; i.addEventListener('change', () => convertirPdf([...(i.files || [])])); i.click(); });
+    zona.addEventListener('dragover', (e) => { e.preventDefault(); zona.classList.add('encima'); });
+    zona.addEventListener('dragleave', () => zona.classList.remove('encima'));
+    zona.addEventListener('drop', (e) => { e.preventDefault(); zona.classList.remove('encima'); convertirPdf([...((e.dataTransfer && e.dataTransfer.files) || [])]); });
+    window.__rmdStats.pdfAHtml = { convertir: convertirPdf, convertirUno: ppPdfAHtml };   // pruebas
     const bGen = botonModal('Generar plantilla', 'primario', async () => {
       if (ocupado) return; const c = cod.value.trim(); if (!/^\d{5,}$/.test(c)) { setTxt(est, 'Escribe el código del RMD.'); est.classList.add('error'); return; }
-      ocupado = true; bGen.disabled = bImp.disabled = true; est.classList.remove('error');
+      ocupado = true; bGen.disabled = bImp.disabled = bPdf.disabled = true; est.classList.remove('error');
       try {
         const r = await ppGenerar(c, { forzar: v.cuerpo.querySelector('.rmd-pp-forzar').checked, avisar: (t) => setTxt(est, t), elegirReceta: (recs, md) => { setTxt(est, `El RMD tiene ${recs.length} recetas asociadas: elige con cuál se emite la plantilla.`); return ppElegirReceta(recs, md); } });
         descargarArchivo(r.nombre, r.html, 'text/html;charset=utf-8');
         const rec = r.resumen.recetas > 1 && r.resumen.receta ? ` · receta ${r.resumen.receta.matnr} / ${r.resumen.receta.verid}${r.resumen.receta.nombre ? ` (${r.resumen.receta.nombre})` : ''}` : '';
         setTxt(est, `Listo: «${r.nombre}» (${(r.resumen.bytes / 1048576).toFixed(1)} MB) · ${r.resumen.pasos} pasos y ${r.resumen.pm} procesos menores${rec} · catálogo de ${r.resumen.catalogo.toLocaleString('es-PE')} pasos · ${r.resumen.docs ? `${r.resumen.docs.toLocaleString('es-PE')} documentos vigentes (avisa los vencidos)` : 'sin lista de documentos vigentes: cárgala en Reglas de revisión para que avise los vencidos'}. Envíalo a Producción.`);
       } catch (e) { if (e.cancelado) setTxt(est, 'No se generó la plantilla: falta elegir la receta.'); else { setTxt(est, 'No se pudo generar: ' + e.message); est.classList.add('error'); } }
-      finally { ocupado = false; bGen.disabled = bImp.disabled = false; }
+      finally { ocupado = false; bGen.disabled = bImp.disabled = bPdf.disabled = false; }
     });
     const bImp = botonModal('Importar un borrador…', '', () => { if (!ocupado) { v.cerrar(); elegirBorrador(); } });
     v.pie.append(botonModal('Cerrar', '', () => { if (!ocupado) v.cerrar(); }), bImp, bGen);

@@ -365,6 +365,9 @@ cuenta). Escribir y responder siempre en **español**.
   FECHA / HORA fuera: `homologacion.es_fecha_hora`, bloque HOMOLOG regenerado); fórmulas acomodadas en `ppPlanEscritura` (fila reutilizada si el paso de
   una fórmula se reemplaza en el mismo lugar, citas «(4.5.2 + 4.5.3)» renumeradas y términos que siguen a la cita nueva). Prueba
   `tampermonkey/pruebas/qa_importar_manda.mjs`. **La siguiente versión debe ser > 1.142.0.**
+- 2026-11-16, v1.143.0 (encima de la 1.142.0): **pedido de Carlos: sección «Convertir PDF en HTML» en la ventana «Plantilla para Producción»** del portal.
+  El PDF de «Generar PDF» que devolvió Producción se vuelve a armar como borrador .html (`ppPdfAHtml` = `ppLeerPdf` + `ppHtml`, catálogo de SAP de hoy),
+  varios a la vez, sin importar ni escribir en SAP. Prueba `qa_local.py` LN63. **La siguiente versión debe ser > 1.143.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
