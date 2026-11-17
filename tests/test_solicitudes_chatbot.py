@@ -143,3 +143,96 @@ def test_ubicar_rmd_por_material_etapa_y_lote():
     dos = MASTERS + [{"md_id": "d1", "codigo": "2202600030", "version": 1, "etapa": "ENVASE", "principal": "2202600030", "estado": "Autorizado", "descripcion": "Y"}]
     m, err = so.elegir_rmd(dos, [], "ENVASE")
     assert m is None and "lote" in err
+
+
+def test_ubicar_rmd_solo_con_lote():
+    """Con el lote basta: los masters vienen de las OP de ese lote (sin material ni etapa)."""
+    ops = [{"md_id": "a2", "orden": "2100000001", "lote": "L123"}]
+    m, err = so.elegir_rmd([x for x in MASTERS if x["md_id"] == "a2"], ops, "", "L123")
+    assert m["codigo"] == "2202600002" and not err
+    m, err = so.elegir_rmd([], [], "", "L999")
+    assert m is None and "Ver OP" in err
+
+
+def test_estado_del_rmd():
+    fam = [
+        {"codigo": "2202600001", "version": 3, "estado": "Ingresado", "descripcion": "X", "etapa": "FABRICACION", "planta": "LIMA"},
+        {"codigo": "2202600001", "version": 2, "estado": "Autorizado", "descripcion": "X", "fecha_autorizacion": "2026-10-02"},
+        {"codigo": "2202600001", "version": 1, "estado": "Suspendido", "descripcion": "X"},
+    ]
+    t = so.texto_estado(fam, {"version": 2}, "L123")
+    assert "última versión es la v3, Ingresado" in t and "vigente (última Autorizada) es la v2, autorizada el 02/10/2026" in t
+    assert "lote L123 se trabaja con la v2" in t
+    assert "Es la vigente" in so.texto_estado(fam[1:2])
+    assert "No tiene una versión Autorizada" in so.texto_estado([fam[0]])
+    assert so.codigos_de(MASTERS, "FABRICACION")[0] in {m["codigo"] for m in MASTERS}
+
+
+class _Pagina:
+    """Página falsa: responde a las lecturas de ubicar.js y a «Generar plantilla» / «Descargar master»."""
+
+    def __init__(self):
+        self.frames = [self]
+        self.url = "https://x/ui5appruntime.html"
+        self.inyectado = False
+
+    def evaluate(self, script, arg=None):
+        if "__ubicarRmd(m, l)" in script:
+            return {"masters": [m for m in MASTERS if m["md_id"] == "a2"], "ops": [{"md_id": "a2", "orden": "1", "lote": arg[1]}]}
+        if "__familiaRmd(c)" in script:
+            return [m for m in MASTERS if m["codigo"] == arg]
+        if "window.__rmdStats.plantilla.generar" in script:
+            return {"nombre": "Plantilla 2202600002 v2 2026-11-17.html", "html": "<html></html>"}
+        if "!!(window.__rmdStats" in script:
+            return self.inyectado
+        if "onCompletarAsociarDatos" in script:
+            return [{"receta": "", "verid": "", "b64": "JVBERi0="}]
+        return None
+
+    def wait_for_function(self, *a, **k):
+        return None
+
+
+def test_pedidos_de_lectura(monkeypatch):
+    from rmd_automation.pages import base
+
+    monkeypatch.setattr(base, "esperar_app", lambda page: None)
+    subidos, parches = [], []
+    monkeypatch.setattr(so, "subir_archivo", lambda i, n, b, t: subidos.append((i, n, b, t)) or f"https://s/{n}")
+    monkeypatch.setattr(so, "_sb", lambda ruta, *a, **k: parches.append((ruta, a)))
+    pg = _Pagina()
+    pg.inyectado = True
+    base_sol = {"id": 9, "automatica": True, "op_lote": "L123", "material": None, "etapa": None, "rmd": None}
+
+    e, r = so.atender_una(pg, {**base_sol, "tipo": "estado", "cambios": [{"accion": "estado_rmd"}]})
+    assert e == "ejecutada" and "RMD 2202600002" in r and "lote L123" in r and not subidos
+
+    e, r = so.atender_una(pg, {**base_sol, "tipo": "documento", "cambios": [{"accion": "pdf_master"}]})
+    assert e == "ejecutada" and subidos[-1][1].endswith("master.pdf") and subidos[-1][2] == b"%PDF-"
+    assert "vence en 7 días" in r and "https://s/" in r and parches[-1][0] == "chatbot_solicitudes?id=eq.9"
+
+    e, r = so.atender_una(pg, {**base_sol, "tipo": "documento", "cambios": [{"accion": "plantilla"}]})
+    assert e == "ejecutada" and subidos[-1][1].endswith(".html") and "Plantilla para Producción" in r
+
+    # sin la marca automática, o con un tipo que no corresponde, no se atiende solo
+    assert so.atender_una(pg, {**base_sol, "automatica": False, "tipo": "estado", "cambios": [{"accion": "estado_rmd"}]})[0] == "revisar"
+    assert so.atender_una(pg, {**base_sol, "tipo": "estado", "cambios": [{"accion": "pdf_master"}]})[0] == "revisar"
+
+
+def test_subir_archivo_crea_bucket_y_firma(monkeypatch):
+    import urllib.error
+
+    llamadas = []
+
+    def falso(ruta, data, tipo="application/json", extra=None):
+        llamadas.append(ruta)
+        if ruta == "bucket":
+            raise urllib.error.HTTPError(ruta, 400, "ya existe", {}, None)
+        if ruta.startswith("object/sign/"):
+            return {"signedURL": "/object/sign/chatbot-archivos/9/a.pdf?token=t"}
+        return {}
+
+    monkeypatch.setattr(so, "_storage", falso)
+    url = so.subir_archivo(9, "RMD 2202 v8 máster.pdf", b"x", "application/pdf")
+    assert url.endswith("/storage/v1/object/sign/chatbot-archivos/9/a.pdf?token=t")
+    assert llamadas[1] == "object/chatbot-archivos/9/RMD_2202_v8_master.pdf"
