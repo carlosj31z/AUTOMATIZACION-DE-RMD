@@ -416,6 +416,49 @@ class RmdEditor:
         if etiqueta:
             self.cerrar_dialogo()
 
+    def cambiar_predecesor(
+        self,
+        estructura: str,
+        etiqueta: str | None,
+        orden_paso: int,
+        codigo_predecesor: str | None,
+        orden_predecesor: int | None,
+    ) -> None:
+        """«Habilitar el paso»: cambia el Depende de un paso (o lo vacía si no hay predecesor) y guarda."""
+        self.abrir_pasos(estructura, etiqueta)
+        if codigo_predecesor:
+            self.establecer_predecesor(orden_paso, codigo_predecesor, int(orden_predecesor or 0))
+        else:
+            self.limpiar_predecesor(orden_paso)
+        self.guardar()
+        self._confirmar_y_cerrar_exito()
+        self.cerrar_dialogo()
+        if etiqueta:
+            self.cerrar_dialogo()
+
+    def actualizar_rmd_en_linea(self) -> str:
+        """Pulsa «Actualizar RMD en Línea» (barra del editor) para que lo guardado llegue a la OP en proceso.
+
+        Verificado sin OP: responde «No se puede actualizar en linea porque no hay una OP asociada.» [OK].
+        Devuelve el texto de los avisos que muestre el portal (confirmación y resultado).
+        """
+        base.click_button(self._dlg, "Actualizar RMD en Línea")
+        textos: list[str] = []
+        for espera in (5000, 20000):  # posible «¿Desea…?» y luego el resultado (puede tardar)
+            boton = self.app.get_by_role("button", name="OK", exact=True).last
+            try:
+                boton.wait_for(state="visible", timeout=espera)
+            except Exception:
+                break
+            aviso = self.app.get_by_role("dialog").filter(has=boton).last
+            try:
+                textos.append(" ".join(aviso.inner_text(timeout=2000).split()))
+            except Exception:
+                pass
+            boton.click()
+            self.page.wait_for_timeout(800)
+        return " | ".join(t for t in textos if t)
+
     def _confirmar_y_cerrar_exito(self) -> None:
         base.confirmar_si_aparece(self.app, "OK")  # "¿Desea ...?"
         self.page.wait_for_timeout(500)

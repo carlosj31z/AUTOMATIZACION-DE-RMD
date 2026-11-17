@@ -8,6 +8,8 @@ Acciones soportadas (todas sobre una versión Ingresada; nunca se envía ni se a
   quitar_pasos / agregar_pasos          lista: "PROCEDIMIENTO>DOCUMENTACION", pasos: [texto o código]
   configurar_paso                       lista, paso (texto), tipo_dato, decimal, casillas
   predecesores_secuenciales             lista: regla "anterior, salvo Sin tipo de dato"
+  cambiar_predecesor                    lista, paso (texto o código), orden_paso?, y predecesor (texto o
+                                        código) + predecesor_orden?, o sin_predecesor: true («habilitar el paso»)
 """
 from __future__ import annotations
 
@@ -20,12 +22,14 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from .snapshot import estructura, listas, normalizar, orden_de_dep
+from .snapshot import codigo_de_dep, estructura, listas, normalizar, orden_de_dep
 
 ACCIONES = {
     "quitar_equipos", "agregar_equipos", "quitar_pasos", "agregar_pasos",
-    "configurar_paso", "predecesores_secuenciales",
+    "configurar_paso", "predecesores_secuenciales", "cambiar_predecesor",
 }
+# Listas que no llevan predecesor (como_se_configura_un_rmd.md, apartado 5).
+SIN_PREDECESOR = ("CONDICIONES AMBIENTALES", "RENDIMIENTO")
 PENDIENTE, APLICADO, ERROR = "pendiente", "ya aplicado", "error"
 
 
@@ -154,6 +158,79 @@ def _plan_secuenciales(a: Accion, snap: dict) -> None:
     a.detalle = f"{faltan} paso(s) con predecesor distinto de la regla" if faltan else "cadena ya conforme"
 
 
+def _ord(lista, p: dict) -> int:
+    """Orden del paso en su lista (si la vista angosta no expone Orden, la posición)."""
+    try:
+        return int(p.get("o"))
+    except (TypeError, ValueError):
+        return lista.pasos.index(p) + 1
+
+
+def _paso_unico(lista, texto: str, orden: Optional[int]) -> tuple[Optional[dict], str]:
+    """Ubica un paso por orden (si se da) o por texto/código; devuelve (paso, error)."""
+    if orden:
+        p = next((x for x in lista.pasos if _ord(lista, x) == int(orden)), None)
+        if p is None:
+            return None, f"no hay paso con orden {orden} en {lista.nombre}"
+        if texto and _coincidencias(type(lista)(lista.nombre, [p]), texto) == []:
+            return None, f"el paso {orden} de {lista.nombre} no coincide con {texto!r}"
+        return p, ""
+    m = _coincidencias(lista, texto)
+    if len(m) != 1:
+        return None, f"el paso {texto!r} coincide con {len(m)} pasos en {lista.nombre}"
+    return m[0], ""
+
+
+def _plan_predecesor(a: Accion, snap: dict) -> None:
+    lst = _lista(snap, a.params["lista"])
+    if lst is None:
+        a.estado, a.mensajes = ERROR, [f"no existe la lista {a.params['lista']!r}"]
+        return
+    paso, err = _paso_unico(lst, str(a.params.get("paso") or ""), a.params.get("orden_paso"))
+    if err:
+        a.estado, a.mensajes = ERROR, [err]
+        return
+    a.params["_orden_paso"] = _ord(lst, paso)
+    actual = (paso.get("dep") or "").strip()
+    if a.params.get("sin_predecesor"):
+        a.params["_pred"] = None
+        a.estado = PENDIENTE if actual else APLICADO
+        a.detalle = f"#{_ord(lst, paso)}: Depende {actual or '(vacío)'} → (sin predecesor)"
+        return
+    if any(n in lst.nombre for n in SIN_PREDECESOR):
+        a.estado, a.mensajes = ERROR, [f"{lst.nombre} no lleva predecesores"]
+        return
+    if paso.get("td") == "Sin tipo de dato":
+        a.estado, a.mensajes = ERROR, ["un paso «Sin tipo de dato» no lleva predecesor"]
+        return
+    texto_pred = str(a.params.get("predecesor") or "")
+    orden_pred = a.params.get("predecesor_orden")
+    candidatos = []
+    # Primero en la misma lista; si no está, en cualquier otra (los primeros pasos cruzan etiquetas).
+    for l in [lst] + [x for x in listas(snap) if x.nombre != lst.nombre]:
+        for p in _coincidencias(l, texto_pred):
+            if orden_pred and _ord(l, p) != int(orden_pred):
+                continue
+            candidatos.append((l, p))
+        if candidatos:
+            break
+    if len(candidatos) != 1:
+        a.estado, a.mensajes = ERROR, [f"el predecesor {texto_pred!r} coincide con {len(candidatos)} pasos"]
+        return
+    l_pred, pred = candidatos[0]
+    if pred.get("td") == "Sin tipo de dato":
+        a.estado, a.mensajes = ERROR, ["un paso «Sin tipo de dato» no puede ser predecesor"]
+        return
+    if l_pred.nombre == lst.nombre and _ord(l_pred, pred) >= _ord(lst, paso):
+        a.estado, a.mensajes = ERROR, ["el predecesor debe ser un paso anterior al paso que se habilita"]
+        return
+    cod, ordp = str(pred.get("cod")), _ord(l_pred, pred)
+    a.params["_pred"] = (cod, ordp)
+    ya = codigo_de_dep(actual) == cod and orden_de_dep(actual) == ordp
+    a.estado = APLICADO if ya else PENDIENTE
+    a.detalle = f"#{_ord(lst, paso)}: Depende {actual or '(vacío)'} → {cod} ({ordp})"
+
+
 def planificar(spec: Spec, snap: dict) -> List[Accion]:
     plan: List[Accion] = []
     for i, c in enumerate(spec.cambios, 1):
@@ -171,6 +248,8 @@ def planificar(spec: Spec, snap: dict) -> List[Accion]:
                 _plan_configurar(a, snap)
             elif a.tipo == "predecesores_secuenciales":
                 _plan_secuenciales(a, snap)
+            elif a.tipo == "cambiar_predecesor":
+                _plan_predecesor(a, snap)
         except KeyError as e:
             a.estado, a.mensajes = ERROR, [f"falta el parámetro {e}"]
         plan.append(a)
@@ -201,8 +280,11 @@ def auditar(ruta: str | Path, spec: Spec, plan: List[Accion], resultado: str) ->
         f.write(json.dumps(reg, ensure_ascii=False) + "\n")
 
 
-def ejecutar(spec: Spec, plan: List[Accion], automation) -> None:
-    """Aplica las acciones pendientes con el editor del portal (requiere sesión iniciada)."""
+def ejecutar(spec: Spec, plan: List[Accion], automation, actualizar_en_linea: bool = False) -> str:
+    """Aplica las acciones pendientes con el editor del portal (requiere sesión iniciada).
+
+    Con `actualizar_en_linea`, al terminar pulsa «Actualizar RMD en Línea» para que lo guardado llegue a la OP en
+    proceso (regla de Carlos, 2026-11-16). Devuelve el aviso del portal de ese paso ("" si no se pulsó)."""
     from .pages.rmd_editor import RmdEditor
 
     editor: RmdEditor = automation.editor_de_rmd(spec.rmd)
@@ -232,5 +314,12 @@ def ejecutar(spec: Spec, plan: List[Accion], automation) -> None:
                 editor.abrir_pasos(est, etq or None)
                 editor.predecesores_secuenciales()
                 editor.cerrar_dialogo()
+            elif a.tipo == "cambiar_predecesor":
+                est, _, etq = p["lista"].partition(">")
+                pred = p.get("_pred")
+                editor.cambiar_predecesor(
+                    est, etq or None, p["_orden_paso"], pred[0] if pred else None, pred[1] if pred else None
+                )
+        return editor.actualizar_rmd_en_linea() if actualizar_en_linea else ""
     finally:
         editor.cerrar_editor()
