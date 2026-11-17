@@ -462,6 +462,11 @@ cuenta). Escribir y responder siempre en **español**.
   PR #94); las consultas libres van al analista y `CHATBOT_MODO=aprobacion` en Vercel vuelve a frenar los cambios. El bot trata
   de usted, sin emojis, y entiende saludos y pedidos escritos por palabras clave. Los enlaces firmados llevan `download=`
   (Supabase sirve el .html como texto plano). Primera plantilla real entregada desde GitHub el 2026-11-17.
+- **Aviso de avance (2026-11-17, pedido de Carlos)**: apenas ubica el RMD, el ejecutor deja en `resultado` (estado sigue
+  `ejecutando`) «Ubiqué el RMD <código> - <descripción> (v<n> <estado>, …). Estoy preparando…» (`avisar_avance`,
+  `texto_avance`) y llama a `notificar(id, avance=True)`; el chat web lo muestra (`mis_solicitudes.avance`, sondeo cada 15 s) y
+  por WhatsApp va solo a quien pidió (status-rmd `notificarAvance`). Al registrar, el bot dice que primero confirma el RMD y el tiempo
+  aproximado (2 a 4 min documentos, 3 a 5 min cambios; las corridas de Actions duran ~1–1,5 min más la cola).
 - Inicio de sesión desde GitHub verificado (run #5, 2026-11-17). Pendiente: la primera escritura real en el RMD de pruebas
   2202609013.
 

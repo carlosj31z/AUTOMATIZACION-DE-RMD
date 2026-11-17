@@ -200,6 +200,7 @@ def test_pedidos_de_lectura(monkeypatch):
     subidos, parches = [], []
     monkeypatch.setattr(so, "subir_archivo", lambda i, n, b, t: subidos.append((i, n, b, t)) or f"https://s/{n}")
     monkeypatch.setattr(so, "_sb", lambda ruta, *a, **k: parches.append((ruta, a)))
+    monkeypatch.setattr(so, "notificar", lambda i, avance=False: None)
     pg = _Pagina()
     pg.inyectado = True
     base_sol = {"id": 9, "automatica": True, "op_lote": "L123", "material": None, "etapa": None, "rmd": None}
@@ -210,6 +211,9 @@ def test_pedidos_de_lectura(monkeypatch):
     e, r = so.atender_una(pg, {**base_sol, "tipo": "documento", "cambios": [{"accion": "pdf_master"}]})
     assert e == "ejecutada" and subidos[-1][1].endswith("master.pdf") and subidos[-1][2] == b"%PDF-"
     assert "vence en 7 días" in r and "https://s/" in r and parches[-1][0] == "chatbot_solicitudes?id=eq.9"
+    # antes del enlace, el avance: RMD ubicado con su descripción y versión (sigue «ejecutando»)
+    avance = [a[1]["resultado"] for ruta, a in parches if ruta.endswith("estado=eq.ejecutando")]
+    assert avance and avance[-1].startswith("Ubiqué el RMD 2202600002") and "lote L123" in avance[-1] and "PDF del master" in avance[-1]
 
     e, r = so.atender_una(pg, {**base_sol, "tipo": "documento", "cambios": [{"accion": "plantilla"}]})
     assert e == "ejecutada" and subidos[-1][1].endswith(".html") and "Plantilla para Producción" in r

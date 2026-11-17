@@ -83,21 +83,40 @@ def terminar(sol_id: int, estado: str, resultado: str) -> None:
     )
 
 
-def notificar(sol_id: int) -> None:
-    """Pide a status-rmd que avise del resultado (WhatsApp a quien pidió y al analista). Si no está configurado, nada."""
+def notificar(sol_id: int, avance: bool = False) -> None:
+    """Pide a status-rmd que avise del resultado (WhatsApp a quien pidió y al analista), o solo del avance a quien
+    pidió (`avance`). Si no está configurado, nada."""
     url, clave = os.environ.get("CHATBOT_URL", "").rstrip("/"), os.environ.get("CHATBOT_CLAVE_ANALISTA", "")
     if not (url and clave):
         return
     req = urllib.request.Request(
         f"{url}/api/chatbot",
         method="POST",
-        data=json.dumps({"accion": "notificar", "id": sol_id}).encode("utf-8"),
+        data=json.dumps({"accion": "notificar", "id": sol_id, **({"avance": True} if avance else {})}).encode("utf-8"),
         headers={"Content-Type": "application/json", "x-clave-analista": clave},
     )
     try:
         urllib.request.urlopen(req, timeout=30).read()
     except Exception as e:  # el aviso no debe tumbar la ejecución
         print(f"  (no se pudo avisar por status-rmd: {e})")
+
+
+def avisar_avance(sol_id: int, texto: str, log: Callable[[str], None] = print) -> None:
+    """Mientras se atiende: deja el avance en `resultado` (sigue «ejecutando») y avisa a quien pidió, para que sepa
+    qué RMD se ubicó y no espere a ciegas. Un fallo aquí no frena la solicitud."""
+    try:
+        _sb(f"chatbot_solicitudes?id=eq.{sol_id}&estado=eq.ejecutando", "PATCH", {"resultado": texto[:1000]})
+        notificar(sol_id, avance=True)
+    except Exception as e:
+        log(f"  (no se pudo avisar el avance: {e})")
+
+
+def texto_avance(m: dict, sol: dict, que: str) -> str:
+    """«Ubiqué el RMD … (descripción). Estoy preparando …»: lo que ve quien pidió apenas se ubica el RMD."""
+    lote = f", el del lote {sol['op_lote']}" if sol.get("op_lote") else ", su última versión Autorizada"
+    desc = (m.get("descripcion") or "").strip()
+    return (f"Ubiqué el RMD {m['codigo']}{f' - {desc}' if desc else ''} (v{m['version']} {m['estado']}{lote}). "
+            f"{que}")
 
 
 def a_spec(sol: dict) -> cb.Spec:
@@ -321,6 +340,9 @@ def atender_lectura(page, sol: dict, simular: bool = False, log: Callable[[str],
     if m is None:
         return "revisar", ubicado
     log(ubicado)
+    if not simular:
+        doc = "la plantilla para Producción" if accion == "plantilla" else "el PDF del master"
+        avisar_avance(sol["id"], texto_avance(m, sol, f"Estoy preparando {doc}; en uno o dos minutos le envío el enlace."), log)
     frame = _frame_app(page)
     if accion == "plantilla":
         _inyectar_mejoras(frame)
@@ -351,13 +373,18 @@ def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], Non
         return atender_lectura(page, sol, simular, log)
     if not sol.get("automatica") or sol.get("tipo") != "cambio":
         return "revisar", "La solicitud no está marcada como cambio automático: la revisa el analista."
-    rmd, ubicado = ubicar_rmd(page, sol)
-    if rmd is None:
-        return "revisar", ubicado
-    if not sol.get("rmd"):
+    if sol.get("rmd"):
+        rmd, m = str(sol["rmd"]), None
+    else:
+        m, ubicado = _ubicar(page, sol)
+        if m is None:
+            return "revisar", ubicado
+        rmd = m["codigo"]
         log(ubicado)
         if not simular:
             _sb(f"chatbot_solicitudes?id=eq.{sol['id']}", "PATCH", {"rmd": rmd})
+            avisar_avance(sol["id"], texto_avance(m, sol, "Estoy aplicando el cambio en SAP (guardar y «Actualizar RMD en Línea»); "
+                                                          "le aviso apenas termine."), log)
     sol = {**sol, "rmd": rmd}
     sp = a_spec(sol)
     snap = extraer(page, sp.rmd, procesos_menores=False)
