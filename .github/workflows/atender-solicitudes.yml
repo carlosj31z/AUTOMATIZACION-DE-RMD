@@ -5,7 +5,7 @@
 #
 # Secretos (Settings → Secrets and variables → Actions):
 #   RMD_USERNAME, RMD_PASSWORD   cuenta del analista en el portal (SAP IAS)
-#   SUPABASE_ANON_KEY            clave pública de Supabase de status-rmd
+#   SUPABASE_SERVICE_ROLE_KEY    clave service_role de Supabase de status-rmd (secreta)
 #   CHATBOT_URL                  https://status-rmd.vercel.app (para avisar el resultado)
 #   CHATBOT_CLAVE_ANALISTA       la misma clave de analista configurada en Vercel
 name: Atender solicitudes del chatbot
@@ -36,7 +36,7 @@ jobs:
       RMD_PASSWORD: ${{ secrets.RMD_PASSWORD }}
       RMD_HEADLESS: "true"
       RMD_TIMEOUT_MS: "60000"
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       CHATBOT_URL: ${{ secrets.CHATBOT_URL }}
       CHATBOT_CLAVE_ANALISTA: ${{ secrets.CHATBOT_CLAVE_ANALISTA }}
       RMD_AUDITORIA: data/auditoria.jsonl
@@ -44,8 +44,8 @@ jobs:
       - name: Comprobar configuración
         id: cfg
         run: |
-          if [ -z "$RMD_USERNAME" ] || [ -z "$RMD_PASSWORD" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "Faltan secretos (RMD_USERNAME, RMD_PASSWORD o SUPABASE_ANON_KEY): no se ejecuta."
+          if [ -z "$RMD_USERNAME" ] || [ -z "$RMD_PASSWORD" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Faltan secretos (RMD_USERNAME, RMD_PASSWORD o SUPABASE_SERVICE_ROLE_KEY): no se ejecuta."
             echo "listo=no" >> "$GITHUB_OUTPUT"
           else
             echo "listo=si" >> "$GITHUB_OUTPUT"
