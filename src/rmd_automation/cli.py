@@ -334,7 +334,7 @@ def solicitudes_group() -> None:
 def solicitudes_atender(limite: int, simular: bool, silencioso: bool) -> None:
     """Aplica en SAP las solicitudes «lista» (habilitar paso y decimales) con la cuenta configurada.
 
-    Usa RMD_LAUNCHPAD_URL + RMD_USERNAME/RMD_PASSWORD (o RMD_CDP_URL) y SUPABASE_ANON_KEY. Después de guardar pulsa
+    Usa RMD_LAUNCHPAD_URL + RMD_USERNAME/RMD_PASSWORD (o RMD_CDP_URL) y SUPABASE_SERVICE_ROLE_KEY. Después de guardar pulsa
     «Actualizar RMD en Línea» y vuelve a leer el RMD para verificar; el resultado queda en la solicitud.
     """
     from .solicitudes import atender

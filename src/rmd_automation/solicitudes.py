@@ -26,9 +26,10 @@ TIPOS_CON_DECIMAL = ("Números", "Rango", "Fórmula", "Entrega", "MuestraCC", "C
 
 
 def _clave() -> str:
-    clave = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+    # Las tablas del chatbot no aceptan la clave pública (anon): solo la service_role, guardada como secreto.
+    clave = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not clave:
-        raise RuntimeError("Falta SUPABASE_ANON_KEY (la clave pública de Supabase de status-rmd).")
+        raise RuntimeError("Falta SUPABASE_SERVICE_ROLE_KEY (clave service_role de Supabase de status-rmd).")
     return clave
 
 
@@ -177,6 +178,8 @@ def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], Non
     from .actions import RmdAutomation
     from .extraer import extraer
 
+    if not sol.get("automatica") or sol.get("tipo") != "cambio":
+        return "revisar", "La solicitud no está marcada como cambio automático: la revisa el analista."
     rmd, ubicado = ubicar_rmd(page, sol)
     if rmd is None:
         return "revisar", ubicado

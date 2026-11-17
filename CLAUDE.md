@@ -450,6 +450,9 @@ cuenta). Escribir y responder siempre en **español**.
 - **Regla de Carlos: Producción no da el código del RMD sino material + etapa**, y el lote si hace falta. `solicitudes.ubicar_rmd`
   (js/ubicar.js, solo lectura): MD por `codDefectoReceta` + `nivelTxt`; con lote, el RMD cuya «Ver OP» (`/RMD`, `lote`) lo tiene;
   sin lote, la última versión Autorizada; si hay dudas (varios masters, lote en otro RMD) pasa a `revisar`.
+- **Seguridad (2026-11-17)**: las tablas `chatbot_*` de Supabase no se abren a la clave anon (es pública): solo la
+  `SUPABASE_SERVICE_ROLE_KEY` (Vercel y secreto de GitHub). Solo se aplica solo lo que viene del chat web con `CHATBOT_CLAVE`
+  o de un número de `CHATBOT_WHATSAPP_PERMITIDOS`; el ejecutor revalida `automatica`/`tipo` y el RMD antes de tocar SAP.
 - Pendiente: probar el inicio de sesión desde GitHub (`solicitudes probar-login`) y la primera escritura real en el RMD de
   pruebas 2202609013.
 
