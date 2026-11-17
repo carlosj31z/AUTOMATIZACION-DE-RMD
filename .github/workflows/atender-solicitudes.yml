@@ -47,6 +47,8 @@ jobs:
           if [ -z "$RMD_USERNAME" ] || [ -z "$RMD_PASSWORD" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "Faltan secretos (RMD_USERNAME, RMD_PASSWORD o SUPABASE_SERVICE_ROLE_KEY): no se ejecuta."
             echo "listo=no" >> "$GITHUB_OUTPUT"
+            # A mano (Run workflow) sale en rojo para que se note; en el cron de cada 15 min no molesta.
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then exit 1; fi
           else
             echo "listo=si" >> "$GITHUB_OUTPUT"
           fi

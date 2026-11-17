@@ -256,9 +256,48 @@ def probar_login(log: Callable[[str], None] = print) -> bool:
 
     try:
         with rmd_session(load_config()) as page:
-            base.esperar_app(page)
+            try:
+                base.esperar_app(page)
+            except Exception as e:
+                log(f"#login → falló: {type(e).__name__}: {str(e).splitlines()[0][:200]}")
+                for linea in describir_pantalla(page):
+                    log(f"#login   {linea}")
+                return False
             log("#login → ok: la app Configuración cargó con la cuenta configurada")
             return True
     except Exception as e:
-        log(f"#login → falló: {type(e).__name__}: {str(e)[:300]}")
+        log(f"#login → falló: {type(e).__name__}: {str(e).splitlines()[0][:300]}")
         return False
+
+
+def describir_pantalla(page) -> List[str]:
+    """Dónde se quedó el navegador, sin datos personales: dominio y ruta (sin parámetros), título,
+    mensajes de error visibles y qué campos/botones hay (solo sus etiquetas). Para el registro público."""
+    import re
+
+    out: List[str] = []
+    try:
+        u = urllib.parse.urlsplit(page.url)
+        out.append(f"pantalla: {u.netloc}{u.path}")
+        out.append(f"título: {page.title()[:120]}")
+        js = """() => {
+          const vis = (e) => e.getClientRects().length > 0;
+          const txt = (e) => (e.innerText || e.value || e.getAttribute('aria-label') || e.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 90);
+          const avisos = [...document.querySelectorAll('[role=alert],.error,.errorMessage,[class*=rror],[id*=rror],[class*=message],h1,h2')]
+            .filter(vis).map(txt).filter(Boolean);
+          const campos = [...document.querySelectorAll('input:not([type=hidden])')].filter(vis)
+            .map((e) => `${e.type}:${e.getAttribute('placeholder') || e.getAttribute('aria-label') || e.name || ''}`);
+          const botones = [...document.querySelectorAll('button,input[type=submit],a[role=button]')].filter(vis).map(txt).filter(Boolean);
+          const iframes = [...document.querySelectorAll('iframe')].map((f) => { try { return new URL(f.src).host; } catch (e) { return ''; } });
+          return { avisos: [...new Set(avisos)].slice(0, 6), campos: campos.slice(0, 8), botones: [...new Set(botones)].slice(0, 10), iframes };
+        }"""
+        d = page.evaluate(js)
+        correo = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
+        limpiar = lambda t: correo.sub("<correo>", t)
+        out += [f"aviso: {limpiar(t)}" for t in d["avisos"]]
+        out.append("campos: " + ", ".join(d["campos"]))
+        out.append("botones: " + limpiar(", ".join(d["botones"])))
+        out.append("iframes: " + ", ".join(d["iframes"]))
+    except Exception as e:  # el diagnóstico no debe tapar el error original
+        out.append(f"(no se pudo describir la pantalla: {type(e).__name__})")
+    return out
