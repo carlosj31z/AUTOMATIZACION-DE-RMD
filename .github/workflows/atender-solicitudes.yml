@@ -1,0 +1,70 @@
+# Ejecutor del asistente de configuraciones (chatbot de status-rmd).
+# Toma de Supabase las solicitudes «lista» (habilitar paso / decimales), entra a SAP con la cuenta del analista
+# guardada en los secretos del repositorio y las aplica: Guardar, «Actualizar RMD en Línea» y verificación.
+# El repositorio es público: el registro solo muestra número y estado de cada solicitud (--silencioso).
+#
+# Secretos (Settings → Secrets and variables → Actions):
+#   RMD_USERNAME, RMD_PASSWORD   cuenta del analista en el portal (SAP IAS)
+#   SUPABASE_ANON_KEY            clave pública de Supabase de status-rmd
+#   CHATBOT_URL                  https://status-rmd.vercel.app (para avisar el resultado)
+#   CHATBOT_CLAVE_ANALISTA       la misma clave de analista configurada en Vercel
+name: Atender solicitudes del chatbot
+
+on:
+  repository_dispatch:
+    types: [solicitud-chatbot]   # lo dispara status-rmd al registrar una solicitud «lista»
+  schedule:
+    - cron: "*/15 * * * *"       # respaldo por si el aviso no llega
+  workflow_dispatch:
+    inputs:
+      solo_probar_login:
+        description: "Solo probar el inicio de sesión (no toca ningún RMD)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: atender-solicitudes
+  cancel-in-progress: false
+
+jobs:
+  atender:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RMD_LAUNCHPAD_URL: https://medifarma-portal-prd-twuxor0u.cpp.cfapps.us10.hana.ondemand.com/site/portalprd#configuracion-display?sap-ui-app-id-hint=saas_approuter_mif.rmd.configuracion
+      RMD_USERNAME: ${{ secrets.RMD_USERNAME }}
+      RMD_PASSWORD: ${{ secrets.RMD_PASSWORD }}
+      RMD_HEADLESS: "true"
+      RMD_TIMEOUT_MS: "60000"
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      CHATBOT_URL: ${{ secrets.CHATBOT_URL }}
+      CHATBOT_CLAVE_ANALISTA: ${{ secrets.CHATBOT_CLAVE_ANALISTA }}
+      RMD_AUDITORIA: data/auditoria.jsonl
+    steps:
+      - name: Comprobar configuración
+        id: cfg
+        run: |
+          if [ -z "$RMD_USERNAME" ] || [ -z "$RMD_PASSWORD" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Faltan secretos (RMD_USERNAME, RMD_PASSWORD o SUPABASE_ANON_KEY): no se ejecuta."
+            echo "listo=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "listo=si" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.listo == 'si'
+      - uses: actions/setup-python@v5
+        if: steps.cfg.outputs.listo == 'si'
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Instalar
+        if: steps.cfg.outputs.listo == 'si'
+        run: |
+          pip install -e .
+          python -m playwright install --with-deps chromium
+      - name: Probar inicio de sesión
+        if: steps.cfg.outputs.listo == 'si' && github.event.inputs.solo_probar_login == 'true'
+        run: python -m rmd_automation.cli solicitudes probar-login
+      - name: Atender solicitudes
+        if: steps.cfg.outputs.listo == 'si' && github.event.inputs.solo_probar_login != 'true'
+        run: python -m rmd_automation.cli solicitudes atender --max 10 --silencioso

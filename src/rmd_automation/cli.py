@@ -322,6 +322,37 @@ def contingencia_diaria(fecha: str | None, hoy: bool, aplicar: bool, carpeta_loc
     ejecutar(cdp, CONTINGENCIA_URL, fecha, carpeta_local, aplicar, avisar=click.echo)
 
 
+@cli.group("solicitudes")
+def solicitudes_group() -> None:
+    """Solicitudes del asistente de configuraciones (chatbot de status-rmd)."""
+
+
+@solicitudes_group.command("atender")
+@click.option("--max", "limite", default=5, show_default=True, help="Cuántas solicitudes tomar en esta corrida.")
+@click.option("--simular", is_flag=True, help="Lee el RMD y muestra el plan, sin tocar SAP ni la solicitud.")
+@click.option("--silencioso", is_flag=True, help="Solo imprime número y estado (para registros públicos, p. ej. GitHub Actions).")
+def solicitudes_atender(limite: int, simular: bool, silencioso: bool) -> None:
+    """Aplica en SAP las solicitudes «lista» (habilitar paso y decimales) con la cuenta configurada.
+
+    Usa RMD_LAUNCHPAD_URL + RMD_USERNAME/RMD_PASSWORD (o RMD_CDP_URL) y SUPABASE_ANON_KEY. Después de guardar pulsa
+    «Actualizar RMD en Línea» y vuelve a leer el RMD para verificar; el resultado queda en la solicitud.
+    """
+    from .solicitudes import atender
+
+    log = (lambda t: click.echo(t) if t.startswith("#") or t.startswith("No hay") else None) if silencioso else click.echo
+    n = atender(limite, simular, log=log)
+    click.echo(f"{n} solicitud(es) atendida(s){' (simulación)' if simular else ''}.")
+
+
+@solicitudes_group.command("probar-login")
+def solicitudes_probar_login() -> None:
+    """Solo inicia sesión con la cuenta configurada y comprueba que abre Configuración (no toca ningún RMD)."""
+    from .solicitudes import probar_login
+
+    if not probar_login(log=click.echo):
+        sys.exit(1)
+
+
 @cli.group("interfaz")
 def interfaz_group() -> None:
     """Userscript «mejoras de interfaz» (Tampermonkey) en la carpeta MEJORAS DE INTERFAZ de SharePoint."""

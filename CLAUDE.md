@@ -432,6 +432,27 @@ cuenta). Escribir y responder siempre en **español**.
   todo la lista de términos homologados) manda sobre el plan.
 - Mantener esta sección al día al publicar una versión o fusionar un PR.
 
+## Asistente de configuraciones (chatbot) — 2026-11-16
+
+- Pedido de Carlos: bot por WhatsApp para Producción y Calidad en Operaciones (status-rmd, `chatbot/LEEME.md`). Jerga:
+  **«habilitar el paso» = cambiar su predecesor (Depende) a un paso anterior no inmediato, o en casos extremos dejarlo sin
+  predecesor**; decimales = columna Decimal del paso en el RMD (no «Editar Paso», que edita el maestro).
+- **Decisión de Carlos (2026-11-16): el bot entra a SAP con la cuenta del analista y aplica solo**, sin aprobación previa
+  (se le advirtió que conviene el OK de TI y ASC). Excepción acotada a la regla de «nunca guardar contraseñas»: la cuenta va
+  **solo** en los secretos de GitHub Actions (`RMD_USERNAME`/`RMD_PASSWORD`), nunca en el repo ni en el chat.
+- Ejecutor: `rmd-automation solicitudes atender` (`src/rmd_automation/solicitudes.py`), workflow
+  `.github/workflows/atender-solicitudes.yml` (repo público: registro con `--silencioso`). Solo `cambiar_predecesor` y
+  `configurar_decimal`, en Ingresados o Autorizados; tras Guardar pulsa **«Actualizar RMD en Línea»** (regla de Carlos: así
+  llega a la OP en proceso) y vuelve a leer para verificar. Acción nueva `cambiar_predecesor` en `cambios.py`.
+- **Decisión de Carlos (2026-11-16): sin IA y gratis**: el bot es **guiado, con opciones cerradas** (status-rmd `api/_chatbot/guiado.js`;
+  Claude queda opcional con `CHATBOT_MOTOR=claude`). Identifica el paso solo por lista + número de orden (`orden_paso`,
+  `predecesor_orden`, `predecesor_lista`).
+- **Regla de Carlos: Producción no da el código del RMD sino material + etapa**, y el lote si hace falta. `solicitudes.ubicar_rmd`
+  (js/ubicar.js, solo lectura): MD por `codDefectoReceta` + `nivelTxt`; con lote, el RMD cuya «Ver OP» (`/RMD`, `lote`) lo tiene;
+  sin lote, la última versión Autorizada; si hay dudas (varios masters, lote en otro RMD) pasa a `revisar`.
+- Pendiente: probar el inicio de sesión desde GitHub (`solicitudes probar-login`) y la primera escritura real en el RMD de
+  pruebas 2202609013.
+
 ## Datos que no van en el repo
 
 - Nada de contraseñas, tokens, cookies ni sesiones. Las credenciales del CLI
