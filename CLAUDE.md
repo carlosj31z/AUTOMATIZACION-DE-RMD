@@ -453,8 +453,15 @@ cuenta). Escribir y responder siempre en **español**.
 - **Seguridad (2026-11-17)**: las tablas `chatbot_*` de Supabase no se abren a la clave anon (es pública): solo la
   `SUPABASE_SERVICE_ROLE_KEY` (Vercel y secreto de GitHub). Solo se aplica solo lo que viene del chat web con `CHATBOT_CLAVE`
   o de un número de `CHATBOT_WHATSAPP_PERMITIDOS`; el ejecutor revalida `automatica`/`tipo` y el RMD antes de tocar SAP.
-- Pendiente: probar el inicio de sesión desde GitHub (`solicitudes probar-login`) y la primera escritura real en el RMD de
-  pruebas 2202609013.
+- **Pedidos de solo lectura (2026-11-17, pedido de Carlos)**: el menú del bot también ofrece plantilla para Producción, PDF del
+  master y estado del RMD (última versión y vigente). El ejecutor (`solicitudes.atender_lectura`) genera la plantilla con el
+  userscript del repo inyectado en la app (`__rmdStats.plantilla.generar`), el PDF con `_JS_PDF_MASTER` de la contingencia, los
+  sube al bucket privado `chatbot-archivos` de Supabase (lo crea si falta) y deja un enlace firmado de 7 días. No escribe en SAP.
+- **Sin clave (2026-11-17)**: el chat web funciona sin clave; sin ella, cambios y documentos esperan la aprobación del analista
+  (el estado se responde solo). El enlace `status-rmd.vercel.app/chatbot/whatsapp.html#clave=<CHATBOT_CLAVE>` la guarda en el
+  equipo y lo deja directo. El bot trata de usted, sin emojis, y entiende saludos y pedidos escritos por palabras clave.
+- Inicio de sesión desde GitHub verificado (run #5, 2026-11-17). Pendiente: la primera escritura real en el RMD de pruebas
+  2202609013 y la primera plantilla / PDF real desde GitHub.
 
 ## Datos que no van en el repo
 

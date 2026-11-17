@@ -1,7 +1,8 @@
 // Solo lectura: ubica los masters (MD) de un material, o los del lote (Ver OP) si solo se da el lote.
 // window.__ubicarRmd(material, lote) -> { masters: [...], ops: [...] }. Se ejecuta en el Launchpad (app en iframe).
+// window.__familiaRmd(codigo) -> todas las versiones (masters) de ese código de RMD (para el estado de la última versión).
 (() => {
-  window.__ubicarRmd = async (material, lote) => {
+  const herramientas = () => {
     const win = document.querySelector('iframe').contentWindow;
     const sap = win.sap;
     const Element = sap.ui.require('sap/ui/core/Element');
@@ -17,6 +18,22 @@
     const leer = (ruta, filtros, params) => new Promise((ok, mal) => modelo.read(ruta, {
       filters: filtros, urlParameters: params, success: ok,
       error: (e) => mal(new Error(`el portal no respondió (${(e && e.statusCode) || 'sin código'})`)) }));
+    return { leer, Filter };
+  };
+  const SELECT_MD = 'mdId,codigo,version,nivelTxt,codigoversionprincipal,codAgrupadorReceta,codDefectoReceta,descripcion,fechaAutorizacion,estadoIdRmd/contenido,sucursalId/contenido';
+  const aMaster = (x) => ({
+    md_id: String(x.mdId), codigo: String(x.codigo || ''), version: Number(x.version) || 0, etapa: x.nivelTxt || '',
+    principal: String(x.codigoversionprincipal || x.codigo || ''), estado: (x.estadoIdRmd && x.estadoIdRmd.contenido) || '',
+    descripcion: x.descripcion || '', planta: (x.sucursalId && x.sucursalId.contenido) || '',
+    fecha_autorizacion: x.fechaAutorizacion ? new Date(x.fechaAutorizacion).toISOString().slice(0, 10) : '' });
+  window.__familiaRmd = async (codigo) => {
+    const { leer, Filter } = herramientas();
+    const c = String(codigo).trim();
+    const md = await leer('/MD', [new Filter('codigo', 'EQ', isNaN(+c) ? c : +c)], { $expand: 'estadoIdRmd,sucursalId', $top: '200', $select: SELECT_MD });
+    return (md.results || []).map(aMaster);
+  };
+  window.__ubicarRmd = async (material, lote) => {
+    const { leer, Filter } = herramientas();
     let ops = [];
     if (lote) {
       const r = await leer('/RMD', [new Filter('lote', 'EQ', String(lote))], { $top: '50', $select: 'mdId_mdId,ordenSAP,lote' });
@@ -30,13 +47,7 @@
       if (!ids.length) return { masters: [], ops };
       filtroMd = [new Filter({ filters: ids.map((id) => new Filter('mdId', 'EQ', id)), and: false })];
     }
-    const md = await leer('/MD', filtroMd, {
-      $expand: 'estadoIdRmd,sucursalId', $top: '200',
-      $select: 'mdId,codigo,version,nivelTxt,codigoversionprincipal,codAgrupadorReceta,codDefectoReceta,descripcion,estadoIdRmd/contenido,sucursalId/contenido' });
-    const masters = (md.results || []).map((x) => ({
-      md_id: String(x.mdId), codigo: String(x.codigo || ''), version: Number(x.version) || 0, etapa: x.nivelTxt || '',
-      principal: String(x.codigoversionprincipal || x.codigo || ''), estado: (x.estadoIdRmd && x.estadoIdRmd.contenido) || '',
-      descripcion: x.descripcion || '', planta: (x.sucursalId && x.sucursalId.contenido) || '' }));
-    return { masters, ops };
+    const md = await leer('/MD', filtroMd, { $expand: 'estadoIdRmd,sucursalId', $top: '200', $select: SELECT_MD });
+    return { masters: (md.results || []).map(aMaster), ops };
   };
 })();
