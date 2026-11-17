@@ -143,3 +143,12 @@ def test_ubicar_rmd_por_material_etapa_y_lote():
     dos = MASTERS + [{"md_id": "d1", "codigo": "2202600030", "version": 1, "etapa": "ENVASE", "principal": "2202600030", "estado": "Autorizado", "descripcion": "Y"}]
     m, err = so.elegir_rmd(dos, [], "ENVASE")
     assert m is None and "lote" in err
+
+
+def test_ubicar_rmd_solo_con_lote():
+    """Con el lote basta: los masters vienen de las OP de ese lote (sin material ni etapa)."""
+    ops = [{"md_id": "a2", "orden": "2100000001", "lote": "L123"}]
+    m, err = so.elegir_rmd([x for x in MASTERS if x["md_id"] == "a2"], ops, "", "L123")
+    assert m["codigo"] == "2202600002" and not err
+    m, err = so.elegir_rmd([], [], "", "L999")
+    assert m is None and "Ver OP" in err

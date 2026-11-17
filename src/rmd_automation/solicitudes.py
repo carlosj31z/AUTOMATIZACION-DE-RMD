@@ -132,9 +132,9 @@ def elegir_rmd(masters: List[dict], ops: List[dict], etapa: str, lote: str = "")
     Con lote: el RMD cuya «Ver OP» tiene ese lote (así se confirma que es el que está en proceso).
     Sin lote: la última versión Autorizada (vigente); si hay varios masters distintos, lo ve el analista.
     """
-    cand = [m for m in masters if _sin_tildes(m.get("etapa")) == _sin_tildes(etapa)]
+    cand = [m for m in masters if not etapa or _sin_tildes(m.get("etapa")) == _sin_tildes(etapa)]
     if not cand:
-        return None, f"no hay RMD del material en la etapa {etapa}"
+        return None, (f"no hay RMD del material en la etapa {etapa}" if etapa else f"el lote {lote} no aparece en «Ver OP» de ningún RMD")
     if lote:
         ids = {o["md_id"] for o in ops}
         con_lote = [m for m in cand if m["md_id"] in ids]
@@ -160,15 +160,16 @@ def ubicar_rmd(page, sol: dict) -> tuple[Optional[str], str]:
 
     if sol.get("rmd"):
         return str(sol["rmd"]), ""
-    if not (sol.get("material") and sol.get("etapa")):
-        return None, "la solicitud no trae RMD ni material y etapa"
+    if not (sol.get("material") and sol.get("etapa")) and not sol.get("op_lote"):
+        return None, "la solicitud no trae RMD, lote ni material y etapa"
     script = resources.files("rmd_automation").joinpath("js/ubicar.js").read_text(encoding="utf-8")
     base.esperar_app(page)
     page.evaluate(script)
-    datos = page.evaluate("([m, l]) => window.__ubicarRmd(m, l)", [str(sol["material"]), sol.get("op_lote") or ""])
-    m, err = elegir_rmd(datos["masters"], datos["ops"], sol["etapa"], sol.get("op_lote") or "")
+    datos = page.evaluate("([m, l]) => window.__ubicarRmd(m, l)", [str(sol.get("material") or ""), sol.get("op_lote") or ""])
+    m, err = elegir_rmd(datos["masters"], datos["ops"], sol.get("etapa") or "", sol.get("op_lote") or "")
     if m is None:
-        return None, f"Material {sol['material']}, etapa {sol['etapa']}: {err}."
+        quien = f"Material {sol['material']}, etapa {sol['etapa']}" if sol.get("material") else f"Lote {sol['op_lote']}"
+        return None, f"{quien}: {err}."
     lote = f", lote {sol['op_lote']} confirmado en Ver OP" if sol.get("op_lote") else " (última versión Autorizada)"
     return m["codigo"], f"RMD {m['codigo']} v{m['version']} {m['estado']} ({m['descripcion']}){lote}."
 

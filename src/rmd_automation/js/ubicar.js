@@ -1,4 +1,4 @@
-// Solo lectura: ubica los masters (MD) de un material y, si se da, las OP (Ver OP) de un lote.
+// Solo lectura: ubica los masters (MD) de un material, o los del lote (Ver OP) si solo se da el lote.
 // window.__ubicarRmd(material, lote) -> { masters: [...], ops: [...] }. Se ejecuta en el Launchpad (app en iframe).
 (() => {
   window.__ubicarRmd = async (material, lote) => {
@@ -17,18 +17,26 @@
     const leer = (ruta, filtros, params) => new Promise((ok, mal) => modelo.read(ruta, {
       filters: filtros, urlParameters: params, success: ok,
       error: (e) => mal(new Error(`el portal no respondió (${(e && e.statusCode) || 'sin código'})`)) }));
-    const md = await leer('/MD', [new Filter('codDefectoReceta', 'EQ', String(material))], {
+    let ops = [];
+    if (lote) {
+      const r = await leer('/RMD', [new Filter('lote', 'EQ', String(lote))], { $top: '50', $select: 'mdId_mdId,ordenSAP,lote' });
+      ops = (r.results || []).map((x) => ({ md_id: String(x.mdId_mdId), orden: String(x.ordenSAP || ''), lote: String(x.lote || '') }));
+    }
+    // Con material: sus masters. Sin material (solo lote): los masters de las OP de ese lote.
+    let filtroMd;
+    if (material) filtroMd = [new Filter('codDefectoReceta', 'EQ', String(material))];
+    else {
+      const ids = [...new Set(ops.map((o) => o.md_id))];
+      if (!ids.length) return { masters: [], ops };
+      filtroMd = [new Filter({ filters: ids.map((id) => new Filter('mdId', 'EQ', id)), and: false })];
+    }
+    const md = await leer('/MD', filtroMd, {
       $expand: 'estadoIdRmd,sucursalId', $top: '200',
       $select: 'mdId,codigo,version,nivelTxt,codigoversionprincipal,codAgrupadorReceta,codDefectoReceta,descripcion,estadoIdRmd/contenido,sucursalId/contenido' });
     const masters = (md.results || []).map((x) => ({
       md_id: String(x.mdId), codigo: String(x.codigo || ''), version: Number(x.version) || 0, etapa: x.nivelTxt || '',
       principal: String(x.codigoversionprincipal || x.codigo || ''), estado: (x.estadoIdRmd && x.estadoIdRmd.contenido) || '',
       descripcion: x.descripcion || '', planta: (x.sucursalId && x.sucursalId.contenido) || '' }));
-    let ops = [];
-    if (lote) {
-      const r = await leer('/RMD', [new Filter('lote', 'EQ', String(lote))], { $top: '50', $select: 'mdId_mdId,ordenSAP,lote' });
-      ops = (r.results || []).map((x) => ({ md_id: String(x.mdId_mdId), orden: String(x.ordenSAP || ''), lote: String(x.lote || '') }));
-    }
     return { masters, ops };
   };
 })();
