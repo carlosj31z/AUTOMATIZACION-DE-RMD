@@ -80,3 +80,66 @@ def test_decimales_solo_en_datos_numericos():
     plan = cb.planificar(sp, snap)
     so._revisar_decimales(plan, snap)
     assert plan[0].estado == cb.ERROR and "Realizado por" in plan[0].mensajes[0]
+
+
+def test_bot_guiado_solo_ordenes_y_otra_lista():
+    """El bot guiado manda solo la lista y los números de orden (sin textos)."""
+    snap = snap_base()
+    fab = snap["structs"][3]["etq"][1]["p"]
+    doc = snap["structs"][3]["etq"][0]["p"]
+    misma = spec({"accion": "cambiar_predecesor", "lista": "PROCEDIMIENTO>FABRICACION", "paso": "", "orden_paso": 5,
+                  "predecesor_orden": 2})
+    a = cb.planificar(misma, snap)[0]
+    assert a.estado == cb.PENDIENTE, a.mensajes
+    assert a.params["_orden_paso"] == 5 and a.params["_pred"] == (fab[1]["cod"], 2)
+    otra = spec({"accion": "cambiar_predecesor", "lista": "PROCEDIMIENTO>FABRICACION", "paso": "", "orden_paso": 5,
+                 "predecesor_orden": 2, "predecesor_lista": "PROCEDIMIENTO>DOCUMENTACION"})
+    a = cb.planificar(otra, snap)[0]
+    assert a.estado == cb.PENDIENTE and a.params["_pred"] == (doc[1]["cod"], 2)
+    # nombre aproximado de la lista (si es único)
+    aprox = spec({"accion": "cambiar_predecesor", "lista": "FABRICA", "paso": "", "orden_paso": 5, "predecesor_orden": 2,
+                  "predecesor_lista": "DOCUMENTA"})
+    assert cb.planificar(aprox, snap)[0].estado == cb.PENDIENTE
+    sin_lista = spec({"accion": "cambiar_predecesor", "lista": "FABRICACION", "paso": "", "orden_paso": 5,
+                      "predecesor_orden": 2, "predecesor_lista": "ENVASE"})
+    assert cb.planificar(sin_lista, snap)[0].estado == cb.ERROR
+
+
+def test_decimales_por_orden():
+    snap = snap_base()
+    sol = {"id": 9, "rmd": "1", "resumen": "x", "cambios": [
+        {"accion": "configurar_decimal", "lista": "PROCEDIMIENTO>RENDIMIENTO", "paso": "", "orden_paso": 3, "decimal": 2}]}
+    plan = cb.planificar(so.a_spec(sol), snap)
+    so._revisar_decimales(plan, snap)
+    assert plan[0].estado in (cb.PENDIENTE, cb.APLICADO), plan[0].mensajes
+    assert plan[0].params["_orden_paso"] == 3
+    malo = {**sol, "cambios": [{"accion": "configurar_decimal", "lista": "PROCEDIMIENTO>FABRICACION", "paso": "",
+                                "orden_paso": 4, "decimal": 2}]}
+    plan = cb.planificar(so.a_spec(malo), snap)
+    so._revisar_decimales(plan, snap)
+    assert plan[0].estado == cb.ERROR  # «Realizado por» no es numérico
+
+
+MASTERS = [
+    {"md_id": "a1", "codigo": "2202600001", "version": 3, "etapa": "FABRICACION", "principal": "2202600001", "estado": "Autorizado", "descripcion": "X"},
+    {"md_id": "a2", "codigo": "2202600002", "version": 4, "etapa": "FABRICACION", "principal": "2202600001", "estado": "Ingresado", "descripcion": "X"},
+    {"md_id": "a0", "codigo": "2202600000", "version": 2, "etapa": "FABRICACION", "principal": "2202600001", "estado": "Suspendido", "descripcion": "X"},
+    {"md_id": "b1", "codigo": "2202600010", "version": 1, "etapa": "ENVASE", "principal": "2202600010", "estado": "Autorizado", "descripcion": "X"},
+    {"md_id": "c1", "codigo": "2202600020", "version": 1, "etapa": "INSPECCIÓN", "principal": "2202600020", "estado": "Autorizado", "descripcion": "X"},
+]
+
+
+def test_ubicar_rmd_por_material_etapa_y_lote():
+    m, err = so.elegir_rmd(MASTERS, [], "FABRICACION")
+    assert m["codigo"] == "2202600001" and not err  # vigente = última Autorizada
+    m, _ = so.elegir_rmd(MASTERS, [], "INSPECCION")  # sin tilde igual coincide
+    assert m["codigo"] == "2202600020"
+    # con lote: manda «Ver OP» (aquí la OP corre en la versión Ingresada)
+    m, _ = so.elegir_rmd(MASTERS, [{"md_id": "a2", "orden": "2100000001", "lote": "L123"}], "FABRICACION", "L123")
+    assert m["codigo"] == "2202600002"
+    m, err = so.elegir_rmd(MASTERS, [{"md_id": "b1", "orden": "1", "lote": "L9"}], "FABRICACION", "L9")
+    assert m is None and "Ver OP" in err
+    assert so.elegir_rmd(MASTERS, [], "ACONDICIONADO")[0] is None
+    dos = MASTERS + [{"md_id": "d1", "codigo": "2202600030", "version": 1, "etapa": "ENVASE", "principal": "2202600030", "estado": "Autorizado", "descripcion": "Y"}]
+    m, err = so.elegir_rmd(dos, [], "ENVASE")
+    assert m is None and "lote" in err

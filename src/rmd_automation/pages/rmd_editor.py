@@ -396,10 +396,12 @@ class RmdEditor:
         tipo_dato: str | None = None,
         decimal: int | str | None = None,
         casillas: Iterable[str] | None = None,
+        orden: int | None = None,
     ) -> None:
-        """Ajusta tipo de dato, decimal y casillas (Edit, R. Por, V.B., Estado CC…) de un paso y guarda."""
+        """Ajusta tipo de dato, decimal y casillas (Edit, R. Por, V.B., Estado CC…) de un paso y guarda.
+        Con `orden` la fila se ubica por posición (el bot guiado identifica el paso solo por su orden)."""
         self.abrir_pasos(estructura, etiqueta)
-        fila = self._fila(paso)
+        fila = self._fila_orden(int(orden)) if orden else self._fila(paso)
         if tipo_dato:
             self.establecer_tipo_dato(paso, tipo_dato)
         if decimal is not None:

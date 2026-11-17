@@ -8,8 +8,9 @@ Acciones soportadas (todas sobre una versión Ingresada; nunca se envía ni se a
   quitar_pasos / agregar_pasos          lista: "PROCEDIMIENTO>DOCUMENTACION", pasos: [texto o código]
   configurar_paso                       lista, paso (texto), tipo_dato, decimal, casillas
   predecesores_secuenciales             lista: regla "anterior, salvo Sin tipo de dato"
-  cambiar_predecesor                    lista, paso (texto o código), orden_paso?, y predecesor (texto o
-                                        código) + predecesor_orden?, o sin_predecesor: true («habilitar el paso»)
+  cambiar_predecesor                    lista, paso (texto o código) y/o orden_paso, y predecesor (texto o
+                                        código) y/o predecesor_orden (+ predecesor_lista si está en otra lista),
+                                        o sin_predecesor: true («habilitar el paso»)
 """
 from __future__ import annotations
 
@@ -69,7 +70,10 @@ def _lista(snap: dict, nombre: str):
     for l in listas(snap):
         if l.nombre == n or l.nombre.endswith(n) or l.nombre.split(">")[-1] == n:
             return l
-    return None
+    # Nombre aproximado (p. ej. el bot guiado ofrece "NOTAS IMPORTANTES"): vale si coincide con una sola lista.
+    ultima = n.split(">")[-1]
+    parecidas = [l for l in listas(snap) if ultima in l.nombre]
+    return parecidas[0] if len(parecidas) == 1 else None
 
 
 def _coincidencias(lista, texto: str) -> List[dict]:
@@ -119,11 +123,11 @@ def _plan_configurar(a: Accion, snap: dict) -> None:
     if lst is None:
         a.estado, a.mensajes = ERROR, [f"no existe la lista {a.params['lista']!r}"]
         return
-    m = _coincidencias(lst, str(a.params["paso"]))
-    if len(m) != 1:
-        a.estado, a.mensajes = ERROR, [f"el paso {a.params['paso']!r} coincide con {len(m)} pasos"]
+    p, err = _paso_unico(lst, str(a.params.get("paso") or ""), a.params.get("orden_paso"))
+    if p is None:
+        a.estado, a.mensajes = ERROR, [err]
         return
-    p = m[0]
+    a.params["_orden_paso"] = _ord(lst, p)
     difs = []
     if "tipo_dato" in a.params and p.get("td") != a.params["tipo_dato"]:
         difs.append(f"tipo {p.get('td')} → {a.params['tipo_dato']}")
@@ -206,8 +210,16 @@ def _plan_predecesor(a: Accion, snap: dict) -> None:
     texto_pred = str(a.params.get("predecesor") or "")
     orden_pred = a.params.get("predecesor_orden")
     candidatos = []
-    # Primero en la misma lista; si no está, en cualquier otra (los primeros pasos cruzan etiquetas).
-    for l in [lst] + [x for x in listas(snap) if x.nombre != lst.nombre]:
+    if a.params.get("predecesor_lista"):
+        l_dada = _lista(snap, a.params["predecesor_lista"])
+        if l_dada is None:
+            a.estado, a.mensajes = ERROR, [f"no existe la lista {a.params['predecesor_lista']!r}"]
+            return
+        donde = [l_dada]
+    else:
+        # Primero en la misma lista; si no está, en cualquier otra (los primeros pasos cruzan etiquetas).
+        donde = [lst] + [x for x in listas(snap) if x.nombre != lst.nombre]
+    for l in donde:
         for p in _coincidencias(l, texto_pred):
             if orden_pred and _ord(l, p) != int(orden_pred):
                 continue
@@ -308,7 +320,8 @@ def ejecutar(spec: Spec, plan: List[Accion], automation, actualizar_en_linea: bo
                     editor.cerrar_dialogo()  # "Etiqueta (n)"
             elif a.tipo == "configurar_paso":
                 est, _, etq = p["lista"].partition(">")
-                editor.configurar_paso(est, etq or None, p["paso"], p.get("tipo_dato"), p.get("decimal"), p.get("casillas"))
+                editor.configurar_paso(est, etq or None, p.get("paso") or "", p.get("tipo_dato"), p.get("decimal"), p.get("casillas"),
+                                      orden=p.get("_orden_paso") if not p.get("paso") else None)
             elif a.tipo == "predecesores_secuenciales":
                 est, _, etq = p["lista"].partition(">")
                 editor.abrir_pasos(est, etq or None)

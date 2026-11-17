@@ -96,10 +96,11 @@ def a_spec(sol: dict) -> cb.Spec:
     out: List[Dict[str, Any]] = []
     for c in sol.get("cambios") or []:
         if c.get("accion") == "cambiar_predecesor":
-            x = {k: c[k] for k in ("lista", "paso", "orden_paso", "predecesor", "predecesor_orden", "sin_predecesor") if k in c}
+            x = {k: c[k] for k in ("lista", "paso", "orden_paso", "predecesor", "predecesor_orden", "predecesor_lista", "sin_predecesor") if k in c}
             out.append({"accion": "cambiar_predecesor", **x})
         elif c.get("accion") == "configurar_decimal":
-            out.append({"accion": "configurar_paso", "lista": c["lista"], "paso": c["paso"], "decimal": int(c["decimal"])})
+            out.append({"accion": "configurar_paso", "lista": c["lista"], "paso": c.get("paso") or "",
+                        "orden_paso": c.get("orden_paso"), "decimal": int(c["decimal"])})
         else:
             raise ValueError(f"acción no automática: {c.get('accion')!r}")
     if not out:
@@ -113,9 +114,62 @@ def _revisar_decimales(plan: List[cb.Accion], snap: dict) -> None:
         if a.tipo != "configurar_paso" or a.estado == cb.ERROR:
             continue
         lst = cb._lista(snap, a.params["lista"])
-        m = cb._coincidencias(lst, str(a.params["paso"])) if lst else []
-        if len(m) == 1 and m[0].get("td") not in TIPOS_CON_DECIMAL:
-            a.estado, a.mensajes = cb.ERROR, [f"el paso es de tipo {m[0].get('td')!r}, no es un dato numérico"]
+        p = cb._paso_unico(lst, str(a.params.get("paso") or ""), a.params.get("orden_paso"))[0] if lst else None
+        if p is not None and p.get("td") not in TIPOS_CON_DECIMAL:
+            a.estado, a.mensajes = cb.ERROR, [f"el paso es de tipo {p.get('td')!r}, no es un dato numérico"]
+
+
+def _sin_tildes(t: str) -> str:
+    import unicodedata
+
+    return "".join(c for c in unicodedata.normalize("NFD", str(t or "").upper()) if unicodedata.category(c) != "Mn").strip()
+
+
+def elegir_rmd(masters: List[dict], ops: List[dict], etapa: str, lote: str = "") -> tuple[Optional[dict], str]:
+    """Del material + etapa (y el lote, si se dio) saca el RMD a configurar. Devuelve (master, error).
+
+    Con lote: el RMD cuya «Ver OP» tiene ese lote (así se confirma que es el que está en proceso).
+    Sin lote: la última versión Autorizada (vigente); si hay varios masters distintos, lo ve el analista.
+    """
+    cand = [m for m in masters if _sin_tildes(m.get("etapa")) == _sin_tildes(etapa)]
+    if not cand:
+        return None, f"no hay RMD del material en la etapa {etapa}"
+    if lote:
+        ids = {o["md_id"] for o in ops}
+        con_lote = [m for m in cand if m["md_id"] in ids]
+        if len(con_lote) == 1:
+            return con_lote[0], ""
+        if not con_lote:
+            return None, f"el lote {lote} no aparece en «Ver OP» de los RMD de ese material y etapa"
+        return None, f"el lote {lote} aparece en varios RMD: " + ", ".join(f"{m['codigo']} v{m['version']}" for m in con_lote)
+    aut = [m for m in cand if m.get("estado") == "Autorizado"]
+    if not aut:
+        return None, "el material no tiene un RMD Autorizado en esa etapa; indica el lote para ubicar el RMD"
+    familias = {m.get("principal") or m["codigo"] for m in aut}
+    if len(familias) > 1:
+        return None, "hay varios RMD Autorizados de ese material y etapa (" + ", ".join(sorted(familias)) + "); indica el lote"
+    return max(aut, key=lambda m: m["version"]), ""
+
+
+def ubicar_rmd(page, sol: dict) -> tuple[Optional[str], str]:
+    """Si la solicitud no trae código de RMD, lo busca con material + etapa (+ lote en «Ver OP»). Solo lectura."""
+    from importlib import resources
+
+    from .pages import base
+
+    if sol.get("rmd"):
+        return str(sol["rmd"]), ""
+    if not (sol.get("material") and sol.get("etapa")):
+        return None, "la solicitud no trae RMD ni material y etapa"
+    script = resources.files("rmd_automation").joinpath("js/ubicar.js").read_text(encoding="utf-8")
+    base.esperar_app(page)
+    page.evaluate(script)
+    datos = page.evaluate("([m, l]) => window.__ubicarRmd(m, l)", [str(sol["material"]), sol.get("op_lote") or ""])
+    m, err = elegir_rmd(datos["masters"], datos["ops"], sol["etapa"], sol.get("op_lote") or "")
+    if m is None:
+        return None, f"Material {sol['material']}, etapa {sol['etapa']}: {err}."
+    lote = f", lote {sol['op_lote']} confirmado en Ver OP" if sol.get("op_lote") else " (última versión Autorizada)"
+    return m["codigo"], f"RMD {m['codigo']} v{m['version']} {m['estado']} ({m['descripcion']}){lote}."
 
 
 def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], None] = print) -> tuple[str, str]:
@@ -123,6 +177,14 @@ def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], Non
     from .actions import RmdAutomation
     from .extraer import extraer
 
+    rmd, ubicado = ubicar_rmd(page, sol)
+    if rmd is None:
+        return "revisar", ubicado
+    if not sol.get("rmd"):
+        log(ubicado)
+        if not simular:
+            _sb(f"chatbot_solicitudes?id=eq.{sol['id']}", "PATCH", {"rmd": rmd})
+    sol = {**sol, "rmd": rmd}
     sp = a_spec(sol)
     snap = extraer(page, sp.rmd, procesos_menores=False)
     estado_rmd = snap.get("estado")
@@ -145,8 +207,8 @@ def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], Non
     final = cb.plan_a_texto(sp, despues)
     linea = f"\nActualizar RMD en Línea: {aviso or 'sin aviso del portal'}"
     if not ok:
-        return "revisar", "Se aplicó pero la verificación encontró diferencias:\n" + final + linea
-    return "ejecutada", f"Aplicado y verificado en el RMD {sp.rmd} ({estado_rmd}):\n" + final + linea
+        return "revisar", (ubicado + "\n" if ubicado else "") + "Se aplicó pero la verificación encontró diferencias:\n" + final + linea
+    return "ejecutada", (ubicado + "\n" if ubicado else "") + f"Aplicado y verificado en el RMD {sp.rmd} ({estado_rmd}):\n" + final + linea
 
 
 def atender(limite: int = 5, simular: bool = False, log: Callable[[str], None] = print) -> int:

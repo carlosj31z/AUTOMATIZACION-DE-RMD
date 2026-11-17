@@ -444,6 +444,12 @@ cuenta). Escribir y responder siempre en **español**.
   `.github/workflows/atender-solicitudes.yml` (repo público: registro con `--silencioso`). Solo `cambiar_predecesor` y
   `configurar_decimal`, en Ingresados o Autorizados; tras Guardar pulsa **«Actualizar RMD en Línea»** (regla de Carlos: así
   llega a la OP en proceso) y vuelve a leer para verificar. Acción nueva `cambiar_predecesor` en `cambios.py`.
+- **Decisión de Carlos (2026-11-16): sin IA y gratis**: el bot es **guiado, con opciones cerradas** (status-rmd `api/_chatbot/guiado.js`;
+  Claude queda opcional con `CHATBOT_MOTOR=claude`). Identifica el paso solo por lista + número de orden (`orden_paso`,
+  `predecesor_orden`, `predecesor_lista`).
+- **Regla de Carlos: Producción no da el código del RMD sino material + etapa**, y el lote si hace falta. `solicitudes.ubicar_rmd`
+  (js/ubicar.js, solo lectura): MD por `codDefectoReceta` + `nivelTxt`; con lote, el RMD cuya «Ver OP» (`/RMD`, `lote`) lo tiene;
+  sin lote, la última versión Autorizada; si hay dudas (varios masters, lote en otro RMD) pasa a `revisar`.
 - Pendiente: probar el inicio de sesión desde GitHub (`solicitudes probar-login`) y la primera escritura real en el RMD de
   pruebas 2202609013.
 
