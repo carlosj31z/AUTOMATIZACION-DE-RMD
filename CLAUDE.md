@@ -457,11 +457,13 @@ cuenta). Escribir y responder siempre en **español**.
   master y estado del RMD (última versión y vigente). El ejecutor (`solicitudes.atender_lectura`) genera la plantilla con el
   userscript del repo inyectado en la app (`__rmdStats.plantilla.generar`), el PDF con `_JS_PDF_MASTER` de la contingencia, los
   sube al bucket privado `chatbot-archivos` de Supabase (lo crea si falta) y deja un enlace firmado de 7 días. No escribe en SAP.
-- **Sin clave (2026-11-17)**: el chat web funciona sin clave; sin ella, cambios y documentos esperan la aprobación del analista
-  (el estado se responde solo). El enlace `status-rmd.vercel.app/chatbot/whatsapp.html#clave=<CHATBOT_CLAVE>` la guarda en el
-  equipo y lo deja directo. El bot trata de usted, sin emojis, y entiende saludos y pedidos escritos por palabras clave.
+- **Sin supervisión (2026-11-17, decisión de Carlos en tarjeta, con el riesgo explicado: la página es pública)**: todo lo que el
+  ejecutor sabe atender (habilitar paso, decimales, plantilla, PDF, estado) va directo, con o sin lote y sin clave (status-rmd
+  PR #94); las consultas libres van al analista y `CHATBOT_MODO=aprobacion` en Vercel vuelve a frenar los cambios. El bot trata
+  de usted, sin emojis, y entiende saludos y pedidos escritos por palabras clave. Los enlaces firmados llevan `download=`
+  (Supabase sirve el .html como texto plano). Primera plantilla real entregada desde GitHub el 2026-11-17.
 - Inicio de sesión desde GitHub verificado (run #5, 2026-11-17). Pendiente: la primera escritura real en el RMD de pruebas
-  2202609013 y la primera plantilla / PDF real desde GitHub.
+  2202609013.
 
 ## Datos que no van en el repo
 
