@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -16,7 +17,9 @@ def rmd_session(config: RMDConfig) -> Iterator[Page]:
         return
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=config.headless)
-        context = browser.new_context()
+        # En español, como en las PC de Medifarma: los selectores usan los textos del portal en español («Ir»,
+        # «Guardar»...). En GitHub Actions el navegador sale en inglés y la app muestra «Go», así que no cargaba.
+        context = browser.new_context(locale="es-PE", timezone_id="America/Lima", extra_http_headers={"Accept-Language": "es-PE,es;q=0.9"})
         context.set_default_timeout(config.default_timeout_ms)
         page = context.new_page()
         try:
@@ -44,9 +47,9 @@ def _login(page: Page, config: RMDConfig) -> None:
     servicio exento de MFA, no con la cuenta personal de un usuario.
     """
     page.goto(config.launchpad_url)
-    page.get_by_placeholder("Email or User Name").fill(config.username)
-    page.get_by_placeholder("Password").fill(config.password)
-    page.get_by_role("button", name="Continue").click()
+    page.get_by_placeholder(re.compile(r"Email|Correo|Usuario|User", re.I)).first.fill(config.username)
+    page.locator("input[type=password]").first.fill(config.password)
+    page.get_by_role("button", name=re.compile(r"^(Continue|Continuar|Iniciar sesi[oó]n|Log On|Sign In)$", re.I)).first.click()
     page.wait_for_load_state("networkidle")
 
 
