@@ -234,5 +234,5 @@ def test_subir_archivo_crea_bucket_y_firma(monkeypatch):
 
     monkeypatch.setattr(so, "_storage", falso)
     url = so.subir_archivo(9, "RMD 2202 v8 máster.pdf", b"x", "application/pdf")
-    assert url.endswith("/storage/v1/object/sign/chatbot-archivos/9/a.pdf?token=t")
+    assert url.endswith("/storage/v1/object/sign/chatbot-archivos/9/a.pdf?token=t&download=RMD_2202_v8_master.pdf")
     assert llamadas[1] == "object/chatbot-archivos/9/RMD_2202_v8_master.pdf"

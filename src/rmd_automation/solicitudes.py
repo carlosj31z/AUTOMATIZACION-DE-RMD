@@ -259,7 +259,10 @@ def subir_archivo(sol_id: int, nombre: str, contenido: bytes, tipo: str) -> str:
     firmado = _storage(f"object/sign/{BUCKET}/{urllib.parse.quote(ruta)}",
                        json.dumps({"expiresIn": DIAS_ENLACE * 24 * 3600}).encode())
     url = firmado.get("signedURL") or firmado.get("signedUrl") or ""
-    return url if url.startswith("http") else f"{SUPABASE_URL}/storage/v1{url}"
+    url = url if url.startswith("http") else f"{SUPABASE_URL}/storage/v1{url}"
+    # Supabase sirve el .html como texto plano (por seguridad): con «download» el enlace baja el archivo con su nombre
+    # y se abre en el navegador del equipo como la plantilla de siempre.
+    return f"{url}{'&' if '?' in url else '?'}download={urllib.parse.quote(_seguro(nombre))}"
 
 
 def _frame_app(page):
