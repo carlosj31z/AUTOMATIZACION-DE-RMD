@@ -237,6 +237,20 @@ with sync_playwright() as p:
         filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}] + [{"desc": t, "tipo": "Realizado por"} for t in textos]
         abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
         return [f["falta"] for f in a["filas"]] == [False, False, False, False, False, False, True], str([f["falta"] for f in a["filas"]])
+    @prueba("LN64 Repetidos y reglas de Carlos (v1.146.0): paso igual al anterior y palabra duplicada seguida se marcan en la Descripción y cuentan como incoherencias; procesos menores de Calidad en Operaciones con tipo de dato piden Estado CC y Edit; «TOMAR LA MUESTRA DESDE…» va sin tipo de dato")
+    def _():
+        filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}, {"desc": "SELLAR LAS CAJAS.", "tipo": "Realizado por", "dep": "1000 (1)"},
+                 {"desc": "SELLAR LAS  CAJAS", "tipo": "Realizado por", "dep": "1001 (2)"}, {"desc": "VERIFICAR QUE COINCIDAN COINCIDAN CON LA INFORMACION.", "tipo": "Realizado por", "dep": "1002 (3)"}]
+        abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
+        des = [f["faltaDes"] for f in a["filas"]]   # (la cuenta lleva además el MARCAR Edit de la Notificación de la 1.ª fila)
+        r = pg.evaluate("""() => { const R = (o) => window.__rmdStats.reglasDeFila(Object.assign({ esPM: true, chk: { 'EDIT': false, 'ESTADO CC': false } }, o)).map((x) => x.col + ':' + x.clase).sort().join(',');
+          return { ceo: R({ padre: 'CALIDAD EN OPERACIONES REGISTRA LOS RESULTADOS:', tipo: 'Texto', desc: 'DESCRIPCION (ASPECTO): MASA BLANCA.' }),
+                   otro: R({ padre: 'MOLER LA MEZCLA', tipo: 'Texto', desc: 'DESCRIPCION (ASPECTO): MASA BLANCA.' }),
+                   sin: R({ padre: 'CALIDAD EN OPERACIONES REGISTRA LOS RESULTADOS:', tipo: 'Sin tipo de dato', desc: 'NOTA: X' }),
+                   muestra: R({ padre: 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA Y REALIZA EL MUESTREO', tipo: 'Verificación Check', desc: 'TOMAR LA MUESTRA DESDE LA VALVULA.', chk: { 'EDIT': true, 'ESTADO CC': false } }) }; }""")
+        ok = (des == [False, False, True, True] and "Paso repetido" in a["filas"][2]["avisoDes"] and "COINCIDAN COINCIDAN" in a["filas"][3]["avisoDes"] and "3 incoherencias" in (a["cuenta"] or "")
+              and r["ceo"] == "EDIT:rmd-marcar,ESTADO CC:rmd-marcar" and r["otro"] == "EDIT:rmd-marcar" and r["sin"] == "" and r["muestra"] == "TIPO DATO:rmd-falta")
+        return ok, f"{des} {a['cuenta']!r} {r}"
     @prueba("LN4 'VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.' y 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA…' son correctos; los demás 'CONTROL DE CALIDAD' se alertan")
     def _():
         textos = [("VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.", False),
@@ -901,7 +915,7 @@ with sync_playwright() as p:
               and any(a.startswith("info:Paso nuevo") for a in r["av"]["n1"]) and any("CANTIDAD MUESTREADA" in a for a in r["av"]["n2"]) and any(a.startswith("aviso:En el catálogo este paso es de DOC") for a in r["av"]["n3"])
               and not any("Debe decir" in a for a in r["av"]["n7"] + r["av"]["n8"]) and any(a.startswith("aviso:Debe decir «CALIDAD EN OPERACIONES»") for a in r["av"]["n9"])
               and any(a.startswith("error:El valor inicial es mayor") for a in r["av"]["n4"]) and any(a.startswith("aviso:El paso 2005 ya está en esta lista") for a in r["av"]["n5"])
-              and any("depende" in a for a in r["av"]["P12"]) and not r["av"]["P21"] and any(a.startswith("info:Ya está así en SAP") for a in r["av"]["P20"]))
+              and any("depende" in a for a in r["av"]["P12"]) and r["av"]["P21"] and all("Paso repetido" in a for a in r["av"]["P21"]) and any(a.startswith("info:Ya está así en SAP") for a in r["av"]["P20"]))
         return ok, json.dumps(r, ensure_ascii=False)[:1900]
     PP_CTX = br.new_context(accept_downloads=True)
     @prueba("LN28 Plantilla para Producción · el archivo (v1.41, borrador): se abre sin SAP con la numeración del PDF; cambiar un texto enlaza solo el paso existente igual; un texto nuevo queda «★ Se creará»; quitar, deshacer, mover, agregar equipo, comentario; «Guardar borrador» pide la solicitud y descarga el archivo, que al volver a abrirlo trae todo")

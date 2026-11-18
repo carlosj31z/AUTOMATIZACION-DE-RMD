@@ -15,16 +15,20 @@ let fallas = 0;
 const ok = (nombre, cond, detalle = '') => { console.log((cond ? 'PASA  ' : 'FALLA ') + nombre + (cond || !detalle ? '' : ' — ' + detalle)); if (!cond) fallas++; };
 
 // paso viejo -> vigente por planta
-ok('PDSG-202 (161493) en LIMA -> 182341', (PPN.homologacionPaso(161493, 'PLANTA LIMA') || {}).codigo === 182341);
-ok('PDSG-202 (1655) en ATE -> 182341', (PPN.homologacionPaso('1655', 'PLANTA ATE') || {}).codigo === 182341);
+ok('PDSG-202 (161493) en LIMA -> 186337', (PPN.homologacionPaso(161493, 'PLANTA LIMA') || {}).codigo === 186337);
+ok('PDSG-202 (1655) en ATE -> 186337', (PPN.homologacionPaso('1655', 'PLANTA ATE') || {}).codigo === 186337);
+ok('POE PDOC-207 (182341) en LIMA -> 186337 (v1.146.0)', (PPN.homologacionPaso(182341, 'PLANTA LIMA') || {}).codigo === 186337);
 ok('«hagan» (31840) en ATE -> 62221', (PPN.homologacionPaso(31840, 'PLANTA ATE') || {}).codigo === 62221);
 ok('«hagan» (31840) en LIMA -> 166452', (PPN.homologacionPaso(31840, 'PLANTA LIMA') || {}).codigo === 166452);
 ok('sin planta y plantas distintas: no adivina', PPN.homologacionPaso(31840, '') === null);
-ok('paso vigente no se marca', PPN.homologacionPaso(182341, 'PLANTA LIMA') === null);
+ok('paso vigente no se marca', PPN.homologacionPaso(186337, 'PLANTA LIMA') === null);
 
 // términos
 const h1 = PPN.homologarTexto('Los vistos buenos (V°B°) serán realizados ... según el POE PDSG-202 vigente.');
-ok('PDSG-202 -> PDOC-207 y (VB)', /PDOC-207/.test(h1.texto) && /\(VB\)/.test(h1.texto) && !/[ÁÉÍÓÚ]/.test(h1.texto), h1.texto);
+ok('PDSG-202 -> PROCEDIMIENTO PDOC-207 y (V°B°)', /SEGUN EL PROCEDIMIENTO PDOC-207/.test(h1.texto) && /\(V°B°\)/.test(h1.texto) && !/[ÁÉÍÓÚ]/.test(h1.texto), h1.texto);
+const h1b = PPN.homologarTexto('LOS VISTOS BUENOS (V°B°) SERAN REALIZADOS Y REGISTRADOS EXCLUSIVAMENTE POR EL JEFE O SUPERVISOR DE SECCION, QUIEN DEBERA REVISAR QUE LA DATA REGISTRADA SEA CONTEMPORANEA SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE.');
+ok('nota V°B° vigente (186337) sin términos por homologar', h1b.reglas.length === 0, h1b.reglas.join(' | '));
+ok('POE PDOC-207 y (VB) -> PROCEDIMIENTO y (V°B°)', /\(V°B°\).*PROCEDIMIENTO PDOC-207/.test(PPN.homologarTexto('LOS VISTOS BUENOS (VB) ... SEGUN EL POE PDOC-207 VIGENTE.').texto));
 const h2 = PPN.homologarTexto('Controlar que sus compañeros hagan lo mismo.');
 ok('hagan -> realicen, conserva la Ñ', h2.texto === 'CONTROLAR QUE SUS COMPAÑEROS REALICEN LO MISMO.', h2.texto);
 ok('instructivo y vigente', PPN.homologarTexto('REALIZAR EL DESPEJE DE LA SALA SEGUN IPRO-P212 VIGENTE.').texto === 'REALIZAR EL DESPEJE DE LA SALA SEGUN INSTRUCTIVO IPRO-P212 VIGENTE.');
