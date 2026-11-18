@@ -57,6 +57,11 @@ ok('Calidad en Operaciones completo: sin aviso', !tiene('m10', /Calidad en Opera
 ok('TOMAR LA MUESTRA DESDE con tipo: Sin tipo de dato', tiene('m7', /Sin tipo de dato/), txt('m7'));
 ok('los repetidos llegan a Producción (k dup)', (av.get('m3') || []).some((x) => x.k === 'dup'));
 
+// v1.146.1: un grupo que se repite por equipo (SELLADORA N° 5 / N° 06: VELOCIDAD, VACIO, SELLADO) no es repetido; solo el igual al inmediatamente anterior
+const t3 = { estructuras: [{ estructuraId: 'E', pasos: [{ id: 's', codigo: '1', texto: 'SELLADO AL VACIO:', tipo: 446, pm: ['SELLADORA AL VACIO N° 5', 'VELOCIDAD:', 'VACIO:', 'SELLADO:', 'SELLADORA AL VACIO N°06', 'VELOCIDAD:', 'VACIO:', 'SELLADO:'].map((t, i) => ({ id: 'g' + i, codigo: String(100 + i), texto: t })) }] }] };
+const av3 = PPN.avisos(t3, {});
+ok('grupo repetido por equipo: sin «Proceso menor repetido»', ![...av3.values()].flat().some((x) => /Proceso menor repetido/.test(x.texto)), JSON.stringify([...av3]));
+
 // copias de lote (duplicar un lote) no son repetidos
 const t2 = { estructuras: [{ estructuraId: 'E', pasos: [{ id: 'a', codigo: '1', texto: 'PESAR', tipo: 438, pm: [] }, { id: 'b', codigo: '1', texto: 'PESAR', tipo: 438, copiaDe: 'a', pm: [] }] }] };
 ok('copia de lote no se marca como repetido', !/Paso repetido/.test(((PPN.avisos(t2, {}).get('b')) || []).map((x) => x.texto).join()));

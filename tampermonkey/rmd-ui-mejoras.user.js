@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.146.0
+// @version      1.146.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.146.0';                                                       // mantener igual a @version
+  const VERSION = '1.146.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2217,11 +2217,11 @@
     });
 
     let alertas = 0; const primeras = [];
-    // v1.146.0: repetidos (pasos: igual al anterior; procesos menores: igual a otro del mismo paso) y paso padre de la ventana de procesos menores
+    // v1.146.0: repetidos = igual al inmediatamente anterior (v1.146.1: también en procesos menores; un grupo que se repite por equipo no cuenta) y paso padre de la ventana de procesos menores
     const claves = filas.map((tr) => { const td = iDes >= 0 ? celda(tr, iDes) : null, ins = esPM && ((iCant >= 0 && norm((inputDe(celda(tr, iCant)) || {}).value)) || (iUM >= 0 && norm(celda(tr, iUM) && celda(tr, iUM).textContent)));
       return td && !ins ? claveRepetido(td.textContent) : ''; });
     const ordenDe = (k) => norm(iOrd >= 0 ? (inputDe(celda(filas[k], iOrd)) || {}).value : '') || String(k + 1);
-    const repetidoDe = claves.map((c, k) => { if (!c) return -1; if (esPasos) return k > 0 && claves[k - 1] === c ? k - 1 : -1; if (esPM) return claves.indexOf(c); return -1; }).map((j, k) => (j === k ? -1 : j));
+    const repetidoDe = claves.map((c, k) => { if (!c) return -1; if (esPasos || esPM) return k > 0 && claves[k - 1] === c ? k - 1 : -1; return -1; }).map((j, k) => (j === k ? -1 : j));
     const padre = esPM ? pasoPadreDePM(d) : null;
     // Predecesor obligatorio con tipo de dato, salvo el primero de PRECAUCIONES, condicionales/paralelos y RENDIMIENTO / CONDICIONES AMBIENTALES.
     const lista = esPasos ? nombreDeLista(tabla, filas, iTipo, iDes) : ''; d.__rmdListaEfectiva = lista;
@@ -2260,7 +2260,7 @@
         avisos.push(msg);
       });
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
-      if (iDes >= 0 && repetidoDe[k] >= 0) marcarFalta(iDes, esPasos ? `Paso repetido: es igual al paso anterior (orden ${ordenDe(repetidoDe[k])}). Quita uno.` : `Proceso menor repetido: es igual al de orden ${ordenDe(repetidoDe[k])} de este mismo paso. Quita uno.`);
+      if (iDes >= 0 && repetidoDe[k] >= 0) marcarFalta(iDes, esPasos ? `Paso repetido: es igual al paso anterior (orden ${ordenDe(repetidoDe[k])}). Quita uno.` : `Proceso menor repetido: es igual al anterior (orden ${ordenDe(repetidoDe[k])}). Quita uno.`);
       if (esPM && iDes >= 0 && padre && padre.tipo && claves[k] && RX_NOTA_SUPERVISOR.test(claves[k]) && notaSupervisorSobra(padre.tipo, padre.vb)) marcarFalta(iDes, MSG_NOTA_SUPERVISOR);
       if (iDep >= 0) {
         const sinTipo = t === 'SIN TIPO DE DATO', v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
@@ -3751,9 +3751,9 @@
       if (tabla.__rmdPM !== estado) return;
       const conAvisos = new Map(), padres = descripcionesDePasos(tabla, filas);
       if (porPaso) porPaso.forEach((l, paso) => {
-        const vistos = new Map();                                       // v1.146.0: procesos menores repetidos dentro del paso
+        let previo = null;                                       // v1.146.1: proceso menor igual al inmediatamente anterior
         const mal = l.map((q) => { const av = avisosDePM(q, padres.get(paso)), c = q.insumo ? '' : claveRepetido(q.desc);
-          if (c && vistos.has(c)) av.push(`Proceso menor repetido: es igual al de orden ${vistos.get(c)} de este mismo paso. Quita uno.`); else if (c) vistos.set(c, q.orden);
+          if (c && previo && previo.c === c) av.push(`Proceso menor repetido: es igual al anterior (orden ${previo.orden}). Quita uno.`); if (c) previo = { c, orden: q.orden };
           return { ...q, avisos: av }; }).filter((q) => q.avisos.length);
         if (mal.length) conAvisos.set(paso, mal); });
       estado.porPaso = conAvisos; estado.todos = porPaso || null; estado.cargando = false;
@@ -18152,8 +18152,8 @@
           // v1.146.0 (pedido de Carlos): repetidos = incoherencia, aunque ya estén así en SAP
           const k = normalizar(x.texto), ant = vivos(l)[vivos(l).indexOf(x) - 1];
           if (k && ant && normalizar(ant.texto) === k && !x.copiaDe && !ant.copiaDe && !(x.codigo && String(x.codigo) === String(ant.codigo || '') && !(igualQueSap(x) && igualQueSap(ant)))) add(x.id, 'aviso', `Paso repetido: es igual al paso anterior (${numeros.get(ant.id) || 'más arriba'}). Quita uno.`, 'dup');
-          const pmVistos = new Map();
-          vivos(x.pm).filter((m) => !m.insumo).forEach((m) => { const km = normalizar(m.texto); if (!km) return; if (pmVistos.has(km)) add(m.id, 'aviso', `Proceso menor repetido: es igual al ${numeros.get(pmVistos.get(km)) || 'de más arriba'} de este mismo paso. Quita uno.`, 'dup'); else pmVistos.set(km, m.id); });
+          let pmPrevio = null;                                               // v1.146.1: solo el igual al inmediatamente anterior (un grupo repetido por equipo no cuenta)
+          vivos(x.pm).filter((m) => !m.insumo).forEach((m) => { const km = normalizar(m.texto); if (!km) return; if (pmPrevio && pmPrevio.k === km) add(m.id, 'aviso', `Proceso menor repetido: es igual al anterior (${numeros.get(pmPrevio.id) || 'más arriba'}). Quita uno.`, 'dup'); pmPrevio = { k: km, id: m.id }; });
           // v1.146.0 (regla de Carlos): sin V.B. o con un tipo distinto de «Realizado por y Visto bueno» no va la nota del supervisor
           const tipoP = +((x.dt && x.dt.tipo) || x.tipo) || 0, nota = vivos(x.pm).find((m) => !m.insumo && RX_NOTA_SUP.test(normalizar(m.texto)));
           if (tipoP && nota && (tipoP !== 441 || x.vb === false)) add(nota.id, 'aviso', 'El paso no es «Realizado por y Visto bueno» con V.B.: no lleva la nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…». Quítala.', 'notavb'); });

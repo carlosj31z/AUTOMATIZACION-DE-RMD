@@ -388,7 +388,9 @@ cuenta). Escribir y responder siempre en **español**.
   MUESTRA DESDE…» va «Sin tipo de dato» (`RX_PUNTO_MUESTREO`). **Homologación**: nota de V°B° vigente = 186337 «(V°B°) … SEGUN EL PROCEDIMIENTO PDOC-207
   VIGENTE.» (antes 182341 «POE»); regla nueva `procedimiento-pdoc` y `(VB)` → `(V°B°)` (el ° ya no se pierde al normalizar). **Documentos en la plantilla**:
   si está en la lista, está vigente (`docVencido` ya no mira validez ni estado). Pruebas `qa_repetidos.mjs` y `qa_local.py` LN64.
-  **La siguiente versión debe ser > 1.146.0.**
+- 2026-11-18, v1.146.1: probada la 1.146.0 en el portal real (solo lectura): un grupo de procesos menores que se repite por equipo (SELLADORA
+  N° 5 / N° 06: VELOCIDAD, VACIO, SELLADO) salía como repetido. Ahora el proceso menor repetido es solo el **igual al inmediatamente anterior**
+  (como los pasos). **La siguiente versión debe ser > 1.146.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
