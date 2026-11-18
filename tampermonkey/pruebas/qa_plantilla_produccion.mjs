@@ -52,13 +52,14 @@ ok('Producción: paso homologado de Calidad en Operaciones (161915 -> 180901)', 
 ok('pasosCeo de LIMA trae 180901 y 180902', ['180901', '180902'].every((c) => PPN.pasosCeo('PLANTA LIMA').some((y) => y.codigo === c)));
 ok('pasosCeo solo pasos con CALIDAD EN OPERACIONES', PPN.pasosCeo('PLANTA ATE').every((y) => /CALIDAD EN OPERACIONES/.test(y.texto)));
 // 3) documentos vencidos
-ok('documento obsoleto', /IPRO-E214: figura como «obsoleto»/.test(txt(prod, 'p3')), txt(prod, 'p3'));
-ok('documento con validez pasada', /IPRO-E221: venció el 01\/05\/2020/.test(txt(prod, 'p4')), txt(prod, 'p4'));
+// v1.146.0 (pedido de Carlos): si está en la lista, está vigente (no se mira la validez ni el estado)
+ok('documento en la lista con estado «obsoleto»: vigente', !/IPRO-E214/.test(txt(prod, 'p3')), txt(prod, 'p3'));
+ok('documento en la lista con validez pasada: vigente', !/IPRO-E221/.test(txt(prod, 'p4')), txt(prod, 'p4'));
 ok('documento vigente sin aviso', !txt(prod, 'p5'), txt(prod, 'p5'));
 ok('documento que no está en la lista (con otros del mismo tipo)', /no figura/.test((PPN.docVencido('PPRO-999', docs) || {}).motivo || ''));
 ok('tipo de documento ausente de la lista: no se adivina', PPN.docVencido('FPRO-250', docs) === null);
 ok('sin lista: no avisa', PPN.docVencido('IPRO-E214', null) === null);
-ok('DOC también ve los documentos vencidos', /IPRO-E214/.test(txt(dt, 'p3')));
+ok('DOC tampoco lo marca', !/IPRO-E214/.test(txt(dt, 'p3')));
 // 4) qué anota Producción en un paso nuevo
 ok('paso nuevo sin indicar qué se anota: error', /error:Falta indicar qué anota Producción/.test(txt(prod, 'n:1')), txt(prod, 'n:1'));
 ok('no repite «el equipo RMD lo creará»', !/equipo RMD/.test(txt(prod, 'n:1')), txt(prod, 'n:1'));

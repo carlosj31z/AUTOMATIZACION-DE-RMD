@@ -23,11 +23,10 @@ from typing import Dict, List, Optional, Tuple
 
 
 def normalizar(texto: str) -> str:
-    """Mayúsculas, sin tildes (la Ñ se conserva) y con espacios simples."""
-    t = (texto or "").replace("ñ", "\0").replace("Ñ", "\0")
+    """Mayúsculas, sin tildes (la Ñ y el ° de V°B° se conservan) y con espacios simples."""
+    t = (texto or "").replace("ñ", "\0").replace("Ñ", "\0").replace("º", "\1").replace("°", "\1")
     t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode("ascii")
-    t = t.replace("\0", "Ñ").upper()
-    t = t.replace("V°B°", "VB").replace("VºBº", "VB")
+    t = t.replace("\0", "Ñ").replace("\1", "°").upper()
     return re.sub(r"\s+", " ", t).strip()
 
 
@@ -46,7 +45,10 @@ class Regla:
 REGLAS: List[Regla] = [
     Regla("pdoc-207", r"\bPDSG-202\b", "PDOC-207",
           "POE de buenas prácticas de documentación: PDSG-202 pasó a PDOC-207 (nota de los vistos buenos)."),
-    Regla("vb", r"\(V\.? ?B\.?\)|\(V\s?°\s?B\s?°\)", "(VB)", "Vistos buenos se escriben (VB)."),
+    # 2026-11-18 (Carlos): nota de V°B° homologada = paso 186337 «LOS VISTOS BUENOS (V°B°) ... SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE.»
+    Regla("procedimiento-pdoc", r"\bSEGUN EL POE PDOC-207\b", "SEGUN EL PROCEDIMIENTO PDOC-207",
+          "PDOC-207 es un procedimiento: «SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE» (no «POE»)."),
+    Regla("vb", r"\(V\.? ?B\.?\)|\(V ?° ?B ?°?\)(?<!\(V°B°\))", "(V°B°)", "Vistos buenos se escriben (V°B°)."),
     Regla("realicen", r"\bHAGAN\b", "REALICEN", "«Hagan» se reemplaza por «realicen» (CONTROLAR QUE SUS COMPAÑEROS REALICEN LO MISMO)."),
     Regla("muestra-cc", r"\bMUESTRAS? PARA CONTROL DE CALIDAD\b", "CANTIDAD MUESTREADA",
           "«Muestra(s) para control de calidad (unidad):» pasa a «CANTIDAD MUESTREADA (unidad):»."),

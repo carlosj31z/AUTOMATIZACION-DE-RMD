@@ -7,7 +7,14 @@ def test_normalizar_quita_tildes_y_conserva_enie():
 
 def test_pdsg_a_pdoc():
     t, r = homologar("LOS VISTOS BUENOS (V°B°) ... SEGUN EL POE PDSG-202 VIGENTE.")
-    assert "PDOC-207" in t and "(VB)" in t and "pdoc-207" in r
+    assert "SEGUN EL PROCEDIMIENTO PDOC-207" in t and "(V°B°)" in t and "pdoc-207" in r and "procedimiento-pdoc" in r
+
+
+def test_nota_vb_vigente_186337_sin_reglas():
+    t = ("LOS VISTOS BUENOS (V°B°) SERAN REALIZADOS Y REGISTRADOS EXCLUSIVAMENTE POR EL JEFE O SUPERVISOR DE SECCION, QUIEN DEBERA "
+         "REVISAR QUE LA DATA REGISTRADA SEA CONTEMPORANEA SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE.")
+    assert homologar(t) == (t, [])
+    assert reemplazo_de_paso(182341, "Planta 2").codigo_vigente == 186337
 
 
 def test_hagan_realicen():
@@ -41,8 +48,8 @@ def test_tabla_de_reemplazos():
     filas = cargar_reemplazos()
     assert len(filas) > 100
     r = reemplazo_de_paso(161493, "PLANTA LIMA")
-    assert r and r.codigo_vigente == 182341
-    assert reemplazo_de_paso(1655, "Planta 1").codigo_vigente == 182341
+    assert r and r.codigo_vigente == 186337
+    assert reemplazo_de_paso(1655, "Planta 1").codigo_vigente == 186337
     assert reemplazo_de_paso(31840, "ATE").codigo_vigente == 62221
     assert reemplazo_de_paso(999999999, "ATE") is None
 

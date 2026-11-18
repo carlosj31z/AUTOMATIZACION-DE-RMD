@@ -380,7 +380,15 @@ cuenta). Escribir y responder siempre en **español**.
   de la versión actualizada con su estado (478 Cerrado → status de lote «Conforme» en status-rmd). 1.145.0 publicada en SharePoint el 2026-11-16 (2 435 403 bytes).
 - 2026-11-16, v1.145.1: **pedido de Carlos: todo octubre** («Seguimiento desde» = 01/10/2026 por defecto; la línea de tiempo de status-rmd sigue en 12/10) y
   cuentan también versiones autorizadas en el periodo que luego quedaron Suspendidas por otra más nueva (fecha real de autorización de `MD_TRAZABILIDAD`;
-  por RMD vale la versión más alta que redujo). **La siguiente versión debe ser > 1.145.1.**
+  por RMD vale la versión más alta que redujo).
+- 2026-11-18, v1.146.0 (encima de la 1.145.1): **pedidos de Carlos: repetidos = incoherencia** (paso igual al anterior, proceso menor repetido en el
+  mismo paso aunque ya esté en SAP, palabra duplicada seguida; `palabrasRepetidas`, `claveRepetido`, `pasoPadreDePM`, `estado.todos` de `revisarPMsDeLista`;
+  en el núcleo `PPN.avisos` con k `dup`, que también ve Producción). **Reglas de Carlos**: nota del supervisor solo con «Realizado por y Visto bueno» (441) y V.B.
+  (`RX_NOTA_SUPERVISOR`, k `notavb`); procesos menores de un paso de Calidad en Operaciones (`RX_PASO_CEO`) con tipo de dato llevan Estado CC y Edit; «TOMAR LA
+  MUESTRA DESDE…» va «Sin tipo de dato» (`RX_PUNTO_MUESTREO`). **Homologación**: nota de V°B° vigente = 186337 «(V°B°) … SEGUN EL PROCEDIMIENTO PDOC-207
+  VIGENTE.» (antes 182341 «POE»); regla nueva `procedimiento-pdoc` y `(VB)` → `(V°B°)` (el ° ya no se pierde al normalizar). **Documentos en la plantilla**:
+  si está en la lista, está vigente (`docVencido` ya no mira validez ni estado). Pruebas `qa_repetidos.mjs` y `qa_local.py` LN64.
+  **La siguiente versión debe ser > 1.146.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
