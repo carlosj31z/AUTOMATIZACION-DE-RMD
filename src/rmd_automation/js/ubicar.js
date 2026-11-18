@@ -36,7 +36,9 @@
     const { leer, Filter } = herramientas();
     let ops = [];
     if (lote) {
-      const r = await leer('/RMD', [new Filter('lote', 'EQ', String(lote))], { $top: '50', $select: 'mdId_mdId,ordenSAP,lote' });
+      // Producción a veces da el número de la orden (OP) en vez del lote: se busca en las dos columnas.
+      const r = await leer('/RMD', [new Filter({ filters: [new Filter('lote', 'EQ', String(lote)), new Filter('ordenSAP', 'EQ', String(lote))], and: false })],
+        { $top: '50', $select: 'mdId_mdId,ordenSAP,lote' });
       ops = (r.results || []).map((x) => ({ md_id: String(x.mdId_mdId), orden: String(x.ordenSAP || ''), lote: String(x.lote || '') }));
     }
     // Con material: sus masters. Sin material (solo lote): los masters de las OP de ese lote.

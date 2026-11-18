@@ -25,8 +25,8 @@ class RmdAutomation:
         self.flujo_aprobacion = FlujoAprobacionPage(page)
         self.solicitud = SolicitudPage(page)
 
-    def editor_de_rmd(self, codigo_rmd: str) -> RmdEditor:
-        self.configuracion.configurar_rmd(codigo_rmd)
+    def editor_de_rmd(self, codigo_rmd: str, version: int | None = None) -> RmdEditor:
+        self.configuracion.configurar_rmd(codigo_rmd, version)
         return RmdEditor(self.page)
 
 

@@ -50,6 +50,7 @@ class Spec:
     descripcion: str
     cambios: List[Dict[str, Any]]
     rmd_referencia: str = ""  # "Codigo RMD" del RMD de referencia (opcional)
+    version: Optional[int] = None  # las versiones comparten el código: con la versión se abre la fila correcta
 
 
 def cargar_spec(ruta: str | Path) -> Spec:
@@ -299,7 +300,7 @@ def ejecutar(spec: Spec, plan: List[Accion], automation, actualizar_en_linea: bo
     proceso (regla de Carlos, 2026-11-16). Devuelve el aviso del portal de ese paso ("" si no se pulsó)."""
     from .pages.rmd_editor import RmdEditor
 
-    editor: RmdEditor = automation.editor_de_rmd(spec.rmd)
+    editor: RmdEditor = automation.editor_de_rmd(spec.rmd, spec.version) if spec.version else automation.editor_de_rmd(spec.rmd)
     try:
         for a in plan:
             if a.estado != PENDIENTE:

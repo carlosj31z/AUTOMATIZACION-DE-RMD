@@ -240,3 +240,83 @@ def test_subir_archivo_crea_bucket_y_firma(monkeypatch):
     url = so.subir_archivo(9, "RMD 2202 v8 máster.pdf", b"x", "application/pdf")
     assert url.endswith("/storage/v1/object/sign/chatbot-archivos/9/a.pdf?token=t&download=RMD_2202_v8_master.pdf")
     assert llamadas[1] == "object/chatbot-archivos/9/RMD_2202_v8_master.pdf"
+
+
+# ---------------------------------------------------------------- pasos por su número (pedido de Carlos, 2026-11-18)
+
+FILAS = [
+    {"num": "4.4.10", "id": "p10", "pm": False, "tabla": "MD_ES_PASO", "orden": 10, "codigo": "500", "descr": "PASO DIEZ", "tipo": 438, "cc": False, "dec": 3},
+    {"num": "4.4.11", "id": "p11", "pm": False, "tabla": "MD_ES_PASO", "orden": 11, "codigo": "501",
+     "descr": "EL JEFE O SUPERVISOR DE LA SECCION VERIFICA LA CONFORMIDAD", "tipo": 440, "cc": True, "dec": None},
+    {"num": "4.4.11.1", "id": "m1", "pm": True, "tabla": "MD_ES_PASO_INSUMO_PASO", "orden": 1, "codigo": "502",
+     "descr": "FECHA / HORA DE VERIFICACION", "tipo": 444, "cc": True, "dec": None},
+]
+
+
+def test_normalizar_numero():
+    assert so.normalizar_numero("4.4.11.-") == "4.4.11"
+    assert so.normalizar_numero(" 4.04.011.1 ") == "4.4.11.1"
+    assert so.normalizar_numero("2100886") == "" and so.normalizar_numero("11") == ""
+
+
+def test_plan_por_numero():
+    esc, ya, err, preds = so.plan_por_numero(
+        [{"accion": "quitar_cc", "numero": "4.4.11"}, {"accion": "quitar_cc", "numero": "4.4.11.1"},
+         {"accion": "quitar_cc", "numero": "4.4.10"}], FILAS)
+    assert [(f["id"], d) for f, d, _ in esc] == [("p11", {"estadoCC": False}), ("m1", {"estadoCC": False})]
+    assert len(ya) == 1 and not err and not preds
+    _, _, err, _ = so.plan_por_numero([{"accion": "quitar_cc", "numero": "4.4.12"}], FILAS)
+    assert err == ["no hay un paso 4.4.12 en este RMD"]
+    _, _, err, _ = so.plan_por_numero([{"accion": "configurar_decimal", "numero": "4.4.11", "decimal": 2}], FILAS)
+    assert "no es un dato numérico" in err[0]
+    esc, _, err, _ = so.plan_por_numero([{"accion": "configurar_decimal", "numero": "4.4.10", "decimal": 2}], FILAS)
+    assert esc[0][1] == {"decimales": 2} and not err
+    _, _, err, preds = so.plan_por_numero([{"accion": "cambiar_predecesor", "numero": "4.4.11.1", "sin_predecesor": True}], FILAS)
+    assert "proceso menor" in err[0] and not preds
+    _, _, err, preds = so.plan_por_numero([{"accion": "cambiar_predecesor", "numero": "4.4.11", "predecesor_numero": "4.4.10"}], FILAS)
+    assert not err and preds[0][0]["id"] == "p11" and preds[0][1]["id"] == "p10"
+
+
+class _PaginaPasos(_Pagina):
+    def __init__(self):
+        super().__init__()
+        self.filas = [dict(f) for f in FILAS]
+        self.escrito = []
+
+    def evaluate(self, script, arg=None):
+        if "__pasosRmd(id)" in script:
+            return [dict(f) for f in self.filas]
+        if "window.__escribirPaso(t, i, d)" in script:
+            tabla, id_, datos = arg
+            self.escrito.append((tabla, id_, datos))
+            for f in self.filas:
+                if f["id"] == id_:
+                    f["cc"] = datos.get("estadoCC", f["cc"])
+                    f["dec"] = datos.get("decimales", f["dec"])
+            return {"usuario": "CJESUSZ"}
+        return super().evaluate(script, arg)
+
+
+def test_quitar_estado_cc_por_numero(monkeypatch, tmp_path):
+    from rmd_automation.pages import base
+
+    monkeypatch.setattr(base, "esperar_app", lambda page: None)
+    parches = []
+    monkeypatch.setattr(so, "_sb", lambda ruta, *a, **k: parches.append((ruta, a)))
+    monkeypatch.setattr(so, "notificar", lambda i, avance=False: None)
+    monkeypatch.setattr(so, "actualizar_en_linea", lambda page, m: "RMD actualizado en línea")
+    monkeypatch.setenv("RMD_AUDITORIA", str(tmp_path / "a.jsonl"))
+    pg = _PaginaPasos()
+    sol = {"id": 12, "automatica": True, "tipo": "cambio", "op_lote": "2100886", "material": None, "etapa": None, "rmd": None,
+           "resumen": "Habilitar para Producción 4.4.11, 4.4.11.1",
+           "cambios": [{"accion": "quitar_cc", "numero": "4.4.11"}, {"accion": "quitar_cc", "numero": "4.4.11.1"}]}
+    e, r = so.atender_una(pg, sol)
+    assert e == "ejecutada", r
+    assert [x[1] for x in pg.escrito] == ["p11", "m1"] and all(x[2] == {"estadoCC": False} for x in pg.escrito)
+    assert "Aplicado y verificado" in r and "Actualizar RMD en Línea: RMD actualizado en línea" in r
+    # repetir: ya no hay nada que cambiar
+    e, r = so.atender_una(pg, sol)
+    assert e == "ejecutada" and "No hizo falta cambiar nada" in r and len(pg.escrito) == 2
+    # un número que no existe pasa al analista con el motivo en el formato de las líneas «✗»
+    e, r = so.atender_una(pg, {**sol, "cambios": [{"accion": "quitar_cc", "numero": "4.4.99"}]})
+    assert e == "revisar" and "✗ 1. paso: no hay un paso 4.4.99 en este RMD [error]" in r
