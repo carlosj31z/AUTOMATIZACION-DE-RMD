@@ -88,7 +88,10 @@
     limpiarCombo(ml('Etapa')); limpiarCombo(ml('Planta')); limpiarCombo(ml('Area')); limpiarCombo(ml('Estado del RMD'));
     const cr = ml('Codigo RMD'); cr.setValue(code); cr.fireChange({ value: code });
     CORE().byId(F().contentDocument.querySelector('[id$=btnGo]').id.replace(/-inner$/, '')).firePress(); await W(1500);
-    const buscar = () => [...F().contentDocument.querySelectorAll('tbody tr')].find((r) => vis(r) && r.children[1]?.textContent.trim() === code);
+    // Las versiones comparten el código: con opciones.version se toma la fila de esa versión.
+    const ver = opciones && opciones.version != null ? String(opciones.version) : null;
+    const buscar = () => [...F().contentDocument.querySelectorAll('tbody tr')].find((r) => vis(r) && r.children[1]?.textContent.trim() === code
+      && (ver == null || r.children[2]?.textContent.trim() === ver));
     await until(() => buscar(), 25000);
     const fila = buscar();
     if (!fila) throw new Error('No se encontró el RMD ' + code);

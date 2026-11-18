@@ -10,14 +10,14 @@ from .config import load_config
 from .pages import base
 
 
-def extraer(page, codigo: str, procesos_menores: bool = True) -> dict:
+def extraer(page, codigo: str, procesos_menores: bool = True, version: int | None = None) -> dict:
     """Lee el RMD. `procesos_menores=False` omite el detalle de procesos menores (mucho más rápido:
     un solo paso puede tener más de 500 líneas); alcanza para planificar cambios de equipos y pasos."""
     script = resources.files("rmd_automation").joinpath("js/extraer.js").read_text(encoding="utf-8")
     base.esperar_app(page)
     page.evaluate(script)
     return page.evaluate(
-        "([code, pm]) => window.__extraerRmd(code, { procesosMenores: pm })", [codigo, procesos_menores]
+        "([code, pm, v]) => window.__extraerRmd(code, { procesosMenores: pm, version: v })", [codigo, procesos_menores, version]
     )
 
 

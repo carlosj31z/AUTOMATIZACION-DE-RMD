@@ -467,6 +467,13 @@ cuenta). Escribir y responder siempre en **español**.
   `texto_avance`) y llama a `notificar(id, avance=True)`; el chat web lo muestra (`mis_solicitudes.avance`, sondeo cada 15 s) y
   por WhatsApp va solo a quien pidió (status-rmd `notificarAvance`). Al registrar, el bot dice que primero confirma el RMD y el tiempo
   aproximado (2 a 4 min documentos, 3 a 5 min cambios; las corridas de Actions duran ~1–1,5 min más la cola).
+- **Pasos por su número y Estado CC (2026-11-18, pedido de Carlos)**: el bot manda `numero` («4.4.11»; «4.4.11.1» = proceso
+  menor) y siempre la etapa. «Habilitar para PRODUCCION» = **quitar la casilla Estado CC** (`quitar_cc`). El ejecutor
+  (`atender_por_numero`) lee la numeración del master con `js/pasos.js` (`__pasosRmd`, como `leerNumeracionFormulas` del
+  userscript) y escribe `estadoCC`/`decimales` con MERGE a `MD_ES_PASO` / `MD_ES_PASO_INSUMO_PASO` (`__escribirPaso`, solo esos
+  campos, con usuarioActualiza/fechaActualiza), verifica releyendo y pulsa «Actualizar RMD en Línea» en **esa versión**
+  (las versiones comparten el código: `configurar_rmd(codigo, version)`, `extraer(..., version=)`). El predecesor por número
+  se traduce a lista + orden con el snapshot y va por el editor. El lote también se busca como número de orden (`ordenSAP`).
 - Inicio de sesión desde GitHub verificado (run #5, 2026-11-17). Pendiente: la primera escritura real en el RMD de pruebas
   2202609013.
 

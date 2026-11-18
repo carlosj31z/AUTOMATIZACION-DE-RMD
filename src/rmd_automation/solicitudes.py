@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -373,24 +374,42 @@ def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], Non
         return atender_lectura(page, sol, simular, log)
     if not sol.get("automatica") or sol.get("tipo") != "cambio":
         return "revisar", "La solicitud no está marcada como cambio automático: la revisa el analista."
-    if sol.get("rmd"):
-        rmd, m = str(sol["rmd"]), None
-    else:
+    # Siempre se ubica el master (con su versión) si hay lote o material: las versiones comparten el código del RMD.
+    m, ubicado = None, ""
+    if sol.get("op_lote") or (sol.get("material") and sol.get("etapa")):
         m, ubicado = _ubicar(page, sol)
         if m is None:
             return "revisar", ubicado
-        rmd = m["codigo"]
         log(ubicado)
         if not simular:
-            _sb(f"chatbot_solicitudes?id=eq.{sol['id']}", "PATCH", {"rmd": rmd})
+            if not sol.get("rmd"):
+                _sb(f"chatbot_solicitudes?id=eq.{sol['id']}", "PATCH", {"rmd": m["codigo"]})
             avisar_avance(sol["id"], texto_avance(m, sol, "Estoy aplicando el cambio en SAP (guardar y «Actualizar RMD en Línea»); "
                                                           "le aviso apenas termine."), log)
+    elif not sol.get("rmd"):
+        return "revisar", "La solicitud no trae lote, material ni RMD."
+    rmd, version = (m["codigo"], m["version"]) if m else (str(sol["rmd"]), None)
     sol = {**sol, "rmd": rmd}
+    if any(c.get("numero") for c in sol.get("cambios") or []):
+        if m is None:
+            return "revisar", "Para ubicar el paso por su número hace falta el lote o el material y la etapa."
+        return atender_por_numero(page, sol, m, ubicado, simular, log)
     sp = a_spec(sol)
-    snap = extraer(page, sp.rmd, procesos_menores=False)
+    sp.version = version
+    snap = extraer(page, sp.rmd, procesos_menores=False, version=version)
     estado_rmd = snap.get("estado")
     if estado_rmd not in ESTADOS_RMD:
         return "revisar", f"El RMD {sp.rmd} está {estado_rmd!r}: solo se cambian Ingresados o Autorizados."
+    return _planificar_y_aplicar(page, sol, sp, snap, ubicado, simular, log)
+
+
+def _planificar_y_aplicar(page, sol: dict, sp: cb.Spec, snap: dict, ubicado: str, simular: bool,
+                          log: Callable[[str], None]) -> tuple[str, str]:
+    """Predecesor y decimales con el editor del portal (planifica, aplica, «Actualizar RMD en Línea» y verifica)."""
+    from .actions import RmdAutomation
+    from .extraer import extraer
+
+    estado_rmd = snap.get("estado")
     plan = cb.planificar(sp, snap)
     _revisar_decimales(plan, snap)
     texto_plan = cb.plan_a_texto(sp, plan)
@@ -401,15 +420,178 @@ def atender_una(page, sol: dict, simular: bool = False, log: Callable[[str], Non
         return "lista", "Simulación (no se tocó SAP):\n" + texto_plan
 
     aviso = cb.ejecutar(sp, plan, RmdAutomation(page), actualizar_en_linea=True)
-    despues = cb.planificar(sp, extraer(page, sp.rmd, procesos_menores=False))
+    despues = cb.planificar(sp, extraer(page, sp.rmd, procesos_menores=False, version=sp.version))
     ok = all(a.estado == cb.APLICADO for a in despues)
     cb.auditar(os.environ.get("RMD_AUDITORIA", "data/auditoria.jsonl"), sp, despues,
                f"chatbot #{sol['id']}: " + ("verificado" if ok else "verificación con diferencias"))
     final = cb.plan_a_texto(sp, despues)
     linea = f"\nActualizar RMD en Línea: {aviso or 'sin aviso del portal'}"
+    pre = ubicado + "\n" if ubicado else ""
     if not ok:
-        return "revisar", (ubicado + "\n" if ubicado else "") + "Se aplicó pero la verificación encontró diferencias:\n" + final + linea
-    return "ejecutada", (ubicado + "\n" if ubicado else "") + f"Aplicado y verificado en el RMD {sp.rmd} ({estado_rmd}):\n" + final + linea
+        return "revisar", pre + "Se aplicó pero la verificación encontró diferencias:\n" + final + linea
+    return "ejecutada", pre + f"Aplicado y verificado en el RMD {sp.rmd} ({estado_rmd}):\n" + final + linea
+
+
+# ---------------------------------------------------------------- pasos por su número («4.4.11», «4.4.11.1»)
+
+TIPOS_DECIMAL_ID = {434, 438, 443, 445, 448, 450}   # Cantidad, Números, Rango, Fórmula, MuestraCC, Entrega
+_RE_NUM = re.compile(r"^\d{1,2}(?:\.\d{1,3}){1,3}$")
+
+
+def normalizar_numero(texto: Any) -> str:
+    """«4.4.11.-», « 4.4.11. » → «4.4.11»; los ceros a la izquierda no cuentan (4.04.011 → 4.4.11)."""
+    t = re.sub(r"[\s.\-:]+$", "", str(texto or "").strip())
+    if not _RE_NUM.match(t):
+        return ""
+    return ".".join(str(int(x)) for x in t.split("."))
+
+
+def _datos_pasos(page, md_id: str) -> List[dict]:
+    from importlib import resources
+
+    from .pages import base
+
+    script = resources.files("rmd_automation").joinpath("js/pasos.js").read_text(encoding="utf-8")
+    base.esperar_app(page)
+    page.evaluate(script)
+    return page.evaluate("(id) => window.__pasosRmd(id)", md_id)
+
+
+def _corto(f: dict) -> str:
+    d = " ".join(str(f.get("descr") or "").split())
+    return f"{f['num']} ({d[:60]}{'…' if len(d) > 60 else ''})" if d else f["num"]
+
+
+def _lista_de(snap: dict, f: dict) -> tuple[Optional[str], Optional[int]]:
+    """Lista del editor (p. ej. «PROCEDIMIENTO>FABRICACION») y orden de un paso, por su código y su orden."""
+    for l in cb.listas(snap):
+        for i, p in enumerate(l.pasos):
+            o = p.get("o")
+            orden = int(o) if str(o or "").isdigit() else i + 1
+            if str(p.get("cod")) == f["codigo"] and orden == f["orden"]:
+                return l.nombre, orden
+    return None, None
+
+
+def plan_por_numero(cambios: List[dict], filas: List[dict]) -> tuple[list, list, list, list]:
+    """Decide qué escribir. Devuelve (escrituras, ya_estaban, errores, predecesores):
+    escrituras = [(fila, datos, texto)], predecesores = [(fila, fila_predecesor | None)]."""
+    por_num = {f["num"]: f for f in filas if f.get("num")}
+    escribir, ya, errores, preds = [], [], [], []
+    for c in cambios:
+        num = normalizar_numero(c.get("numero"))
+        f = por_num.get(num)
+        if not num:
+            errores.append(f"el número de paso {c.get('numero')!r} no es válido (debe ser como 4.4.11)")
+            continue
+        if f is None:
+            errores.append(f"no hay un paso {num} en este RMD")
+            continue
+        acc = c.get("accion")
+        if acc == "quitar_cc":
+            if f["cc"]:
+                escribir.append((f, {"estadoCC": False}, f"{_corto(f)}: se quitó la casilla Estado CC (ahora lo registra Producción)"))
+            else:
+                ya.append(f"{_corto(f)}: ya no tenía la casilla Estado CC")
+        elif acc == "configurar_decimal":
+            dec = int(c.get("decimal"))
+            if f.get("tipo") not in TIPOS_DECIMAL_ID:
+                errores.append(f"el paso {num} no es un dato numérico: no lleva decimales")
+            elif f.get("dec") == dec:
+                ya.append(f"{_corto(f)}: ya tenía {dec} decimales")
+            else:
+                escribir.append((f, {"decimales": dec}, f"{_corto(f)}: decimales {f.get('dec') if f.get('dec') is not None else '(vacío)'} → {dec}"))
+        elif acc == "cambiar_predecesor":
+            if f["pm"]:
+                errores.append(f"el {num} es un proceso menor: no tiene predecesor (se puede quitar su casilla Estado CC)")
+                continue
+            if c.get("sin_predecesor"):
+                preds.append((f, None))
+                continue
+            pn = normalizar_numero(c.get("predecesor_numero"))
+            fp = por_num.get(pn)
+            if fp is None or fp["pm"]:
+                errores.append(f"no hay un paso {pn or c.get('predecesor_numero')} en este RMD para usarlo como predecesor")
+                continue
+            preds.append((f, fp))
+        else:
+            errores.append(f"acción no automática: {acc!r}")
+    return escribir, ya, errores, preds
+
+
+def _con_x(errores: List[str], accion: str = "paso") -> str:
+    # Mismo formato que plan_a_texto: status-rmd saca de aquí el motivo en palabras simples (líneas «✗»).
+    return "\n".join(f" ✗ {i}. {accion}: {e} [error]" for i, e in enumerate(errores, 1))
+
+
+def actualizar_en_linea(page, m: dict) -> str:
+    """Abre la versión ubicada y pulsa «Actualizar RMD en Línea» (regla de Carlos: así llega a la OP en proceso)."""
+    from .actions import RmdAutomation
+
+    editor = RmdAutomation(page).editor_de_rmd(m["codigo"], m["version"])
+    try:
+        return editor.actualizar_rmd_en_linea()
+    finally:
+        editor.cerrar_editor()
+
+
+def atender_por_numero(page, sol: dict, m: dict, ubicado: str, simular: bool,
+                       log: Callable[[str], None]) -> tuple[str, str]:
+    """Pasos indicados por su número del registro. Estado CC y decimales se escriben como el Grabar del portal
+    (MERGE de la fila de MD_ES_PASO / MD_ES_PASO_INSUMO_PASO); el predecesor, con el editor."""
+    from .extraer import extraer
+
+    if m.get("estado") not in ESTADOS_RMD:
+        return "revisar", f"El RMD {m['codigo']} v{m['version']} está {m.get('estado')!r}: solo se cambian Ingresados o Autorizados."
+    pre = ubicado + "\n" if ubicado else ""
+    filas = _datos_pasos(page, m["md_id"])
+    escribir, ya, errores, preds = plan_por_numero(sol.get("cambios") or [], filas)
+    if errores:
+        return "revisar", pre + "No se pudo aplicar solo:\n" + _con_x(errores)
+    if preds:  # predecesor: al editor, con la lista y el orden de cada paso
+        snap = extraer(page, m["codigo"], procesos_menores=False, version=m["version"])
+        legado, faltan = [], []
+        for f, fp in preds:
+            lista, orden = _lista_de(snap, f)
+            if not lista:
+                faltan.append(f"no ubiqué el paso {f['num']} en el editor del RMD")
+                continue
+            c: Dict[str, Any] = {"accion": "cambiar_predecesor", "lista": lista, "paso": "", "orden_paso": orden}
+            if fp is None:
+                c["sin_predecesor"] = True
+            else:
+                lp, op = _lista_de(snap, fp)
+                if not lp:
+                    faltan.append(f"no ubiqué el paso {fp['num']} en el editor del RMD")
+                    continue
+                c["predecesor_orden"] = op
+                if lp != lista:
+                    c["predecesor_lista"] = lp
+            legado.append(c)
+        if faltan:
+            return "revisar", pre + "No se pudo aplicar solo:\n" + _con_x(faltan)
+        sp = a_spec({**sol, "cambios": legado})
+        sp.version = m["version"]
+        return _planificar_y_aplicar(page, sol, sp, snap, ubicado, simular, log)
+
+    lineas = [t for _, _, t in escribir] + ya
+    log("\n".join(lineas) or "nada que cambiar")
+    if simular:
+        return "lista", "Simulación (no se tocó SAP):\n" + "\n".join(lineas)
+    if not escribir:
+        return "ejecutada", pre + f"No hizo falta cambiar nada en el RMD {m['codigo']} v{m['version']}:\n" + "\n".join(ya)
+    for f, datos, _ in escribir:
+        page.evaluate("([t, i, d]) => window.__escribirPaso(t, i, d)", [f["tabla"], f["id"], datos])
+    despues = {f["id"]: f for f in _datos_pasos(page, m["md_id"])}
+    mal = [f["num"] for f, datos, _ in escribir
+           if any((despues.get(f["id"]) or {}).get({"estadoCC": "cc", "decimales": "dec"}[k]) != v for k, v in datos.items())]
+    aviso = actualizar_en_linea(page, m)
+    cb.auditar(os.environ.get("RMD_AUDITORIA", "data/auditoria.jsonl"), cb.Spec(m["codigo"], sol.get("resumen", ""), []), [],
+               f"chatbot #{sol['id']} v{m['version']}: " + "; ".join(lineas) + (f"; sin verificar: {', '.join(mal)}" if mal else "; verificado"))
+    linea = f"\nActualizar RMD en Línea: {aviso or 'sin aviso del portal'}"
+    if mal:
+        return "revisar", pre + _con_x([f"se guardó el paso {n} pero al volver a leerlo no quedó como se pidió" for n in mal]) + linea
+    return "ejecutada", pre + f"Aplicado y verificado en el RMD {m['codigo']} v{m['version']} ({m['estado']}):\n" + "\n".join(lineas) + linea
 
 
 def atender(limite: int = 5, simular: bool = False, log: Callable[[str], None] = print) -> int:

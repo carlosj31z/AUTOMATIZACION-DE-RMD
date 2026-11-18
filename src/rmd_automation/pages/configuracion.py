@@ -157,10 +157,22 @@ class ConfiguracionPage:
         # Botón "Configurar" de la barra de la tabla principal -> diálogo "Configuracion Maestra".
         base.click_button(self.app, "Configurar")
 
-    def configurar_rmd(self, codigo_rmd: str) -> None:
+    def configurar_rmd(self, codigo_rmd: str, version: Optional[int] = None) -> None:
         # Menú de Acción de la fila -> "Configurar el RMD" -> diálogo "<código> - <descripción>".
+        # Las versiones de un RMD comparten el código: con `version` se elige la fila de esa versión (columna 3).
         self.filtrar(ConfiguracionFiltro(codigo_rmd=codigo_rmd))
-        self.elegir_accion("Configurar el RMD")
+        fila = self.fila_de_version(codigo_rmd, version) if version else None
+        self.elegir_accion("Configurar el RMD", fila)
+
+    def fila_de_version(self, codigo_rmd: str, version: int) -> Locator:
+        filas = self.app.locator("tbody tr").filter(visible=True)
+        filas.first.wait_for(timeout=25000)
+        for i in range(filas.count()):
+            celdas = filas.nth(i).locator("td")
+            if celdas.count() > 2 and celdas.nth(1).inner_text().strip() == str(codigo_rmd) \
+                    and celdas.nth(2).inner_text().strip() == str(version):
+                return filas.nth(i)
+        raise RuntimeError(f"no aparece la versión {version} del RMD {codigo_rmd} en la lista")
 
     def elegir_accion(self, accion: str, fila: Optional[Locator] = None) -> None:
         """Abre el menú de Acción de una fila (por defecto la primera) y elige `accion`.
