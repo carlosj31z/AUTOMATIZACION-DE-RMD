@@ -99,6 +99,8 @@ REGLAS: List[Regla] = [
           "Varios documentos seguidos: «VIGENTES» una sola vez, al final (PPRO-200 Y PPRO-201 VIGENTES)."),
     # el grupo queda marcado (MARCA) para que la regla del singular no lo toque; la marca se quita al final y no cuenta como cambio
     Regla("vigentes", DOC_GRUPO + r"(?:,? VIGENTES?\b)?", r"\1 VIGENTES" + MARCA, "Después de varios documentos va «VIGENTES»."),
+    Regla("tipo-plural", r"\b(INSTRUCTIVO|PROCEDIMIENTO) (?=" + _COD + r"(?:" + SEP + _COD + r")+)", r"\1S ",
+          "Varios documentos del mismo tipo: «INSTRUCTIVOS» / «PROCEDIMIENTOS»."),
     Regla("vigente", DOC + r"(?! VIGENTES?\b)(?!" + SEP_DOC + _COD + r")", r"\1 VIGENTE", "Después de un documento va «VIGENTE»."),
     Regla("vigente-singular", DOC + r" VIGENTES\b(?!" + MARCA + r")", r"\1 VIGENTE", "Un solo documento: «VIGENTE» (no «VIGENTES»)."),
     Regla("marca", MARCA, "", ""),

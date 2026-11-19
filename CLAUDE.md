@@ -425,7 +425,9 @@ cuenta). Escribir y responder siempre en **español**.
   con el texto sugerido** (misma sección), el aviso «Términos por homologar» trae el botón «Usar el paso X»; el aviso «Por homologar» de la tabla también
   (si el código vigente está en el catálogo). **Pedido de Carlos: si hay más de un paso parecido** (exactos + `parecidos` ≥ 0,85 de la misma sección,
   campo `opciones` del aviso), el editor los lista con «Usar el paso X», **ordenados por masters Autorizados + Ingresados** (`EMB.uso`, `htmlOpciones`,
-  «el más usado»). Bloque HOMOLOG regenerado. Pruebas `tests/test_homologacion.py` y `qa_homologacion.mjs`.
+  «el más usado»); solo se ofrecen pasos **ya homologados** (sin términos pendientes) que citan **los mismos documentos**, y «ya existe» exige el texto
+  exacto con puntuación. Varios documentos del mismo tipo: «INSTRUCTIVOS» / «PROCEDIMIENTOS» (`tipo-plural`). Probado en el portal (solo lectura,
+  ULCERAN 40 2202609489); ojo: en esas pruebas el cortafuegos también va en el marco `rmd-vista-marco` de la Edición rápida. Bloque HOMOLOG regenerado. Pruebas `tests/test_homologacion.py` y `qa_homologacion.mjs`.
   **La siguiente versión debe ser > 1.148.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
