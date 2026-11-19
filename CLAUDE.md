@@ -413,6 +413,10 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-19, v1.147.1: **Carlos: el jefe o supervisor de la sección es de Producción, no de Control de Calidad.** Un proceso menor de un paso de
   Calidad en Operaciones cuyo texto nombra al JEFE / SUPERVISOR / OPERARIO / OPERADOR / PERSONAL DE PRODUCCION ya no pide «Estado CC» aunque hable de
   muestreo o calidad (caso 180904 en el paso 182861; `RX_RESP_PRODUCCION` en `reglasDeFila`, `RX_RESP_PROD` en `ppNucleo`). Prueba `qa_repetidos.mjs`.
+  **Regla de Carlos (misma versión): un paso «Realizado por y Visto bueno» (441) con R. Por y V.B. marcados lleva obligatoriamente como ÚLTIMO proceso
+  menor «NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.»**: incoherencia si falta (celda Proc. Men.
+  de la tabla de Pasos y último proceso menor en su ventana) o si no es la última; en la Edición rápida y el borrador avisos k `notafalta` (botón «Agregar la
+  nota al final», con el código del catálogo de la misma sección) y `notafin` (botón «Mover al final»). `notaSupervisorObligatoria`, `NOTA_SUPERVISOR_TXT`.
   **La siguiente versión debe ser > 1.147.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto

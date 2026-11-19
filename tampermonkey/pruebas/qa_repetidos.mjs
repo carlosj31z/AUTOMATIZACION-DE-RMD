@@ -73,6 +73,24 @@ ok('v1.147.1: verificacion del jefe o supervisor (Produccion) en paso de Calidad
     }
   }
 }
+// v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. lleva la nota del supervisor como ÚLTIMO proceso menor
+{
+  const NOTA_FIN = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
+  const t2 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [
+    { id: 'q1', codigo: '117343', texto: 'DESCARGAR EL PRODUCTO, FILTRANDO POR MALLA ORGANDI.', tipo: 441, rpor: true, vb: true, pm: [] },
+    { id: 'q2', codigo: '200', texto: 'PESAR EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [{ id: 'n1', codigo: '9', texto: NOTA_FIN }, { id: 'n2', codigo: '10', texto: 'PESO (kg):' }] },
+    { id: 'q3', codigo: '201', texto: 'TAMIZAR EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [{ id: 'n3', codigo: '10', texto: 'PESO (kg):' }, { id: 'n4', codigo: '9', texto: NOTA_FIN }] },
+    { id: 'q4', codigo: '202', texto: 'LIMPIAR LA SALA.', tipo: 441, rpor: true, vb: false, pm: [] },
+    { id: 'q5', codigo: '203', texto: 'MEZCLAR EL PRODUCTO.', tipo: 439, rpor: true, pm: [] },
+  ] }] };
+  const bus = PPN.crearBuscador([{ codigo: '9', texto: NOTA_FIN, estr: 'E', etq: null, tipo: 446 }, { codigo: '10', texto: 'PESO (kg):', estr: 'E', etq: null, tipo: 438 }]);
+  const av2 = PPN.avisos(t2, { buscador: bus }), l2 = (id) => av2.get(id) || [], tx2 = (id) => l2(id).map((x) => x.texto).join(' | ');
+  ok('nota obligatoria: falta en el paso 117343 (441 con R. Por y V.B.)', /falta la nota/.test(tx2('q1')), tx2('q1'));
+  ok('nota obligatoria: ofrece agregar el proceso menor del catálogo', l2('q1').some((x) => x.agregar === '9'), JSON.stringify(l2('q1')));
+  ok('nota obligatoria: no es la última -> moverla al final', /muévela al final/.test(tx2('n1')) && l2('n1').some((x) => x.alFinal), tx2('n1'));
+  ok('nota obligatoria: al final, sin aviso', !/falta la nota|muévela/.test(tx2('q3') + tx2('n4')), tx2('q3') + tx2('n4'));
+  ok('nota obligatoria: sin V.B. o con otro tipo no se pide', !/falta la nota/.test(tx2('q4') + tx2('q5')), tx2('q4') + tx2('q5'));
+}
 ok('TOMAR LA MUESTRA DESDE con tipo: Sin tipo de dato', tiene('m7', /Sin tipo de dato/), txt('m7'));
 ok('los repetidos llegan a Producción (k dup)', (av.get('m3') || []).some((x) => x.k === 'dup'));
 
