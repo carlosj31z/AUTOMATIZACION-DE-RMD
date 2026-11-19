@@ -18295,7 +18295,11 @@
           else if (!prod) { const h = homologarTexto(t); if (h.reglas.length) {
             // v1.148.0 (pedido de Carlos): si ya existe un paso con el texto sugerido, se ofrece seleccionarlo en vez de crear otro
             const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr) : [], ya = ex.find((f) => !etq || f.etq === etq) || ex[0];
-            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${ya ? `ya existe el paso ${ya.codigo} con ese texto: selecciónalo con el botón.` : 'busca un paso con ese texto antes de crear otro.'}`, 'terminos', ya && ya.codigo); } }
+            // v1.148.0 (pedido de Carlos): si hay más de un paso parecido, el editor los ordena por Autorizados + Ingresados y recomienda el más usado
+            const par = bus && bus.parecidos ? bus.parecidos(h.texto, { estr, etq, max: 6, minimo: 0.85 }).map((y) => y.f).filter((f) => f.estr === estr) : [];
+            const opciones = [...new Map([...ex, ...par].filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
+            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${ya ? `ya existe el paso ${ya.codigo} con ese texto: selecciónalo con el botón.` : opciones.length ? 'hay pasos parecidos que ya existen: elige uno con su botón antes de crear otro.' : 'busca un paso con ese texto antes de crear otro.'}`, 'terminos', ya && ya.codigo);
+            if (opciones.length > (ya ? 1 : 0)) out.get(x.id).slice(-1)[0].opciones = opciones; } }
           // v1.134.0 (pedido de Carlos): documentos vencidos o que ya no figuran como vigentes
           if (ctx.docs) codigosDoc(t).forEach((cod) => { const v = docVencido(cod, ctx.docs, hoy); if (v) add(x.id, 'aviso', `Documento ${v.codigo}: ${v.motivo}. Revisa el código o la versión vigente antes de enviarlo.`, 'doc'); });
           // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción indica qué se anota (la casilla del RMD)
@@ -18872,7 +18876,19 @@
     }
     const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || cantCambiada(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b) || dtCambiada(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
     // v1.134.0: un aviso que se resuelve con un paso del catálogo (homologado de Calidad en Operaciones, o el que ya existe) trae su botón
-    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${a.usar && BUS.porCodigo(a.usar) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}</div>`).join('');
+    // v1.148.0 (pedido de Carlos): pasos sugeridos para homologar, ordenados por masters Autorizados + Ingresados (el más usado primero)
+    const USO_PEND = new Set(); let usoT = 0;
+    const pedirUso = (cods) => { if (!EMB || !EMB.uso) return; const f = cods.map(String).filter((c) => !USO.has(c) && !USO_PEND.has(c)); if (!f.length) return; f.forEach((c) => USO_PEND.add(c));
+      EMB.uso(f, (c, u) => { USO.set(String(c), u); USO_PEND.delete(String(c)); clearTimeout(usoT); usoT = setTimeout(pintarTodo, 300); }); };
+    const pesoUso = (c) => { const u = USO.get(String(c)); return u ? (u.aut || 0) + (u.ing || 0) : -1; };
+    const htmlOpciones = (id, a) => {
+      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (cods.length < 2) return '';
+      pedirUso(cods);
+      const orden = cods.slice().sort((x, y) => (pesoUso(y) - pesoUso(x)) || ((USO.get(y) || {}).aut || 0) - ((USO.get(x) || {}).aut || 0)), top = pesoUso(orden[0]) > 0 ? orden[0] : null;
+      return `<div class="pp-opciones">${orden.map((c) => { const f = BUS.porCodigo(c), u = USO.get(c);
+        return `<div class="pp-opcion"><button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(c)}" title="${esc(f.texto)}">Usar el paso ${esc(c)}</button> <span class="pp-op-tx">${esc(f.texto)}</span> <span class="pp-op-uso">${u ? (u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso') : EMB && EMB.uso ? 'contando…' : ''}${c === top ? ' · el más usado' : ''}</span></div>`; }).join('')}</div>`;
+    };
+    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${htmlOpciones(id, a) || ''}${a.usar && BUS.porCodigo(a.usar) && !htmlOpciones(id, a) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
     const htmlAntes = (x, b) => (b && !x.quitado && cambiado(x, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '');
     function htmlRango(x) {
@@ -20068,8 +20084,9 @@
 .pp-tag.falta{background:#fdecea;color:#b71c1c;border:1px dashed #e57373;cursor:pointer;font:inherit;font-size:inherit}
 .pp-usar{margin-left:6px;padding:1px 8px;border:1px solid #2e7d32;border-radius:10px;background:#fff;color:#1b5e20;cursor:pointer;font:inherit;font-size:11.5px}
 .pp-usar:hover{background:#e8f5e9}
+.pp-opciones{margin:4px 0 0 0;display:flex;flex-direction:column;gap:3px}.pp-opcion{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pp-opcion .pp-usar{margin-left:0}.pp-op-tx{opacity:.85}.pp-op-uso{font-size:11px;opacity:.75;white-space:nowrap}
 .pp-aviso-gen button{margin-left:6px;font:inherit;font-size:12px;cursor:pointer}
-@media print{.pp-usar,.pp-tag.falta{display:none}}
+@media print{.pp-usar,.pp-opciones,.pp-tag.falta{display:none}}
 :root { --tx: #1f2328; --ap: #59636e; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
   --cam: #9a6700; --cam-f: #fff4d6; --mov: #2f5fb3; --mov-f: #e8effb; --crea: #7a3fbf; --crea-f: #f3ebfc; color-scheme: light; }
 * { box-sizing: border-box; }

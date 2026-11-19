@@ -62,6 +62,12 @@ ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt
   const tr = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [{ id: 'h1', codigo: null, nuevo: true, texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN POE PPRO-219 VIGENTE.', tipo: 439, pm: [] }] }] };
   const av = PPN.avisos(tr, { buscador: bus }).get('h1') || [], t = av.find((x) => x.k === 'terminos');
   ok('paso ya creado con el texto sugerido: ofrece seleccionarlo', t && t.usar === '125954' && /ya existe el paso 125954/.test(t.texto), JSON.stringify(av));
+  const bus2 = PPN.crearBuscador([
+    { codigo: '500', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN PROCEDIMIENTO PPRO-219 VIGENTE', estr: 'E', etq: null, tipo: 439 },
+    { codigo: '501', texto: 'REALIZAR EL DESPEJE DE LA SALA, SEGUN PROCEDIMIENTO PPRO-219 VIGENTE.', estr: 'E', etq: null, tipo: 439 },
+    { codigo: '502', texto: 'LIMPIAR LA BALANZA.', estr: 'E', etq: null, tipo: 439 }]);
+  const av2 = PPN.avisos(tr, { buscador: bus2 }).get('h1') || [], t2 = av2.find((x) => x.k === 'terminos');
+  ok('varios parecidos: el aviso trae las opciones para ordenarlas por uso', t2 && Array.isArray(t2.opciones) && t2.opciones.includes('500') && t2.opciones.includes('501') && !t2.opciones.includes('502'), JSON.stringify(av2));
 }
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallas ? 1 : 0);
