@@ -417,7 +417,14 @@ cuenta). Escribir y responder siempre en **español**.
   menor «NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.»**: incoherencia si falta (celda Proc. Men.
   de la tabla de Pasos y último proceso menor en su ventana) o si no es la última; en la Edición rápida y el borrador avisos k `notafalta` (botón «Agregar la
   nota al final», con el código del catálogo de la misma sección) y `notafin` (botón «Mover al final»). `notaSupervisorObligatoria`, `NOTA_SUPERVISOR_TXT`.
-  **La siguiente versión debe ser > 1.147.1.**
+  1.147.1 publicada en SharePoint el 2026-11-19 (2 452 793 bytes), PR #126.
+- 2026-11-19, v1.148.0 (encima de la 1.147.1): **acuerdo con Carlos sobre la homologación de términos**: «POE» se reemplaza por «PROCEDIMIENTO»
+  (reglas `procedimiento`, `poe`, `poe-plural`); después de un documento va «VIGENTE» y después de varios seguidos (separados por «, », « Y », « E »,
+  « O », «/», con o sin su tipo en medio) «VIGENTES» una sola vez al final (`vigentes-sin-repetir`, `vigentes`, `vigente`, `vigente-singular`; el grupo
+  se marca con \u0002 y la regla `marca` la quita sin contar como cambio, en `homologar` y en `homologarTexto`). **Si ya existe en el catálogo un paso
+  con el texto sugerido** (misma sección), el aviso «Términos por homologar» trae el botón «Usar el paso X»; el aviso «Por homologar» de la tabla también
+  (si el código vigente está en el catálogo). Bloque HOMOLOG regenerado. Pruebas `tests/test_homologacion.py` y `qa_homologacion.mjs`.
+  **La siguiente versión debe ser > 1.148.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

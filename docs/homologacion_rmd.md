@@ -92,8 +92,10 @@ Todo en MAYÚSCULAS y sin tildes (la Ñ se conserva). Cada regla tiene su clave 
 | Y/O CAMBIO DE TURNO | Y/O **HAY** CAMBIO DE TURNO | LIMA Acondicionado | `hay-cambio` |
 | USAR EL UNIFORME … SEGUN POE **PBEB-200** | … SEGUN POE **PPRO-243** | ATE Acondicionado | `ppro-243` |
 | SEGUN IPRO-P212 VIGENTE | SEGUN **INSTRUCTIVO** IPRO-P212 VIGENTE | 24; sobre todo LIMA | `instructivo` |
-| SEGUN PPRO-200 VIGENTE | SEGUN **POE** PPRO-200 (LIMA usa también **PROCEDIMIENTO** PPRO-200) | ATE y LIMA | `procedimiento` |
-| IACO-P202. / IPRO-P212. (sin «vigente») | INSTRUCTIVO IACO-P202 VIGENTE. | LIMA Acondicionado | `vigente` |
+| SEGUN PPRO-200 VIGENTE | SEGUN **PROCEDIMIENTO** PPRO-200 VIGENTE | ATE y LIMA | `procedimiento` |
+| … POE PPRO-219 … / LOS POE … | … **PROCEDIMIENTO** PPRO-219 … / LOS **PROCEDIMIENTOS** … (2026-11-19, Carlos: «POE» se reemplaza por «PROCEDIMIENTO») | ATE y LIMA | `poe`, `poe-plural` |
+| Documento sin «vigente» (IACO-P202. / FPRO-250 Y …) | … IACO-P202 **VIGENTE**. (2026-11-19, Carlos: después de **un** documento va VIGENTE) | ATE y LIMA | `vigente` |
+| Varios documentos (PPRO-217 VIGENTE E INSTRUCTIVO IPRO-P256 VIGENTE) | PPRO-217 E INSTRUCTIVO IPRO-P256 **VIGENTES** (una sola vez, al final); un solo documento con VIGENTES pasa a VIGENTE | ATE y LIMA | `vigentes-sin-repetir`, `vigentes`, `vigente-singular` |
 | FECHA / HORA INICIO : | FECHA / HORA INICIO: | | `fecha-hora` |
 
 Otros cambios de redacción que el equipo hizo y que conviene seguir cuando el
