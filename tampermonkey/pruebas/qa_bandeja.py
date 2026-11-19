@@ -22,7 +22,7 @@ SIMULADO = r"""
 window.Filter = function (a, op, v) { if (a && typeof a === 'object') { if (a.filters) { this.filters = a.filters; this.and = a.and; } else { this.path = a.path; this.op = a.operator; this.value = a.value1; this.ci = a.caseSensitive === false; } } else { this.path = a; this.op = op; this.value = v; } };
 const coincide = (r, f) => {
   if (f.filters) return f.and ? f.filters.every((y) => coincide(r, y)) : f.filters.some((y) => coincide(r, y));
-  const v = r[f.path];
+  const tl = /^tolower\((\w+)\)$/.exec(f.path || ''), v = tl ? String(r[tl[1]] == null ? '' : r[tl[1]]).toLowerCase() : r[f.path];
   if (f.op === 'EQ') return String(v) === String(f.value) || (v == null && f.value == null);
   if (f.op === 'NE') return f.value === null ? v != null : String(v) !== String(f.value);
   if (f.op === 'Contains') return String(v || '').toUpperCase().includes(String(f.value).toUpperCase());
@@ -97,6 +97,7 @@ for (let i = 0; i < 120; i++) {
     fechaRegistro: new Date(base - i * 3600000), usuarioRegistro: 'NCUELLARL', observacion: 'linea 1\nlinea 2', wfInstanceId: 'WF' + (i + 1), mdIdVersionAnt: i === 1 ? 'MANT' : null });
   if (i < 2) BD.MD_DESTINATARIOS.push({ mdId_mdId: id, usuarioId_usuarioId: 'U1', tipo: null });
   if (i === 2) BD.MD_DESTINATARIOS.push({ mdId_mdId: id, usuarioId_usuarioId: 'U2', tipo: null });
+  if (i >= 3) (BD.MD_ESTATUSPROCESO = BD.MD_ESTATUSPROCESO || []).push({ idProceso: 'S' + i, mdId_mdId: id, tipo: 'SOLICITUD', estadoIdProceso_iMaestraId: null, usuarioRegistro: 'CJESUSZ', fechaRegistro: new Date(base + i * 60000) });
 }
 TAREAS.WF1 = [{ id: 'T1', activityId: 'usertask2', status: 'READY' }];
 TAREAS.WF2 = [{ id: 'T2', activityId: 'usertask2', status: 'READY' }];
@@ -160,6 +161,8 @@ with sync_playwright() as p:
 
     r = pg.evaluate("async () => { B.S.buscar = 'agua'; const a = await B.cargarPagina('todas'); B.S.buscar = ''; return a.map((x) => x.mdId); }")
     ok("buscar por nombre filtra en el servidor (sin importar mayúsculas)", r == ["M1"], r)
+    r = pg.evaluate("async () => { const md5 = BD.MD.find((m) => m.mdId === 'M5'); md5.estadoIdRmd_iMaestraId = 467; BD.MD_ESTATUSPROCESO.find((x) => x.mdId_mdId === 'M5').fechaRegistro = new Date(base + 9e8); B.S.estado = '469'; const a = await B.cargarPagina('todas'); const est = lecturas.filter((x) => x.ent === 'MD_ESTATUSPROCESO').map((x) => x.p.$orderby); B.S.estado = ''; md5.estadoIdRmd_iMaestraId = 469; return { ids: a.slice(0, 5).map((x) => x.mdId), fecha: !!a[0].fechaAprob, rech: a.some((x) => +x.estadoIdRmd_iMaestraId === 470), est }; }")
+    ok("Aprobada: por fecha de aprobación (la última aprobada primero), también las ya Ingresadas, sin Rechazadas (v1.147.0)", r["ids"] == ["M5", "M120", "M119", "M117", "M116"] and r["fecha"] and not r["rech"] and r["est"][0] == "fechaRegistro desc", r)
 
     # --- Rechazar sin motivo / con tarea no READY ---
     r = pg.evaluate("async () => { escrituras.length = 0; try { await B.rechazar('M1', '  '); return 'sin error'; } catch (e) { return [e.message, escrituras.length]; } }")

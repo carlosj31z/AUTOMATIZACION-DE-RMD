@@ -9391,7 +9391,8 @@
     function filtrosBusqueda() {
       const q = S.buscar.trim(); const out = [];
       if (q) {
-        const partes = [new (F())({ path: 'descripcion', operator: 'Contains', value1: q, caseSensitive: false })];
+        // v1.147.0: como la app original (tolower(descripcion) Contains); con caseSensitive:false el portal no devolvía nada (DOLOFARMALAN, 2202609488)
+        const partes = [new (F())('tolower(descripcion)', 'Contains', q.toLowerCase())];
         if (/^\d+$/.test(q)) partes.push(new (F())('codigoSolicitud', 'Contains', q), new (F())('codigo', 'Contains', q));
         out.push(o(partes));
       }
@@ -9415,10 +9416,37 @@
       return A.cargando;
     }
     // Todas: por partes, la más nueva primero. Quien no es aprobador ve las suyas (registrador) o en las que es destinatario.
+    // v1.147.0 (pedido de Carlos): «Aprobada» = todas las solicitudes aprobadas (aunque ya estén Ingresadas o Autorizadas), la última aprobada primero.
+    // La fecha de aprobación es la fila tipo SOLICITUD de MD_ESTATUSPROCESO (una por MD; estadoIdProceso viene vacío): se descartan las Rechazadas.
+    async function cargarAprobadas(L, clave) {
+      await quienSoy();
+      const f = yo.fs, todoVisible = f.aprobador; let agregadas = 0, vueltas = 0;
+      while (!L.fin && agregadas < 12 && vueltas < 6) {
+        vueltas++;
+        const st = await api.leer('MD_ESTATUSPROCESO', [eq('tipo', 'SOLICITUD')], { $select: 'idProceso,mdId_mdId,fechaRegistro,usuarioRegistro', $orderby: 'fechaRegistro desc', $top: String(POR_PAGINA), $skip: String(L.skip) });
+        if (L.clave !== clave) return L.filas;
+        L.skip += POR_PAGINA; if (st.length < POR_PAGINA) L.fin = true;
+        const ya = new Set(L.filas.map((x) => x.mdId)), cuando = new Map(), ids = [];
+        st.forEach((x) => { if (x.mdId_mdId && !cuando.has(x.mdId_mdId) && !ya.has(x.mdId_mdId)) { cuando.set(x.mdId_mdId, x); ids.push(x.mdId_mdId); } });
+        if (!ids.length) continue;
+        const mds = await api.leer('MD', [y([o(ids.map((id) => eq('mdId', id))), ...filtrosBusqueda()])], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $top: String(ids.length) });
+        if (L.clave !== clave) return L.filas;
+        const porId = new Map(mds.map((m) => [m.mdId, m]));
+        const visibles = ids.map((id) => porId.get(id)).filter((md) => md && md.codigoSolicitud && ![K.SOLICITADO, K.RECHAZADA].includes(+md.estadoIdRmd_iMaestraId)
+          && (todoVisible || md.usuarioRegistro === yo.data.usuario || soyDestinatario(md)));
+        visibles.forEach((md) => { const x = cuando.get(md.mdId); md.fechaAprob = x.fechaRegistro; md.usuarioAprob = x.usuarioRegistro; });
+        L.filas.push(...visibles); agregadas += visibles.length;
+      }
+      return L.filas;
+    }
     async function cargarPagina(cual) {
       const L = S[cual], clave = [S.buscar, S.estado, S.planta].join('|');
       if (L.clave !== clave) { L.filas = []; L.skip = 0; L.fin = false; L.clave = clave; L.error = ''; }
       if (L.cargando || L.fin) return L.cargando;
+      if (+S.estado === K.APROBADA) {
+        L.cargando = cargarAprobadas(L, clave).catch((e) => { L.error = e.message || String(e); throw e; }).finally(() => { L.cargando = null; });
+        return L.cargando;
+      }
       L.cargando = (async () => {
         await quienSoy();
         const base = [new (F())('codigoSolicitud', 'NE', null)];
@@ -9788,7 +9816,7 @@
       return `<button type="button" class="rmd-bs-t${S.sel === md.mdId ? ' sel' : ''}" role="option" aria-selected="${S.sel === md.mdId}" data-id="${esc(md.mdId)}">
         <span class="rmd-bs-t1"><span class="rmd-bs-nom">${esc(md.descripcion || '')}</span><span class="rmd-bs-est ${c}">${esc(estadoTxt(md))}</span></span>
         <span class="rmd-bs-t3">${datos.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
-        <span class="rmd-bs-t4"><span>${esc(fechaTxt(md.fechaRegistro, true))}</span><span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
+        <span class="rmd-bs-t4">${md.fechaAprob ? `<span title="Fecha de aprobación de la solicitud">Aprobada ${esc(fechaTxt(md.fechaAprob, true))}</span>` : `<span>${esc(fechaTxt(md.fechaRegistro, true))}</span>`}<span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
       </button>`;
     }
     const adjTxt = (n) => (n ? `${n} adjunto${n === 1 ? '' : 's'}` : '');
