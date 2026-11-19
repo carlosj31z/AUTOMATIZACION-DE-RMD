@@ -100,8 +100,9 @@ Otros cambios de redacción que el equipo hizo y que conviene seguir cuando el
 paso existe en el RMD (no tienen regla automática, están en la tabla con clase
 `redaccion`):
 
-- LIMA Acondicionado: programar en la codificadora «NUMERO DE LOTE, **FECHA DE
-  ELABORACION**, FECHA DE EXPIRA Y EL TEXTO ADICIONAL…» (paso 181115).
+- ~~LIMA Acondicionado: «FECHA DE ELABORACION» en la codificadora (35156 → 181115)~~: **no es homologación** (Carlos,
+  2026-11-19): viene de un control de cambio puntual para los productos de Ecuador. Queda en la tabla como `especifico`
+  (no se avisa ni se propone).
 - LIMA Envase (inyectables hormonales): «INSUMOS» pasa a «**BULK**» en los pasos
   de entrega y de precauciones (183417, 183464).
 - LIMA Envase: el control de peso cada hora agrega «Y REGISTRAR EN EL FORMATO
