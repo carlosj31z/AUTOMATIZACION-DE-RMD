@@ -1089,6 +1089,52 @@ with sync_playwright() as p:
                   and ["Orden", "equipo", "/MD_ES_EQUIPO('Q2')", '{"orden":1}'] in ops and ["Orden", "equipo", "/MD_ES_EQUIPO('Q1')", '{"orden":3}'] in ops and not any(o[2] == "/MD_ES_UTENSILIO('U1')" for o in ops))
         okRb = r["rbEq"] == ["Q2", "U1", "Q1", "Q9"] and r["rbEsp"][:2] == ["S3:DENSIDAD (20 C)::1.02 - 1.08 g/mL", "S1:pH (25 °C)::3.90 - 4.10"] and not r["rbConf"]
         return okUi and okPlan and okRb, json.dumps({"ui": okUi, "plan": okPlan, "rb": okRb, "eq": [eq0, eq1, eq2], "esp": [esp0, esp1], "btn": btn, "vacia": vacia, "st": {k: v for k, v in st.items() if k != "W"}, "r": r, "errores": errs[:3]}, ensure_ascii=False)[:3000]
+    @prueba("LN65 Ingreso del borrador · paso que solo usa este RMD (v1.147.0, pedido de Carlos): si se corrige el texto de un paso que tiene una sola fila en todo SAP y es de este RMD Ingresado, se corrige su texto en el catálogo (MERGE /PASO con descripcion) en vez de crear un paso nuevo; si lo usa otro RMD, otra fila de este RMD o el RMD no está Ingresado, se crea un paso nuevo como antes. Además, el cuadro «Marca aquí para poder ingresar» usa los colores del tema (modo claro) y los pasos del catálogo se releen de SAP al abrir")
+    def _():
+        d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")
+        r = pg.evaluate("""async (d) => { const antes = window.sap; try {
+          function F(a, b, c) { if (a && typeof a === 'object') { this.filters = a.filters; this.and = a.and; } else { this.path = a; this.op = b; this.value = c; } }
+          const val = (fs, path) => { let v = null; (fs || []).forEach((f) => { if (f.path === path) v = f.value; (f.filters || []).forEach((g) => { if (g.path === path) v = v == null ? [g.value] : [].concat(v, g.value); }); }); return v; };
+          const PASOS = [{ pasoId: 'X2011', codigo: 2011, descripcion: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', estructuraId_estructuraId: 'S-PROC', etiquetaId_etiquetaId: 'G-FAB', tipoDatoId_iMaestraId: 446, activo: true, estadoId_iMaestraId: 2 },
+            { pasoId: 'X2005', codigo: 2005, descripcion: 'CONDICIONES AMBIENTALES:', estructuraId_estructuraId: 'S-PROC', etiquetaId_etiquetaId: 'G-FAB', tipoDatoId_iMaestraId: 446, activo: true, estadoId_iMaestraId: 2 }];
+          let FILAS = {};
+          const modelo = { getServiceMetadata: () => ({ dataServices: { schema: [{ entityType: [{ name: 'PASO', property: ['pasoId', 'descripcion', 'usuarioActualiza', 'fechaActualiza'].map((name) => ({ name })) }] }] } }),
+            read: (ruta, o) => { const e = ruta.replace(/^\\//, ''); let res = [];
+              if (e === 'ETIQUETA') res = [{ etiquetaId: 'G-DOC', descripcion: 'DOCUMENTACION' }, { etiquetaId: 'G-FAB', descripcion: 'FABRICACION' }];
+              else if (e === 'PASO') { const c = val(o.filters, 'codigo'), es = val(o.filters, 'estructuraId_estructuraId'), tx = val(o.filters, 'tolower(descripcion)');
+                res = tx != null ? [] : c != null ? PASOS.filter((p) => [].concat(c).map(String).includes(String(p.codigo))) : PASOS.filter((p) => p.estructuraId_estructuraId === es).map((p) => ({ ...p, numeracion: true })); }
+              else if (e === 'MD_ES_PASO') res = (FILAS[val(o.filters, 'pasoId_pasoId')] || []);
+              setTimeout(() => o.success({ results: res }), 2); } };
+          window.sap = { ui: { require: (n) => (n === 'sap/ui/model/Filter' ? F : n === 'sap/ui/model/FilterOperator' ? { EQ: 'EQ' } : null), getCore: () => ({ byId: () => null }) } };
+          const P = window.__rmdStats.plantilla, N = P.nucleo, arbol = d.arbol;
+          arbol.estructuras[2].etiquetas[1].pasos.push({ id: 'P22', pasoId: 'X2011', codigo: '2011', texto: 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS.', orden: 3, tipo: 446, vi: null, vf: null, margen: null, depende: null, rpor: false, vb: false, etqCat: 'G-FAB', pm: [] });
+          const paq = P.paquete(d.md, arbol, d.cat, 'PRUEBA'), datos = { ...paq, rmd: { ...paq.rmd, mdId: 'MD1' }, tipos: { 446: 'Sin tipo de dato' } };
+          const plan = async (W, estado = 467) => { const an = { destino: { mdId: 'MD1', codigo: '2202600001', version: 3, estadoIdRmd_iMaestraId: estado, nivelTxt: 'FABRICACION' }, enSap: [], avisos: new Map(), cambios: N.cambios(datos.arbol, W), actual: JSON.parse(JSON.stringify(datos.arbol)), mapa: null };
+            return P.plan(datos, { trabajo: W, guardado: 'x' }, an, modelo, 'PRUEBA'); };
+          const editar = (W, id, texto) => { const x = W.estructuras[2].etiquetas[1].pasos.find((y) => y.id === id); Object.assign(x, { texto, codigo: null, pasoId: null, nuevo: true }); };
+          const resumen = (r) => ({ bloqueos: r.bloqueos, crear: r.ops.filter((o) => o.accion === 'Crear').length, cambiar: r.ops.filter((o) => o.accion === 'Cambiar').length,
+            editar: r.ops.filter((o) => o.accion === 'Editar').map((o) => ({ ruta: o.ruta, datos: Object.keys(o.datos).sort(), desc: o.datos.descripcion, inv: o.inv.datos.descripcion, marca: o.marca })) });
+          FILAS = { X2011: [{ mdEstructuraPasoId: 'P22', mdId_mdId: 'MD1', activo: true }] };
+          const W1 = JSON.parse(JSON.stringify(datos.arbol)); editar(W1, 'P22', 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS Y UTENSILIOS.'); const a = resumen(await plan(W1));
+          FILAS = { X2011: [{ mdEstructuraPasoId: 'P22', mdId_mdId: 'MD1', activo: true }, { mdEstructuraPasoId: 'Z9', mdId_mdId: 'MD9', activo: false }] };
+          const W2 = JSON.parse(JSON.stringify(datos.arbol)); editar(W2, 'P22', 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS Y UTENSILIOS.'); const b = resumen(await plan(W2));
+          FILAS = { X2011: [{ mdEstructuraPasoId: 'P22', mdId_mdId: 'MD1', activo: true }] };
+          const W3 = JSON.parse(JSON.stringify(datos.arbol)); editar(W3, 'P22', 'VERIFICAR LA LIMPIEZA DE LOS EQUIPOS Y UTENSILIOS.'); const c = resumen(await plan(W3, 465));
+          FILAS = { X2005: [{ mdEstructuraPasoId: 'P20', mdId_mdId: 'MD1', activo: true }, { mdEstructuraPasoId: 'P21', mdId_mdId: 'MD1', activo: true }] };
+          const W4 = JSON.parse(JSON.stringify(datos.arbol)); editar(W4, 'P21', 'CONDICIONES AMBIENTALES DE LA SALA:'); const e4 = resumen(await plan(W4));
+          return { a, b, c, e4 };
+        } catch (e) { return { error: String(e && e.stack || e).slice(0, 600) }; } finally { window.sap = antes; } }""", d0)
+        if r.get("error"): return False, r["error"]
+        a, b, c, e4 = r["a"], r["b"], r["c"], r["e4"]
+        css = pg.evaluate("""() => { const st = [...document.querySelectorAll('style')].map((x) => x.textContent).join('\\n'); const m = /\\.rmd-ing-conf \\{[^}]*\\}/.exec(st); return m ? m[0] : ''; }""")
+        js = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rmd-ui-mejoras.user.js"), encoding="utf-8").read()
+        ok = (not a["bloqueos"] and a["crear"] == 0 and a["cambiar"] == 0 and len(a["editar"]) == 1
+              and a["editar"][0]["ruta"] == "/PASO('X2011')" and a["editar"][0]["datos"] == ["descripcion", "fechaActualiza", "usuarioActualiza"]
+              and a["editar"][0]["desc"] == "VERIFICAR LA LIMPIEZA DE LOS EQUIPOS Y UTENSILIOS." and a["editar"][0]["inv"] == "VERIFICAR LA LIMPIEZA DE LOS EQUIPOS." and a["editar"][0]["marca"]["id"] == "P22"
+              and not b["bloqueos"] and b["crear"] == 1 and not b["editar"] and not c["editar"] and any("no está Ingresado" in x for x in c["bloqueos"]) and not e4["bloqueos"] and e4["crear"] == 1 and not e4["editar"]
+              and "var(--rmd-superficie)" in css and "var(--rmd-texto)" in css and "#1d2733" not in css
+              and "PP_TTL_PASOS" in js and "ppCatalogoAlDia(datos" in js)
+        return ok, json.dumps({"r": r, "css": css}, ensure_ascii=False)[:2500]
     @prueba("LN61 Ingreso del borrador · insumos en los pasos (v1.136.0, regla de Carlos): el cambio de cantidad de un insumo dentro de un paso se graba (cantidadInsumo de su fila); el insumo agregado (en un paso existente o en uno nuevo) se graba como «Agregar Insumo» del portal (aPasoInsumoPaso con el insumo de la receta del RMD, tipo de dato de los insumos, 3 decimales) y la receta recalcula cantidadRm; un insumo que no está en la receta bloquea")
     def _():
         d0 = pg.evaluate("(" + PP_DATOS_JS + ")()")

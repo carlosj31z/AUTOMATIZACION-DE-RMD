@@ -22,10 +22,10 @@ SIMULADO = r"""
 window.Filter = function (a, op, v) { if (a && typeof a === 'object') { if (a.filters) { this.filters = a.filters; this.and = a.and; } else { this.path = a.path; this.op = a.operator; this.value = a.value1; this.ci = a.caseSensitive === false; } } else { this.path = a; this.op = op; this.value = v; } };
 const coincide = (r, f) => {
   if (f.filters) return f.and ? f.filters.every((y) => coincide(r, y)) : f.filters.some((y) => coincide(r, y));
-  const v = r[f.path];
+  const tl = /^tolower\((\w+)\)$/.exec(f.path || ''), v = tl ? String(r[tl[1]] == null ? '' : r[tl[1]]).toLowerCase() : r[f.path];
   if (f.op === 'EQ') return String(v) === String(f.value) || (v == null && f.value == null);
   if (f.op === 'NE') return f.value === null ? v != null : String(v) !== String(f.value);
-  if (f.op === 'Contains') return String(v || '').toUpperCase().includes(String(f.value).toUpperCase());
+  if (f.op === 'Contains') { if (tl && !/^'.*'$/.test(String(f.value))) throw new Error('400: valor sin comillas'); return String(v || '').toUpperCase().includes(String(f.value).replace(/^'|'$/g, '').toUpperCase()); }
   throw new Error('operador ' + f.op);
 };
 // arma las filas (con sus navegaciones) a partir de la BD
@@ -97,6 +97,7 @@ for (let i = 0; i < 120; i++) {
     fechaRegistro: new Date(base - i * 3600000), usuarioRegistro: 'NCUELLARL', observacion: 'linea 1\nlinea 2', wfInstanceId: 'WF' + (i + 1), mdIdVersionAnt: i === 1 ? 'MANT' : null });
   if (i < 2) BD.MD_DESTINATARIOS.push({ mdId_mdId: id, usuarioId_usuarioId: 'U1', tipo: null });
   if (i === 2) BD.MD_DESTINATARIOS.push({ mdId_mdId: id, usuarioId_usuarioId: 'U2', tipo: null });
+  if (i >= 3) (BD.MD_ESTATUSPROCESO = BD.MD_ESTATUSPROCESO || []).push({ idProceso: 'S' + i, mdId_mdId: id, tipo: 'SOLICITUD', estadoIdProceso_iMaestraId: null, usuarioRegistro: 'CJESUSZ', fechaRegistro: new Date(base + i * 60000) });
 }
 TAREAS.WF1 = [{ id: 'T1', activityId: 'usertask2', status: 'READY' }];
 TAREAS.WF2 = [{ id: 'T2', activityId: 'usertask2', status: 'READY' }];
@@ -129,7 +130,7 @@ window.B = crearBandeja({
   esc: (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
   toast: (t, e) => toasts.push([t, !!e]), usuarioVisible: (u) => (u === 'KMORENOM' ? 'VM' : u), persona: () => ({ email: 'carlos@empresa.pe' }), fetch: fakeFetch,
   generarPdfRmd: async (A, C, h, y, k, p, E) => { window.gen = { cod: A.rmdId, desc: C, matnr: y.Matnr, p, ordenes: A.aEstructura.results.map((e) => e.orden), pasos: A.aEstructura.results[1].aPaso.results.map((x) => x.orden), ins: A.aEstructura.results[1].aInsumo.results.map((x) => x.ItemNo), lote: A.loteVistaRMD, hist: E && Array.isArray(E.results) }; return encodeURI(btoa('%PDF-1.4 rmd')); },
-  externos: () => {}, abrirRmd: (c, v) => { window.abierto = [c, v]; }, abrirApp: (h) => { window.app = h; }, alCambiarPendientes: (n) => { window.pend = n; },
+  externos: () => {}, abrirRmd: (c, v) => { window.abierto = [c, v]; }, abrirApp: (h) => { window.app = h; }, abrirBorrador: (t, n, pdf) => { window.borrador = [n, !!pdf]; }, alCambiarPendientes: (n) => { window.pend = n; },
 });
 """
 
@@ -160,6 +161,12 @@ with sync_playwright() as p:
 
     r = pg.evaluate("async () => { B.S.buscar = 'agua'; const a = await B.cargarPagina('todas'); B.S.buscar = ''; return a.map((x) => x.mdId); }")
     ok("buscar por nombre filtra en el servidor (sin importar mayúsculas)", r == ["M1"], r)
+    r = pg.evaluate("async () => { const md5 = BD.MD.find((m) => m.mdId === 'M5'); md5.estadoIdRmd_iMaestraId = 467; BD.MD_ESTATUSPROCESO.find((x) => x.mdId_mdId === 'M5').fechaRegistro = new Date(base + 9e8); B.S.estado = '469'; const a = await B.cargarPagina('todas'); const est = lecturas.filter((x) => x.ent === 'MD_ESTATUSPROCESO').map((x) => x.p.$orderby); B.S.estado = ''; md5.estadoIdRmd_iMaestraId = 469; return { ids: a.slice(0, 5).map((x) => x.mdId), fecha: !!a[0].fechaAprob, rech: a.some((x) => +x.estadoIdRmd_iMaestraId === 470), est }; }")
+    ok("Aprobada: por fecha de aprobación (la última aprobada primero), también las ya Ingresadas, sin Rechazadas (v1.147.0)", r["ids"] == ["M5", "M120", "M119", "M117", "M116"] and r["fecha"] and not r["rech"] and r["est"][0] == "fechaRegistro desc", r)
+    r = pg.evaluate("async () => { B.S.estado = '469'; B.S.buscar = 'producto 11'; const n0 = lecturas.length; const a = await B.cargarPagina('todas'); const est = lecturas.slice(n0).filter((x) => x.ent === 'MD_ESTATUSPROCESO').length; B.S.buscar = ''; B.S.estado = ''; return { ids: a.map((x) => x.mdId), est }; }")
+    ok("Aprobada con búsqueda: primero los MD que coinciden y luego su fecha de aprobación (v1.147.0)", r["ids"] == ["M120", "M119", "M117", "M116", "M114", "M113", "M111", "M12"] and r["est"] == 1, r)
+    r = pg.evaluate("async () => { B.S.estado = '469'; B.S.buscar = 'producto 5'; const vieja = B.cargarPagina('todas'); B.S.buscar = 'producto 7'; const a = await B.cargarPagina('todas'); await vieja.catch(() => {}); const ids = B.S.todas.filas.map((x) => x.mdId); B.S.buscar = ''; B.S.estado = ''; return { a: a.map((x) => x.mdId), ids }; }")
+    ok("cambiar la búsqueda con una carga en curso lanza la nueva (v1.147.0)", r["a"] and r["a"] == ["M80", "M78", "M77", "M75", "M74", "M72", "M71", "M8"] and r["ids"] == r["a"], r)
 
     # --- Rechazar sin motivo / con tarea no READY ---
     r = pg.evaluate("async () => { escrituras.length = 0; try { await B.rechazar('M1', '  '); return 'sin error'; } catch (e) { return [e.message, escrituras.length]; } }")
@@ -225,6 +232,16 @@ with sync_playwright() as p:
     pg.locator(".rmd-bs-t").first.click(); pg.wait_for_selector(".rmd-bs-adjl", timeout=5000); pg.wait_for_timeout(200)
     ok("el detalle trae Aprobar y Rechazar (solo texto) y los adjuntos", pg.locator(".rmd-bs-btn.si").inner_text() == "Aprobar" and pg.locator(".rmd-bs-btn.no").inner_text() == "Rechazar" and pg.locator(".rmd-bs-adjl li").count() == 2)
     pg.screenshot(path=os.path.join(CAPTURAS, "bandeja-2-detalle.png"))
+    bots = pg.evaluate("() => [...document.querySelectorAll('.rmd-bs-adjl li')].map((li) => [...li.querySelectorAll('button')].map((b) => b.textContent.trim()))")
+    ok("cada adjunto trae Ver y Descargar; el PDF o .html también «Revisar como borrador»; un Excel solo Descargar (v1.147.0)", bots == [["Ver", "Descargar", "Revisar como borrador"], ["Descargar"]], bots)
+    with pg.expect_download() as dl:
+        pg.locator(".rmd-bs-adjl li").nth(1).locator("button", has_text="Descargar").click()
+    ok("Descargar baja el archivo con su nombre", dl.value.suggested_filename == "cc.xlsx", dl.value.suggested_filename)
+    with pg.context.expect_page() as nueva:
+        pg.locator(".rmd-bs-adjl li").first.locator("button", has_text="Ver").click()
+    pv = nueva.value; pv.wait_for_timeout(500)
+    ok("Ver abre el PDF en una pestaña nueva", pv.url.startswith("blob:") or "sustento.pdf" in (pv.title() or ""), pv.url)
+    pv.close()
     det = pg.locator(".rmd-bs-det").inner_text(); lista = pg.locator(".rmd-bs-lista").inner_text()
     ok("sin «te toca» ni pestaña de flujo de revisión", "te toca" not in lista and pg.locator(".rmd-bs-pestanas button").count() == 2, pg.locator(".rmd-bs-pestanas").inner_text())
     ok("los destinatarios van en una sola línea resumida", pg.locator(".rmd-bs-destr").count() == 1 and pg.locator(".rmd-bs-destr li").count() == 0, det)

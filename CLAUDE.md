@@ -400,6 +400,16 @@ cuenta). Escribir y responder siempre en **español**.
   (como los pasos). 1.146.1 publicada en SharePoint el 2026-11-18 (2 427 559 bytes).
 - 2026-11-19, v1.146.2: **Carlos: «FECHA DE ELABORACION» en la codificadora (35156 → 181115) no es homologación** (CC puntual de los productos
   de Ecuador): fila marcada `especifico` y bloque HOMOLOG regenerado. **La siguiente versión debe ser > 1.146.2.**
+- 2026-11-19, v1.147.0 (encima de la 1.146.2): **pedidos de Carlos.** Pasos del catálogo releídos de SAP al abrir plantilla, Edición rápida o borrador
+  (`ppCatalogo` con `PP_TTL_PASOS` 2 min; `ppCatalogoAlDia` en el .html importado). Ingreso: paso o proceso menor cuyo texto se corrige y que solo tiene
+  **una fila en todo SAP, de este RMD Ingresado** → op «Editar» = MERGE `/PASO('<id>')` `descripcion` (+ usuario/fecha si el metadato los tiene), no un paso
+  nuevo (`editarEnSitio` en `ppPlanEscritura`; verificado en `ppVerificarIngreso`). Cuadro «Marca aquí para poder ingresar» con colores del tema. Campanita:
+  adjuntos con Ver / Descargar / «Revisar como borrador». **Solicitud más rápida** (bloque `==SOLICITUD-RAPIDA==`, opción `solicitudrapida`): SOLICITUD
+  elegido + Ir solo, `/MD` en paralelo y RECETA sin esperar (la app tardaba ~30 s: 6 páginas en serie de 2,5 MB). Pruebas `qa_local.py` LN65,
+  `qa_bandeja.py`, `qa_solicitud_rapida.mjs`. Campanita: chip «Aprobada» ordenado por **fecha de aprobación** (fila `tipo = 'SOLICITUD'` de
+  `MD_ESTATUSPROCESO`, una por MD; cuentan las ya Ingresadas/Autorizadas, sin Rechazadas; muestra quién aprobó; con búsqueda, primero los MD y luego
+  sus filas), búsqueda `tolower(descripcion)` con el valor **entre comillas** (UI5 no las pone) y búsqueda nueva aunque siga otra carga.
+  Solicitud rápida elige SOLICITUD cuando `/MAESTRA` tiene datos. Probado en el portal en solo lectura (DESKTOP-KJ339H3). **La siguiente versión debe ser > 1.147.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
