@@ -9391,8 +9391,8 @@
     function filtrosBusqueda() {
       const q = S.buscar.trim(); const out = [];
       if (q) {
-        // v1.147.0: como la app original (tolower(descripcion) Contains); con caseSensitive:false el portal no devolvía nada (DOLOFARMALAN, 2202609488)
-        const partes = [new (F())('tolower(descripcion)', 'Contains', q.toLowerCase())];
+        // v1.147.0: como la app original (tolower(descripcion) Contains con el valor entre comillas, que UI5 no pone en una ruta con función)
+        const partes = [new (F())('tolower(descripcion)', 'Contains', "'" + q.toLowerCase().replace(/'/g, "''") + "'")];
         if (/^\d+$/.test(q)) partes.push(new (F())('codigoSolicitud', 'Contains', q), new (F())('codigo', 'Contains', q));
         out.push(o(partes));
       }
@@ -9816,7 +9816,7 @@
       return `<button type="button" class="rmd-bs-t${S.sel === md.mdId ? ' sel' : ''}" role="option" aria-selected="${S.sel === md.mdId}" data-id="${esc(md.mdId)}">
         <span class="rmd-bs-t1"><span class="rmd-bs-nom">${esc(md.descripcion || '')}</span><span class="rmd-bs-est ${c}">${esc(estadoTxt(md))}</span></span>
         <span class="rmd-bs-t3">${datos.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
-        <span class="rmd-bs-t4">${md.fechaAprob ? `<span title="Fecha de aprobación de la solicitud">Aprobada ${esc(fechaTxt(md.fechaAprob, true))}</span>` : `<span>${esc(fechaTxt(md.fechaRegistro, true))}</span>`}<span>${esc(D.usuarioVisible(md.usuarioRegistro || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
+        <span class="rmd-bs-t4">${md.fechaAprob ? `<span title="Fecha de aprobación de la solicitud">Aprobada ${esc(fechaTxt(md.fechaAprob, true))}</span>` : `<span>${esc(fechaTxt(md.fechaRegistro, true))}</span>`}<span${md.fechaAprob ? ' title="Usuario que aprobó la solicitud"' : ''}>${esc(D.usuarioVisible((md.fechaAprob ? md.usuarioAprob : md.usuarioRegistro) || ''))}</span><span class="rmd-bs-adj" data-adj="${esc(md.mdId)}">${adj && adj.__n != null ? adjTxt(adj.__n) : ''}</span></span>
       </button>`;
     }
     const adjTxt = (n) => (n ? `${n} adjunto${n === 1 ? '' : 's'}` : '');

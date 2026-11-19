@@ -25,7 +25,7 @@ const coincide = (r, f) => {
   const tl = /^tolower\((\w+)\)$/.exec(f.path || ''), v = tl ? String(r[tl[1]] == null ? '' : r[tl[1]]).toLowerCase() : r[f.path];
   if (f.op === 'EQ') return String(v) === String(f.value) || (v == null && f.value == null);
   if (f.op === 'NE') return f.value === null ? v != null : String(v) !== String(f.value);
-  if (f.op === 'Contains') return String(v || '').toUpperCase().includes(String(f.value).toUpperCase());
+  if (f.op === 'Contains') { if (tl && !/^'.*'$/.test(String(f.value))) throw new Error('400: valor sin comillas'); return String(v || '').toUpperCase().includes(String(f.value).replace(/^'|'$/g, '').toUpperCase()); }
   throw new Error('operador ' + f.op);
 };
 // arma las filas (con sus navegaciones) a partir de la BD
