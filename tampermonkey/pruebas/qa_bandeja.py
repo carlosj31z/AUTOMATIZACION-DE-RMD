@@ -129,7 +129,7 @@ window.B = crearBandeja({
   esc: (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
   toast: (t, e) => toasts.push([t, !!e]), usuarioVisible: (u) => (u === 'KMORENOM' ? 'VM' : u), persona: () => ({ email: 'carlos@empresa.pe' }), fetch: fakeFetch,
   generarPdfRmd: async (A, C, h, y, k, p, E) => { window.gen = { cod: A.rmdId, desc: C, matnr: y.Matnr, p, ordenes: A.aEstructura.results.map((e) => e.orden), pasos: A.aEstructura.results[1].aPaso.results.map((x) => x.orden), ins: A.aEstructura.results[1].aInsumo.results.map((x) => x.ItemNo), lote: A.loteVistaRMD, hist: E && Array.isArray(E.results) }; return encodeURI(btoa('%PDF-1.4 rmd')); },
-  externos: () => {}, abrirRmd: (c, v) => { window.abierto = [c, v]; }, abrirApp: (h) => { window.app = h; }, alCambiarPendientes: (n) => { window.pend = n; },
+  externos: () => {}, abrirRmd: (c, v) => { window.abierto = [c, v]; }, abrirApp: (h) => { window.app = h; }, abrirBorrador: (t, n, pdf) => { window.borrador = [n, !!pdf]; }, alCambiarPendientes: (n) => { window.pend = n; },
 });
 """
 
@@ -225,6 +225,16 @@ with sync_playwright() as p:
     pg.locator(".rmd-bs-t").first.click(); pg.wait_for_selector(".rmd-bs-adjl", timeout=5000); pg.wait_for_timeout(200)
     ok("el detalle trae Aprobar y Rechazar (solo texto) y los adjuntos", pg.locator(".rmd-bs-btn.si").inner_text() == "Aprobar" and pg.locator(".rmd-bs-btn.no").inner_text() == "Rechazar" and pg.locator(".rmd-bs-adjl li").count() == 2)
     pg.screenshot(path=os.path.join(CAPTURAS, "bandeja-2-detalle.png"))
+    bots = pg.evaluate("() => [...document.querySelectorAll('.rmd-bs-adjl li')].map((li) => [...li.querySelectorAll('button')].map((b) => b.textContent.trim()))")
+    ok("cada adjunto trae Ver y Descargar; el PDF o .html también «Revisar como borrador»; un Excel solo Descargar (v1.147.0)", bots == [["Ver", "Descargar", "Revisar como borrador"], ["Descargar"]], bots)
+    with pg.expect_download() as dl:
+        pg.locator(".rmd-bs-adjl li").nth(1).locator("button", has_text="Descargar").click()
+    ok("Descargar baja el archivo con su nombre", dl.value.suggested_filename == "cc.xlsx", dl.value.suggested_filename)
+    with pg.context.expect_page() as nueva:
+        pg.locator(".rmd-bs-adjl li").first.locator("button", has_text="Ver").click()
+    pv = nueva.value; pv.wait_for_timeout(500)
+    ok("Ver abre el PDF en una pestaña nueva", pv.url.startswith("blob:") or "sustento.pdf" in (pv.title() or ""), pv.url)
+    pv.close()
     det = pg.locator(".rmd-bs-det").inner_text(); lista = pg.locator(".rmd-bs-lista").inner_text()
     ok("sin «te toca» ni pestaña de flujo de revisión", "te toca" not in lista and pg.locator(".rmd-bs-pestanas button").count() == 2, pg.locator(".rmd-bs-pestanas").inner_text())
     ok("los destinatarios van en una sola línea resumida", pg.locator(".rmd-bs-destr").count() == 1 and pg.locator(".rmd-bs-destr li").count() == 0, det)
