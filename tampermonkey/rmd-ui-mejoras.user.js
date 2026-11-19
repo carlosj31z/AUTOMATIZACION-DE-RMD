@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.148.0
+// @version      1.148.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.148.0';                                                       // mantener igual a @version
+  const VERSION = '1.148.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1889,13 +1889,13 @@
   // texto para comparar repetidos: sin tildes, sin signos ni espacios de más
   const claveRepetido = (t) => SIN_ACENTOS(t).replace(/[^A-Z0-9Ñ%°]+/g, ' ').trim();
   // v1.146.0 (regla de Carlos): la nota del supervisor solo va en pasos «Realizado por y Visto bueno» con V.B. marcado
-  const RX_NOTA_SUPERVISOR = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFICAR PRESENCIALMENTE\b/;
+  const RX_NOTA_SUPERVISOR = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFI?CAR PRESENCIALMENTE\b/;
   const MSG_NOTA_SUPERVISOR = 'Lleva la nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» pero el paso no es «Realizado por y Visto bueno» con V.B. marcado: quita la nota (regla de Carlos)';
   const notaSupervisorSobra = (tipoPaso, vb) => { const t = SIN_ACENTOS(tipoPaso); return !!t && (t !== 'REALIZADO POR Y VISTO BUENO' || vb === false); };
   // v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. marcados lleva esa nota como ÚLTIMO proceso menor
   const NOTA_SUPERVISOR_TXT = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
   const notaSupervisorObligatoria = (tipoPaso, rPor, vb) => SIN_ACENTOS(tipoPaso) === 'REALIZADO POR Y VISTO BUENO' && rPor === true && vb === true;
-  const MSG_NOTA_FALTA = `Paso «Realizado por y Visto bueno» con R. Por y V.B.: su último proceso menor debe ser «${NOTA_SUPERVISOR_TXT}» y no lo tiene. Agrégalo al final (regla de Carlos)`;
+  const MSG_NOTA_FALTA = `Paso «Realizado por y Visto bueno» con R. Por y V.B.: su último proceso menor debe ser «${NOTA_SUPERVISOR_TXT}» (con o sin punto final) y no lo tiene. Agrégalo al final (regla de Carlos)`;
   const MSG_NOTA_NO_ULTIMA = 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final (regla de Carlos)';
   // v1.146.0 (regla de Carlos): los procesos menores que llena Calidad en Operaciones y llevan tipo de dato van con Estado CC y Edit;
   // «TOMAR LA MUESTRA DESDE…» (punto de muestreo) es instrucción: Sin tipo de dato
@@ -17955,7 +17955,7 @@
     // v1.146.0 (pedido de Carlos): palabras duplicadas seguidas («COINCIDAN COINCIDAN») -> ['COINCIDAN']
     const palabrasRepetidas = (t) => { const s = String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(), out = new Set(), rx = /(?<![\p{L}\p{N}])(\p{L}{2,})\s+\1(?![\p{L}\p{N}])/gu; let m; while ((m = rx.exec(s))) out.add(m[1]); return [...out]; };
     // v1.146.0 (reglas de Carlos): nota del supervisor solo en «Realizado por y Visto bueno» (441) con V.B.; Calidad en Operaciones; punto de muestreo
-    const RX_NOTA_SUP = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFICAR PRESENCIALMENTE\b/, RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
+    const RX_NOTA_SUP = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFI?CAR PRESENCIALMENTE\b/, RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
     const RX_PUNTO_MUESTREO = /^TOMAR (LA |LAS )?MUESTRAS? DESDE\b|\bPUNTOS? DE MUESTREO\b/;
     const NOTA_SUP_TXT = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
     const RX_RESP_PROD = /\b(JEFE|SUPERVISOR|OPERARIO|OPERADOR)\b|\bPERSONAL DE PRODUCCION\b/; // v1.147.1: lo verifica Produccion, sin Estado CC
@@ -18352,8 +18352,8 @@
           // v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. lleva la nota del supervisor como último proceso menor
           if (tipoP === 441 && x.rpor === true && x.vb === true) {
             const pmT = vivos(x.pm).filter((m) => !m.insumo), ult = pmT[pmT.length - 1];
-            if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» como último proceso menor.`, 'notafalta');
-              const cat = bus && bus.exactos ? bus.exactos(NOTA_SUP_TXT).find((f) => !estr || f.estr === estr) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
+            if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» (con o sin punto final) como último proceso menor.`, 'notafalta');
+              const cat = bus && bus.exactos ? [NOTA_SUP_TXT, NOTA_SUP_TXT.slice(0, -1)].map((t) => bus.exactos(t).find((f) => !estr || f.estr === estr)).find(Boolean) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
             else if (nota !== ult) { add(nota.id, 'aviso', 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final.', 'notafin'); out.get(nota.id).slice(-1)[0].alFinal = true; }
           } });
         // paso quitado con dependientes

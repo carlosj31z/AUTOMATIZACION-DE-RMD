@@ -428,7 +428,10 @@ cuenta). Escribir y responder siempre en **español**.
   «el más usado»); solo se ofrecen pasos **ya homologados** (sin términos pendientes) que citan **los mismos documentos**, y «ya existe» exige el texto
   exacto con puntuación. Varios documentos del mismo tipo: «INSTRUCTIVOS» / «PROCEDIMIENTOS» (`tipo-plural`). Probado en el portal (solo lectura,
   ULCERAN 40 2202609489); ojo: en esas pruebas el cortafuegos también va en el marco `rmd-vista-marco` de la Edición rápida. Bloque HOMOLOG regenerado. Pruebas `tests/test_homologacion.py` y `qa_homologacion.mjs`.
-  1.148.0 publicada en SharePoint el 2026-11-19 (2 458 005 bytes), PR #127. **La siguiente versión debe ser > 1.148.0.**
+  1.148.0 publicada en SharePoint el 2026-11-19 (2 458 005 bytes), PR #127.
+- 2026-11-19, v1.148.1: **Carlos: la nota obligatoria del supervisor vale también sin punto final** (y con el tipeo «VERIFCAR»: `VERIFI?CAR` en
+  `RX_NOTA_SUPERVISOR`/`RX_NOTA_SUP`); «Agregar la nota al final» busca en el catálogo con y sin punto. Prueba `qa_repetidos.mjs`.
+  **La siguiente versión debe ser > 1.148.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

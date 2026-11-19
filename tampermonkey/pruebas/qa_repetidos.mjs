@@ -89,6 +89,15 @@ ok('v1.147.1: verificacion del jefe o supervisor (Produccion) en paso de Calidad
   ok('nota obligatoria: ofrece agregar el proceso menor del catálogo', l2('q1').some((x) => x.agregar === '9'), JSON.stringify(l2('q1')));
   ok('nota obligatoria: no es la última -> moverla al final', /muévela al final/.test(tx2('n1')) && l2('n1').some((x) => x.alFinal), tx2('n1'));
   ok('nota obligatoria: al final, sin aviso', !/falta la nota|muévela/.test(tx2('q3') + tx2('n4')), tx2('q3') + tx2('n4'));
+  // v1.148.1 (Carlos): la nota también vale sin punto final (y con «VERIFCAR»); el catálogo sin punto también se ofrece
+  const SIN_PUNTO = NOTA_FIN.slice(0, -1), t4 = { estructuras: [{ estructuraId: 'E', pasos: [
+    { id: 'r1', codigo: '300', texto: 'SECAR EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [{ id: 'o1', codigo: '10', texto: 'PESO (kg):' }, { id: 'o2', codigo: '11', texto: SIN_PUNTO }] },
+    { id: 'r2', codigo: '301', texto: 'MOLER EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [{ id: 'o3', codigo: '12', texto: SIN_PUNTO.replace('VERIFICAR', 'VERIFCAR') }] },
+    { id: 'r3', codigo: '302', texto: 'ENVASAR EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [] } ] }] };
+  const av4 = PPN.avisos(t4, { buscador: PPN.crearBuscador([{ codigo: '11', texto: SIN_PUNTO, estr: 'E', etq: null, tipo: 446 }]) }), l4 = (id) => av4.get(id) || [], tx4 = (id) => l4(id).map((x) => x.texto).join(' | ');
+  ok('nota sin punto final: vale como nota obligatoria', !/falta la nota|muévela/.test(tx4('r1') + tx4('o2')), tx4('r1') + tx4('o2'));
+  ok('nota con «VERIFCAR»: también vale', !/falta la nota/.test(tx4('r2')), tx4('r2'));
+  ok('catálogo solo sin punto: ofrece agregarla', l4('r3').some((x) => x.agregar === '11'), JSON.stringify(l4('r3')));
   ok('nota obligatoria: sin V.B. o con otro tipo no se pide', !/falta la nota/.test(tx2('q4') + tx2('q5')), tx2('q4') + tx2('q5'));
 }
 ok('TOMAR LA MUESTRA DESDE con tipo: Sin tipo de dato', tiene('m7', /Sin tipo de dato/), txt('m7'));
