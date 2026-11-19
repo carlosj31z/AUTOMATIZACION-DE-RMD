@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (cargador)
 // @namespace    medifarma.rmd
-// @version      1.2.0
-// @description  Usa siempre la versión más reciente de «RMD · mejoras de interfaz» que haya en la carpeta MEJORAS DE INTERFAZ de SharePoint, con cualquier nombre de archivo (por ejemplo 1.56.0.js).
+// @version      1.3.0
+// @description  Usa siempre la versión más reciente de «RMD · mejoras de interfaz»: la más alta entre la carpeta MEJORAS DE INTERFAZ de SharePoint (cualquier nombre, p. ej. 1.56.0.js) y la rama «publicado» del repositorio en GitHub.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-start
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @connect      medifarmape.sharepoint.com
+// @connect      raw.githubusercontent.com
 // @updateURL    https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras-cargador.user.js
 // @downloadURL  https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/PLANTA%20LIMA/DIRECCION%20TECNICA/DOCUMENTACION%20TECNICA/10.-REPORTES%202024-2026/PROYECTOS/MEJORAS%20DE%20INTERFAZ/rmd-ui-mejoras-cargador.user.js
 // ==/UserScript==
@@ -21,11 +22,15 @@
 // carpetas y archivos) y solo dentro de 04.-RMD/3.-CONTINGENCIA para escribir.
 // v1.2.0: lectura (GET) de la carpeta 04.-RMD/10.- RMD DE CARACTERIZACION (lista y archivos, para el Excel «CARACTERIZACIÓN LISTADO» que pide
 // Status RMD). Con { binario: true } la respuesta trae además bytes (ArrayBuffer) con el archivo tal cual.
+// v1.3.0: segunda fuente, la rama «publicado» de GitHub (carlosj31z/AUTOMATIZACION-DE-RMD, tampermonkey/rmd-ui-mejoras.user.js), para publicar
+// desde la nube sin la PC: se usa la versión más alta de las dos (a igual versión, la de SharePoint). Si una fuente falla, solo se acepta una versión
+// MAYOR que la guardada cuando la que no respondió es la fuente de la guardada (nunca se baja por una sesión vencida o un corte). 404 en GitHub = sin versión.
 (function () {
   'use strict';
-  const CARGADOR = '1.2.0';
+  const CARGADOR = '1.3.0';
   const SITIO = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA';
   const CARPETA = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';
+  const GITHUB = 'https://raw.githubusercontent.com/carlosj31z/AUTOMATIZACION-DE-RMD/publicado/tampermonkey/rmd-ui-mejoras.user.js';
   const CADA = 10 * 60 * 1000;                                       // como máximo una revisión cada 10 min (valor compartido entre pestañas)
   const raiz = document.documentElement;
   const enApp = /ui5appruntime/.test(location.pathname);              // solo el marco de la app revisa la carpeta
@@ -53,6 +58,20 @@
       .map((f) => ({ nombre: f.Name, ruta: f.ServerRelativeUrl, clave: [f.Name, f.TimeLastModified, f.Length].join('|'), fecha: Date.parse(f.TimeLastModified) || 0 }));
   }
   const bajar = (f) => pedir(`${SITIO}/_api/web/GetFileByServerRelativePath(decodedurl='${enc(f.ruta)}')/$value`, false);
+  // GitHub: primero solo la cabecera (Range, ~4 KB) para saber la versión; el script completo (~2,5 MB) se baja solo si hay que cambiar a esa versión
+  const pedirGitHub = (rango) => new Promise((ok, mal) => GM_xmlhttpRequest({
+    method: 'GET', url: `${GITHUB}?t=${Date.now()}`, timeout: 60000, overrideMimeType: 'text/plain; charset=utf-8', headers: rango ? { Range: 'bytes=0-4095' } : {},
+    onload: (r) => (r.status === 404 ? ok(null) : r.status >= 200 && r.status < 300 ? ok(r.responseText || '') : mal(new Error(`GitHub respondió ${r.status}`))),
+    onerror: () => mal(new Error('sin conexión con GitHub')), ontimeout: () => mal(new Error('GitHub no respondió a tiempo')),
+  }));
+  async function versionGitHub() {                                   // null = rama o archivo aún no publicados (404): GitHub no ofrece versión
+    const t = await pedirGitHub(true);
+    if (t === null) return null;
+    const fin = t.indexOf('// ==/UserScript=='), cab = fin > 0 ? t.slice(0, fin) : '';
+    const v = (/^\/\/ @version\s+(\d+\.\d+\.\d+)\s*$/m.exec(cab) || [])[1], n = (/^\/\/ @name\s+(.+)$/m.exec(cab) || [])[1] || '';
+    if (!v || !/mejoras de interfaz/i.test(n) || /cargador/i.test(n)) throw new Error('GitHub no devolvió el script');
+    return { nombre: 'GitHub (publicado)', clave: `github|${v}`, version: v, fecha: 0, github: true };
+  }
 
   // paquete = { version, archivo, clave, guardado, codigo }; meta = lo mismo sin el código (lecturas baratas)
   let inyectada = null;
@@ -80,24 +99,31 @@
     enCurso = (async () => {
       try {
         const vistos = GM_getValue('vistos', {}), meta = GM_getValue('meta', null), textos = new Map();
-        const archivos = await listar();
+        const [sp, gh] = await Promise.allSettled([listar(), versionGitHub()]);
+        if (sp.status === 'rejected' && gh.status === 'rejected') throw new Error(`${sp.reason.message}; ${gh.reason.message}`);
+        const archivos = sp.status === 'fulfilled' ? sp.value : [], deGitHub = gh.status === 'fulfilled' && gh.value ? [gh.value] : [];
+        // la guardada no se puede comparar si su fuente no respondió: entonces solo se acepta una versión mayor (nunca se baja por una sesión vencida)
+        const sinSuFuente = meta && (String(meta.clave).startsWith('github|') ? gh.status === 'rejected' : sp.status === 'rejected');
         for (const f of archivos) {                                    // sin versión en el nombre: se lee su @version una vez por archivo (nombre|fecha|tamaño)
           if (f.clave in vistos) f.version = vistos[f.clave];
           else if (!(f.version = versionDeNombre(f.nombre))) { const t = await bajar(f); f.version = vistos[f.clave] = versionDeTexto(t); if (f.version) textos.set(f.clave, t); }
         }
         // la carpeta manda: versión más alta (a igual versión, la más reciente); si se borra la última, se vuelve a la anterior
-        const orden = archivos.filter((f) => f.version).sort((a, b) => comparar(b.version, a.version) || b.fecha - a.fecha);
+        // a igual versión gana SharePoint (fecha 0 en GitHub)
+        const orden = archivos.filter((f) => f.version).concat(deGitHub)
+          .filter((f) => !sinSuFuente || comparar(f.version, meta.version) > 0)
+          .sort((a, b) => comparar(b.version, a.version) || b.fecha - a.fecha);
         for (const f of orden) {
           if (meta && meta.clave === f.clave) break;
-          const texto = textos.get(f.clave) || await bajar(f), v = versionDeTexto(texto);
+          const texto = f.github ? await pedirGitHub(false) || '' : textos.get(f.clave) || await bajar(f), v = versionDeTexto(texto);
           vistos[f.clave] = v;
-          if (!v) continue;                                            // no es el script o llegó incompleto
+          if (!v || (f.github && v !== f.version)) continue;               // no es el script, llegó incompleto o no coincide con su cabecera
           const m = { version: v, archivo: f.nombre, clave: f.clave, guardado: Date.now() };
           GM_setValue('paquete', Object.assign({ codigo: texto }, m)); GM_setValue('meta', m);
           break;
         }
         const vigentes = new Set(archivos.map((f) => f.clave));
-        GM_setValue('vistos', Object.fromEntries(Object.entries(vistos).filter(([k]) => vigentes.has(k))));
+        if (sp.status === 'fulfilled') GM_setValue('vistos', Object.fromEntries(Object.entries(vistos).filter(([k]) => vigentes.has(k))));
         GM_setValue('error', '');
       } catch (e) { GM_setValue('error', (e && e.message) || String(e)); }
       finally { enCurso = null; publicar(); }

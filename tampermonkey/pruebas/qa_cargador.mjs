@@ -11,7 +11,7 @@ const ok = (cond, msg) => { console.log((cond ? 'PASA  ' : 'FALLA ') + msg); if 
 // carpeta simulada: nombre -> { texto, fecha }
 const carpeta = new Map();
 const subir = (nombre, texto, fecha = new Date().toISOString()) => carpeta.set(nombre, { texto, fecha });
-let modo = 'ok', pedidos = [];
+let modo = 'ok', pedidos = [], ghPedidos = [], github = null, ghCaido = false, spCaido = false;
 const almacen = new Map();
 function cargar({ pathname = '/cp.portal/ui5appruntime.html', conBody = true } = {}) {
   const attrs = {}, oyentes = {}, inyectados = [];
@@ -28,6 +28,12 @@ function cargar({ pathname = '/cp.portal/ui5appruntime.html', conBody = true } =
       if (modo === 'sin-sesion') return o.onload({ status: 403, responseText: '' });
       if (modo === 'login') return o.onload({ status: 200, responseText: '<html>Iniciar sesión</html>' });
       if (modo === 'red') return o.onerror({});
+      if (/^https:\/\/raw\.githubusercontent\.com\/carlosj31z\/AUTOMATIZACION-DE-RMD\/publicado\/tampermonkey\/rmd-ui-mejoras\.user\.js\?t=\d+$/.test(o.url)) {
+        ghPedidos.push(o.headers && o.headers.Range ? 'cabecera' : 'completo');
+        if (ghCaido) return o.onerror({});
+        return o.onload(github ? { status: 200, responseText: github } : { status: 404, responseText: '' });
+      }
+      if (spCaido && /sharepoint/.test(o.url)) return o.onload({ status: 403, responseText: '' });
       if (o.method === 'POST' || /search\/query/.test(o.url)) return o.onload({ status: 200, responseText: JSON.stringify({ url: o.url, metodo: o.method, cab: o.headers, cuerpo: !!o.data }) });
       if (/10\.-%20RMD%20DE%20CARACTERIZACION/.test(o.url)) return o.onload(o.responseType === 'arraybuffer' ? { status: 200, response: new Uint8Array([80, 75, 3, 4]).buffer } : { status: 200, responseText: '{"value":[]}' });
       if (/\/Files\?/.test(o.url)) {
@@ -65,7 +71,7 @@ subir('rmd-ui-mejoras-cargador.user.js', CARGADOR, '2026-10-10T10:00:00Z');
 let c = cargar(); await c.listo(); await pausa(20);
 ok(listados() === 1 && JSON.stringify(bajadas()) === JSON.stringify([`${V}.js`]), `1. primera carga: 1 listado y solo baja ${V}.js (${bajadas()})`);
 ok(c.inyectados.length === 1 && c.inyectados[0].startsWith(`window.__rmdDesdeCargador = "${V}";`) && c.inyectados[0].includes(`const VERSION = '${V}';`), '1. inyecta el script con la marca __rmdDesdeCargador');
-ok(c.attrs['data-rmd-cargador'] === '1.2.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
+ok(c.attrs['data-rmd-cargador'] === '1.3.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
 
 // 2. otra página antes de 10 min: inyecta de la caché sin pedir nada
 pedidos = []; c = cargar(); await pausa(20);
@@ -150,6 +156,34 @@ ok(antes === 0 && c.inyectados.length === 1, '10. sin <body> todavía: inyecta e
     if (n === 'Excel de caracterización') ok(r && r.bytes && r.bytes.byteLength === 4, '11. puente: el Excel llega en bytes');
     if (r && r.estado === 200 && n === 'contextinfo') ok(!('Cookie' in JSON.parse(r.texto).cab), '11. puente: solo pasa las cabeceras permitidas');
   }
+}
+
+// 12. GitHub (rama «publicado») como segunda fuente: gana la versión más alta; una fuente caída nunca baja de versión
+{
+  c = cargar(); c.revisar(); await c.listo(); await pausa(5);
+  ok(c.estado().ultima === V, `12. sin rama publicado (404): sigue SharePoint ${V}, error «${c.estado().error}»`);
+  ok(!c.estado().error, '12. el 404 de GitHub no es un error');
+  github = conVersion(SCRIPT, '9.5.0');
+  pedidos = []; ghPedidos = []; c.revisar(); await c.listo(); await pausa(5);
+  ok(JSON.stringify(ghPedidos) === '["cabecera","completo"]', `12. versión nueva en GitHub: cabecera y luego el script completo (${ghPedidos})`);
+  ok(c.estado().ultima === '9.5.0' && c.estado().archivo === 'GitHub (publicado)' && bajadas().length === 0, `12. GitHub con 9.5.0: la toma sin bajar de SharePoint (${c.estado().archivo})`);
+  c = cargar(); await pausa(20);
+  ok(c.inyectados[0].includes("const VERSION = '9.5.0';"), '12. al recargar inyecta la 9.5.0 de GitHub');
+  ghPedidos = []; c.revisar(); await c.listo(); await pausa(5);
+  ok(JSON.stringify(ghPedidos) === '["cabecera"]' && c.estado().ultima === '9.5.0', `12. revisión sin cambios: solo pide la cabecera a GitHub (${ghPedidos})`);
+  spCaido = true; c.revisar(); await c.listo(); await pausa(5);
+  ok(c.estado().ultima === '9.5.0' && !c.estado().error, `12. SharePoint sin sesión: sigue 9.5.0 sin error (${c.estado().error})`);
+  spCaido = false; ghCaido = true; c.revisar(); await c.listo(); await pausa(5);
+  ok(c.estado().ultima === '9.5.0', `12. GitHub caído con la 9.5.0 guardada de GitHub: no baja a ${V} (${c.estado().ultima})`);
+  ghCaido = false; github = null; c.revisar(); await c.listo(); await pausa(5);
+  ok(c.estado().ultima === V, `12. se retira de GitHub con las dos fuentes al día: vuelve a ${V}`);
+  github = conVersion(SCRIPT, '9.6.0').slice(0, 300000); c.revisar(); await c.listo(); await pausa(5);
+  ok(c.estado().ultima === V && !c.estado().error, '12. GitHub con archivo cortado: se ignora, sigue SharePoint');
+  github = SCRIPT; c.revisar(); await c.listo(); await pausa(5);
+  ok(c.estado().ultima === V && c.estado().archivo === `${V}.js`, `12. misma versión en las dos: gana SharePoint (${c.estado().archivo})`);
+  ghCaido = true; spCaido = true; c.revisar(); await c.listo(); await pausa(5);
+  ok(/SharePoint/.test(c.estado().error) && /GitHub/.test(c.estado().error) && c.estado().ultima === V, `12. las dos caídas: error «${c.estado().error}» y sigue la guardada`);
+  ghCaido = false; spCaido = false; github = null;
 }
 
 console.log(fallos.length ? `\n${fallos.length} falla(s)` : '\nTodo pasa.');
