@@ -18884,7 +18884,7 @@
       EMB.uso(f, (c, u) => { USO.set(String(c), u); USO_PEND.delete(String(c)); clearTimeout(usoT); usoT = setTimeout(pintarTodo, 300); }); };
     const pesoUso = (c) => { const u = USO.get(String(c)); return u ? (u.aut || 0) + (u.ing || 0) : -1; };
     const htmlOpciones = (id, a) => {
-      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (cods.length < 2) return '';
+      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (!cods.length || (cods.length < 2 && a.usar && String(a.usar) === cods[0])) return '';
       pedirUso(cods);
       const orden = cods.slice().sort((x, y) => (pesoUso(y) - pesoUso(x)) || ((USO.get(y) || {}).aut || 0) - ((USO.get(x) || {}).aut || 0)), top = pesoUso(orden[0]) > 0 ? orden[0] : null;
       return `<div class="pp-opciones">${orden.map((c) => { const f = BUS.porCodigo(c), u = USO.get(c);
