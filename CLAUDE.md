@@ -62,6 +62,13 @@ cuenta). Escribir y responder siempre en **español**.
 - El cargador descarga el `.js` de **versión más alta** de la carpeta de
   SharePoint **MEJORAS DE INTERFAZ**. Subir un archivo ahí llega a **todos los
   usuarios**: es un paso que no se deshace con un clic.
+- **Desde la nube, sin la PC (cargador 1.3.0, 2026-11-19, decisión de Carlos)**: el cargador también lee la rama
+  **`publicado`** de GitHub (`tampermonkey/rmd-ui-mejoras.user.js` en raw.githubusercontent.com) y usa la versión más alta
+  entre GitHub y SharePoint (a igual versión, SharePoint). Publicar desde la nube = fusionar el PR y luego
+  `git push origin <commit fusionado>:publicado` (avance rápido; nunca forzar). Llega a todos como subir a SharePoint, con
+  el mismo cuidado: QA antes y la versión debe ser mayor que la publicada. Para volver atrás, mover `publicado` a un commit
+  anterior solo funciona si SharePoint no tiene una versión mayor. Si una fuente no responde, el cargador nunca baja de
+  versión. Solo llega a las PCs que ya tengan el cargador 1.3.0 (Tampermonkey lo actualiza solo desde SharePoint).
 - Al publicar: el archivo se llama `<versión>.js` (p. ej. `1.106.0.js`).
   **Nunca sobrescribir ni borrar** archivos existentes; siempre una versión nueva.
   `rmd-automation interfaz publicar` sin `--subir` solo simula; con `--subir` sube.
