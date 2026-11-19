@@ -9421,6 +9421,24 @@
     async function cargarAprobadas(L, clave) {
       await quienSoy();
       const f = yo.fs, todoVisible = f.aprobador; let agregadas = 0, vueltas = 0;
+      const ve = (md) => md && md.codigoSolicitud && ![K.SOLICITADO, K.RECHAZADA].includes(+md.estadoIdRmd_iMaestraId) && (todoVisible || md.usuarioRegistro === yo.data.usuario || soyDestinatario(md));
+      if (S.buscar.trim()) {
+        // Con búsqueda: primero los MD que coinciden y luego sus filas SOLICITUD (no recorrer todas las aprobaciones de 40 en 40)
+        const mds = (await api.todo('MD', [y([new (F())('codigoSolicitud', 'NE', null), ...filtrosBusqueda()])], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $orderby: 'fechaRegistro desc' })).filter(ve);
+        if (L.clave !== clave) return L.filas;
+        const cuando = new Map();
+        for (let i = 0; i < mds.length; i += POR_PAGINA) {
+          const ids = mds.slice(i, i + POR_PAGINA).map((m) => m.mdId);
+          const st = await api.leer('MD_ESTATUSPROCESO', [y([eq('tipo', 'SOLICITUD'), o(ids.map((id) => eq('mdId_mdId', id)))])], { $select: 'idProceso,mdId_mdId,fechaRegistro,usuarioRegistro', $top: String(ids.length * 2) });
+          if (L.clave !== clave) return L.filas;
+          st.forEach((x) => { const c = cuando.get(x.mdId_mdId); if (!c || +new Date(x.fechaRegistro) > +new Date(c.fechaRegistro)) cuando.set(x.mdId_mdId, x); });
+        }
+        const filas = mds.filter((md) => cuando.has(md.mdId));
+        filas.forEach((md) => { const x = cuando.get(md.mdId); md.fechaAprob = x.fechaRegistro; md.usuarioAprob = x.usuarioRegistro; });
+        filas.sort((a, b) => +new Date(b.fechaAprob) - +new Date(a.fechaAprob));
+        L.filas = filas; L.fin = true;
+        return L.filas;
+      }
       while (!L.fin && agregadas < 12 && vueltas < 6) {
         vueltas++;
         const st = await api.leer('MD_ESTATUSPROCESO', [eq('tipo', 'SOLICITUD')], { $select: 'idProceso,mdId_mdId,fechaRegistro,usuarioRegistro', $orderby: 'fechaRegistro desc', $top: String(POR_PAGINA), $skip: String(L.skip) });
@@ -9432,8 +9450,7 @@
         const mds = await api.leer('MD', [y([o(ids.map((id) => eq('mdId', id))), ...filtrosBusqueda()])], { $expand: EXPAND_LISTA, $select: SELECT_LISTA, $top: String(ids.length) });
         if (L.clave !== clave) return L.filas;
         const porId = new Map(mds.map((m) => [m.mdId, m]));
-        const visibles = ids.map((id) => porId.get(id)).filter((md) => md && md.codigoSolicitud && ![K.SOLICITADO, K.RECHAZADA].includes(+md.estadoIdRmd_iMaestraId)
-          && (todoVisible || md.usuarioRegistro === yo.data.usuario || soyDestinatario(md)));
+        const visibles = ids.map((id) => porId.get(id)).filter(ve);
         visibles.forEach((md) => { const x = cuando.get(md.mdId); md.fechaAprob = x.fechaRegistro; md.usuarioAprob = x.usuarioRegistro; });
         L.filas.push(...visibles); agregadas += visibles.length;
       }
@@ -9441,13 +9458,16 @@
     }
     async function cargarPagina(cual) {
       const L = S[cual], clave = [S.buscar, S.estado, S.planta].join('|');
-      if (L.clave !== clave) { L.filas = []; L.skip = 0; L.fin = false; L.clave = clave; L.error = ''; }
+      // v1.147.0: si cambió el filtro con una carga en curso, se lanza la nueva (la vieja se corta sola al ver otra clave)
+      if (L.clave !== clave) { L.filas = []; L.skip = 0; L.fin = false; L.clave = clave; L.error = ''; L.cargando = null; }
       if (L.cargando || L.fin) return L.cargando;
+      const soltar = (pr) => pr.catch((e) => { if (L.clave === clave) L.error = e.message || String(e); throw e; }).finally(() => { if (L.cargando === pr2) L.cargando = null; });
+      let pr2;
       if (+S.estado === K.APROBADA) {
-        L.cargando = cargarAprobadas(L, clave).catch((e) => { L.error = e.message || String(e); throw e; }).finally(() => { L.cargando = null; });
+        pr2 = L.cargando = soltar(cargarAprobadas(L, clave));
         return L.cargando;
       }
-      L.cargando = (async () => {
+      pr2 = L.cargando = soltar((async () => {
         await quienSoy();
         const base = [new (F())('codigoSolicitud', 'NE', null)];
         if (S.estado) base.push(eq('estadoIdRmd_iMaestraId', +S.estado));
@@ -9464,7 +9484,7 @@
           L.filas.push(...visibles); agregadas += visibles.length;
         }
         return L.filas;
-      })().catch((e) => { L.error = e.message || String(e); throw e; }).finally(() => { L.cargando = null; });
+      })());
       return L.cargando;
     }
     async function leerDetalle(mdId, forzar) {
