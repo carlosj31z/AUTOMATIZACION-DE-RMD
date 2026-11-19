@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.147.0
+// @version      1.147.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.147.0';                                                       // mantener igual a @version
+  const VERSION = '1.147.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1896,6 +1896,9 @@
   // «TOMAR LA MUESTRA DESDE…» (punto de muestreo) es instrucción: Sin tipo de dato
   const RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
   const RX_PUNTO_MUESTREO = /^TOMAR (LA |LAS )?MUESTRAS? DESDE\b|\bPUNTOS? DE MUESTREO\b/;
+  // v1.147.1 (Carlos): el jefe o supervisor de la seccion (y el operario) son de Produccion: aunque el paso sea de Calidad en Operaciones
+  // y el texto hable de muestreo o calidad, ese proceso menor no lleva Estado CC (caso 180904 en el paso 182861)
+  const RX_RESP_PRODUCCION = /\b(JEFE|SUPERVISOR|OPERARIO|OPERADOR)\b|\bPERSONAL DE PRODUCCION\b/;
   function reglasDeFila(f) {
     const out = [], tipo = f.tipo || '', t = SIN_ACENTOS(tipo), desc = SIN_ACENTOS(f.desc || ''), chk = f.chk || {};
     const regla = reglaCasillas(tipo, f.esPM);
@@ -1908,7 +1911,7 @@
     if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
     if (f.esPM && regla && /^CANTIDAD MUESTREADA|^FECHA\s*\/?\s*HORA DE MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
     // v1.146.0: proceso menor de un paso que llena Calidad en Operaciones
-    const deCeo = f.esPM && f.padre && RX_PASO_CEO.test(SIN_ACENTOS(f.padre)) && !(norm(f.cant) || norm(f.um));
+    const deCeo = f.esPM && f.padre && RX_PASO_CEO.test(SIN_ACENTOS(f.padre)) && !(norm(f.cant) || norm(f.um)) && !RX_RESP_PRODUCCION.test(desc);
     const puntoMuestreo = f.esPM && f.desc != null && !(norm(f.cant) || norm(f.um)) && RX_PUNTO_MUESTREO.test(desc);
     if (puntoMuestreo && t && t !== 'SIN TIPO DE DATO') out.push({ col: 'TIPO DATO', clase: 'rmd-falta', msg: 'El punto de muestreo es una instrucción: Tipo Dato «Sin tipo de dato» (regla de Carlos)' });
     else if (deCeo && t && t !== 'SIN TIPO DE DATO') {
@@ -17934,6 +17937,7 @@
     // v1.146.0 (reglas de Carlos): nota del supervisor solo en «Realizado por y Visto bueno» (441) con V.B.; Calidad en Operaciones; punto de muestreo
     const RX_NOTA_SUP = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFICAR PRESENCIALMENTE\b/, RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
     const RX_PUNTO_MUESTREO = /^TOMAR (LA |LAS )?MUESTRAS? DESDE\b|\bPUNTOS? DE MUESTREO\b/;
+    const RX_RESP_PROD = /\b(JEFE|SUPERVISOR|OPERARIO|OPERADOR)\b|\bPERSONAL DE PRODUCCION\b/; // v1.147.1: lo verifica Produccion, sin Estado CC
     // «Distinguir tildes»: con la opción, dos textos son iguales solo si también coinciden sus tildes (FRACCION ≠ FRACCIÓN); la búsqueda por palabras
     // sigue sin importar tildes
     let TILDES = false;
@@ -18382,7 +18386,7 @@
         const ceo = RX_PASO_CEO.test(normalizar(p.texto));
         vivos(p.pm).forEach((m) => { const d = m.dt; if (!d || m.insumo) return; const tipo = +d.tipo || 0, txt = normalizar(m.texto);
           if (RX_PUNTO_MUESTREO.test(txt)) { if (tipo && tipo !== DT_SIN_TIPO) add(m.id, 'aviso', 'El punto de muestreo es una instrucción: tipo de dato «Sin tipo de dato».'); return; }
-          if (ceo && tipo && tipo !== DT_SIN_TIPO && (!d.cc || !d.edit)) add(m.id, 'aviso', `Lo llena Calidad en Operaciones y tiene tipo de dato: marca ${[!d.cc ? '«Estado CC»' : '', !d.edit ? '«Edit»' : ''].filter(Boolean).join(' y ')}.`); });
+          if (ceo && !RX_RESP_PROD.test(txt) && tipo && tipo !== DT_SIN_TIPO && (!d.cc || !d.edit)) add(m.id, 'aviso', `Lo llena Calidad en Operaciones y tiene tipo de dato: marca ${[!d.cc ? '«Estado CC»' : '', !d.edit ? '«Edit»' : ''].filter(Boolean).join(' y ')}.`); });
       });
     }
     // Rehace el borrador sobre `actual`; conflictos si SAP y Producción tocaron lo mismo. mapa: id base -> id actual (otra versión).
