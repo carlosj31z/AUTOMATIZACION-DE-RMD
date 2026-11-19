@@ -390,7 +390,9 @@ cuenta). Escribir y responder siempre en **español**.
   si está en la lista, está vigente (`docVencido` ya no mira validez ni estado). Pruebas `qa_repetidos.mjs` y `qa_local.py` LN64.
 - 2026-11-18, v1.146.1: probada la 1.146.0 en el portal real (solo lectura): un grupo de procesos menores que se repite por equipo (SELLADORA
   N° 5 / N° 06: VELOCIDAD, VACIO, SELLADO) salía como repetido. Ahora el proceso menor repetido es solo el **igual al inmediatamente anterior**
-  (como los pasos). **La siguiente versión debe ser > 1.146.1.**
+  (como los pasos). 1.146.1 publicada en SharePoint el 2026-11-18 (2 427 559 bytes).
+- 2026-11-19, v1.146.2: **Carlos: «FECHA DE ELABORACION» en la codificadora (35156 → 181115) no es homologación** (CC puntual de los productos
+  de Ecuador): fila marcada `especifico` y bloque HOMOLOG regenerado. **La siguiente versión debe ser > 1.146.2.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

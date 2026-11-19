@@ -21,6 +21,7 @@ ok('POE PDOC-207 (182341) en LIMA -> 186337 (v1.146.0)', (PPN.homologacionPaso(1
 ok('«hagan» (31840) en ATE -> 62221', (PPN.homologacionPaso(31840, 'PLANTA ATE') || {}).codigo === 62221);
 ok('«hagan» (31840) en LIMA -> 166452', (PPN.homologacionPaso(31840, 'PLANTA LIMA') || {}).codigo === 166452);
 ok('sin planta y plantas distintas: no adivina', PPN.homologacionPaso(31840, '') === null);
+ok('FECHA DE ELABORACION (35156) no se homologa: CC puntual de Ecuador (v1.146.2)', PPN.homologacionPaso(35156, 'PLANTA LIMA') === null);
 ok('paso vigente no se marca', PPN.homologacionPaso(186337, 'PLANTA LIMA') === null);
 
 // términos

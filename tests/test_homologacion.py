@@ -73,3 +73,8 @@ def test_fecha_hora_no_se_homologa():
     assert homologar("FECHA / HORA INICIO :")[1] == []
     assert reemplazo_de_paso(35476, "ATE") is None and reemplazo_de_paso(13680, "LIMA") is None
     assert reemplazo_de_paso(31840, "LIMA").codigo_vigente == 166452
+
+
+def test_fecha_elaboracion_no_es_homologacion():
+    # 2026-11-19 (Carlos): 35156 -> 181115 viene de un CC puntual de Ecuador
+    assert reemplazo_de_paso(35156, "Planta 2") is None
