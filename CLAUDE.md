@@ -406,7 +406,10 @@ cuenta). Escribir y responder siempre en **español**.
   nuevo (`editarEnSitio` en `ppPlanEscritura`; verificado en `ppVerificarIngreso`). Cuadro «Marca aquí para poder ingresar» con colores del tema. Campanita:
   adjuntos con Ver / Descargar / «Revisar como borrador». **Solicitud más rápida** (bloque `==SOLICITUD-RAPIDA==`, opción `solicitudrapida`): SOLICITUD
   elegido + Ir solo, `/MD` en paralelo y RECETA sin esperar (la app tardaba ~30 s: 6 páginas en serie de 2,5 MB). Pruebas `qa_local.py` LN65,
-  `qa_bandeja.py`, `qa_solicitud_rapida.mjs`. **La siguiente versión debe ser > 1.147.0.**
+  `qa_bandeja.py`, `qa_solicitud_rapida.mjs`. Campanita: chip «Aprobada» ordenado por **fecha de aprobación** (fila `tipo = 'SOLICITUD'` de
+  `MD_ESTATUSPROCESO`, una por MD; cuentan las ya Ingresadas/Autorizadas, sin Rechazadas; muestra quién aprobó; con búsqueda, primero los MD y luego
+  sus filas), búsqueda `tolower(descripcion)` con el valor **entre comillas** (UI5 no las pone) y búsqueda nueva aunque siga otra carga.
+  Solicitud rápida elige SOLICITUD cuando `/MAESTRA` tiene datos. Probado en el portal en solo lectura (DESKTOP-KJ339H3). **La siguiente versión debe ser > 1.147.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

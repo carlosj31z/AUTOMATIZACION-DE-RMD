@@ -29,6 +29,7 @@ async function escenario({ yaElegida = false, opcion = true, totalMd = 5127 } = 
   const window = { sap, top: { location: { hash: '#solicitud-display?sap-ui-app-id-hint=saas_approuter_mif.rmd.solicitud' } } };
   const location = { pathname: '/cp.portal/ui5appruntime.html', href: 'https://x.hana.ondemand.com/cp.portal/ui5appruntime.html' };
   setTimeout(() => { ctrl.mainModelv2 = modelo; }, 300);   // init() crea mainModelv2 después de loadMaestra
+  setTimeout(() => { datos['/MAESTRA'] = [{ id: 1 }]; }, 600);   // onSetMaestra: señal de que el maestro terminó
   const errores = [];
   const f = new Function('window', 'sap', 'location', 'on', 'aislar', 'anotarError', 'NORM', bloque + '\nreturn { solLeerEnParalelo };');
   f(window, sap, location, (k) => (k === 'solicitudrapida' ? opcion : true), (n, g) => { try { return g(); } catch (e) { errores.push(n + ': ' + e.message); } }, (n, e) => errores.push(n + ': ' + e), (t) => String(t).trim().toUpperCase());

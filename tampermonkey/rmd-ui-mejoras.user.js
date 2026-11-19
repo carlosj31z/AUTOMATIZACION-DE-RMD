@@ -238,7 +238,10 @@
       if (fase === 'elegir') {
         // loadMaestra llena /aListaApps antes de que init() cree mainModelv2: sin él, onInitApp falla en getData (probado en el portal 2026-11-19)
         if (!(mg.getProperty('/aListaApps') || []).length || !ctrl.mainModelv2 || typeof ctrl.mainModelv2.read !== 'function') { tListo = 0; return; }
-        if (!tListo) { tListo = Date.now(); return; } if (Date.now() - tListo < 800) return;   // un respiro para que init() termine
+        if (!tListo) { tListo = Date.now(); return; }
+        // Señal de que el maestro terminó: /MAESTRA con datos (onSetMaestra corre tras el id de sistema y las constantes). Si no llega en 6 s, se sigue igual.
+        const m = mg.getProperty('/MAESTRA'), maestra = Array.isArray(m) ? m.length > 0 : !!(m && Object.keys(m).length);
+        if (Date.now() - tListo < (maestra ? 800 : 6000)) return;
         if (mg.getProperty('/aFilters/aplicacionId')) { fase = 'listo'; return; }          // la persona ya eligió: no se toca
         const box = fb.determineControlByName ? fb.determineControlByName('Z') : null; if (!box || !box.getItems) return;
         const it = box.getItems().find((x) => x.getKey() === SOL_APP_SOLICITUD) || box.getItems().find((x) => NORM(x.getText()) === 'SOLICITUD'); if (!it) return;
