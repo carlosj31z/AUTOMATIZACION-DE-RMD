@@ -49,5 +49,30 @@ ok('aviso del paso viejo con el código vigente', /62221/.test(txt('p1')) && /Po
 ok('aviso de términos en paso nuevo', /Términos por homologar/.test(txt('p2')) && /INSTRUCTIVO IPRO-P212/.test(txt('p2')), txt('p2'));
 ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt('p3'));
 
+// v1.148.0 (pedido de Carlos): POE -> PROCEDIMIENTO, VIGENTE / VIGENTES, y seleccionar el paso ya creado con el texto sugerido
+{
+  const H = (t) => PPN.homologarTexto(t).texto;
+  ok('POE -> PROCEDIMIENTO', H('REALIZAR EL DESPEJE DE LA SALA SEGUN POE PPRO-219 VIGENTE.') === 'REALIZAR EL DESPEJE DE LA SALA SEGUN PROCEDIMIENTO PPRO-219 VIGENTE.');
+  ok('un documento: VIGENTE', H('SEGUN PPRO-200.') === 'SEGUN PROCEDIMIENTO PPRO-200 VIGENTE.', H('SEGUN PPRO-200.'));
+  ok('dos documentos del mismo tipo: INSTRUCTIVOS', H('SELLADO SEGUN IPRO-I200 E IPRO-P213.') === 'SELLADO SEGUN INSTRUCTIVOS IPRO-I200 E IPRO-P213 VIGENTES.', H('SELLADO SEGUN IPRO-I200 E IPRO-P213.'));
+  ok('varios documentos: VIGENTES al final', H('SEGUN POE PPRO-217 VIGENTE E INSTRUCTIVO IPRO-P256 VIGENTE.') === 'SEGUN PROCEDIMIENTO PPRO-217 E INSTRUCTIVO IPRO-P256 VIGENTES.', H('SEGUN POE PPRO-217 VIGENTE E INSTRUCTIVO IPRO-P256 VIGENTE.'));
+  ok('un documento con VIGENTES -> VIGENTE', H('SEGUN LO INDICADO EN EL INSTRUCTIVO IPRO-P261 VIGENTES.') === 'SEGUN LO INDICADO EN EL INSTRUCTIVO IPRO-P261 VIGENTE.');
+  const ya = 'PREPARAR EL SISTEMA DE FILTRACION, SEGUN INSTRUCTIVOS IPRO-P204, IPRO-E205 E IPRO-E206 VIGENTES.';
+  ok('ya homologado: sin reglas', PPN.homologarTexto(ya).reglas.length === 0 && H(ya) === ya);
+  const bus = PPN.crearBuscador([{ codigo: '125954', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN PROCEDIMIENTO PPRO-219 VIGENTE.', estr: 'E', etq: null, tipo: 439 }]);
+  const tr = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [{ id: 'h1', codigo: null, nuevo: true, texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN POE PPRO-219 VIGENTE.', tipo: 439, pm: [] }] }] };
+  const av = PPN.avisos(tr, { buscador: bus }).get('h1') || [], t = av.find((x) => x.k === 'terminos');
+  ok('paso ya creado con el texto sugerido: ofrece seleccionarlo', t && t.usar === '125954' && /ya existe el paso 125954/.test(t.texto), JSON.stringify(av));
+  const bus2 = PPN.crearBuscador([
+    { codigo: '500', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN PROCEDIMIENTO PPRO-219 VIGENTE', estr: 'E', etq: null, tipo: 439 },
+    { codigo: '501', texto: 'REALIZAR EL DESPEJE DE LA SALA, SEGUN PROCEDIMIENTO PPRO-219 VIGENTE.', estr: 'E', etq: null, tipo: 439 },
+    { codigo: '502', texto: 'LIMPIAR LA BALANZA.', estr: 'E', etq: null, tipo: 439 },
+    { codigo: '503', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN POE PPRO-219 VIGENTE.', estr: 'E', etq: null, tipo: 439 },
+    { codigo: '504', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN PROCEDIMIENTO PPRO-218 VIGENTE.', estr: 'E', etq: null, tipo: 439 }]);
+  const av2 = PPN.avisos(tr, { buscador: bus2 }).get('h1') || [], t2 = av2.find((x) => x.k === 'terminos');
+  ok('varios parecidos: el aviso trae las opciones para ordenarlas por uso', t2 && Array.isArray(t2.opciones) && t2.opciones.includes('500') && t2.opciones.includes('501') && !t2.opciones.includes('502'), JSON.stringify(av2));
+  ok('no ofrece pasos sin homologar (POE) ni que citan otro documento', t2 && !t2.opciones.includes('503') && !t2.opciones.includes('504'), JSON.stringify(t2));
+  ok('«ya existe» solo con el texto exacto, puntuación incluida', t2 && t2.usar === undefined && /parecidos/.test(t2.texto), JSON.stringify(t2));
+}
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallas ? 1 : 0);

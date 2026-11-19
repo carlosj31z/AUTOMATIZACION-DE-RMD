@@ -41,6 +41,15 @@ class Regla:
         return re.sub(self.patron, self.reemplazo, texto)
 
 
+# Código de documento (PPRO-200, IPRO-P212, FPRO-250) y separadores de una lista de documentos («, », « Y », « O », «/»).
+_COD = r"[A-Z]{3}[A-Z0-9]-[A-Z]?\d{3}\b"
+SEP = r"(?: ?, ?| Y | E | O | ?/ ?)"
+# entre dos documentos puede ir su tipo: «PPRO-215 E INSTRUCTIVO IPRO-P261», «IPRO-P217 Y EL PROCEDIMIENTO PPRO-215»
+SEP_DOC = SEP + r"(?:(?:EL|LA|LOS|LAS) )?(?:(?:POE|PROCEDIMIENTO|INSTRUCTIVO|FORMATO)S? )?"
+DOC = r"\b(" + _COD + r")"
+DOC_GRUPO = r"\b(" + _COD + r"(?:" + SEP_DOC + _COD + r")+)"
+MARCA = "\u0002"
+
 # El orden importa: primero las frases largas y después las cortas.
 REGLAS: List[Regla] = [
     Regla("pdoc-207", r"\bPDSG-202\b", "PDOC-207",
@@ -81,9 +90,20 @@ REGLAS: List[Regla] = [
     Regla("ppro-243", r"\bPBEB-200\b", "PPRO-243", "Uniforme de ingreso a planta: PBEB-200 pasó a PPRO-243 (ATE)."),
     Regla("instructivo", r"\bSEGUN (I[A-Z]{3}-[A-Z]\d{3})\b", r"SEGUN INSTRUCTIVO \1",
           "Un código que empieza con I (IPRO-P212, IACO-P202…) va precedido de «INSTRUCTIVO»."),
-    Regla("procedimiento", r"\bSEGUN (P[A-Z]{3}-\d{3})\b", r"SEGUN POE \1",
-          "Un código que empieza con P (PPRO-200, PACO-214…) va precedido de «POE» (o «PROCEDIMIENTO» en LIMA)."),
-    Regla("vigente", r"\b([A-Z]{4}-[A-Z]?\d{3})\.(?=\s|$)", r"\1 VIGENTE.", "Todo código de documento termina en «VIGENTE»."),
+    # 2026-11-19 (Carlos): «POE» se reemplaza por «PROCEDIMIENTO», y después del documento va VIGENTE (uno) o VIGENTES (varios)
+    Regla("procedimiento", r"\bSEGUN (P[A-Z]{3}-\d{3})\b", r"SEGUN PROCEDIMIENTO \1",
+          "Un código que empieza con P (PPRO-200, PACO-214…) va precedido de «PROCEDIMIENTO»."),
+    Regla("poe-plural", r"\bLOS POES?\b", "LOS PROCEDIMIENTOS", "«POE» se reemplaza por «PROCEDIMIENTO» («LOS PROCEDIMIENTOS»)."),
+    Regla("poe", r"\bPOE\b", "PROCEDIMIENTO", "«POE» se reemplaza por «PROCEDIMIENTO»."),
+    Regla("vigentes-sin-repetir", DOC + r" VIGENTES?(?=" + SEP_DOC + _COD + r")", r"\1",
+          "Varios documentos seguidos: «VIGENTES» una sola vez, al final (PPRO-200 Y PPRO-201 VIGENTES)."),
+    # el grupo queda marcado (MARCA) para que la regla del singular no lo toque; la marca se quita al final y no cuenta como cambio
+    Regla("vigentes", DOC_GRUPO + r"(?:,? VIGENTES?\b)?", r"\1 VIGENTES" + MARCA, "Después de varios documentos va «VIGENTES»."),
+    Regla("tipo-plural", r"\b(INSTRUCTIVO|PROCEDIMIENTO) (?=" + _COD + r"(?:" + SEP + _COD + r")+)", r"\1S ",
+          "Varios documentos del mismo tipo: «INSTRUCTIVOS» / «PROCEDIMIENTOS»."),
+    Regla("vigente", DOC + r"(?! VIGENTES?\b)(?!" + SEP_DOC + _COD + r")", r"\1 VIGENTE", "Después de un documento va «VIGENTE»."),
+    Regla("vigente-singular", DOC + r" VIGENTES\b(?!" + MARCA + r")", r"\1 VIGENTE", "Un solo documento: «VIGENTE» (no «VIGENTES»)."),
+    Regla("marca", MARCA, "", ""),
     # 2026-11-15, pedido de Carlos: sin la regla «fecha-hora» (saltaba por un espacio antes de los dos puntos: no es homologación)
 ]
 
@@ -93,10 +113,10 @@ def homologar(texto: str) -> Tuple[str, List[str]]:
     t = normalizar(texto)
     aplicadas = []
     for r in REGLAS:
-        nuevo = r.aplicar(t)
-        if nuevo != t:
+        nuevo = re.sub(r"\s+", " ", r.aplicar(t)).strip()
+        if nuevo.replace(MARCA, "") != t.replace(MARCA, ""):
             aplicadas.append(r.clave)
-            t = re.sub(r"\s+", " ", nuevo).strip()
+        t = nuevo
     t = re.sub(r"\bVIGENTE VIGENTE\b", "VIGENTE", t)
     return t, aplicadas
 
