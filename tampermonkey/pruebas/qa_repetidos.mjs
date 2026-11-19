@@ -36,7 +36,8 @@ const trabajo = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENT
   { id: 'p33', codigo: '104', texto: 'SELLAR LAS CAJAS.', tipo: 439, rpor: true, vb: false, pm: [] },
   { id: 'p34', codigo: '105', texto: 'SELLAR LAS CAJAS', tipo: 439, rpor: true, vb: false, pm: [] },
   { id: 'p40', codigo: '182861', texto: 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA Y REALIZA EL MUESTREO.', tipo: 439, rpor: true, pm: [
-    { id: 'm7', codigo: '186382', texto: 'TOMAR LA MUESTRA DESDE LA VALVULA DE DESCARGA.', dt: { tipo: 432, edit: true, cc: true } }] },
+    { id: 'm7', codigo: '186382', texto: 'TOMAR LA MUESTRA DESDE LA VALVULA DE DESCARGA.', dt: { tipo: 432, edit: true, cc: true } },
+    { id: 'm11', codigo: '180904', texto: 'EL JEFE O SUPERVISOR DE LA SECCION VERIFICA EL PROCESO DE MUESTREO DE CALIDAD EN OPERACIONES.', dt: { tipo: 437, edit: true, cc: false } }] },
   { id: 'p41', codigo: '180901', texto: 'CALIDAD EN OPERACIONES REGISTRA LOS RESULTADOS:', tipo: 446, pm: [
     { id: 'm8', codigo: '186383', texto: 'DESCRIPCION (ASPECTO): MASA DE COLOR BLANCO.', dt: { tipo: 433, edit: true, cc: false } },
     { id: 'm9', codigo: '162821', texto: 'VERIFICADO POR:', dt: { tipo: 433, edit: false, cc: true } },
@@ -54,6 +55,42 @@ ok('nota del supervisor en paso sin V.B. (Realizado por): aviso', tiene('m6', /n
 ok('Calidad en Operaciones: DESCRIPCION sin Estado CC', tiene('m8', /marca «Estado CC»/), txt('m8'));
 ok('Calidad en Operaciones: VERIFICADO POR sin Edit', tiene('m9', /marca «Edit»/), txt('m9'));
 ok('Calidad en Operaciones completo: sin aviso', !tiene('m10', /Calidad en Operaciones/), txt('m10'));
+ok('v1.147.1: verificacion del jefe o supervisor (Produccion) en paso de Calidad en Operaciones: sin Estado CC', !tiene('m11', /Estado CC/), txt('m11'));
+// v1.147.1: lo mismo en la ventana de Procesos menores del portal (reglasDeFila)
+{
+  const i = fuente.indexOf('  const CHK = ['), j = fuente.indexOf('  function reglasDeFila(f) {');
+  const k = fuente.indexOf('\n  }\n', j) + 4;
+  ok('encuentro reglasDeFila del portal', i > 0 && j > i);
+  if (i > 0 && j > i) {
+    let reglas = null;
+    try { reglas = new Function('norm', 'on', 'SIN_ACENTOS', fuente.slice(i, k) + '\nreturn reglasDeFila;')((t) => (t || '').replace(/\s+/g, ' ').trim(), () => false, (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')); } catch (e) { ok('cargar reglasDeFila del portal', false, e.message); }
+    if (reglas) {
+      const padre = 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA DE FABRICACION Y REALIZA EL MUESTREO PARA LOS ANALISIS CORRESPONDIENTES';
+      const sup = reglas({ esPM: true, padre, tipo: 'Verificación Check', desc: 'EL JEFE O SUPERVISOR DE LA SECCION VERIFICA EL PROCESO DE MUESTREO DE CALIDAD EN OPERACIONES.', chk: { 'EDIT': true, 'ESTADO CC': false } });
+      ok('portal: 180904 jefe o supervisor no pide Estado CC', !sup.some((x) => x.col === 'ESTADO CC'), JSON.stringify(sup));
+      const cant = reglas({ esPM: true, padre, tipo: 'Números', desc: 'CANTIDAD MUESTREADA (kg):', chk: { 'EDIT': true, 'ESTADO CC': false } });
+      ok('portal: CANTIDAD MUESTREADA sigue pidiendo Estado CC', cant.some((x) => x.col === 'ESTADO CC'), JSON.stringify(cant));
+    }
+  }
+}
+// v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. lleva la nota del supervisor como ÚLTIMO proceso menor
+{
+  const NOTA_FIN = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
+  const t2 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [
+    { id: 'q1', codigo: '117343', texto: 'DESCARGAR EL PRODUCTO, FILTRANDO POR MALLA ORGANDI.', tipo: 441, rpor: true, vb: true, pm: [] },
+    { id: 'q2', codigo: '200', texto: 'PESAR EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [{ id: 'n1', codigo: '9', texto: NOTA_FIN }, { id: 'n2', codigo: '10', texto: 'PESO (kg):' }] },
+    { id: 'q3', codigo: '201', texto: 'TAMIZAR EL PRODUCTO.', tipo: 441, rpor: true, vb: true, pm: [{ id: 'n3', codigo: '10', texto: 'PESO (kg):' }, { id: 'n4', codigo: '9', texto: NOTA_FIN }] },
+    { id: 'q4', codigo: '202', texto: 'LIMPIAR LA SALA.', tipo: 441, rpor: true, vb: false, pm: [] },
+    { id: 'q5', codigo: '203', texto: 'MEZCLAR EL PRODUCTO.', tipo: 439, rpor: true, pm: [] },
+  ] }] };
+  const bus = PPN.crearBuscador([{ codigo: '9', texto: NOTA_FIN, estr: 'E', etq: null, tipo: 446 }, { codigo: '10', texto: 'PESO (kg):', estr: 'E', etq: null, tipo: 438 }]);
+  const av2 = PPN.avisos(t2, { buscador: bus }), l2 = (id) => av2.get(id) || [], tx2 = (id) => l2(id).map((x) => x.texto).join(' | ');
+  ok('nota obligatoria: falta en el paso 117343 (441 con R. Por y V.B.)', /falta la nota/.test(tx2('q1')), tx2('q1'));
+  ok('nota obligatoria: ofrece agregar el proceso menor del catálogo', l2('q1').some((x) => x.agregar === '9'), JSON.stringify(l2('q1')));
+  ok('nota obligatoria: no es la última -> moverla al final', /muévela al final/.test(tx2('n1')) && l2('n1').some((x) => x.alFinal), tx2('n1'));
+  ok('nota obligatoria: al final, sin aviso', !/falta la nota|muévela/.test(tx2('q3') + tx2('n4')), tx2('q3') + tx2('n4'));
+  ok('nota obligatoria: sin V.B. o con otro tipo no se pide', !/falta la nota/.test(tx2('q4') + tx2('q5')), tx2('q4') + tx2('q5'));
+}
 ok('TOMAR LA MUESTRA DESDE con tipo: Sin tipo de dato', tiene('m7', /Sin tipo de dato/), txt('m7'));
 ok('los repetidos llegan a Producción (k dup)', (av.get('m3') || []).some((x) => x.k === 'dup'));
 

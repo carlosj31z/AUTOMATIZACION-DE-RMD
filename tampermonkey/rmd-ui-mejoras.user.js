@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.147.0
+// @version      1.147.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.147.0';                                                       // mantener igual a @version
+  const VERSION = '1.147.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1892,10 +1892,18 @@
   const RX_NOTA_SUPERVISOR = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFICAR PRESENCIALMENTE\b/;
   const MSG_NOTA_SUPERVISOR = 'Lleva la nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» pero el paso no es «Realizado por y Visto bueno» con V.B. marcado: quita la nota (regla de Carlos)';
   const notaSupervisorSobra = (tipoPaso, vb) => { const t = SIN_ACENTOS(tipoPaso); return !!t && (t !== 'REALIZADO POR Y VISTO BUENO' || vb === false); };
+  // v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. marcados lleva esa nota como ÚLTIMO proceso menor
+  const NOTA_SUPERVISOR_TXT = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
+  const notaSupervisorObligatoria = (tipoPaso, rPor, vb) => SIN_ACENTOS(tipoPaso) === 'REALIZADO POR Y VISTO BUENO' && rPor === true && vb === true;
+  const MSG_NOTA_FALTA = `Paso «Realizado por y Visto bueno» con R. Por y V.B.: su último proceso menor debe ser «${NOTA_SUPERVISOR_TXT}» y no lo tiene. Agrégalo al final (regla de Carlos)`;
+  const MSG_NOTA_NO_ULTIMA = 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final (regla de Carlos)';
   // v1.146.0 (regla de Carlos): los procesos menores que llena Calidad en Operaciones y llevan tipo de dato van con Estado CC y Edit;
   // «TOMAR LA MUESTRA DESDE…» (punto de muestreo) es instrucción: Sin tipo de dato
   const RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
   const RX_PUNTO_MUESTREO = /^TOMAR (LA |LAS )?MUESTRAS? DESDE\b|\bPUNTOS? DE MUESTREO\b/;
+  // v1.147.1 (Carlos): el jefe o supervisor de la seccion (y el operario) son de Produccion: aunque el paso sea de Calidad en Operaciones
+  // y el texto hable de muestreo o calidad, ese proceso menor no lleva Estado CC (caso 180904 en el paso 182861)
+  const RX_RESP_PRODUCCION = /\b(JEFE|SUPERVISOR|OPERARIO|OPERADOR)\b|\bPERSONAL DE PRODUCCION\b/;
   function reglasDeFila(f) {
     const out = [], tipo = f.tipo || '', t = SIN_ACENTOS(tipo), desc = SIN_ACENTOS(f.desc || ''), chk = f.chk || {};
     const regla = reglaCasillas(tipo, f.esPM);
@@ -1908,7 +1916,7 @@
     if (regla && t === 'REALIZADO POR' && /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/.test(desc)) regla['ESTADO CC'] = true;
     if (f.esPM && regla && /^CANTIDAD MUESTREADA|^FECHA\s*\/?\s*HORA DE MUESTREO/.test(desc)) { regla.EDIT = true; regla['ESTADO CC'] = true; }
     // v1.146.0: proceso menor de un paso que llena Calidad en Operaciones
-    const deCeo = f.esPM && f.padre && RX_PASO_CEO.test(SIN_ACENTOS(f.padre)) && !(norm(f.cant) || norm(f.um));
+    const deCeo = f.esPM && f.padre && RX_PASO_CEO.test(SIN_ACENTOS(f.padre)) && !(norm(f.cant) || norm(f.um)) && !RX_RESP_PRODUCCION.test(desc);
     const puntoMuestreo = f.esPM && f.desc != null && !(norm(f.cant) || norm(f.um)) && RX_PUNTO_MUESTREO.test(desc);
     if (puntoMuestreo && t && t !== 'SIN TIPO DE DATO') out.push({ col: 'TIPO DATO', clase: 'rmd-falta', msg: 'El punto de muestreo es una instrucción: Tipo Dato «Sin tipo de dato» (regla de Carlos)' });
     else if (deCeo && t && t !== 'SIN TIPO DE DATO') {
@@ -2291,6 +2299,12 @@
     const ordenDe = (k) => norm(iOrd >= 0 ? (inputDe(celda(filas[k], iOrd)) || {}).value : '') || String(k + 1);
     const repetidoDe = claves.map((c, k) => { if (!c) return -1; if (esPasos || esPM) return k > 0 && claves[k - 1] === c ? k - 1 : -1; return -1; }).map((j, k) => (j === k ? -1 : j));
     const padre = esPM ? pasoPadreDePM(d) : null;
+    // v1.147.1 (regla de Carlos): en la ventana de procesos menores de un «Realizado por y Visto bueno» con R. Por y V.B., la nota del supervisor va al final
+    const notaFin = { falta: -1, noUltima: -1 };
+    if (esPM && padre && notaSupervisorObligatoria(padre.tipo, padre.rPor, padre.vb)) {
+      const conTexto = claves.map((c, k) => (c ? k : -1)).filter((k) => k >= 0), iNota = conTexto.find((k) => RX_NOTA_SUPERVISOR.test(claves[k])), ult = conTexto[conTexto.length - 1];
+      if (iNota == null) { if (ult != null) notaFin.falta = ult; } else if (iNota !== ult) notaFin.noUltima = iNota;
+    }
     // Predecesor obligatorio con tipo de dato, salvo el primero de PRECAUCIONES, condicionales/paralelos y RENDIMIENTO / CONDICIONES AMBIENTALES.
     const lista = esPasos ? nombreDeLista(tabla, filas, iTipo, iDes) : ''; d.__rmdListaEfectiva = lista;
     const tipadoFila = (tr) => { const t = SIN_ACENTOS((inputDe(celda(tr, iTipo)) || {}).value || ''); return !!t && t !== 'SIN TIPO DE DATO'; };
@@ -2330,6 +2344,8 @@
       const marcarFalta = (idx, msg) => { const td = celda(tr, idx); td.classList.add('rmd-falta'); td.title = msg; avisos.push(msg); };
       if (iDes >= 0 && repetidoDe[k] >= 0) marcarFalta(iDes, esPasos ? `Paso repetido: es igual al paso anterior (orden ${ordenDe(repetidoDe[k])}). Quita uno.` : `Proceso menor repetido: es igual al anterior (orden ${ordenDe(repetidoDe[k])}). Quita uno.`);
       if (esPM && iDes >= 0 && padre && padre.tipo && claves[k] && RX_NOTA_SUPERVISOR.test(claves[k]) && notaSupervisorSobra(padre.tipo, padre.vb)) marcarFalta(iDes, MSG_NOTA_SUPERVISOR);
+      if (esPM && iDes >= 0 && k === notaFin.falta) marcarFalta(iDes, 'Después de este proceso menor falta la nota obligatoria. ' + MSG_NOTA_FALTA);
+      if (esPM && iDes >= 0 && k === notaFin.noUltima) marcarFalta(iDes, MSG_NOTA_NO_ULTIMA);
       if (iDep >= 0) {
         const sinTipo = t === 'SIN TIPO DE DATO', v = norm((inputDe(celda(tr, iDep)) || {}).value), mm = /^(\S+)\s*\((\d+)\)/.exec(v);
         // «CÓDIGO (ORDEN)» solo se compara si ese orden y código están en esta misma lista (el primero de una etiqueta puede depender de otra)
@@ -2357,6 +2373,12 @@
       const pmTodos = esPasos && tabla.__rmdPM && tabla.__rmdPM.todos ? tabla.__rmdPM.todos.get((objetoDeFila(tr) || {}).mdEstructuraPasoId) || [] : [];
       const notaSup = pmTodos.find((q) => !q.insumo && RX_NOTA_SUPERVISOR.test(claveRepetido(q.desc)));
       if (notaSup && notaSupervisorSobra(tipo, iChk['V.B.'] >= 0 && celda(tr, iChk['V.B.']) ? chk['V.B.'] : undefined)) avisosPM.push(`Proceso menor ${notaSup.orden} (${notaSup.codigo} ${notaSup.desc.slice(0, 40)}): ${MSG_NOTA_SUPERVISOR}`);
+      // v1.147.1 (regla de Carlos): con R. Por y V.B. la nota del supervisor es obligatoria y va al final (solo cuando ya se leyeron los procesos menores)
+      if (esPasos && tabla.__rmdPM && tabla.__rmdPM.todos && notaSupervisorObligatoria(tipo, chk['R. POR'], chk['V.B.'])) {
+        const pmTexto = pmTodos.filter((q) => !q.insumo), ultimo = pmTexto[pmTexto.length - 1];
+        if (!notaSup) avisosPM.push(MSG_NOTA_FALTA);
+        else if (ultimo !== notaSup) avisosPM.push(`Proceso menor ${notaSup.orden} (${notaSup.codigo}): ${MSG_NOTA_NO_ULTIMA}`);
+      }
       const tdPM = iProcMen >= 0 ? celda(tr, iProcMen) : null;
       if (avisosPM.length && tdPM) { tdPM.classList.add('rmd-pm-mal'); tdPM.dataset.rmdPm = String(avisosPM.length); tdPM.title = 'Procesos menores con incoherencias (ábrelos para ver dónde):\n' + avisosPM.join('\n'); }
       else if (tdPM && tdPM.title && /^Procesos menores con incoherencias/.test(tdPM.title)) tdPM.removeAttribute('title');
@@ -3783,16 +3805,17 @@
   // v1.146.0: paso padre de la ventana «Procesos Menores para el Paso: <código>» -> { codigo, desc, tipo, vb } (de la tabla de Pasos abierta debajo)
   function pasoPadreDePM(d) {
     const m = /^Procesos Menores para el Paso:\s*(\S+)(?:\s*\((.*)\))?/i.exec(cabeceraDe(d)); if (!m) return null;
-    const out = { codigo: m[1], desc: m[2] || '', tipo: '', vb: undefined };
+    const out = { codigo: m[1], desc: m[2] || '', tipo: '', vb: undefined, rPor: undefined };
     for (const t of document.querySelectorAll('.sapMDialog table.sapMListTbl')) {
       const ths = [...t.querySelectorAll('thead th')].map((th) => NORM(th.textContent));
       if (!ths.includes('CLAVE MODELO')) continue;
-      const iC = ths.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iD = ths.findIndex((n) => /^DESCRIPCI/.test(n)), iT = ths.indexOf('TIPO DATO'), iV = ths.indexOf('V.B.');
+      const iC = ths.findIndex((n) => n === 'CÓDIGO' || n === 'CODIGO'), iD = ths.findIndex((n) => /^DESCRIPCI/.test(n)), iT = ths.indexOf('TIPO DATO'), iV = ths.indexOf('V.B.'), iR = ths.indexOf('R. POR');
       const tr = filasPrincipales(t).find((r) => celda(r, iC) && norm(celda(r, iC).textContent) === out.codigo);
       if (!tr) continue;
       if (iD >= 0) out.desc = norm(celda(tr, iD).textContent);
       if (iT >= 0) out.tipo = (inputDe(celda(tr, iT)) || {}).value || '';
       if (iV >= 0 && celda(tr, iV) && celda(tr, iV).querySelector('[role=checkbox]')) out.vb = marcada(celda(tr, iV));
+      if (iR >= 0 && celda(tr, iR) && celda(tr, iR).querySelector('[role=checkbox]')) out.rPor = marcada(celda(tr, iR));
       break;
     }
     return out;
@@ -17934,6 +17957,8 @@
     // v1.146.0 (reglas de Carlos): nota del supervisor solo en «Realizado por y Visto bueno» (441) con V.B.; Calidad en Operaciones; punto de muestreo
     const RX_NOTA_SUP = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFICAR PRESENCIALMENTE\b/, RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
     const RX_PUNTO_MUESTREO = /^TOMAR (LA |LAS )?MUESTRAS? DESDE\b|\bPUNTOS? DE MUESTREO\b/;
+    const NOTA_SUP_TXT = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
+    const RX_RESP_PROD = /\b(JEFE|SUPERVISOR|OPERARIO|OPERADOR)\b|\bPERSONAL DE PRODUCCION\b/; // v1.147.1: lo verifica Produccion, sin Estado CC
     // «Distinguir tildes»: con la opción, dos textos son iguales solo si también coinciden sus tildes (FRACCION ≠ FRACCIÓN); la búsqueda por palabras
     // sigue sin importar tildes
     let TILDES = false;
@@ -18312,7 +18337,14 @@
           vivos(x.pm).filter((m) => !m.insumo).forEach((m) => { const km = normalizar(m.texto); if (!km) return; if (pmPrevio && pmPrevio.k === km) add(m.id, 'aviso', `Proceso menor repetido: es igual al anterior (${numeros.get(pmPrevio.id) || 'más arriba'}). Quita uno.`, 'dup'); pmPrevio = { k: km, id: m.id }; });
           // v1.146.0 (regla de Carlos): sin V.B. o con un tipo distinto de «Realizado por y Visto bueno» no va la nota del supervisor
           const tipoP = +((x.dt && x.dt.tipo) || x.tipo) || 0, nota = vivos(x.pm).find((m) => !m.insumo && RX_NOTA_SUP.test(normalizar(m.texto)));
-          if (tipoP && nota && (tipoP !== 441 || x.vb === false)) add(nota.id, 'aviso', 'El paso no es «Realizado por y Visto bueno» con V.B.: no lleva la nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…». Quítala.', 'notavb'); });
+          if (tipoP && nota && (tipoP !== 441 || x.vb === false)) add(nota.id, 'aviso', 'El paso no es «Realizado por y Visto bueno» con V.B.: no lleva la nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…». Quítala.', 'notavb');
+          // v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. lleva la nota del supervisor como último proceso menor
+          if (tipoP === 441 && x.rpor === true && x.vb === true) {
+            const pmT = vivos(x.pm).filter((m) => !m.insumo), ult = pmT[pmT.length - 1];
+            if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» como último proceso menor.`, 'notafalta');
+              const cat = bus && bus.exactos ? bus.exactos(NOTA_SUP_TXT).find((f) => !estr || f.estr === estr) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
+            else if (nota !== ult) { add(nota.id, 'aviso', 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final.', 'notafin'); out.get(nota.id).slice(-1)[0].alFinal = true; }
+          } });
         // paso quitado con dependientes
         (l || []).filter((x) => x.quitado && x.codigo).forEach((x) => { const dep = vivos(l).filter((y) => String(y.depende || '') === String(x.codigo)); if (dep.length) add(x.id, 'aviso', `${dep.map((y) => numeros.get(y.id) || y.texto.slice(0, 30)).join(', ')} depende${dep.length > 1 ? 'n' : ''} de este paso: el equipo RMD revisará los predecesores.`); });
       };
@@ -18382,7 +18414,7 @@
         const ceo = RX_PASO_CEO.test(normalizar(p.texto));
         vivos(p.pm).forEach((m) => { const d = m.dt; if (!d || m.insumo) return; const tipo = +d.tipo || 0, txt = normalizar(m.texto);
           if (RX_PUNTO_MUESTREO.test(txt)) { if (tipo && tipo !== DT_SIN_TIPO) add(m.id, 'aviso', 'El punto de muestreo es una instrucción: tipo de dato «Sin tipo de dato».'); return; }
-          if (ceo && tipo && tipo !== DT_SIN_TIPO && (!d.cc || !d.edit)) add(m.id, 'aviso', `Lo llena Calidad en Operaciones y tiene tipo de dato: marca ${[!d.cc ? '«Estado CC»' : '', !d.edit ? '«Edit»' : ''].filter(Boolean).join(' y ')}.`); });
+          if (ceo && !RX_RESP_PROD.test(txt) && tipo && tipo !== DT_SIN_TIPO && (!d.cc || !d.edit)) add(m.id, 'aviso', `Lo llena Calidad en Operaciones y tiene tipo de dato: marca ${[!d.cc ? '«Estado CC»' : '', !d.edit ? '«Edit»' : ''].filter(Boolean).join(' y ')}.`); });
       });
     }
     // Rehace el borrador sobre `actual`; conflictos si SAP y Producción tocaron lo mismo. mapa: id base -> id actual (otra versión).
@@ -18835,7 +18867,7 @@
     }
     const estadoCl = (x, b) => [!b ? 'agr' : '', x.quitado ? 'qui' : '', b && !x.quitado && (cambiado(x, b) || cantCambiada(x, b) || valoresCambiados(x, b) || casillasCambiadas(x, b) || dtCambiada(x, b)) ? 'cam' : '', MOV.has(x.id) ? 'mov' : ''].filter(Boolean).join(' ');
     // v1.134.0: un aviso que se resuelve con un paso del catálogo (homologado de Calidad en Operaciones, o el que ya existe) trae su botón
-    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${a.usar && BUS.porCodigo(a.usar) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}</div>`).join('');
+    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${a.usar && BUS.porCodigo(a.usar) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
     const htmlAntes = (x, b) => (b && !x.quitado && cambiado(x, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '');
     function htmlRango(x) {
@@ -19688,6 +19720,19 @@
       });
     }
     // v1.134.0: pasa al paso del catálogo indicado (homologado de Calidad en Operaciones o el que ya existe con el mismo texto)
+    // v1.147.1 (regla de Carlos): la nota del supervisor como último proceso menor de un «Realizado por y Visto bueno» con R. Por y V.B.
+    function agregarNotaSupervisor(id, codigo) {
+      const f = encontrar(id), c = BUS.porCodigo(codigo); if (!f || !c) { aviso('Esa nota no está en el catálogo de esta plantilla.'); return; }
+      let nuevoId = null;
+      cambio(() => { const v = encontrar(id).item; if (!v.pm) v.pm = []; nuevoId = `n:${seq++}`;
+        v.pm.push({ id: nuevoId, texto: c.texto, codigo: String(c.codigo), pasoId: null, nuevo: false, etqCat: c.etq, tipo: c.tipo, comentario: '' }); });
+      setTimeout(() => { if (nuevoId) { irA(nuevoId); seleccionar(nuevoId); } }, 30);
+    }
+    function notaAlFinal(id) {
+      const f = encontrar(id); if (!f || f.clase !== 'pm') return;
+      cambio(() => { const g = encontrar(id), l = g.lista, i = l.indexOf(g.item); if (i < 0) return; l.splice(i, 1); l.push(g.item); });
+      setTimeout(() => { irA(id); seleccionar(id); }, 30);
+    }
     function usarPaso(id, codigo) {
       const f = encontrar(id), c = BUS.porCodigo(codigo); if (!f || !c) { aviso('Ese paso no está en el catálogo de esta plantilla.'); return; }
       if (c.estr !== f.e.estructuraId) { aviso('Ese paso es de otra sección del RMD.'); return; }
@@ -19923,6 +19968,8 @@
       else if (a === 'ir-obs') { const o = document.getElementById('pp-obs-ta'); if (o) { o.scrollIntoView({ block: 'center' }); o.focus(); } }
       else if (a === 'quitar-tildes') quitarTildesTodo();
       else if (a === 'usar-paso') usarPaso(id, b.dataset.codigo);
+      else if (a === 'agregar-nota') agregarNotaSupervisor(id, b.dataset.codigo);
+      else if (a === 'nota-al-final') notaAlFinal(id);
       else if (a === 'siguiente-aviso') siguienteAviso(b.dataset.k || '');
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
