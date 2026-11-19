@@ -100,6 +100,7 @@
     ['controlescambio', 'Controles de Cambios', 'Pestaña en Configuración Maestra con las acciones de DOC abiertas (en plazo o vencidas) del registro de controles de cambio que tocan un RMD (Excel cargado a mano), sus RMD asociados según las Observaciones y el envío de evidencia a 4.- EVIDENCIA CC Y NC MASIVOS.'],
     ['seguimientocc', 'Seguimiento de CC', 'Bandera ⚑ en cada CC de «Controles de Cambios» y pestaña «Seguimiento CC» en Configuración Maestra: los RMD impactados de cada CC con bandera (sugeridos por Observaciones, de «Mis movimientos» o buscándolos), si ya ejecutaron el CC, y Excel o copia para el cuadro. Compartido con el equipo a través de status-rmd; no escribe en SAP.'],
     ['bandejasol', 'Bandeja de solicitudes', 'Campanita en la barra de la lista: las Solicitudes de Manufactura Digital como una ticketera, ya cargadas y por partes (las por atender primero), con su detalle, adjuntos y destinatarios, y Aprobar o Rechazar con las mismas escrituras que la app «Solicitud».'],
+    ['solicitudrapida', 'Solicitud más rápida', 'En la app «Solicitud de Manufactura Digital»: entra con SOLICITUD elegido en «Aplicación» y pulsa «Ir» solo; la lista se lee por partes a la vez (no una tras otra) y los códigos de material se cargan sin hacer esperar.'],
     ['lote', 'Buscar por lote', 'Ícono en la barra de la lista: escribe un lote y ves sus órdenes de SAP y los RMD de cada una (como la app «Registro», sin escribir nada).'],
     ['suspension', 'Modificaciones masivas', 'Suspende varios master, agrégales una observación o actualiza su receta cuando cambia un material.'],
   ];
@@ -191,6 +192,68 @@
   const dialogos = () => (dlgPasada ? dlgPasada.slice() : dialogosVisibles());
   const anotarError = (nombre, e) => { const s = window.__rmdStats; if (s) s.errores = (s.errores || []).slice(-9).concat(nombre + ': ' + ((e && e.message) || e)); };
   const aislar = (nombre, f) => { try { return f(); } catch (e) { anotarError(nombre, e); return undefined; } };
+
+  // ==SOLICITUD-RAPIDA==
+  // v1.147.0 (pedido de Carlos): la app «Solicitud de Manufactura Digital» (mif.rmd.solicitud) tardaba ~30 s: al elegir SOLICITUD espera la lista
+  // completa de RECETA (8 páginas, ~4,5 s) y el «Ir» lee las ~5 100 solicitudes en 6 páginas de 1000, una tras otra (~23 s, 12,8 MB).
+  // Aquí: SOLICITUD queda elegido y se pulsa «Ir» solo (una vez al entrar), las páginas de /MD se piden 6 a la vez (services/solicitud.getDataWithSelect,
+  // misma forma de resultado) y onGetRecetas no hace esperar (el combo «Código de Material» se llena cuando llega). Solo lectura: no cambia qué se lee.
+  const SOL_APP_SOLICITUD = '3b5fc15f-3dcb-4c0f-8927-8ba26964da38', SOL_VISTA = 'application-solicitud-display-component---MainView';
+  function solVista() {
+    const core = window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore(); if (!core) return null;
+    const v = core.byId(SOL_VISTA);
+    return v && v.getController && v.getController() && v.getController().getMetadata().getName() === 'mif.rmd.solicitud.controller.MainView' ? v : null;
+  }
+  // páginas de 1000 por $skiptoken (como getDataWithSelectSkip), de 6 en 6; termina en la primera que trae menos de 1000
+  function solLeerEnParalelo(modelo, ruta, expand, filtros, select, orden, desc) {
+    const pagina = (skip) => new Promise((ok, mal) => { const up = { $expand: expand, $select: select }; if (skip) up.$skiptoken = skip; if (orden) up.$orderby = `${orden}${desc ? ' desc' : ''}`; modelo.read(ruta, { filters: filtros, urlParameters: up, success: ok, error: mal }); });
+    return (async () => {
+      const p0 = await pagina(0); let res = (p0.results || []).slice(); if (res.length < 1000) return { results: res };
+      for (let skip = 1000; ; skip += 6000) {
+        const lote = await Promise.all([0, 1, 2, 3, 4, 5].map((k) => pagina(skip + k * 1000)));
+        for (const p of lote) { const r = p.results || []; res = res.concat(r); if (r.length < 1000) return { results: res }; }
+      }
+    })();
+  }
+  function solParchear(ctrl) {
+    let svc = null; try { svc = sap.ui.require('mif/rmd/solicitud/services/solicitud'); } catch (e) { /* aún no cargado */ }
+    if (!svc || typeof svc.getDataWithSelect !== 'function') return false;
+    if (!svc.__rmdRapido) { const orig = svc.getDataWithSelect; svc.__rmdRapido = orig;
+      svc.getDataWithSelect = function (modelo, ruta, expand, filtros, select, orden, desc) { return on('solicitudrapida') ? solLeerEnParalelo(modelo, ruta, expand, filtros, select, orden, desc) : orig.apply(this, arguments); }; }
+    if (typeof ctrl.onGetRecetas === 'function' && !ctrl.onGetRecetas.__rmd) {
+      const orig = ctrl.onGetRecetas, w = function () { if (!on('solicitudrapida')) return orig.apply(this, arguments); const p = orig.apply(this, arguments); if (p && p.catch) p.catch((e) => anotarError('solicitud recetas', e)); return Promise.resolve(); };
+      w.__rmd = true; ctrl.onGetRecetas = w;
+    }
+    return true;
+  }
+  function solicitudRapida() {
+    const t0 = Date.now(); let parcheado = false, fase = 'elegir', tElegir = 0;
+    const tick = setInterval(() => aislar('solicitudRapida', () => {
+      if (Date.now() - t0 > 120000 || fase === 'listo') { clearInterval(tick); return; }
+      const vista = solVista(); if (!vista) return;
+      if (!on('solicitudrapida')) { clearInterval(tick); return; }
+      const ctrl = vista.getController(); if (!parcheado) parcheado = solParchear(ctrl);
+      const mg = ctrl.modelGeneral || vista.getModel('modelGeneral'); if (!mg || !parcheado) return;
+      const fb = (vista.findAggregatedObjects(true, (o) => o.isA && o.isA('sap.ui.comp.filterbar.FilterBar')) || [])[0]; if (!fb) return;
+      if (fase === 'elegir') {
+        if (!(mg.getProperty('/aListaApps') || []).length) return;                       // loadMaestra aún no termina
+        if (mg.getProperty('/aFilters/aplicacionId')) { fase = 'listo'; return; }          // la persona ya eligió: no se toca
+        const box = fb.determineControlByName ? fb.determineControlByName('Z') : null; if (!box || !box.getItems) return;
+        const it = box.getItems().find((x) => x.getKey() === SOL_APP_SOLICITUD) || box.getItems().find((x) => NORM(x.getText()) === 'SOLICITUD'); if (!it) return;
+        box.setSelectedKey(it.getKey()); box.fireChange({ value: it.getText() }); fase = 'ir'; tElegir = Date.now();
+        return;
+      }
+      if (fase === 'ir') {
+        const info = mg.getProperty('/oInfoUsuario');
+        if (mg.getProperty('/aFilters/aplicacionId') !== SOL_APP_SOLICITUD) { fase = 'listo'; return; }  // cambió de aplicación a mano
+        if (!info || !info.funcionUsuario || !info.data) { if (Date.now() - tElegir > 60000) fase = 'listo'; return; }
+        fase = 'listo'; fb.fireSearch();
+      }
+    }), 250);
+  }
+  const esAppSolicitud = () => { let h = location.href; try { h += ' ' + window.top.location.hash; } catch (e) { /* otro origen */ } return /solicitud-display|rmd\.solicitud/i.test(h); };
+  if (/ui5appruntime/.test(location.pathname) && esAppSolicitud()) setTimeout(() => aislar('solicitudRapida', solicitudRapida), 0);
+  // ==SOLICITUD-RAPIDA-FIN==
 
   // ---- utilidades UI5 ---------------------------------------------------------------------------
   function pulsar(btn) {
