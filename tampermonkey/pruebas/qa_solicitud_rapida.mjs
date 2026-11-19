@@ -7,7 +7,7 @@ let fallas = 0; const ok = (n, c, d) => { console.log((c ? 'PASA  ' : 'FALLA ') 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function escenario({ yaElegida = false, opcion = true, totalMd = 5127 } = {}) {
-  const lecturas = [], eventos = [];
+  const lecturas = [], eventos = []; let tElegir = null; const t0 = Date.now();
   let maxParalelo = 0, enCurso = 0;
   const modelo = { read: (ruta, o) => { const skip = +(o.urlParameters.$skiptoken || 0); lecturas.push({ ruta, skip, exp: o.urlParameters.$expand }); enCurso++; maxParalelo = Math.max(maxParalelo, enCurso);
     setTimeout(() => { enCurso--; const n = Math.max(0, Math.min(1000, totalMd - skip)); o.success({ results: Array.from({ length: n }, (_, i) => ({ mdId: 'M' + (skip + i), destinatariosMD: { results: [] } })) }); }, 15); } };
@@ -18,26 +18,27 @@ async function escenario({ yaElegida = false, opcion = true, totalMd = 5127 } = 
   svc.getDataWithSelect = async () => { throw new Error('original no debía usarse'); };
   const items = [{ getKey: () => '3b5fc15f-3dcb-4c0f-8927-8ba26964da38', getText: () => 'SOLICITUD' }, { getKey: () => '295fd633-d654-49b6-86a0-674611a3b783', getText: () => 'FLUJO DE REVISIÓN' }];
   let recetasListas = false;
-  const ctrl = { modelGeneral: mg, getMetadata: () => ({ getName: () => 'mif.rmd.solicitud.controller.MainView' }),
+  const ctrl = { modelGeneral: mg, mainModelv2: null, getMetadata: () => ({ getName: () => 'mif.rmd.solicitud.controller.MainView' }),
     onGetRecetas: async function () { await espera(400); recetasListas = true; mg.setProperty('/aListRecetas', [1, 2]); },
     async onInitApp() { const t = Date.now(); await ctrl.onGetRecetas(); eventos.push(['initApp', Date.now() - t]); await espera(30); mg.setProperty('/oInfoUsuario', { data: { usuario: 'CJESUSZ' }, funcionUsuario: { aprobadorSolicitud: true } }); } };
-  const box = { sel: null, getItems: () => items, setSelectedKey: (k) => { box.sel = k; }, getSelectedKey: () => box.sel, fireChange: () => { eventos.push(['change', box.sel]); mg.setProperty('/aFilters/aplicacionId', box.sel); ctrl.onInitApp(); } };
+  const box = { sel: null, getItems: () => items, setSelectedKey: (k) => { box.sel = k; }, getSelectedKey: () => box.sel, fireChange: () => { tElegir = Date.now() - t0; eventos.push(['change', box.sel]); mg.setProperty('/aFilters/aplicacionId', box.sel); ctrl.onInitApp(); } };
   const fb = { isA: (t) => t === 'sap.ui.comp.filterbar.FilterBar', determineControlByName: (n) => (n === 'Z' ? box : null),
     fireSearch: async () => { eventos.push(['search', !!(datos['/oInfoUsuario'] || {}).funcionUsuario]); const r = await svc.getDataWithSelect(modelo, '/MD', 'estadoIdRmd,aReceta', [], 'mdId'); eventos.push(['lista', r.results.length]); } };
   const vista = { getController: () => ctrl, getModel: () => mg, findAggregatedObjects: (_, f) => [fb].filter(f) };
   const sap = { ui: { getCore: () => ({ byId: (id) => (id === 'application-solicitud-display-component---MainView' ? vista : null) }), require: (n) => (n === 'mif/rmd/solicitud/services/solicitud' ? svc : null) } };
   const window = { sap, top: { location: { hash: '#solicitud-display?sap-ui-app-id-hint=saas_approuter_mif.rmd.solicitud' } } };
   const location = { pathname: '/cp.portal/ui5appruntime.html', href: 'https://x.hana.ondemand.com/cp.portal/ui5appruntime.html' };
+  setTimeout(() => { ctrl.mainModelv2 = modelo; }, 300);   // init() crea mainModelv2 después de loadMaestra
   const errores = [];
   const f = new Function('window', 'sap', 'location', 'on', 'aislar', 'anotarError', 'NORM', bloque + '\nreturn { solLeerEnParalelo };');
-  const t0 = Date.now();
   f(window, sap, location, (k) => (k === 'solicitudrapida' ? opcion : true), (n, g) => { try { return g(); } catch (e) { errores.push(n + ': ' + e.message); } }, (n, e) => errores.push(n + ': ' + e), (t) => String(t).trim().toUpperCase());
-  await espera(1500);
-  return { lecturas, eventos, maxParalelo, errores, recetasListas, box, tiempoLista: Date.now() - t0 };
+  await espera(2500);
+  return { tElegir, lecturas, eventos, maxParalelo, errores, recetasListas, box, tiempoLista: Date.now() - t0 };
 }
 
 const a = await escenario();
 const ev = Object.fromEntries(a.eventos.map((e) => [e[0], e[1]]));
+ok('espera a que exista mainModelv2 (sin él onInitApp fallaba en el portal)', a.eventos.length && a.tElegir >= 300 + 800, a.tElegir);
 ok('elige SOLICITUD en Aplicación con su change (onSelectAplicacion)', ev.change === '3b5fc15f-3dcb-4c0f-8927-8ba26964da38', a.eventos);
 ok('onGetRecetas no hace esperar a onInitApp (sigue con USUARIO enseguida)', ev.initApp != null && ev.initApp < 100, a.eventos);
 ok('los códigos de material igual se cargan (en segundo plano)', a.recetasListas);

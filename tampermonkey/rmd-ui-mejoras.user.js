@@ -227,7 +227,7 @@
     return true;
   }
   function solicitudRapida() {
-    const t0 = Date.now(); let parcheado = false, fase = 'elegir', tElegir = 0;
+    const t0 = Date.now(); let parcheado = false, fase = 'elegir', tElegir = 0, tListo = 0;
     const tick = setInterval(() => aislar('solicitudRapida', () => {
       if (Date.now() - t0 > 120000 || fase === 'listo') { clearInterval(tick); return; }
       const vista = solVista(); if (!vista) return;
@@ -236,7 +236,9 @@
       const mg = ctrl.modelGeneral || vista.getModel('modelGeneral'); if (!mg || !parcheado) return;
       const fb = (vista.findAggregatedObjects(true, (o) => o.isA && o.isA('sap.ui.comp.filterbar.FilterBar')) || [])[0]; if (!fb) return;
       if (fase === 'elegir') {
-        if (!(mg.getProperty('/aListaApps') || []).length) return;                       // loadMaestra aún no termina
+        // loadMaestra llena /aListaApps antes de que init() cree mainModelv2: sin él, onInitApp falla en getData (probado en el portal 2026-11-19)
+        if (!(mg.getProperty('/aListaApps') || []).length || !ctrl.mainModelv2 || typeof ctrl.mainModelv2.read !== 'function') { tListo = 0; return; }
+        if (!tListo) { tListo = Date.now(); return; } if (Date.now() - tListo < 800) return;   // un respiro para que init() termine
         if (mg.getProperty('/aFilters/aplicacionId')) { fase = 'listo'; return; }          // la persona ya eligió: no se toca
         const box = fb.determineControlByName ? fb.determineControlByName('Z') : null; if (!box || !box.getItems) return;
         const it = box.getItems().find((x) => x.getKey() === SOL_APP_SOLICITUD) || box.getItems().find((x) => NORM(x.getText()) === 'SOLICITUD'); if (!it) return;
