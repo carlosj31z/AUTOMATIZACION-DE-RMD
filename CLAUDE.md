@@ -439,6 +439,7 @@ cuenta). Escribir y responder siempre en **español**.
   1.148.2 publicada en SharePoint el 2026-11-20 (2 459 982 bytes, commit 0aa16b6 de la rama del PR #130).
 - 2026-11-20, v1.148.3: «Por homologar» (tabla) y Calidad en Operaciones: si el código vigente es de otra etapa se ofrece el del mismo texto de
   esta etapa (`enCatalogo(cod, estr, etq)`; p. ej. 109294 → 184004 FAB se ofrece 184008 ENV en Envase). Prueba `qa_homologacion.mjs`.
+  1.148.3 probada en el portal (solo lectura: ULCERAN 2202609489 y BEN GAY 2202608918) y publicada en SharePoint el 2026-11-20 (2 460 555 bytes, commit ee4237c).
   **La siguiente versión debe ser > 1.148.3.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
