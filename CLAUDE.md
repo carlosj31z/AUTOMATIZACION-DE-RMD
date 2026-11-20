@@ -450,7 +450,8 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-20, v1.150.0 (encima de la 1.149.0): **pedido de Carlos: el Excel de «V°B° última vs. penúltima» sale desde una fecha concreta**, no solo
   de un mes. «Excel desde» / «hasta» (por defecto del 1 del mes a hoy) en lugar de «Mes del Excel»; `vbArmarFilas(maestro, 'AAAA-MM-DD', 'AAAA-MM-DD')`
   (`vbRango`, las dos fechas incluidas; con número de año y mes sigue por mes), hoja «RMD del periodo» y nombre «RMD trabajados <desde> a <hasta> - VB.xlsx».
-  «Enviar a Status RMD» no cambia. Prueba `tampermonkey/pruebas/qa_vb_rango.mjs`. **La siguiente versión debe ser > 1.150.0.**
+  «Enviar a Status RMD» no cambia. Prueba `tampermonkey/pruebas/qa_vb_rango.mjs`. 1.150.0 publicada en SharePoint el 2026-11-20 11:29 (Lima) (2 465 969 bytes), PR #134.
+  **La siguiente versión debe ser > 1.150.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
