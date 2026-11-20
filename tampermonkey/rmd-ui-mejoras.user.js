@@ -18315,7 +18315,7 @@
         if (x.nuevo && bus) {
           const ex = bus.exactos(t).filter((f) => f.estr === estr), aqui = ex.filter((f) => !etq || f.etq === etq);
           if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`, 'existe', aqui[0].codigo);
-          else if (ex.length) add(x.id, 'info', `Existe con el mismo texto en ${nomEtq(ex[0].etq)} (paso ${ex[0].codigo}). Usarlo en otra etiqueta puede hacer que no aparezca en su lugar en producción.`);
+          // v1.148.2 (Carlos): nunca se sugieren pasos de otra etiqueta
           else { const g = iguales.get(x.id);
             if (!g || g.n < 2) add(x.id, 'info', 'Paso nuevo: el equipo RMD lo creará en SAP.');
             else if (g.primero === x.id) add(x.id, 'info', `Paso nuevo: el equipo RMD lo creará en SAP una sola vez y se usará en los ${g.n} lugares donde está igual.`);
@@ -18356,7 +18356,7 @@
           if (tipoP === 441 && x.rpor === true && x.vb === true) {
             const pmT = vivos(x.pm).filter((m) => !m.insumo), ult = pmT[pmT.length - 1];
             if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» (con o sin punto final) como último proceso menor.`, 'notafalta');
-              const cat = bus && bus.exactos ? [NOTA_SUP_TXT, NOTA_SUP_TXT.slice(0, -1)].map((t) => bus.exactos(t).find((f) => !estr || f.estr === estr)).find(Boolean) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
+              const cat = bus && bus.exactos ? [NOTA_SUP_TXT, NOTA_SUP_TXT.slice(0, -1)].map((t) => bus.exactos(t).find((f) => (!estr || f.estr === estr) && (!etq || f.etq === etq))).find(Boolean) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
             else if (nota !== ult) { add(nota.id, 'aviso', 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final.', 'notafin'); out.get(nota.id).slice(-1)[0].alFinal = true; }
           } });
         // paso quitado con dependientes
