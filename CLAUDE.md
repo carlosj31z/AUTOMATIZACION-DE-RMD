@@ -431,9 +431,9 @@ cuenta). Escribir y responder siempre en **español**.
   1.148.0 publicada en SharePoint el 2026-11-19 (2 458 005 bytes), PR #127.
 - 2026-11-19, v1.148.1: **Carlos: la nota obligatoria del supervisor vale también sin punto final** (y con el tipeo «VERIFCAR»: `VERIFI?CAR` en
   `RX_NOTA_SUPERVISOR`/`RX_NOTA_SUP`); «Agregar la nota al final» busca en el catálogo con y sin punto. Prueba `qa_repetidos.mjs`.
-- 2026-11-20, v1.148.2 (incluye la 1.148.1, que no llegó a subirse): **pedido de Carlos: sugerencias de homologación claras.** Si hay pasos con el
-  texto idéntico solo se ofrecen esos (`exactos` en el aviso) y el editor recomienda uno, el más usado (Aut. + Ing.), con los demás plegados
-  (`<details class="pp-mas">`); los parecidos de otro texto (otra sala) solo salen si no hay idénticos. Prueba `qa_homologacion.mjs`.
+- 2026-11-20, v1.148.2 (incluye la 1.148.1, que no llegó a subirse): **pedido de Carlos: sugerencias de homologación claras.** Solo se ofrecen pasos de la
+  misma etapa (`mismaEtapa`: misma etiqueta) con el texto EXACTAMENTE igual al homologado (`exactos` en el aviso), nunca parecidos; si hay varios,
+  el editor recomienda uno, el más usado (Aut. + Ing.), con los demás plegados (`<details class="pp-mas">`). Prueba `qa_homologacion.mjs`.
   **La siguiente versión debe ser > 1.148.2.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto

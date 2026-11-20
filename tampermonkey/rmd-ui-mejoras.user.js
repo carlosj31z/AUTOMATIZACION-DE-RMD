@@ -18296,15 +18296,15 @@
             // v1.148.0 (pedido de Carlos): si ya existe un paso con el texto sugerido, se ofrece seleccionarlo en vez de crear otro
             // v1.148.0 (pedido de Carlos): solo se ofrecen pasos ya homologados (sin términos pendientes) que citan los mismos documentos;
             // si hay más de uno, el editor los ordena por Autorizados + Ingresados y recomienda el más usado
-            const docsSug = codigosDoc(h.texto).sort().join('|'), homologado = (f) => { const hf = homologarTexto(f.texto); return !hf.reglas.length && codigosDoc(hf.texto).sort().join('|') === docsSug; };
-            const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && !homologarTexto(f.texto).reglas.length && homologarTexto(f.texto).texto === h.texto) : [], ya = ex.find((f) => !etq || f.etq === etq) || ex[0];
-            const par = bus && bus.parecidos ? bus.parecidos(h.texto, { estr, etq, max: 10, minimo: 0.9 }).map((y) => y.f).filter((f) => f.estr === estr && homologado(f)) : [];
+            // v1.148.2 (Carlos): solo pasos de la misma etapa (etiqueta: ENVASE con ENVASE, FABRICACION con FABRICACION)
+            const mismaEtapa = (f) => !etq || String(f.etq || '') === String(etq);
+            const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && mismaEtapa(f) && !homologarTexto(f.texto).reglas.length && homologarTexto(f.texto).texto === h.texto) : [];
             // v1.148.2 (pedido de Carlos): si hay pasos con el texto idéntico solo se ofrecen esos (el editor recomienda el más usado);
             // los parecidos con otro texto (p. ej. otra sala) solo salen cuando no hay ninguno idéntico
             const deUnico = (lista) => [...new Map(lista.filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
-            const exOtros = deUnico(ex), opciones = exOtros.length ? exOtros : deUnico(par), nEx = exOtros.length;
-            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${nEx > 1 ? `ya existen ${nEx} pasos con ese texto: usa el recomendado (el más usado).` : nEx ? `ya existe el paso ${exOtros[0]} con ese texto: selecciónalo con el botón.` : opciones.length ? 'no hay un paso con ese texto exacto, pero sí parecidos: revisa que digan lo mismo antes de usar uno.' : 'busca un paso con ese texto antes de crear otro.'}`, 'terminos', nEx ? exOtros[0] : undefined);
-            if (opciones.length > (nEx ? 1 : 0) || (!nEx && opciones.length)) { const ul = out.get(x.id).slice(-1)[0]; ul.opciones = opciones; ul.exactos = nEx > 0; } } }
+            const exOtros = deUnico(ex), opciones = exOtros, nEx = exOtros.length;   // v1.148.2 (Carlos): solo pasos EXACTAMENTE iguales; nunca parecidos
+            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${nEx > 1 ? `ya existen ${nEx} pasos con ese texto: usa el recomendado (el más usado).` : nEx ? `ya existe el paso ${exOtros[0]} con ese texto: selecciónalo con el botón.` : 'no hay un paso con ese texto exacto en esta etapa: créalo con el texto homologado.'}`, 'terminos', nEx ? exOtros[0] : undefined);
+            if (nEx > 1) { const ul = out.get(x.id).slice(-1)[0]; ul.opciones = opciones; ul.exactos = nEx > 0; } } }
           // v1.134.0 (pedido de Carlos): documentos vencidos o que ya no figuran como vigentes
           if (ctx.docs) codigosDoc(t).forEach((cod) => { const v = docVencido(cod, ctx.docs, hoy); if (v) add(x.id, 'aviso', `Documento ${v.codigo}: ${v.motivo}. Revisa el código o la versión vigente antes de enviarlo.`, 'doc'); });
           // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción indica qué se anota (la casilla del RMD)
