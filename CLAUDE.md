@@ -431,7 +431,15 @@ cuenta). Escribir y responder siempre en **español**.
   1.148.0 publicada en SharePoint el 2026-11-19 (2 458 005 bytes), PR #127.
 - 2026-11-19, v1.148.1: **Carlos: la nota obligatoria del supervisor vale también sin punto final** (y con el tipeo «VERIFCAR»: `VERIFI?CAR` en
   `RX_NOTA_SUPERVISOR`/`RX_NOTA_SUP`); «Agregar la nota al final» busca en el catálogo con y sin punto. Prueba `qa_repetidos.mjs`.
-  **La siguiente versión debe ser > 1.148.1.**
+- 2026-11-20, v1.148.2 (incluye la 1.148.1, que no llegó a subirse): **pedido de Carlos: sugerencias de homologación claras.** Solo se ofrecen pasos de la
+  misma etapa (`mismaEtapa`: misma etiqueta) con el texto EXACTAMENTE igual al homologado (`exactos` en el aviso), nunca parecidos; si hay varios,
+  el editor recomienda uno, el más usado (Aut. + Ing.), con los demás plegados (`<details class="pp-mas">`). La lista «Pasos que ya existen en SAP» (editor y portal)
+  y los homologados de Calidad en Operaciones también solo de la misma etapa (`buscar`/`parecidos` con `soloEtq`). «Exactamente igual» distingue mayúsculas y tildes
+  (`crudo`), y con el texto en MAYÚSCULAS no se sugieren pasos con minúsculas (`mismaCaja`, opción `caja` de `buscar`). Prueba `qa_homologacion.mjs`.
+  1.148.2 publicada en SharePoint el 2026-11-20 (2 459 982 bytes, commit 0aa16b6 de la rama del PR #130).
+- 2026-11-20, v1.148.3: «Por homologar» (tabla) y Calidad en Operaciones: si el código vigente es de otra etapa se ofrece el del mismo texto de
+  esta etapa (`enCatalogo(cod, estr, etq)`; p. ej. 109294 → 184004 FAB se ofrece 184008 ENV en Envase). Prueba `qa_homologacion.mjs`.
+  **La siguiente versión debe ser > 1.148.3.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

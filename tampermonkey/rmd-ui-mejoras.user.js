@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.148.1
+// @version      1.148.3
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.148.1';                                                       // mantener igual a @version
+  const VERSION = '1.148.3';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -18079,6 +18079,8 @@
     const palabrasConsulta = (n) => [...new Set(n.split(' ').filter((w) => w.length >= 2 || /^\d$/.test(w)))].filter((w, _, a) => a.length === 1 || !VACIAS.has(w));
     // Buscador de pasos: exacto normalizado y por palabras (prefijos, sin orden ni tildes, tolerante a una letra); ranking por rareza, frase y etiqueta.
     // También por código.
+    // v1.148.2 (Carlos): si el texto va en MAYÚSCULAS no se sugieren pasos con minúsculas (todo el RMD va uniforme)
+    const mismaCaja = (a, b) => !/[a-zà-ÿ]/.test(String(a || '')) ? !/[a-zà-ÿ]/.test(String(b || '')) : true;
     function crearBuscador(filas) {
       const exacto = new Map(), indice = new Map(), porCod = new Map();
       filas.forEach((f, i) => {
@@ -18092,14 +18094,14 @@
         porCodigo: (c) => porCod.get(String(c)),
         // Similitud de frase (palabras + bigramas)
         parecidos(texto, op = {}) {
-          const { estr = null, etq = null, max = 5, minimo = 0.55, soloEstr = true } = op, n = normalizar(texto); if (n.length < 3) return [];
+          const { estr = null, etq = null, max = 5, minimo = 0.55, soloEstr = true, soloEtq = false } = op, n = normalizar(texto); if (n.length < 3) return [];
           const ts = [...new Set(fichas(n))].map((w) => indice.get(w) || []).filter((l) => l.length).sort((a, b) => a.length - b.length), cand = new Set();
           for (const l of ts.slice(0, 4)) { for (const i of l) cand.add(i); if (cand.size > 8000) break; }
-          const r = []; cand.forEach((i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr)) return; const s = similitud(n, f.n) + (etq && f.etq === etq ? 0.03 : 0); if (s >= minimo) r.push({ f, s }); });
+          const r = []; cand.forEach((i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr) || (soloEtq && etq && f.etq !== etq)) return; const s = similitud(n, f.n) + (etq && f.etq === etq ? 0.03 : 0); if (s >= minimo) r.push({ f, s }); });
           return r.sort((a, b) => b.s - a.s).slice(0, max);
         },
         buscar(texto, op = {}) {
-          const { estr = null, etq = null, max = 8, soloEstr = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
+          const { estr = null, etq = null, max = 8, soloEstr = false, soloEtq = false, caja = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
           const ts = palabrasConsulta(n); res.tokens = ts; if (!ts.length) return res;
           const mejor = ts.map((q) => {                                           // por palabra: documento -> mejor peso
             const m = new Map(), pesos = []; for (const w of vocab) { const p = pesoPalabra(q, w); if (p) pesos.push([w, p]); }
@@ -18110,7 +18112,7 @@
           const suma = mejor.reduce((s, x) => s + x.w, 0) || 1;
           mejor.forEach((x) => x.m.forEach((p, i) => { const c = cand.get(i) || { s: 0, k: 0 }; c.s += x.w * p; c.k++; cand.set(i, c); }));
           const quiere = ts.length, todos = [];
-          cand.forEach((c, i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr)) return; if (c.k === quiere || (quiere >= 3 && c.k >= quiere - 1)) todos.push([i, c]); });
+          cand.forEach((c, i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr) || (soloEtq && etq && f.etq !== etq) || (caja && !mismaCaja(texto, f.texto))) return; if (c.k === quiere || (quiere >= 3 && c.k >= quiere - 1)) todos.push([i, c]); });
           todos.forEach(([i, c]) => { const f = filas[i]; const cob = c.s / suma, frase = f.n.includes(n) ? 0.12 : 0, sim = quiere >= 2 ? 0.2 * similitud(n, f.n) : 0, falta = c.k < quiere ? -0.25 : 0;
             const s = Math.min(1, 0.7 * cob + frase + sim + falta), extra = (estr && f.estr === estr ? 0.02 : 0) + (etq && f.etq === etq ? 0.04 : 0) - Math.min(0.05, f.n.length / 6000);
             res.push({ f, s, orden: s + extra, igual: f.n === n && (!TILDES || conTildes(f.texto) === conTildes(texto)) }); });
@@ -18264,7 +18266,10 @@
     const AVISOS_PRODUCCION = new Set(['existe', 'dup', 'ceo', 'doc', 'registro', 'cant', 'rango']);
     function avisos(trabajo, ctx = {}) {
       const out = new Map(), prod = ctx.modo === 'produccion', add = (id, nivel, texto, k, usar) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto, ...(k ? { k } : {}), ...(usar ? { usar: String(usar) } : {}) }); };
-      const enCatalogo = (cod, estr) => { const f = cod && bus && bus.porCodigo(cod); return f && (!estr || f.estr === estr) ? f : null; }, hoy = new Date();
+      // v1.148.2 (Carlos): el paso vigente debe ser de la misma etapa; si en el catálogo es de otra, se busca el del mismo texto en esta etapa
+      const enCatalogo = (cod, estr, etq) => { const f = cod && bus && bus.porCodigo(cod); if (!f) return null; const aqui = (g) => (!estr || g.estr === estr) && (!etq || String(g.etq || '') === String(etq));
+        if (aqui(f)) return f; if (etq === undefined && (!estr || f.estr === estr)) return f;
+        const cr = (v) => String(v || '').replace(/\s+/g, ' ').trim(); return (bus.exactos ? bus.exactos(f.texto) : []).find((g) => aqui(g) && cr(g.texto) === cr(f.texto)) || null; }, hoy = new Date();
       const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base);
       const enBase = new Map(), cantBase = new Map();                          // id -> código en la base; insumo -> cantidad en la base
       (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => { enBase.set(m.id, String(m.codigo || '')); if (m.insumo) cantBase.set(m.id, m.cant); }); })));
@@ -18281,27 +18286,32 @@
         // mismas excepciones de Calidad que en el portal
         const n = normalizar(t), cc = esPm || !/\bBIOCARGA\b/.test(n) ? n.replace(/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES O CONTROL DE CALIDAD/g, 'CALIDAD EN OPERACIONES')
           .replace(/FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION FPRO \d+(?: VIGENTE)? A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA/g, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION') : '';
-        const hp = !x.insumo && !x.nuevo && homologacionPaso(x.codigo, ctx.planta), hpCeo = hp && RX_CEO.test(hp.texto) && enCatalogo(hp.codigo, estr);
+        const hp = !x.insumo && !x.nuevo && homologacionPaso(x.codigo, ctx.planta), hpCeo = hp && RX_CEO.test(hp.texto) && enCatalogo(hp.codigo, estr, etq || null);
         if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(cc) && !hpCeo) {
           const ya = igualQueSap(x), muestra = /MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(cc);
           // v1.134.0: el paso homologado de Calidad en Operaciones que lo reemplaza (mismo texto con «CALIDAD EN OPERACIONES», o uno de la tabla muy parecido)
           let usar = null; if (!muestra && bus) { const q = n.replace(/\bCONTROL DE CALIDAD\b/g, 'CALIDAD EN OPERACIONES'), ex = bus.exactos(q).filter((f) => f.estr === estr && (!etq || f.etq === etq));
-            if (ex[0]) usar = ex[0]; else { const ceo = new Set(pasosCeo(ctx.planta).map((y) => y.codigo)), par = bus.parecidos(q, { estr, etq, max: 6, minimo: 0.8 }).find((y) => ceo.has(String(y.f.codigo))); if (par) usar = par.f; } }
+            if (ex[0]) usar = ex[0]; else { const ceo = new Set(pasosCeo(ctx.planta).map((y) => y.codigo)), par = bus.parecidos(q, { estr, etq, max: 6, minimo: 0.8, soloEtq: true }).find((y) => ceo.has(String(y.f.codigo))); if (par) usar = par.f; } }
           add(x.id, ya && !prod ? 'info' : 'aviso', `${ya && !prod ? 'Ya está así en SAP: d' : 'D'}ebe decir «${muestra ? 'CANTIDAD MUESTREADA (kg):' : 'CALIDAD EN OPERACIONES'}» en lugar de «${muestra ? 'MUESTRA PARA CONTROL DE CALIDAD' : 'CONTROL DE CALIDAD'}».${usar ? ` Paso homologado: ${usar.codigo} «${usar.texto}».` : ''}`, 'ceo', usar && usar.codigo);
         }
         if (!x.insumo) {                                                       // v1.132.0: homologación (docs/homologacion_rmd.md)
-          if (hpCeo) add(x.id, 'aviso', `Paso homologado de Calidad en Operaciones: se reemplaza por el ${hp.codigo} «${hp.texto}».`, 'ceo', hp.codigo);
-          else if (hp) { const cat = enCatalogo(hp.codigo, estr); add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${hp.codigo} «${hp.texto}». ${cat ? 'Selecciónalo con el botón.' : 'Usa «Cambiar paso».'}`, 'homolog', cat && hp.codigo); }
+          if (hpCeo) add(x.id, 'aviso', `Paso homologado de Calidad en Operaciones: se reemplaza por el ${hpCeo.codigo} «${hpCeo.texto}».`, 'ceo', hpCeo.codigo);
+          else if (hp) { const cat = enCatalogo(hp.codigo, estr, etq || null); add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${cat ? cat.codigo : hp.codigo} «${hp.texto}». ${cat ? 'Selecciónalo con el botón.' : 'No existe en esta etapa: créalo con ese texto.'}`, 'homolog', cat && cat.codigo); }
           else if (!prod) { const h = homologarTexto(t); if (h.reglas.length) {
             // v1.148.0 (pedido de Carlos): si ya existe un paso con el texto sugerido, se ofrece seleccionarlo en vez de crear otro
             // v1.148.0 (pedido de Carlos): solo se ofrecen pasos ya homologados (sin términos pendientes) que citan los mismos documentos;
             // si hay más de uno, el editor los ordena por Autorizados + Ingresados y recomienda el más usado
-            const docsSug = codigosDoc(h.texto).sort().join('|'), homologado = (f) => { const hf = homologarTexto(f.texto); return !hf.reglas.length && codigosDoc(hf.texto).sort().join('|') === docsSug; };
-            const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && !homologarTexto(f.texto).reglas.length && homologarTexto(f.texto).texto === h.texto) : [], ya = ex.find((f) => !etq || f.etq === etq) || ex[0];
-            const par = bus && bus.parecidos ? bus.parecidos(h.texto, { estr, etq, max: 10, minimo: 0.9 }).map((y) => y.f).filter((f) => f.estr === estr && homologado(f)) : [];
-            const opciones = [...new Map([...ex, ...par].filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
-            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${ya ? `ya existe el paso ${ya.codigo} con ese texto: selecciónalo con el botón.` : opciones.length ? 'hay pasos parecidos que ya existen: elige uno con su botón antes de crear otro.' : 'busca un paso con ese texto antes de crear otro.'}`, 'terminos', ya && ya.codigo);
-            if (opciones.length > (ya ? 1 : 0)) out.get(x.id).slice(-1)[0].opciones = opciones; } }
+            // v1.148.2 (Carlos): solo pasos de la misma etapa (etiqueta: ENVASE con ENVASE, FABRICACION con FABRICACION)
+            const mismaEtapa = (f) => !etq || String(f.etq || '') === String(etq);
+            // v1.148.2 (Carlos): «exactamente igual» distingue mayúsculas y tildes (todo el RMD va uniforme)
+            const crudo = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+            const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && mismaEtapa(f) && crudo(f.texto) === crudo(h.texto)) : [];
+            // v1.148.2 (pedido de Carlos): si hay pasos con el texto idéntico solo se ofrecen esos (el editor recomienda el más usado);
+            // los parecidos con otro texto (p. ej. otra sala) solo salen cuando no hay ninguno idéntico
+            const deUnico = (lista) => [...new Map(lista.filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
+            const exOtros = deUnico(ex), opciones = exOtros, nEx = exOtros.length;   // v1.148.2 (Carlos): solo pasos EXACTAMENTE iguales; nunca parecidos
+            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${nEx > 1 ? `ya existen ${nEx} pasos con ese texto: usa el recomendado (el más usado).` : nEx ? `ya existe el paso ${exOtros[0]} con ese texto: selecciónalo con el botón.` : 'no hay un paso con ese texto exacto en esta etapa: créalo con el texto homologado.'}`, 'terminos', nEx ? exOtros[0] : undefined);
+            if (nEx > 1) { const ul = out.get(x.id).slice(-1)[0]; ul.opciones = opciones; ul.exactos = nEx > 0; } } }
           // v1.134.0 (pedido de Carlos): documentos vencidos o que ya no figuran como vigentes
           if (ctx.docs) codigosDoc(t).forEach((cod) => { const v = docVencido(cod, ctx.docs, hoy); if (v) add(x.id, 'aviso', `Documento ${v.codigo}: ${v.motivo}. Revisa el código o la versión vigente antes de enviarlo.`, 'doc'); });
           // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción indica qué se anota (la casilla del RMD)
@@ -18310,9 +18320,9 @@
             else if (r && r[0] === 'rango' && (num(x.vi) == null || num(x.vf) == null)) add(x.id, 'error', 'Indica el valor mínimo y el máximo del rango (✎ Editar).', 'rango'); }
         }
         if (x.nuevo && bus) {
-          const ex = bus.exactos(t).filter((f) => f.estr === estr), aqui = ex.filter((f) => !etq || f.etq === etq);
+          const ex = bus.exactos(t).filter((f) => f.estr === estr && mismaCaja(t, f.texto)), aqui = ex.filter((f) => !etq || f.etq === etq);
           if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`, 'existe', aqui[0].codigo);
-          else if (ex.length) add(x.id, 'info', `Existe con el mismo texto en ${nomEtq(ex[0].etq)} (paso ${ex[0].codigo}). Usarlo en otra etiqueta puede hacer que no aparezca en su lugar en producción.`);
+          // v1.148.2 (Carlos): nunca se sugieren pasos de otra etiqueta
           else { const g = iguales.get(x.id);
             if (!g || g.n < 2) add(x.id, 'info', 'Paso nuevo: el equipo RMD lo creará en SAP.');
             else if (g.primero === x.id) add(x.id, 'info', `Paso nuevo: el equipo RMD lo creará en SAP una sola vez y se usará en los ${g.n} lugares donde está igual.`);
@@ -18353,7 +18363,7 @@
           if (tipoP === 441 && x.rpor === true && x.vb === true) {
             const pmT = vivos(x.pm).filter((m) => !m.insumo), ult = pmT[pmT.length - 1];
             if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» (con o sin punto final) como último proceso menor.`, 'notafalta');
-              const cat = bus && bus.exactos ? [NOTA_SUP_TXT, NOTA_SUP_TXT.slice(0, -1)].map((t) => bus.exactos(t).find((f) => !estr || f.estr === estr)).find(Boolean) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
+              const cat = bus && bus.exactos ? [NOTA_SUP_TXT, NOTA_SUP_TXT.slice(0, -1)].map((t) => bus.exactos(t).find((f) => (!estr || f.estr === estr) && (!etq || f.etq === etq))).find(Boolean) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
             else if (nota !== ult) { add(nota.id, 'aviso', 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final.', 'notafin'); out.get(nota.id).slice(-1)[0].alFinal = true; }
           } });
         // paso quitado con dependientes
@@ -18884,11 +18894,15 @@
       EMB.uso(f, (c, u) => { USO.set(String(c), u); USO_PEND.delete(String(c)); clearTimeout(usoT); usoT = setTimeout(pintarTodo, 300); }); };
     const pesoUso = (c) => { const u = USO.get(String(c)); return u ? (u.aut || 0) + (u.ing || 0) : -1; };
     const htmlOpciones = (id, a) => {
-      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (!cods.length || (cods.length < 2 && a.usar && String(a.usar) === cods[0])) return '';
+      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (!cods.length || (cods.length < 2 && a.usar && String(a.usar) === cods[0] && !a.opciones)) return '';
       pedirUso(cods);
-      const orden = cods.slice().sort((x, y) => (pesoUso(y) - pesoUso(x)) || ((USO.get(y) || {}).aut || 0) - ((USO.get(x) || {}).aut || 0)), top = pesoUso(orden[0]) > 0 ? orden[0] : null;
-      return `<div class="pp-opciones">${orden.map((c) => { const f = BUS.porCodigo(c), u = USO.get(c);
-        return `<div class="pp-opcion"><button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(c)}" title="${esc(f.texto)}">Usar el paso ${esc(c)}</button> <span class="pp-op-tx">${esc(f.texto)}</span> <span class="pp-op-uso">${u ? (u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso') : EMB && EMB.uso ? 'contando…' : ''}${c === top ? ' · el más usado' : ''}</span></div>`; }).join('')}</div>`;
+      const orden = cods.slice().sort((x, y) => (pesoUso(y) - pesoUso(x)) || ((USO.get(y) || {}).aut || 0) - ((USO.get(x) || {}).aut || 0) || (+x - +y));
+      const uso = (c) => { const u = USO.get(c); return u ? (u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso') : EMB && EMB.uso ? 'contando…' : ''; };
+      const fila = (c, conTexto, rec) => { const f = BUS.porCodigo(c);
+        return `<div class="pp-opcion${rec ? ' pp-rec' : ''}"><button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(c)}" title="${esc(f.texto)}">Usar el paso ${esc(c)}${rec ? ' (recomendado)' : ''}</button>${conTexto ? ` <span class="pp-op-tx">${esc(f.texto)}</span>` : ''} <span class="pp-op-uso">${uso(c)}${rec && pesoUso(c) > 0 ? ' · el más usado' : ''}</span></div>`; };
+      // v1.148.2 (pedido de Carlos): con texto idéntico se recomienda UN paso (el más usado) y los demás quedan plegados
+      if (a.exactos) return `<div class="pp-opciones">${fila(orden[0], false, true)}${orden.length > 1 ? `<details class="pp-mas"><summary>Otros ${orden.length - 1} paso${orden.length > 2 ? 's' : ''} con el mismo texto</summary>${orden.slice(1).map((c) => fila(c, false, false)).join('')}</details>` : ''}</div>`;
+      return `<div class="pp-opciones"><div class="pp-op-nota">Parecidos, con texto distinto: compáralo antes de usarlo.</div>${orden.map((c) => fila(c, true, false)).join('')}</div>`;
     };
     const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${htmlOpciones(id, a) || ''}${a.usar && BUS.porCodigo(a.usar) && !htmlOpciones(id, a) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
@@ -19469,9 +19483,9 @@
         const pintarSug = (mas) => {
           if (mas) lim += 20; else lim = 12;
           const t = ta.value.trim(); if (t.length < 2) { sug.innerHTML = '<div class="pp-sug-tit">Escribe parte de una palabra (limp, agit, balanz…) y aparecen los pasos que ya existen.</div>'; return; }
-          const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true });
+          const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true, soloEtq: true, caja: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa y en mayúsculas si el texto va en mayúsculas
           // v1.134.0 (pedido de Carlos): si el paso habla de Calidad en Operaciones o de muestreo, primero los pasos homologados de Calidad en Operaciones
-          const ceo = PROD && /CALIDAD|MUESTR|INSPECTIV|CONTROL DE PROCESO/.test(PPN.normalizar(t)) ? PPN.pasosCeo(PQ.rmd.planta).map((y) => BUS.porCodigo(y.codigo)).filter((f) => f && f.estr === estr).sort((a, b2) => ((b2.etq === etq) - (a.etq === etq)) || (PPN.similitud(PPN.normalizar(t), b2.n || PPN.normalizar(b2.texto)) - PPN.similitud(PPN.normalizar(t), a.n || PPN.normalizar(a.texto)))).slice(0, 6) : [];
+          const ceo = PROD && /CALIDAD|MUESTR|INSPECTIV|CONTROL DE PROCESO/.test(PPN.normalizar(t)) ? PPN.pasosCeo(PQ.rmd.planta).map((y) => BUS.porCodigo(y.codigo)).filter((f) => f && f.estr === estr && (!etq || f.etq === etq)).sort((a, b2) => ((b2.etq === etq) - (a.etq === etq)) || (PPN.similitud(PPN.normalizar(t), b2.n || PPN.normalizar(b2.texto)) - PPN.similitud(PPN.normalizar(t), a.n || PPN.normalizar(a.texto)))).slice(0, 6) : [];
           const htmlCeo = ceo.length ? `<div class="pp-sug-tit ceo">Pasos homologados de Calidad en Operaciones</div>${ceo.map((f) => `<button type="button" class="pp-sug-it ceo${elegido && String(elegido.codigo) === String(f.codigo) ? ' elegido' : ''}" data-codigo="${esc(f.codigo)}"><span class="pct">CEO</span><span class="cod">${esc(f.codigo)}</span><span class="tx">${esc(f.texto)}</span>${etq && f.etq && f.etq !== etq ? `<span class="otra">${esc(ETQ.get(f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}` : '';
           sug.innerHTML = htmlCeo + (r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${etq && y.f.etq && y.f.etq !== etq ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}${htmlUso(y.f.codigo)}</button>`).join('')}${r.total > r.length ? '<button type="button" class="pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : `<div class="pp-sug-tit">Ningún paso de esta estructura coincide: si lo dejas así, queda como ${PROD ? '«★ Paso nuevo»' : '«★ Se creará»'}.</div>`);
         };
@@ -20086,7 +20100,7 @@
 .pp-tag.falta{background:#fdecea;color:#b71c1c;border:1px dashed #e57373;cursor:pointer;font:inherit;font-size:inherit}
 .pp-usar{margin-left:6px;padding:1px 8px;border:1px solid #2e7d32;border-radius:10px;background:#fff;color:#1b5e20;cursor:pointer;font:inherit;font-size:11.5px}
 .pp-usar:hover{background:#e8f5e9}
-.pp-opciones{margin:4px 0 0 0;display:flex;flex-direction:column;gap:3px}.pp-opcion{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pp-opcion .pp-usar{margin-left:0}.pp-op-tx{opacity:.85}.pp-op-uso{font-size:11px;opacity:.75;white-space:nowrap}
+.pp-opciones{margin:4px 0 0 0;display:flex;flex-direction:column;gap:3px}.pp-opcion{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pp-opcion .pp-usar{margin-left:0}.pp-op-tx{opacity:.85}.pp-op-uso{font-size:11px;opacity:.75;white-space:nowrap}.pp-rec .pp-usar{font-weight:600}.pp-mas>summary{cursor:pointer;font-size:12px;opacity:.85}.pp-mas .pp-opcion{margin:3px 0 0 12px}.pp-op-nota{font-size:12px;opacity:.85}
 .pp-aviso-gen button{margin-left:6px;font:inherit;font-size:12px;cursor:pointer}
 @media print{.pp-usar,.pp-opciones,.pp-tag.falta{display:none}}
 :root { --tx: #1f2328; --ap: #59636e; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
@@ -21559,7 +21573,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       lim = mas ? lim + 20 : 12; const t = ta.value.trim();
       if (/^\d{3,}$/.test(t)) { const y = bus.porCodigo(t); sug.innerHTML = y ? `<button type="button" class="rmd-pp-sug-it${elegido && String(elegido.codigo) === String(y.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.codigo)}"><span class="cod">${esc(y.codigo)}</span><span class="tx">${esc(y.texto)}</span>${coincide(y) ? '' : `<span class="otra">${y.estr !== f.estr ? 'otra estructura' : esc(etqNom.get(y.etq) || 'otra etiqueta')}</span>`}</button>` : '<div class="rmd-nota">No hay un paso con ese código en el catálogo de la plantilla.</div>'; return; }
       if (t.length < 2) { sug.innerHTML = '<div class="rmd-nota">Escribe parte de una palabra (limp, agit, balanz…) o el código del paso.</div>'; return; }
-      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true });
+      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true, soloEtq: true, caja: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa y en mayúsculas si el texto va en mayúsculas
       sug.innerHTML = r.length ? `<div class="rmd-nota">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="rmd-pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${f.etq && y.f.etq && y.f.etq !== f.etq ? `<span class="otra">${esc(etqNom.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="rmd-pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="rmd-nota">Ningún paso de esta estructura coincide: si lo dejas así, se creará.</div>';
     };
     const cerrar = () => { celda.replaceChildren(...antes); if (bIngresar) bIngresar.disabled = !!bIngresar.title; };

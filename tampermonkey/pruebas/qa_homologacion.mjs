@@ -70,9 +70,31 @@ ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt
     { codigo: '503', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN POE PPRO-219 VIGENTE.', estr: 'E', etq: null, tipo: 439 },
     { codigo: '504', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN PROCEDIMIENTO PPRO-218 VIGENTE.', estr: 'E', etq: null, tipo: 439 }]);
   const av2 = PPN.avisos(tr, { buscador: bus2 }).get('h1') || [], t2 = av2.find((x) => x.k === 'terminos');
-  ok('varios parecidos: el aviso trae las opciones para ordenarlas por uso', t2 && Array.isArray(t2.opciones) && t2.opciones.includes('500') && t2.opciones.includes('501') && !t2.opciones.includes('502'), JSON.stringify(av2));
-  ok('no ofrece pasos sin homologar (POE) ni que citan otro documento', t2 && !t2.opciones.includes('503') && !t2.opciones.includes('504'), JSON.stringify(t2));
-  ok('«ya existe» solo con el texto exacto, puntuación incluida', t2 && t2.usar === undefined && /parecidos/.test(t2.texto), JSON.stringify(t2));
+  ok('parecidos con otro texto: no se ofrecen (solo exactamente iguales)', t2 && !t2.usar && !t2.opciones && /no hay un paso con ese texto exacto/.test(t2.texto), JSON.stringify(t2));
+  // v1.148.2 (pedido de Carlos, caso 4.4.16 de ENVASE): con pasos de texto idéntico solo se ofrecen esos; la otra sala no
+  const SUG = 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA DE ENVASE Y REALIZA EL MUESTREO PARA LOS ANALISIS CORRESPONDIENTES SEGUN PROCEDIMIENTO PCPR-202 VIGENTE.';
+  const bus3 = PPN.crearBuscador([
+    { codigo: '182861', texto: SUG.replace('ENVASE', 'FABRICACION').replace('SEGUN PROC', 'SEGUN EL PROC'), estr: 'E', etq: null, tipo: 446 },
+    { codigo: '186339', texto: SUG, estr: 'E', etq: null, tipo: 446 },
+    { codigo: '186440', texto: SUG, estr: 'E', etq: null, tipo: 446 }]);
+  const tr3 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [{ id: 'c1', codigo: null, nuevo: true, texto: SUG.replace('SEGUN PROCEDIMIENTO', 'SEGUN POE'), tipo: 446, pm: [] }] }] };
+  const t3 = (PPN.avisos(tr3, { buscador: bus3 }).get('c1') || []).find((x) => x.k === 'terminos');
+  const bus4 = PPN.crearBuscador([{ codigo: '186339', texto: SUG, estr: 'E', etq: 'ENV', tipo: 446 }, { codigo: '186440', texto: SUG, estr: 'E', etq: 'FAB', tipo: 446 }]);
+  const tr4 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [], etiquetas: [{ etiquetaId: 'ENV', pasos: [{ id: 'c2', codigo: null, nuevo: true, texto: tr3.estructuras[0].pasos[0].texto, tipo: 446, pm: [] }] }] }] };
+  const t4 = (PPN.avisos(tr4, { buscador: bus4 }).get('c2') || []).find((x) => x.k === 'terminos');
+  ok('misma etapa: solo el paso de ENVASE para un paso de ENVASE', t4 && t4.usar === '186339' && !t4.opciones, JSON.stringify(t4));
+  const bus5 = PPN.crearBuscador([{ codigo: '161237', texto: 'Verificar los registros de control de balanza segun instructivos IPRO-I202 e IPRO-I200 vigentes.', estr: 'E', etq: null, tipo: 446 }]);
+  const tr5 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [{ id: 'c5', codigo: null, nuevo: true, texto: 'VERIFICAR LOS REGISTROS DE CONTROL DE BALANZA SEGUN INSTRUCTIVOS IPRO-I202 E IPRO-I200, VIGENTES.', tipo: 446, pm: [] }] }] };
+  const t5 = (PPN.avisos(tr5, { buscador: bus5 }).get('c5') || []).find((x) => x.k === 'terminos');
+  ok('mayúsculas: no sugiere el paso en minúsculas', t5 && !t5.usar && !t5.opciones, JSON.stringify(t5));
+  ok('buscar con caja: sin el paso en minúsculas', bus5.buscar('VERIFICAR LOS REGISTROS', { caja: true }).length === 0 && bus5.buscar('VERIFICAR LOS REGISTROS', {}).length === 1);
+  // tabla de homologación: el vigente de otra etapa se cambia por el del mismo texto de esta etapa (109294 -> 184004 FAB / 184008 ENV)
+  const DESP = 'REALIZAR EL DESPEJE DE LA SALA SEGUN INSTRUCTIVO IPRO-P212 VIGENTE.';
+  const bus6 = PPN.crearBuscador([{ codigo: '184004', texto: DESP, estr: 'E', etq: 'FAB', tipo: 439 }, { codigo: '184008', texto: DESP, estr: 'E', etq: 'ENV', tipo: 439 }, { codigo: '109294', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN IPRO-P212', estr: 'E', etq: 'ENV', tipo: 439 }]);
+  const tr6 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [], etiquetas: [{ etiquetaId: 'ENV', pasos: [{ id: 'c6', codigo: '109294', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN IPRO-P212', tipo: 439, pm: [] }] }] }] };
+  const l6 = PPN.avisos(tr6, { buscador: bus6, planta: 'Planta 2' }).get('c6') || [], h6 = l6.find((x) => x.k === 'homolog');
+  ok('tabla de homologación: ofrece el paso de la misma etapa (184008), no el de FABRICACION', h6 && h6.usar === '184008' && /184008/.test(h6.texto), JSON.stringify(l6));
+  ok('texto idéntico: solo los idénticos, marcados como exactos', t3 && t3.exactos === true && t3.opciones.join() === '186339,186440' && /ya existen 2 pasos/.test(t3.texto), JSON.stringify(t3));
 }
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallas ? 1 : 0);
