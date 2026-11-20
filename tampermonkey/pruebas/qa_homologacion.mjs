@@ -96,5 +96,27 @@ ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt
   ok('tabla de homologación: ofrece el paso de la misma etapa (184008), no el de FABRICACION', h6 && h6.usar === '184008' && /184008/.test(h6.texto), JSON.stringify(l6));
   ok('texto idéntico: solo los idénticos, marcados como exactos', t3 && t3.exactos === true && t3.opciones.join() === '186339,186440' && /ya existen 2 pasos/.test(t3.texto), JSON.stringify(t3));
 }
+
+// v1.149.0 (CC «MODIFICACION RMD ACO PLANTA 2 - RETIRO DEL PASO: REGISTRAR EN LA SOLAPA CORRESPONDIENTE», pedido de Carlos)
+{
+  const T = 'CONTAR LAS CAJAS DE LOS CUATRO LADOS POR CADA PISO Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE.', LIMPIO = 'CONTAR LAS CAJAS DE LOS CUATRO LADOS POR CADA PISO.';
+  const ACO = { etapa: 'ACONDICIONADO', planta: 'PLANTA LIMA' };
+  ok('solapa: ACO LIMA retira la frase', PPN.homologarTexto(T, ACO).texto === LIMPIO, PPN.homologarTexto(T, ACO).texto);
+  ok('solapa: sin etapa/planta no se aplica', PPN.homologarTexto(T).reglas.length === 0);
+  ok('solapa: ENVASE LIMA no se aplica', PPN.homologarTexto(T, { etapa: 'ENVASE', planta: 'PLANTA LIMA' }).reglas.length === 0);
+  ok('solapa: ACO ATE no se aplica', PPN.homologarTexto(T, { etapa: 'ACONDICIONADO', planta: 'PLANTA ATE' }).reglas.length === 0);
+  ok('solapa: proceso menor solo queda vacío', PPN.homologarTexto('REGISTRAR EN LA SOLAPA CORRESPONDIENTE', ACO).texto === '');
+  ok('solapa: «solo» filtra reglas (VIGENTE no entra)', PPN.homologarTexto('SEGUN PPRO-200 Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE.', { ...ACO, solo: /^solapa/ }).texto === 'SEGUN PPRO-200.');
+  const bus = PPN.crearBuscador([{ codigo: '190001', texto: LIMPIO, estr: 'E', etq: 'ACO', tipo: 446 }]);
+  const tr = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [], etiquetas: [{ etiquetaId: 'ACO', pasos: [{ id: 'p', codigo: '180000', texto: 'LOS POTES ETIQUETADOS SON RECEPCIONADOS Y ENCAJADOS.', tipo: 439, pm: [
+    { id: 'm1', codigo: '180001', texto: T, tipo: 446 }, { id: 'm2', codigo: '180002', texto: 'REGISTRAR EN LA SOLAPA CORRESPONDIENTE.', tipo: 446 }] }] }] }] };
+  const av = PPN.avisos(tr, { buscador: bus, ...ACO });
+  const m1 = (av.get('m1') || []).find((x) => x.k === 'terminos'), m2 = (av.get('m2') || []).find((x) => x.k === 'retirar');
+  ok('solapa: aviso con el paso idéntico 190001', m1 && m1.usar === '190001' && /SOLAPA/.test(m1.texto), JSON.stringify(av.get('m1')));
+  ok('solapa: proceso menor solo -> «Por retirar»', m2 && /Por retirar/.test(m2.texto), JSON.stringify(av.get('m2')));
+  const av2 = PPN.avisos(tr, { buscador: PPN.crearBuscador([]), ...ACO }), m1b = (av2.get('m1') || []).find((x) => x.k === 'terminos');
+  ok('solapa: sin paso idéntico, texto sugerido para el botón', m1b && m1b.sugerido === LIMPIO && !m1b.usar, JSON.stringify(m1b));
+  ok('solapa: en Envase no avisa', !(PPN.avisos(tr, { buscador: bus, etapa: 'ENVASE', planta: 'PLANTA LIMA' }).get('m1') || []).some((x) => /SOLAPA/.test(x.texto)));
+}
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallas ? 1 : 0);

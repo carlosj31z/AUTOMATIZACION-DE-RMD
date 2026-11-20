@@ -251,6 +251,15 @@ with sync_playwright() as p:
         ok = (des == [False, False, True, True] and "Paso repetido" in a["filas"][2]["avisoDes"] and "COINCIDAN COINCIDAN" in a["filas"][3]["avisoDes"] and "3 incoherencias" in (a["cuenta"] or "")
               and r["ceo"] == "EDIT:rmd-marcar,ESTADO CC:rmd-marcar" and r["otro"] == "EDIT:rmd-marcar" and r["sin"] == "" and r["muestra"] == "TIPO DATO:rmd-falta")
         return ok, f"{des} {a['cuenta']!r} {r}"
+    @prueba("LN66 CC ACO Planta 2 (v1.149.0, pedido de Carlos): en la tabla de Pasos de un RMD de Acondicionado de LIMA, «Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE» se marca en la Descripción con el texto sugerido; el proceso menor que es solo esa frase pide retirarse; en otra etapa o planta no se marca")
+    def _():
+        r = pg.evaluate("""() => { const R = (o) => window.__rmdStats.reglasDeFila(Object.assign({ esPM: true, tipo: 'Verificación Check', chk: {} }, o)).filter((x) => /SOLAPA/.test(x.msg)).map((x) => x.col + ':' + x.msg);
+          const T = 'CONTAR LAS CAJAS DE LOS CUATRO LADOS POR CADA PISO Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE.';
+          return { aco: R({ desc: T, etapa: 'ACONDICIONADO', planta: 'PLANTA LIMA' }), solo: R({ desc: 'REGISTRAR EN LA SOLAPA CORRESPONDIENTE', etapa: 'ACONDICIONADO', planta: 'PLANTA LIMA' }),
+                   env: R({ desc: T, etapa: 'ENVASE', planta: 'PLANTA LIMA' }), ate: R({ desc: T, etapa: 'ACONDICIONADO', planta: 'PLANTA ATE' }), sin: R({ desc: T }) }; }""")
+        ok = (len(r["aco"]) == 1 and "DESCRIPCION:" in r["aco"][0] and "«CONTAR LAS CAJAS DE LOS CUATRO LADOS POR CADA PISO.»" in r["aco"][0]
+              and len(r["solo"]) == 1 and "retirar este proceso menor" in r["solo"][0] and not r["env"] and not r["ate"] and not r["sin"])
+        return ok, str(r)
     @prueba("LN4 'VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.' y 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION… A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA…' son correctos; los demás 'CONTROL DE CALIDAD' se alertan")
     def _():
         textos = [("VERIFICAR QUE EL GRANEL TENGA LA APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE.", False),

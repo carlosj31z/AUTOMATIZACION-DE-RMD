@@ -440,6 +440,12 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-20, v1.148.3: «Por homologar» (tabla) y Calidad en Operaciones: si el código vigente es de otra etapa se ofrece el del mismo texto de
   esta etapa (`enCatalogo(cod, estr, etq)`; p. ej. 109294 → 184004 FAB se ofrece 184008 ENV en Envase). Prueba `qa_homologacion.mjs`.
   **La siguiente versión debe ser > 1.148.3.**
+- 2026-11-20, v1.149.0 (encima de la 1.148.3): **pedido de Carlos, CC preliminar «MODIFICACION RMD ACO PLANTA 2 - RETIRO DEL PASO: REGISTRAR EN LA
+  SOLAPA CORRESPONDIENTE»**: en RMD de Acondicionado de LIMA se retira « Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE» (o el proceso menor que es solo esa frase).
+  Reglas de homologación **acotadas** (`Regla.etapas` / `Regla.plantas`; en JS 5.º elemento `{ e, p }` de HOMOLOG_REGLAS; `homologarTexto(t, { etapa, planta, solo })`):
+  sin etapa y planta conocidas no se aplican. Edición rápida/borrador: aviso «Términos por homologar» con el paso idéntico o botón «Usar el texto sugerido»
+  (`sugerido`, `usarTextoSugerido`); texto vacío → aviso k `retirar` con «Quitar». Tabla de Pasos: `reglasDeFila` con `etapa`/`planta` de `asociarDatos`.
+  Pruebas `qa_homologacion.mjs`, `qa_local.py` LN66, `tests/test_homologacion.py`. **La siguiente versión debe ser > 1.149.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

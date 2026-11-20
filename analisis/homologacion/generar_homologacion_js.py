@@ -19,7 +19,10 @@ GRUPO = re.compile(r"\\(\d)")
 
 
 def regla_js(r):
-    return [r.clave, r.patron, GRUPO.sub(lambda m: "$" + m.group(1), r.reemplazo), r.descripcion]
+    js = [r.clave, r.patron, GRUPO.sub(lambda m: "$" + m.group(1), r.reemplazo), r.descripcion]
+    if r.etapas or r.plantas:     # 2026-11-20: regla acotada a etapas / plantas (CC de ACO de LIMA): { e: [etapas], p: ["A" | "L"] }
+        js.append({"e": list(r.etapas), "p": ["A" if p == "ATE" else "L" for p in r.plantas]})
+    return js
 
 
 def bloque():
@@ -37,7 +40,7 @@ def bloque():
         "    // Generado por analisis/homologacion/generar_homologacion_js.py: no editar a mano (ver docs/homologacion_rmd.md).",
         "    // Paso viejo -> { A (ATE) | L (LIMA): [código vigente, texto] }",
         "    const HOMOLOG_PASOS = " + json.dumps(pasos, ensure_ascii=False, separators=(",", ":")) + ";",
-        "    // [clave, patrón, reemplazo, descripción]: términos que el equipo ya cambió en los autorizados de fase 2",
+        "    // [clave, patrón, reemplazo, descripción, { e: etapas, p: plantas }?]: términos que el equipo ya cambió en los autorizados de fase 2",
         "    const HOMOLOG_REGLAS = " + json.dumps(reglas, ensure_ascii=False) + ";",
         "    " + FIN,
     ])
