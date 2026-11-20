@@ -88,6 +88,12 @@ ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt
   const t5 = (PPN.avisos(tr5, { buscador: bus5 }).get('c5') || []).find((x) => x.k === 'terminos');
   ok('mayúsculas: no sugiere el paso en minúsculas', t5 && !t5.usar && !t5.opciones, JSON.stringify(t5));
   ok('buscar con caja: sin el paso en minúsculas', bus5.buscar('VERIFICAR LOS REGISTROS', { caja: true }).length === 0 && bus5.buscar('VERIFICAR LOS REGISTROS', {}).length === 1);
+  // tabla de homologación: el vigente de otra etapa se cambia por el del mismo texto de esta etapa (109294 -> 184004 FAB / 184008 ENV)
+  const DESP = 'REALIZAR EL DESPEJE DE LA SALA SEGUN INSTRUCTIVO IPRO-P212 VIGENTE.';
+  const bus6 = PPN.crearBuscador([{ codigo: '184004', texto: DESP, estr: 'E', etq: 'FAB', tipo: 439 }, { codigo: '184008', texto: DESP, estr: 'E', etq: 'ENV', tipo: 439 }, { codigo: '109294', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN IPRO-P212', estr: 'E', etq: 'ENV', tipo: 439 }]);
+  const tr6 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [], etiquetas: [{ etiquetaId: 'ENV', pasos: [{ id: 'c6', codigo: '109294', texto: 'REALIZAR EL DESPEJE DE LA SALA SEGUN IPRO-P212', tipo: 439, pm: [] }] }] }] };
+  const l6 = PPN.avisos(tr6, { buscador: bus6, planta: 'Planta 2' }).get('c6') || [], h6 = l6.find((x) => x.k === 'homolog');
+  ok('tabla de homologación: ofrece el paso de la misma etapa (184008), no el de FABRICACION', h6 && h6.usar === '184008' && /184008/.test(h6.texto), JSON.stringify(l6));
   ok('texto idéntico: solo los idénticos, marcados como exactos', t3 && t3.exactos === true && t3.opciones.join() === '186339,186440' && /ya existen 2 pasos/.test(t3.texto), JSON.stringify(t3));
 }
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');

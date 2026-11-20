@@ -18266,7 +18266,10 @@
     const AVISOS_PRODUCCION = new Set(['existe', 'dup', 'ceo', 'doc', 'registro', 'cant', 'rango']);
     function avisos(trabajo, ctx = {}) {
       const out = new Map(), prod = ctx.modo === 'produccion', add = (id, nivel, texto, k, usar) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto, ...(k ? { k } : {}), ...(usar ? { usar: String(usar) } : {}) }); };
-      const enCatalogo = (cod, estr) => { const f = cod && bus && bus.porCodigo(cod); return f && (!estr || f.estr === estr) ? f : null; }, hoy = new Date();
+      // v1.148.2 (Carlos): el paso vigente debe ser de la misma etapa; si en el catálogo es de otra, se busca el del mismo texto en esta etapa
+      const enCatalogo = (cod, estr, etq) => { const f = cod && bus && bus.porCodigo(cod); if (!f) return null; const aqui = (g) => (!estr || g.estr === estr) && (!etq || String(g.etq || '') === String(etq));
+        if (aqui(f)) return f; if (etq === undefined && (!estr || f.estr === estr)) return f;
+        const cr = (v) => String(v || '').replace(/\s+/g, ' ').trim(); return (bus.exactos ? bus.exactos(f.texto) : []).find((g) => aqui(g) && cr(g.texto) === cr(f.texto)) || null; }, hoy = new Date();
       const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base);
       const enBase = new Map(), cantBase = new Map();                          // id -> código en la base; insumo -> cantidad en la base
       (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => { enBase.set(m.id, String(m.codigo || '')); if (m.insumo) cantBase.set(m.id, m.cant); }); })));
@@ -18283,7 +18286,7 @@
         // mismas excepciones de Calidad que en el portal
         const n = normalizar(t), cc = esPm || !/\bBIOCARGA\b/.test(n) ? n.replace(/CONTROL DE CALIDAD O CALIDAD EN OPERACIONES|CALIDAD EN OPERACIONES O CONTROL DE CALIDAD/g, 'CALIDAD EN OPERACIONES')
           .replace(/FINALMENTE ENTREGAR EL FORMATO DE INSPECCION EN LINEAS DE PRODUCCION FPRO \d+(?: VIGENTE)? A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA/g, 'FINALMENTE ENTREGAR EL FORMATO DE INSPECCION') : '';
-        const hp = !x.insumo && !x.nuevo && homologacionPaso(x.codigo, ctx.planta), hpCeo = hp && RX_CEO.test(hp.texto) && enCatalogo(hp.codigo, estr);
+        const hp = !x.insumo && !x.nuevo && homologacionPaso(x.codigo, ctx.planta), hpCeo = hp && RX_CEO.test(hp.texto) && enCatalogo(hp.codigo, estr, etq || null);
         if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(cc) && !hpCeo) {
           const ya = igualQueSap(x), muestra = /MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(cc);
           // v1.134.0: el paso homologado de Calidad en Operaciones que lo reemplaza (mismo texto con «CALIDAD EN OPERACIONES», o uno de la tabla muy parecido)
@@ -18292,8 +18295,8 @@
           add(x.id, ya && !prod ? 'info' : 'aviso', `${ya && !prod ? 'Ya está así en SAP: d' : 'D'}ebe decir «${muestra ? 'CANTIDAD MUESTREADA (kg):' : 'CALIDAD EN OPERACIONES'}» en lugar de «${muestra ? 'MUESTRA PARA CONTROL DE CALIDAD' : 'CONTROL DE CALIDAD'}».${usar ? ` Paso homologado: ${usar.codigo} «${usar.texto}».` : ''}`, 'ceo', usar && usar.codigo);
         }
         if (!x.insumo) {                                                       // v1.132.0: homologación (docs/homologacion_rmd.md)
-          if (hpCeo) add(x.id, 'aviso', `Paso homologado de Calidad en Operaciones: se reemplaza por el ${hp.codigo} «${hp.texto}».`, 'ceo', hp.codigo);
-          else if (hp) { const cat = enCatalogo(hp.codigo, estr); add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${hp.codigo} «${hp.texto}». ${cat ? 'Selecciónalo con el botón.' : 'Usa «Cambiar paso».'}`, 'homolog', cat && hp.codigo); }
+          if (hpCeo) add(x.id, 'aviso', `Paso homologado de Calidad en Operaciones: se reemplaza por el ${hpCeo.codigo} «${hpCeo.texto}».`, 'ceo', hpCeo.codigo);
+          else if (hp) { const cat = enCatalogo(hp.codigo, estr, etq || null); add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${cat ? cat.codigo : hp.codigo} «${hp.texto}». ${cat ? 'Selecciónalo con el botón.' : 'No existe en esta etapa: créalo con ese texto.'}`, 'homolog', cat && cat.codigo); }
           else if (!prod) { const h = homologarTexto(t); if (h.reglas.length) {
             // v1.148.0 (pedido de Carlos): si ya existe un paso con el texto sugerido, se ofrece seleccionarlo en vez de crear otro
             // v1.148.0 (pedido de Carlos): solo se ofrecen pasos ya homologados (sin términos pendientes) que citan los mismos documentos;

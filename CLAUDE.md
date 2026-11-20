@@ -435,7 +435,8 @@ cuenta). Escribir y responder siempre en **español**.
   misma etapa (`mismaEtapa`: misma etiqueta) con el texto EXACTAMENTE igual al homologado (`exactos` en el aviso), nunca parecidos; si hay varios,
   el editor recomienda uno, el más usado (Aut. + Ing.), con los demás plegados (`<details class="pp-mas">`). La lista «Pasos que ya existen en SAP» (editor y portal)
   y los homologados de Calidad en Operaciones también solo de la misma etapa (`buscar`/`parecidos` con `soloEtq`). «Exactamente igual» distingue mayúsculas y tildes
-  (`crudo`), y con el texto en MAYÚSCULAS no se sugieren pasos con minúsculas (`mismaCaja`, opción `caja` de `buscar`). Prueba `qa_homologacion.mjs`.
+  (`crudo`), y con el texto en MAYÚSCULAS no se sugieren pasos con minúsculas (`mismaCaja`, opción `caja` de `buscar`). «Por homologar» (tabla) y Calidad en Operaciones:
+  si el código vigente es de otra etapa se ofrece el del mismo texto de esta etapa (`enCatalogo(cod, estr, etq)`; p. ej. 184004 FAB → 184008 ENV). Prueba `qa_homologacion.mjs`.
   **La siguiente versión debe ser > 1.148.2.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
