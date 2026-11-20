@@ -30,15 +30,36 @@ def normalizar(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
+def planta_corta(planta: Optional[str]) -> str:
+    """«ATE» / «LIMA» desde «PLANTA ATE», «Planta 1», «P2»…; vacío si no se reconoce."""
+    p = normalizar(planta or "")
+    if re.search(r"\bATE\b|\bPLANTA 1\b|^P1$", p):
+        return "ATE"
+    if re.search(r"\bLIMA\b|\bPLANTA 2\b|^P2$", p):
+        return "LIMA"
+    return ""
+
+
 @dataclass(frozen=True)
 class Regla:
     clave: str
     patron: str
     reemplazo: str
     descripcion: str
+    # 2026-11-20: reglas que vienen de un CC de una etapa o planta (vacío = todas). Una regla acotada solo se aplica
+    # cuando se conoce la etapa / planta del RMD y coincide.
+    etapas: Tuple[str, ...] = ()
+    plantas: Tuple[str, ...] = ()
 
     def aplicar(self, texto: str) -> str:
         return re.sub(self.patron, self.reemplazo, texto)
+
+    def aplica_a(self, etapa: Optional[str] = None, planta: Optional[str] = None) -> bool:
+        if self.etapas and not any(e in normalizar(etapa or "") for e in self.etapas):
+            return False
+        if self.plantas and planta_corta(planta) not in self.plantas:
+            return False
+        return True
 
 
 # Código de documento (PPRO-200, IPRO-P212, FPRO-250) y separadores de una lista de documentos («, », « Y », « O », «/»).
@@ -50,8 +71,17 @@ DOC = r"\b(" + _COD + r")"
 DOC_GRUPO = r"\b(" + _COD + r"(?:" + SEP_DOC + _COD + r")+)"
 MARCA = "\u0002"
 
+# 2026-11-20, CC preliminar «MODIFICACION RMD ACO PLANTA 2 - RETIRO DEL PASO: REGISTRAR EN LA SOLAPA CORRESPONDIENTE» (pedido de
+# Carlos): en los RMD de Acondicionado se retira « Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE» o, si es todo el texto, el proceso menor.
+CC_SOLAPA = "CC «MODIFICACION RMD ACO PLANTA 2 - RETIRO DEL PASO: REGISTRAR EN LA SOLAPA CORRESPONDIENTE»"
+SOLAPA = r"REGISTRAR(?:LO|LA|LOS|LAS)? EN LA SOLAPA CORRESPONDIENTE"
+
 # El orden importa: primero las frases largas y después las cortas.
 REGLAS: List[Regla] = [
+    Regla("solapa-aco-solo", r"^" + SOLAPA + r" ?\.?$", "",
+          CC_SOLAPA + ": el proceso menor «REGISTRAR EN LA SOLAPA CORRESPONDIENTE» se retira.", ("ACONDICIONADO",), ("LIMA",)),
+    Regla("solapa-aco", r"(?: ?, ?Y|,| Y) " + SOLAPA + r"\b", "",
+          CC_SOLAPA + ": se retira «Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE».", ("ACONDICIONADO",), ("LIMA",)),
     Regla("pdoc-207", r"\bPDSG-202\b", "PDOC-207",
           "POE de buenas prácticas de documentación: PDSG-202 pasó a PDOC-207 (nota de los vistos buenos)."),
     # 2026-11-18 (Carlos): nota de V°B° homologada = paso 186337 «LOS VISTOS BUENOS (V°B°) ... SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE.»
@@ -108,11 +138,16 @@ REGLAS: List[Regla] = [
 ]
 
 
-def homologar(texto: str) -> Tuple[str, List[str]]:
-    """Devuelve (texto homologado, claves de las reglas aplicadas)."""
+def homologar(texto: str, etapa: Optional[str] = None, planta: Optional[str] = None) -> Tuple[str, List[str]]:
+    """Devuelve (texto homologado, claves de las reglas aplicadas).
+
+    `etapa` y `planta` del RMD activan las reglas acotadas (p. ej. las de un CC solo de Acondicionado de LIMA). Un texto
+    homologado vacío quiere decir que el paso o proceso menor se retira."""
     t = normalizar(texto)
     aplicadas = []
     for r in REGLAS:
+        if not r.aplica_a(etapa, planta):
+            continue
         nuevo = re.sub(r"\s+", " ", r.aplicar(t)).strip()
         if nuevo.replace(MARCA, "") != t.replace(MARCA, ""):
             aplicadas.append(r.clave)

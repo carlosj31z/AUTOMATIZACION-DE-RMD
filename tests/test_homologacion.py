@@ -99,3 +99,23 @@ def test_poe_es_procedimiento_y_vigente_o_vigentes():
     assert homologar(t) == (t, [])
     assert homologar("SELLADO SEGUN IPRO-I200 E IPRO-P213.")[0] == "SELLADO SEGUN INSTRUCTIVOS IPRO-I200 E IPRO-P213 VIGENTES."
     assert homologar("SEGUN PPRO-200 Y PPRO-201.")[0] == "SEGUN PROCEDIMIENTOS PPRO-200 Y PPRO-201 VIGENTES."
+
+
+# 2026-11-20: CC «MODIFICACION RMD ACO PLANTA 2 - RETIRO DEL PASO: REGISTRAR EN LA SOLAPA CORRESPONDIENTE»
+SOLAPA_TXT = "CONTAR LAS CAJAS DE LOS CUATRO LADOS POR CADA PISO Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE."
+
+
+def test_solapa_aco_lima_se_retira_la_frase():
+    t, r = homologar(SOLAPA_TXT, etapa="ACONDICIONADO", planta="PLANTA LIMA")
+    assert t == "CONTAR LAS CAJAS DE LOS CUATRO LADOS POR CADA PISO." and r == ["solapa-aco"]
+    assert homologar("CONTAR LAS CAJAS, REGISTRAR EN LA SOLAPA CORRESPONDIENTE", "Acondicionado", "P2")[0] == "CONTAR LAS CAJAS"
+
+
+def test_solapa_aco_proceso_menor_solo_queda_vacio():
+    assert homologar("REGISTRAR EN LA SOLAPA CORRESPONDIENTE.", etapa="ACONDICIONADO", planta="LIMA") == ("", ["solapa-aco-solo"])
+
+
+def test_solapa_no_aplica_fuera_de_aco_lima_ni_sin_contexto():
+    assert homologar(SOLAPA_TXT)[1] == []
+    assert homologar(SOLAPA_TXT, etapa="ENVASE", planta="LIMA")[1] == []
+    assert homologar(SOLAPA_TXT, etapa="ACONDICIONADO", planta="PLANTA ATE")[1] == []
