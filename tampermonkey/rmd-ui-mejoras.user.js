@@ -18092,14 +18092,14 @@
         porCodigo: (c) => porCod.get(String(c)),
         // Similitud de frase (palabras + bigramas)
         parecidos(texto, op = {}) {
-          const { estr = null, etq = null, max = 5, minimo = 0.55, soloEstr = true } = op, n = normalizar(texto); if (n.length < 3) return [];
+          const { estr = null, etq = null, max = 5, minimo = 0.55, soloEstr = true, soloEtq = false } = op, n = normalizar(texto); if (n.length < 3) return [];
           const ts = [...new Set(fichas(n))].map((w) => indice.get(w) || []).filter((l) => l.length).sort((a, b) => a.length - b.length), cand = new Set();
           for (const l of ts.slice(0, 4)) { for (const i of l) cand.add(i); if (cand.size > 8000) break; }
-          const r = []; cand.forEach((i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr)) return; const s = similitud(n, f.n) + (etq && f.etq === etq ? 0.03 : 0); if (s >= minimo) r.push({ f, s }); });
+          const r = []; cand.forEach((i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr) || (soloEtq && etq && f.etq !== etq)) return; const s = similitud(n, f.n) + (etq && f.etq === etq ? 0.03 : 0); if (s >= minimo) r.push({ f, s }); });
           return r.sort((a, b) => b.s - a.s).slice(0, max);
         },
         buscar(texto, op = {}) {
-          const { estr = null, etq = null, max = 8, soloEstr = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
+          const { estr = null, etq = null, max = 8, soloEstr = false, soloEtq = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
           const ts = palabrasConsulta(n); res.tokens = ts; if (!ts.length) return res;
           const mejor = ts.map((q) => {                                           // por palabra: documento -> mejor peso
             const m = new Map(), pesos = []; for (const w of vocab) { const p = pesoPalabra(q, w); if (p) pesos.push([w, p]); }
@@ -18110,7 +18110,7 @@
           const suma = mejor.reduce((s, x) => s + x.w, 0) || 1;
           mejor.forEach((x) => x.m.forEach((p, i) => { const c = cand.get(i) || { s: 0, k: 0 }; c.s += x.w * p; c.k++; cand.set(i, c); }));
           const quiere = ts.length, todos = [];
-          cand.forEach((c, i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr)) return; if (c.k === quiere || (quiere >= 3 && c.k >= quiere - 1)) todos.push([i, c]); });
+          cand.forEach((c, i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr) || (soloEtq && etq && f.etq !== etq)) return; if (c.k === quiere || (quiere >= 3 && c.k >= quiere - 1)) todos.push([i, c]); });
           todos.forEach(([i, c]) => { const f = filas[i]; const cob = c.s / suma, frase = f.n.includes(n) ? 0.12 : 0, sim = quiere >= 2 ? 0.2 * similitud(n, f.n) : 0, falta = c.k < quiere ? -0.25 : 0;
             const s = Math.min(1, 0.7 * cob + frase + sim + falta), extra = (estr && f.estr === estr ? 0.02 : 0) + (etq && f.etq === etq ? 0.04 : 0) - Math.min(0.05, f.n.length / 6000);
             res.push({ f, s, orden: s + extra, igual: f.n === n && (!TILDES || conTildes(f.texto) === conTildes(texto)) }); });
@@ -18286,7 +18286,7 @@
           const ya = igualQueSap(x), muestra = /MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(cc);
           // v1.134.0: el paso homologado de Calidad en Operaciones que lo reemplaza (mismo texto con «CALIDAD EN OPERACIONES», o uno de la tabla muy parecido)
           let usar = null; if (!muestra && bus) { const q = n.replace(/\bCONTROL DE CALIDAD\b/g, 'CALIDAD EN OPERACIONES'), ex = bus.exactos(q).filter((f) => f.estr === estr && (!etq || f.etq === etq));
-            if (ex[0]) usar = ex[0]; else { const ceo = new Set(pasosCeo(ctx.planta).map((y) => y.codigo)), par = bus.parecidos(q, { estr, etq, max: 6, minimo: 0.8 }).find((y) => ceo.has(String(y.f.codigo))); if (par) usar = par.f; } }
+            if (ex[0]) usar = ex[0]; else { const ceo = new Set(pasosCeo(ctx.planta).map((y) => y.codigo)), par = bus.parecidos(q, { estr, etq, max: 6, minimo: 0.8, soloEtq: true }).find((y) => ceo.has(String(y.f.codigo))); if (par) usar = par.f; } }
           add(x.id, ya && !prod ? 'info' : 'aviso', `${ya && !prod ? 'Ya está así en SAP: d' : 'D'}ebe decir «${muestra ? 'CANTIDAD MUESTREADA (kg):' : 'CALIDAD EN OPERACIONES'}» en lugar de «${muestra ? 'MUESTRA PARA CONTROL DE CALIDAD' : 'CONTROL DE CALIDAD'}».${usar ? ` Paso homologado: ${usar.codigo} «${usar.texto}».` : ''}`, 'ceo', usar && usar.codigo);
         }
         if (!x.insumo) {                                                       // v1.132.0: homologación (docs/homologacion_rmd.md)
@@ -19476,9 +19476,9 @@
         const pintarSug = (mas) => {
           if (mas) lim += 20; else lim = 12;
           const t = ta.value.trim(); if (t.length < 2) { sug.innerHTML = '<div class="pp-sug-tit">Escribe parte de una palabra (limp, agit, balanz…) y aparecen los pasos que ya existen.</div>'; return; }
-          const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true });
+          const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true, soloEtq: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa
           // v1.134.0 (pedido de Carlos): si el paso habla de Calidad en Operaciones o de muestreo, primero los pasos homologados de Calidad en Operaciones
-          const ceo = PROD && /CALIDAD|MUESTR|INSPECTIV|CONTROL DE PROCESO/.test(PPN.normalizar(t)) ? PPN.pasosCeo(PQ.rmd.planta).map((y) => BUS.porCodigo(y.codigo)).filter((f) => f && f.estr === estr).sort((a, b2) => ((b2.etq === etq) - (a.etq === etq)) || (PPN.similitud(PPN.normalizar(t), b2.n || PPN.normalizar(b2.texto)) - PPN.similitud(PPN.normalizar(t), a.n || PPN.normalizar(a.texto)))).slice(0, 6) : [];
+          const ceo = PROD && /CALIDAD|MUESTR|INSPECTIV|CONTROL DE PROCESO/.test(PPN.normalizar(t)) ? PPN.pasosCeo(PQ.rmd.planta).map((y) => BUS.porCodigo(y.codigo)).filter((f) => f && f.estr === estr && (!etq || f.etq === etq)).sort((a, b2) => ((b2.etq === etq) - (a.etq === etq)) || (PPN.similitud(PPN.normalizar(t), b2.n || PPN.normalizar(b2.texto)) - PPN.similitud(PPN.normalizar(t), a.n || PPN.normalizar(a.texto)))).slice(0, 6) : [];
           const htmlCeo = ceo.length ? `<div class="pp-sug-tit ceo">Pasos homologados de Calidad en Operaciones</div>${ceo.map((f) => `<button type="button" class="pp-sug-it ceo${elegido && String(elegido.codigo) === String(f.codigo) ? ' elegido' : ''}" data-codigo="${esc(f.codigo)}"><span class="pct">CEO</span><span class="cod">${esc(f.codigo)}</span><span class="tx">${esc(f.texto)}</span>${etq && f.etq && f.etq !== etq ? `<span class="otra">${esc(ETQ.get(f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}` : '';
           sug.innerHTML = htmlCeo + (r.length ? `<div class="pp-sug-tit">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${etq && y.f.etq && y.f.etq !== etq ? `<span class="otra">${esc(ETQ.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}${htmlUso(y.f.codigo)}</button>`).join('')}${r.total > r.length ? '<button type="button" class="pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : `<div class="pp-sug-tit">Ningún paso de esta estructura coincide: si lo dejas así, queda como ${PROD ? '«★ Paso nuevo»' : '«★ Se creará»'}.</div>`);
         };
@@ -21566,7 +21566,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       lim = mas ? lim + 20 : 12; const t = ta.value.trim();
       if (/^\d{3,}$/.test(t)) { const y = bus.porCodigo(t); sug.innerHTML = y ? `<button type="button" class="rmd-pp-sug-it${elegido && String(elegido.codigo) === String(y.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.codigo)}"><span class="cod">${esc(y.codigo)}</span><span class="tx">${esc(y.texto)}</span>${coincide(y) ? '' : `<span class="otra">${y.estr !== f.estr ? 'otra estructura' : esc(etqNom.get(y.etq) || 'otra etiqueta')}</span>`}</button>` : '<div class="rmd-nota">No hay un paso con ese código en el catálogo de la plantilla.</div>'; return; }
       if (t.length < 2) { sug.innerHTML = '<div class="rmd-nota">Escribe parte de una palabra (limp, agit, balanz…) o el código del paso.</div>'; return; }
-      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true });
+      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true, soloEtq: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa
       sug.innerHTML = r.length ? `<div class="rmd-nota">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="rmd-pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${f.etq && y.f.etq && y.f.etq !== f.etq ? `<span class="otra">${esc(etqNom.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="rmd-pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="rmd-nota">Ningún paso de esta estructura coincide: si lo dejas así, se creará.</div>';
     };
     const cerrar = () => { celda.replaceChildren(...antes); if (bIngresar) bIngresar.disabled = !!bIngresar.title; };

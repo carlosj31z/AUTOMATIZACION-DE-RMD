@@ -433,7 +433,8 @@ cuenta). Escribir y responder siempre en **español**.
   `RX_NOTA_SUPERVISOR`/`RX_NOTA_SUP`); «Agregar la nota al final» busca en el catálogo con y sin punto. Prueba `qa_repetidos.mjs`.
 - 2026-11-20, v1.148.2 (incluye la 1.148.1, que no llegó a subirse): **pedido de Carlos: sugerencias de homologación claras.** Solo se ofrecen pasos de la
   misma etapa (`mismaEtapa`: misma etiqueta) con el texto EXACTAMENTE igual al homologado (`exactos` en el aviso), nunca parecidos; si hay varios,
-  el editor recomienda uno, el más usado (Aut. + Ing.), con los demás plegados (`<details class="pp-mas">`). Prueba `qa_homologacion.mjs`.
+  el editor recomienda uno, el más usado (Aut. + Ing.), con los demás plegados (`<details class="pp-mas">`). La lista «Pasos que ya existen en SAP» (editor y portal)
+  y los homologados de Calidad en Operaciones también solo de la misma etapa (`buscar`/`parecidos` con `soloEtq`). Prueba `qa_homologacion.mjs`.
   **La siguiente versión debe ser > 1.148.2.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
