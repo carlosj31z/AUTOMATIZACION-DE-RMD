@@ -445,7 +445,8 @@ cuenta). Escribir y responder siempre en **español**.
   Reglas de homologación **acotadas** (`Regla.etapas` / `Regla.plantas`; en JS 5.º elemento `{ e, p }` de HOMOLOG_REGLAS; `homologarTexto(t, { etapa, planta, solo })`):
   sin etapa y planta conocidas no se aplican. Edición rápida/borrador: aviso «Términos por homologar» con el paso idéntico o botón «Usar el texto sugerido»
   (`sugerido`, `usarTextoSugerido`); texto vacío → aviso k `retirar` con «Quitar». Tabla de Pasos: `reglasDeFila` con `etapa`/`planta` de `asociarDatos`.
-  Pruebas `qa_homologacion.mjs`, `qa_local.py` LN66, `tests/test_homologacion.py`. **La siguiente versión debe ser > 1.149.0.**
+  Pruebas `qa_homologacion.mjs`, `qa_local.py` LN66, `tests/test_homologacion.py`. Probada en el portal (solo lectura, 2202608752 v8: paso idéntico 186432).
+  1.149.0 publicada en SharePoint el 2026-11-20 06:43 (Lima) (2 464 442 bytes), PR #131. **La siguiente versión debe ser > 1.149.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
