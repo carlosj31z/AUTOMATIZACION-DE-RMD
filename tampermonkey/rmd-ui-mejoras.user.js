@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.149.0
+// @version      1.150.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.149.0';                                                       // mantener igual a @version
+  const VERSION = '1.150.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -9083,8 +9083,15 @@
   const vbFecha = (x) => (!(x instanceof Date) || isNaN(x) ? null : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate())) : diaLocal(x));
   const vbIngreso = (obs) => { const t = String(obs || '').slice(0, 8); if (!/^\d{8}$/.test(t)) return null; const d = new Date(Date.UTC(+t.slice(0, 4), +t.slice(4, 6) - 1, +t.slice(6, 8))); return d.getUTCMonth() === +t.slice(4, 6) - 1 ? d : null; };
   const vbVariacion = (dif) => (dif == null ? 'Sin versión anterior' : dif > 0 ? 'Aumentó' : dif < 0 ? 'Disminuyó' : 'Se mantuvo');
+  // v1.150.0 (pedido de Carlos, 20/11/2026): el Excel también sale desde una fecha concreta. vbArmarFilas(maestro, anio, mes) = un mes;
+  // vbArmarFilas(maestro, 'AAAA-MM-DD', 'AAAA-MM-DD') = de la primera fecha a la segunda, las dos incluidas (días en UTC, como las fechas de SAP).
+  function vbRango(anio, mes) {
+    if (typeof anio === 'number') return { ini: Date.UTC(anio, mes - 1, 1), fin: Date.UTC(anio, mes, 1) };
+    const dia = (iso) => { const [a, m, d] = String(iso).split('-').map(Number); return Date.UTC(a, m - 1, d); };
+    return { ini: dia(anio), fin: dia(mes) + 864e5 };
+  }
   function vbArmarFilas(maestro, anio, mes) {
-    const enMes = (d) => d && d.getUTCFullYear() === anio && d.getUTCMonth() + 1 === mes, cadenas = new Map();
+    const rg = vbRango(anio, mes), enMes = (d) => d && !isNaN(d) && d.getTime() >= rg.ini && d.getTime() < rg.fin, cadenas = new Map();
     maestro.forEach((x) => { if (x.codigo && VB_PLANTAS[x.planta]) { const k = x.principal || x.codigo; if (!cadenas.has(k)) cadenas.set(k, []); cadenas.get(k).push(x); } });
     const filas = [];
     cadenas.forEach((regs, principal) => {
@@ -9124,11 +9131,13 @@
   }
   function vbExcel(filas, anio, mes) {
     const libro = Xlsx.crearLibro(), hoy = new Date(), dd2 = (n) => String(n).padStart(2, '0');
-    const cab = ['Planta', 'Etapa', 'Producto', 'Sección', 'Material', 'Movimiento en el mes', 'Fecha último movimiento', 'Últ. versión', 'Últ. código RMD', 'Últ. estado', 'Últ. F. registro', 'Últ. F. ingreso', 'Últ. F. autorización',
+    const porMes = typeof anio === 'number', dmy = (iso) => String(iso).split('-').reverse().join('/');
+    const periodoTxt = porMes ? `en ${dd2(mes)}/${anio}` : `del ${dmy(anio)} al ${dmy(mes)}`, enTxt = porMes ? 'en el mes' : 'en el periodo';
+    const cab = ['Planta', 'Etapa', 'Producto', 'Sección', 'Material', porMes ? 'Movimiento en el mes' : 'Movimiento en el periodo', 'Fecha último movimiento', 'Últ. versión', 'Últ. código RMD', 'Últ. estado', 'Últ. F. registro', 'Últ. F. ingreso', 'Últ. F. autorización',
       'Últ. V°B° (Realizado por y Visto bueno)', 'Últ. solo «Visto bueno»', 'Penúlt. versión', 'Penúlt. código RMD', 'Penúlt. estado', 'Penúlt. V°B° (Realizado por y Visto bueno)', 'Penúlt. solo «Visto bueno»', 'Diferencia V°B°', 'Variación', 'Versión vigente', '¿Última es la vigente?', 'Últ. casilla V.B.', 'Penúlt. casilla V.B.'];
     const anchos = [8, 15, 44, 18, 12, 22, 13, 8, 13, 13, 12, 12, 13, 14, 10, 9, 13, 13, 14, 10, 10, 14, 9, 11, 11, 11];
     const orden = [...filas].sort((a, b) => `${VB_PLANTAS[a.ult.planta]}|${a.ult.etapa}|${a.ult.producto}`.localeCompare(`${VB_PLANTAS[b.ult.planta]}|${b.ult.etapa}|${b.ult.producto}`, 'es'));
-    const h = libro.hoja('RMD del mes', { activa: true, congelar: 'D2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'RMDMes', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, orden.length + 1)}`, estilo: 'TableStyleMedium2' } });
+    const h = libro.hoja(porMes ? 'RMD del mes' : 'RMD del periodo', { activa: true, congelar: 'D2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'RMDMes', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, orden.length + 1)}`, estilo: 'TableStyleMedium2' } });
     cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
     const estVar = { 'Aumentó': 'estAut', 'Disminuyó': 'estSus', 'Se mantuvo': 'estIng' };
     orden.forEach((x, i) => {
@@ -9140,19 +9149,19 @@
     const variaciones = ['Aumentó', 'Disminuyó', 'Se mantuvo', 'Sin versión anterior'], cuenta = new Map();
     filas.forEach((x) => { const k = `${VB_PLANTAS[x.ult.planta]}|${x.ult.etapa}`; if (!cuenta.has(k)) cuenta.set(k, Object.fromEntries(variaciones.map((v) => [v, 0]))); cuenta.get(k)[vbVariacion(x.pen ? x.ult.vb - x.pen.vb : null)]++; });
     const r = libro.hoja('Resumen', { cols: [[1, 1, 12], [2, 2, 16], [3, 7, 12]] });
-    r.poner('A1', `RMD trabajados en ${dd2(mes)}/${anio}: conteo por variación de V°B°`, 'titulo');
+    r.poner('A1', `RMD trabajados ${periodoTxt}: conteo por variación de V°B°`, 'titulo');
     ['Planta', 'Etapa', ...variaciones, 'Total'].forEach((t, c) => r.poner({ c, r: 1 }, t, 'negrita'));
     let fila = 2; const tot = Object.fromEntries(variaciones.map((v) => [v, 0]));
     [...cuenta.keys()].sort((a, b) => a.localeCompare(b, 'es')).forEach((k) => { const [pl, et] = k.split('|'), n = cuenta.get(k); r.poner({ c: 0, r: fila }, pl); if (et) r.poner({ c: 1, r: fila }, et);
       variaciones.forEach((v, j) => { r.poner({ c: 2 + j, r: fila }, n[v]); tot[v] += n[v]; }); r.poner({ c: 6, r: fila }, variaciones.reduce((s, v) => s + n[v], 0)); fila++; });
     r.poner({ c: 0, r: fila }, 'Total', 'negrita'); variaciones.forEach((v, j) => r.poner({ c: 2 + j, r: fila }, tot[v], 'negrita')); r.poner({ c: 6, r: fila }, filas.length, 'negrita'); fila += 2;
-    ['Criterios', '• Un RMD es la cadena de versiones de un mismo código principal; entra si alguna versión se registró, ingresó (fecha al inicio de la Observación) o autorizó en el mes. Solo Planta Ate y Planta Lima.',
+    ['Criterios', '• Un RMD es la cadena de versiones de un mismo código principal; entra si alguna versión se registró, ingresó (fecha al inicio de la Observación) o autorizó ${enTxt}. Solo Planta Ate y Planta Lima.',
       '• Las solicitudes sin código (Solicitado, Solicitud Aprobada o Rechazada) no cuentan como versión: aún no tienen estructura.',
       '• Las versiones Canceladas no se cuentan: se toma la versión anterior. Si un número de versión se repite, vale la más reciente.',
       '• V°B° = pasos activos de la estructura PROCEDIMIENTO con tipo de dato «Realizado por y Visto bueno». Los de tipo «Visto bueno» solo se informan aparte y no entran en la diferencia.',
       '• Diferencia = V°B° de la última versión − V°B° de la penúltima.', '• Casilla V.B. = pasos activos de PROCEDIMIENTO con la casilla «V.B.» marcada, de cualquier tipo de dato (es la cuenta del PPT «Seguimiento de V°B°» de Status RMD).', '• Versión vigente = la versión Autorizada más alta. Ojo: al suspender, SAP cambia la fecha de autorización por la de la suspensión.',
       `• Leído del portal (solo lectura) el ${dd2(hoy.getDate())}/${dd2(hoy.getMonth() + 1)}/${hoy.getFullYear()}.`].forEach((t, i) => r.poner({ c: 0, r: fila + i }, t, i ? 'normal' : 'negrita'));
-    return { libro, nombre: `RMD trabajados ${anio}-${dd2(mes)} - VB.xlsx` };
+    return { libro, nombre: porMes ? `RMD trabajados ${anio}-${dd2(mes)} - VB.xlsx` : `RMD trabajados ${anio} a ${mes} - VB.xlsx` };
   }
   // Lee del portal los RMD trabajados en el mes con los V°B° de su última y penúltima versión (solo lectura).
   async function vbLeerMes(modelo, anio, mes, avance) {
@@ -9161,7 +9170,7 @@
     const maestro = md.map((x) => ({ mdId: x.mdId, codigo: x.codigo ? String(x.codigo) : '', version: +x.version || 0, producto: x.descripcion || '', etapa: x.nivelTxt || '', seccion: x.areaRmdTxt || '', material: x.codDefectoReceta || '',
       registro: vbFecha(x.fechaRegistro), autorizacion: vbFecha(x.fechaAutorizacion), observacion: x.observacion || '', principal: x.codigoversionprincipal ? String(x.codigoversionprincipal) : '', estado: (x.estadoIdRmd && x.estadoIdRmd.contenido) || '', planta: String((x.sucursalId && x.sucursalId.codigo) || '') }));
     const filas = vbArmarFilas(maestro, anio, mes);
-    if (!filas.length) throw new Error(`No hay RMD trabajados en ${dd2(mes)}/${anio}.`);
+    if (!filas.length) throw new Error(typeof anio === 'number' ? `No hay RMD trabajados en ${dd2(mes)}/${anio}.` : `No hay RMD trabajados del ${String(anio).split('-').reverse().join('/')} al ${String(mes).split('-').reverse().join('/')}.`);
     const est = await leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' }), proc = new Set(est.filter((e) => String(e.descripcion || '').trim().toUpperCase().startsWith('PROCEDIMIENTO')).map((e) => e.estructuraId));
     const ids = filas.flatMap((x) => [x.ult, x.pen].filter(Boolean).map((y) => y.mdId));
     const cnt = await vbConteos(modelo, ids, proc, (h, t) => avance(`Contando los V°B° de ${filas.length} RMD… ${h} de ${t} versiones`));
@@ -9262,19 +9271,21 @@
     const modelo = modeloListaPrincipal(); if (!modelo) { toast('Abre la lista "Configuración Manufactura Digital" para exportar.', true); return; }
     let trabajando = false; const hoy = new Date(), dd2 = (n) => String(n).padStart(2, '0');
     const v = ventana('V°B° de la última versión frente a la penúltima', { reporte: true, cancelar: () => { if (!trabajando) v.cerrar(); } });
-    v.cuerpo.innerHTML = `<p>Excel de los RMD <b>trabajados en el mes</b> (Ate y Lima: alguna versión registrada, ingresada o autorizada en el mes) con los <b>V°B°</b> (pasos de PROCEDIMIENTO con «Realizado por y Visto bueno») de su <b>última versión</b> frente a la <b>penúltima</b>, la diferencia y un resumen por planta y etapa. Sin versiones Canceladas. No cambia nada en SAP.</p>
+    v.cuerpo.innerHTML = `<p>Excel de los RMD <b>trabajados entre dos fechas</b> (Ate y Lima: alguna versión registrada, ingresada o autorizada en ese periodo; por defecto del 1 del mes a hoy) con los <b>V°B°</b> (pasos de PROCEDIMIENTO con «Realizado por y Visto bueno») de su <b>última versión</b> frente a la <b>penúltima</b>, la diferencia y un resumen por planta y etapa. Sin versiones Canceladas. No cambia nada en SAP.</p>
       <p>«Enviar a Status RMD» manda a INDICADORES → «PPT de V°B°» los RMD con <b>menos casillas «V.B.»</b> desde la fecha indicada: actualizados (Autorizados desde esa fecha) y por actualizar (Ingresados), con el estado de los lotes hechos con la versión actualizada, para el PowerPoint «Seguimiento de V°B° en RMD».</p>
-      <label class="rmd-vb-mes">Mes del Excel <input type="month" class="rmd-vb-mes-i" value="${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}"></label>
+      <label class="rmd-vb-mes">Excel desde <input type="date" class="rmd-vb-ini-i" value="${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-01"></label>
+      <label class="rmd-vb-mes">hasta <input type="date" class="rmd-vb-fin-i" value="${hoy.getFullYear()}-${dd2(hoy.getMonth() + 1)}-${dd2(hoy.getDate())}"></label><br>
       <label class="rmd-vb-mes">Seguimiento desde <input type="date" class="rmd-vb-desde-i" value="${VB_DESDE}"></label><p class="rmd-progreso"></p>`;
     const prog = v.cuerpo.querySelector('.rmd-progreso'), avance = (t, error) => { setTxt(prog, t); prog.classList.toggle('error', !!error); };
-    const leerMesElegido = () => { const [anio, mes] = (v.cuerpo.querySelector('.rmd-vb-mes-i').value || '').split('-').map(Number); return anio && mes ? { anio, mes } : null; };
+    const ISO_OK = /^\d{4}-\d{2}-\d{2}$/, leerRango = () => { const ini = v.cuerpo.querySelector('.rmd-vb-ini-i').value, fin = v.cuerpo.querySelector('.rmd-vb-fin-i').value; return ISO_OK.test(ini || '') && ISO_OK.test(fin || '') ? { ini, fin } : null; };
     const ocupado = (si) => { trabajando = si; bGen.disabled = si; bEnv.disabled = si; };
     const bGen = botonModal('Exportar Excel', 'primario', async () => {
-      const m = leerMesElegido(); if (!m) { avance('Elige el mes.', true); return; }
-      const { anio, mes } = m; ocupado(true);
+      const rg = leerRango(); if (!rg) { avance('Elige las fechas desde y hasta.', true); return; }
+      if (rg.ini > rg.fin) { avance('La fecha «desde» es posterior a «hasta».', true); return; }
+      ocupado(true);
       try {
-        const filas = await vbLeerMes(modelo, anio, mes, avance);
-        const xl = vbExcel(filas, anio, mes); descargarArchivo(xl.nombre, await xl.libro.generar(), TIPO_XLSX);
+        const filas = await vbLeerMes(modelo, rg.ini, rg.fin, avance);
+        const xl = vbExcel(filas, rg.ini, rg.fin); descargarArchivo(xl.nombre, await xl.libro.generar(), TIPO_XLSX);
         const c = (t) => filas.filter((x) => vbVariacion(x.pen ? x.ult.vb - x.pen.vb : null) === t).length;
         avance(`Listo: ${filas.length} RMD (${c('Aumentó')} aumentaron, ${c('Disminuyó')} disminuyeron, ${c('Se mantuvo')} se mantuvieron, ${c('Sin versión anterior')} sin versión anterior). Se descargó «${xl.nombre}».`);
       } catch (e) { avance(/^No hay RMD/.test(e.message) ? e.message : 'No se pudo armar el Excel: ' + e.message, true); }
