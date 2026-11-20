@@ -73,6 +73,15 @@ ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt
   ok('varios parecidos: el aviso trae las opciones para ordenarlas por uso', t2 && Array.isArray(t2.opciones) && t2.opciones.includes('500') && t2.opciones.includes('501') && !t2.opciones.includes('502'), JSON.stringify(av2));
   ok('no ofrece pasos sin homologar (POE) ni que citan otro documento', t2 && !t2.opciones.includes('503') && !t2.opciones.includes('504'), JSON.stringify(t2));
   ok('«ya existe» solo con el texto exacto, puntuación incluida', t2 && t2.usar === undefined && /parecidos/.test(t2.texto), JSON.stringify(t2));
+  // v1.148.2 (pedido de Carlos, caso 4.4.16 de ENVASE): con pasos de texto idéntico solo se ofrecen esos; la otra sala no
+  const SUG = 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA DE ENVASE Y REALIZA EL MUESTREO PARA LOS ANALISIS CORRESPONDIENTES SEGUN PROCEDIMIENTO PCPR-202 VIGENTE.';
+  const bus3 = PPN.crearBuscador([
+    { codigo: '182861', texto: SUG.replace('ENVASE', 'FABRICACION').replace('SEGUN PROC', 'SEGUN EL PROC'), estr: 'E', etq: null, tipo: 446 },
+    { codigo: '186339', texto: SUG, estr: 'E', etq: null, tipo: 446 },
+    { codigo: '186440', texto: SUG, estr: 'E', etq: null, tipo: 446 }]);
+  const tr3 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [{ id: 'c1', codigo: null, nuevo: true, texto: SUG.replace('SEGUN PROCEDIMIENTO', 'SEGUN POE'), tipo: 446, pm: [] }] }] };
+  const t3 = (PPN.avisos(tr3, { buscador: bus3 }).get('c1') || []).find((x) => x.k === 'terminos');
+  ok('texto idéntico: solo los idénticos, marcados como exactos', t3 && t3.exactos === true && t3.opciones.join() === '186339,186440' && /ya existen 2 pasos/.test(t3.texto), JSON.stringify(t3));
 }
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallas ? 1 : 0);

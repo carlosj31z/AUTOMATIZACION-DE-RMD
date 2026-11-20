@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.148.1
+// @version      1.148.2
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.148.1';                                                       // mantener igual a @version
+  const VERSION = '1.148.2';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -18299,9 +18299,12 @@
             const docsSug = codigosDoc(h.texto).sort().join('|'), homologado = (f) => { const hf = homologarTexto(f.texto); return !hf.reglas.length && codigosDoc(hf.texto).sort().join('|') === docsSug; };
             const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && !homologarTexto(f.texto).reglas.length && homologarTexto(f.texto).texto === h.texto) : [], ya = ex.find((f) => !etq || f.etq === etq) || ex[0];
             const par = bus && bus.parecidos ? bus.parecidos(h.texto, { estr, etq, max: 10, minimo: 0.9 }).map((y) => y.f).filter((f) => f.estr === estr && homologado(f)) : [];
-            const opciones = [...new Map([...ex, ...par].filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
-            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${ya ? `ya existe el paso ${ya.codigo} con ese texto: selecciónalo con el botón.` : opciones.length ? 'hay pasos parecidos que ya existen: elige uno con su botón antes de crear otro.' : 'busca un paso con ese texto antes de crear otro.'}`, 'terminos', ya && ya.codigo);
-            if (opciones.length > (ya ? 1 : 0)) out.get(x.id).slice(-1)[0].opciones = opciones; } }
+            // v1.148.2 (pedido de Carlos): si hay pasos con el texto idéntico solo se ofrecen esos (el editor recomienda el más usado);
+            // los parecidos con otro texto (p. ej. otra sala) solo salen cuando no hay ninguno idéntico
+            const deUnico = (lista) => [...new Map(lista.filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
+            const exOtros = deUnico(ex), opciones = exOtros.length ? exOtros : deUnico(par), nEx = exOtros.length;
+            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${nEx > 1 ? `ya existen ${nEx} pasos con ese texto: usa el recomendado (el más usado).` : nEx ? `ya existe el paso ${exOtros[0]} con ese texto: selecciónalo con el botón.` : opciones.length ? 'no hay un paso con ese texto exacto, pero sí parecidos: revisa que digan lo mismo antes de usar uno.' : 'busca un paso con ese texto antes de crear otro.'}`, 'terminos', nEx ? exOtros[0] : undefined);
+            if (opciones.length > (nEx ? 1 : 0) || (!nEx && opciones.length)) { const ul = out.get(x.id).slice(-1)[0]; ul.opciones = opciones; ul.exactos = nEx > 0; } } }
           // v1.134.0 (pedido de Carlos): documentos vencidos o que ya no figuran como vigentes
           if (ctx.docs) codigosDoc(t).forEach((cod) => { const v = docVencido(cod, ctx.docs, hoy); if (v) add(x.id, 'aviso', `Documento ${v.codigo}: ${v.motivo}. Revisa el código o la versión vigente antes de enviarlo.`, 'doc'); });
           // v1.134.0 (pedido de Carlos): en un paso nuevo, Producción indica qué se anota (la casilla del RMD)
@@ -18884,11 +18887,15 @@
       EMB.uso(f, (c, u) => { USO.set(String(c), u); USO_PEND.delete(String(c)); clearTimeout(usoT); usoT = setTimeout(pintarTodo, 300); }); };
     const pesoUso = (c) => { const u = USO.get(String(c)); return u ? (u.aut || 0) + (u.ing || 0) : -1; };
     const htmlOpciones = (id, a) => {
-      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (!cods.length || (cods.length < 2 && a.usar && String(a.usar) === cods[0])) return '';
+      const cods = [...new Set([...(a.usar ? [a.usar] : []), ...(a.opciones || [])].map(String))].filter((c) => BUS.porCodigo(c)); if (!cods.length || (cods.length < 2 && a.usar && String(a.usar) === cods[0] && !a.opciones)) return '';
       pedirUso(cods);
-      const orden = cods.slice().sort((x, y) => (pesoUso(y) - pesoUso(x)) || ((USO.get(y) || {}).aut || 0) - ((USO.get(x) || {}).aut || 0)), top = pesoUso(orden[0]) > 0 ? orden[0] : null;
-      return `<div class="pp-opciones">${orden.map((c) => { const f = BUS.porCodigo(c), u = USO.get(c);
-        return `<div class="pp-opcion"><button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(c)}" title="${esc(f.texto)}">Usar el paso ${esc(c)}</button> <span class="pp-op-tx">${esc(f.texto)}</span> <span class="pp-op-uso">${u ? (u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso') : EMB && EMB.uso ? 'contando…' : ''}${c === top ? ' · el más usado' : ''}</span></div>`; }).join('')}</div>`;
+      const orden = cods.slice().sort((x, y) => (pesoUso(y) - pesoUso(x)) || ((USO.get(y) || {}).aut || 0) - ((USO.get(x) || {}).aut || 0) || (+x - +y));
+      const uso = (c) => { const u = USO.get(c); return u ? (u.total ? `Aut. ${u.aut.toLocaleString('es-PE')} · Ing. ${u.ing.toLocaleString('es-PE')}` : 'Sin uso') : EMB && EMB.uso ? 'contando…' : ''; };
+      const fila = (c, conTexto, rec) => { const f = BUS.porCodigo(c);
+        return `<div class="pp-opcion${rec ? ' pp-rec' : ''}"><button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(c)}" title="${esc(f.texto)}">Usar el paso ${esc(c)}${rec ? ' (recomendado)' : ''}</button>${conTexto ? ` <span class="pp-op-tx">${esc(f.texto)}</span>` : ''} <span class="pp-op-uso">${uso(c)}${rec && pesoUso(c) > 0 ? ' · el más usado' : ''}</span></div>`; };
+      // v1.148.2 (pedido de Carlos): con texto idéntico se recomienda UN paso (el más usado) y los demás quedan plegados
+      if (a.exactos) return `<div class="pp-opciones">${fila(orden[0], false, true)}${orden.length > 1 ? `<details class="pp-mas"><summary>Otros ${orden.length - 1} paso${orden.length > 2 ? 's' : ''} con el mismo texto</summary>${orden.slice(1).map((c) => fila(c, false, false)).join('')}</details>` : ''}</div>`;
+      return `<div class="pp-opciones"><div class="pp-op-nota">Parecidos, con texto distinto: compáralo antes de usarlo.</div>${orden.map((c) => fila(c, true, false)).join('')}</div>`;
     };
     const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${htmlOpciones(id, a) || ''}${a.usar && BUS.porCodigo(a.usar) && !htmlOpciones(id, a) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
@@ -20086,7 +20093,7 @@
 .pp-tag.falta{background:#fdecea;color:#b71c1c;border:1px dashed #e57373;cursor:pointer;font:inherit;font-size:inherit}
 .pp-usar{margin-left:6px;padding:1px 8px;border:1px solid #2e7d32;border-radius:10px;background:#fff;color:#1b5e20;cursor:pointer;font:inherit;font-size:11.5px}
 .pp-usar:hover{background:#e8f5e9}
-.pp-opciones{margin:4px 0 0 0;display:flex;flex-direction:column;gap:3px}.pp-opcion{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pp-opcion .pp-usar{margin-left:0}.pp-op-tx{opacity:.85}.pp-op-uso{font-size:11px;opacity:.75;white-space:nowrap}
+.pp-opciones{margin:4px 0 0 0;display:flex;flex-direction:column;gap:3px}.pp-opcion{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pp-opcion .pp-usar{margin-left:0}.pp-op-tx{opacity:.85}.pp-op-uso{font-size:11px;opacity:.75;white-space:nowrap}.pp-rec .pp-usar{font-weight:600}.pp-mas>summary{cursor:pointer;font-size:12px;opacity:.85}.pp-mas .pp-opcion{margin:3px 0 0 12px}.pp-op-nota{font-size:12px;opacity:.85}
 .pp-aviso-gen button{margin-left:6px;font:inherit;font-size:12px;cursor:pointer}
 @media print{.pp-usar,.pp-opciones,.pp-tag.falta{display:none}}
 :root { --tx: #1f2328; --ap: #59636e; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
