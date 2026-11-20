@@ -18079,6 +18079,8 @@
     const palabrasConsulta = (n) => [...new Set(n.split(' ').filter((w) => w.length >= 2 || /^\d$/.test(w)))].filter((w, _, a) => a.length === 1 || !VACIAS.has(w));
     // Buscador de pasos: exacto normalizado y por palabras (prefijos, sin orden ni tildes, tolerante a una letra); ranking por rareza, frase y etiqueta.
     // También por código.
+    // v1.148.2 (Carlos): si el texto va en MAYÚSCULAS no se sugieren pasos con minúsculas (todo el RMD va uniforme)
+    const mismaCaja = (a, b) => !/[a-zà-ÿ]/.test(String(a || '')) ? !/[a-zà-ÿ]/.test(String(b || '')) : true;
     function crearBuscador(filas) {
       const exacto = new Map(), indice = new Map(), porCod = new Map();
       filas.forEach((f, i) => {
@@ -18099,7 +18101,7 @@
           return r.sort((a, b) => b.s - a.s).slice(0, max);
         },
         buscar(texto, op = {}) {
-          const { estr = null, etq = null, max = 8, soloEstr = false, soloEtq = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
+          const { estr = null, etq = null, max = 8, soloEstr = false, soloEtq = false, caja = false } = op, n = normalizar(texto), res = []; res.tokens = []; res.total = 0;
           const ts = palabrasConsulta(n); res.tokens = ts; if (!ts.length) return res;
           const mejor = ts.map((q) => {                                           // por palabra: documento -> mejor peso
             const m = new Map(), pesos = []; for (const w of vocab) { const p = pesoPalabra(q, w); if (p) pesos.push([w, p]); }
@@ -18110,7 +18112,7 @@
           const suma = mejor.reduce((s, x) => s + x.w, 0) || 1;
           mejor.forEach((x) => x.m.forEach((p, i) => { const c = cand.get(i) || { s: 0, k: 0 }; c.s += x.w * p; c.k++; cand.set(i, c); }));
           const quiere = ts.length, todos = [];
-          cand.forEach((c, i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr) || (soloEtq && etq && f.etq !== etq)) return; if (c.k === quiere || (quiere >= 3 && c.k >= quiere - 1)) todos.push([i, c]); });
+          cand.forEach((c, i) => { const f = filas[i]; if (!f || (soloEstr && estr && f.estr !== estr) || (soloEtq && etq && f.etq !== etq) || (caja && !mismaCaja(texto, f.texto))) return; if (c.k === quiere || (quiere >= 3 && c.k >= quiere - 1)) todos.push([i, c]); });
           todos.forEach(([i, c]) => { const f = filas[i]; const cob = c.s / suma, frase = f.n.includes(n) ? 0.12 : 0, sim = quiere >= 2 ? 0.2 * similitud(n, f.n) : 0, falta = c.k < quiere ? -0.25 : 0;
             const s = Math.min(1, 0.7 * cob + frase + sim + falta), extra = (estr && f.estr === estr ? 0.02 : 0) + (etq && f.etq === etq ? 0.04 : 0) - Math.min(0.05, f.n.length / 6000);
             res.push({ f, s, orden: s + extra, igual: f.n === n && (!TILDES || conTildes(f.texto) === conTildes(texto)) }); });
@@ -18298,7 +18300,9 @@
             // si hay más de uno, el editor los ordena por Autorizados + Ingresados y recomienda el más usado
             // v1.148.2 (Carlos): solo pasos de la misma etapa (etiqueta: ENVASE con ENVASE, FABRICACION con FABRICACION)
             const mismaEtapa = (f) => !etq || String(f.etq || '') === String(etq);
-            const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && mismaEtapa(f) && !homologarTexto(f.texto).reglas.length && homologarTexto(f.texto).texto === h.texto) : [];
+            // v1.148.2 (Carlos): «exactamente igual» distingue mayúsculas y tildes (todo el RMD va uniforme)
+            const crudo = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+            const ex = bus && bus.exactos ? bus.exactos(h.texto).filter((f) => f.estr === estr && mismaEtapa(f) && crudo(f.texto) === crudo(h.texto)) : [];
             // v1.148.2 (pedido de Carlos): si hay pasos con el texto idéntico solo se ofrecen esos (el editor recomienda el más usado);
             // los parecidos con otro texto (p. ej. otra sala) solo salen cuando no hay ninguno idéntico
             const deUnico = (lista) => [...new Map(lista.filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
@@ -18313,7 +18317,7 @@
             else if (r && r[0] === 'rango' && (num(x.vi) == null || num(x.vf) == null)) add(x.id, 'error', 'Indica el valor mínimo y el máximo del rango (✎ Editar).', 'rango'); }
         }
         if (x.nuevo && bus) {
-          const ex = bus.exactos(t).filter((f) => f.estr === estr), aqui = ex.filter((f) => !etq || f.etq === etq);
+          const ex = bus.exactos(t).filter((f) => f.estr === estr && mismaCaja(t, f.texto)), aqui = ex.filter((f) => !etq || f.etq === etq);
           if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`, 'existe', aqui[0].codigo);
           // v1.148.2 (Carlos): nunca se sugieren pasos de otra etiqueta
           else { const g = iguales.get(x.id);
@@ -19476,7 +19480,7 @@
         const pintarSug = (mas) => {
           if (mas) lim += 20; else lim = 12;
           const t = ta.value.trim(); if (t.length < 2) { sug.innerHTML = '<div class="pp-sug-tit">Escribe parte de una palabra (limp, agit, balanz…) y aparecen los pasos que ya existen.</div>'; return; }
-          const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true, soloEtq: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa
+          const r = BUS.buscar(t, { estr, etq, max: lim, soloEstr: true, soloEtq: true, caja: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa y en mayúsculas si el texto va en mayúsculas
           // v1.134.0 (pedido de Carlos): si el paso habla de Calidad en Operaciones o de muestreo, primero los pasos homologados de Calidad en Operaciones
           const ceo = PROD && /CALIDAD|MUESTR|INSPECTIV|CONTROL DE PROCESO/.test(PPN.normalizar(t)) ? PPN.pasosCeo(PQ.rmd.planta).map((y) => BUS.porCodigo(y.codigo)).filter((f) => f && f.estr === estr && (!etq || f.etq === etq)).sort((a, b2) => ((b2.etq === etq) - (a.etq === etq)) || (PPN.similitud(PPN.normalizar(t), b2.n || PPN.normalizar(b2.texto)) - PPN.similitud(PPN.normalizar(t), a.n || PPN.normalizar(a.texto)))).slice(0, 6) : [];
           const htmlCeo = ceo.length ? `<div class="pp-sug-tit ceo">Pasos homologados de Calidad en Operaciones</div>${ceo.map((f) => `<button type="button" class="pp-sug-it ceo${elegido && String(elegido.codigo) === String(f.codigo) ? ' elegido' : ''}" data-codigo="${esc(f.codigo)}"><span class="pct">CEO</span><span class="cod">${esc(f.codigo)}</span><span class="tx">${esc(f.texto)}</span>${etq && f.etq && f.etq !== etq ? `<span class="otra">${esc(ETQ.get(f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}` : '';
@@ -21566,7 +21570,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       lim = mas ? lim + 20 : 12; const t = ta.value.trim();
       if (/^\d{3,}$/.test(t)) { const y = bus.porCodigo(t); sug.innerHTML = y ? `<button type="button" class="rmd-pp-sug-it${elegido && String(elegido.codigo) === String(y.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.codigo)}"><span class="cod">${esc(y.codigo)}</span><span class="tx">${esc(y.texto)}</span>${coincide(y) ? '' : `<span class="otra">${y.estr !== f.estr ? 'otra estructura' : esc(etqNom.get(y.etq) || 'otra etiqueta')}</span>`}</button>` : '<div class="rmd-nota">No hay un paso con ese código en el catálogo de la plantilla.</div>'; return; }
       if (t.length < 2) { sug.innerHTML = '<div class="rmd-nota">Escribe parte de una palabra (limp, agit, balanz…) o el código del paso.</div>'; return; }
-      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true, soloEtq: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa
+      const r = bus.buscar(t, { estr: f.estr, etq: f.etq, max: lim, soloEstr: true, soloEtq: true, caja: true });   // v1.148.2 (Carlos): solo pasos de la misma etapa y en mayúsculas si el texto va en mayúsculas
       sug.innerHTML = r.length ? `<div class="rmd-nota">Pasos que ya existen en SAP · ${r.total > r.length ? `${r.length} de ${r.total.toLocaleString('es-PE')}` : r.length} coincidencia${r.length === 1 ? '' : 's'}</div>${r.map((y) => `<button type="button" class="rmd-pp-sug-it${y.igual ? ' igual' : ''}${elegido && String(elegido.codigo) === String(y.f.codigo) ? ' elegido' : ''}" data-codigo="${esc(y.f.codigo)}"><span class="pct">${y.igual ? 'Igual' : Math.round(y.s * 100) + ' %'}</span><span class="cod">${esc(y.f.codigo)}</span><span class="tx">${marcado(y.f.texto, r.tokens)}</span>${f.etq && y.f.etq && y.f.etq !== f.etq ? `<span class="otra">${esc(etqNom.get(y.f.etq) || 'otra etiqueta')}</span>` : ''}</button>`).join('')}${r.total > r.length ? '<button type="button" class="rmd-pp-sug-mas" data-mas="1">Ver más</button>' : ''}` : '<div class="rmd-nota">Ningún paso de esta estructura coincide: si lo dejas así, se creará.</div>';
     };
     const cerrar = () => { celda.replaceChildren(...antes); if (bIngresar) bIngresar.disabled = !!bIngresar.title; };

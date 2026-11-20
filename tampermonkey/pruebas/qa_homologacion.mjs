@@ -83,6 +83,11 @@ ok('paso vigente sin aviso de homologación', !/homologar/i.test(txt('p3')), txt
   const tr4 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [], etiquetas: [{ etiquetaId: 'ENV', pasos: [{ id: 'c2', codigo: null, nuevo: true, texto: tr3.estructuras[0].pasos[0].texto, tipo: 446, pm: [] }] }] }] };
   const t4 = (PPN.avisos(tr4, { buscador: bus4 }).get('c2') || []).find((x) => x.k === 'terminos');
   ok('misma etapa: solo el paso de ENVASE para un paso de ENVASE', t4 && t4.usar === '186339' && !t4.opciones, JSON.stringify(t4));
+  const bus5 = PPN.crearBuscador([{ codigo: '161237', texto: 'Verificar los registros de control de balanza segun instructivos IPRO-I202 e IPRO-I200 vigentes.', estr: 'E', etq: null, tipo: 446 }]);
+  const tr5 = { estructuras: [{ estructuraId: 'E', nombre: '4.4.- PROCEDIMIENTO', pasos: [{ id: 'c5', codigo: null, nuevo: true, texto: 'VERIFICAR LOS REGISTROS DE CONTROL DE BALANZA SEGUN INSTRUCTIVOS IPRO-I202 E IPRO-I200, VIGENTES.', tipo: 446, pm: [] }] }] };
+  const t5 = (PPN.avisos(tr5, { buscador: bus5 }).get('c5') || []).find((x) => x.k === 'terminos');
+  ok('mayúsculas: no sugiere el paso en minúsculas', t5 && !t5.usar && !t5.opciones, JSON.stringify(t5));
+  ok('buscar con caja: sin el paso en minúsculas', bus5.buscar('VERIFICAR LOS REGISTROS', { caja: true }).length === 0 && bus5.buscar('VERIFICAR LOS REGISTROS', {}).length === 1);
   ok('texto idéntico: solo los idénticos, marcados como exactos', t3 && t3.exactos === true && t3.opciones.join() === '186339,186440' && /ya existen 2 pasos/.test(t3.texto), JSON.stringify(t3));
 }
 console.log(fallas ? `\n${fallas} prueba(s) fallaron` : '\nTodo bien');
