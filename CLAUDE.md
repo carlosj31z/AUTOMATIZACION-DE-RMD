@@ -452,6 +452,9 @@ cuenta). Escribir y responder siempre en **español**.
   (`vbRango`, las dos fechas incluidas; con número de año y mes sigue por mes), hoja «RMD del periodo» y nombre «RMD trabajados <desde> a <hasta> - VB.xlsx».
   «Enviar a Status RMD» no cambia. Prueba `tampermonkey/pruebas/qa_vb_rango.mjs`. 1.150.0 publicada en SharePoint el 2026-11-20 11:29 (Lima) (2 465 969 bytes), PR #134.
   **La siguiente versión debe ser > 1.150.0.**
+- 2026-11-23, v1.151.0 (encima de la 1.150.0): **pedido de Carlos: la barra de progreso de «Ingresar en SAP» («Escribiendo N de M… faltan ~X s») se ve siempre**,
+  fija al pie del cuerpo de la ventana (`.rmd-ing-avance`, `position: sticky; bottom: 0`) sin desplazarse hasta el final; no cambia el tamaño de la ventana.
+  **La siguiente versión debe ser > 1.151.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
