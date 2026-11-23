@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.150.0
+// @version      1.151.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.150.0';                                                       // mantener igual a @version
+  const VERSION = '1.151.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -565,6 +565,7 @@
   .rmd-ing-ops { max-height: 38vh; overflow: auto; margin: 8px 0; } .rmd-ing-grupo { margin: 4px 0; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; } .rmd-ing-grupo summary { cursor: pointer; padding: 6px 10px; } .rmd-ing-grupo summary span { opacity: .65; margin-left: 6px; font-size: 12px; }
   .rmd-ing-grupo table { margin: 0; } .rmd-ing-tag { display: inline-block; padding: 0 8px; border-radius: 9px; font: 700 11px/18px var(--rmd-fuente); background: rgba(128,128,128,.22); }
   .rmd-ing-tag.t-agregar { background: rgba(46,160,67,.25); } .rmd-ing-tag.t-quitar { background: rgba(220,53,69,.25); } .rmd-ing-tag.t-cambiar, .rmd-ing-tag.t-rango { background: rgba(224,160,0,.28); } .rmd-ing-tag.t-crear, .rmd-ing-tag.t-editar { background: rgba(155,107,214,.3); } .rmd-ing-tag.t-orden, .rmd-ing-tag.t-predecesor { background: rgba(10,110,209,.25); }
+  .rmd-ing-avance { position: sticky; bottom: 0; z-index: 2; background: var(--rmd-superficie); } .rmd-ing-avance:has(.rmd-ing-barra:not([hidden])) { padding: 2px 0 4px; border-top: 1px solid var(--rmd-borde); box-shadow: 0 -6px 12px -8px rgba(0,0,0,.35); } .rmd-ing-avance .rmd-pp-prog:empty { display: none; }
   .rmd-ing-barra { height: 8px; margin: 10px 0 4px; border-radius: 4px; background: rgba(128,128,128,.22); overflow: hidden; } .rmd-ing-barra i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--rmd-acento), var(--rmd-verde)); transition: width .25s; }
   .rmd-ing-res { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; padding: 12px 16px; border-radius: 10px; } .rmd-ing-res b { font-size: 17px; } .rmd-ing-res.ok { background: rgba(46,160,67,.16); } .rmd-ing-res.mal { background: rgba(224,160,0,.2); }
   .rmd-ing-aviso { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; padding: 7px 12px; border-radius: 8px; background: rgba(155,107,214,.16); border-left: 4px solid #9b6bd6; font-size: 12.5px; } .rmd-ing-aviso .rmd-btn { margin-left: 6px; }
@@ -22378,7 +22379,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       ${plan.revision.length ? `<details class="rmd-ing-nota ambar rmd-ing-rev" open><summary><b>Revisión con las reglas: ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''}</b> (no bloquean; se aceptan al confirmar)</summary><ul>${plan.revision.slice(0, 60).map((a) => `<li><span class="rmd-nota">${esc(a.donde)}</span><br>${esc(a.texto)}</li>`).join('')}${plan.revision.length > 60 ? `<li>… y ${plan.revision.length - 60} más</li>` : ''}</ul></details>` : '<p class="rmd-nota rmd-ing-rev-ok">✓ Revisión con las reglas: sin alertas en lo que se ingresa.</p>'}
       <div class="rmd-ing-ops">${grupos()}</div>
       <label class="rmd-ing-conf"><input type="checkbox" class="rmd-pp-ok"><span><b>Marca aquí para poder ingresar:</b> confirmo que quiero escribir estos cambios en el RMD ${esc(an.destino.codigo)} v${esc(an.destino.version)} de SAP${plan.revision.length ? ` y acepto las ${plan.revision.length} alerta${plan.revision.length > 1 ? 's' : ''} de la revisión` : ''}${plan.resumen.crear ? ` y crear ${r.crear} paso${r.crear > 1 ? 's' : ''} nuevo${r.crear > 1 ? 's' : ''} en el catálogo` : ''}${r.editar ? ` y corregir el texto de ${r.editar} paso${r.editar > 1 ? 's' : ''} del catálogo que solo usa este RMD` : ''}${opc.obs != null ? ' y, al terminar, guardar sus Observaciones nuevas (con el Guardar de «Asociar fórmulas»; «Deshacer ingreso» no las revierte)' : ''}.</span></label>
-      <div class="rmd-ing-barra" hidden><i></i></div><div class="rmd-progreso rmd-pp-prog"></div>`;
+      <div class="rmd-ing-avance"><div class="rmd-ing-barra" hidden><i></i></div><div class="rmd-progreso rmd-pp-prog"></div></div>`;
     const cuerpo = v.cuerpo, prog = cuerpo.querySelector('.rmd-pp-prog'), ok = cuerpo.querySelector('.rmd-pp-ok'), barra = cuerpo.querySelector('.rmd-ing-barra'), bi = barra.querySelector('i');
     const pintar = () => { const abiertos = new Set([...cuerpo.querySelectorAll('.rmd-ing-grupo[open] summary b')].map((x) => x.textContent)); cuerpo.querySelector('.rmd-ing-ops').innerHTML = grupos(); cuerpo.querySelectorAll('.rmd-ing-grupo').forEach((g) => { if (abiertos.has(g.querySelector('summary b').textContent)) g.open = true; }); };
     cuerpo.addEventListener('click', async (ev) => {
