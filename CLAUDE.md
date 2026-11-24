@@ -459,7 +459,8 @@ cuenta). Escribir y responder siempre en **español**.
   «Abrir en Edición rápida» tras importar un borrador) **se vuelve al portal como estaba antes de abrirla**: al cerrar la ventana del ingreso
   terminado (botón «Volver al portal» o cualquier otro) `ppVolverAlPortal` quita la vista y las ventanas del userscript y borra la copia local del
   borrador; ya no se vuelve a cargar la Edición rápida (`ppVistaTrasIngreso` queda sin uso). Igual en el guardado solo de Observaciones.
-  Prueba `qa_local.py` LN67. **La siguiente versión debe ser > 1.152.0.**
+  Prueba `qa_local.py` LN67. PR #136. 1.152.0 publicada el 2026-11-23 20:27 (Lima) en la rama `publicado` (2 467 326 bytes).
+  **La siguiente versión debe ser > 1.152.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
