@@ -1782,6 +1782,47 @@ with sync_playwright() as p:
               and despues["ls"] == [None, "{}"] and "Volviste al portal" in despues["toast"] and codigo == {"volver": 2, "boton": 2, "viejo": 0, "reabre": 0})
         return ok, json.dumps({"antes": antes, "despues": despues, "codigo": codigo}, ensure_ascii=False)[:1500]
 
+    @prueba("LN68 Sesión del portal vencida al «Guardar en SAP…» (v1.153.0, pedido de Carlos): el 401 («el servidor no respondió al leer MD (401)») se reconoce como sesión vencida; la sesión se comprueba con $metadata (401 o redirección = vencida; otro error no frena); se renueva sola con un marco oculto o con «Iniciar sesión otra vez» / «Reintentar», y luego se reintenta sin perder los cambios")
+    def _():
+        estado = {"st": 401}
+        def responder(route):
+            st = estado["st"]
+            if st == 302: route.fulfill(status=302, headers={"Location": "https://login.invalid/"}, body="")
+            else: route.fulfill(status=st, content_type="application/xml", body="<edmx/>" if st == 200 else "no")
+        pg.route("**/srv-sesion/**", responder)
+        U = "https://maqueta.local/srv-sesion/$metadata"
+        pg.evaluate("(u) => window.__rmdStats.sesion.url(u)", U)
+        viva = {}
+        for st in (401, 302, 200, 500, 404):
+            estado["st"] = st; viva[st] = pg.evaluate("() => window.__rmdStats.sesion.viva()")
+        venc = pg.evaluate("""() => { const S = window.__rmdStats.sesion; return [S.vencida(new Error('el servidor no respondió al leer MD (401)')), S.vencida({ statusCode: 401 }), S.vencida('Se detuvo: SAP respondió (401)'),
+          S.vencida(new Error('el servidor no respondió al leer MD (403)')), S.vencida(new Error('el RMD ya no está Ingresado.')), S.vencida(null)]; }""")
+        # renovación sola (marco oculto): la sesión vuelve a los 2 s
+        estado["st"] = 401
+        pg.evaluate("""() => { window.__reint = 0; const c = document.createElement('div'); c.id = 'qa-sesion'; document.body.appendChild(c);
+          window.__rmdStats.sesion.pedir(c, () => { window.__reint++; }); }""")
+        pg.wait_for_timeout(700); t1 = pg.evaluate("() => ({ txt: document.querySelector('#qa-sesion').textContent, marco: !!document.querySelector('.rmd-sesion-marco') })")
+        estado["st"] = 200; pg.wait_for_timeout(3000)
+        s1 = pg.evaluate("() => ({ reint: window.__reint, caja: !!document.querySelector('#qa-sesion .rmd-sesion'), marco: !!document.querySelector('.rmd-sesion-marco') })")
+        # sin marco oculto (ya se intentó): botones; «Reintentar» con la sesión aún vencida avisa; con la sesión viva reintenta
+        estado["st"] = 401
+        pg.evaluate("() => window.__rmdStats.sesion.pedir(document.querySelector('#qa-sesion'), () => { window.__reint++; }, { silencio: false })")
+        pg.wait_for_timeout(200)
+        b = pg.evaluate("() => [...document.querySelectorAll('#qa-sesion .rmd-sesion button')].map((x) => x.textContent)")
+        pg.click("#qa-sesion .rmd-sesion button:has-text('Reintentar')"); pg.wait_for_timeout(500)
+        t2 = pg.evaluate("() => document.querySelector('#qa-sesion .rmd-sesion').textContent")
+        estado["st"] = 200; pg.click("#qa-sesion .rmd-sesion button:has-text('Reintentar')"); pg.wait_for_timeout(600)
+        s2 = pg.evaluate("() => ({ reint: window.__reint, caja: !!document.querySelector('#qa-sesion .rmd-sesion') })")
+        pg.evaluate("() => { document.querySelector('#qa-sesion').remove(); window.__rmdStats.sesion.url(null); }"); pg.unroute("**/srv-sesion/**")
+        fuente = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rmd-ui-mejoras.user.js"), encoding="utf-8").read()
+        codigo = {"guardar": fuente.count("if (!(await sesionPortalViva())) throw errorSesion();"), "ingreso": fuente.count("if (!(await sesionPortalViva()) && !(await renovarSesionOculta())) throw errorSesion();"),
+                  "token": fuente.count("m.refreshSecurityToken(() => ok(), () => ok(), true)"), "tope": fuente.count("esSesionVencida(e) && intento < 2")}
+        ok = (viva == {401: False, 302: False, 200: True, 500: True, 404: True} and venc == [True, True, True, False, False, False]
+              and "La sesión del portal venció" in t1["txt"] and "no se perdieron" in t1["txt"] and t1["marco"]
+              and s1 == {"reint": 1, "caja": False, "marco": False} and b == ["Iniciar sesión otra vez", "Reintentar"]
+              and "sigue vencida" in t2 and s2 == {"reint": 2, "caja": False} and codigo == {"guardar": 1, "ingreso": 1, "token": 1, "tope": 1})
+        return ok, json.dumps({"viva": viva, "venc": venc, "t1": t1, "s1": s1, "b": b, "t2": t2, "s2": s2, "codigo": codigo}, ensure_ascii=False)[:1500]
+
     @prueba("LN58 Edición rápida (v1.124.0): los pasos de RENDIMIENTO / CONDICIONES AMBIENTALES no piden predecesor (y se avisa si lo traen); en un RMD Ingresado la vista muestra las Observaciones en lugar de «Cómo se usa»: avisa la 1.ª línea copiada de la versión anterior y la arma con la fecha de hoy, avisa el CC pendiente de la versión anterior y lo anota como aplicado, y «Guardar en SAP» lleva las Observaciones nuevas")
     def _():
         d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
