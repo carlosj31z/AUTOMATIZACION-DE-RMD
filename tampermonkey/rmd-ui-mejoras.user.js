@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.153.0
+// @version      1.153.1
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.153.0';                                                       // mantener igual a @version
+  const VERSION = '1.153.1';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -21372,23 +21372,52 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   let SESION_URL_PRUEBA = null;                                        // pruebas
   const esSesionVencida = (e) => !!e && (e.sesionVencida === true || +e.statusCode === 401 || /\(401\)/.test(String(e.message || e)));
   function errorSesion() { const e = new Error('la sesión del portal venció'); e.sesionVencida = true; return e; }
-  function modelosPortal() { const l = []; try { l.push(modeloListaPrincipal()); } catch (e) { /* sin lista */ } try { const c = controladorPrincipal(); l.push(c && c.getView().getModel('mainModelv2')); } catch (e) { /* sin controlador */ } return [...new Set(l.filter(Boolean))]; }
+  // ODataModel del portal: el de la lista y todos los de la vista y el componente (v1.153.1: todos llevan la cabecera «token» de la API)
+  function modelosPortal() {
+    const l = []; try { l.push(modeloListaPrincipal()); } catch (e) { /* sin lista */ }
+    try { const c = controladorPrincipal(), v = c && c.getView(), comp = c && c.getOwnerComponent && c.getOwnerComponent();
+      if (v) l.push(v.getModel('mainModelv2'));
+      [v && v.oModels, v && v.oPropagatedProperties && v.oPropagatedProperties.oModels, comp && comp.oModels].forEach((o) => Object.values(o || {}).forEach((m) => l.push(m))); } catch (e) { /* sin controlador */ }
+    return [...new Set(l.filter((m) => m && m.sServiceUrl))];
+  }
+  const cabecerasPortal = () => { const m = modelosPortal().find((x) => x.mCustomHeaders && x.mCustomHeaders.token) || modelosPortal()[0]; return Object.assign({}, (m && m.mCustomHeaders) || {}); };
   function urlPruebaSesion() {
     if (SESION_URL_PRUEBA) return SESION_URL_PRUEBA;
-    const m = modelosPortal().find((x) => x.sServiceUrl); if (!m) return null;
+    const m = modelosPortal()[0]; if (!m) return null;
     try { return new URL(m.sServiceUrl.replace(/\/?$/, '/') + '$metadata', document.baseURI).href; } catch (e) { return null; }
   }
-  // false solo si la sesión venció de verdad (401, o el portal redirige al inicio de sesión); cualquier otra respuesta o un corte de red
-  // cuenta como viva, para no frenar el guardado por otro motivo (la lectura real dirá el error que sea)
-  async function sesionPortalViva() {
+  // v1.153.1 (probado en el portal): la API del portal no usa solo la sesión, también la cabecera «token» (JWT de 24 h que la app pide al abrir a
+  // «…/dest-apiseguridad/useridp»). Sin ella todo responde 401. Por eso la comprobación manda las cabeceras del portal, y si el token venció se pide
+  // otro igual que la app y se pone en todos sus modelos.
+  function urlTokenPortal() {
+    if (SESION_URL_PRUEBA) return SESION_URL_PRUEBA.replace(/[^/]*$/, 'useridp');
+    const m = modelosPortal().find((x) => /\/dest-apigateway\//.test(x.sServiceUrl)); if (!m) return null;
+    try { return new URL(m.sServiceUrl.split('/dest-apigateway/')[0] + '/dest-apiseguridad/useridp', document.baseURI).href; } catch (e) { return null; }
+  }
+  function tokenVencido(tk) { try { const p = JSON.parse(atob(String(tk).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); return !!p.exp && p.exp * 1000 < Date.now() + 60000; } catch (e) { return false; } }
+  async function renovarTokenApi() {
+    const u = urlTokenPortal(); if (!u) return false;
+    try { const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', headers: { 'X-Requested-With': 'XMLHttpRequest' } }); if (!r.ok) return false;
+      const j = await r.json(), tk = j && j.oDataResponse && j.oDataResponse.sToken; if (!tk) return false;
+      modelosPortal().forEach((m) => { try { if (m.mCustomHeaders && 'token' in m.mCustomHeaders) m.setHeaders(Object.assign({}, m.mCustomHeaders, { token: tk })); } catch (e) { /* modelo sin cabeceras */ } });
+      return true; } catch (e) { return false; }
+  }
+  async function probarSesion() {
     const u = urlPruebaSesion(); if (!u) return true;
-    try { const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    try { const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', headers: Object.assign({ 'X-Requested-With': 'XMLHttpRequest' }, cabecerasPortal()) });
       return !(r.status === 401 || r.type === 'opaqueredirect'); }
     catch (e) { return true; }
   }
+  // false solo si la sesión venció de verdad (401, o el portal redirige al inicio de sesión) y no se pudo pedir otro token; cualquier otra
+  // respuesta o un corte de red cuenta como viva, para no frenar el guardado por otro motivo (la lectura real dirá el error que sea)
+  async function sesionPortalViva() {
+    if (tokenVencido(cabecerasPortal().token)) await renovarTokenApi();
+    if (await probarSesion()) return true;
+    return (await renovarTokenApi()) && probarSesion();
+  }
   // el token de escritura (CSRF) era de la sesión vencida: se pide otro para que el Guardar del portal y el ingreso no fallen con 403
   function renovarTokensPortal() {
-    return Promise.all(modelosPortal().map((m) => new Promise((ok) => { try { if (m.refreshSecurityToken) m.refreshSecurityToken(() => ok(), () => ok(), true); else ok(); } catch (e) { ok(); } })));
+    return Promise.all(modelosPortal().map((m) => new Promise((ok) => { try { if (m.refreshSecurityToken && m.bTokenHandling !== false) m.refreshSecurityToken(() => ok(), () => ok(), true); else ok(); } catch (e) { ok(); } })));
   }
   async function esperarSesion(ms, parar) {
     const fin = Date.now() + ms;
