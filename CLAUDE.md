@@ -467,7 +467,12 @@ cuenta). Escribir y responder siempre en **español**.
   redirección = vencida; otro error no frena); si venció se renueva sola con un marco oculto (`renovarSesionOculta`) o con el cuadro «La sesión del portal
   venció» (`pedirSesionPortal`: «Iniciar sesión otra vez» abre una ventana pequeña del portal, «Reintentar»), se pide otro token CSRF
   (`renovarTokensPortal`) y se reintenta sin perder los cambios (tope de 2 reintentos). Prueba `qa_local.py` LN68.
-  **La siguiente versión debe ser > 1.153.0.**
+- 2026-11-24, v1.153.1 (probada en el portal, solo lectura, desde el navegador de la app de Claude de MIFLPWATEDTC04): **la API del portal
+  (`…/dest-apigateway/…`) exige la cabecera `token`** (JWT de 24 h que la app pide al abrir a `…/dest-apiseguridad/useridp`,
+  `oDataResponse.sToken`); sin ella todo responde 401. La comprobación de sesión manda las cabeceras del portal (`cabecerasPortal`), y si el token
+  venció o falla se pide otro a `useridp` y se pone en todos los modelos del portal (`renovarTokenApi`, `modelosPortal`). Probado: con un token
+  inválido una lectura da 401; «Guardar en SAP…» de la Edición rápida (2202609013) renovó el token y llegó a la revisión sin escribir nada.
+  **La siguiente versión debe ser > 1.153.1.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
