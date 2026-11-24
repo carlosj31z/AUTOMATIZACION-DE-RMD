@@ -1761,6 +1761,27 @@ with sync_playwright() as p:
               and g and g["vista"] == "dt" and g["dtP13"]["tipo"] == 447 and g["conf"] is False and not queda["vista"] and not queda["emb"])
         return ok, json.dumps({ "r": {k: r[k] for k in ("avSin", "ventanas", "fondo")}, "resumen": st["resumen"][:900], "av": avs, "v": v, "av1": av1, "av2": av2, "notif": notif, "sigue": sigue, "edit": st["edit"], "st": {k: st[k] for k in ("dt", "tags", "chips", "cm")}, "g": g, "queda": queda }, ensure_ascii=False)[:2400]
 
+    @prueba("LN67 Volver al portal tras el ingreso rápido (v1.152.0, pedido de Carlos): al terminar el ingreso desde la Edición rápida (también la abierta tras importar un borrador) se cierra la vista y las ventanas del ingreso y queda el portal como estaba (sin volver a cargar la Edición rápida); se borra la copia del borrador del navegador; el botón dice «Volver al portal»")
+    def _():
+        d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
+        antes = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] });
+          localStorage.setItem('rmdPlantilla:2202600001:x', '{}'); localStorage.setItem('rmdPlantilla:2202699999:x', '{}');
+          const ventanas = [...document.querySelectorAll('.sapMDialog')].map((x) => x.getBoundingClientRect().width), html = document.querySelector('.sapMDialog') ? document.querySelector('.sapMDialog').outerHTML.length : 0;
+          await P.montarVista(paq, null, { claves: [], puestos: [] });
+          const m = document.createElement('div'); m.className = 'rmd-modal-fondo'; document.body.appendChild(m);   // la ventana del ingreso terminado
+          return { ventanas, html, vista: !!document.querySelector('.rmd-vista-fondo') }; }""", d0)
+        pg.evaluate("() => window.__rmdStats.volverAlPortal({ codigo: '2202600001', version: 3 })"); pg.wait_for_timeout(1500)
+        despues = pg.evaluate("""() => ({ vista: !!document.querySelector('.rmd-vista-fondo'), stats: !!window.__rmdStats.vista && !!window.__rmdStats.vista.fondo.isConnected, emb: !!window.__rmdVistaEmb,
+          modales: document.querySelectorAll('.rmd-modal-fondo').length, ventanas: [...document.querySelectorAll('.sapMDialog')].map((x) => x.getBoundingClientRect().width),
+          html: document.querySelector('.sapMDialog') ? document.querySelector('.sapMDialog').outerHTML.length : 0,
+          ls: [localStorage.getItem('rmdPlantilla:2202600001:x'), localStorage.getItem('rmdPlantilla:2202699999:x')], toast: [...document.querySelectorAll('.rmd-toast, [class*=toast]')].map((t) => t.textContent).join(' | ') })""")
+        pg.evaluate("() => localStorage.removeItem('rmdPlantilla:2202699999:x')")
+        fuente = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rmd-ui-mejoras.user.js"), encoding="utf-8").read()
+        codigo = {"volver": fuente.count("ppVolverAlPortal(an.destino)"), "boton": fuente.count("botonModal('Volver al portal'"), "viejo": fuente.count("Volver a la vista (leída otra vez de SAP)"), "reabre": fuente.count("ppVistaTrasIngreso(an.destino)")}
+        ok = (antes["vista"] and not despues["vista"] and not despues["stats"] and not despues["emb"] and despues["modales"] == 0 and despues["ventanas"] == antes["ventanas"] and despues["html"] == antes["html"]
+              and despues["ls"] == [None, "{}"] and "Volviste al portal" in despues["toast"] and codigo == {"volver": 2, "boton": 2, "viejo": 0, "reabre": 0})
+        return ok, json.dumps({"antes": antes, "despues": despues, "codigo": codigo}, ensure_ascii=False)[:1500]
+
     @prueba("LN58 Edición rápida (v1.124.0): los pasos de RENDIMIENTO / CONDICIONES AMBIENTALES no piden predecesor (y se avisa si lo traen); en un RMD Ingresado la vista muestra las Observaciones en lugar de «Cómo se usa»: avisa la 1.ª línea copiada de la versión anterior y la arma con la fecha de hoy, avisa el CC pendiente de la versión anterior y lo anota como aplicado, y «Guardar en SAP» lleva las Observaciones nuevas")
     def _():
         d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
