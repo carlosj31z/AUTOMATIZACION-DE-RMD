@@ -473,6 +473,13 @@ cuenta). Escribir y responder siempre en **español**.
   venció o falla se pide otro a `useridp` y se pone en todos los modelos del portal (`renovarTokenApi`, `modelosPortal`). Probado: con un token
   inválido una lectura da 401; «Guardar en SAP…» de la Edición rápida (2202609013) renovó el token y llegó a la revisión sin escribir nada.
   **La siguiente versión debe ser > 1.153.1.**
+- 2026-11-24, v1.154.0 (encima de la 1.153.1) + **cargador 1.4.0**: **pedido de Carlos: la contingencia no detectaba lo ya cargado** (NISTAZINC NF UNG TUB 15g
+  2202608853 v7 «Por cargar» con su PDF ya en la carpeta). Causa: los PDF se ubican con el buscador de SharePoint (`spBuscar`), que va atrasado tras subir o mover a
+  OBSOLETO; el cargador 1.3.0 no tenía la culpa (su puente es igual al 1.2.0). Ahora las carpetas que da el buscador se leen en el momento (`contVerificar`,
+  `spListar`, `Contingencia.combinar`; cargador 1.4.0 permite GET de `Files`/`Folders` dentro de 3.-CONTINGENCIA). Subir/archivar lo ya hecho no es error. Familia
+  sin reacondicionados (`esReac`) y sin PDF de otra etapa (`etapaOk`). Productos nuevos: `sugerirCarpetas` + «Subir aquí» (`spCrearCarpeta`). Simulado con SAP y
+  SharePoint reales (solo lectura, 20, 23 y 24/11, Planta 2). **El cargador 1.4.0 se publica SOBRESCRIBIENDO `rmd-ui-mejoras-cargador.user.js` en MEJORAS DE
+  INTERFAZ** (su @updateURL es fijo). **La siguiente versión debe ser > 1.154.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

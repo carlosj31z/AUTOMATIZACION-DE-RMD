@@ -71,7 +71,7 @@ subir('rmd-ui-mejoras-cargador.user.js', CARGADOR, '2026-10-10T10:00:00Z');
 let c = cargar(); await c.listo(); await pausa(20);
 ok(listados() === 1 && JSON.stringify(bajadas()) === JSON.stringify([`${V}.js`]), `1. primera carga: 1 listado y solo baja ${V}.js (${bajadas()})`);
 ok(c.inyectados.length === 1 && c.inyectados[0].startsWith(`window.__rmdDesdeCargador = "${V}";`) && c.inyectados[0].includes(`const VERSION = '${V}';`), '1. inyecta el script con la marca __rmdDesdeCargador');
-ok(c.attrs['data-rmd-cargador'] === '1.3.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
+ok(c.attrs['data-rmd-cargador'] === '1.4.0' && c.estado().actual === V && c.estado().ultima === V && !c.estado().error, `1. estado publicado ${JSON.stringify(c.estado())}`);
 
 // 2. otra página antes de 10 min: inyecta de la caché sin pedir nada
 pedidos = []; c = cargar(); await pausa(20);
@@ -145,6 +145,11 @@ ok(antes === 0 && c.inyectados.length === 1, '10. sin <body> todavía: inyecta e
     ['lista de caracterización', 'GET', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files?@a='${CAR}'&$select=Name,ServerRelativeUrl,TimeLastModified`, 200],
     ['Excel de caracterización', 'GET', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='${CAR}%2FCARACTERIZACI%C3%93N%20LISTADO.xlsx'`, 200],
     ['salir de caracterización', 'GET', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='${CAR}%2F..%2F..%2Fx.xlsx'`, 400],
+    ['lista de una carpeta de contingencia (1.4.0, el simulado responde 404 a lo que deja pasar)', 'GET', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files?@a='${CONT}'&$select=Name`, 404],
+    ['subcarpetas de contingencia (1.4.0)', 'GET', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Folders?@a='${CONT}'&$select=Name`, 404],
+    ['lista fuera de contingencia', 'GET', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files?@a='${OTRA}'&$select=Name`, 400],
+    ['salir de contingencia con ..', 'GET', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files?@a='${CONT}%2F..%2F..%2F..'&$select=Name`, 400],
+    ['bajar un PDF de contingencia', 'GET', API + `web/GetFileByServerRelativePath(DecodedUrl=@a)/$value?@a='${CONT}%2Fa.pdf'`, 400],
     ['escribir en caracterización', 'POST', API + `web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${CAR}'&@n='a.pdf'`, 400],
   ];
   c = cargar();

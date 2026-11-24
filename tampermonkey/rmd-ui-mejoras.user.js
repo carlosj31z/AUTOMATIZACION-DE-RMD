@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.153.1
+// @version      1.154.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.153.1';                                                       // mantener igual a @version
+  const VERSION = '1.154.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -93,7 +93,7 @@
     ['documentos', 'Documentos citados del RMD', 'Instructivos, procedimientos y formatos citados en el RMD abierto, en Excel.'],
     ['verop', 'Ver OP completo', 'Abre directamente con todas las OP asociadas, ordenadas por fecha de inicio, con filtro por columna y exportación a CSV.'],
     ['statusrmd', 'Enviar a Status RMD', 'Envía el maestro completo sin descargar archivos.'],
-    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). «Por código» carga o reemplaza masters en específico aunque ya esté la misma versión. Necesita el cargador 1.1.0.'],
+    ['contingencia', 'Contingencia a SharePoint', 'En el menú Exportar: el master de los RMD autorizados ayer (u hoy) a la carpeta de su versión anterior en 3.-CONTINGENCIA, y esa versión a OBSOLETO. Cada planta carga la suya (Planta 1 = Ate, Planta 2 = Lima). «Por código» carga o reemplaza masters en específico aunque ya esté la misma versión. Necesita el cargador 1.1.0; con el 1.4.0 confirma en la carpeta lo que encuentra el buscador de SharePoint.'],
     ['compararrmd', 'Comparar dos RMD', 'En el menú Exportar: busca dos RMD cualesquiera y muestra sus master lado a lado, como Draftable: lo quitado en rojo, lo agregado en verde, lo modificado con sus palabras resaltadas, y la lista de cambios para ir de uno a otro.'],
     ['plantillaprod', 'Plantilla para Producción', 'Archivo para que Producción proponga cambios sin entrar a SAP.'],
     ['vistasimple', 'Edición rápida', 'En el menú de cada RMD, debajo de «Configurar el RMD»: abre el RMD en una vista como la del borrador de Producción, aquí en el portal; haces todos los cambios (también las Observaciones) y «Guardar en SAP» los escribe de una vez con revisión y «Deshacer». La vista completa (DOC) edita tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto y color.'],
@@ -402,6 +402,9 @@
   .rmd-cont-ruta + .rmd-cont-ruta { margin-top: 6px; } .rmd-cont-ruta span:not(.rmd-cont-ya) { color: var(--rmd-apagado); } .rmd-cont-ruta i { color: var(--rmd-apagado); font-style: normal; opacity: .7; } .rmd-cont-ruta b { font-weight: 600; }
   .rmd-cont-arch { display: block; color: var(--rmd-apagado); font-size: 12px; overflow-wrap: break-word; } .rmd-cont-arch + .rmd-cont-arch { margin-top: 4px; } .rmd-cont-vacio { color: var(--rmd-apagado); opacity: .6; }
   .rmd-cont-nota { color: var(--rmd-ambar); }
+  .rmd-cont-nuevo { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; } .rmd-cont-sug { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; cursor: pointer; } .rmd-cont-sug input { margin: 2px 0 0; } .rmd-cont-sug small { color: var(--rmd-apagado); }
+  .rmd-cont-destino { width: 100%; box-sizing: border-box; height: 28px; padding: 0 6px; border: 1px solid var(--rmd-borde-campo); border-radius: 6px; background: transparent; color: var(--rmd-texto); font: 12px var(--rmd-fuente); }
+  .rmd-btn.rmd-cont-aqui { align-self: flex-start; height: 26px; padding: 0 10px; font-size: 12.5px; }
   .rmd-cont-a { color: inherit; text-decoration: none; } .rmd-cont-a:hover { color: var(--rmd-acento-texto); text-decoration: underline; } .rmd-cont-a:hover span, .rmd-cont-a:hover i { color: inherit; }
   .rmd-cont-sub { display: block; margin-top: 5px; color: var(--rmd-apagado); font-size: 11.5px; overflow-wrap: anywhere; } .rmd-cont-sub b { color: var(--rmd-texto); font-weight: 600; } .rmd-cont-sub .rmd-cont-a { color: var(--rmd-acento-texto); text-decoration: underline; }
   .rmd-cont-tag { display: table; margin-top: 5px; padding: 0 7px; border: 1px solid var(--rmd-borde); border-radius: 8px; color: var(--rmd-apagado); font: 600 10.5px/17px var(--rmd-fuente); white-space: nowrap; }
@@ -7757,9 +7760,15 @@
       if (!/\.pdf$/i.test(nombre)) return null;
       const m = NOMBRES.map((r) => r.exec(nombre)).find(Boolean); if (!m) return null;
       const obsoleto = partes.some(esObsoleto), carpeta = (partes.length && esObsoleto(partes[partes.length - 1]) ? partes.slice(0, -1) : partes).join('/');
-      return { ruta: partes.concat(nombre).join('/'), codigo: m[1], version: m[3], obsoleto, carpeta };
+      return { ruta: partes.concat(nombre).join('/'), codigo: m[1], version: m[3], obsoleto, carpeta, etapa: m[2] ? m[2].toUpperCase() : '' };
     }
-    const familia = (r) => `${r.material || r.agrupador}|${sinTildes(r.etapa)}`;
+    // v1.154.0: un master de reacondicionado (descripción «REACONDICIONADO …», agrupador 000000) comparte el material de su receta con el
+    // producto, pero su PDF va en la carpeta REACONDICIONADO: no es la misma familia (caso LITIASIN K 2202609446 y 2202505646)
+    const esReac = (r) => /^(REACONDICIONADO|REPROCESO)\b/.test(sinTildes(r.descripcion));
+    const familia = (r) => `${r.material || r.agrupador}|${sinTildes(r.etapa)}|${esReac(r) ? 'R' : ''}`;
+    // v1.154.0: el PDF cuyo nombre trae otra etapa (p. ej. «-ACO-» para un RMD de Envase) no es de este RMD: SAP repite códigos entre
+    // etapas (2202401995 es Envase y también Acondicionado de NISTAZINC NF UNG TUB 30g)
+    const etapaOk = (p, r) => { const x = p.etapa && ETAPA_SEG[sinTildes(p.etapa)]; return !x || x === sinTildes(r.etapa); };
     function nombreArchivo(r, descripcion) {
       const e = sinTildes(r.etapa), etq = ABREV[e] || e.slice(0, 3);
       const d = String(descripcion || r.descripcion || '').trim().replace(/[\\/:*?"<>|#%]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
@@ -7773,8 +7782,9 @@
     // planta (opcional): solo los autorizados de esa planta y solo las carpetas de esa planta; forzar: si su PDF ya está, se vuelve a
     // subir igual (aunque sea la misma versión) y el que estaba pasa antes a OBSOLETO (reemplazar)
     function planificar(autorizados, previos, rutas, planta, forzar = false) {
-      const pdfs = rutas.map(interpretar).filter((p) => p && (!planta || plantaDeCarpeta(p.ruta) === planta));
+      const todos = rutas.map(interpretar).filter((p) => p && (!planta || plantaDeCarpeta(p.ruta) === planta));
       return autorizados.filter((r) => !planta || esDePlanta(r, planta)).map((r) => {
+        const pdfs = todos.filter((p) => etapaOk(p, r));
         const codPrev = new Set(previos.filter((o) => o.codigo !== r.codigo && (r.material || r.agrupador) && familia(o) === familia(r)).map((o) => o.codigo));
         const propios = pdfs.filter((p) => p.codigo === r.codigo && !p.obsoleto), fam = pdfs.filter((p) => codPrev.has(p.codigo)), activas = fam.filter((p) => !p.obsoleto);
         const yaEsta = [...new Set(propios.map((p) => p.carpeta))].sort();
@@ -7795,7 +7805,47 @@
     const diaDe = (x) => (!(x instanceof Date) || isNaN(x) ? '' : x.getUTCHours() + x.getUTCMinutes() + x.getUTCSeconds() === 0 ? x.toISOString().slice(0, 10) : fechaIsoLocal(x));
     // códigos pegados (de Excel, separados por espacios, comas o saltos de línea), sin repetir
     const codigosDe = (t) => [...new Set(String(t || '').match(/\d{4,12}/g) || [])];
-    return { interpretar, esObsoleto, nombreArchivo, planificar, codigosDe, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta };
+    // v1.154.0: el buscador de SharePoint va atrasado (minutos u horas) después de subir un PDF o pasarlo a OBSOLETO. Las carpetas que encontró
+    // se leen en el momento (cargador 1.4.0) y mandan: listados = { carpeta: [rutas de sus PDF y de los de su OBSOLETO] } (null = la carpeta ya
+    // no existe). Las rutas del buscador de una carpeta leída se reemplazan por lo que hay hoy; las de carpetas sin leer se quedan.
+    const carpetasDe = (rutas) => [...new Set(rutas.map(interpretar).filter(Boolean).map((p) => p.carpeta))].sort();
+    function combinar(rutasBuscador, listados) {
+      const leidas = new Set(Object.keys(listados || {}));
+      const fuera = rutasBuscador.filter((r) => { const p = interpretar(r); return !p || !leidas.has(p.carpeta); });
+      return [...new Set(fuera.concat(...Object.values(listados || {}).map((x) => x || [])))];
+    }
+    // producto nuevo o sin PDF anterior: carpetas parecidas de la planta (por las palabras de la descripción), con la etapa del RMD.
+    // rutas: PDF que encontró el buscador con la primera palabra de la descripción; devuelve hasta 3 { carpeta, existe, ejemplo }.
+    // carpeta de etapa: FAB/FABRICACION, ENV/ENVASE/ENVASADO, ACO/ACONDICIONADO, REC/RECUBRIMIENTO, INS/INSPECCION -> etapa de SAP
+    const ETAPA_SEG = { FAB: 'FABRICACION', FABRICACION: 'FABRICACION', ENV: 'ENVASE', ENVASE: 'ENVASE', ENVASADO: 'ENVASE', ACO: 'ACONDICIONADO', ACONDICIONADO: 'ACONDICIONADO',
+      REC: 'RECUBRIMIENTO', RECUBRIMIENTO: 'RECUBRIMIENTO', INS: 'INSPECCION', INSPECCION: 'INSPECCION' };
+    const LARGO = { FABRICACION: 'FABRICACION', ENVASE: 'ENVASADO', ACONDICIONADO: 'ACONDICIONADO', RECUBRIMIENTO: 'RECUBRIMIENTO', INSPECCION: 'INSPECCION' };
+    // palabras que no distinguen un producto (formas, envases, etapas)
+    const GENERICAS = new Set('REACONDICIONADO REPROCESO SEM SOL LIQ TAB CAP CRM UNG OVU SUS PVO INY AMP FCO TUB SOB CJA POT BLI NF MM GEL JBE GTS LOC ACO ENV FAB REC INS FOLIO MUESTRA MEDICA'.split(' '));
+    const palabras = (t) => sinTildes(t).replace(/[^A-Z0-9Ñ]+/g, ' ').split(' ').filter((x) => x.length > 1);
+    const palabraClave = (descripcion) => palabras(descripcion).find((x) => x.length >= 4 && !/^\d/.test(x) && !GENERICAS.has(x)) || '';
+    function sugerirCarpetas(r, rutas, planta) {
+      const e = sinTildes(r.etapa), propias = new Set(palabras([r.descripcion].concat(r.recetas || []).join(' ')).filter((x) => !GENERICAS.has(x))), cand = new Map();
+      const sumar = (destino, puntos, existe, ejemplo) => { const y = cand.get(destino); if (!y || puntos > y.puntos) cand.set(destino, { carpeta: destino, existe: existe || !!(y && y.existe), ejemplo, puntos }); else if (existe) y.existe = true; };
+      rutas.map(interpretar).filter((p) => p && p.codigo !== r.codigo && (!planta || plantaDeCarpeta(p.ruta) === planta)).forEach((p) => {
+        const seg = p.carpeta.split('/');
+        // la última carpeta de etapa se cambia por la del RMD (abreviada o completa, como esté); lo que sigue (presentación, producto) se queda
+        let k = -1; seg.forEach((x, i) => { if (i > 0 && ETAPA_SEG[sinTildes(x)]) k = i; });
+        const suya = k < 0 || ETAPA_SEG[sinTildes(seg[k])] === e;
+        const nueva = k < 0 || suya ? null : sinTildes(seg[k]).length <= 4 ? (ABREV[e] || e.slice(0, 3)) : sinTildes(seg[k]) === 'ENVASE' && e === 'ENVASE' ? 'ENVASE' : (LARGO[e] || e);
+        const destino = nueva ? seg.slice(0, k).concat(nueva, seg.slice(k + 1)).join('/') : p.carpeta;
+        // cuentan las palabras del producto que están en el nombre de la carpeta (no basta con el nombre de un PDF de otro producto)
+        const comunes = new Set(palabras(seg.slice(1).join(' ')).filter((x) => propias.has(x)));
+        if (comunes.size) sumar(destino, comunes.size + (suya ? 0.5 : 0), suya, p.ruta);
+      });
+      // reacondicionado: también la carpeta REACONDICIONADO de la planta
+      if (planta && /^(REACONDICIONADO|REPROCESO)/.test(sinTildes(r.descripcion))) sumar(planta.carpeta + '/REACONDICIONADO', 1, false, '');
+      return [...cand.values()].filter((c) => c.puntos >= 1).sort((a, b) => b.puntos - a.puntos || (b.existe - a.existe) || a.carpeta.localeCompare(b.carpeta)).slice(0, 3);
+    }
+    // carpeta escrita a mano para un producto nuevo: dentro de la carpeta de la planta, sin «..» ni caracteres que SharePoint no admite
+    const carpetaValida = (c, planta) => { const s = String(c || '').replace(/\\/g, '/').split('/').map((x) => x.trim()).filter(Boolean);
+      return s.length >= 2 && s[0] === planta.carpeta && s.every((x) => x !== '.' && x !== '..' && !/[\\:*?"<>|#%]/.test(x)) ? s.join('/') : null; };
+    return { interpretar, esObsoleto, nombreArchivo, planificar, codigosDe, fechaIsoLocal, diaDe, PLANTAS, plantaDeCarpeta, esDePlanta, carpetasDe, combinar, sugerirCarpetas, palabraClave, carpetaValida };
   })();
   // ==CONTINGENCIA-FIN==
   window.__rmdStats.contingencia = { Contingencia, leer: (f) => contLeer(controladorPrincipal().getView().getModel('mainModelv2'), f), pdf: (id) => contPdf(controladorPrincipal().getView().getModel('mainModelv2'), id), buscar: (c) => spBuscar(c) };   // pruebas
@@ -7870,15 +7920,70 @@
     return [...rutas];
   }
   const spDigest = async () => (await spJson('POST', `${CONT_SITIO}/_api/contextinfo`)).FormDigestValue;
+  // v1.154.0: subir y archivar no fallan si ya estaba hecho (el buscador atrasado lo daba por pendiente): devuelven false en ese caso
+  const YA_EXISTE = /-2130575257|already exists|ya existe/i, NO_EXISTE = /respondió 404|-2147024894|FileNotFound|not found|no se encuentra|no existe/i;
   async function spSubir(carpeta, nombre, bytes) {
     const h = { 'X-RequestDigest': await spDigest(), 'Content-Type': 'application/pdf' };
-    await spJson('POST', `${CONT_SITIO}/_api/web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${spQ(CONT_RAIZ + '/' + carpeta)}'&@n='${spQ(nombre)}'`, { cabeceras: h, cuerpo: bytes });
+    try { await spJson('POST', `${CONT_SITIO}/_api/web/GetFolderByServerRelativePath(DecodedUrl=@a)/Files/AddUsingPath(DecodedUrl=@n,Overwrite=false)?@a='${spQ(CONT_RAIZ + '/' + carpeta)}'&@n='${spQ(nombre)}'`, { cabeceras: h, cuerpo: bytes }); return true; }
+    catch (e) { if (YA_EXISTE.test(e.message)) return false; throw e; }
   }
   async function spArchivar(ruta) {
     const h = { 'X-RequestDigest': await spDigest() }, partes = ruta.split('/'), nombre = partes.pop(), destino = partes.concat('OBSOLETO').join('/');
     await spJson('POST', `${CONT_SITIO}/_api/web/Folders/AddUsingPath(DecodedUrl=@a,Overwrite=false)?@a='${spQ(CONT_RAIZ + '/' + destino)}'`, { cabeceras: h }).catch((e) => { if (!/ (400|409|500):/.test(e.message)) throw e; });
-    await spJson('POST', `${CONT_SITIO}/_api/web/GetFileByServerRelativePath(DecodedUrl=@a)/MoveToUsingPath(DecodedUrl=@b,moveOperations=1)?@a='${spQ(CONT_RAIZ + '/' + ruta)}'&@b='${spQ(CONT_RAIZ + '/' + destino + '/' + nombre)}'`, { cabeceras: h });
-    return destino + '/' + nombre;
+    try { await spJson('POST', `${CONT_SITIO}/_api/web/GetFileByServerRelativePath(DecodedUrl=@a)/MoveToUsingPath(DecodedUrl=@b,moveOperations=1)?@a='${spQ(CONT_RAIZ + '/' + ruta)}'&@b='${spQ(CONT_RAIZ + '/' + destino + '/' + nombre)}'`, { cabeceras: h }); return true; }
+    catch (e) { if (NO_EXISTE.test(e.message)) return false; throw e; }
+  }
+  // carpeta nueva (producto nuevo), nivel por nivel; las que ya existen se dejan
+  async function spCrearCarpeta(carpeta) {
+    const h = { 'X-RequestDigest': await spDigest() }, s = carpeta.split('/');
+    for (let i = 2; i <= s.length; i++) {
+      await spJson('POST', `${CONT_SITIO}/_api/web/Folders/AddUsingPath(DecodedUrl=@a,Overwrite=false)?@a='${spQ(CONT_RAIZ + '/' + s.slice(0, i).join('/'))}'`, { cabeceras: h }).catch((e) => { if (!/ (400|409|500):/.test(e.message)) throw e; });
+    }
+  }
+  // v1.154.0: lista en el momento (cargador 1.4.0) una carpeta de 3.-CONTINGENCIA: { archivos, carpetas } (nombres); null si no existe
+  const SIN_CARGADOR_14 = 'el cargador no deja leer la carpeta: actualízalo a la versión 1.4.0';
+  async function spListar(rel) {
+    const a = spQ(CONT_RAIZ + (rel ? '/' + rel : '')), out = {};
+    for (const q of ['Files', 'Folders']) {
+      let r = null;
+      for (let i = 0; i < 5; i++) {
+        r = await spPedir('GET', `${CONT_SITIO}/_api/web/GetFolderByServerRelativePath(DecodedUrl=@a)/${q}?@a='${a}'&$select=Name`, { cabeceras: { Accept: 'application/json;odata=nometadata' } });
+        if (![406, 429, 503].includes(r.estado)) break; await esperar(1000 * 2 ** i);
+      }
+      if (r.estado === 400 && /no permitido/.test(r.texto || '')) { const e = new Error(SIN_CARGADOR_14); e.sinCargador = true; throw e; }
+      if (r.estado === 404 || (r.estado >= 400 && /-2147024894|FileNotFound|-2130575338/.test(r.texto || ''))) return null;
+      if (r.estado === 401 || r.estado === 403) throw new Error('sin permiso o sin sesión de SharePoint en este navegador');
+      if (r.estado < 200 || r.estado >= 300) throw new Error(`SharePoint respondió ${r.estado}`);
+      let j = null; try { j = JSON.parse(r.texto); } catch (e) { /* vacío */ }
+      out[q === 'Files' ? 'archivos' : 'carpetas'] = ((j && (j.value || (j.d && j.d.results))) || []).map((f) => f.Name).filter(Boolean);
+    }
+    return out;
+  }
+  // carpetas que encontró el buscador, leídas en el momento: { listados, verificado }; sin cargador 1.4.0, verificado = false
+  async function contVerificar(rutasBuscador) {
+    const listados = {}; let sin = false;
+    await enParalelo(Contingencia.carpetasDe(rutasBuscador), 4, async (c) => {
+      if (sin) return;
+      try {
+        const l = await spListar(c); if (!l) { listados[c] = null; return; }
+        const r = l.archivos.filter((n) => /\.pdf$/i.test(n)).map((n) => c + '/' + n);
+        for (const o of l.carpetas.filter((x) => Contingencia.esObsoleto(x))) { const lo = await spListar(c + '/' + o); if (lo) r.push(...lo.archivos.filter((n) => /\.pdf$/i.test(n)).map((n) => c + '/' + o + '/' + n)); }
+        listados[c] = r;
+      } catch (e) { if (e.sinCargador) sin = true; else throw e; }
+    });
+    return sin ? { listados: {}, verificado: false } : { listados, verificado: true };
+  }
+  // producto nuevo: PDF de la planta cuyo nombre empieza con la palabra clave de la descripción (para sugerir carpeta)
+  async function spBuscarNombre(palabra, planta) {
+    if (!palabra) return [];
+    const base = 'https://medifarmape.sharepoint.com' + CONT_RAIZ + '/', rutas = new Set();
+    const kql = `FileName:${palabra}* AND path:"${base}${planta.carpeta}"`;
+    const d = await spJson('GET', `${CONT_SITIO}/_api/search/query?querytext='${spQ(kql)}'&selectproperties='Path'&rowlimit=200&trimduplicates=false`);
+    ((((d && d.PrimaryQueryResult) || {}).RelevantResults || {}).Table || { Rows: [] }).Rows.forEach((r) => {
+      const c = (r.Cells || []).find((x) => x.Key === 'Path'); if (!c) return; let v = c.Value; try { v = decodeURI(v); } catch (e) { /* ya viene decodificada */ }
+      if (v.startsWith(base)) rutas.add(v.slice(base.length));
+    });
+    return [...rutas];
   }
 
   // RMD autorizados en la fecha y versiones no vigentes del mismo material (para ubicar la carpeta y lo que pasa a OBSOLETO)
@@ -8006,7 +8111,8 @@
     });
     const tipo = (p) => (!p.carpetas.length ? 'mano' : p.subir.length || p.aObsoleto.length ? 'subir' : 'ya');
     const TIPOS = { subir: 'Por cargar', ya: 'Ya cargado', mano: 'Ubicar a mano' };
-    const estadoDe = (p) => p.estado || { txt: p.reemplazar.length ? 'Por reemplazar' : TIPOS[tipo(p)], cls: tipo(p) };
+    // v1.154.0: con su PDF ya en la carpeta y solo la versión anterior por archivar no es «Por cargar»
+    const estadoDe = (p) => p.estado || { txt: p.reemplazar.length ? 'Por reemplazar' : tipo(p) === 'subir' && !p.subir.length ? 'Falta pasar a OBSOLETO' : TIPOS[tipo(p)], cls: tipo(p) };
     const deCuando = () => (plan.fecha ? `autorizados el ${fmt(plan.fecha)}` : 'de los códigos pegados');
     const titulo = (t) => String(t || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
     const spUrl = (rel) => 'https://medifarmape.sharepoint.com' + (CONT_RAIZ + (rel ? '/' + rel : '')).split('/').map(encodeURIComponent).join('/');
@@ -8029,13 +8135,32 @@
     // Observaciones del RMD (SAP): 3 líneas y «ver más» si es larga
     const obsRmd = (t) => (t ? `<div class="rmd-cont-obsv"><span class="rmd-cont-obsv-rot">Observaciones</span><div class="rmd-cont-obsv-txt">${esc(t)}</div>${t.length > 140 || t.split('\n').length > 3 ? '<button type="button" class="rmd-link rmd-cont-mas">ver más</button>' : ''}</div>` : '');
     caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-mas'); if (!b) return; const d = b.parentElement.classList.toggle('abierta'); b.textContent = d ? 'ver menos' : 'ver más'; });
+    // v1.154.0: producto nuevo o sin PDF anterior: carpetas parecidas de la planta (con la etapa del RMD) y un campo para corregirla; «Subir aquí»
+    // crea la carpeta si no existe y sube el PDF (con confirmación). Sin sugerencias, el campo arranca en la carpeta de la planta.
+    const destinoNuevo = (p, i) => {
+      const sg = p.sugeridas || [], val = p.destino || (sg[0] && sg[0].carpeta) || plan.planta.carpeta + '/';
+      const ops = sg.map((x, k) => `<label class="rmd-cont-sug"><input type="radio" name="rmd-cont-sug-${i}" value="${esc(x.carpeta)}" ${x.carpeta === val ? 'checked' : ''}><span>${esc(x.carpeta.split('/').slice(1).join(' › '))}${x.existe ? ' <small>(ya existe)</small>' : x.existe === false ? ' <small>(no existe: se crea)</small>' : ''}</span></label>`).join('');
+      return `<div class="rmd-cont-nuevo" data-i="${i}">${sg.length ? '<span class="rmd-cont-sub">Carpetas parecidas en la planta:</span>' + ops : `<span class="rmd-cont-sub">No se encontró una carpeta parecida en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}.</span>`}
+        <input type="text" class="rmd-cont-destino" spellcheck="false" aria-label="Carpeta de destino" value="${esc(val)}" ${ocupadoC ? 'disabled' : ''}>
+        <button type="button" class="rmd-btn rmd-cont-aqui" ${ocupadoC ? 'disabled' : ''} title="Crea la carpeta si no existe y sube el PDF">Subir aquí</button></div>`;
+    };
+    caja.addEventListener('change', (e) => { const r = e.target.closest('.rmd-cont-sug input'); if (!r) return; const d = r.closest('.rmd-cont-nuevo'); d.querySelector('.rmd-cont-destino').value = r.value; plan[+d.dataset.i].destino = r.value; });
+    caja.addEventListener('input', (e) => { if (!e.target.classList.contains('rmd-cont-destino')) return; plan[+e.target.closest('.rmd-cont-nuevo').dataset.i].destino = e.target.value; });
+    caja.addEventListener('click', async (e) => {
+      const b = e.target.closest('.rmd-cont-aqui'); if (!b || !plan || ocupadoC) return;
+      const d = b.closest('.rmd-cont-nuevo'), p = plan[+d.dataset.i], c = Contingencia.carpetaValida(d.querySelector('.rmd-cont-destino').value, plan.planta);
+      if (!c) { toast(`Escribe una carpeta dentro de ${plan.planta.carpeta} (sin «..» ni los caracteres \\ : * ? " < > | # %).`, true); return; }
+      const antes = { carpetas: p.carpetas, subir: p.subir, crear: p.crear };
+      Object.assign(p, { carpetas: [c], subir: [c], crear: true, destino: c });
+      if (!(await cargar(p))) { Object.assign(p, antes); pintar(); }
+    });
     const mensaje = (html, cls = '') => { caja.innerHTML = `<div class="rmd-cont-msg ${cls}">${html}</div>`; };
     const giro = '<span class="rmd-cont-giro" aria-hidden="true"></span>';
     const pintarEstado = (p, tr) => {
       if (!tr) return; const e = estadoDe(p);
       tr.className = e.cls; tr.hidden = filtro !== 'todos' && e.cls !== filtro && !(filtro === 'subir' && e.cls === 'curso');
       tr.lastElementChild.innerHTML = `<span class="rmd-cont-est ${e.cls}">${esc(e.txt)}</span>${e.err ? `<span class="rmd-cont-err">${esc(e.err)}</span>` : ''}`
-        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="${p.reemplazar.length ? 'Volver a subir este master: el PDF que ya está pasa a OBSOLETO' : 'Cargar solo este master a SharePoint'}" ${ocupadoC ? 'disabled' : ''}>${p.reemplazar.length ? 'Reemplazar este' : 'Cargar este'}</button>` : '');
+        + (e.cls === 'subir' ? `<button type="button" class="rmd-btn rmd-cont-uno" title="${p.reemplazar.length ? 'Volver a subir este master: el PDF que ya está pasa a OBSOLETO' : p.subir.length ? 'Cargar solo este master a SharePoint' : 'Su PDF ya está en la carpeta: solo pasa la versión anterior a OBSOLETO'}" ${ocupadoC ? 'disabled' : ''}>${p.reemplazar.length ? 'Reemplazar este' : p.subir.length ? 'Cargar este' : 'Pasar a OBSOLETO'}</button>` : '');
     };
     // tarjetas: cuántos hay de cada tipo (y filtran la tabla); el avance de la carga va al pie
     const resumen = (progreso) => {
@@ -8043,7 +8168,7 @@
       const nObs = plan.reduce((s, p) => s + (p.estado ? 0 : p.aObsoleto.length + p.reemplazar.length), 0);
       const tarjeta = (k, txt, c, ayuda) => `<button type="button" class="rmd-cont-kpi ${k}${filtro === k ? ' activo' : ''}" data-f="${k}" ${c || k === 'todos' ? '' : 'disabled'} title="${esc(ayuda)}"><b>${c}</b><span>${txt}</span></button>`;
       res.innerHTML = `<div class="rmd-cont-kpis">${tarjeta('todos', `RMD de ${esc(plan.planta.txt)}`, plan.length, 'Ver todos')}${tarjeta('subir', 'Por cargar', n.subir, 'Se suben con «Cargar a SharePoint»')}${tarjeta('ya', 'Ya cargados', n.ya, 'Su PDF ya está en la carpeta')}${tarjeta('mano', 'Ubicar a mano', n.mano, 'Sin carpeta de versión anterior: súbelos a mano')}${n.ok ? tarjeta('ok', 'Cargados ahora', n.ok, 'Cargados en esta sesión') : ''}${n.error ? tarjeta('error', 'Con error', n.error, 'Revisa el motivo en la fila y pulsa «Actualizar»') : ''}</div>
-        <div class="rmd-cont-datos">${plan.fecha ? `<span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>` : `<span>Por código: <b>${plan.codigos.length}</b> pegado${plan.codigos.length > 1 ? 's' : ''}</span>`}${plan.faltan && plan.faltan.length ? `<span class="rmd-cont-nota" title="${esc(plan.faltan.map((f) => f.codigo + (f.estado ? ' (' + titulo(f.estado) + ')' : ' (no está en SAP)')).join(', '))}">${plan.faltan.length} sin versión Autorizada: ${esc(plan.faltan.slice(0, 4).map((f) => f.codigo).join(', '))}${plan.faltan.length > 4 ? '…' : ''}</span>` : ''}${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
+        <div class="rmd-cont-datos">${plan.fecha ? `<span>Autorizados el <b>${esc(fmt(plan.fecha))}</b></span>` : `<span>Por código: <b>${plan.codigos.length}</b> pegado${plan.codigos.length > 1 ? 's' : ''}</span>`}${plan.faltan && plan.faltan.length ? `<span class="rmd-cont-nota" title="${esc(plan.faltan.map((f) => f.codigo + (f.estado ? ' (' + titulo(f.estado) + ')' : ' (no está en SAP)')).join(', '))}">${plan.faltan.length} sin versión Autorizada: ${esc(plan.faltan.slice(0, 4).map((f) => f.codigo).join(', '))}${plan.faltan.length > 4 ? '…' : ''}</span>` : ''}${nObs ? `<span><b>${nObs}</b> PDF anterior${nObs > 1 ? 'es pasan' : ' pasa'} a OBSOLETO</span>` : ''}${plan.otras ? `<span title="Los carga ${esc(plan.otraPlanta)}">+${plan.otras} de ${esc(plan.otraPlanta)} (no se muestran)</span>` : ''}${plan.sinPlanta ? `<span class="rmd-cont-nota">${plan.sinPlanta} sin planta en SAP</span>` : ''}${plan.verificado ? '<span title="Lo que encontró el buscador de SharePoint se confirmó leyendo cada carpeta en el momento">Confirmado en la carpeta</span>' : `<span class="rmd-cont-nota" title="El buscador de SharePoint va atrasado minutos u horas después de subir un PDF o pasarlo a OBSOLETO. Con el cargador 1.4.0 cada carpeta se lee en el momento.">Sin confirmar en la carpeta: actualiza el cargador a la 1.4.0</span>`}<span title="Hora en que se leyó SAP y SharePoint; «Actualizar» vuelve a leer">Revisado ${esc(plan.hora)}</span></div>`;
       pieEstado.innerHTML = progreso ? `${giro}<span>${esc(progreso.txt)}</span><span class="rmd-cont-barra"><span style="width:${Math.round(100 * progreso.i / progreso.n)}%"></span></span>` : '';
       const nSubir = n.subir; bCargar.textContent = nSubir > 1 ? `Cargar los ${nSubir} a SharePoint` : nSubir ? 'Cargar 1 a SharePoint' : 'Cargar a SharePoint'; bCargar.disabled = ocupadoC || !nSubir;
     };
@@ -8057,7 +8182,7 @@
         const r = p.rmd, a = p.anterior;
         const aut = r.hora || r.usuario ? `<span class="rmd-cont-meta" title="Autorizado el ${esc(fmt(r.fecha || plan.fecha || ''))}${r.hora ? ' a las ' + esc(r.hora) : ''}${r.usuario ? ' por ' + esc(r.usuario) : ''}">Aut. ${esc([r.hora, r.usuario].filter(Boolean).join(' · '))}</span>` : '';
         const dest = p.carpetas.length ? p.carpetas.map((c) => ruta(c, p.yaEsta.includes(c))).join('')
-          : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span><span class="rmd-cont-sub">Créale su carpeta y súbelo a mano en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}</span>`;
+          : `<span class="rmd-cont-nota">${a ? 'Ninguna versión anterior tiene PDF en la carpeta de la planta.' : 'Producto nuevo: no hay versiones anteriores en SAP.'}</span>${destinoNuevo(p, i)}`;
         const arch = `<span class="rmd-cont-nombre${p.subir.length ? '' : ' apagado'}">${esc(nombrePrevisto(r))}</span>${tipoPdf(r)}${p.carpetas.length && !p.subir.length ? '<span class="rmd-cont-sub">Ya está en la carpeta</span>' : p.reemplazar.length ? '<span class="rmd-cont-sub">Reemplaza al que ya está</span>' : ''}`;
         // versión anterior y, debajo, su PDF que pasa a OBSOLETO (una sola columna)
         const aObs = p.reemplazar.concat(p.aObsoleto);
@@ -8070,7 +8195,7 @@
         <thead><tr><th>RMD</th><th>Descripción</th><th>Archivo que se sube</th><th>Versión anterior · pasa a OBSOLETO</th><th>Carpeta de destino</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
       plan.forEach((p, i) => pintarEstado(p, caja.querySelector(`tr[data-i="${i}"]`))); resumen();
     };
-    const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); caja.querySelectorAll('.rmd-cont-uno').forEach((b) => { b.disabled = si; }); if (si) bCargar.disabled = true; };
+    const bloquear = (si) => { ocupadoC = si; bActualizar.disabled = si; entradas.forEach((x) => { x.disabled = si; }); caja.querySelectorAll('.rmd-cont-uno, .rmd-cont-aqui, .rmd-cont-destino').forEach((b) => { b.disabled = si; }); if (si) bCargar.disabled = true; };
     // «Cargar este» en la fila: carga solo ese master
     caja.addEventListener('click', (e) => { const b = e.target.closest('.rmd-cont-uno'); const tr = b && b.closest('tr[data-i]'); if (tr && plan) cargar(plan[+tr.dataset.i]); });
     async function revisar() {
@@ -8086,22 +8211,36 @@
         mensaje(`${giro}Buscando en ${esc(planta.carpeta)} las versiones anteriores de ${propios.length} RMD…`);
         const codigos = [...new Set(propios.map((r) => r.codigo).concat(previos.filter((r) => mats.has(r.material)).map((r) => r.codigo)))];
         const rutas = propios.length ? await spBuscar(codigos) : []; if (cerrado || t !== turno) return;
-        plan = Contingencia.planificar(propios, previos, rutas, planta, cod); plan.fecha = fecha; plan.codigos = codigos; plan.faltan = faltan || []; plan.planta = planta;
+        // v1.154.0: el buscador va atrasado; lo que encontró se confirma leyendo cada carpeta (cargador 1.4.0)
+        let verif = { listados: {}, verificado: !rutas.length };
+        if (rutas.length) { mensaje(`${giro}Confirmando en cada carpeta lo que encontró el buscador de SharePoint…`); verif = await contVerificar(rutas); if (cerrado || t !== turno) return; }
+        plan = Contingencia.planificar(propios, previos, Contingencia.combinar(rutas, verif.listados), planta, cod); plan.verificado = verif.verificado;
+        const nuevos = plan.filter((p) => !p.carpetas.length);
+        if (nuevos.length) {
+          mensaje(`${giro}Buscando carpetas parecidas para ${nuevos.length} producto${nuevos.length > 1 ? 's' : ''} sin carpeta…`);
+          for (const p of nuevos) {
+            try { p.sugeridas = Contingencia.sugerirCarpetas(p.rmd, await spBuscarNombre(Contingencia.palabraClave(p.rmd.descripcion), planta), planta); } catch (e) { p.sugeridas = []; }
+            // con el cargador 1.4.0 se mira si la carpeta sugerida ya existe (tiene algo dentro); sin él queda «por confirmar»
+            for (const x of p.sugeridas) if (!x.existe) { if (!plan.verificado) { x.existe = null; continue; } try { const l = await spListar(x.carpeta); x.existe = !!(l && (l.archivos.length || l.carpetas.length)); } catch (e) { x.existe = null; } }
+          }
+          if (cerrado || t !== turno) return;
+        }
+        plan.fecha = fecha; plan.codigos = codigos; plan.faltan = faltan || []; plan.planta = planta;
         plan.otras = autorizados.filter((r) => r.planta && !Contingencia.esDePlanta(r, planta)).length; plan.sinPlanta = autorizados.filter((r) => !r.planta).length; plan.otraPlanta = Contingencia.PLANTAS.filter((x) => x !== planta).map((x) => x.txt).join(' o ') || 'otra planta'; plan.hora = new Date().toTimeString().slice(0, 5); bloquear(false); pintar();
       } catch (e) { bloquear(false); mensaje(`No se pudo revisar: ${esc(e.message)}`, 'error'); }
       finally { if (t === turno && ocupadoC) bloquear(false); }
     }
     // uno: un solo paso del plan («Cargar este»); sin él, todos los que están por cargar
     async function cargar(uno) {
-      if (!plan || ocupadoC) return;
-      const lote = (uno ? [uno] : plan).filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return;
+      if (!plan || ocupadoC) return false;
+      const lote = (uno ? [uno] : plan).filter((p) => !p.estado && tipo(p) === 'subir'); if (!lote.length) return false;
       const nPdf = lote.filter((p) => p.subir.length).length, nObs = lote.reduce((n, p) => n + p.aObsoleto.length + p.reemplazar.length, 0), nRe = lote.filter((p) => p.reemplazar.length).length;
       const obsTxt = (nObs ? ` y ${nObs} PDF anterior${nObs > 1 ? 'es pasarán' : ' pasará'} a OBSOLETO` : '') + (nRe ? ` (${nRe === 1 && uno ? 'ya estaba en la carpeta: se reemplaza' : `${nRe} ya estaba${nRe > 1 ? 'n' : ''} en la carpeta: se reemplaza${nRe > 1 ? 'n' : ''}`})` : '');
       preguntando = true;
       const si = uno
-        ? await confirmar(`¿Cargar ${uno.rmd.codigo} v${uno.rmd.version}?`, `${nPdf ? `Se subirá su PDF a ${uno.subir.join(', ')}` : 'No se sube PDF'}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' })
+        ? await confirmar(`¿Cargar ${uno.rmd.codigo} v${uno.rmd.version}?`, `${nPdf ? `Se subirá su PDF a ${uno.subir.join(', ')}${uno.crear ? ' (la carpeta se crea si no existe)' : ''}` : 'No se sube PDF'}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' })
         : await confirmar(`¿Cargar la contingencia de ${plan.planta.txt}?`, `Se subirán ${nPdf} PDF a 3.-CONTINGENCIA › ${plan.planta.carpeta}${obsTxt}.`, 'Escribe en SharePoint y no se deshace desde aquí.', { si: 'Cargar', no: 'Cancelar' });
-      preguntando = false; if (!si || cerrado) return;
+      preguntando = false; if (!si || cerrado) return false;
       bloquear(true); bCerrar.disabled = true;
       let hechos = 0, fallos = 0;
       for (const [k, p] of lote.entries()) {
@@ -8109,21 +8248,27 @@
         const i = plan.indexOf(p), tr = caja.querySelector(`tr[data-i="${i}"]`);
         const marcar = (txt, cls, err) => { p.estado = { txt, cls, err }; pintarEstado(p, tr); resumen(cls === 'curso' && { txt: `Cargando ${k + 1} de ${lote.length}: ${p.rmd.codigo}`, i: k, n: lote.length }); };
         if (tr) tr.scrollIntoView({ block: 'nearest' });
+        let nuevo = 0, yaEstaba = 0;
         try {
           if (p.subir.length) {
             marcar('Generando PDF', 'curso');
             const pdf = await contPdf(modelo, p.rmd.mdId), nombre = Contingencia.nombreArchivo(p.rmd, pdf.receta);
             // reemplazar: el PDF que ya estaba pasa primero a OBSOLETO (puede tener el mismo nombre que el nuevo)
             for (const x of p.reemplazar) { marcar('A OBSOLETO', 'curso'); await spArchivar(x); }
-            for (const c of p.subir) { marcar('Subiendo', 'curso'); await spSubir(c, nombre, pdf.bytes); }
+            for (const c of p.subir) {
+              if (p.crear) { marcar('Creando carpeta', 'curso'); await spCrearCarpeta(c); }
+              marcar('Subiendo', 'curso'); if (await spSubir(c, nombre, pdf.bytes)) nuevo++; else yaEstaba++;
+            }
           }
-          for (const x of p.aObsoleto) { marcar('A OBSOLETO', 'curso'); await spArchivar(x); }
-          marcar('Cargado', 'ok'); hechos++;
+          // v1.154.0: si ya estaba hecho (el buscador iba atrasado) no es error
+          for (const x of p.aObsoleto) { marcar('A OBSOLETO', 'curso'); if (await spArchivar(x)) nuevo++; else yaEstaba++; }
+          marcar(!nuevo && yaEstaba ? 'Ya estaba cargado' : 'Cargado', 'ok'); hechos++;
         } catch (e) { marcar('Error', 'error', e.message); fallos++; }
       }
       bloquear(false); bCerrar.disabled = false; resumen();
       toast(uno ? (fallos ? `${uno.rmd.codigo}: no se pudo cargar.` : `${uno.rmd.codigo} cargado en SharePoint.`)
         : `Contingencia de ${plan.planta.txt} ${plan.fecha ? `del ${fmt(plan.fecha)}` : 'por código'}: ${hechos} RMD cargados${fallos ? `, ${fallos} con error` : ''}.`, !!fallos);
+      return true;
     }
     revisar();
   }

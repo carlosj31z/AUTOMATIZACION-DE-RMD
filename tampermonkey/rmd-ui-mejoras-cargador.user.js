@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (cargador)
 // @namespace    medifarma.rmd
-// @version      1.3.0
+// @version      1.4.0
 // @description  Usa siempre la versión más reciente de «RMD · mejoras de interfaz»: la más alta entre la carpeta MEJORAS DE INTERFAZ de SharePoint (cualquier nombre, p. ej. 1.56.0.js) y la rama «publicado» del repositorio en GitHub.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-start
@@ -25,9 +25,11 @@
 // v1.3.0: segunda fuente, la rama «publicado» de GitHub (carlosj31z/AUTOMATIZACION-DE-RMD, tampermonkey/rmd-ui-mejoras.user.js), para publicar
 // desde la nube sin la PC: se usa la versión más alta de las dos (a igual versión, la de SharePoint). Si una fuente falla, solo se acepta una versión
 // MAYOR que la guardada cuando la que no respondió es la fuente de la guardada (nunca se baja por una sesión vencida o un corte). 404 en GitHub = sin versión.
+// v1.4.0: lectura (GET) de la lista de archivos y subcarpetas de 04.-RMD/3.-CONTINGENCIA, para que la contingencia confirme en el momento lo que
+// encontró el buscador de SharePoint (su índice va atrasado minutos u horas después de subir un PDF o pasarlo a OBSOLETO). Solo listas, sin contenido.
 (function () {
   'use strict';
-  const CARGADOR = '1.3.0';
+  const CARGADOR = '1.4.0';
   const SITIO = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA';
   const CARPETA = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';
   const GITHUB = 'https://raw.githubusercontent.com/carlosj31z/AUTOMATIZACION-DE-RMD/publicado/tampermonkey/rmd-ui-mejoras.user.js';
@@ -145,6 +147,11 @@
     const resto = url.slice(API.length);
     if (metodo === 'GET') {
       if (/^search\/query\?/.test(resto)) return true;
+      // v1.4.0: lista de archivos o de subcarpetas (solo nombres) de una carpeta dentro de 3.-CONTINGENCIA
+      if (/^web\/GetFolderByServerRelativePath\(DecodedUrl=@a\)\/(Files|Folders)\?@a='[^']*'(&\$select=[A-Za-z,]+)?$/.test(resto)) {
+        const c = (() => { try { return decodeURIComponent(/@a='([^']*)'/.exec(resto)[1]).replace(/''/g, "'"); } catch (e) { return ''; } })();
+        if ((c + '/').startsWith(CONTINGENCIA) && !c.includes('/..')) return true;
+      }
       // solo lectura de la carpeta de caracterización: su lista de archivos o el contenido de un archivo de ella
       if (!/^web\/(GetFolderByServerRelativePath\(DecodedUrl=@a\)\/Files|GetFileByServerRelativePath\(DecodedUrl=@a\)\/\$value)\?@a='[^']*'(&\$select=[A-Za-z,]+)?$/.test(resto)) return false;
       const r = (() => { try { return decodeURIComponent(/@a='([^']*)'/.exec(resto)[1]).replace(/''/g, "'"); } catch (e) { return ''; } })();
