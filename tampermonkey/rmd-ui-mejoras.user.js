@@ -8139,7 +8139,7 @@
     // crea la carpeta si no existe y sube el PDF (con confirmación). Sin sugerencias, el campo arranca en la carpeta de la planta.
     const destinoNuevo = (p, i) => {
       const sg = p.sugeridas || [], val = p.destino || (sg[0] && sg[0].carpeta) || plan.planta.carpeta + '/';
-      const ops = sg.map((x, k) => `<label class="rmd-cont-sug"><input type="radio" name="rmd-cont-sug-${i}" value="${esc(x.carpeta)}" ${x.carpeta === val ? 'checked' : ''}><span>${esc(x.carpeta.split('/').slice(1).join(' › '))}${x.existe ? ' <small>(ya existe)</small>' : ' <small>(se crea)</small>'}</span></label>`).join('');
+      const ops = sg.map((x, k) => `<label class="rmd-cont-sug"><input type="radio" name="rmd-cont-sug-${i}" value="${esc(x.carpeta)}" ${x.carpeta === val ? 'checked' : ''}><span>${esc(x.carpeta.split('/').slice(1).join(' › '))}${x.existe ? ' <small>(ya existe)</small>' : x.existe === false ? ' <small>(no existe: se crea)</small>' : ''}</span></label>`).join('');
       return `<div class="rmd-cont-nuevo" data-i="${i}">${sg.length ? '<span class="rmd-cont-sub">Carpetas parecidas en la planta:</span>' + ops : `<span class="rmd-cont-sub">No se encontró una carpeta parecida en ${enlace(plan.planta.carpeta, esc(plan.planta.carpeta) + ' ↗', 'Abrir la carpeta de la planta en SharePoint')}.</span>`}
         <input type="text" class="rmd-cont-destino" spellcheck="false" aria-label="Carpeta de destino" value="${esc(val)}" ${ocupadoC ? 'disabled' : ''}>
         <button type="button" class="rmd-btn rmd-cont-aqui" ${ocupadoC ? 'disabled' : ''} title="Crea la carpeta si no existe y sube el PDF">Subir aquí</button></div>`;
@@ -8218,7 +8218,11 @@
         const nuevos = plan.filter((p) => !p.carpetas.length);
         if (nuevos.length) {
           mensaje(`${giro}Buscando carpetas parecidas para ${nuevos.length} producto${nuevos.length > 1 ? 's' : ''} sin carpeta…`);
-          for (const p of nuevos) { try { p.sugeridas = Contingencia.sugerirCarpetas(p.rmd, await spBuscarNombre(Contingencia.palabraClave(p.rmd.descripcion), planta), planta); } catch (e) { p.sugeridas = []; } }
+          for (const p of nuevos) {
+            try { p.sugeridas = Contingencia.sugerirCarpetas(p.rmd, await spBuscarNombre(Contingencia.palabraClave(p.rmd.descripcion), planta), planta); } catch (e) { p.sugeridas = []; }
+            // con el cargador 1.4.0 se mira si la carpeta sugerida ya existe (tiene algo dentro); sin él queda «por confirmar»
+            for (const x of p.sugeridas) if (!x.existe) { if (!plan.verificado) { x.existe = null; continue; } try { const l = await spListar(x.carpeta); x.existe = !!(l && (l.archivos.length || l.carpetas.length)); } catch (e) { x.existe = null; } }
+          }
           if (cerrado || t !== turno) return;
         }
         plan.fecha = fecha; plan.codigos = codigos; plan.faltan = faltan || []; plan.planta = planta;
