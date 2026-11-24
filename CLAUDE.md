@@ -461,6 +461,13 @@ cuenta). Escribir y responder siempre en **español**.
   borrador; ya no se vuelve a cargar la Edición rápida (`ppVistaTrasIngreso` queda sin uso). Igual en el guardado solo de Observaciones.
   Prueba `qa_local.py` LN67. PR #136. 1.152.0 publicada el 2026-11-23 20:27 (Lima) en la rama `publicado` (2 467 326 bytes).
   **La siguiente versión debe ser > 1.152.0.**
+- 2026-11-24, v1.153.0 (encima de la 1.152.0): **pedido de Carlos: «Guardar en SAP…» de la Edición rápida fallaba con «No se pudo revisar: el servidor
+  no respondió al leer MD (401)»** (ENVASE IBUMEJORAL MUJER 200mg 2202609504 v3, plantilla importada + 59 cambios): la sesión del portal venció mientras
+  editaba. Ahora `vistaGuardar` y el ingreso (`correr`, antes de escribir) comprueban la sesión con `$metadata` del servicio (`sesionPortalViva`: solo 401 o
+  redirección = vencida; otro error no frena); si venció se renueva sola con un marco oculto (`renovarSesionOculta`) o con el cuadro «La sesión del portal
+  venció» (`pedirSesionPortal`: «Iniciar sesión otra vez» abre una ventana pequeña del portal, «Reintentar»), se pide otro token CSRF
+  (`renovarTokensPortal`) y se reintenta sin perder los cambios (tope de 2 reintentos). Prueba `qa_local.py` LN68.
+  **La siguiente versión debe ser > 1.153.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

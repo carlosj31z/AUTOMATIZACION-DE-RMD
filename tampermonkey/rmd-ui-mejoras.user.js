@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.152.0
+// @version      1.153.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.152.0';                                                       // mantener igual a @version
+  const VERSION = '1.153.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -561,6 +561,7 @@
   tr.rmd-ing-destello > td { animation: rmd-ing-flash 2.4s ease-out 2; } @keyframes rmd-ing-flash { 0%, 100% { box-shadow: none; } 30% { box-shadow: inset 0 0 0 9999px rgba(255,200,0,.35); } }
   .rmd-ing-card { min-width: 118px; padding: 10px 14px; border-radius: 10px; background: rgba(128,128,128,.12); box-shadow: inset 0 3px 0 var(--c, #8a94a0); display: flex; flex-direction: column; } .rmd-ing-card b { font-size: 24px; line-height: 1.1; } .rmd-ing-card span { font-size: 12px; opacity: .85; }
   .rmd-ing-card.verde { --c: var(--rmd-verde); } .rmd-ing-card.rojo { --c: var(--rmd-rojo); } .rmd-ing-card.ambar { --c: var(--rmd-ambar); } .rmd-ing-card.azul { --c: var(--rmd-acento); } .rmd-ing-card.violeta { --c: #9b6bd6; }
+  .rmd-sesion-btns { display: flex; gap: 8px; margin-top: 6px; } .rmd-sesion p { margin: 6px 0 0; }
   .rmd-ing-nota { margin: 8px 0; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; background: rgba(128,128,128,.1); border-left: 4px solid var(--c, #8a94a0); } .rmd-ing-nota ul { margin: 4px 0 0; padding-left: 18px; } .rmd-ing-nota.ambar { --c: var(--rmd-ambar); } .rmd-ing-nota.rojo { --c: var(--rmd-rojo); }
   .rmd-ing-ops { max-height: 38vh; overflow: auto; margin: 8px 0; } .rmd-ing-grupo { margin: 4px 0; border: 1px solid var(--rmd-borde-campo); border-radius: 8px; } .rmd-ing-grupo summary { cursor: pointer; padding: 6px 10px; } .rmd-ing-grupo summary span { opacity: .65; margin-left: 6px; font-size: 12px; }
   .rmd-ing-grupo table { margin: 0; } .rmd-ing-tag { display: inline-block; padding: 0 8px; border-radius: 9px; font: 700 11px/18px var(--rmd-fuente); background: rgba(128,128,128,.22); }
@@ -21363,14 +21364,90 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   // v1.129.0: si el RMD sigue Ingresado y no cambió en SAP, se pasa directo a «Ingresar en SAP» (la vista ya muestra los cambios: la revisión intermedia sobraba);
   // la revisión solo aparece cuando hay algo que decidir (RMD Autorizado, cambios en SAP desde que se abrió la vista o solo Observaciones)
   // errores en lo que se cambia (los de pasos que no se tocan ya estaban en SAP y no frenan la Edición rápida)
+  // ---- Sesión del portal vencida (v1.153.0, pedido de Carlos) ----
+  // El portal cierra la sesión sola tras un rato (~35–40 min); si se edita mucho en la Edición rápida, al «Guardar en SAP…» la lectura respondía 401
+  // («el servidor no respondió al leer MD (401)») y el guardado moría. Ahora: antes de revisar y de escribir se comprueba la sesión; si venció se intenta
+  // renovar sin molestar (marco oculto) y, si SAP pide usuario y clave, se abre una ventana pequeña del portal para iniciar sesión. Al volver la sesión se
+  // renueva el token de escritura del portal y se reintenta solo. Los cambios nunca se pierden: siguen en la vista y en la copia de este navegador.
+  let SESION_URL_PRUEBA = null;                                        // pruebas
+  const esSesionVencida = (e) => !!e && (e.sesionVencida === true || +e.statusCode === 401 || /\(401\)/.test(String(e.message || e)));
+  function errorSesion() { const e = new Error('la sesión del portal venció'); e.sesionVencida = true; return e; }
+  function modelosPortal() { const l = []; try { l.push(modeloListaPrincipal()); } catch (e) { /* sin lista */ } try { const c = controladorPrincipal(); l.push(c && c.getView().getModel('mainModelv2')); } catch (e) { /* sin controlador */ } return [...new Set(l.filter(Boolean))]; }
+  function urlPruebaSesion() {
+    if (SESION_URL_PRUEBA) return SESION_URL_PRUEBA;
+    const m = modelosPortal().find((x) => x.sServiceUrl); if (!m) return null;
+    try { return new URL(m.sServiceUrl.replace(/\/?$/, '/') + '$metadata', document.baseURI).href; } catch (e) { return null; }
+  }
+  // false solo si la sesión venció de verdad (401, o el portal redirige al inicio de sesión); cualquier otra respuesta o un corte de red
+  // cuenta como viva, para no frenar el guardado por otro motivo (la lectura real dirá el error que sea)
+  async function sesionPortalViva() {
+    const u = urlPruebaSesion(); if (!u) return true;
+    try { const r = await fetch(u, { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      return !(r.status === 401 || r.type === 'opaqueredirect'); }
+    catch (e) { return true; }
+  }
+  // el token de escritura (CSRF) era de la sesión vencida: se pide otro para que el Guardar del portal y el ingreso no fallen con 403
+  function renovarTokensPortal() {
+    return Promise.all(modelosPortal().map((m) => new Promise((ok) => { try { if (m.refreshSecurityToken) m.refreshSecurityToken(() => ok(), () => ok(), true); else ok(); } catch (e) { ok(); } })));
+  }
+  async function esperarSesion(ms, parar) {
+    const fin = Date.now() + ms;
+    while (Date.now() < fin) { await esperar(1500); if (await sesionPortalViva()) { await renovarTokensPortal(); return true; } if (parar && parar()) return sesionPortalViva(); }
+    return false;
+  }
+  // sin ventanas: un marco oculto pasa por el inicio de sesión del portal (si el inicio de sesión de SAP sigue abierto, vuelve solo)
+  async function renovarSesionOculta(ms = 12000) {
+    const u = urlPruebaSesion(); if (!u) return true;
+    const f = document.createElement('iframe'); f.className = 'rmd-sesion-marco'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+    f.style.cssText = 'position:fixed;left:-20px;top:-20px;width:1px;height:1px;border:0;opacity:0;pointer-events:none'; f.src = u; document.body.appendChild(f);
+    try { return await esperarSesion(ms); } finally { f.remove(); }
+  }
+  // con el clic del usuario (si no, el navegador bloquea la ventana): null = ventana bloqueada
+  async function renovarSesionVentana(ms = 5 * 60000) {
+    const u = urlPruebaSesion() || location.href;
+    let w = null; try { w = window.open(u, 'rmdSesionPortal', 'width=560,height=680'); } catch (e) { w = null; }
+    if (!w) return null;
+    const ok = await esperarSesion(ms, () => w.closed);
+    try { if (!w.closed) w.close(); } catch (e) { /* otra ventana */ }
+    return ok;
+  }
+  // Cuadro «La sesión venció» dentro de una ventana del script (cont = elemento donde se pinta); reintentar() se llama con la sesión de nuevo viva
+  async function pedirSesionPortal(cont, reintentar, opc = {}) {
+    const ya = cont.querySelector('.rmd-sesion'); if (ya) ya.remove();
+    const caja = document.createElement('div'); caja.className = 'rmd-ing-nota ambar rmd-sesion';
+    const nota = opc.nota || 'Tus cambios no se perdieron: siguen en la Edición rápida y guardados en este navegador.';
+    caja.innerHTML = `<b>La sesión del portal venció</b> (SAP la cierra sola tras un rato). ${esc(nota)}<p class="rmd-progreso rmd-espera">Renovando la sesión…</p>`;
+    cont.appendChild(caja); const p = caja.querySelector('p');
+    const listo = () => { caja.remove(); reintentar(); };
+    if (opc.silencio !== false && await renovarSesionOculta()) { setTxt(p, 'Sesión renovada. Reintentando…'); setTimeout(listo, 300); return; }
+    p.classList.remove('rmd-espera');
+    setTxt(p, 'Pulsa «Iniciar sesión otra vez»: se abre una ventana pequeña del portal. Si pide usuario y clave, inicia sesión ahí; la ventana se cierra sola y se reintenta.');
+    const fila = document.createElement('div'); fila.className = 'rmd-sesion-btns';
+    const bIni = botonModal('Iniciar sesión otra vez', 'primario', async () => {
+      bIni.disabled = bRe.disabled = true; p.classList.add('rmd-espera'); setTxt(p, 'Esperando que inicies sesión en la ventana del portal…');
+      const r = await renovarSesionVentana(); p.classList.remove('rmd-espera'); bIni.disabled = bRe.disabled = false;
+      if (r) { setTxt(p, 'Sesión renovada. Reintentando…'); setTimeout(listo, 300); }
+      else if (r === null) setTxt(p, 'El navegador bloqueó la ventana. Permite las ventanas emergentes de este sitio, o abre el portal en otra pestaña, inicia sesión y vuelve aquí a pulsar «Reintentar».');
+      else setTxt(p, 'Todavía no hay sesión. Inicia sesión en la ventana del portal (o en otra pestaña) y pulsa «Reintentar».');
+    });
+    const bRe = botonModal('Reintentar', '', async () => { bRe.disabled = true; const viva = await sesionPortalViva(); bRe.disabled = false;
+      if (viva) { await renovarTokensPortal(); listo(); } else setTxt(p, 'La sesión sigue vencida. Pulsa «Iniciar sesión otra vez».'); });
+    fila.append(bIni, bRe); caja.appendChild(fila);
+  }
+  window.__rmdStats.sesion = { viva: sesionPortalViva, vencida: esSesionVencida, pedir: pedirSesionPortal, url: (u) => { SESION_URL_PRUEBA = u; } };   // pruebas
   function ppErroresDeCambios(an) { const ids = new Set(); an.cambios.forEach((c) => { ids.add(c.id); (c.pm || []).forEach((m) => ids.add(m.id)); });
     return [...an.avisos.entries()].filter(([id]) => ids.has(id)).flatMap(([, l]) => l).filter((a) => a.nivel === 'error'); }
-  async function vistaGuardar(datos, prop) {
+  async function vistaGuardar(datos, prop, intento = 0) {
     const v = ventana('Guardar en SAP'); v.fondo.querySelector('.rmd-modal').classList.add('rmd-pp', 'rmd-pp-imp'); v.cuerpo.innerHTML = '<p class="rmd-progreso rmd-espera">Revisando los cambios con el RMD de SAP…</p>';
-    try { const an = await ppAnalizar(datos, prop), errores = ppErroresDeCambios(an).length;
+    const otraVez = () => { v.cerrar(); vistaGuardar(datos, prop, intento + 1).catch((e) => toast('No se pudo revisar: ' + e.message, true)); };
+    try { if (!(await sesionPortalViva())) throw errorSesion();                                  // v1.153.0: sesión vencida → se renueva antes de leer
+      const an = await ppAnalizar(datos, prop), errores = ppErroresDeCambios(an).length;
       if (an.destino && an.destino.mdId === datos.rmd.mdId && !an.enSap.length && an.cambios.length && !errores) { v.cerrar(); await abrirIngreso(datos, prop, an, { obs: ppObsNueva(datos, prop) }); return; }
       pintarImportacion(v, datos, prop, an, { desdeVista: true }); }
-    catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo revisar: ${esc(e.message)}</p>`; v.pie.innerHTML = ''; v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); }
+    catch (e) {
+      v.pie.innerHTML = ''; v.pie.append(botonModal('Cerrar', '', () => v.cerrar()));
+      if (esSesionVencida(e) && intento < 2) { v.cuerpo.innerHTML = ''; pedirSesionPortal(v.cuerpo, otraVez, { silencio: intento === 0 }); return; }
+      v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo revisar: ${esc(e.message)}</p>${esSesionVencida(e) ? '<p>SAP sigue sin aceptar la sesión. Tus cambios siguen en la Edición rápida y en este navegador: abre el portal en otra pestaña, inicia sesión y vuelve a pulsar «Guardar en SAP…» (si recargas esta página, al abrir otra vez la Edición rápida de este RMD se ofrece recuperar los cambios).</p>' : ''}`; }
   }
   // v1.152.0 (pedido de Carlos): al terminar el ingreso desde la Edición rápida (también la abierta tras importar un borrador) se cierra la
   // vista y se vuelve al portal tal como estaba antes de abrirla (la vista es una capa encima del portal: la lista, filtros y desplazamiento
@@ -22365,7 +22442,9 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-progreso rmd-espera">Preparando las escrituras…</p>`;
     const bCerrar = botonModal('Cerrar', '', () => { if (!ocupado) v.cerrar(); }); v.pie.append(bCerrar);
     let plan;
-    try { plan = await ppPlanEscritura(datos, prop, an, modelo, usuario); } catch (e) { v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-progreso error">No se pudo preparar: ${esc(e.message)}</p>`; return null; }
+    try { plan = await ppPlanEscritura(datos, prop, an, modelo, usuario); } catch (e) {
+      if (esSesionVencida(e) && !opc.reintento) { v.cuerpo.innerHTML = pasos(1); pedirSesionPortal(v.cuerpo, () => { v.cerrar(); abrirIngreso(datos, prop, an, { ...opc, reintento: true }); }); return null; }   // v1.153.0
+      v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-progreso error">No se pudo preparar: ${esc(e.message)}</p>`; return null; }
     const est = { plan, diario: [], dif: null, ventana: v };
     window.__rmdStats.plantilla.ingreso = est;
     if (plan.bloqueos.length) { v.cuerpo.innerHTML = `${pasos(1)}<p class="rmd-progreso error">No se puede ingresar todavía:</p><ul class="rmd-pp-checks">${plan.bloqueos.map((b) => `<li>✕ ${esc(b)}</li>`).join('')}</ul>`; return est; }
@@ -22413,6 +22492,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       try {
         if (!simular && !opc.simular) {
           if (dialogos().length > 1) throw new Error('cierra las ventanas del portal que estén abiertas (solo debe quedar esta).');
+          setTxt(prog, 'Comprobando la sesión del portal…');                                       // v1.153.0: no se empieza a escribir con la sesión vencida
+          if (!(await sesionPortalViva()) && !(await renovarSesionOculta())) throw errorSesion();
           setTxt(prog, 'Comprobando que el RMD sigue igual…');
           const md = (await leerTodoDe(modelo, 'MD', [new (sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter)('mdId', 'EQ', an.destino.mdId)], { $select: 'mdId,estadoIdRmd_iMaestraId' }))[0];
           if (!md || +md.estadoIdRmd_iMaestraId !== 467) throw new Error('el RMD ya no está Ingresado.');
@@ -22421,14 +22502,16 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         const t0 = Date.now();
         est.diario = await ppEjecutarIngreso(modelo, plan, { simular: !!simular || !!opc.simular, detener: () => detener, avance: (h, t, x) => { const seg = (Date.now() - t0) / 1000, resta = h ? Math.round((seg / h) * (t - h)) : 0; bi.style.width = `${Math.round((h / t) * 100)}%`; setTxt(prog, `${simular ? 'Simulando' : 'Escribiendo'} ${h} de ${t}…${resta > 2 ? ` · faltan ~${resta} s` : ''} · ${x.desc.slice(0, 80)}`); pintar(); } });
         pintar(); const mal = est.diario.find((x) => x.estado === 'error'), hechas = est.diario.filter((x) => x.estado === 'hecho').length;
-        if (mal) { setTxt(prog, `Se detuvo en la operación ${mal.n}: ${mal.error}. Hechas antes: ${hechas}. Puedes deshacerlas con «Deshacer ingreso» o revisar el RMD en el portal.`); prog.classList.add('error'); await guardar(false, est.diario, ['Detenido por un error']); }
+        if (mal) { setTxt(prog, `Se detuvo en la operación ${mal.n}: ${mal.error}. Hechas antes: ${hechas}. Puedes deshacerlas con «Deshacer ingreso» o revisar el RMD en el portal.`); prog.classList.add('error'); await guardar(false, est.diario, ['Detenido por un error']);
+          if (esSesionVencida(mal.error)) pedirSesionPortal(cuerpo, () => setTxt(prog, 'Sesión renovada. Ya puedes usar «Deshacer ingreso» o revisar el RMD en el portal.'), { silencio: false, nota: 'Inicia sesión otra vez para poder deshacer o revisar lo escrito.' }); }
         else if (est.diario.length < plan.ops.length) { setTxt(prog, `Detenido tras ${hechas} operaciones.`); await guardar(false, est.diario, ['Detenido']); }
         else if (simular || opc.simular) setTxt(prog, `Simulación lista: ${est.diario.length} escrituras que se harían (no se envió nada).`);
         else { setTxt(prog, 'Comprobando el resultado…'); est.dif = await ppVerificarIngreso(modelo, an.destino, prop, plan); await guardar(false, est.diario, est.dif); bi.style.width = '100%';
           if (opc.obs != null) { setTxt(prog, 'Guardando las Observaciones…'); try { const r2 = await ppGuardarObs(an.destino, opc.obs, datos.rmd); est.obs = { ok: true, mensajes: r2.mensajes || [] }; } catch (e) { est.obs = { ok: false, error: e.message }; } setTxt(prog, ''); }
           cuerpo.querySelector('.rmd-ing-pasos').outerHTML = pasos(4); resultado(); }
         bX.disabled = false;
-      } catch (e) { setTxt(prog, 'No se escribió nada: ' + e.message); prog.classList.add('error'); }
+      } catch (e) { setTxt(prog, 'No se escribió nada: ' + e.message); prog.classList.add('error');
+        if (esSesionVencida(e)) pedirSesionPortal(cuerpo, () => { setTxt(prog, ''); prog.classList.remove('error'); correr(simular); }, { silencio: false }); }   // v1.153.0: con la sesión renovada se reintenta solo
       finally { ocupado = false; if ((simular || opc.simular) && cuerpo.querySelector('.rmd-ing-pasos')) cuerpo.querySelector('.rmd-ing-pasos').outerHTML = pasos(1); bSim.disabled = false; bIng.disabled = est.diario.some((x) => x.estado === 'hecho'); bDet.style.display = 'none'; }
     };
     const resultado = () => {
