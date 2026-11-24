@@ -455,6 +455,11 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-23, v1.151.0 (encima de la 1.150.0): **pedido de Carlos: la barra de progreso de «Ingresar en SAP» («Escribiendo N de M… faltan ~X s») se ve siempre**,
   fija al pie del cuerpo de la ventana (`.rmd-ing-avance`, `position: sticky; bottom: 0`) sin desplazarse hasta el final; no cambia el tamaño de la ventana.
   **La siguiente versión debe ser > 1.151.0.**
+- 2026-11-24, v1.152.0 (encima de la 1.151.0): **pedido de Carlos: al terminar el ingreso desde la Edición rápida** (también la abierta con
+  «Abrir en Edición rápida» tras importar un borrador) **se vuelve al portal como estaba antes de abrirla**: al cerrar la ventana del ingreso
+  terminado (botón «Volver al portal» o cualquier otro) `ppVolverAlPortal` quita la vista y las ventanas del userscript y borra la copia local del
+  borrador; ya no se vuelve a cargar la Edición rápida (`ppVistaTrasIngreso` queda sin uso). Igual en el guardado solo de Observaciones.
+  Prueba `qa_local.py` LN67. **La siguiente versión debe ser > 1.152.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

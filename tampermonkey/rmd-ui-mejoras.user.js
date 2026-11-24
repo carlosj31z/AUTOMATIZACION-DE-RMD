@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.151.0
+// @version      1.152.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.151.0';                                                       // mantener igual a @version
+  const VERSION = '1.152.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -21372,7 +21372,17 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       pintarImportacion(v, datos, prop, an, { desdeVista: true }); }
     catch (e) { v.cuerpo.innerHTML = `<p class="rmd-progreso error">No se pudo revisar: ${esc(e.message)}</p>`; v.pie.innerHTML = ''; v.pie.append(botonModal('Cerrar', '', () => v.cerrar())); }
   }
-  // tras un ingreso desde la vista: se vuelve a abrir con el RMD como quedó en SAP
+  // v1.152.0 (pedido de Carlos): al terminar el ingreso desde la Edición rápida (también la abierta tras importar un borrador) se cierra la
+  // vista y se vuelve al portal tal como estaba antes de abrirla (la vista es una capa encima del portal: la lista, filtros y desplazamiento
+  // siguen ahí). Ya no se vuelve a cargar la Edición rápida; para seguir editando se abre otra vez desde el menú del RMD.
+  function ppVolverAlPortal(destino) {
+    document.querySelectorAll('.rmd-modal-fondo').forEach((f) => f.remove());
+    try { Object.keys(localStorage).filter((k) => k.startsWith(`rmdPlantilla:${destino.codigo}:`)).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* sin almacenamiento */ }
+    if (VISTA) VISTA.cerrar();
+    toast(`RMD ${destino.codigo} v${destino.version} ingresado. Volviste al portal.`);
+  }
+  window.__rmdStats.volverAlPortal = ppVolverAlPortal;   // pruebas
+  // tras un ingreso desde la vista: se vuelve a abrir con el RMD como quedó en SAP (desde v1.152.0 ya no se usa al terminar el ingreso)
   async function ppVistaTrasIngreso(destino) {
     document.querySelectorAll('.rmd-modal-fondo').forEach((f) => f.remove());
     // v1.129.0: lo editado ya está en SAP: fuera la copia del navegador (si no, al volver se ofrecía «Recuperarlos» con cambios ya guardados)
@@ -21519,8 +21529,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       if (!(await confirmar('¿Guardar las Observaciones?', `Se reemplazan las Observaciones del RMD ${an.destino.codigo} v${an.destino.version} con el texto de la vista, con el Guardar de «Asociar fórmulas» del portal.`, 'No uses el portal mientras se guarda.'))) return;
       bIngresar.disabled = true; const pr = document.createElement('p'); pr.className = 'rmd-progreso rmd-espera'; pr.textContent = 'Guardando las Observaciones…'; v.cuerpo.append(pr);
       try { const r2 = await ppGuardarObs(an.destino, obsNueva, datos.rmd); pr.className = 'rmd-progreso'; pr.textContent = `✓ Observaciones guardadas en SAP.${(r2.mensajes || []).length ? ' El portal dijo: ' + r2.mensajes.join(' · ') : ''}`;
-        bIngresar.style.display = 'none'; v.pie.querySelectorAll('button').forEach((b) => { if (b.textContent === 'Volver a la vista') b.style.display = 'none'; }); const c0 = v.cerrar; let ya = false; v.cerrar = () => { c0(); if (!ya && VISTA) { ya = true; ppVistaTrasIngreso(an.destino); } };   // v1.129.0: la vista de abajo quedó vieja
-        v.pie.append(botonModal('Volver a la vista (leída otra vez de SAP)', 'primario', () => v.cerrar())); }
+        bIngresar.style.display = 'none'; v.pie.querySelectorAll('button').forEach((b) => { if (b.textContent === 'Volver a la vista') b.style.display = 'none'; }); const c0 = v.cerrar; let ya = false; v.cerrar = () => { c0(); if (!ya && VISTA) { ya = true; ppVolverAlPortal(an.destino); } };   // v1.152.0: vuelve al portal
+        v.pie.append(botonModal('Volver al portal', 'primario', () => v.cerrar())); }
       catch (e) { pr.className = 'rmd-progreso error'; pr.textContent = 'No se guardaron las Observaciones: ' + e.message; bIngresar.disabled = false; }
     }) : botonModal('Ingresar en SAP…', 'primario', () => abrirIngreso(datos, prop, an, { obs: obsNueva })); if (sinIngreso) { bIngresar.disabled = true; bIngresar.title = sinIngreso; }
     const cT = v.cuerpo.querySelector('.rmd-pp-tildes-c');
@@ -22430,9 +22440,10 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       cuerpo.querySelectorAll('.rmd-ing-nota').forEach((x) => x.remove()); cuerpo.querySelector('.rmd-ing-cards').insertAdjacentHTML('beforebegin', bloque);
       setTxt(prog, ''); const conf = cuerpo.querySelector('.rmd-ing-conf'); if (conf) conf.style.display = 'none';        // v1.129.0: ya no se queda en «Comprobando el resultado…»
       bAbrir.style.display = bDes.style.display = ''; bIng.style.display = bSim.style.display = 'none';
-      // v1.129.0: tras ingresar desde la Edición rápida, la vista de abajo quedó vieja: al cerrar esta ventana (con cualquier botón) se vuelve a leer de SAP
-      if (VISTA && !v.__trasIngreso) { v.__trasIngreso = true; const c0 = v.cerrar; v.cerrar = () => { c0(); if (est.volverVista !== false && VISTA) { est.volverVista = false; ppVistaTrasIngreso(an.destino); } };
-        v.pie.append(botonModal('Volver a la vista (leída otra vez de SAP)', 'primario', () => v.cerrar())); }
+      // v1.152.0 (pedido de Carlos): tras ingresar desde la Edición rápida, al cerrar esta ventana (con cualquier botón) se cierra la vista y se
+      // vuelve al portal como estaba antes de abrirla (antes, v1.129.0, se volvía a cargar la Edición rápida leída otra vez de SAP)
+      if (VISTA && !v.__trasIngreso) { v.__trasIngreso = true; const c0 = v.cerrar; v.cerrar = () => { c0(); if (est.volverVista !== false && VISTA) { est.volverVista = false; ppVolverAlPortal(an.destino); } };
+        v.pie.append(botonModal('Volver al portal', 'primario', () => v.cerrar())); }
     };
     const bIng = botonModal('Ingresar en SAP', 'primario', () => { if (!ok.checked) { const c = cuerpo.querySelector('.rmd-ing-conf'); c.scrollIntoView({ block: 'center', behavior: 'smooth' }); c.classList.remove('rmd-ing-conf-flash'); void c.offsetWidth; c.classList.add('rmd-ing-conf-flash'); setTxt(prog, 'Marca la casilla de confirmación para poder ingresar.'); return; } correr(false); }), bSim = botonModal('Probar sin escribir', '', () => correr(true)), bDet = botonModal('Detener', '', () => { detener = true; }),
       bX = botonModal('Exportar registro', '', async () => { try { const x = ppExcelIngreso(datos, an.destino, est.diario, est.dif || [], plan.manual, plan.avisos); descargarArchivo(x.nombre, await x.libro.generar(), TIPO_XLSX); } catch (e) { toast('No se pudo armar el Excel: ' + e.message, true); } }),
