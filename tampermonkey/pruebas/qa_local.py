@@ -1836,8 +1836,12 @@ with sync_playwright() as p:
           const paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); paq.rmd.estado = 'Ingresado'; paq.rmd.version = 3;
           const l0 = '20261001CJ-1-C2.0-FI1.0-FA1.0-F2'; paq.rmd.observacion = l0 + '\\n20261001CJ Pendiente aplicar 26-200-CC';
           window.__vistaGuardada = null;
-          const V = await P.montarVista(paq, null, { claves: [], puestos: [], obs: true, previa: { version: 2, codigo: '2202600000', estado: 'Autorizado', observacion: paq.rmd.observacion } }); V.emb.guardar = (p) => { window.__vistaGuardada = p; };
-          return { normal, rend, conDep, amb }; }""", d0)
+          // v1.155.0: la v2 tenía 99 casillas V.B. (más que esta versión): la fase 3 se permite y se sugiere
+          window.__rmdStats.faseVb.cache.set('MD-PREV-LN58', { t: Date.now(), n: 99 });
+          const V = await P.montarVista(paq, null, { claves: [], puestos: [], obs: true, previa: { mdId: 'MD-PREV-LN58', version: 2, codigo: '2202600000', estado: 'Autorizado', observacion: paq.rmd.observacion } }); V.emb.guardar = (p) => { window.__vistaGuardada = p; };
+          const o = V.emb.obs, l3 = '20261001CJ-1-C2.0-FI1.0-FA1.0-F3';
+          const fase = { menos: o.revisar(l3, { vbAct: 5 }), mismos: o.revisar(l3, { vbAct: 99 }), sugerida: o.revisar('', { vbAct: 5 }).sugerida, noSug: o.revisar('', { vbAct: 99 }).sugerida };
+          return { normal, rend, conDep, amb, fase: { menosOk: fase.menos.ok, mismosOk: fase.mismos.ok, mismosAviso: fase.mismos.nomenclatura.join(' '), sug: fase.sugerida.fase, sugPermite: fase.sugerida.faseVb.permite, noSug: fase.noSug.fase, noPermite: fase.noSug.faseVb.permite } }; }""", d0)
         fr = None
         for _ in range(60):
             fr = next((f for f in pg.frames if f != pg.main_frame), None)
@@ -1845,7 +1849,7 @@ with sync_playwright() as p:
                 if fr and fr.evaluate("() => !!document.querySelector('.pp-obs')"): break
             except Exception: pass
             pg.wait_for_timeout(250)
-        v1 = fr.evaluate("() => ({ ayuda: !!document.querySelector('.pp-ayuda'), rev: document.querySelector('.pp-obs-der').textContent, ta: document.querySelector('#pp-obs-ta').value, gen: !!document.querySelector('.pp-obs-gen') })")
+        v1 = fr.evaluate("() => ({ ayuda: !!document.querySelector('.pp-ayuda'), rev: document.querySelector('.pp-obs-der').textContent, ta: document.querySelector('#pp-obs-ta').value, gen: !!document.querySelector('.pp-obs-gen'), f3: (() => { const s = document.querySelector('#pp-obs-fase'), o = s && [...s.options].find((x) => x.value === 'F3'); return { valor: s && s.value, bloqueada: !!(o && o.disabled) }; })() })")
         fr.click("[data-a=obs-aplicar]"); fr.wait_for_timeout(150)
         fr.fill("#pp-obs-ini", "CJ"); fr.select_option("#pp-obs-fase", "F3"); fr.click("[data-a=obs-nom]"); fr.wait_for_timeout(150)
         v2 = fr.evaluate("() => ({ ta: document.querySelector('#pp-obs-ta').value, rev: document.querySelector('.pp-obs-der').textContent, total: window.__pp.estado().contar.total, resumen: window.__pp.textoResumen() })")
@@ -1856,7 +1860,10 @@ with sync_playwright() as p:
         import datetime
         hoy = datetime.date.today().strftime("%Y%m%d")
         ls = v2["ta"].split("\n")
-        ok = (r["normal"] >= 1 and r["rend"] == 0 and r["conDep"] >= 1 and r["amb"] == 0
+        fz = r["fase"]
+        ok_fase = (fz["menosOk"] and not fz["mismosOk"] and "menos V°B°" in fz["mismosAviso"] and fz["sug"] == "F3" and fz["sugPermite"] and fz["noSug"] == "" and not fz["noPermite"]
+                   and v1["f3"]["valor"] == "F3" and not v1["f3"]["bloqueada"] and "Sugerida F3" in v1["rev"])
+        ok = (ok_fase and r["normal"] >= 1 and r["rend"] == 0 and r["conDep"] >= 1 and r["amb"] == 0
               and not v1["ayuda"] and v1["gen"] and "misma de la v2" in v1["rev"] and "Falta aplicar 26-200-CC" in v1["rev"]
               and ls[0] == hoy + "CJ-1-C2.0-FI1.0-FA1.0-F3" and any(x.startswith("26-200-CC/") for x in ls) and "Falta aplicar 26-200-CC" not in v2["rev"] and "1.ª línea" in v2["rev"]
               and v2["total"] == 1 and "OBSERVACIONES (cambiadas en la vista)" in v2["resumen"] and ayuda and g == v2["ta"])

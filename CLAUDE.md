@@ -480,6 +480,12 @@ cuenta). Escribir y responder siempre en **español**.
   sin reacondicionados (`esReac`) y sin PDF de otra etapa (`etapaOk`). Productos nuevos: `sugerirCarpetas` + «Subir aquí» (`spCrearCarpeta`). Simulado con SAP y
   SharePoint reales (solo lectura, 20, 23 y 24/11, Planta 2). **El cargador 1.4.0 se publica SOBRESCRIBIENDO `rmd-ui-mejoras-cargador.user.js` en MEJORAS DE
   INTERFAZ** (su @updateURL es fijo). **La siguiente versión debe ser > 1.154.0.**
+- 2026-11-25, v1.155.0 (encima de la 1.154.0): **regla de Carlos: la fase 3 es para las versiones con MENOS V°B° que la anterior.** Se cuentan las
+  casillas «V.B.» de PROCEDIMIENTO (`casillasVbDe` = `vbConteos(...).casVb`, recordadas 2 min). En Asociar fórmulas (`faseVbAsociar`, `generadorNomenclatura`) y en
+  las Observaciones de la Edición rápida (`ppObsEmb(rmd, previa, vbAnt)`, `revisar(texto, { vbAct })`; el editor cuenta la vista con `vbEnTrabajo`) F3 o superior
+  solo se elige si tiene menos que la versión anterior, y F3 se sugiere si y solo si los tiene (`reglaFaseVb`, `FASE_MENOS_VB`). Sin anterior o sin poder contar: bloqueada.
+  **Columna «Fase» en los exportados** (`faseCorta` = `Reglas.faseDeObservacion(obs).corto`, vacía si no se reconoce), siempre al final de cada hoja. Prueba
+  `qa_fase_vb.mjs`. **La siguiente versión debe ser > 1.155.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

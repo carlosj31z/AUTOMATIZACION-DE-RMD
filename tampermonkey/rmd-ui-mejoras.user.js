@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.154.0
+// @version      1.155.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.154.0';                                                       // mantener igual a @version
+  const VERSION = '1.155.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2726,19 +2726,24 @@
       const l0 = (obs || '').split(/\r?\n/)[0], res = analizarNomenclatura(l0), act = partesNomenclatura(l0);
       const pr = d.__rmdPendRes && d.__rmdPendRes.previa, l0Ant = pr ? String(pr.observacion || '').split(/\r?\n/)[0].trim() : '', ant = l0Ant ? partesNomenclatura(l0Ant) : null;
       const vAnt = pr ? `v${pr.version}` : '', copiada = res.ok && !!l0Ant && l0.trim() === l0Ant;
+      // v1.155.0: fase 3 o superior solo con menos V°B° que la versión anterior; F3 se sugiere si y solo si los tiene
+      const fv = faseVbAsociar(d, anterior, !anterior && !!(leida && leida.buscando)), nAct = numeroFase(act.fase);
+      const faseMal = res.ok && !copiada && nAct >= FASE_MENOS_VB && !fv.buscando && !fv.permite, sugerirF3 = res.ok && !copiada && !faseMal && fv.permite && nAct < FASE_MENOS_VB;
       const textoN = copiada ? `⚠ La 1.ª línea es la misma de la ${vAnt} (se copió al crear la versión): pon la fecha de hoy y tus iniciales, y revisa prioridad, complejidad y fase.`
-        : res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' : res.avisos.map((a) => '⚠ ' + a).join('\n');
+        : faseMal ? `⚠ La fase ${act.fase} es para versiones con menos V°B° que la anterior. ${fv.texto}`
+        : res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' + (sugerirF3 ? `\nSugerencia: fase 3. ${fv.texto}` : nAct >= FASE_MENOS_VB && fv.permite ? `\n✓ ${fv.texto}` : '') : res.avisos.map((a) => '⚠ ' + a).join('\n');
       const det = d.querySelector('#rmd-aviso-nomenclatura');
-      if (res.ok && !copiada) {
-        const nota = ant && ant.fase ? (ant.fase === act.fase ? ` <small class="rmd-nm-ant" title="Misma fase que la ${vAnt}">= ${esc(vAnt)}</small>` : ` <small class="rmd-nm-ant cambia" title="La ${vAnt} estaba en ${esc(ant.fase)}">${esc(vAnt)}: ${esc(ant.fase)}</small>`) : '';
+      if (res.ok && !copiada && !faseMal) {
+        const nota = (ant && ant.fase ? (ant.fase === act.fase ? ` <small class="rmd-nm-ant" title="Misma fase que la ${vAnt}">= ${esc(vAnt)}</small>` : ` <small class="rmd-nm-ant cambia" title="La ${vAnt} estaba en ${esc(ant.fase)}">${esc(vAnt)}: ${esc(ant.fase)}</small>`) : '')
+          + (sugerirF3 ? ` <small class="rmd-nm-ant cambia" title="${esc(fv.texto)}">sugerida F3</small>` : '');
         fijarSegmento(d, 'nomenclatura', { estado: 'ok', valor: esc(res.corto) + nota, titulo: textoN + (ant && ant.fase ? `\nFase de la ${vAnt}: ${ant.fase}` : '') });
         if (det && det.textContent !== textoN) det.textContent = textoN;
       } else {
-        fijarSegmento(d, 'nomenclatura', { estado: 'aviso', valor: copiada ? `copiada de la ${esc(vAnt)}` : `${res.avisos.length} por corregir`, detalle: '1', abrir: true,
+        fijarSegmento(d, 'nomenclatura', { estado: 'aviso', valor: copiada ? `copiada de la ${esc(vAnt)}` : faseMal ? `${esc(act.fase)} sin menos V°B°` : `${res.avisos.length} por corregir`, detalle: '1', abrir: true,
           titulo: 'Formato: AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase (p. ej. 20260918CJ-1-C2.0-FI1.0-FA1.0-F2)' });
-        if (det) generadorNomenclatura(d, det, { texto: textoN, act: copiada ? {} : act, ant, vAnt, reemplazar: act.parece });
+        if (det) generadorNomenclatura(d, det, { texto: textoN, act: copiada ? {} : faseMal ? { ...act, fase: '' } : act, ant, vAnt, reemplazar: act.parece, fv });
       }
-      marcarCampo(d, 'Observaciones', !res.ok || copiada);
+      marcarCampo(d, 'Observaciones', !res.ok || copiada || faseMal);
     } else fijarSegmento(d, 'nomenclatura', null);
   }
   // Versión anterior leída del portal cuando la lista principal no la tiene (p. ej. filtrada por un solo código): por el enlace mdIdVersionAnt o, si
@@ -2771,7 +2776,51 @@
   // Nomenclatura sugerida, editable: el botón reemplaza la 1.ª línea (o la agrega arriba si no era una nomenclatura).
   // Se escribe como al teclear: se guarda con el Guardar del portal.
   const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R', 'F4', 'F4R', 'F5', 'F5R', 'F6', 'F6R'];
-  function generadorNomenclatura(d, det, { texto, act, ant, vAnt, reemplazar }) {
+  // v1.155.0 (regla de Carlos): la fase 3 es para las versiones con MENOS vistos buenos que la anterior. Se cuentan las casillas «V.B.» de los pasos
+  // activos de PROCEDIMIENTO (la misma cuenta del PPT «Seguimiento de V°B°», vbConteos). F3 o superior solo se deja elegir si esta versión tiene menos
+  // que la anterior, y se sugiere F3 si y solo si los tiene. Sin versión anterior, o sin poder contar, F3 o superior no se permite (se dice por qué).
+  const FASE_MENOS_VB = 3;
+  const numeroFase = (f) => { const m = /^F(\d{1,2})/i.exec(String(f || '').trim()); return m ? +m[1] : 0; };
+  function reglaFaseVb(act, ant, vAnt, buscando) {
+    if (buscando) return { buscando: true, act: null, ant: null, permite: false, sugerida: '', texto: 'Contando los V°B° de esta versión y la anterior…' };
+    const sabe = Number.isFinite(act) && Number.isFinite(ant), menos = sabe && act < ant;
+    const texto = !vAnt ? 'Sin versión anterior: la fase 3 o superior no aplica (es para versiones con menos V°B° que la anterior).'
+      : !sabe ? `No se pudieron contar los V°B° de esta versión y de la ${vAnt}: la fase 3 o superior queda bloqueada hasta poder contarlos.`
+      : menos ? `Esta versión tiene ${act} V°B° y la ${vAnt} tenía ${ant}: corresponde la fase 3.`
+      : `Esta versión tiene ${act} V°B° y la ${vAnt} tenía ${ant}: no tiene menos V°B°, no puede ir en fase 3 o superior.`;
+    return { buscando: false, act: sabe ? act : null, ant: sabe ? ant : null, permite: menos, sugerida: menos ? 'F3' : '', texto };
+  }
+  // casillas «V.B.» por mdId (null si no se pudo contar); se recuerdan 2 min
+  let vbProcPromesa = null; const VB_CASILLAS = new Map();
+  const estructurasProcedimiento = (modelo) => (vbProcPromesa = vbProcPromesa || leerTodoDe(modelo, 'ESTRUCTURA', [], { $select: 'estructuraId,descripcion' })
+    .then((est) => new Set(est.filter((e) => String(e.descripcion || '').trim().toUpperCase().startsWith('PROCEDIMIENTO')).map((e) => e.estructuraId)))
+    .catch((e) => { vbProcPromesa = null; throw e; }));
+  async function casillasVbDe(modelo, mdIds) {
+    const ahora = Date.now(), ids = [...new Set(mdIds.filter(Boolean))], faltan = ids.filter((id) => { const c = VB_CASILLAS.get(id); return !c || ahora - c.t > 120000; });
+    if (faltan.length) {
+      if (!modelo) throw new Error('sin el modelo del portal para contar los V°B°');
+      const cnt = await vbConteos(modelo, faltan, await estructurasProcedimiento(modelo));
+      faltan.forEach((id) => { const c = cnt[id]; VB_CASILLAS.set(id, { t: ahora, n: c && c.casVb != null ? c.casVb : null }); });
+    }
+    return Object.fromEntries(ids.map((id) => [id, VB_CASILLAS.get(id) ? VB_CASILLAS.get(id).n : null]));
+  }
+  // «Asociar fórmulas»: cuenta una vez por ventana (y otra vez pasados 2 min) y vuelve a revisar al llegar
+  function faseVbAsociar(d, anterior, buscandoAnt) {
+    const ctrl = controladorPrincipal(), V = ctrl && ctrl.getView(), am = V && V.getModel('asociarDatos'), asoc = am && am.getData(), modelo = V && V.getModel('mainModelv2');
+    if (!asoc || !asoc.mdId || !modelo || buscandoAnt) return reglaFaseVb(null, null, '', true);
+    const vAnt = anterior ? `v${anterior.version}` : '', clave = `${asoc.mdId}|${anterior ? anterior.mdId : ''}`;
+    if (d.__rmdFaseVbClave !== clave || (!d.__rmdFaseVb.buscando && Date.now() - d.__rmdFaseVbT > 120000)) {
+      d.__rmdFaseVbClave = clave; d.__rmdFaseVbT = Date.now();
+      if (!anterior) d.__rmdFaseVb = reglaFaseVb(null, null, '');
+      else {
+        d.__rmdFaseVb = d.__rmdFaseVb && d.__rmdFaseVbClaveOk === clave ? d.__rmdFaseVb : reglaFaseVb(null, null, vAnt, true);
+        const listo = (r) => { if (d.__rmdFaseVbClave !== clave) return; d.__rmdFaseVb = r; d.__rmdFaseVbClaveOk = clave; aislar('revisarAsociar', revisarAsociar); };
+        casillasVbDe(modelo, [asoc.mdId, anterior.mdId]).then((c) => listo(reglaFaseVb(c[asoc.mdId], c[anterior.mdId], vAnt)), () => listo(reglaFaseVb(null, null, vAnt)));
+      }
+    }
+    return d.__rmdFaseVb;
+  }
+  function generadorNomenclatura(d, det, { texto, act, ant, vAnt, reemplazar, fv }) {
     let g = det.querySelector('.rmd-nm-gen');
     if (!g) {
       det.innerHTML = '<div class="rmd-nm-avisos"></div><div class="rmd-nm-gen"><span class="rmd-nm-et">Sugerida</span><span class="rmd-nm-cod"><span class="rmd-nm-hoy"></span>' +
@@ -2786,6 +2835,7 @@
         const q = (s) => g.querySelector(s).value, ini = q('.rmd-nm-ini');
         if (ini.length !== 2) { toast('Escribe tus 2 iniciales (nombre + apellido).', true); g.querySelector('.rmd-nm-ini').focus(); return; }
         if (!q('.rmd-nm-fase')) { toast(`Elige la fase de esta versión${g.__rmdFaseAnt ? ` (la ${g.__rmdFaseAnt})` : ''}: no siempre es la misma que la anterior.`, true); g.querySelector('.rmd-nm-fase').focus(); return; }
+        const fv0 = g.__rmdFaseVb; if (numeroFase(q('.rmd-nm-fase')) >= FASE_MENOS_VB && !(fv0 && fv0.permite)) { toast(`La fase ${q('.rmd-nm-fase')} es para versiones con menos V°B° que la anterior. ${fv0 ? fv0.texto : ''}`, true); g.querySelector('.rmd-nm-fase').focus(); return; }
         const el = campoDe(d, 'Observaciones'), c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')); if (!c) return;
         const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), ini, q('.rmd-nm-pri'), q('.rmd-nm-com'), q('.rmd-nm-fase'));
         const lineas = String(c.getValue() || '').split(/\r?\n/), valor = (g.__rmdReemplazar ? [nueva, ...lineas.slice(1)] : [nueva, ...lineas.filter((x, i) => i || x.trim())]).join('\n');
@@ -2797,16 +2847,21 @@
     g.__rmdReemplazar = reemplazar;
     const b = g.querySelector('.rmd-nm-usar'), tb = reemplazar ? 'Reemplazar la 1.ª línea' : 'Agregar como 1.ª línea'; if (b.textContent !== tb) b.textContent = tb;
     const hoy = hoyAAAAMMDD(), h = g.querySelector('.rmd-nm-hoy'); if (h.textContent !== hoy) h.textContent = hoy;
-    const pri = act.prioridad || (ant && ant.prioridad) || '2', com = act.complejidad || (ant && ant.complejidad) || 'C1.0', fase = act.fase || '';   // la fase no se copia de la versión anterior: no siempre es la misma
+    // la fase no se copia de la versión anterior (no siempre es la misma); v1.155.0: se sugiere F3 si y solo si esta versión tiene menos V°B° que la anterior
+    const fvx = fv || reglaFaseVb(null, null, vAnt, true); g.__rmdFaseVb = fvx;
+    const pri = act.prioridad || (ant && ant.prioridad) || '2', com = act.complejidad || (ant && ant.complejidad) || 'C1.0', fase = act.fase || fvx.sugerida || '';
     const ini = rsUsuarioIniciales() || act.ini || (ant && ant.ini) || '';
-    const pista = ant && ant.fase ? `fase de la ${esc(vAnt)}: <b>${esc(ant.fase)}</b>${ant.prioridad ? ` · prioridad ${esc(ant.prioridad)}` : ''}${ant.complejidad ? ` · ${esc(ant.complejidad)}` : ''}` : vAnt ? `la ${esc(vAnt)} no tiene nomenclatura` : '';
+    const pista = (ant && ant.fase ? `fase de la ${esc(vAnt)}: <b>${esc(ant.fase)}</b>${ant.prioridad ? ` · prioridad ${esc(ant.prioridad)}` : ''}${ant.complejidad ? ` · ${esc(ant.complejidad)}` : ''}` : vAnt ? `la ${esc(vAnt)} no tiene nomenclatura` : '')
+      + `<br>${fvx.sugerida ? '<b>Sugerida F3.</b> ' : ''}${esc(fvx.texto)}`;
     const ps = g.querySelector('.rmd-nm-pista'); if (ps.innerHTML !== pista) ps.innerHTML = pista;
-    const clave = [pri, com, fase, ini].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) return;
+    const sf = g.querySelector('.rmd-nm-fase'), bloqueo = fvx.permite ? '' : fvx.buscando ? 'Contando los V°B°…' : fvx.texto;
+    const marcar = () => [...sf.options].forEach((o) => { const no = !!bloqueo && numeroFase(o.value) >= FASE_MENOS_VB; o.disabled = no; o.title = no ? bloqueo : ''; });
+    const clave = [pri, com, fase, ini, fvx.permite, fvx.buscando].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) { marcar(); if (sf.selectedOptions[0] && sf.selectedOptions[0].disabled) sf.value = ''; return; }
     d.__rmdNmClave = clave;
-    const sf = g.querySelector('.rmd-nm-fase'), fases = !fase || FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
-    sf.innerHTML = '<option value="">F?</option>' + fases.filter(Boolean).map((x) => `<option>${esc(x)}</option>`).join('');
+    const fases = !fase || FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
+    sf.innerHTML = '<option value="">F?</option>' + fases.filter(Boolean).map((x) => `<option>${esc(x)}</option>`).join(''); marcar();
     g.__rmdFaseAnt = ant && ant.fase ? `${vAnt} estaba en ${ant.fase}` : '';
-    sf.value = fase; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
+    sf.value = fase; if (sf.selectedOptions[0] && sf.selectedOptions[0].disabled) sf.value = ''; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
   }
   const hoyAAAAMMDD = () => { const f = new Date(); return `${f.getFullYear()}${String(f.getMonth() + 1).padStart(2, '0')}${String(f.getDate()).padStart(2, '0')}`; };
 
@@ -3311,6 +3366,7 @@
 
   let pendiente = false;
   window.__rmdStats = { ajustes: 0, listas: () => dialogos().map((d) => d.__rmdListaEfectiva || ''), reglasDeFila, espec: { abrir: abrirModificarEspec }, ponerCambios };   // pruebas
+  window.__rmdStats.faseVb = { reglaFaseVb, numeroFase, casillasVbDe, cache: VB_CASILLAS };   // pruebas
   window.__rmdStats.encajar = { uno: encajarEnPantalla, todo: encajarTodo };   // pruebas
   // Al desactivar las mejoras se retira todo lo añadido
   function limpiezaTotal() {
@@ -6291,7 +6347,7 @@
     const HOJA_DATOS = 'Exportación SAPUI5', REF_DATOS = "'Exportación SAPUI5'", TABLA_DATOS = 'DatosRMD';
     const CAMPOS = ['Código', 'Código de Solicitud', 'Versión', 'Estado', 'Código por Defecto', 'Código Agrupador', 'Descripción', 'Etapa', 'Fecha Registro',
       'Usuario Registro', 'Fecha Autorización', 'Usuario Autorización', 'A/F', 'Fecha Solicitud', 'Planta', 'Sección', 'Motivo', 'Observación',
-      'Fec Ingreso Real', 'F.I Real', 'Dias', 'Usuario', 'Prioridad', 'No contar', 'FC', 'FI', 'FA', 'Por revisar', 'RMD ING', 'RMD APR'];
+      'Fec Ingreso Real', 'F.I Real', 'Dias', 'Usuario', 'Prioridad', 'No contar', 'FC', 'FI', 'FA', 'Por revisar', 'RMD ING', 'RMD APR', 'Fase'];
     const C = Object.fromEntries(CAMPOS.map((n, i) => [n, i]));
     const L = Object.fromEntries(CAMPOS.map((n, i) => [n, Xlsx.letra(i)]));
     // Columnas calculadas: mismas fórmulas del archivo manual; el valor se calcula aquí para no depender del recálculo.
@@ -6304,7 +6360,7 @@
       'No contar': 'cabeceraAmbar', FC: 'cabeceraGris', FI: 'cabeceraGris', FA: 'cabeceraGris' };
     const ANCHOS_DATOS = [[1, 1, 11.375], [2, 2, 15.375], [3, 3, 6.125], [4, 4, 10.75], [5, 5, 12.75], [6, 6, 10.875], [7, 7, 30.75], [8, 8, 17.375], [9, 9, 17.25],
       [10, 10, 19.25], [11, 11, 11.625], [12, 12, 10.125], [13, 13, 10.75], [14, 14, 18.25], [15, 15, 23.875], [16, 16, 10.75], [17, 17, 21], [18, 18, 97.25],
-      [19, 19, 11.5], [20, 23, 9], [24, 24, 12.375], [25, 27, 7], [28, 28, 34], [29, 30, 10]];
+      [19, 19, 11.5], [20, 23, 9], [24, 24, 12.375], [25, 27, 7], [28, 28, 34], [29, 30, 10], [31, 31, 7]];
     const ANCHOS_RESUMEN = [[1, 1, 18.75], [2, 2, 21.25], [3, 7, 7], [16, 16, 17.25], [17, 17, 22.75], [18, 18, 18.375], [30, 30, 15.375], [31, 31, 19.5],
       [32, 32, 17.75], [52, 52, 13.375], [53, 53, 19.5], [54, 54, 21.75], [67, 67, 26.375], [68, 68, 12]];
     // Hoja1: planta, nombre, iniciales en Observación y usuario SAP que autoriza (Karla Vanessa Moreno, KMORENOM, va como Vanessa: VM; ver usuarioVisible).
@@ -6362,6 +6418,8 @@
     const networkdays = (ini, fin) => { const a = aSerial(ini), b = aSerial(fin); return a == null || b == null ? VALOR : a < 0 || b < 0 ? Xlsx.error('#NUM!') : diasHabiles(a, b); };
     const producto = (a, b) => { const x = aNumero(a), y = aNumero(b); return x == null || y == null ? VALOR : x * y; };
     // Las 10 columnas con fórmula de una fila (Observación: AAAAMMDD + iniciales + prioridad + FC/FI/FA).
+    // v1.155.0: columna «Fase» (al final) de la 1.ª línea de Observaciones (F1, F2R…); vacía si no se reconoce
+    const faseDeObs = (obs) => { const tok = String(obs == null ? '' : obs).split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)F(\d{1,2})(?:-?(R))?$/i.exec(tok); return m ? `F${m[1]}${m[2] ? 'R' : ''}` : ''; };
     function calculadas(obs, fechaAut) {
       const S = mid(obs, 1, 8), T = texto0000(S), Y = mid(obs, 15, 3), Z = mid(obs, 21, 3), AA = mid(obs, 27, 3);
       return { S, T, U: networkdays(T, fechaAut || null), V: mid(obs, 9, 2), W: mid(obs, 12, 1), Y, Z, AA, AC: producto(Y, Z), AD: producto(Y, AA) };
@@ -6462,7 +6520,7 @@
         const obs = f.observacion ? String(f.observacion).slice(0, 32767) : null;
         registros.push([nulo(f.codigo), nulo(f.codigoSolicitud), nulo(f.version), nulo(f.estado), nulo(f.codDefecto), nulo(f.codAgrupador), nulo(f.descripcion), nulo(f.etapa),
           fechaOk(f.fechaRegistro), nulo(uVis(f.usuarioRegistro)), nulo(f.fechaAut), nulo(uVis(f.usuarioAutorizacion)), nulo(af), fechaOk(f.fechaSolicitud), nulo(f.planta), nulo(f.seccion),
-          nulo(f.motivo), obs, k.S, k.T, k.U, k.V, k.W, noContar, k.Y, k.Z, k.AA, nota, k.AC, k.AD]);
+          nulo(f.motivo), obs, k.S, k.T, k.U, k.V, k.W, noContar, k.Y, k.Z, k.AA, nota, k.AC, k.AD, nulo(faseDeObs(f.observacion))]);
         est.sap++;
       });
       // 2) PEND del mes anterior al final de los datos (sin fórmulas; Fecha Solicitud = día 30). PL1 = Planta Ate, PL2 = Planta Lima.
@@ -6479,7 +6537,7 @@
       est.pl1 = pl1.length; est.pl2 = pl2.length;
 
       // 3) hoja de datos como tabla de Excel (las dinámicas toman filas nuevas al actualizar)
-      const ultima = registros.length + 1, rango = `A1:AD${ultima}`;
+      const ultima = registros.length + 1, rango = `A1:${Xlsx.letra(CAMPOS.length - 1)}${ultima}`;
       const hd = libro.hoja(HOJA_DATOS, { cols: ANCHOS_DATOS, congelar: 'H1', tabla: { nombre: TABLA_DATOS, ref: rango } });
       CAMPOS.forEach((n, c) => hd.poner({ c, r: 0 }, n, ESTILO_CAB[n] || 'cabecera'));
       registros.forEach((reg, i) => {
@@ -7142,6 +7200,8 @@
       listaVigentesDeFilas, listaCalificadosDeFilas, mapaCalificados, faseDeObservacion, csvAFilas, paraExportar, leerExportado, fusionar, nuevoId };
   })();
   // ==REGLAS-FIN==
+  // v1.155.0 (pedido de Carlos): columna «Fase» en los exportados = fase de la 1.ª línea de Observaciones (F1, F2R…); vacía si no se reconoce
+  const faseCorta = (obs) => Reglas.faseDeObservacion(obs).corto;
   // ==PENDIENTES-INICIO==
   // ---- Controles de cambio y pendientes en las Observaciones de «Asociar fórmulas» ----
   // Una línea de CC: «26-379-CC/L.Fernandez/2026-10-22;Descripción;proceso;moderado» (acepta «//», «,» antes del nivel y espacios).
@@ -8962,8 +9022,8 @@
     };
     const datosMd = (m) => [m.codigo, m.version, m.descripcion, m.codDefecto, m.estado, m.seccion, m.etapa, m.planta, m.fechaAut];
     tabla('Equipos por master', 'EquiposPorMaster',
-      ['Código equipo', 'Equipo / instrumento / material', 'Tipo', 'N.º SAP', 'Ubicación técnica', 'Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Orden en el RMD'],
-      [18, 52, 13, 12, 20, 13, 9, 46, 17, 13, 26, 16, 14, 16, 10], filas.map((x) => [x.codigo, x.desc, x.tipo, x.sap, x.ubic, ...datosMd(x.md), x.orden]), { 13: 'fechaDia' }, { activa: true, congelar: 'C2' });
+      ['Código equipo', 'Equipo / instrumento / material', 'Tipo', 'N.º SAP', 'Ubicación técnica', 'Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Orden en el RMD', 'Fase'],
+      [18, 52, 13, 12, 20, 13, 9, 46, 17, 13, 26, 16, 14, 16, 10, 7], filas.map((x) => [x.codigo, x.desc, x.tipo, x.sap, x.ubic, ...datosMd(x.md), x.orden, x.md.fase]), { 13: 'fechaDia' }, { activa: true, congelar: 'C2' });
     const resumen = new Map();
     filas.forEach((x) => {
       const k = (x.codigo || '') + '|' + x.desc + '|' + x.tipo; let r = resumen.get(k);
@@ -8976,8 +9036,8 @@
       [18, 52, 13, 10, 12, 11, 40, 60], res.map((r) => [r.codigo, r.desc, r.tipo, r.masters.size, r.aut.size, r.ing.size, [...r.etapas].sort().join(', '), [...r.secciones].sort().join(', ')]), { 6: 'envuelto', 7: 'envuelto' });
     const cuenta = new Map(); filas.forEach((x) => { const c = cuenta.get(x.mdId) || { eq: 0, ut: 0 }; if (x.tipo === 'EQUIPO') c.eq++; else c.ut++; cuenta.set(x.mdId, c); });
     const ms = [...masters].sort((a, b) => nat(a.codigo, b.codigo) || (b.version || 0) - (a.version || 0));
-    tabla('Masters', 'Masters', ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Equipos', 'Utensilios y agrupadores', 'Total'],
-      [13, 9, 46, 17, 13, 26, 16, 14, 16, 10, 14, 9], ms.map((m) => { const c = cuenta.get(m.mdId) || { eq: 0, ut: 0 }; return [...datosMd(m), c.eq, c.ut, c.eq + c.ut]; }), { 8: 'fechaDia' });
+    tabla('Masters', 'Masters', ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Equipos', 'Utensilios y agrupadores', 'Total', 'Fase'],
+      [13, 9, 46, 17, 13, 26, 16, 14, 16, 10, 14, 9, 7], ms.map((m) => { const c = cuenta.get(m.mdId) || { eq: 0, ut: 0 }; return [...datosMd(m), c.eq, c.ut, c.eq + c.ut, m.fase]; }), { 8: 'fechaDia' });
     const hI = libro.hoja('Información', { cols: [[1, 1, 30], [2, 2, 90]] });
     hI.poner('A1', 'Equipos, instrumentos y materiales por master', 'titulo');
     [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} (leído de SAP)`],
@@ -8988,9 +9048,9 @@
       .forEach(([a, b], i) => { hI.poner({ c: 0, r: 2 + i }, a, 'negrita'); hI.poner({ c: 1, r: 2 + i }, b, 'texto'); });
     return { libro, nombre: `Equipos por master RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, filas: filas.length, equipos: res.length };
   }
-  const SELECT_MD_EQ = 'mdId,codigo,version,descripcion,codDefectoReceta,nivelTxt,areaRmdTxt,fechaAutorizacion,estadoIdRmd/contenido,sucursalId/contenido';
+  const SELECT_MD_EQ = 'mdId,codigo,version,descripcion,codDefectoReceta,nivelTxt,areaRmdTxt,fechaAutorizacion,observacion,estadoIdRmd/contenido,sucursalId/contenido';
   const mdParaEquipos = (m) => ({ mdId: m.mdId, codigo: m.codigo || '', version: m.version, descripcion: m.descripcion || '', codDefecto: m.codDefectoReceta || '', estado: (m.estadoIdRmd && m.estadoIdRmd.contenido) || '',
-    seccion: m.areaRmdTxt || '', etapa: m.nivelTxt || '', planta: (m.sucursalId && m.sucursalId.contenido) || '', fechaAut: diaLocal(m.fechaAutorizacion) });
+    seccion: m.areaRmdTxt || '', etapa: m.nivelTxt || '', planta: (m.sucursalId && m.sucursalId.contenido) || '', fechaAut: diaLocal(m.fechaAutorizacion), fase: faseCorta(m.observacion) });
   async function leerEquiposDeTodos(modelo, avisar) {
     const avance = { eq: [0, 1], ut: [0, 1] }, pintar = () => avisar && avisar(avance.eq[0] + avance.ut[0], avance.eq[1] + avance.ut[1]);
     const [eqs, uts] = await Promise.all([
@@ -9164,36 +9224,36 @@
     const pend = filas.filter((x) => x.estado !== 'Autorizado' && x.estado !== ESTADO_INACTIVO).sort((a, b) => ordenEst[a.estado] - ordenEst[b.estado] || (a.estado === 'Ingresado' ? (b.dias || 0) - (a.dias || 0) : (a.dias || 0) - (b.dias || 0)) || nat(a.producto, b.producto));
     // v1.126.0: linajes que cuentan como solicitados del mes (criterio del equipo)
     const linMes = new Set(delMes ? delMes.lista.filter((z) => z.cuenta).map((z) => z.linaje) : []), sdm = (k) => (delMes ? (linMes.has(k) ? 'Sí' : 'No') : '');
-    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Última suspensión (trazabilidad)', 'Solicitud abierta (versión siguiente)', delMes ? `Solicitado de ${delMes.etiqueta}` : 'Solicitado del mes', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado'],
-      [12, 10, 12, 14, 24, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18],
-      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), fx(x.fSusp), x.solic, sdm(x.linaje), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod]),
+    tabla('Pendientes', 'Pendientes', ['Estado', 'Días en el estado', 'Desde', 'Última suspensión (trazabilidad)', 'Solicitud abierta (versión siguiente)', delMes ? `Solicitado de ${delMes.etiqueta}` : 'Solicitado del mes', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Observaciones completas', 'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Versión autorizada vigente', 'Reemplazado por', 'Usuario registro', 'Última actualización por', 'Producción Estado', 'Fase'],
+      [12, 10, 12, 14, 24, 12, 13, 8, 30, 46, 15, 14, 22, 26, 60, 70, 22, 40, 50, 40, 16, 20, 16, 16, 18, 7],
+      pend.map((x) => [x.estado, x.dias, fx(x.fEstado), fx(x.fSusp), x.solic, sdm(x.linaje), x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.motivo, x.ultima, x.obs, ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '', x.reemp, usuarioVisible(x.m.usuarioRegistro), usuarioVisible(x.m.usuarioActualiza), x.prod, faseCorta(x.m.observacion)]),
       { 0: (f) => estiloEst(f[0]), 1: 'numCelda', 2: 'fechaCelda', 3: 'fechaCelda', 4: 'textoCelda', 5: (f) => (f[5] === 'Sí' ? 'estIng' : 'celda'), 6: 'codigoCelda', 7: 'numCelda', 9: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'textoCelda', 19: 'textoCelda' }, { congelar: 'H2', activa: true });
     //  Solicitados del mes (v1.126.0): los que cuentan primero (pendientes antes que autorizados) y al final los quitados, para revisar
     const sdmFilas = delMes ? delMes.lista.slice().sort((a, b) => (b.cuenta - a.cuenta) || (b.pendiente - a.pendiente) || (new Date(a.md.fechaRegistro || 0) - new Date(b.md.fechaRegistro || 0))) : [];
     if (delMes) tabla('Solicitados del mes', 'SolicitadosMes', ['¿Cuenta?', '¿Pendiente?', 'Criterio', 'Estado actual', 'Fecha registro', 'Última suspensión (trazabilidad)', 'Código RMD / solicitud', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Usuario registro',
-      'Última versión del master', 'Estado de la última versión', 'Producción Estado'],
-      [9, 11, 46, 16, 12, 14, 16, 8, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 18],
+      'Última versión del master', 'Estado de la última versión', 'Producción Estado', 'Fase'],
+      [9, 11, 46, 16, 12, 14, 16, 8, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 18, 7],
       sdmFilas.map((z) => { const m = z.md, obs = lineasObs(m.observacion); return [z.cuenta ? 'Sí' : 'No', z.cuenta ? (z.pendiente ? 'Sí' : 'No (autorizado)') : '', z.criterio, z.estado, fx(m.fechaRegistro), fx(z.fSusp), m.codigo || m.codigoSolicitud || '', +m.version || m.version, productoDeDescripcion(m.descripcion), m.descripcion,
-        etapaBonita(etapaUV(m.nivelTxt)), (m.sucursalId && m.sucursalId.contenido) || '', m.areaRmdTxt || '', (m.motivoId && m.motivoId.descripcion) || '', obs[obs.length - 1] || '', usuarioVisible(m.usuarioRegistro), z.ultima ? `${z.ultima.codigo} v${z.ultima.version}` : '(sin versión aún)', z.ultima ? estadoUVVista(z.ultima, z.ultima) : '', mapaProd[m.estadoIdProceso_iMaestraId] || '']; }),
+        etapaBonita(etapaUV(m.nivelTxt)), (m.sucursalId && m.sucursalId.contenido) || '', m.areaRmdTxt || '', (m.motivoId && m.motivoId.descripcion) || '', obs[obs.length - 1] || '', usuarioVisible(m.usuarioRegistro), z.ultima ? `${z.ultima.codigo} v${z.ultima.version}` : '(sin versión aún)', z.ultima ? estadoUVVista(z.ultima, z.ultima) : '', mapaProd[m.estadoIdProceso_iMaestraId] || '', faseCorta(m.observacion)]; }),
       { 0: (f) => (f[0] === 'Sí' ? 'estAut' : 'estSus'), 1: (f) => (f[1] === 'Sí' ? 'estIng' : 'celda'), 2: 'textoCelda', 3: (f) => (ESTADOS_UV.includes(f[3]) || f[3] === ESTADO_INACTIVO ? estiloEst(f[3]) : 'estIng'), 4: 'fechaCelda', 5: 'fechaCelda', 6: 'codigoCelda', 7: 'numCelda', 9: 'textoCelda', 14: 'textoCelda', 17: (f) => (f[17] ? estiloEst(f[17]) : 'celda') }, { congelar: 'D2' });
     //  Última versión
     const todas = filas.slice().sort((a, b) => nat(a.producto, b.producto) || ordenEtapa(a.etapa, b.etapa) || nat(a.m.descripcion, b.m.descripcion));
     tabla('Última versión', 'UltimaVersion', ['Estado', 'Código RMD', 'Versión', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Código por defecto', 'Código agrupador', 'Código de solicitud', 'Motivo', 'Última observación', 'Observaciones completas',
-      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'Última suspensión (trazabilidad)', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal'],
-      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 14, 6, 12, 18, 10, 16, 22, 20, 16],
+      'CC aplicados', 'CC pendientes de aplicar', 'Otros pendientes anotados', 'Baja / descontinuado', 'Fecha registro', 'Usuario registro', 'Fecha autorización', 'Usuario autorización', 'Última suspensión (trazabilidad)', 'A/F', 'Fecha solicitud', 'Producción Estado', 'Versiones del master', 'Versión autorizada vigente', 'Versión posterior en solicitud', 'Reemplazado por', 'Código de la versión principal', 'Fase'],
+      [12, 13, 8, 30, 46, 15, 14, 22, 15, 13, 14, 26, 50, 60, 22, 40, 50, 40, 12, 16, 12, 16, 14, 6, 12, 18, 10, 16, 22, 20, 16, 7],
       todas.map((x) => [x.estado, x.m.codigo, +x.m.version || x.m.version, x.producto, x.m.descripcion, etapaBonita(x.etapa), x.planta, x.seccion, x.m.codDefectoReceta, x.m.codAgrupadorReceta, x.m.codigoSolicitud, x.motivo, x.ultima, x.obs,
         ccTxt(x), pendCcTxt(x), pendTxt(x), bajaTxt(x), fx(x.m.fechaRegistro), usuarioVisible(x.m.usuarioRegistro), fx(x.m.fechaAutorizacion), usuarioVisible(x.m.usuarioAutorizacion), fx(x.fSusp), x.m.af, fx(x.m.fechaSolicitud), x.prod, x.versiones, x.autVigente ? `${x.autVigente.codigo} v${x.autVigente.version}` : '',
-        x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal]),
+        x.posterior.map((y) => `${y.codigo} v${y.version} (${estadoUV(y)})`).join(', '), x.reemp, x.principal, faseCorta(x.m.observacion)]),
       { 0: (f) => estiloEst(f[0]), 1: 'codigoCelda', 2: 'numCelda', 4: 'textoCelda', 12: 'textoCelda', 13: 'textoCelda', 14: 'textoCelda', 15: 'textoCelda', 16: 'textoCelda', 17: 'textoCelda', 18: 'fechaCelda', 20: 'fechaCelda', 22: 'fechaCelda', 24: 'fechaCelda', 26: 'numCelda' }, { congelar: 'C2' });
     //  Solicitados (v1.125.0): solicitudes abiertas (Solicitado o Solicitud Aprobada), de la más antigua a la más nueva, con la última versión de su master
     const sol = (solicitados || []).map((y) => { const m = y.md, f = m.fechaSolicitud || m.fechaRegistro, d = f ? new Date(f) : null, obs = lineasObs(m.observacion);
       return { y, m, f: d && !isNaN(d) ? d : null, dias: d && !isNaN(d) ? Math.max(0, Math.floor((hoy - d) / 864e5)) : null, ultima: obs[obs.length - 1] || '', u: y.ultima }; })
       .sort((a, b) => (b.dias || 0) - (a.dias || 0) || nat(productoDeDescripcion(a.m.descripcion), productoDeDescripcion(b.m.descripcion)));
     tabla('Solicitados', 'Solicitados', ['Estado', 'Días desde la solicitud', 'Fecha solicitud', 'Código de solicitud', 'Versión solicitada', 'Producto', 'Descripción', 'Etapa', 'Planta', 'Área (sección)', 'Motivo', 'Última observación', 'Solicitado por',
-      'Última versión actual', 'Estado de la última versión', 'Última suspensión (trazabilidad)', 'Producción Estado', delMes ? `Solicitado de ${delMes.etiqueta}` : 'Solicitado del mes'],
-      [16, 10, 12, 14, 9, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 14, 18, 12],
+      'Última versión actual', 'Estado de la última versión', 'Última suspensión (trazabilidad)', 'Producción Estado', delMes ? `Solicitado de ${delMes.etiqueta}` : 'Solicitado del mes', 'Fase'],
+      [16, 10, 12, 14, 9, 30, 46, 15, 14, 22, 26, 60, 16, 18, 14, 14, 18, 12, 7],
       sol.map((x) => [x.y.estado, x.dias, fx(x.f), x.m.codigoSolicitud || x.m.codigo, +x.m.version || x.m.version, productoDeDescripcion(x.m.descripcion), x.m.descripcion, etapaBonita(etapaUV(x.m.nivelTxt)), (x.m.sucursalId && x.m.sucursalId.contenido) || '', x.m.areaRmdTxt || '',
-        (x.m.motivoId && x.m.motivoId.descripcion) || '', x.ultima, usuarioVisible(x.m.usuarioRegistro), x.u ? `${x.u.codigo} v${x.u.version}` : '(master nuevo)', x.u ? estadoUVVista(x.u, x.u) : '', fx(x.y.fSuspUlt), mapaProd[x.m.estadoIdProceso_iMaestraId] || '', sdm(x.y.linaje)]),
+        (x.m.motivoId && x.m.motivoId.descripcion) || '', x.ultima, usuarioVisible(x.m.usuarioRegistro), x.u ? `${x.u.codigo} v${x.u.version}` : '(master nuevo)', x.u ? estadoUVVista(x.u, x.u) : '', fx(x.y.fSuspUlt), mapaProd[x.m.estadoIdProceso_iMaestraId] || '', sdm(x.y.linaje), faseCorta(x.m.observacion)]),
       { 0: 'estIng', 1: 'numCelda', 2: 'fechaCelda', 3: 'codigoCelda', 4: 'numCelda', 6: 'textoCelda', 11: 'textoCelda', 14: (f) => (f[14] ? estiloEst(f[14]) : 'celda'), 15: 'fechaCelda' }, { congelar: 'E2' });
     //  Frases de Observaciones: cada línea con un CC o con algo pendiente, de todas las versiones (para revisar cómo se anota)
     const frases = [];
@@ -9281,8 +9341,8 @@
     const porMes = typeof anio === 'number', dmy = (iso) => String(iso).split('-').reverse().join('/');
     const periodoTxt = porMes ? `en ${dd2(mes)}/${anio}` : `del ${dmy(anio)} al ${dmy(mes)}`, enTxt = porMes ? 'en el mes' : 'en el periodo';
     const cab = ['Planta', 'Etapa', 'Producto', 'Sección', 'Material', porMes ? 'Movimiento en el mes' : 'Movimiento en el periodo', 'Fecha último movimiento', 'Últ. versión', 'Últ. código RMD', 'Últ. estado', 'Últ. F. registro', 'Últ. F. ingreso', 'Últ. F. autorización',
-      'Últ. V°B° (Realizado por y Visto bueno)', 'Últ. solo «Visto bueno»', 'Penúlt. versión', 'Penúlt. código RMD', 'Penúlt. estado', 'Penúlt. V°B° (Realizado por y Visto bueno)', 'Penúlt. solo «Visto bueno»', 'Diferencia V°B°', 'Variación', 'Versión vigente', '¿Última es la vigente?', 'Últ. casilla V.B.', 'Penúlt. casilla V.B.'];
-    const anchos = [8, 15, 44, 18, 12, 22, 13, 8, 13, 13, 12, 12, 13, 14, 10, 9, 13, 13, 14, 10, 10, 14, 9, 11, 11, 11];
+      'Últ. V°B° (Realizado por y Visto bueno)', 'Últ. solo «Visto bueno»', 'Penúlt. versión', 'Penúlt. código RMD', 'Penúlt. estado', 'Penúlt. V°B° (Realizado por y Visto bueno)', 'Penúlt. solo «Visto bueno»', 'Diferencia V°B°', 'Variación', 'Versión vigente', '¿Última es la vigente?', 'Últ. casilla V.B.', 'Penúlt. casilla V.B.', 'Últ. fase', 'Penúlt. fase'];
+    const anchos = [8, 15, 44, 18, 12, 22, 13, 8, 13, 13, 12, 12, 13, 14, 10, 9, 13, 13, 14, 10, 10, 14, 9, 11, 11, 11, 8, 8];
     const orden = [...filas].sort((a, b) => `${VB_PLANTAS[a.ult.planta]}|${a.ult.etapa}|${a.ult.producto}`.localeCompare(`${VB_PLANTAS[b.ult.planta]}|${b.ult.etapa}|${b.ult.producto}`, 'es'));
     const h = libro.hoja(porMes ? 'RMD del mes' : 'RMD del periodo', { activa: true, congelar: 'D2', cols: anchos.map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'RMDMes', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, orden.length + 1)}`, estilo: 'TableStyleMedium2' } });
     cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
@@ -9290,7 +9350,7 @@
     orden.forEach((x, i) => {
       const u = x.ult, p = x.pen, dif = p ? u.vb - p.vb : null, varia = vbVariacion(dif);
       const fila = [VB_PLANTAS[u.planta], u.etapa, u.producto, u.seccion, u.material, x.movimientos, x.ultimoMov, u.version, u.codigo, u.estado, u.registro, vbIngreso(u.observacion), u.autorizacion,
-        u.vb, u.soloVb, p && p.version, p && p.codigo, p && p.estado, p && p.vb, p && p.soloVb, dif, varia, x.vigente, x.vigente === u.version ? 'Sí' : 'No', u.casVb, p && p.casVb];
+        u.vb, u.soloVb, p && p.version, p && p.codigo, p && p.estado, p && p.vb, p && p.soloVb, dif, varia, x.vigente, x.vigente === u.version ? 'Sí' : 'No', u.casVb, p && p.casVb, faseCorta(u.observacion), p ? faseCorta(p.observacion) : ''];
       fila.forEach((v, c) => { if (v == null || v === '') return; h.poner({ c, r: i + 1 }, v, v instanceof Date ? 'fechaDia' : c === 21 && estVar[v] ? estVar[v] : 'normal'); });
     });
     const variaciones = ['Aumentó', 'Disminuyó', 'Se mantuvo', 'Sin versión anterior'], cuenta = new Map();
@@ -10479,21 +10539,22 @@
     if (ids.length) {
       avance(`Leyendo el status de ${ids.length} RMD…`);
       mds = await leerPorIds(modelo, 'MD', 'mdId', ids, { $expand: 'estadoIdRmd,sucursalId',
-        $select: 'mdId,codigo,codigoSolicitud,version,descripcion,nivelTxt,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,estadoIdRmd/contenido,sucursalId/contenido' });
+        $select: 'mdId,codigo,codigoSolicitud,version,descripcion,nivelTxt,fechaRegistro,usuarioRegistro,fechaActualiza,usuarioActualiza,fechaAutorizacion,usuarioAutorizacion,observacion,estadoIdRmd/contenido,sucursalId/contenido' });
     }
     // v1.127.0: status de hoy INACTIVO (solo a la vista) para los master de la lista del equipo que siguen Suspendidos
     const items = misMovArmar({ usuario, desde, hasta, mds, traz: res.traz, filas });
     items.forEach((x) => { const e = estadoVisible(x.mdId, x.estado); if (e !== x.estado) { x.estado = e; x.grupo = misMovGrupo(e); } });
+    const obsDe = new Map(mds.map((m) => [m.mdId, m.observacion])); items.forEach((x) => { x.fase = faseCorta(obsDe.get(x.mdId)); });   // v1.155.0: columna «Fase» del Excel
     return { items, avisos };
   }
   function misMovExcel(items, usuario, dTxt, hTxt) {
-    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento', 'Autorizado en SAP', 'Usuario que autorizó'];
-    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17, 17, 22].map((w, i) => [i + 1, i + 1, w]),
+    const libro = Xlsx.crearLibro(), cab = ['Código RMD', 'Versión', 'Producto', 'Etapa', 'Planta', 'Status de hoy', 'Qué hiciste', 'Primer movimiento', 'Último movimiento', 'Autorizado en SAP', 'Usuario que autorizó', 'Fase'];
+    const h = libro.hoja('Mis movimientos', { activa: true, congelar: 'B2', cols: [12, 8, 44, 15, 14, 13, 60, 17, 17, 17, 22, 7].map((w, i) => [i + 1, i + 1, w]),
       tabla: { nombre: 'MisMovimientos', ref: `A1:${Xlsx.letra(cab.length - 1)}${Math.max(2, items.length + 1)}`, estilo: 'TableStyleMedium2' } });
     cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
     const est = { Autorizado: 'estAut', Ingresado: 'estIng', Suspendido: 'estSus', Inactivo: 'estIna' };
     items.forEach((x, i) => [x.codigo || x.solicitud, x.version === '' ? null : +x.version || x.version, x.producto, x.etapa, x.planta, x.estado, x.acciones.join(' · '), new Date(x.primero), new Date(x.ultimo),
-      x.autSap ? (x.autSap.soloDia ? x.autSap.texto : new Date(x.autSap.t)) : null, x.autSap ? usuarioVisible(x.autSap.usuario) : null]
+      x.autSap ? (x.autSap.soloDia ? x.autSap.texto : new Date(x.autSap.t)) : null, x.autSap ? usuarioVisible(x.autSap.usuario) : null, x.fase || '']
       .forEach((v, c) => { if (v == null || v === '') return; h.poner({ c, r: i + 1 }, v, v instanceof Date ? 'fechaHora' : c === 5 && est[x.grupo] ? est[x.grupo] : 'normal'); }));
     return { libro, nombre: `Mis movimientos RMD ${usuario} ${dTxt}${hTxt !== dTxt ? ' a ' + hTxt : ''}.xlsx` };
   }
@@ -10762,9 +10823,10 @@
     let mapa = {}; try { mapa = await mapaProduccionEstado(ctrl); } catch (e) { }
     const lib = sap.ui.require('sap/ui/export/library'), EdmType = (lib && lib.EdmType) || {};
     const col = { label: 'Producción Estado', property: 'estadoIdProceso_iMaestraId', type: EdmType.Enumeration || 'Enumeration', valueMap: mapa };
+    const colFase = { label: 'Fase', property: RMD_FASE_EXPORT, type: EdmType.String || 'String' };   // v1.155.0: fase de la 1.ª línea de Observaciones
     const propia = Object.prototype.hasOwnProperty.call(ctrl, 'createColumnMDExport'), orig = ctrl.createColumnMDExport;
-    ctrl.createColumnMDExport = function () { const c = orig.apply(this, arguments); if (Array.isArray(c)) c.push(col); return c; };
-    if (on('inactivovista')) inactivosEnProximoExportado();
+    ctrl.createColumnMDExport = function () { const c = orig.apply(this, arguments); if (Array.isArray(c)) c.push(col, colFase); return c; };
+    ajustarProximoExportado(on('inactivovista'));
     try { fnOrig.call(ctrl); }   // onExportXLS lee las columnas de forma síncrona: se restauran enseguida
     finally { if (propia) ctrl.createColumnMDExport = orig; else delete ctrl.createColumnMDExport; }
   }
@@ -10785,18 +10847,29 @@
     if (n) { if (Array.isArray(ds)) st.dataSource = nuevas; else ds.data = nuevas; }
     return n;
   }
-  function inactivosEnProximoExportado() {
+  // v1.155.0: cada fila (copia) lleva además la fase de su 1.ª línea de Observaciones para la columna «Fase» (vacía si no se reconoce)
+  const RMD_FASE_EXPORT = 'rmdFaseExportado';
+  function faseEnFilasExport(st) {
+    const ds = st && st.dataSource, arr = Array.isArray(ds) ? ds : ds && Array.isArray(ds.data) ? ds.data : null; if (!arr) return 0;
+    const nuevas = arr.map((f) => (f && typeof f === 'object' ? { ...f, [RMD_FASE_EXPORT]: faseCorta(f.observacion) } : f));
+    if (Array.isArray(ds)) st.dataSource = nuevas; else ds.data = nuevas;
+    return nuevas.filter((f) => f && f[RMD_FASE_EXPORT]).length;
+  }
+  function ajustarProximoExportado(inactivos) {
     const instalar = (S) => {
       if (!S || !S.prototype || typeof S.prototype.build !== 'function' || S.prototype.build.__rmdInactivo) return;
       const orig = S.prototype.build, restaurar = () => { if (S.prototype.build === nuevo) S.prototype.build = orig; };
-      const nuevo = function () { restaurar(); try { inactivosEnFilasExport(this._mSettings || this.mSettings); } catch (e) { console.warn('[RMD] INACTIVO en el exportado:', e); } return orig.apply(this, arguments); };
+      const nuevo = function () { restaurar(); const st = this._mSettings || this.mSettings;
+        if (inactivos) { try { inactivosEnFilasExport(st); } catch (e) { console.warn('[RMD] INACTIVO en el exportado:', e); } }
+        try { faseEnFilasExport(st); } catch (e) { console.warn('[RMD] Fase en el exportado:', e); }
+        return orig.apply(this, arguments); };
       nuevo.__rmdInactivo = true; S.prototype.build = nuevo; setTimeout(restaurar, 120000);
     };
     const S = sap.ui.require('sap/ui/export/Spreadsheet');
     if (S) instalar(S); else sap.ui.require(['sap/ui/export/Spreadsheet'], instalar);   // aún sin cargar: se instala antes de que el portal lo use
   }
-  window.__rmdStats.inactivosEnFilasExport = inactivosEnFilasExport;   // pruebas
-  window.__rmdStats.columnasExportadoOriginal = async () => { const ctrl = controladorPrincipal(), mapa = await mapaProduccionEstado(ctrl); return { columnas: ctrl.createColumnMDExport().map((c) => c.label).concat('Producción Estado'), mapa }; };
+  window.__rmdStats.inactivosEnFilasExport = inactivosEnFilasExport; window.__rmdStats.faseEnFilasExport = faseEnFilasExport;   // pruebas
+  window.__rmdStats.columnasExportadoOriginal = async () => { const ctrl = controladorPrincipal(), mapa = await mapaProduccionEstado(ctrl); return { columnas: ctrl.createColumnMDExport().map((c) => c.label).concat('Producción Estado', 'Fase'), mapa }; };
 
   // ---- Buscar RMD por equipo ----
   // Catálogos EQUIPO, UTENSILIO y UTENSILIO_CLASIFICACION (una vez por sesión) -> masters con esos equipos.
@@ -10901,10 +10974,10 @@
     const bX = botonModal('Exportar Excel', '', async () => {
       if (!ultimo) return;
       const filas = ultimo.filas.filter((x) => todos.checked || !['Suspendido', 'Cancelado'].includes(x.md.estado)), hoy = new Date(), dd = (n) => String(n).padStart(2, '0');
-      const libro = Xlsx.crearLibro(), cab = ['Código equipo', 'Equipo / instrumento / material', 'Tipo', 'Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización'];
-      const h = libro.hoja('RMD por equipo', { activa: true, congelar: 'A2', cols: [18, 50, 12, 13, 9, 46, 17, 13, 26, 16, 14, 16].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'RMDPorEquipo', ref: `A1:L${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      const libro = Xlsx.crearLibro(), cab = ['Código equipo', 'Equipo / instrumento / material', 'Tipo', 'Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Estado', 'Área (sección)', 'Etapa', 'Planta', 'Fecha autorización', 'Fase'];
+      const h = libro.hoja('RMD por equipo', { activa: true, congelar: 'A2', cols: [18, 50, 12, 13, 9, 46, 17, 13, 26, 16, 14, 16, 7].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'RMDPorEquipo', ref: `A1:M${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
-      filas.forEach((x, i) => [x.equipo.codigo, x.equipo.desc, x.equipo.tipo, x.md.codigo, x.md.version, x.md.descripcion, x.md.codDefecto, x.md.estado, x.md.seccion, x.md.etapa, x.md.planta, x.md.fechaAut]
+      filas.forEach((x, i) => [x.equipo.codigo, x.equipo.desc, x.equipo.tipo, x.md.codigo, x.md.version, x.md.descripcion, x.md.codDefecto, x.md.estado, x.md.seccion, x.md.etapa, x.md.planta, x.md.fechaAut, x.md.fase]
         .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, val, c === 11 ? 'fechaDia' : 'normal'); }));
       descargarArchivo(`RMD por equipo ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())}.xlsx`, await libro.generar(), TIPO_XLSX);
     });
@@ -11345,25 +11418,25 @@
     const exportarMaterial = async () => {                                // lo listado en Cambio de material (con el resultado si ya se actualizó)
       const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
       const filas = plan.filter((x) => !x.oculto || mVer.checked || resultados.some((y) => y.codigo === x.codigo));
-      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Planta', 'Recetas (material / versión)', 'Lista en SAP', 'Otros cambios en SAP', 'Cambio en SAP', 'Se puede actualizar', 'Qué se hará', 'Resultado', 'Observaciones'];
+      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Planta', 'Recetas (material / versión)', 'Lista en SAP', 'Otros cambios en SAP', 'Cambio en SAP', 'Se puede actualizar', 'Qué se hará', 'Resultado', 'Observaciones', 'Fase'];
       const SAP_TXT = { nuevo: 'Solo el reemplazo', otros: 'Reemplazo y otros cambios', ambos: 'Tiene los dos materiales', anterior: 'Aún tiene el anterior', ninguno: 'No tiene ninguno', error: 'No se pudo leer' };
-      const h = libro.hoja('Cambio de material', { activa: true, congelar: 'B2', cols: [13, 9, 44, 12, 16, 14, 26, 24, 50, 24, 12, 50, 50, 70].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'CambioMaterial', ref: `A1:N${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      const h = libro.hoja('Cambio de material', { activa: true, congelar: 'B2', cols: [13, 9, 44, 12, 16, 14, 26, 24, 50, 24, 12, 50, 50, 70, 7].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'CambioMaterial', ref: `A1:O${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
       filas.forEach((x, i) => { const r = resultados.find((y) => y.codigo === x.codigo), rs = x.recetas;
         const que = x.aplica ? (x.accion === 'version' ? `Versión ${+x.version + 1} Ingresada · ${x.fase}` : 'Sacar y meter la receta en esta versión') : x.motivoNo;
         [x.codigo, x.version, x.descripcion, x.estado, x.etapa, x.planta, rs.map((y) => `${y.matnr} / ${y.verid}`).join('\n'), rs.map((y) => SAP_TXT[y.sap] || y.sap).join('\n'),
-          rs.map((y) => (y.otros || []).join('; ')).filter(Boolean).join('\n'), rs.map((y) => (y.cambio ? `${y.cambio} del ${y.desde}` : '')).filter(Boolean).join('\n'), x.aplica ? 'Sí' : 'No', que, r ? r.resultado : '', r && r.obs ? r.obs : x.observacion]
+          rs.map((y) => (y.otros || []).join('; ')).filter(Boolean).join('\n'), rs.map((y) => (y.cambio ? `${y.cambio} del ${y.desde}` : '')).filter(Boolean).join('\n'), x.aplica ? 'Sí' : 'No', que, r ? r.resultado : '', r && r.obs ? r.obs : x.observacion, faseCorta(r && r.obs ? r.obs : x.observacion)]
           .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, val, [6, 7, 8, 9, 13].includes(c) ? 'envuelto' : 'normal'); }); });
       descargarArchivo(`Cambio de material ${detectado.anterior} a ${detectado.nuevo} ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())} ${dd(hoy.getHours())}${dd(hoy.getMinutes())}.xlsx`, await libro.generar(), TIPO_XLSX);
     };
     const bX = botonModal('Exportar Excel', '', async () => {
       if (modo === 'material') { if (detectado) await exportarMaterial().catch((e) => toast('No se pudo armar el Excel: ' + e.message, true)); return; }
       const hoy = new Date(), dd = (n) => String(n).padStart(2, '0'), libro = Xlsx.crearLibro();
-      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Etapa', 'Área (sección)', 'Planta', 'Modificación', 'Estado anterior', 'Estado actual', 'Resultado', 'Línea agregada', 'Observaciones', 'Fecha y hora', 'Usuario'];
-      const h = libro.hoja('Modificaciones masivas', { activa: true, congelar: 'B2', cols: [13, 9, 44, 17, 16, 24, 14, 20, 14, 14, 40, 40, 70, 18, 28].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'ModificacionesMasivas', ref: `A1:O${Math.max(2, resultados.length + 1)}`, estilo: 'TableStyleMedium2' } });
+      const cab = ['Código RMD', 'Versión', 'Descripción del master', 'Código por defecto', 'Etapa', 'Área (sección)', 'Planta', 'Modificación', 'Estado anterior', 'Estado actual', 'Resultado', 'Línea agregada', 'Observaciones', 'Fecha y hora', 'Usuario', 'Fase'];
+      const h = libro.hoja('Modificaciones masivas', { activa: true, congelar: 'B2', cols: [13, 9, 44, 17, 16, 24, 14, 20, 14, 14, 40, 40, 70, 18, 28, 7].map((w, i) => [i + 1, i + 1, w]), tabla: { nombre: 'ModificacionesMasivas', ref: `A1:P${Math.max(2, resultados.length + 1)}`, estilo: 'TableStyleMedium2' } });
       cab.forEach((t, c) => h.poner({ c, r: 0 }, t, 'normal'));
       resultados.forEach((x, i) => { const m = x.md || {};
-        [x.codigo, m.version, m.descripcion, m.codDefectoReceta, m.nivelTxt, m.areaRmdTxt, m.sucursalId && m.sucursalId.contenido, x.modo, x.estadoAntes, x.estadoDespues, x.resultado, x.motivo, x.obs, x.fecha, usuarioVisible(x.usuario)]
+        [x.codigo, m.version, m.descripcion, m.codDefectoReceta, m.nivelTxt, m.areaRmdTxt, m.sucursalId && m.sucursalId.contenido, x.modo, x.estadoAntes, x.estadoDespues, x.resultado, x.motivo, x.obs, x.fecha, usuarioVisible(x.usuario), faseCorta(x.obs != null ? x.obs : m.observacion)]
           .forEach((val, c) => { if (val !== '' && val != null) h.poner({ c, r: i + 1 }, c === 13 ? new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), val.getHours(), val.getMinutes())) : val, c === 12 ? 'envuelto' : c === 13 ? 'fechaHora' : 'normal'); }); });
       descargarArchivo(`Modificaciones masivas RMD ${hoy.getFullYear()}-${dd(hoy.getMonth() + 1)}-${dd(hoy.getDate())} ${dd(hoy.getHours())}${dd(hoy.getMinutes())}.xlsx`, await libro.generar(), TIPO_XLSX);
     });
@@ -11465,9 +11538,9 @@
     const vg = (doc) => (vig ? [info(doc) ? 'Sí' : 'No'] : []);
     tabla('Documentos', 'Documentos', ['Documento', 'Tipo', ...(vig ? ['Vigente', 'Título en la lista de vigentes'] : []), 'Masters', 'Autorizados', 'Citas', 'Etapas'], vig ? [16, 15, 9, 50, 10, 12, 9, 50] : [16, 15, 10, 12, 9, 50],
       [...porDoc].map(([doc, x]) => [doc, Reglas.tipoDocumento(doc), ...vg(doc), ...(vig ? [(info(doc) || {}).titulo || ''] : []), x.masters.size, x.aut.size, x.citas, [...x.etapas].sort().join(', ')]), {}, { activa: true });
-    tabla('Citas', 'CitasDocumentos', ['Documento', 'Tipo', ...(vig ? ['Vigente'] : []), 'Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Área (sección)', 'Planta', 'Lista', 'Paso / proceso menor', 'Orden', 'Código del paso', 'Descripción donde aparece'],
-      vig ? [16, 15, 9, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90] : [16, 15, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90],
-      cs.map((c) => [c.doc, Reglas.tipoDocumento(c.doc), ...vg(c.doc), c.md.codigo, c.md.version, c.md.descripcion, c.md.estado, c.md.etapa, c.md.seccion, c.md.planta, c.lista, c.esPM ? 'Proceso menor' : 'Paso', c.orden, c.codigoPaso, c.desc]), { [vig ? 14 : 13]: 'envuelto' }, { congelar: 'B2' });
+    tabla('Citas', 'CitasDocumentos', ['Documento', 'Tipo', ...(vig ? ['Vigente'] : []), 'Código RMD', 'Versión', 'Descripción del master', 'Estado', 'Etapa', 'Área (sección)', 'Planta', 'Lista', 'Paso / proceso menor', 'Orden', 'Código del paso', 'Descripción donde aparece', 'Fase'],
+      vig ? [16, 15, 9, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90, 7] : [16, 15, 13, 9, 42, 12, 15, 24, 13, 36, 14, 8, 13, 90, 7],
+      cs.map((c) => [c.doc, Reglas.tipoDocumento(c.doc), ...vg(c.doc), c.md.codigo, c.md.version, c.md.descripcion, c.md.estado, c.md.etapa, c.md.seccion, c.md.planta, c.lista, c.esPM ? 'Proceso menor' : 'Paso', c.orden, c.codigoPaso, c.desc, c.md.fase]), { [vig ? 14 : 13]: 'envuelto' }, { congelar: 'B2' });
     const hI = libro.hoja('Información', { cols: [[1, 1, 30], [2, 2, 90]] });
     hI.poner('A1', 'Documentos citados en todos los master', 'titulo');
     [['Generado', `${dd(hoy.getDate())}/${dd(hoy.getMonth() + 1)}/${hoy.getFullYear()} ${dd(hoy.getHours())}:${dd(hoy.getMinutes())} (leído de SAP en ${r.segundos} s)`], ['Estados incluidos', estados.join(', ')],
@@ -17770,15 +17843,17 @@
     const analistasDe = (rec) => [...new Set((rec.acciones || []).map((a) => a.analista).filter(Boolean))].join(', ');
     const accionesTxt = (rec) => (rec.acciones || []).map((a) => `Acción ${a.accion || 's/n'}: ${a.descripcion}`).join(' | ');
     // Cuadro: una fila por CC y RMD (un CC sin RMD, una fila); items = [{ rec, filas: [{ r, e }], estado }]
-    const COLS = ['Código CC', 'Planta', 'Acciones', 'Plazo', 'Analista', 'Estado del CC', 'Código RMD', 'Versión', 'Producto', 'Etapa', 'Status en SAP', 'CC en Observaciones', 'Ejecutado', 'Fecha de autorización', 'Asociado por', 'Marcado por'];
+    const COLS = ['Código CC', 'Planta', 'Acciones', 'Plazo', 'Analista', 'Estado del CC', 'Código RMD', 'Versión', 'Producto', 'Etapa', 'Status en SAP', 'CC en Observaciones', 'Ejecutado', 'Fecha de autorización', 'Asociado por', 'Marcado por', 'Fase'];
+    // v1.155.0: «Fase» de la versión de hoy (1.ª línea de Observaciones: F1, F2R…); vacía si no se reconoce
+    const faseObs = (obs) => { const tok = String(obs == null ? '' : obs).split(/\r?\n/)[0].trim().split(/\s+/)[0] || '', m = /(?:^|-)F(\d{1,2})(?:-?(R))?$/i.exec(tok); return m ? `F${m[1]}${m[2] ? 'R' : ''}` : ''; };
     function filasCuadro(items, dia, quien) {
       const out = [], d = (iso) => (iso ? dia(iso) : ''), q = quien || ((x) => x);
       items.forEach(({ rec, filas, estado }) => {
         const cab = [rec.codigo + (rec.adenda ? ' ' + rec.adenda : ''), rec.planta, accionesTxt(rec), d(plazoDe(rec)), analistasDe(rec), estado];
         const pie = (r) => [r ? `${q(r.agregadoPor)} ${d(r.agregadoEn)}`.trim() : '', `${q(rec.marcadoPor)} ${d(rec.marcadoEn)}`.trim()];
-        if (!filas.length) { out.push([...cab, '', '', '', '', '', '', '', '', ...pie(null)]); return; }
+        if (!filas.length) { out.push([...cab, '', '', '', '', '', '', '', '', ...pie(null), '']); return; }
         filas.forEach(({ r, e }) => out.push([...cab, e ? e.codigo : r.codigo, e ? e.version : '', r.descripcion, r.etapa, e ? e.estadoSap : '', e ? e.tipoTxt : '',
-          e ? (e.ejecutado ? (e.manual ? 'Sí (a mano)' : 'Sí') : 'No') : '', e ? d(e.fechaAut) : '', ...pie(r)]));
+          e ? (e.ejecutado ? (e.manual ? 'Sí (a mano)' : 'Sí') : 'No') : '', e ? d(e.fechaAut) : '', ...pie(r), e && e.md ? faseObs(e.md.observacion) : '']));
       });
       return out;
     }
@@ -18028,7 +18103,7 @@
   }
   function segLibro() {
     const { filas } = segCuadro(), C = SeguimientoCC.COLS, libro = Xlsx.crearLibro(), hoy = new Date(), p = (n) => String(n).padStart(2, '0');
-    const h = libro.hoja('Seguimiento CC', { activa: true, congelar: 'B2', cols: [16, 9, 60, 11, 18, 13, 13, 8, 42, 15, 13, 14, 12, 13, 26, 26].map((w, i) => [i + 1, i + 1, w]),
+    const h = libro.hoja('Seguimiento CC', { activa: true, congelar: 'B2', cols: [16, 9, 60, 11, 18, 13, 13, 8, 42, 15, 13, 14, 12, 13, 26, 26, 7].map((w, i) => [i + 1, i + 1, w]),
       tabla: { nombre: 'SeguimientoCC', ref: `A1:${Xlsx.letra(C.length - 1)}${Math.max(2, filas.length + 1)}`, estilo: 'TableStyleMedium2' } });
     C.forEach((t, c) => h.poner({ c, r: 0 }, t, 'encabezado'));
     const est = { Ejecutado: 'estAut', 'En proceso': 'estIng', Pendiente: 'estSus', 'Sin RMD': 'estSus' };
@@ -19468,12 +19543,15 @@
       const lineas = [`RMD ${r.codigo} v${r.version} · ${r.descripcion} · ${r.etapa} · ${r.planta} · ${r.estado || ''}`, `Vista ${DT ? 'completa (DOC)' : 'simple'} · ${n.total} cambio(s), ${n.errores} error(es), ${n.avisos} aviso(s), ${n.nuevos} paso(s) nuevo(s)`, '', 'CAMBIOS'];
       CMB.forEach((c) => lineas.push(`- ${c.numero || ''} ${ETQ_ACCION[c.accion] || c.accion}${c.clase === 'pm' ? ' (proceso menor)' : ''} · ${c.lugar || ''}: ${c.accion === 'quitar' ? c.antes : c.campos ? `${String(c.texto || '').slice(0, 60)} — ${c.campos.map((y) => `${y.campo}: ${y.antes} → ${y.despues}`).join('; ')}` : `${c.antes ? c.antes + ' → ' : ''}${c.despues || c.texto || ''}`}${c.codigo ? ` (paso ${c.codigo})` : ''}${c.nuevo ? ' ★ nuevo' : ''}${c.comentario ? ` · comentario: ${c.comentario}` : ''}`));
       ['error', 'aviso'].forEach((nv) => { const l = [...AV.entries()].flatMap(([id, xs]) => xs.filter((a) => a.nivel === nv).map((a) => `- ${etiqueta(id)}: ${a.texto}`)); if (l.length) lineas.push('', nv === 'error' ? 'ERRORES' : 'AVISOS', ...l); });
-      if (OBS) { const R = OBS.revisar(obsTexto()); lineas.push('', `OBSERVACIONES${obsCambiada() ? ' (cambiadas en la vista)' : ''}`, obsTexto() || '(vacías)');
+      if (OBS) { const R = OBS.revisar(obsTexto(), { vbAct: vbEnTrabajo() }); lineas.push('', `OBSERVACIONES${obsCambiada() ? ' (cambiadas en la vista)' : ''}`, obsTexto() || '(vacías)');
         [...R.nomenclatura.map((t) => 'Nomenclatura: ' + t), ...R.pendientes.map((p) => p.texto), ...R.formato.map((t) => 'Formato de CC: ' + t)].forEach((t) => lineas.push('- ' + t)); }
       return lineas.join('\n');
     }
     // ---------- Observaciones (v1.124.0, solo en la vista del portal) ----------
     const obsTexto = () => (W && W.obs != null ? String(W.obs) : OBS ? OBS.texto : '');
+    // v1.155.0: casillas «V.B.» de los pasos de PROCEDIMIENTO tal como quedan en la vista (para la regla de la fase 3)
+    const vbEnTrabajo = () => { let n = 0; const sum = (ps) => (ps || []).forEach((x) => { if (!x.quitado && x.vb) n++; });
+      ((W && W.estructuras) || []).forEach((e) => { if (e.quitado || !/^PROCEDIMIENTO/i.test(String(e.nombre || '').trim())) return; sum(e.pasos); (e.etiquetas || []).forEach((t) => sum(t.pasos)); }); return n; };
     const obsCambiada = () => !!(OBS && W && W.obs != null && String(W.obs).replace(/\s+$/, '') !== String(OBS.texto).replace(/\s+$/, ''));
     function htmlObs() {
       const t = obsTexto(), ed = OBS.editable, filas = Math.min(9, Math.max(3, t.split('\n').length + 1));
@@ -19484,10 +19562,13 @@
         <div class="pp-obs-der">${htmlObsRevision()}</div></div></section>`;
     }
     function htmlObsRevision() {
-      const R = OBS.revisar(obsTexto()), s = R.sugerida, ed = OBS.editable, opt = (l, v) => l.map((x) => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('');
-      const nom = R.ok ? `<div class="pp-obs-l ok">✓ 1.ª línea: ${esc(R.resumen)}</div>` : R.nomenclatura.map((x) => `<div class="pp-obs-l av">⚠ ${esc(x)}</div>`).join('');
-      const gen = ed && !R.ok ? `<div class="pp-obs-gen" title="AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase"><span>${esc(s.hoy)}</span><input id="pp-obs-ini" maxlength="2" spellcheck="false" value="${esc(s.ini)}" title="Tus iniciales (nombre + apellido)" aria-label="Iniciales">-<select id="pp-obs-pri" title="Prioridad" aria-label="Prioridad">${opt(['1', '2', '3'], s.pri)}</select>-<select id="pp-obs-com" title="Complejidad" aria-label="Complejidad">${opt(s.complejidades, s.com)}</select>-FI1.0-FA1.0-<select id="pp-obs-fase" title="Fase de esta versión (no se copia de la anterior)" aria-label="Fase"><option value="">F?</option>${opt(s.fases, s.fase)}</select>
-        <button type="button" data-a="obs-nom">${s.reemplazar ? 'Reemplazar 1.ª línea' : 'Poner como 1.ª línea'}</button>${s.faseAnt ? `<small>fase de la ${esc(s.vAnt)}: <b>${esc(s.faseAnt)}</b></small>` : ''}</div>` : '';
+      const R = OBS.revisar(obsTexto(), { vbAct: vbEnTrabajo() }), s = R.sugerida, ed = OBS.editable, opt = (l, v) => l.map((x) => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('');
+      // v1.155.0: F3 o superior solo con menos V°B° que la versión anterior (bloqueadas si no)
+      const fvb = s.faseVb || null, faseAlta = (x) => { const m = /^F(\d{1,2})/i.exec(x); return !!(m && fvb && +m[1] >= fvb.desde); };
+      const optFase = (q) => q.fases.map((x) => { const no = faseAlta(x) && !fvb.permite; return `<option${x === q.fase && !no ? ' selected' : ''}${no ? ` disabled title="${esc(fvb.texto)}"` : ''}>${esc(x)}</option>`; }).join('');
+      const nom = R.ok ? `<div class="pp-obs-l ok">✓ 1.ª línea: ${esc(R.resumen)}</div>${R.faseInfo ? `<div class="pp-obs-l info">ℹ ${esc(R.faseInfo)}</div>` : ''}` : R.nomenclatura.map((x) => `<div class="pp-obs-l av">⚠ ${esc(x)}</div>`).join('');
+      const gen = ed && !R.ok ? `<div class="pp-obs-gen" title="AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase"><span>${esc(s.hoy)}</span><input id="pp-obs-ini" maxlength="2" spellcheck="false" value="${esc(s.ini)}" title="Tus iniciales (nombre + apellido)" aria-label="Iniciales">-<select id="pp-obs-pri" title="Prioridad" aria-label="Prioridad">${opt(['1', '2', '3'], s.pri)}</select>-<select id="pp-obs-com" title="Complejidad" aria-label="Complejidad">${opt(s.complejidades, s.com)}</select>-FI1.0-FA1.0-<select id="pp-obs-fase" title="Fase de esta versión (no se copia de la anterior)" aria-label="Fase"><option value="">F?</option>${optFase(s)}</select>
+        <button type="button" data-a="obs-nom">${s.reemplazar ? 'Reemplazar 1.ª línea' : 'Poner como 1.ª línea'}</button>${s.faseAnt ? `<small>fase de la ${esc(s.vAnt)}: <b>${esc(s.faseAnt)}</b></small>` : ''}${fvb ? `<small class="pp-obs-fvb">${fvb.sugerida ? '<b>Sugerida F3.</b> ' : ''}${esc(fvb.texto)}</small>` : ''}</div>` : '';
       const chips = (l, cls) => l.map((c) => `<span class="pp-obs-cc ${cls}">${esc(c)}</span>`).join('');
       const cc = R.aplicados.length || R.heredados.length ? `<div class="pp-obs-l">CC aplicados: ${chips(R.aplicados, '') || '<i>ninguno nuevo</i>'}${R.heredados.length ? ` <small>de la versión anterior:</small> ${chips(R.heredados, 'viejo')}` : ''}</div>` : '';
       const res = R.resueltos.length ? `<div class="pp-obs-l ok">✓ Resuelto: ${R.resueltos.map(esc).join(', ')}</div>` : '';
@@ -19534,7 +19615,8 @@
         const v = (id) => (document.getElementById(id) || {}).value || '', ini = v('pp-obs-ini').toUpperCase().replace(/[^A-ZÑ]/g, '');
         if (ini.length !== 2) { aviso('Escribe tus 2 iniciales (nombre + apellido).'); return; }
         if (!v('pp-obs-fase')) { aviso('Elige la fase de esta versión: no se copia de la anterior.'); return; }
-        const R = OBS.revisar(obsTexto()); obsPoner(OBS.nomenclatura(obsTexto(), { ini, pri: v('pp-obs-pri'), com: v('pp-obs-com'), fase: v('pp-obs-fase') }, R.sugerida.reemplazar));
+        const R = OBS.revisar(obsTexto(), { vbAct: vbEnTrabajo() }), fvb = R.sugerida.faseVb, mF = /^F(\d{1,2})/i.exec(v('pp-obs-fase'));
+        if (fvb && mF && +mF[1] >= fvb.desde && !fvb.permite) { aviso(`La fase ${v('pp-obs-fase')} es para versiones con menos V°B° que la anterior. ${fvb.texto}`); return; } obsPoner(OBS.nomenclatura(obsTexto(), { ini, pri: v('pp-obs-pri'), com: v('pp-obs-com'), fase: v('pp-obs-fase') }, R.sugerida.reemplazar));
       }
     }
     function copiarResumen() { const t = textoResumen(); const ok = () => aviso('Resumen copiado.'); try { navigator.clipboard.writeText(t).then(ok, () => { fallback(t); ok(); }); } catch (e) { fallback(t); ok(); } }
@@ -21417,24 +21499,30 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   }
   // v1.124.0: Observaciones en la vista (pedido de Carlos): 1.ª línea de nomenclatura, CC aplicados del listado, pendientes heredados y notas.
   // Las funciones corren en el portal (listado de CC, usuario de SAP); el editor del marco solo pinta y escribe el texto.
-  function ppObsEmb(rmd, previa) {
+  function ppObsEmb(rmd, previa, vbAnt = null) {
     const planta = rmd.planta || '', responsable = responsableSap(), ini = rsUsuarioIniciales(), vAnt = previa ? `v${previa.version}` : '';
     const l0Ant = previa ? String(previa.observacion || '').split(/\r?\n/)[0].trim() : '', ant = l0Ant ? partesNomenclatura(l0Ant) : null;
     const listado = () => (RR.cambios && RR.cambios.cambios) || null;
     return {
       texto: String(rmd.observacion || ''), editable: /ingresad/i.test(rmd.estado || ''), planta, hayListado: () => !!listado(),
       previa: previa ? { version: previa.version, codigo: String(previa.codigo), estado: previa.estado || '' } : null,
-      revisar(texto) {
-        const l0 = String(texto || '').split(/\r?\n/)[0], res = analizarNomenclatura(l0), act = partesNomenclatura(l0), copiada = res.ok && !!l0Ant && l0.trim() === l0Ant;
+      // op.vbAct: casillas «V.B.» de PROCEDIMIENTO de esta versión tal como está en la vista (las cuenta el editor)
+      revisar(texto, op = {}) {
+        const l0 = String(texto || '').split(/\r?\n/)[0], res0 = analizarNomenclatura(l0), act = partesNomenclatura(l0), copiada = res0.ok && !!l0Ant && l0.trim() === l0Ant;
+        // v1.155.0: fase 3 o superior solo con menos V°B° que la versión anterior; F3 se sugiere si y solo si los tiene
+        const fv = reglaFaseVb(op.vbAct, vbAnt, previa ? vAnt : ''), nAct = numeroFase(act.fase), faseMal = res0.ok && !copiada && nAct >= FASE_MENOS_VB && !fv.permite;
+        const res = faseMal ? { ...res0, ok: false, avisos: [`La fase ${act.fase} es para versiones con menos V°B° que la anterior. ${fv.texto}`] } : res0;
+        const faseInfo = res.ok && !copiada ? (fv.permite && nAct < FASE_MENOS_VB ? `Sugerencia: fase 3. ${fv.texto}` : fv.permite ? fv.texto : '') : '';
         const h = Pendientes.heredados(previa ? [{ version: previa.version, codigo: previa.codigo, estado: previa.estado, observacion: previa.observacion }] : [], { version: rmd.version, observacion: texto });
         const pendientes = [...h.ccs.map((x) => ({ cc: x.cc, texto: `Falta aplicar ${x.cc} (pendiente de la v${x.version}): ${x.linea}` })), ...h.textos.map((x) => ({ texto: `Pendiente de la v${x.version}: ${x.linea}. Revisa si ya se aplicó.` })),
           ...(h.motivos || []).map((x) => ({ texto: `La v${x.version} se suspendió por: ${x.linea}. Revisa que esta versión lo atienda.` })), ...h.propios.map((x) => ({ propio: true, texto: `Pendiente anotado en esta versión: ${x.linea}` }))];
-        return { ok: res.ok && !copiada, resumen: res.ok ? (res.corto || res.resumen || '') : '',
+        return { ok: res.ok && !copiada, resumen: res.ok ? (res.corto || res.resumen || '') : '', faseInfo,
           nomenclatura: copiada ? [`La 1.ª línea es la misma de la ${vAnt} (se copió al crear la versión): pon la fecha de hoy y tus iniciales, y revisa prioridad, complejidad y fase.`] : res.ok ? [] : res.avisos,
           aplicados: h.aplicados.filter((x) => !x.heredado).map((x) => x.codigo), heredados: h.aplicados.filter((x) => x.heredado).map((x) => x.codigo), resueltos: h.resueltos.map((x) => `${x.cc} (de la v${x.version})`), pendientes,
           formato: h.formato.map((x) => `${x.linea}: falta ${x.faltan.join(', ')}`),
           sugerida: { hoy: hoyAAAAMMDD(), ini: ini || act.ini || (ant && ant.ini) || '', pri: act.prioridad || (ant && ant.prioridad) || '2', com: act.complejidad || (ant && ant.complejidad) || 'C1.0',
-            fase: copiada ? '' : act.fase || '', faseAnt: (ant && ant.fase) || '', vAnt, reemplazar: !!act.parece, fases: FASES_NOM, complejidades: COMPLEJIDADES } };
+            fase: copiada || faseMal ? fv.sugerida : act.fase || fv.sugerida, faseAnt: (ant && ant.fase) || '', vAnt, reemplazar: !!act.parece, fases: FASES_NOM, complejidades: COMPLEJIDADES,
+            faseVb: { permite: fv.permite, sugerida: fv.sugerida, texto: fv.texto, desde: FASE_MENOS_VB } } };
       },
       nomenclatura(texto, { ini: i2, pri, com, fase }, reemplazar) {
         const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), i2, pri, com, fase), ls = String(texto || '').split(/\r?\n/);
@@ -21493,8 +21581,11 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   async function montarVista(datos, prop, extra = {}) {
     if (VISTA) VISTA.cerrar();
     const ctrl = controladorPrincipal(), paq = { ...datos }; delete paq.desdePdf;
+    // v1.155.0: V°B° (casillas «V.B.» de PROCEDIMIENTO) de la versión anterior, para la regla de la fase 3; los de esta versión los cuenta el editor
+    let vbAnt = null;
+    if (extra.obs && extra.previa && extra.previa.mdId) { try { vbAnt = (await casillasVbDe(ctrl && ctrl.getView ? ctrl.getView().getModel('mainModelv2') : null, [extra.previa.mdId]))[extra.previa.mdId]; } catch (e) { vbAnt = null; } }
     const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado, docs: RR.mapa || null,
-      obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa) : null,
+      obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa, vbAnt) : null,
       uso: (cods, cb) => usoDePasosPorCodigo(cods, cb).catch(() => {}),          // v1.129.0: en cuántos masters Autorizados / Ingresados está cada paso
       guardar: (p2) => { vistaGuardar(paq, p2).catch((e) => toast('No se pudo revisar: ' + e.message, true)); }, cerrar: () => { if (VISTA) VISTA.cerrar(); } };
     const titulo = `Edición rápida · RMD ${paq.rmd.codigo} v${paq.rmd.version}`, html = ppHtml(await ppEmpacar(paq), prop, titulo, true);

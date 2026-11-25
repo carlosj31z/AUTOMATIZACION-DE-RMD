@@ -86,7 +86,8 @@ ok('Mismos nombres de tablas dinámicas que el archivo del equipo', ['Tabla din�
 const leido = await Xlsx.leerLibro(u8);
 ok('Hojas y orden del archivo del equipo', JSON.stringify(leido.hojas) === JSON.stringify(['Exportación SAPUI5', 'PEND PL1', 'PEND PL2', 'RESUMEN', 'Hoja1']), leido.hojas.join(', '));
 const datos = await leido.filas('Exportación SAPUI5');
-ok('Hoja de datos: 30 columnas, 5 RMD + 2 PEND', datos[0].length === 30 && datos.length === 8 && datos[0][29] === 'RMD APR');
+ok('Hoja de datos: 31 columnas (v1.155.0: «Fase» al final), 5 RMD + 2 PEND', datos[0].length === 31 && datos.length === 8 && datos[0][29] === 'RMD APR' && datos[0][30] === 'Fase');
+ok('Hoja de datos: «Fase» sale de la 1.ª línea de Observaciones y queda vacía si no se reconoce', datos.slice(1, 6).every((f, i) => { const o = String(f[17] || '').split(/\r?\n/)[0].trim().split(/\s+/)[0], m = /(?:^|-)F(\d{1,2})(?:-?(R))?$/i.exec(o); return (f[30] || '') === (m ? `F${m[1]}${m[2] ? 'R' : ''}` : ''); }) && datos.slice(1, 6).some((f) => f[30]) && !datos[7][30], JSON.stringify(datos.slice(1).map((f) => [f[17], f[30]])));
 ok('Hoja de datos: fecha de registro en UTC como número de serie', cerca(datos[1][8], Date.parse('2026-08-03T15:00:00Z') / 86400000 + 25569));
 ok('Hoja de datos: PEND PL1 entra con su estado y como ANTIGUO', datos[7][3] === 'Por hacer solicitud' && datos[7][12] === 'ANTIGUO' && datos[7][14] === 'PLANTA ATE');
 ok('Hoja de datos: "No contar" sugerido y su motivo en "Por revisar"', datos[4][23] === 'PEND CC' && /Revisar "No contar"/.test(datos[4][27] || ''));
