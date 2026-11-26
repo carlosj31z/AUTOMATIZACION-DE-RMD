@@ -486,6 +486,11 @@ cuenta). Escribir y responder siempre en **español**.
   solo se elige si tiene menos que la versión anterior, y F3 se sugiere si y solo si los tiene (`reglaFaseVb`, `FASE_MENOS_VB`). Sin anterior o sin poder contar: bloqueada.
   **Columna «Fase» en los exportados** (`faseCorta` = `Reglas.faseDeObservacion(obs).corto`, vacía si no se reconoce), siempre al final de cada hoja. Prueba
   `qa_fase_vb.mjs`. **La siguiente versión debe ser > 1.155.0.**
+- 2026-11-26, v1.156.0 (encima de la 1.155.0): **pedidos de Carlos.** Fase 3: versión anterior por `mdIdVersionAnt` o misma cadena + etapa
+  (`nivelTxt`) + planta, sin Canceladas (`ESTADOS_VERSION`, `versionAnteriorDe`, `filaPrincipal`); con menos V°B° se sugiere F3 en la nomenclatura
+  (`sugerirF3`). Clic en la celda Código de la lista = copiar (`codigoCopiable`, opción `copiarcodigo`). «Comparar dos RMD» → «Editar <RMD> para
+  homologar» (`abrirHomologar`: Edición rápida con `emb.ref`, panel `htmlRef`/`refDiferencias`/`refAccion`, sin Observaciones) y «Ocultar lista de
+  cambios» (`rmdCmpSinLista`). Probado en el portal en solo lectura (2202608976 v3 vs 2202504740 v2). **La siguiente versión debe ser > 1.156.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
