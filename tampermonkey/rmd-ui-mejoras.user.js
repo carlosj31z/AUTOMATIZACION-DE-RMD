@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.159.0
+// @version      1.160.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.159.0';                                                       // mantener igual a @version
+  const VERSION = '1.160.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -488,6 +488,11 @@
   .rmd-cmp-ed-msg { color: var(--rmd-apagado); } .rmd-cmp-ed-msg.error { color: var(--rmd-rojo); } .rmd-cmp-ed-bot { display: inline-flex; gap: 6px; margin-left: auto; }
   .rmd-cmp-acc { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; } .rmd-cmp-acc .rmd-btn { min-height: 0; padding: 1px 8px; font-size: 12px; }
   .rmd-cmp-acc.flota { position: absolute; right: 14px; z-index: 2; margin: 0; padding: 2px; border-radius: 6px; background: var(--rmd-superficie); box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .rmd-cmp-ed-ok { cursor: pointer; } .rmd-cmp-ed-ok:hover { outline: 1px dashed var(--rmd-acento, #0a66c2); outline-offset: 1px; }
+  .rmd-cmp-menu { position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 2px; min-width: 220px; max-width: 360px; padding: 6px; border: 1px solid var(--rmd-borde, #c9ced4); border-radius: 8px; background: var(--rmd-superficie, #fff); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  .rmd-cmp-menu-tit { padding: 2px 6px 6px; font-size: 12px; opacity: .8; border-bottom: 1px solid var(--rmd-borde, #e3e6ea); margin-bottom: 2px; }
+  .rmd-cmp-menu button { padding: 5px 8px; border: 0; border-radius: 5px; background: none; color: inherit; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+  .rmd-cmp-menu button:hover, .rmd-cmp-menu button:focus { background: rgba(10,102,194,.12); outline: none; } .rmd-cmp-menu button.qui { color: var(--rmd-rojo, #b42318); }
   .rmd-cmp-hecho { padding: 1px 8px; border-radius: 10px; background: rgba(46,160,67,.18); color: var(--rmd-verde); font-size: 12px; font-weight: 600; white-space: nowrap; }
   .rmd-cmp-vista { display: inline-flex; border: 1px solid var(--rmd-borde); border-radius: 6px; overflow: hidden; } .rmd-cmp-vista button { padding: 4px 12px; border: 0; background: none; color: var(--rmd-texto); font: 13px var(--rmd-fuente); cursor: pointer; }
   .rmd-cmp-vista button[aria-pressed="true"] { background: var(--rmd-acento); color: #fff; }
@@ -8860,11 +8865,63 @@
       abrirHomologar(m, o, { oculto: true, avisar: (t) => { if (ed) { ed.msg = t; pintarEd(); } },
         homol: (api) => { if (!ed) return; ed.api = api; ed.msg = ''; pintarEd(); }, alPintar: () => { if (ed && ed.api) pintarEd(); },
         alIngresar: () => { quitarModalesPagina(); ed = null; comparar(); },
+        alModal: (f, cerrar) => mostrarModalEd(f, cerrar), alAviso: (t) => { if (ed) { ed.msg = t; pintarEd(); } },
         error: (e) => { if (ed) { ed.msg = 'No se pudo preparar la edición: ' + e.message; ed.fallo = true; pintarEd(); } } });
     }
-    function terminarEd() { if (VISTA) VISTA.cerrar(); quitarModalesPagina(); ed = null; pintarResultado(); }
+    function terminarEd() { quitarModalesPagina(); if (VISTA) VISTA.cerrar(); ed = null; pintarResultado(); }
     const quitarObs = () => { if (ed && ed.obs) { ed.obs.disconnect(); ed.obs = null; } };
-    function quitarModalesPagina() { try { if (pagina && !pagina.closed) pagina.document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove()); } catch (e) { /* sin pestaña */ } quitarObs(); }
+    function quitarModalesPagina() { cerrarMenuEd(); try { if (pagina && !pagina.closed) { pagina.document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove()); const h = pagina.document.getElementById('rmd-cmp-edhost'); if (h) h.remove(); } } catch (e) { /* sin pestaña */ } quitarObs(); }
+    // v1.160.0: las ventanas del editor oculto (Editar, Configuración, Mover a…, Agregar) se muestran en esta pestaña con su propio estilo
+    function mostrarModalEd(f, cerrar) {
+      if (!ed || !pagina || pagina.closed) return;
+      const pd = pagina.document; let host = pd.getElementById('rmd-cmp-edhost');
+      if (!host) {
+        host = pd.createElement('div'); host.id = 'rmd-cmp-edhost'; const sr = host.attachShadow({ mode: 'open' });
+        const st = pd.createElement('style'); st.textContent = PP_EDITOR_CSS.replace(/:root\b/g, ':host').replace(/html,\s*body\s*\{/g, '.pp-host-raiz {') + '\n.pp-host-raiz { background: none; }';
+        const raiz = pd.createElement('div'); raiz.className = 'pp-vista pp-host-raiz'; sr.append(st, raiz); pd.body.appendChild(host);
+        pd.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; const ult = [...raiz.children].pop(); if (ult && ult.__cerrar) { e.preventDefault(); e.stopPropagation(); ult.__cerrar(); } }, true);
+      }
+      f.__cerrar = cerrar; host.shadowRoot.querySelector('.pp-host-raiz').appendChild(pd.adoptNode(f));
+      setTimeout(() => { const i = f.querySelector('textarea, input:not([type="checkbox"]):not([type="radio"]), select'); if (i) i.focus(); }, 30);
+    }
+    // fila del editor ↔ línea del RMD editado en la comparación (por texto; primero la siguiente en orden)
+    function mapaFilas() {
+      const L = ed.l === 'a' ? R.A : R.B, filas = ed.api.filas(), porLinea = new Map(), porFila = new Map(), claves = L.map((x) => (x.zona === 'cabecera' ? '' : claveCmp(x.texto)));
+      let ult = -1;
+      const cumple = (k, t) => { const lt = claves[k]; return !!lt && !porLinea.has(k) && (lt.includes(t) || (lt.length > 12 && t.includes(lt))); };
+      filas.forEach((f) => {
+        const t = claveCmp(f.texto); if (t.length < 3) return;
+        let k = -1; for (let i = ult + 1; i < L.length; i++) if (cumple(i, t)) { k = i; break; }
+        if (k < 0) for (let i = 0; i <= ult && i < L.length; i++) if (cumple(i, t)) { k = i; break; }
+        if (k < 0) return; porLinea.set(k, f); porFila.set(f.id, k); ult = k;
+      });
+      return { filas, porLinea, porFila };
+    }
+    const NOMBRE_FILA = { paso: 'Paso', pm: 'Proceso menor', equipo: 'Equipo', utensilio: 'Utensilio', especificacion: 'Especificación', insumo: 'Insumo' };
+    let menuEd = null;
+    function cerrarMenuEd() { if (!menuEd) return; const m = menuEd; menuEd = null; try { m.ownerDocument.removeEventListener('mousedown', m.__fuera, true); m.ownerDocument.removeEventListener('keydown', m.__tecla, true); } catch (e) { /* pestaña cerrada */ } m.remove(); }
+    // clic en una línea del RMD editado: sus acciones de la Edición rápida (las mismas que trae cada fila allí)
+    function abrirMenuEd(k, x, y) {
+      cerrarMenuEd(); if (!ed || !ed.api || ed.guardando) return;
+      const M = mapaFilas(), f = M.porLinea.get(k); if (!f || !f.acciones.length) return;
+      const pd = res.ownerDocument, m = pd.createElement('div'); m.className = 'rmd-cmp-menu'; m.setAttribute('role', 'menu');
+      m.innerHTML = `<div class="rmd-cmp-menu-tit"><b>${esc(NOMBRE_FILA[f.clase] || '')}</b>${f.quitado ? ' (quitado)' : ''}: ${esc(f.texto.slice(0, 80))}</div>` + f.acciones.map((a) => `<button type="button" role="menuitem" data-fa="${esc(a.a)}"${a.qui ? ' class="qui"' : ''}>${esc(a.texto)}</button>`).join('');
+      pd.body.appendChild(m); menuEd = m;
+      const w = pd.defaultView, r = m.getBoundingClientRect();
+      m.style.left = `${Math.max(8, Math.min(x, w.innerWidth - r.width - 8))}px`; m.style.top = `${Math.max(8, Math.min(y, w.innerHeight - r.height - 8))}px`;
+      m.addEventListener('click', (e) => { const b = e.target.closest('button[data-fa]'); if (!b) return; cerrarMenuEd(); if (ed && ed.api && !ed.api.fila(f.id, b.dataset.fa)) { ed.msg = 'No se pudo: la fila cambió. Vuelve a intentarlo.'; pintarEd(); } });
+      m.__fuera = (e) => { if (!m.contains(e.target)) cerrarMenuEd(); };
+      m.__tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); cerrarMenuEd(); } };
+      pd.addEventListener('mousedown', m.__fuera, true); pd.addEventListener('keydown', m.__tecla, true);
+      const b0 = m.querySelector('button'); if (b0) b0.focus();
+    }
+    function lineaDeClic(t) {
+      if (!ed || !R) return null;
+      if (vista === 'pdf') { const p = panel(ed.l), el = p && p.contains(t) ? t.closest('[data-l]') : null; return el ? +el.dataset.l : null; }
+      const c = t.closest('.rmd-cmp-f[data-k] > *'); if (!c) return null;
+      const fila = c.parentElement, lado = [...fila.children].indexOf(c) === 0 ? 'a' : 'b'; if (lado !== ed.l) return null;
+      const r = R.filas[+fila.dataset.k], k = r ? (lado === 'a' ? r.a : r.b) : null; return k == null ? null : k;
+    }
     // «Guardar en SAP…»: la revisión y el ingreso de siempre; sus ventanas se pasan a esta pestaña
     function guardarEd() {
       if (!ed || !ed.api || ed.guardando) return;
@@ -8903,7 +8960,7 @@
       const barra = res.querySelector('.rmd-cmp-barra'); if (!barra) return;
       let b = res.querySelector('.rmd-cmp-ed'); if (!b) { b = res.ownerDocument.createElement('div'); b.className = 'rmd-cmp-ed'; barra.after(b); }
       const n = ed.api ? ed.api.cambios() : 0, items = ed.api ? ed.api.items() : [];
-      b.innerHTML = `<b>Editando ${esc(nombre(ed.m))}</b><span>${ed.api ? `${n} cambio${n === 1 ? '' : 's'} por guardar · ${items.filter((x) => !/^lista/.test(x.tipo)).length} diferencia${items.length === 1 ? '' : 's'} con ${esc(nombre(ed.o))}` : ''}</span>
+      b.innerHTML = `<b>Editando ${esc(nombre(ed.m))}</b><span>${ed.api ? `${n} cambio${n === 1 ? '' : 's'} por guardar · ${items.filter((x) => !/^lista/.test(x.tipo)).length} diferencia${items.length === 1 ? '' : 's'} con ${esc(nombre(ed.o))} · clic en una línea de ${esc(cortoDe(ed.m))} para editarla, configurarla, agregar debajo, moverla o quitarla` : ''}</span>
         ${ed.msg ? `<span class="rmd-cmp-ed-msg${ed.fallo ? ' error' : ''}">${esc(ed.msg)}</span>` : ''}
         <span class="rmd-cmp-ed-bot"><button type="button" class="rmd-btn" data-a="ed-deshacer" ${ed.api && ed.api.hayDeshacer() && !ed.guardando ? '' : 'disabled'}>Deshacer</button><button type="button" class="rmd-btn primario" data-a="ed-guardar" ${ed.api && n && !ed.guardando ? '' : 'disabled'}>Guardar en SAP…</button><button type="button" class="rmd-btn" data-a="ed-salir" ${ed.guardando ? 'disabled' : ''}>Terminar sin guardar</button></span>`;
       res.querySelectorAll('.rmd-cmp-acc').forEach((x) => x.remove());
@@ -8921,7 +8978,16 @@
         const p = panel(l); c.classList.add('flota'); c.style.top = `${Math.max(0, el.getBoundingClientRect().top - p.getBoundingClientRect().top + p.scrollTop)}px`; p.appendChild(c);
       };
       if (!ed.guardando) ubicarItems(items).forEach((u) => poner(u.lado, u.k, boton(u)));
-      ed.hechos.forEach((h) => poner(h.l, h.k, `<span class="rmd-cmp-hecho">✓ ${esc(h.txt)}</span>`));
+      ed.hechos.filter((h) => h.l !== ed.l).forEach((h) => poner(h.l, h.k, `<span class="rmd-cmp-hecho">✓ ${esc(h.txt)}</span>`));
+      // v1.160.0: cada línea del RMD editado se abre con clic (todas las acciones de la Edición rápida); lo cambiado queda marcado en su línea
+      const M = mapaFilas(), ord = M.filas.map((f) => f.id), porK = new Map();
+      res.querySelectorAll('.rmd-cmp-ed-ok').forEach((x) => x.classList.remove('rmd-cmp-ed-ok'));
+      M.porLinea.forEach((f, k) => { const el = elementoLinea(ed.l, k); if (el) { el.classList.add('rmd-cmp-ed-ok'); el.title = 'Clic: editar, configurar, agregar, mover o quitar'; } });
+      ed.api.cambiados().forEach((c) => {
+        let k = M.porFila.get(c.id); for (let i = ord.indexOf(c.id) - 1; k == null && i >= 0; i--) k = M.porFila.get(ord[i]);   // fila nueva: en la línea de la anterior
+        if (k == null) return; const l = porK.get(k) || []; const t = c.accion === 'agregar' ? `Nuevo: ${c.texto.slice(0, 50)}` : c.etq; if (!l.includes(t)) l.push(t); porK.set(k, l);
+      });
+      porK.forEach((l, k) => poner(ed.l, k, `<span class="rmd-cmp-hecho">✓ ${esc(l.join(' · '))}</span>`));
     }
     // ---- Vista «Como el PDF»: cada master con su formato; las diferencias se pintan encima y el desplazamiento va sincronizado ----
     function hojaPdf(l) {
@@ -8991,7 +9057,8 @@
     }
     function ir(g) { if (!R || !R.cambios.length) return; actual = (g + R.cambios.length) % R.cambios.length; marcarActual(true); }
     function alClic(e) {
-      const b = e.target.closest('button'); if (!b) return;
+      const b = e.target.closest('button');
+      if (!b) { if (ed && ed.api && !e.target.closest('a, input, select, textarea, .rmd-cmp-acc')) { const k = lineaDeClic(e.target); if (k != null) abrirMenuEd(k, e.clientX + 4, e.clientY + 4); } return; }
       if (b.dataset.a === 'sig') ir(actual + 1); else if (b.dataset.a === 'ant') ir(actual < 0 ? -1 : actual - 1);
       else if (b.classList.contains('rmd-cmp-pliegue')) { for (let k = +b.dataset.desde; k < +b.dataset.hasta; k++) abiertos.add(k); const y = docEl().scrollTop; pintarResultado(); docEl().scrollTop = y; }
       else if (b.dataset.a === 'lista') {
@@ -19665,6 +19732,13 @@
       accion: (a, k) => refAccion(a, k), deshacer: () => deshacerUno(), cambios: () => contar().total, hayDeshacer: () => deshacer.length > 0,
       errores: () => erroresPropios().map(([id, l]) => { const f = encontrar(id), t = f && f.item ? String(f.item.texto || f.item.desc || '') : ''; return `${t.slice(0, 80)}: ${l.filter((x) => x.nivel === 'error').map((x) => x.texto).join(' ')}`; }),
       guardar: () => { if (erroresPropios().length) return false; guardarEnSap(); return true; },
+      // v1.160.0 (pedido de Carlos): todas las acciones de cada fila (editar, configuración, agregar, mover, quitar…) desde la comparación
+      filas: () => $$('.pp-doc tr[data-id]').map((tr) => { const f = encontrar(tr.dataset.id); if (!f || !/^(paso|pm|equipo|utensilio|especificacion|insumo)$/.test(f.clase)) return null;
+        const tx = tr.querySelector('.pp-tx') || tr.querySelector('td');
+        const acc = [...tr.querySelectorAll(':scope > td .pp-acc button[data-a]')].filter((b) => !/^(comentar|copiar|marcar)$/.test(b.dataset.a)).map((b) => ({ a: b.dataset.a, texto: b.textContent.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim(), qui: b.classList.contains('qui') }));
+        return { id: tr.dataset.id, clase: f.clase, texto: tx ? tx.textContent.trim() : '', quitado: !!f.item.quitado, acciones: acc }; }).filter(Boolean),
+      fila: (id, a) => { const b = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(id)}"] > td .pp-acc [data-a="${a}"]`); if (!b) return false; b.click(); return true; },
+      cambiados: () => CMB.map((c) => ({ id: c.id, accion: c.accion, etq: ETQ_ACCION[c.accion] || c.accion, texto: String(c.accion === 'quitar' ? c.antes || '' : c.despues || c.texto || '') })),
     }), 0);
     function htmlPanel() {
       const n = contar(), conAviso = [...AV.entries()].filter(([, l]) => l.some((a) => a.nivel !== 'info'));
@@ -20037,7 +20111,9 @@
       document.body.appendChild(f); const cerrar = () => { f.remove(); document.removeEventListener('keydown', tecla, true); };
       const tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); cerrar(); } };
       document.addEventListener('keydown', tecla, true); f.addEventListener('mousedown', (e) => { if (e.target === f) cerrar(); });
-      if (alMontar) alMontar(f.firstElementChild, cerrar); return cerrar;
+      if (alMontar) alMontar(f.firstElementChild, cerrar);
+      if (EMB && typeof EMB.alModal === 'function') { try { EMB.alModal(f, cerrar); } catch (e) { /* la comparación ya no está: la ventana queda en la vista */ } }   // v1.160.0: editor oculto de «Comparar dos RMD»
+      return cerrar;
     }
     // PDF: diálogo de impresión del navegador con destino «Guardar como PDF»
     function generarPdf() {
@@ -20753,7 +20829,7 @@
         m.addEventListener('click', (e) => { const a = e.target.dataset.a; if (a === 'cancelar') cerrar(); else if (a === 'pdf-ahora') { cerrar(); generarPdf(); } else if (a === 'otra' && ULTIMO) descargar(ULTIMO.html, ULTIMO.nombre); else if (a === 'copiar') { try { navigator.clipboard.writeText(nombre); e.target.textContent = 'Nombre copiado'; } catch (x) { e.target.textContent = 'Selecciónalo y cópialo a mano'; } } });
       });
     }
-    function aviso(t) { const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
+    function aviso(t) { if (EMB && typeof EMB.alAviso === 'function') { try { EMB.alAviso(t); } catch (e) { /* sin comparación */ } } const x = document.createElement('div'); x.className = 'pp-toast'; x.textContent = t; document.body.appendChild(x); setTimeout(() => x.remove(), 6000); }
     window.addEventListener('beforeprint', () => { if (MARCADOS.size) { MARCADOS = new Set(); ANCLA = null; pintarTodo(); } const s = $('.pp-solo-impresion'); if (s) s.innerHTML = htmlImpresion() + htmlDatosPdf(); });
     window.__pp = { estado: () => ({ W, SOL, CMB, AV: [...AV.entries()], contar: contar(), seleccion: SELECCION, pdfHecho, guardadoUna, marcados: marcados(), porta: PORTA }), editar, quitar, mover, moverA, comentar, guardar, encontrar, buscador: () => BUS, irA, seleccionar,
       marcar, duplicar, copiar, pegar, colocar, moverGrupo, quitarGrupo, listasDoc, editarConfig, editarConfigEtiqueta, textoResumen, propActual, guardarEnSap, dt: (v) => { if (v !== undefined) { DT = !!v; pintarTodo(); } return DT; } };   // pruebas
@@ -22008,7 +22084,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       const [arbolRef, claves, puestos] = await Promise.all([ppLeerArbol(modelo, { mdId: ref.mdId }), ppClavesModelo(ctrl), ppPuestosRmd(ctrl, r.paquete.arbol.recetas)]);
       const nombreRef = `${ref.codigo} v${ref.version}`, corto = String(ref.codigo) === String(md.codigo) ? `v${ref.version}` : String(ref.codigo);
       await montarVista(r.paquete, null, { claves, puestos, obs: false, referencia: { nombre: nombreRef, corto, arbol: { estructuras: arbolRef.estructuras } },
-        oculto: !!opc.oculto, homol: opc.homol || null, alPintar: opc.alPintar || null, alIngresar: opc.alIngresar || null });
+        oculto: !!opc.oculto, homol: opc.homol || null, alPintar: opc.alPintar || null, alIngresar: opc.alIngresar || null, alModal: opc.alModal || null, alAviso: opc.alAviso || null });
       if (espera) espera.cerrar();
     } catch (e) {
       if (opc.oculto) { if (opc.error) opc.error(e); return; }
@@ -22086,7 +22162,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     if (extra.obs && extra.previa && extra.previa.mdId) { try { vbAnt = (await casillasVbDe(ctrl && ctrl.getView ? ctrl.getView().getModel('mainModelv2') : null, [extra.previa.mdId]))[extra.previa.mdId]; } catch (e) { vbAnt = null; } }
     const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado, docs: RR.mapa || null,
       obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa, vbAnt) : null, ref: extra.referencia || null,
-      homol: extra.homol || null, alPintar: extra.alPintar || null, alIngresar: extra.alIngresar || null,   // v1.159.0: edición desde «Comparar dos RMD»   // v1.156.0: el otro RMD de «Comparar dos RMD» (homologar)
+      homol: extra.homol || null, alPintar: extra.alPintar || null, alIngresar: extra.alIngresar || null, alModal: extra.alModal || null, alAviso: extra.alAviso || null,   // v1.159.0/v1.160.0: edición desde «Comparar dos RMD»
       uso: (cods, cb) => usoDePasosPorCodigo(cods, cb).catch(() => {}),          // v1.129.0: en cuántos masters Autorizados / Ingresados está cada paso
       guardar: (p2) => { vistaGuardar(paq, p2).catch((e) => toast('No se pudo revisar: ' + e.message, true)); }, cerrar: () => { if (VISTA) VISTA.cerrar(); } };
     const titulo = `Edición rápida · RMD ${paq.rmd.codigo} v${paq.rmd.version}${extra.referencia ? ` · homologar con ${extra.referencia.nombre}` : ''}`, html = ppHtml(await ppEmpacar(paq), prop, titulo, true);
