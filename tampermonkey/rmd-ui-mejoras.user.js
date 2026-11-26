@@ -18754,10 +18754,12 @@
     // v1.158.0 (pedido de Carlos): los pasos de Calidad en Operaciones dependen del primer paso de CONDICIONES AMBIENTALES de su estructura
     // (suele estar al comienzo del PROCEDIMIENTO): así se habilitan desde el inicio y Producción no tiene que pedir que los habiliten.
     const esPasoCeo = (x) => !!x && RX_PASO_CEO.test(normalizar(x.texto));
+    // el primer paso de la estructura cuyo texto empieza con «CONDICIONES AMBIENTALES» (p. ej. 4.4.1 «CONDICIONES AMBIENTALES:» del PROCEDIMIENTO)
     function pasoCondicionesDe(e) {
-      const t = ((e && e.etiquetas) || []).find((y) => /^CONDICIONES AMBIENTALES/.test(planoNom(y.nombre))); if (!t) return null;
-      const vivos = (t.pasos || []).filter((x) => !x.quitado), tipoDe = (x) => +((x.dt && x.dt.tipo) || x.tipo || 0);
-      return vivos.find((x) => tipoDe(x) && tipoDe(x) !== DT_SIN_TIPO) || vivos[0] || null;
+      if (!e) return null;
+      const listas = [e.pasos || [], ...[...(e.etiquetas || [])].sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).map((t) => t.pasos || [])];
+      for (const l of listas) { const x = l.find((y) => !y.quitado && /^CONDICIONES AMBIENTALES\b/.test(planoNom(y.texto))); if (x) return x; }
+      return null;
     }
     // reglas de la configuración (vista completa): las mismas que pide el portal al grabar y las de «Cómo se configura un RMD»
     function avisosDt(trabajo, add, numeros) {
@@ -21866,6 +21868,11 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         if (!(r instanceof CSSFontFaceRule) || !/["']?72/.test(r.style.getPropertyValue('font-family'))) continue;
         const base = sh.href || location.href; out.push(r.cssText.replace(/url\((["']?)([^"')]+)\1\)/g, (m, q, u) => { try { return `url("${new URL(u, base).href}")`; } catch (e) { return m; } }));
       }
+    }
+    if (!out.length) {                                                       // el tema de UI5 viene de otro dominio: sus reglas no se pueden leer, se arma la @font-face
+      const sh = [...document.styleSheets].map((x) => x.href || '').find((h) => /\/sap\/ui\/core\/themes\//.test(h));
+      if (sh) { const raiz = sh.slice(0, sh.indexOf('/sap/ui/core/themes/') + '/sap/ui/core/themes/'.length) + 'sap_fiori_3/fonts/';
+        [['72-Regular', 400], ['72-Bold', 700]].forEach(([f, w]) => out.push(`@font-face { font-family: "72"; font-weight: ${w}; font-style: normal; src: url("${raiz}${f}.woff2") format("woff2"); }`)); }
     }
     return out.join('\n');
   }
