@@ -13458,7 +13458,7 @@
     if (!filtroFase.item || filtroFase.item.bIsDestroyed || !items.includes(filtroFase.item)) {
       const FGI = sap.ui.require('sap/ui/comp/filterbar/FilterGroupItem'), Select = sap.ui.require('sap/m/Select'), Item = sap.ui.require('sap/ui/core/Item');
       if (!FGI || !Select || !Item) return;
-      const sel = new Select({ width: '100%', forceSelection: false, tooltip: 'Fase de la 1.ª línea de Observaciones. «Ir» muestra solo los RMD de esa fase (con los demás filtros).',
+      const sel = new Select({ width: '100%', forceSelection: true, tooltip: 'Fase de la 1.ª línea de Observaciones. «Ir» muestra solo los RMD de esa fase (con los demás filtros).',
         items: FASES_FILTRO.map(([k, t]) => new Item({ key: k, text: t })), selectedKey: filtroFase.valor });
       sel.attachChange(() => { filtroFase.valor = sel.getSelectedKey() || ''; });
       const it = new FGI({ groupName: 'MANGROUP', name: 'RMDFASE', label: 'Fase', labelTooltip: 'Solo los RMD de esta fase (1.ª línea de Observaciones)', visibleInFilterBar: true, control: sel });
@@ -20617,7 +20617,7 @@
 .pp-opciones{margin:4px 0 0 0;display:flex;flex-direction:column;gap:3px}.pp-opcion{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pp-opcion .pp-usar{margin-left:0}.pp-op-tx{opacity:.85}.pp-op-uso{font-size:11px;opacity:.75;white-space:nowrap}.pp-rec .pp-usar{font-weight:600}.pp-mas>summary{cursor:pointer;font-size:12px;opacity:.85}.pp-mas .pp-opcion{margin:3px 0 0 12px}.pp-op-nota{font-size:12px;opacity:.85}
 .pp-aviso-gen button{margin-left:6px;font:inherit;font-size:12px;cursor:pointer}
 @media print{.pp-usar,.pp-opciones,.pp-tag.falta{display:none}}
-:root { --fuente: "72", "72full", var(--fuente); --tx: #1f2328; --ap: #4f5862; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
+:root { --fuente: "72", "72full", "Segoe UI", Arial, sans-serif; --tx: #1f2328; --ap: #4f5862; --bd: #c9ced4; --bd2: #e3e6ea; --fondo: #e9ebee; --hoja: #fff; --linea: #444; --acento: #0a66c2; --agr: #1a7f37; --agr-f: #e6f4ea; --qui: #b42318; --qui-f: #fdecea;
   --cam: #9a6700; --cam-f: #fff4d6; --mov: #2f5fb3; --mov-f: #e8effb; --crea: #7a3fbf; --crea-f: #f3ebfc; color-scheme: light; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -20654,7 +20654,7 @@ tr.pp-ref-dist > td:first-child { box-shadow: inset 4px 0 0 var(--cam); } tr.pp-
 /* la hoja (como el PDF) */
 .pp-doc { background: var(--hoja); border: 1px solid var(--bd); box-shadow: 0 1px 6px rgba(0,0,0,.08); padding: 26px 160px 40px 30px; }
 .pp-pagina { width: 760px; border-collapse: collapse; } .pp-pagina > thead > tr > td, .pp-pagina > tbody > tr > td { padding: 0; vertical-align: top; }
-.pp-pagina, .pp-pagina table { font-family: Roboto, var(--fuente); color: #000; }
+.pp-pagina, .pp-pagina table { font-family: Roboto, "Segoe UI", Arial, sans-serif; color: #000; }
 .pp-enc { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 14px; font-size: 12.5px; font-weight: 700; color: #000; }
 .pp-enc td { border: 1px solid var(--linea); padding: 3px 6px; vertical-align: middle; overflow-wrap: anywhere; }
 .pp-enc .logo { border-bottom: 0; height: 40px; padding: 4px 8px 0; } .pp-enc .logo img { height: 32px; display: block; } .pp-logo-tx { color: #c8102e; font-style: italic; font-size: 17px; }
