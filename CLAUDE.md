@@ -497,10 +497,10 @@ cuenta). Escribir y responder siempre en **español**.
   «Agrupador»** en la barra de filtros (`filtroFase`, `gestionarFiltroFase`: oculta el FilterGroupItem `D` y agrega `RMDFASE`; con fase elegida `onGetMd`
   lee todo `/MD` con los filtros del portal + `observacion` contiene la fase y deja solo esa fase, `leerListaConFase`). Probado en el portal en solo
   lectura (Fase 3: 77 RMD; 2202609513 en F3 con 4 vs 3 V°B° avisa sin bloquear). **Solo existen F1 a F3R** (`FASES_NOM`, `FASE_MAX_VIGENTE`; F4+ = aviso «no está vigente»). **La siguiente versión debe ser > 1.157.0.**
-- 2026-11-26, v1.158.0 (encima de la 1.157.0): **pedidos de Carlos.** **Los pasos de Calidad en Operaciones dependen por defecto del primer paso
-  «CONDICIONES AMBIENTALES» de PROCEDIMIENTO** (paso de cualquier etiqueta, p. ej. 4.4.1; `PPN.pasoCondicionesDe`, `PPN.esPasoCeo`): aviso k `ceoca` en la
-  Edición rápida y el borrador con el botón «Depender de CONDICIONES AMBIENTALES»; los pasos CEO nuevos del ingreso ya llevan ese predecesor
-  (`ppPlanEscritura`). **Clave Modelo sin nombres de personas** (opción `clavesmodelo`): el modelo `localModel>/dataClaveModelo` del componente
+- 2026-11-26, v1.158.0 (encima de la 1.157.0): **pedidos de Carlos.** **Solo para CJESUSZ (`CEO_CA_USUARIOS`): los pasos de Calidad en Operaciones con tipo de dato del PROCEDIMIENTO pasan solos a depender del primer
+  paso «CONDICIONES AMBIENTALES»** (paso de cualquier etiqueta, p. ej. 4.4.1; `PPN.ceoSinCondiciones`, `PPN.pasoCondicionesDe`, `PPN.esPasoCeo`): al abrir «Configurar el RMD»
+  de un RMD Ingresado (`menuConfigurarCeo` → `ceoDependerCa`: MERGE `MD_ES_PASO` `depende`/`dependeMdEstructuraPasoId`, una vez por RMD en la sesión) y al terminar un
+  ingreso de la Edición rápida o del borrador. Sin aviso para nadie (Carlos lo pidió así). Probado en lectura con 2202609513: 182861 y 180901 → 81236. **Clave Modelo sin nombres de personas** (opción `clavesmodelo`): el modelo `localModel>/dataClaveModelo` del componente
   (ERP ClaveModeloSet, 47 filas con personas y empresas) se deja en Setup Pre Proceso / Proceso / Setup Post Proceso (`filtrarClavesModelo`,
   `esClaveValida`), también en `ppClavesModelo`. **Interfaz más legible**: letra más grande en avisos y notas, fuente «72» en la Edición rápida
   (`fuente72Css`), colores fijos (rojo bloquea, ámbar revisar, gris informa), más contraste en tema oscuro, avisos de fase sin repetir.
