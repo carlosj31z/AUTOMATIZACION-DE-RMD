@@ -18606,7 +18606,7 @@
     // k = tipo de aviso; usar = código de un paso del catálogo que lo resuelve («Usar paso homologado»)
     const AVISOS_PRODUCCION = new Set(['existe', 'dup', 'ceo', 'doc', 'registro', 'cant', 'rango']);
     function avisos(trabajo, ctx = {}) {
-      const out = new Map(), prod = ctx.modo === 'produccion', add = (id, nivel, texto, k, usar) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto, ...(k ? { k } : {}), ...(usar ? { usar: String(usar) } : {}) }); };
+      const out = new Map(), prod = ctx.modo === 'produccion', add = (id, nivel, texto, k, usar, extra) => { let l = out.get(id); if (!l) out.set(id, (l = [])); l.push({ nivel, texto, ...(k ? { k } : {}), ...(usar ? { usar: String(usar) } : {}), ...(extra || {}) }); };
       // v1.148.2 (Carlos): el paso vigente debe ser de la misma etapa; si en el catálogo es de otra, se busca el del mismo texto en esta etapa
       const enCatalogo = (cod, estr, etq) => { const f = cod && bus && bus.porCodigo(cod); if (!f) return null; const aqui = (g) => (!estr || g.estr === estr) && (!etq || String(g.etq || '') === String(etq));
         if (aqui(f)) return f; if (etq === undefined && (!estr || f.estr === estr)) return f;
@@ -18750,10 +18750,18 @@
     const LISTA_SIN_PRED = /^(RENDIMIENTO|CONDICIONES AMBIENTALES)/, PASO_INDEPENDIENTE = /\bEN CASO (QUE|DE)\b|BAJO LA SUPERVISION|PARALELAMENTE|EN PARALELO|ENTREGAR LA DOCUMENTACION ORDENADA Y FIRMADA/;
     const planoNom = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().replace(/^\d+(\.\d+)*\.?-?\s*/, '');
     function listaSinPredecesor(e, t) { for (const n of [t && t.nombre, e && e.nombre]) { const k = planoNom(n); if (LISTA_SIN_PRED.test(k)) return k.match(LISTA_SIN_PRED)[1]; } return ''; }
+    // v1.158.0 (pedido de Carlos): los pasos de Calidad en Operaciones dependen del primer paso de CONDICIONES AMBIENTALES de su estructura
+    // (suele estar al comienzo del PROCEDIMIENTO): así se habilitan desde el inicio y Producción no tiene que pedir que los habiliten.
+    const esPasoCeo = (x) => !!x && RX_PASO_CEO.test(normalizar(x.texto));
+    function pasoCondicionesDe(e) {
+      const t = ((e && e.etiquetas) || []).find((y) => /^CONDICIONES AMBIENTALES/.test(planoNom(y.nombre))); if (!t) return null;
+      const vivos = (t.pasos || []).filter((x) => !x.quitado), tipoDe = (x) => +((x.dt && x.dt.tipo) || x.tipo || 0);
+      return vivos.find((x) => tipoDe(x) && tipoDe(x) !== DT_SIN_TIPO) || vivos[0] || null;
+    }
     // reglas de la configuración (vista completa): las mismas que pide el portal al grabar y las de «Cómo se configura un RMD»
     function avisosDt(trabajo, add, numeros) {
       const vivos = (l) => (l || []).filter((x) => !x.quitado), todos = new Map(), orden = [];
-      trabajo.estructuras.forEach((e) => [[null, e.pasos || []], ...(e.etiquetas || []).map((t) => [t, t.pasos || []])].forEach(([t, l]) => { const sinPred = listaSinPredecesor(e, t); vivos(l).forEach((p) => { todos.set(p.id, { p, l, sinPred }); orden.push(p.id); }); }));
+      trabajo.estructuras.forEach((e) => [[null, e.pasos || []], ...(e.etiquetas || []).map((t) => [t, t.pasos || []])].forEach(([t, l]) => { const sinPred = listaSinPredecesor(e, t); vivos(l).forEach((p) => { todos.set(p.id, { p, l, sinPred, e }); orden.push(p.id); }); }));
       const quitados = new Set(); trabajo.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => (l || []).filter((x) => x.quitado).forEach((x) => quitados.add(x.id))));
       const fila = (x, esPm) => {
         const d = x.dt; if (!d || x.insumo) return; const tipo = +d.tipo || 0, vacio = (v) => v == null || String(v).trim() === '';
@@ -18771,6 +18779,15 @@
         if (esPm) return;
         const dep = String(d.dep || ''), sinPred = todos.get(x.id).sinPred;
         if (sinPred) { if (dep) add(x.id, 'aviso', `En ${sinPred} los pasos no llevan predecesor: vacía «Depende».`); return; }
+        if (tipo && tipo !== DT_SIN_TIPO && esPasoCeo(x)) {
+          const ca = pasoCondicionesDe(todos.get(x.id).e);
+          if (ca && ca.id !== x.id) {
+            if (dep === ca.id) return;
+            const nuevoAuto = String(x.id).startsWith('n:') && !d.depFijo;           // paso nuevo sin «Depende» elegido: el ingreso lo pone solo
+            if (!nuevoAuto) { const n = numeros && numeros.get && numeros.get(ca.id); add(x.id, 'aviso', `Lo llena Calidad en Operaciones: debe depender del primer paso de CONDICIONES AMBIENTALES${n ? ` (${n})` : ''} para que se habilite desde el inicio.`, 'ceoca', null, { ca: ca.id }); }
+            return;
+          }
+        }
         if (dep && dep === x.id) add(x.id, 'error', 'Depende de sí mismo: en Producción nunca se habilita.');
         else if (dep && quitados.has(dep)) add(x.id, 'error', 'Depende de un paso que se quita: elige otro predecesor.');
         else if (dep && todos.has(dep)) { const pd = todos.get(dep), mismo = pd.l === todos.get(x.id).l; if (mismo && pd.l.indexOf(pd.p) > pd.l.indexOf(x)) add(x.id, 'error', 'Depende de un paso posterior: en Producción nunca se habilita.'); if (+((pd.p.dt || {}).tipo) === DT_SIN_TIPO) add(x.id, 'aviso', 'El predecesor es un «Sin tipo de dato»: debe depender del paso anterior con tipo de dato.'); }
@@ -18983,7 +19000,7 @@
       const partes = [`${prefijo} RMD ${rmd.codigo} v${rmd.version}`, String(rmd.etapa || '').trim(), cortar(String(rmd.descripcion || '').trim(), 90)].filter(Boolean);
       return `${partes.join(' - ')} ${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}${ext ? '.' + ext : ''}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
     }
-    return { TIPO, RANGO, homologacionPaso, homologarTexto, pasosCeo, REGISTROS, REGISTRO_TXT, registroDe, registroDeTipo, codigosDoc, mapaDocs, docVencido, listaSinPredecesor, normalizar, palabrasRepetidas, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, imponer, corregirTrabajo, sinSaltos, vigentePorTexto, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO, enOrden, eqSecuencia, ESPEC_CAMPOS, ESPEC_MAX, txtEsp, textoEsp, grupoEsp, especReordenable };
+    return { TIPO, RANGO, homologacionPaso, homologarTexto, pasosCeo, esPasoCeo, pasoCondicionesDe, REGISTROS, REGISTRO_TXT, registroDe, registroDeTipo, codigosDoc, mapaDocs, docVencido, listaSinPredecesor, normalizar, palabrasRepetidas, tildes, detectarTildes, conTildes, igualTexto, tildesEn, quitarTildes, palabrasConTilde, similitud, crearBuscador, resaltar, buscarEn, pesoPalabra, rebase, imponer, corregirTrabajo, sinSaltos, vigentePorTexto, numerar, cambios, avisos, huella, desempacarPasos, porOrden, num, nombreArchivo, textoInsumo, AVISO_CANT_LM, insClave, cantRecetaCambiada, claveNueva, nuevosIguales, DT_CAMPOS, dtCampos, dtValor, dtCambios, DT_TIPOS_CON_EDIT, DT_RANGO, DT_NOTIF, DT_SIN_TIPO, enOrden, eqSecuencia, ESPEC_CAMPOS, ESPEC_MAX, txtEsp, textoEsp, grupoEsp, especReordenable };
   }
   // Editor del borrador (.html, sin SAP). Se serializa con toString(). La hoja replica el PDF del portal (controller/table.js).
   function ppEditorApp(PPN) {
@@ -19252,7 +19269,7 @@
       if (a.exactos) return `<div class="pp-opciones">${fila(orden[0], false, true)}${orden.length > 1 ? `<details class="pp-mas"><summary>Otros ${orden.length - 1} paso${orden.length > 2 ? 's' : ''} con el mismo texto</summary>${orden.slice(1).map((c) => fila(c, false, false)).join('')}</details>` : ''}</div>`;
       return `<div class="pp-opciones"><div class="pp-op-nota">Parecidos, con texto distinto: compáralo antes de usarlo.</div>${orden.map((c) => fila(c, true, false)).join('')}</div>`;
     };
-    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${htmlOpciones(id, a) || ''}${a.usar && BUS.porCodigo(a.usar) && !htmlOpciones(id, a) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}${a.sugerido ? ` <button type="button" class="pp-usar" data-a="usar-texto" data-id="${esc(id)}" title="${esc(a.sugerido)}">Usar el texto sugerido</button>` : ''}${a.k === 'retirar' ? ` <button type="button" class="pp-usar" data-a="quitar" data-id="${esc(id)}">Quitar</button>` : ''}</div>`).join('');
+    const htmlAvisos = (id) => (AV.get(id) || []).map((a) => `<div class="pp-aviso ${a.nivel}${a.k ? ' k-' + a.k : ''}">${a.nivel === 'error' ? '✕' : a.nivel === 'aviso' ? '⚠' : 'ℹ'} ${esc(a.texto)}${htmlOpciones(id, a) || ''}${a.usar && BUS.porCodigo(a.usar) && !htmlOpciones(id, a) ? ` <button type="button" class="pp-usar" data-a="usar-paso" data-id="${esc(id)}" data-codigo="${esc(a.usar)}" title="Reemplaza el texto por el del paso ${esc(a.usar)} del catálogo de SAP">${a.k === 'ceo' ? 'Usar paso homologado' : 'Usar el paso'} ${esc(a.usar)}</button>` : ''}${a.agregar && BUS.porCodigo(a.agregar) ? ` <button type="button" class="pp-usar" data-a="agregar-nota" data-id="${esc(id)}" data-codigo="${esc(a.agregar)}" title="Agrega el proceso menor ${esc(a.agregar)} del catálogo de SAP al final del paso">Agregar la nota al final</button>` : ''}${a.alFinal ? ` <button type="button" class="pp-usar" data-a="nota-al-final" data-id="${esc(id)}">Mover al final</button>` : ''}${a.sugerido ? ` <button type="button" class="pp-usar" data-a="usar-texto" data-id="${esc(id)}" title="${esc(a.sugerido)}">Usar el texto sugerido</button>` : ''}${a.k === 'retirar' ? ` <button type="button" class="pp-usar" data-a="quitar" data-id="${esc(id)}">Quitar</button>` : ''}${a.k === 'ceoca' && a.ca ? ` <button type="button" class="pp-usar" data-a="dep-ca" data-id="${esc(id)}" data-ca="${esc(a.ca)}">Depender de CONDICIONES AMBIENTALES</button>` : ''}</div>`).join('');
     const htmlComentario = (x) => (x.comentario ? `<div class="pp-coment">💬 ${esc(x.comentario)}</div>` : '');
     const htmlAntes = (x, b) => (b && !x.quitado && cambiado(x, b) ? `<div class="pp-antes">Antes: ${esc(b.texto)}${b.codigo ? ` (paso ${esc(b.codigo)})` : ''}</div>` : '');
     function htmlRango(x) {
@@ -19623,6 +19640,7 @@
     // el paso anterior (en su lista) con tipo de dato: el predecesor habitual
     function depSugerido(x) {
       const r = IDXP.get(x.id); if (!r || PPN.listaSinPredecesor(r.e, r.t)) return ''; const i = r.lista.indexOf(r.p);   // RENDIMIENTO / CONDICIONES AMBIENTALES: sin predecesor
+      if (PPN.esPasoCeo && PPN.esPasoCeo(r.p)) { const ca = PPN.pasoCondicionesDe(r.e); if (ca && ca.id !== r.p.id) return ca.id; }   // v1.158.0: Calidad en Operaciones
       for (let j = i - 1; j >= 0; j--) { const y = r.lista[j]; if (y.quitado) continue; const t = +(y.dt ? y.dt.tipo : y.tipo); if (t && t !== PPN.DT_SIN_TIPO) return y.id; }
       return '';
     }
@@ -20242,6 +20260,12 @@
         v.pm.push({ id: nuevoId, texto: c.texto, codigo: String(c.codigo), pasoId: null, nuevo: false, etqCat: c.etq, tipo: c.tipo, comentario: '' }); });
       setTimeout(() => { if (nuevoId) { irA(nuevoId); seleccionar(nuevoId); } }, 30);
     }
+    // v1.158.0: «Depende» fijo a otro paso (Calidad en Operaciones -> primer paso de CONDICIONES AMBIENTALES)
+    function dependerDe(id, pred) {
+      const f = encontrar(id); if (!f || f.clase === 'pm' || !pred || pred === id) return; indexarDt();
+      const y = IDXP.get(pred); cambio(() => { const v = encontrar(id).item; v.dt = { ...(v.dt || {}), dep: pred, depFijo: true, depTxt: y ? String(y.p.codigo || '') : '' }; });
+      setTimeout(() => { irA(id); seleccionar(id); }, 30);
+    }
     function notaAlFinal(id) {
       const f = encontrar(id); if (!f || f.clase !== 'pm') return;
       cambio(() => { const g = encontrar(id), l = g.lista, i = l.indexOf(g.item); if (i < 0) return; l.splice(i, 1); l.push(g.item); });
@@ -20495,6 +20519,7 @@
       else if (a === 'usar-texto') usarTextoSugerido(id);
       else if (a === 'agregar-nota') agregarNotaSupervisor(id, b.dataset.codigo);
       else if (a === 'nota-al-final') notaAlFinal(id);
+      else if (a === 'dep-ca') dependerDe(id, b.dataset.ca);
       else if (a === 'siguiente-aviso') siguienteAviso(b.dataset.k || '');
       else if (a === 'ayuda-ok') { ayudaAbierta = false; try { localStorage.setItem(CLAVE_AYUDA, '1'); } catch (x) { } pintarTodo(); }
     });
@@ -22771,6 +22796,11 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
           });
         }
       }
+      // v1.158.0 (pedido de Carlos): un paso nuevo de Calidad en Operaciones depende del primer paso de CONDICIONES AMBIENTALES de su estructura
+      seqPasos.forEach((s) => s.vivos.forEach((v) => {
+        if (!v.nuevo || tipoDe(v) === PP_SIN_TIPO || !PPN.esPasoCeo(v.x) || PPN.listaSinPredecesor(s.L.e, s.L.t)) return;
+        const ca = PPN.pasoCondicionesDe(s.L.e), caD = ca && ca.id !== v.x.id ? D(ca.id) : ''; if (caD) cambia.set(v.id, caD);
+      }));
       // dependientes de otras listas -> al anterior del quitado
       rowsMd.forEach((r, id) => { if (!cambia.has(id) && !quitados.has(id) && r.dependeMdEstructuraPasoId && quitados.has(r.dependeMdEstructuraPasoId)) cambia.set(id, salta(r.dependeMdEstructuraPasoId)); });
       depManual.forEach((v, id) => cambia.delete(id));                                       // el «Depende» elegido en la vista completa manda
