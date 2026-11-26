@@ -464,6 +464,7 @@
   .rmd-cmp-tipo { font-weight: 600; } .rmd-cmp-secc { color: var(--rmd-apagado); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rmd-cmp-cambios del { color: var(--rmd-rojo); overflow-wrap: anywhere; } .rmd-cmp-cambios ins { color: var(--rmd-verde); text-decoration: none; overflow-wrap: anywhere; }
   @media (max-width: 1100px) { .rmd-cmp-main { grid-template-columns: minmax(0, 1fr); } .rmd-cmp-cambios { display: none; } .rmd-cmp-elegir { grid-template-columns: minmax(0, 1fr); } }
+  .rmd-cmp-main.rmd-cmp-sinlista { grid-template-columns: minmax(0, 1fr); } .rmd-cmp-main.rmd-cmp-sinlista > .rmd-cmp-cambios { display: none; }
   .rmd-cmp-pdfs { min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
   .rmd-cmp-pdf { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--rmd-borde); border-radius: 8px; overflow: hidden; }
   .rmd-cmp-pdf > .rmd-cmp-pdf-cab { flex: 0 0 auto; padding: 6px 10px; font-size: 12.5px; background: var(--rmd-cabecera); border-bottom: 1px solid var(--rmd-borde); }
@@ -8657,6 +8658,8 @@
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2');
     if (!modelo) { toast('Abre la lista «Configuración Manufactura Digital» para comparar RMD.', true); return; }
     let ocupado = false, R = null, actual = -1, soloCambios = false, abiertos = new Set(), vista = 'pdf';
+    // v1.156.0 (pedido de Carlos): la lista de cambios de la derecha se puede ocultar para que los dos RMD usen todo el ancho
+    let sinLista = false; try { sinLista = localStorage.getItem('rmdCmpSinLista') === '1'; } catch (x) { /* sin almacenamiento */ }
     const lados = { a: null, b: null }, docs = new Map();
     const v = ventana('Comparar dos RMD', { cancelar: () => { if (!ocupado) cerrar(); } });
     const caja = v.fondo.querySelector('.rmd-modal'); caja.classList.add('rmd-cmp-ventana');
@@ -8803,9 +8806,9 @@
           <span class="rmd-cmp-resumen">${resumen.cambios ? `<b>${resumen.cambios}</b> cambio${resumen.cambios === 1 ? '' : 's'}: <span class="modificado">${resumen.modificado} modificada${resumen.modificado === 1 ? '' : 's'}</span> · <span class="agregado">${resumen.agregado} agregada${resumen.agregado === 1 ? '' : 's'}</span> · <span class="quitado">${resumen.quitado} quitada${resumen.quitado === 1 ? '' : 's'}</span> <small>(líneas)</small>` : '<b>Sin diferencias</b> en el texto de los dos master.'}</span>
           <span class="rmd-cmp-vista" role="group" aria-label="Vista"><button type="button" data-vista="pdf" aria-pressed="${vista === 'pdf'}">Como el PDF</button><button type="button" data-vista="texto" aria-pressed="${vista === 'texto'}">Solo texto</button></span>
           ${vista === 'texto' ? `<label><input type="checkbox" class="rmd-cmp-solo" ${soloCambios ? 'checked' : ''}> Solo cambios</label>` : ''}
-          <span class="rmd-cmp-nav"><button type="button" class="rmd-btn" data-a="ant" title="Cambio anterior (Alt+↑)" ${resumen.cambios ? '' : 'disabled'}>↑ Anterior</button><span class="rmd-cmp-pos" aria-live="polite"></span><button type="button" class="rmd-btn" data-a="sig" title="Cambio siguiente (Alt+↓)" ${resumen.cambios ? '' : 'disabled'}>Siguiente ↓</button></span>
+          <span class="rmd-cmp-nav"><button type="button" class="rmd-btn" data-a="ant" title="Cambio anterior (Alt+↑)" ${resumen.cambios ? '' : 'disabled'}>↑ Anterior</button><span class="rmd-cmp-pos" aria-live="polite"></span><button type="button" class="rmd-btn" data-a="sig" title="Cambio siguiente (Alt+↓)" ${resumen.cambios ? '' : 'disabled'}>Siguiente ↓</button><button type="button" class="rmd-btn" data-a="lista" aria-pressed="${!sinLista}" title="Oculta o muestra la lista de cambios de la derecha; oculta, los dos RMD ocupan todo el ancho">${sinLista ? 'Mostrar lista de cambios' : 'Ocultar lista de cambios'}</button></span>
         </div>
-        <div class="rmd-cmp-main">
+        <div class="rmd-cmp-main${sinLista ? ' rmd-cmp-sinlista' : ''}">
           ${vista === 'pdf' ? `<div class="rmd-cmp-pdfs">${['a', 'b'].map((l) => `<div class="rmd-cmp-pdf" data-lado="${l}"><div class="rmd-cmp-pdf-cab">${fichaMd(l === 'a' ? ma : mb)}</div><div class="rmd-cmp-pdf-scroll" tabindex="0" aria-label="Master ${l === 'a' ? 'original' : 'modificado'}"><div class="rmd-cmp-papel">${hojaPdf(l)}</div></div></div>`).join('')}</div>`
           : `<div class="rmd-cmp-doc" tabindex="0" aria-label="Los dos master lado a lado">
             <div class="rmd-cmp-f rmd-cmp-cab"><div class="rmd-cmp-c">${fichaMd(ma)}</div><div class="rmd-cmp-c">${fichaMd(mb)}</div></div>
@@ -8887,6 +8890,11 @@
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.a === 'sig') ir(actual + 1); else if (b.dataset.a === 'ant') ir(actual < 0 ? -1 : actual - 1);
       else if (b.classList.contains('rmd-cmp-pliegue')) { for (let k = +b.dataset.desde; k < +b.dataset.hasta; k++) abiertos.add(k); const y = docEl().scrollTop; pintarResultado(); docEl().scrollTop = y; }
+      else if (b.dataset.a === 'lista') {
+        sinLista = !sinLista; try { localStorage.setItem('rmdCmpSinLista', sinLista ? '1' : '0'); } catch (x) { /* sin almacenamiento */ }
+        const m = res.querySelector('.rmd-cmp-main'); if (m) m.classList.toggle('rmd-cmp-sinlista', sinLista);
+        b.textContent = sinLista ? 'Mostrar lista de cambios' : 'Ocultar lista de cambios'; b.setAttribute('aria-pressed', String(!sinLista));
+      }
       else if (b.dataset.vista) { if (vista !== b.dataset.vista) { vista = b.dataset.vista; pintarResultado(); if (actual >= 0) marcarActual(true); } }
       else if (b.dataset.g != null) ir(+b.dataset.g);
       else if (b.dataset.a === 'homologar' && R) {
@@ -19410,6 +19418,13 @@
         setTimeout(() => { if (nuevoId) { irA(nuevoId); seleccionar(nuevoId); } }, 30);
       }
     }
+    // texto con las palabras que cambian resaltadas (las demás tal cual), para ver de un vistazo qué es distinto
+    function refResaltar(a, b) {
+      const ta = String(a || '').split(/\s+/).filter(Boolean), tb = String(b || '').split(/\s+/).filter(Boolean), ia = new Set(), ib = new Set();
+      refLcs(ta.map(refClave), tb.map(refClave)).forEach(([i, j]) => { ia.add(i); ib.add(j); });
+      const pinta = (t, igual) => t.map((w, k) => (igual.has(k) ? esc(w) : `<mark>${esc(w)}</mark>`)).join(' ');
+      return [pinta(ta, ia), pinta(tb, ib)];
+    }
     function htmlRef() {
       if (!REF) return '';
       const n = REF_ITEMS.length, corto = (t) => { t = String(t || ''); return t.length > 110 ? t.slice(0, 110) + '…' : t; };
@@ -19418,7 +19433,7 @@
       const filas = REF_ITEMS.map((it) => {
         const cab = it.lista !== ultLista ? `<div class="pp-ref-lista">${esc(it.lista)}</div>` : ''; ultLista = it.lista;
         const donde = it.id || it.tras || it.padre, ir = donde ? ` data-ir="${esc(donde)}"` : '';
-        const texto = it.tipo === 'dist' ? `<span class="pp-ref-a">${esc(corto(it.texto))}</span><span class="pp-ref-b">${esc(corto(it.refTexto))}</span>` : it.tipo === 'falta' ? `<span class="pp-ref-b">${esc(corto(it.refTexto))}</span>` : `<span class="pp-ref-a">${esc(corto(it.texto))}</span>`;
+        const texto = it.tipo === 'dist' ? (([x, y]) => `<span class="pp-ref-a">${x}</span><span class="pp-ref-b">${y}</span>`)(refResaltar(it.texto, it.refTexto)) : it.tipo === 'falta' ? `<span class="pp-ref-b">${esc(corto(it.refTexto))}</span>` : `<span class="pp-ref-a">${esc(corto(it.texto))}</span>`;
         const btn = it.tipo === 'dist' && !it.insumo ? `<button type="button" class="pp-usar" data-a="ref-usar" data-k="${it.k}" title="Pone el texto de ${esc(REF.nombre)}${it.refCodigo ? ` (paso ${esc(it.refCodigo)})` : ''}">Usar el de ${esc(REF.corto || REF.nombre)}</button>`
           : it.tipo === 'falta' && !it.insumo ? `<button type="button" class="pp-usar" data-a="ref-agregar" data-k="${it.k}" title="Lo agrega en este lugar${it.refCodigo ? ` con el paso ${esc(it.refCodigo)}` : ''}${it.pm ? '' : ' y sus procesos menores'}">Agregar aquí</button>`
           : it.tipo === 'solo' ? `<button type="button" class="pp-usar" data-a="ref-quitar" data-k="${it.k}">Quitar</button>` : '';
@@ -20559,7 +20574,7 @@ button { font: inherit; cursor: pointer; } button:disabled { cursor: default; op
 .pp-ref-it { display: flex; gap: 6px; align-items: flex-start; margin: 3px 0; padding: 5px 6px; border: 1px solid var(--bd2); border-left: 3px solid var(--cam); border-radius: 6px; background: var(--hoja); }
 .pp-ref-it.k-solo, .pp-ref-it.k-lista-solo { border-left-color: var(--qui); } .pp-ref-it.k-falta, .pp-ref-it.k-lista-falta { border-left-color: var(--agr); }
 .pp-ref-ir { flex: 1 1 auto; min-width: 0; text-align: left; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--tx); cursor: pointer; }
-.pp-ref-t { display: block; font-size: 11px; color: var(--ap); } .pp-ref-a, .pp-ref-b { display: block; } .pp-ref-it.k-dist .pp-ref-a { text-decoration: line-through; color: var(--qui); } .pp-ref-it.k-dist .pp-ref-b, .pp-ref-it.k-falta .pp-ref-b { color: var(--agr); }
+.pp-ref-t { display: block; font-size: 11px; color: var(--ap); } .pp-ref-a, .pp-ref-b { display: block; } .pp-ref-it.k-dist .pp-ref-a { color: var(--qui); } .pp-ref-it mark { background: var(--cam-f); color: inherit; font-weight: 600; padding: 0 1px; } .pp-ref-it.k-dist .pp-ref-b, .pp-ref-it.k-falta .pp-ref-b { color: var(--agr); }
 .pp-ref-it .pp-usar { flex: 0 0 auto; }
 tr.pp-ref-dist > td:first-child { box-shadow: inset 4px 0 0 var(--cam); } tr.pp-ref-solo > td:first-child { box-shadow: inset 4px 0 0 var(--qui); } tr.pp-ref-pm > td:first-child { box-shadow: inset 4px 0 0 var(--mov); }
 .pp-cmb-av { display: block; margin-top: 3px; } .pp-cmb-av.error { color: var(--qui) !important; } .pp-cmb-av.aviso { color: var(--cam) !important; }
