@@ -491,6 +491,12 @@ cuenta). Escribir y responder siempre en **español**.
   (`sugerirF3`). Clic en la celda Código de la lista = copiar (`codigoCopiable`, opción `copiarcodigo`). «Comparar dos RMD» → «Editar <RMD> para
   homologar» (`abrirHomologar`: Edición rápida con `emb.ref`, panel `htmlRef`/`refDiferencias`/`refAccion`, sin Observaciones) y «Ocultar lista de
   cambios» (`rmdCmpSinLista`). Probado en el portal en solo lectura (2202608976 v3 vs 2202504740 v2). **La siguiente versión debe ser > 1.156.0.**
+  1.156.0 publicada en `publicado` el 2026-11-26.
+- 2026-11-26, v1.157.0 (encima de la 1.156.0): **pedido de Carlos: F3 sin menos V°B° no se bloquea**, solo se avisa que la nomenclatura no corresponde
+  (`reglaFaseVb` ya no habla de bloqueo; opciones de fase nunca `disabled`; «Usar»/«obs-nom» ponen la línea con aviso). **Filtro «Fase» en lugar de
+  «Agrupador»** en la barra de filtros (`filtroFase`, `gestionarFiltroFase`: oculta el FilterGroupItem `D` y agrega `RMDFASE`; con fase elegida `onGetMd`
+  lee todo `/MD` con los filtros del portal + `observacion` contiene la fase y deja solo esa fase, `leerListaConFase`). Probado en el portal en solo
+  lectura (Fase 3: 77 RMD; 2202609513 en F3 con 4 vs 3 V°B° avisa sin bloquear). **La siguiente versión debe ser > 1.157.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

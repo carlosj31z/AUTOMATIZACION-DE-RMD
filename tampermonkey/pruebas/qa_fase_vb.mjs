@@ -24,7 +24,7 @@ ok('Más V°B°: no permite F3 ni la sugiere', !mas.permite && mas.sugerida === 
 const sinAnt = reglaFaseVb(3, null, '');
 ok('Sin versión anterior: no permite F3', !sinAnt.permite && sinAnt.sugerida === '' && /Sin versión anterior/.test(sinAnt.texto));
 const sinContar = reglaFaseVb(null, 9, 'v4');
-ok('Sin poder contar: F3 bloqueada y se dice por qué', !sinContar.permite && /No se pudieron contar/.test(sinContar.texto));
+ok('Sin poder contar: F3 no se confirma y se dice por qué', !sinContar.permite && /No se pudieron contar/.test(sinContar.texto));
 const contando = reglaFaseVb(null, null, 'v4', true);
 ok('Mientras cuenta: no permite ni sugiere todavía', contando.buscando && !contando.permite && contando.sugerida === '');
 ok('Cero V°B° frente a uno: también es menos', reglaFaseVb(0, 1, 'v2').permite);
@@ -34,8 +34,9 @@ const casos = [['20261120CJ-1-C2.0-FI1.0-FA1.0-F2\n26-379-CC/…', 'F2'], ['2026
   ['20240123CR-2\nCAMBIO DE PUESTO', ''], ['', ''], [null, ''], ['PENDIENTE BORRADOR CARACTERIZACION', ''], ['20261120CJ-1-C2.0-FI1.0-FA1.0-F?', '']];
 ok('Fase de Observaciones: F2, F2R, F3-R → F3R; sin fase reconocible queda vacía', casos.every(([o, f]) => faseObs(o).corto === f), JSON.stringify(casos.map(([o]) => faseObs(o).corto)));
 
-// el editor (Edición rápida) bloquea F3+ con el mismo umbral que manda el portal
-ok('El editor bloquea F3 o superior con el umbral del portal (faseVb.desde)', /faseVb: \{ permite: fv\.permite, sugerida: fv\.sugerida, texto: fv\.texto, desde: FASE_MENOS_VB \}/.test(fuente) && /\+mF\[1\] >= fvb\.desde && !fvb\.permite/.test(fuente));
+// v1.157.0 (pedido de Carlos): F3+ sin menos V°B° ya no se bloquea; el editor y el portal solo avisan que no corresponde
+ok('El editor avisa (sin bloquear) F3 o superior con el umbral del portal (faseVb.desde)', /faseVb: \{ permite: fv\.permite, sugerida: fv\.sugerida, texto: fv\.texto, desde: FASE_MENOS_VB \}/.test(fuente) && /\+mF\[1\] >= fvb\.desde && !fvb\.permite\) aviso\(`Ojo: la nomenclatura no corresponde/.test(fuente));
+ok('Ninguna opción de fase queda deshabilitada', !/o\.disabled = no;/.test(fuente) && !/\$\{no \? ` disabled/.test(fuente) && /o\.disabled = false;/.test(fuente));
 ok('La fase de la versión nueva no se copia de la anterior (solo se sugiere F3 por los V°B°)', /fase = act\.fase \|\| fvx\.sugerida \|\| ''/.test(fuente) && !/fase = act\.fase \|\| \(ant && ant\.fase\)/.test(fuente));
 
 console.log(fallas ? `\n${fallas} falla(s)` : '\nTodo pasa');
