@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.156.0
+// @version      1.157.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.156.0';                                                       // mantener igual a @version
+  const VERSION = '1.157.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -2654,6 +2654,7 @@
     // Fase: dígito + revisión opcional (F2, F2R, F2-R)
     const fase = partes.slice(5).join('-'), mFase = /^F(\d)(-?R)?$/.exec(fase);
     if (!mFase) avisos.push(`La fase ("${fase}") debe ser F seguido de un número y, si aplica, "R" (ej. F1, F1R, F2, F2-R).`);
+    else if (+mFase[1] > FASE_MAX_VIGENTE || +mFase[1] < 1) avisos.push(`La fase ${fase} no está vigente: por ahora solo existen de la F1 a la F3R.`);
     const ok = avisos.length === 0;
     return { ok, avisos, resumen: ok ? `fecha ${fechaTxt} · iniciales ${iniciales} · prioridad ${prioridad} · complejidad ${mComp[1]} · fase ${mFase[1]}${mFase[2] ? 'R' : ''}` : null,
       corto: ok ? `${fechaTxt} · ${iniciales} · P${prioridad} · C${mComp[1]} · F${mFase[1]}${mFase[2] ? 'R' : ''}` : null };
@@ -2741,7 +2742,7 @@
       const faseMal = res.ok && !copiada && nAct >= FASE_MENOS_VB && !fv.buscando && !fv.permite, sugerirF3 = res.ok && !copiada && !faseMal && fv.permite && nAct < FASE_MENOS_VB;
       // v1.156.0: con menos V°B° y la fase en F1/F2 se avisa (ya no queda escondido en el resumen) y la sugerida trae F3 lista para poner
       const textoN = copiada ? `⚠ La 1.ª línea es la misma de la ${vAnt} (se copió al crear la versión): pon la fecha de hoy y tus iniciales, y revisa prioridad, complejidad y fase.`
-        : faseMal ? `⚠ La fase ${act.fase} es para versiones con menos V°B° que la anterior. ${fv.texto}`
+        : faseMal ? `⚠ La nomenclatura no corresponde: la fase ${act.fase} es para versiones con menos V°B° que la anterior. ${fv.texto}`
         : sugerirF3 ? `⚠ ${fv.texto} Está en ${act.fase}: cámbiala a F3 con el botón.`
         : res.ok ? '✓ Nomenclatura de Observaciones correcta: ' + res.resumen + '.' + (sugerirF3 ? `\nSugerencia: fase 3. ${fv.texto}` : nAct >= FASE_MENOS_VB && fv.permite ? `\n✓ ${fv.texto}` : '') : res.avisos.map((a) => '⚠ ' + a).join('\n');
       const det = d.querySelector('#rmd-aviso-nomenclatura');
@@ -2751,9 +2752,9 @@
         fijarSegmento(d, 'nomenclatura', { estado: 'ok', valor: esc(res.corto) + nota, titulo: textoN + (ant && ant.fase ? `\nFase de la ${vAnt}: ${ant.fase}` : '') });
         if (det && det.textContent !== textoN) det.textContent = textoN;
       } else {
-        fijarSegmento(d, 'nomenclatura', { estado: 'aviso', valor: copiada ? `copiada de la ${esc(vAnt)}` : faseMal ? `${esc(act.fase)} sin menos V°B°` : sugerirF3 ? `${esc(act.fase)}: corresponde F3 (menos V°B°)` : `${res.avisos.length} por corregir`, detalle: '1', abrir: true,
+        fijarSegmento(d, 'nomenclatura', { estado: 'aviso', valor: copiada ? `copiada de la ${esc(vAnt)}` : faseMal ? `${esc(act.fase)} no corresponde (sin menos V°B°)` : sugerirF3 ? `${esc(act.fase)}: corresponde F3 (menos V°B°)` : `${res.avisos.length} por corregir`, detalle: '1', abrir: true,
           titulo: 'Formato: AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase (p. ej. 20260918CJ-1-C2.0-FI1.0-FA1.0-F2)' });
-        if (det) generadorNomenclatura(d, det, { texto: textoN, act: copiada ? {} : faseMal ? { ...act, fase: '' } : sugerirF3 ? { ...act, fase: 'F3' } : act, ant, vAnt, reemplazar: act.parece || sugerirF3, fv });
+        if (det) generadorNomenclatura(d, det, { texto: textoN, act: copiada ? {} : sugerirF3 ? { ...act, fase: 'F3' } : act, ant, vAnt, reemplazar: act.parece || sugerirF3, fv });
       }
       marcarCampo(d, 'Observaciones', !res.ok || copiada || faseMal || sugerirF3);
     } else fijarSegmento(d, 'nomenclatura', null);
@@ -2787,7 +2788,8 @@
   }
   // Nomenclatura sugerida, editable: el botón reemplaza la 1.ª línea (o la agrega arriba si no era una nomenclatura).
   // Se escribe como al teclear: se guarda con el Guardar del portal.
-  const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R', 'F4', 'F4R', 'F5', 'F5R', 'F6', 'F6R'];
+  const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R'];   // v1.157.0 (Carlos): en el portal solo existen hasta la fase 3R; las superiores aún no están vigentes
+  const FASE_MAX_VIGENTE = 3;
   // v1.155.0 (regla de Carlos): la fase 3 es para las versiones con MENOS vistos buenos que la anterior. Se cuentan las casillas «V.B.» de los pasos
   // activos de PROCEDIMIENTO (la misma cuenta del PPT «Seguimiento de V°B°», vbConteos). F3 o superior solo se deja elegir si esta versión tiene menos
   // que la anterior, y se sugiere F3 si y solo si los tiene. Sin versión anterior, o sin poder contar, F3 o superior no se permite (se dice por qué).
@@ -2796,10 +2798,11 @@
   function reglaFaseVb(act, ant, vAnt, buscando) {
     if (buscando) return { buscando: true, act: null, ant: null, permite: false, sugerida: '', texto: 'Contando los V°B° de esta versión y la anterior…' };
     const sabe = Number.isFinite(act) && Number.isFinite(ant), menos = sabe && act < ant;
-    const texto = !vAnt ? 'Sin versión anterior: la fase 3 o superior no aplica (es para versiones con menos V°B° que la anterior).'
-      : !sabe ? `No se pudieron contar los V°B° de esta versión y de la ${vAnt}: la fase 3 o superior queda bloqueada hasta poder contarlos.`
+    // v1.157.0 (pedido de Carlos): F3 o superior ya no se bloquea; solo se avisa que la nomenclatura no corresponde
+    const texto = !vAnt ? 'Sin versión anterior: la fase 3 o superior no corresponde (es para versiones con menos V°B° que la anterior).'
+      : !sabe ? `No se pudieron contar los V°B° de esta versión y de la ${vAnt}: no se puede confirmar si corresponde la fase 3.`
       : menos ? `Esta versión tiene ${act} V°B° y la ${vAnt} tenía ${ant}: corresponde la fase 3.`
-      : `Esta versión tiene ${act} V°B° y la ${vAnt} tenía ${ant}: no tiene menos V°B°, no puede ir en fase 3 o superior.`;
+      : `Esta versión tiene ${act} V°B° y la ${vAnt} tenía ${ant}: no tiene menos V°B°, la fase 3 o superior no corresponde.`;
     return { buscando: false, act: sabe ? act : null, ant: sabe ? ant : null, permite: menos, sugerida: menos ? 'F3' : '', texto };
   }
   // casillas «V.B.» por mdId (null si no se pudo contar); se recuerdan 2 min
@@ -2847,12 +2850,12 @@
         const q = (s) => g.querySelector(s).value, ini = q('.rmd-nm-ini');
         if (ini.length !== 2) { toast('Escribe tus 2 iniciales (nombre + apellido).', true); g.querySelector('.rmd-nm-ini').focus(); return; }
         if (!q('.rmd-nm-fase')) { toast(`Elige la fase de esta versión${g.__rmdFaseAnt ? ` (la ${g.__rmdFaseAnt})` : ''}: no siempre es la misma que la anterior.`, true); g.querySelector('.rmd-nm-fase').focus(); return; }
-        const fv0 = g.__rmdFaseVb; if (numeroFase(q('.rmd-nm-fase')) >= FASE_MENOS_VB && !(fv0 && fv0.permite)) { toast(`La fase ${q('.rmd-nm-fase')} es para versiones con menos V°B° que la anterior. ${fv0 ? fv0.texto : ''}`, true); g.querySelector('.rmd-nm-fase').focus(); return; }
+        const fv0 = g.__rmdFaseVb, faseNo = numeroFase(q('.rmd-nm-fase')) >= FASE_MENOS_VB && !(fv0 && fv0.permite);   // v1.157.0: se avisa, no se bloquea
         const el = campoDe(d, 'Observaciones'), c = el && sap.ui.getCore().byId(el.id.replace(/-inner$/, '')); if (!c) return;
         const nueva = nomenclaturaMaterial(hoyAAAAMMDD(), ini, q('.rmd-nm-pri'), q('.rmd-nm-com'), q('.rmd-nm-fase'));
         const lineas = String(c.getValue() || '').split(/\r?\n/), valor = (g.__rmdReemplazar ? [nueva, ...lineas.slice(1)] : [nueva, ...lineas.filter((x, i) => i || x.trim())]).join('\n');
         c.setValue(valor); if (c.fireLiveChange) c.fireLiveChange({ value: valor }); c.fireChange({ value: valor }); d.__rmdNmToco = false;
-        toast(`1.ª línea: ${nueva}. Se guarda con el Guardar del portal.`);
+        toast(`1.ª línea: ${nueva}. Se guarda con el Guardar del portal.` + (faseNo ? ` Ojo: la fase ${q('.rmd-nm-fase')} no corresponde. ${fv0 && !fv0.buscando ? fv0.texto : ''}` : ''), faseNo);
       });
     }
     const av = g.previousElementSibling; if (av.textContent !== texto) av.textContent = texto;
@@ -2866,11 +2869,11 @@
     const pista = (ant && ant.fase ? `fase de la ${esc(vAnt)}: <b>${esc(ant.fase)}</b>${ant.prioridad ? ` · prioridad ${esc(ant.prioridad)}` : ''}${ant.complejidad ? ` · ${esc(ant.complejidad)}` : ''}` : vAnt ? `la ${esc(vAnt)} no tiene nomenclatura` : '')
       + `<br>${fvx.sugerida ? '<b>Sugerida F3.</b> ' : ''}${esc(fvx.texto)}`;
     const ps = g.querySelector('.rmd-nm-pista'); if (ps.innerHTML !== pista) ps.innerHTML = pista;
-    const sf = g.querySelector('.rmd-nm-fase'), bloqueo = fvx.permite ? '' : fvx.buscando ? 'Contando los V°B°…' : fvx.texto;
-    const marcar = () => [...sf.options].forEach((o) => { const no = !!bloqueo && numeroFase(o.value) >= FASE_MENOS_VB; o.disabled = no; o.title = no ? bloqueo : ''; });
-    const clave = [pri, com, fase, ini, fvx.permite, fvx.buscando].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) { marcar(); if (sf.selectedOptions[0] && sf.selectedOptions[0].disabled) sf.value = ''; return; }
+    const sf = g.querySelector('.rmd-nm-fase'), bloqueo = fvx.permite ? '' : fvx.buscando ? 'Contando los V°B°…' : 'No corresponde: ' + fvx.texto;
+    const marcar = () => [...sf.options].forEach((o) => { const no = !!bloqueo && numeroFase(o.value) >= FASE_MENOS_VB; o.disabled = false; o.title = no ? bloqueo : ''; });   // v1.157.0: solo el aviso
+    const clave = [pri, com, fase, ini, fvx.permite, fvx.buscando].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) { marcar(); return; }
     d.__rmdNmClave = clave;
-    const fases = !fase || FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
+    const fases = FASES_NOM;   // v1.157.0: solo las vigentes (F1 a F3R)
     sf.innerHTML = '<option value="">F?</option>' + fases.filter(Boolean).map((x) => `<option>${esc(x)}</option>`).join(''); marcar();
     g.__rmdFaseAnt = ant && ant.fase ? `${vAnt} estaba en ${ant.fase}` : '';
     sf.value = fase; if (sf.selectedOptions[0] && sf.selectedOptions[0].disabled) sf.value = ''; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
@@ -13421,6 +13424,47 @@
   // También: «Código Agrupador» -> «Agrupador» y tarjetas más estrechas.
   const EXPAND_LISTA_MD = 'estadoIdRmd,estadoIdProceso,sucursalId,motivoId,destinatariosMD/usuarioId,aStatusProceso/estadoIdProceso,aStatusProceso/mdId,aReceta/recetaId,aTrazabilidad/estadoTrazab';
   const filtroEquipo = { item: null, input: null, ids: null, texto: '', resumen: '' };
+  // v1.157.0 (pedido de Carlos): filtro «Fase» en lugar de «Agrupador» (no se usa). La fase sale de la 1.ª línea de Observaciones (como la columna Fase),
+  // así que «Ir» trae del servidor todos los master que cumplen los demás filtros y dicen esa fase en Observaciones, y deja en la lista solo los de esa fase.
+  const filtroFase = { item: null, select: null, valor: '' };
+  const FASES_FILTRO = [['', 'Todas'], ...FASES_NOM.map((x) => [x, x.replace(/^F(\d+)(R?)$/, (m, n, r) => `Fase ${n}${r ? ' R' : ''}`)]), ['-', 'Sin fase']];
+  const valorFase = () => (filtroFase.select && on('fase') ? filtroFase.select.getSelectedKey() || '' : '');
+  const cumpleFase = (o, v) => { const c = Reglas.faseDeObservacion(o && o.observacion).corto; return v === '-' ? !c : c === v; };
+  async function leerListaConFase(ctrl, filtros, ocupado_, v) {
+    const modelo = ctrl.getView().getModel('mainModelv2'), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, FO = sap.ui.require('sap/ui/model/FilterOperator') || sap.ui.model.FilterOperator;
+    if (!filtros || !filtros.length) return { results: [] };            // growing: ya se trajo todo
+    if (ocupado_) sap.ui.core.BusyIndicator.show(0);
+    try {
+      const extra = v && v !== '-' ? [new F({ path: 'observacion', operator: FO.Contains, value1: v })] : [];
+      let res = await leerTodoDe(modelo, 'MD', filtros.concat(extra), { $expand: EXPAND_LISTA_MD, $orderby: 'fechaRegistro desc' });
+      if (filtroEquipo.ids) { const ids = new Set(filtroEquipo.ids); res = res.filter((o) => ids.has(o.mdId)); }
+      res = res.filter((o) => cumpleFase(o, v)).sort((a, b) => b.codigo - a.codigo || b.version - a.version);
+      window.__rmdStats.filtroFase = { fase: v, filas: res.length, t: Date.now() };   // pruebas
+      return { results: res };
+    } finally { if (ocupado_) sap.ui.core.BusyIndicator.hide(); }
+  }
+  function gestionarFiltroFase(fb, items) {
+    const agr = items.find((x) => x.getName() === 'D');
+    if (!on('fase')) {
+      if (filtroFase.item) { fb.removeFilterGroupItem(filtroFase.item); filtroFase.item.destroy(); filtroFase.item = filtroFase.select = null; }
+      if (agr && agr.__rmdOculto) { agr.setVisibleInFilterBar(true); delete agr.__rmdOculto; }
+      return;
+    }
+    if (agr && agr.getVisibleInFilterBar() && !agr.__rmdOculto) {
+      const c = agr.getControl(); if (c && c.setValue && c.getValue && c.getValue()) c.setValue('');   // que no quede filtrando escondido
+      agr.setVisibleInFilterBar(false); agr.__rmdOculto = true;
+    }
+    if (!filtroFase.item || filtroFase.item.bIsDestroyed || !items.includes(filtroFase.item)) {
+      const FGI = sap.ui.require('sap/ui/comp/filterbar/FilterGroupItem'), Select = sap.ui.require('sap/m/Select'), Item = sap.ui.require('sap/ui/core/Item');
+      if (!FGI || !Select || !Item) return;
+      const sel = new Select({ width: '100%', forceSelection: false, tooltip: 'Fase de la 1.ª línea de Observaciones. «Ir» muestra solo los RMD de esa fase (con los demás filtros).',
+        items: FASES_FILTRO.map(([k, t]) => new Item({ key: k, text: t })), selectedKey: filtroFase.valor });
+      sel.attachChange(() => { filtroFase.valor = sel.getSelectedKey() || ''; });
+      const it = new FGI({ groupName: 'MANGROUP', name: 'RMDFASE', label: 'Fase', labelTooltip: 'Solo los RMD de esta fase (1.ª línea de Observaciones)', visibleInFilterBar: true, control: sel });
+      fb.addFilterGroupItem(it);
+      filtroFase.item = it; filtroFase.select = sel;
+    }
+  }
   function barraFiltrosPrincipal() {
     const lab = [...document.querySelectorAll('.sapUiCompFilterBar label, .sapUiCompFilterBar .sapMLabel')].find((l) => !l.closest('.sapMDialog') && /^Codigo RMD/i.test(norm(l.textContent)));
     const fbDom = lab && lab.closest('.sapUiCompFilterBar'); return fbDom ? sap.ui.getCore().byId(fbDom.id) : null;
@@ -13461,11 +13505,13 @@
     const ctrl = controladorPrincipal(), fb = ctrl && barraFiltrosPrincipal(); if (!fb || !fb.getFilterGroupItems) return;
     const items = fb.getFilterGroupItems();
     compactarBarraFiltros(fb, items);
-    if (!on('buscarequipo')) {
+    try { gestionarFiltroFase(fb, items); } catch (e) { window.__rmdStats.errores = (window.__rmdStats.errores || []).slice(-9).concat('filtro fase: ' + e.message); }
+    if (!on('buscarequipo') && !on('fase')) {
       if (filtroEquipo.item) { fb.removeFilterGroupItem(filtroEquipo.item); filtroEquipo.item.destroy(); filtroEquipo.item = filtroEquipo.input = null; filtroEquipo.ids = null; }
       return;
     }
-    if (!filtroEquipo.item || filtroEquipo.item.bIsDestroyed || !items.includes(filtroEquipo.item)) {
+    if (!on('buscarequipo') && filtroEquipo.item) { fb.removeFilterGroupItem(filtroEquipo.item); filtroEquipo.item.destroy(); filtroEquipo.item = filtroEquipo.input = null; filtroEquipo.ids = null; }
+    if (on('buscarequipo') && (!filtroEquipo.item || filtroEquipo.item.bIsDestroyed || !items.includes(filtroEquipo.item))) {
       const FGI = sap.ui.require('sap/ui/comp/filterbar/FilterGroupItem'), Input = sap.ui.require('sap/m/Input'), ListItem = sap.ui.require('sap/ui/core/ListItem');
       if (!FGI || !Input || !ListItem) return;
       const inp = new Input({ placeholder: 'Código o nombre', showSuggestion: true, filterSuggests: false, width: '100%', tooltip: 'Equipo, instrumento, material, utensilio o agrupador: código o parte del nombre. "Ir" muestra solo los master que lo tienen (con los demás filtros).' });
@@ -13498,18 +13544,19 @@
         const r = await orig.call(yo, ev);
         window.__rmdStats.filtroEquipo = { texto: filtroEquipo.texto, masters: filtroEquipo.ids ? filtroEquipo.ids.length : null, t: Date.now() };   // pruebas
         if (filtroEquipo.ids) toast(filtroEquipo.resumen + ' La lista muestra los que cumplen también los demás filtros.', !filtroEquipo.ids.length);
+        else if (valorFase() && window.__rmdStats.filtroFase) { const ff = window.__rmdStats.filtroFase; toast(`${ff.filas} RMD en ${FASES_FILTRO.find((x) => x[0] === ff.fase)[1].toLowerCase()} con los demás filtros.`, !ff.filas); }
         return r;
       };
       w.__rmdEquipo = orig; regS.fFunction = w;
     }
     const regR = ((fb.mEventRegistry || {}).reset || [])[0];
     if (regR && !regR.fFunction.__rmdEquipo) {
-      const orig = regR.fFunction; const w = function () { if (filtroEquipo.input) filtroEquipo.input.setValue(''); filtroEquipo.ids = null; filtroEquipo.texto = ''; return orig.apply(this, arguments); };
+      const orig = regR.fFunction; const w = function () { if (filtroEquipo.input) filtroEquipo.input.setValue(''); filtroEquipo.ids = null; filtroEquipo.texto = ''; if (filtroFase.select) filtroFase.select.setSelectedKey(''); filtroFase.valor = ''; return orig.apply(this, arguments); };
       w.__rmdEquipo = orig; regR.fFunction = w;
     }
     if (!ctrl.__rmdOnGetMd && typeof ctrl.onGetMd === 'function') {
       const orig = ctrl.onGetMd; ctrl.__rmdOnGetMd = orig;
-      ctrl.onGetMd = function (filtros, formula, valor, ocupado_) { return filtroEquipo.ids ? leerListaConEquipo(ctrl, filtros, ocupado_) : orig.apply(this, arguments); };
+      ctrl.onGetMd = function (filtros, formula, valor, ocupado_) { const vf = valorFase(); return vf ? leerListaConFase(ctrl, filtros, ocupado_, vf) : filtroEquipo.ids ? leerListaConEquipo(ctrl, filtros, ocupado_) : orig.apply(this, arguments); };
     }
   }
   // «Código Agrupador» -> «Agrupador», «Restablecer» -> ícono «clear-filter» y tarjetas más estrechas
@@ -19743,7 +19790,7 @@
       const R = OBS.revisar(obsTexto(), { vbAct: vbEnTrabajo() }), s = R.sugerida, ed = OBS.editable, opt = (l, v) => l.map((x) => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('');
       // v1.155.0: F3 o superior solo con menos V°B° que la versión anterior (bloqueadas si no)
       const fvb = s.faseVb || null, faseAlta = (x) => { const m = /^F(\d{1,2})/i.exec(x); return !!(m && fvb && +m[1] >= fvb.desde); };
-      const optFase = (q) => q.fases.map((x) => { const no = faseAlta(x) && !fvb.permite; return `<option${x === q.fase && !no ? ' selected' : ''}${no ? ` disabled title="${esc(fvb.texto)}"` : ''}>${esc(x)}</option>`; }).join('');
+      const optFase = (q) => q.fases.map((x) => { const no = faseAlta(x) && !fvb.permite; return `<option${x === q.fase ? ' selected' : ''}${no ? ` title="No corresponde: ${esc(fvb.texto)}"` : ''}>${esc(x)}</option>`; }).join('');   // v1.157.0: sin bloquear
       const nom = R.ok ? `<div class="pp-obs-l ok">✓ 1.ª línea: ${esc(R.resumen)}</div>${R.faseInfo ? `<div class="pp-obs-l ${R.sugerirF3 ? 'av' : 'info'}">${R.sugerirF3 ? '⚠' : 'ℹ'} ${esc(R.faseInfo)}</div>` : ''}` : R.nomenclatura.map((x) => `<div class="pp-obs-l av">⚠ ${esc(x)}</div>`).join('');
       const gen = ed && (!R.ok || R.sugerirF3) ? `<div class="pp-obs-gen" title="AAAAMMDD+iniciales-prioridad-Ccomplejidad-FI1.0-FA1.0-Ffase"><span>${esc(s.hoy)}</span><input id="pp-obs-ini" maxlength="2" spellcheck="false" value="${esc(s.ini)}" title="Tus iniciales (nombre + apellido)" aria-label="Iniciales">-<select id="pp-obs-pri" title="Prioridad" aria-label="Prioridad">${opt(['1', '2', '3'], s.pri)}</select>-<select id="pp-obs-com" title="Complejidad" aria-label="Complejidad">${opt(s.complejidades, s.com)}</select>-FI1.0-FA1.0-<select id="pp-obs-fase" title="Fase de esta versión (no se copia de la anterior)" aria-label="Fase"><option value="">F?</option>${optFase(s)}</select>
         <button type="button" data-a="obs-nom">${s.reemplazar ? 'Reemplazar 1.ª línea' : 'Poner como 1.ª línea'}</button>${s.faseAnt ? `<small>fase de la ${esc(s.vAnt)}: <b>${esc(s.faseAnt)}</b></small>` : ''}${fvb ? `<small class="pp-obs-fvb">${fvb.sugerida ? '<b>Sugerida F3.</b> ' : ''}${esc(fvb.texto)}</small>` : ''}</div>` : '';
@@ -19794,7 +19841,7 @@
         if (ini.length !== 2) { aviso('Escribe tus 2 iniciales (nombre + apellido).'); return; }
         if (!v('pp-obs-fase')) { aviso('Elige la fase de esta versión: no se copia de la anterior.'); return; }
         const R = OBS.revisar(obsTexto(), { vbAct: vbEnTrabajo() }), fvb = R.sugerida.faseVb, mF = /^F(\d{1,2})/i.exec(v('pp-obs-fase'));
-        if (fvb && mF && +mF[1] >= fvb.desde && !fvb.permite) { aviso(`La fase ${v('pp-obs-fase')} es para versiones con menos V°B° que la anterior. ${fvb.texto}`); return; } obsPoner(OBS.nomenclatura(obsTexto(), { ini, pri: v('pp-obs-pri'), com: v('pp-obs-com'), fase: v('pp-obs-fase') }, R.sugerida.reemplazar));
+        if (fvb && mF && +mF[1] >= fvb.desde && !fvb.permite) aviso(`Ojo: la nomenclatura no corresponde, la fase ${v('pp-obs-fase')} es para versiones con menos V°B° que la anterior. ${fvb.texto}`); obsPoner(OBS.nomenclatura(obsTexto(), { ini, pri: v('pp-obs-pri'), com: v('pp-obs-com'), fase: v('pp-obs-fase') }, R.sugerida.reemplazar));
       }
     }
     function copiarResumen() { const t = textoResumen(); const ok = () => aviso('Resumen copiado.'); try { navigator.clipboard.writeText(t).then(ok, () => { fallback(t); ok(); }); } catch (e) { fallback(t); ok(); } }
@@ -21698,7 +21745,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
         const l0 = String(texto || '').split(/\r?\n/)[0], res0 = analizarNomenclatura(l0), act = partesNomenclatura(l0), copiada = res0.ok && !!l0Ant && l0.trim() === l0Ant;
         // v1.155.0: fase 3 o superior solo con menos V°B° que la versión anterior; F3 se sugiere si y solo si los tiene
         const fv = reglaFaseVb(op.vbAct, vbAnt, previa ? vAnt : ''), nAct = numeroFase(act.fase), faseMal = res0.ok && !copiada && nAct >= FASE_MENOS_VB && !fv.permite;
-        const res = faseMal ? { ...res0, ok: false, avisos: [`La fase ${act.fase} es para versiones con menos V°B° que la anterior. ${fv.texto}`] } : res0;
+        const res = faseMal ? { ...res0, ok: false, avisos: [`La nomenclatura no corresponde: la fase ${act.fase} es para versiones con menos V°B° que la anterior. ${fv.texto}`] } : res0;
         const sugerirF3 = res.ok && !copiada && fv.permite && nAct < FASE_MENOS_VB;   // v1.156.0: se avisa y la sugerida trae F3
         const faseInfo = res.ok && !copiada ? (sugerirF3 ? `${fv.texto} Está en ${act.fase}: cámbiala a F3.` : fv.permite ? fv.texto : '') : '';
         const h = Pendientes.heredados(previa ? [{ version: previa.version, codigo: previa.codigo, estado: previa.estado, observacion: previa.observacion }] : [], { version: rmd.version, observacion: texto });
@@ -21709,7 +21756,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
           aplicados: h.aplicados.filter((x) => !x.heredado).map((x) => x.codigo), heredados: h.aplicados.filter((x) => x.heredado).map((x) => x.codigo), resueltos: h.resueltos.map((x) => `${x.cc} (de la v${x.version})`), pendientes,
           formato: h.formato.map((x) => `${x.linea}: falta ${x.faltan.join(', ')}`),
           sugerida: { hoy: hoyAAAAMMDD(), ini: ini || act.ini || (ant && ant.ini) || '', pri: act.prioridad || (ant && ant.prioridad) || '2', com: act.complejidad || (ant && ant.complejidad) || 'C1.0',
-            fase: copiada || faseMal || sugerirF3 ? fv.sugerida : act.fase || fv.sugerida, faseAnt: (ant && ant.fase) || '', vAnt, reemplazar: !!act.parece || sugerirF3, fases: FASES_NOM, complejidades: COMPLEJIDADES,
+            fase: copiada || sugerirF3 ? fv.sugerida : act.fase || fv.sugerida, faseAnt: (ant && ant.fase) || '', vAnt, reemplazar: !!act.parece || sugerirF3, fases: FASES_NOM, complejidades: COMPLEJIDADES,
             faseVb: { permite: fv.permite, sugerida: fv.sugerida, texto: fv.texto, desde: FASE_MENOS_VB } } };
       },
       nomenclatura(texto, { ini: i2, pri, com, fase }, reemplazar) {
