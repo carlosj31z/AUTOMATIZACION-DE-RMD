@@ -21754,6 +21754,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       espera.cerrar();
     } catch (e) { if (e.cancelado) { espera.cerrar(); return; } p.classList.add('error'); setTxt(p, 'No se pudo abrir: ' + e.message); espera.pie.append(botonModal('Cerrar', '', () => espera.cerrar())); }
   }
+  window.__rmdStats.homologar = abrirHomologar;   // pruebas
   const TEXTO_MENU_VISTA = 'Edición rápida';
   function menuVistaEnFilas(ctl) {
     if (!on('vistasimple') || !ctl || !ctl.getItems) return;
