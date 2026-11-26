@@ -41,6 +41,7 @@
     ['revisor', 'Destinatarios de la revisión', 'Nombre del jefe y del gerente en «Producción Estatus».'],
     ['historialcambios', 'Historial en Trazabilidad', 'Qué cambió entre versiones y en cada guardado, con su usuario.'],
     ['listapausa', 'Refresco de la lista solo a la vista', 'El refresco automático de cada 30 s espera mientras hay una ventana abierta o la pestaña está en segundo plano, y se hace al volver.'],
+    ['clavesmodelo', 'Clave Modelo sin nombres de personas', 'La lista de Clave Modelo de los pasos (y de la Edición rápida) solo ofrece Setup Pre Proceso, Proceso y Setup Post Proceso, sin los nombres de personas y empresas que trae SAP.'],
     ['copiarcodigo', 'Copiar el código con un clic', 'En la lista principal, un clic en el código del RMD lo copia al portapapeles.'],
     ['estadocolor', 'Estado en color', 'En la lista principal, la columna Estado como etiqueta de color (Ingresado, Autorizado, Suspendido…).'],
     ['ancho', 'Ventanas a medida', 'Las ventanas del RMD toman el tamaño que necesita su contenido.'],
@@ -3520,8 +3521,23 @@
     latido.pausado = null; latido.reanudados = (latido.reanudados || 0) + 1; aislar('reanudarLatido', () => c.onSearch());
   }
   document.addEventListener('visibilitychange', () => setTimeout(reanudarLatido, 300));
+  // v1.158.0 (pedido de Carlos): la lista de Clave Modelo del portal (ERP ClaveModeloSet) trae nombres de personas y empresas;
+  // solo se ofrecen las claves válidas (Setup Pre Proceso, Proceso, Setup Post Proceso). Se filtra el modelo del componente.
+  const esClaveValida = (k, t) => CLAVES.includes(SIN_ACENTOS(t || '')) || CLAVES.includes(SIN_ACENTOS(k || '')) || /^(SETPRE|SETPOST|PROCESO)$/i.test(norm(k));
+  function filtrarClavesModelo() {
+    if (!on('clavesmodelo')) return;
+    const C = sap.ui.core && sap.ui.core.Component; if (!C || !C.registry) return;
+    Object.values(C.registry.all()).forEach((c) => {
+      const m = c.getModel && c.getModel('localModel'), d = m && m.getProperty('/dataClaveModelo');
+      if (!Array.isArray(d) || !d.length || d.__rmdFiltrada) return;
+      const ok = d.filter((x) => x && esClaveValida(x.Vlsch, x.Txt));
+      if (!ok.length || ok.length === d.length) { d.__rmdFiltrada = true; return; }
+      ok.__rmdFiltrada = true; m.setProperty('/dataClaveModelo', ok);
+    });
+  }
   function revisionPeriodica() {
     reanudarLatido();
+    if (opc.activo) aislar('filtrarClavesModelo', filtrarClavesModelo);
     montarPanel();
     if (!dialogos().length) { if (++sinVentanas >= 3 && portapapeles && !ocupadoCopia) limpiarPortapapeles(); } else sinVentanas = 0;
     if (opc.activo && opc.singuardar) refrescarBases();
@@ -21721,7 +21737,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   let PP_CLAVES = null;
   async function ppClavesModelo(ctrl) {
     if (PP_CLAVES && Date.now() - PP_CLAVES.t < 30 * 60000) return PP_CLAVES.l;
-    try { const l = (await leerErp(ctrl.oModelErpNec, 'ClaveModeloSet', [])).map((x) => [norm(x.Vlsch), norm(x.Txt)]).filter((x) => x[0]); if (l.length) PP_CLAVES = { t: Date.now(), l }; return l; } catch (e) { return []; }
+    try { const l = (await leerErp(ctrl.oModelErpNec, 'ClaveModeloSet', [])).map((x) => [norm(x.Vlsch), norm(x.Txt)]).filter((x) => x[0] && (!on('clavesmodelo') || esClaveValida(x[0], x[1]))); if (l.length) PP_CLAVES = { t: Date.now(), l }; return l; } catch (e) { return []; }
   }
   async function ppPuestosRmd(ctrl, recetas) {
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, rutas = new Map(); (recetas || []).forEach((r) => { if (r.plnnr) rutas.set(`${r.plnnr}|${r.alnal}`, r); });
@@ -23175,7 +23191,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   const GRUPOS_PANEL = [
     ['Uso diario', 'inicio', ['saludo', 'fiestas', 'titulo', 'enter', 'singuardar', 'sesion', 'orbes']],
     ['Lista principal', 'lista', ['barrafiltros', 'fase', 'buscarequipo', 'revisor', 'historialcambios', 'listapausa', 'estadocolor', 'copiarcodigo', 'inactivovista']],
-    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'predanterior', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal']],
+    ['Ventanas del RMD', 'tabla', ['ancho', 'columnas', 'ocultar', 'estado', 'pmtitulo', 'pdfventana', 'grupos', 'depende', 'predanterior', 'filtro', 'vivo', 'pasosvacios', 'listasutiles', 'textosportal', 'clavesmodelo']],
     ['Edición de pasos', 'lapiz', ['copiar', 'repetirpaso', 'nuevopaso', 'editarpaso', 'cambiarpaso', 'pasominusculas', 'formulas', 'espec']],
     ['Recetas y fórmulas', 'matraz', ['asociar', 'pendientes', 'obsalto', 'recetas', 'recetasvarias', 'puestoreceta', 'cambiosrecetas', 'recetasauto', 'insumosnoguarda']],
     ['Revisión y alertas', 'alerta', ['reglas', 'sintipo', 'puesto', 'bajas', 'detectartildes', 'reglasrev', 'motivocaract', 'acuerdos', 'ordenest']],
