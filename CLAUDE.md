@@ -497,6 +497,15 @@ cuenta). Escribir y responder siempre en **español**.
   «Agrupador»** en la barra de filtros (`filtroFase`, `gestionarFiltroFase`: oculta el FilterGroupItem `D` y agrega `RMDFASE`; con fase elegida `onGetMd`
   lee todo `/MD` con los filtros del portal + `observacion` contiene la fase y deja solo esa fase, `leerListaConFase`). Probado en el portal en solo
   lectura (Fase 3: 77 RMD; 2202609513 en F3 con 4 vs 3 V°B° avisa sin bloquear). **Solo existen F1 a F3R** (`FASES_NOM`, `FASE_MAX_VIGENTE`; F4+ = aviso «no está vigente»). **La siguiente versión debe ser > 1.157.0.**
+- 2026-11-26, v1.158.0 (encima de la 1.157.0): **pedidos de Carlos.** **Solo para CJESUSZ (`CEO_CA_USUARIOS`): los pasos de Calidad en Operaciones con tipo de dato del PROCEDIMIENTO pasan solos a depender del primer
+  paso «CONDICIONES AMBIENTALES»** (paso de cualquier etiqueta, p. ej. 4.4.1; `PPN.ceoSinCondiciones`, `PPN.pasoCondicionesDe`, `PPN.esPasoCeo`): al abrir «Configurar el RMD»
+  de un RMD Ingresado (`menuConfigurarCeo` → `ceoDependerCa`: MERGE `MD_ES_PASO` `depende`/`dependeMdEstructuraPasoId`, una vez por RMD en la sesión) y al terminar un
+  ingreso de la Edición rápida o del borrador. Sin aviso para nadie (Carlos lo pidió así). Probado en lectura con 2202609513: 182861 y 180901 → 81236. **Clave Modelo sin nombres de personas** (opción `clavesmodelo`): el modelo `localModel>/dataClaveModelo` del componente
+  (ERP ClaveModeloSet, 47 filas con personas y empresas) se deja en Setup Pre Proceso / Proceso / Setup Post Proceso (`filtrarClavesModelo`,
+  `esClaveValida`), también en `ppClavesModelo`. **Interfaz más legible**: letra más grande en avisos y notas, fuente «72» en la Edición rápida
+  (`fuente72Css`), colores fijos (rojo bloquea, ámbar revisar, gris informa), más contraste en tema oscuro, avisos de fase sin repetir.
+  **Observaciones de la Edición rápida se minimizan** («Minimizar»/«Mostrar», `obsPlegar`, recordado en `rmdObsPlegada`; plegada muestra la 1.ª línea y
+  los avisos). Probado en el portal en solo lectura (2202609513, 2202609528). Prueba `qa_ceo_condiciones.mjs`. **La siguiente versión debe ser > 1.158.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
