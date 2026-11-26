@@ -19815,13 +19815,23 @@
     const vbEnTrabajo = () => { let n = 0; const sum = (ps) => (ps || []).forEach((x) => { if (!x.quitado && x.vb) n++; });
       ((W && W.estructuras) || []).forEach((e) => { if (e.quitado || !/^PROCEDIMIENTO/i.test(String(e.nombre || '').trim())) return; sum(e.pasos); (e.etiquetas || []).forEach((t) => sum(t.pasos)); }); return n; };
     const obsCambiada = () => !!(OBS && W && W.obs != null && String(W.obs).replace(/\s+$/, '') !== String(OBS.texto).replace(/\s+$/, ''));
+    // v1.158.0 (pedido de Carlos): el cuadro de Observaciones se minimiza (ocupa mucho); se recuerda en el navegador
+    let obsPlegada = false; try { obsPlegada = localStorage.getItem('rmdObsPlegada') === '1'; } catch (e) { /* sin almacenamiento */ }
+    function obsPlegar() {
+      obsPlegada = !obsPlegada; try { localStorage.setItem('rmdObsPlegada', obsPlegada ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+      const sec = document.querySelector('.pp-obs'); if (!sec) return;
+      sec.classList.toggle('plegada', obsPlegada); const b = sec.querySelector('[data-a="obs-plegar"]');
+      if (b) { b.textContent = obsPlegada ? 'Mostrar' : 'Minimizar'; b.setAttribute('aria-expanded', String(!obsPlegada)); }
+    }
     function htmlObs() {
       const t = obsTexto(), ed = OBS.editable, filas = Math.min(9, Math.max(3, t.split('\n').length + 1));
-      return `<section class="pp-obs" aria-label="Observaciones"><div class="pp-obs-cab"><b>Observaciones</b>${obsCambiada() ? '<span class="pp-obs-cam">● cambiadas: se guardan con «Guardar en SAP»</span>' : ''}
+      const rev = htmlObsRevision(), nAv = (rev.match(/pp-obs-l av/g) || []).length, l1 = (t.split('\n')[0] || '').trim();
+      return `<section class="pp-obs${obsPlegada ? ' plegada' : ''}" aria-label="Observaciones"><div class="pp-obs-cab"><b>Observaciones</b><button type="button" class="pp-obs-plegar" data-a="obs-plegar" aria-expanded="${!obsPlegada}" title="Minimiza o muestra el cuadro de Observaciones">${obsPlegada ? 'Mostrar' : 'Minimizar'}</button>${obsCambiada() ? '<span class="pp-obs-cam">● cambiadas: se guardan con «Guardar en SAP»</span>' : ''}
+        <span class="pp-obs-res">${esc(l1 || 'sin 1.ª línea')}${nAv ? ` <span class="pp-obs-res-av">⚠ ${nAv} aviso${nAv > 1 ? 's' : ''}</span>` : ''}</span>
         <small>${ed ? (OBS.previa ? `versión anterior: v${esc(OBS.previa.version)}${OBS.previa.estado ? ' · ' + esc(OBS.previa.estado) : ''}` : 'sin versión anterior') : 'Solo lectura: las Observaciones se cambian en un RMD Ingresado.'}</small></div>
         <div class="pp-obs-cuerpo"><div class="pp-obs-izq"><textarea id="pp-obs-ta" rows="${filas}" spellcheck="false" aria-label="Observaciones"${ed ? '' : ' readonly'}>${esc(t)}</textarea>
         ${ed ? `<div class="pp-obs-bot"><button type="button" data-a="obs-cc" title="Control de cambio aplicado (del listado de la planta del RMD, o la plantilla 26-###-CC/…)">+ CC</button><button type="button" data-a="obs-pendiente" title="Lo que falta aplicar: la siguiente versión lo hereda y el portal lo avisa">+ Pendiente</button><button type="button" data-a="obs-nota" title="Otra anotación con fecha e iniciales">+ Nota</button><button type="button" data-a="obs-nota-cambios" title="Una nota con el resumen de los cambios hechos en esta vista">+ Nota con los cambios</button>${obsCambiada() ? '<button type="button" data-a="obs-restaurar" title="Vuelve a las Observaciones de SAP">Restaurar</button>' : ''}</div>` : ''}</div>
-        <div class="pp-obs-der">${htmlObsRevision()}</div></div></section>`;
+        <div class="pp-obs-der">${rev}</div></div></section>`;
     }
     function htmlObsRevision() {
       const R = OBS.revisar(obsTexto(), { vbAct: vbEnTrabajo() }), s = R.sugerida, ed = OBS.editable, opt = (l, v) => l.map((x) => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('');
@@ -20508,6 +20518,7 @@
       else if (a === 'config-etq') editarConfigEtiqueta(b.dataset.id);
       else if (a === 'sap') guardarEnSap();
       else if (a === 'resumen') copiarResumen();
+      else if (a === 'obs-plegar') obsPlegar();
       else if (a.startsWith('obs-')) obsAccion(a, b);
       else if (a === 'cerrar-vista') cerrarVista();
       else if (a === 'comentar') comentar(id);
@@ -20828,6 +20839,8 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
 /* v1.124.0: Observaciones en la vista del portal */
 .pp-obs { scroll-margin-top: 110px; margin: 8px 16px 0; padding: 8px 12px; border: 1px solid var(--bd2); border-left: 3px solid var(--acento); border-radius: 6px; background: #fff; font: 12px/17px var(--fuente); }
 .pp-obs-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; } .pp-obs-cab small { color: var(--ap); } .pp-obs-cam { color: #8a5a00; font-weight: 600; }
+.pp-obs-plegar { font: inherit; font-size: 12px; padding: 1px 8px; } .pp-obs-res { display: none; font-family: Consolas, monospace; color: var(--ap); } .pp-obs-res-av { color: #8a5a00; font-family: var(--fuente); font-weight: 600; }
+.pp-obs.plegada { padding-top: 6px; padding-bottom: 6px; } .pp-obs.plegada .pp-obs-cab { margin-bottom: 0; } .pp-obs.plegada .pp-obs-cuerpo, .pp-obs.plegada .pp-obs-cab small { display: none; } .pp-obs.plegada .pp-obs-res { display: inline; }
 .pp-obs-cuerpo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; } @media (max-width: 900px) { .pp-obs-cuerpo { grid-template-columns: 1fr; } }
 .pp-obs textarea { width: 100%; box-sizing: border-box; resize: vertical; max-height: 190px; font: 12px/16px Consolas, "Courier New", monospace; padding: 5px 7px; border: 1px solid var(--bd2); border-radius: 4px; }
 .pp-obs textarea[readonly] { background: #f6f8fa; } .pp-obs-bot { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; } .pp-obs-bot button, .pp-obs-der button { font-size: 11px; padding: 1px 8px; }
