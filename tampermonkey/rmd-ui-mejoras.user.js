@@ -8909,6 +8909,7 @@
       const otro = cortoDe(ed.o), este = cortoDe(ed.m);
       const boton = (u) => { const it = u.it;
         if (it.tipo === 'dist') return `<button type="button" class="rmd-btn" data-a="ed-acc" data-ra="ref-usar" data-k="${it.k}" data-txt="Se usará el texto de ${esc(otro)}" title="Pone el texto de ${esc(nombre(ed.o))}${it.refCodigo ? ` (paso ${esc(it.refCodigo)})` : ''}">Usar el de ${esc(otro)}</button>`;
+        if (it.tipo === 'orden') return `<button type="button" class="rmd-btn" data-a="ed-acc" data-ra="ref-ordenar" data-k="${it.k}" data-txt="Se ordenará como ${esc(otro)}" title="Deja los equipos y utensilios de ${esc(nombre(ed.m))} en el mismo orden que ${esc(nombre(ed.o))}">Ordenar como ${esc(otro)}</button>`;
         if (it.tipo === 'falta') return `<button type="button" class="rmd-btn" data-a="ed-acc" data-ra="ref-agregar" data-k="${it.k}" data-txt="Se agregará a ${esc(este)}" title="Lo agrega a ${esc(nombre(ed.m))} en el mismo lugar${it.pm || it.eq ? '' : ' (con sus procesos menores)'}">Agregar a ${esc(este)}</button>`;
         return `<button type="button" class="rmd-btn" data-a="ed-acc" data-ra="ref-quitar" data-k="${it.k}" data-txt="Se quitará" title="Lo quita de ${esc(nombre(ed.m))}">Quitar</button>`; };
       const poner = (l, k, html) => {
@@ -19570,6 +19571,11 @@
           lw.forEach((x) => { if (!kr.has(refEqClave(x))) add({ tipo: 'solo', eq: cl, lista: e.nombre, id: x.id, texto: refEqTexto(x) }); });
           lr.forEach((y, j) => { if (!kw.has(refEqClave(y))) add({ tipo: 'falta', eq: cl, lista: e.nombre, estId: e.id, refEq: y, refAnt: j > 0 ? lr[j - 1] : null, refTexto: refEqTexto(y) }); });
         });
+        // mismo equipo en otro lugar del orden: «Ordenar como» el otro RMD (una sola numeración de equipos y utensilios)
+        const sw = PPN.eqSecuencia(e).map((z) => z.x).filter((x) => !x.quitado), sr = PPN.eqSecuencia(r).map((z) => z.x), kr2 = sr.map(refEqClave), kw2 = new Set(sw.map(refEqClave));
+        const ow = sw.filter((x) => kr2.includes(refEqClave(x))), orr = kr2.filter((k2) => kw2.has(k2));
+        const i0 = ow.findIndex((x, i) => refEqClave(x) !== orr[i]);
+        if (i0 >= 0) add({ tipo: 'orden', eq: 'equipos', lista: e.nombre, estId: e.id, id: ow[i0].id, texto: refEqTexto(ow[i0]), refOrden: kr2 });
       });
       mr.forEach((L, k) => { if (!mw.has(k) && L.pasos.length) add({ tipo: 'lista-falta', lista: nombreLista(L.e, L.t), texto: `Solo ${REF.nombre} tiene esta lista (${L.pasos.length} paso${L.pasos.length === 1 ? '' : 's'}): agrégala con «Configurar el RMD» si corresponde` }); });
     }
@@ -19592,6 +19598,12 @@
           if (b && PPN.igualTexto(it.refTexto, b.texto)) { v.codigo = b.codigo; v.pasoId = b.pasoId; v.nuevo = false; v.etqCat = b.etqCat; v.tipo = b.tipo; }
           else { v.codigo = null; v.pasoId = null; v.nuevo = true; v.etqCat = null; v.tipo = b ? b.tipo : (v.tipo || null); } });
         setTimeout(() => { irA(it.id); seleccionar(it.id); }, 30); return;
+      }
+      if (a === 'ref-ordenar') {
+        cambio(() => { const e = encontrar(it.estId).item, todos = PPN.eqSecuencia(e).map((z) => z.x), pos = (x) => it.refOrden.indexOf(refEqClave(x));
+          const con = todos.filter((x) => !x.quitado && pos(x) >= 0).sort((x, y) => pos(x) - pos(y)), resto = todos.filter((x) => !con.includes(x));
+          [...con, ...resto].forEach((x, i) => { x.orden = i + 1; }); });
+        setTimeout(() => irA(it.estId), 30); return;
       }
       if (a === 'ref-agregar' && it.eq) {                                     // v1.159.0: equipo o utensilio del otro RMD, en el mismo lugar del orden
         let nuevoId = null;
@@ -19625,7 +19637,7 @@
     function htmlRef() {
       if (!REF) return '';
       const n = REF_ITEMS.length, corto = (t) => { t = String(t || ''); return t.length > 110 ? t.slice(0, 110) + '…' : t; };
-      const etq = { dist: 'Distinto', solo: 'Solo en este RMD', falta: `Falta (está en ${REF.nombre})`, 'lista-solo': 'Lista solo en este RMD', 'lista-falta': 'Lista que falta' };
+      const etq = { orden: 'Otro orden', dist: 'Distinto', solo: 'Solo en este RMD', falta: `Falta (está en ${REF.nombre})`, 'lista-solo': 'Lista solo en este RMD', 'lista-falta': 'Lista que falta' };
       let ultLista = '';
       const filas = REF_ITEMS.map((it) => {
         const cab = it.lista !== ultLista ? `<div class="pp-ref-lista">${esc(it.lista)}</div>` : ''; ultLista = it.lista;
@@ -19633,7 +19645,8 @@
         const texto = it.tipo === 'dist' ? (([x, y]) => `<span class="pp-ref-a">${x}</span><span class="pp-ref-b">${y}</span>`)(refResaltar(it.texto, it.refTexto)) : it.tipo === 'falta' ? `<span class="pp-ref-b">${esc(corto(it.refTexto))}</span>` : `<span class="pp-ref-a">${esc(corto(it.texto))}</span>`;
         const btn = it.tipo === 'dist' && !it.insumo ? `<button type="button" class="pp-usar" data-a="ref-usar" data-k="${it.k}" title="Pone el texto de ${esc(REF.nombre)}${it.refCodigo ? ` (paso ${esc(it.refCodigo)})` : ''}">Usar el de ${esc(REF.corto || REF.nombre)}</button>`
           : it.tipo === 'falta' && !it.insumo ? `<button type="button" class="pp-usar" data-a="ref-agregar" data-k="${it.k}" title="${it.eq ? 'Lo agrega a la lista de equipos en el mismo lugar' : `Lo agrega en este lugar${it.refCodigo ? ` con el paso ${esc(it.refCodigo)}` : ''}${it.pm ? '' : ' y sus procesos menores'}`}">Agregar aquí</button>`
-          : it.tipo === 'solo' ? `<button type="button" class="pp-usar" data-a="ref-quitar" data-k="${it.k}">Quitar</button>` : '';
+          : it.tipo === 'solo' ? `<button type="button" class="pp-usar" data-a="ref-quitar" data-k="${it.k}">Quitar</button>`
+          : it.tipo === 'orden' ? `<button type="button" class="pp-usar" data-a="ref-ordenar" data-k="${it.k}" title="Deja los equipos y utensilios en el mismo orden que ${esc(REF.nombre)}">Ordenar como ${esc(REF.corto || REF.nombre)}</button>` : '';
         return `${cab}<div class="pp-ref-it k-${it.tipo}"><button type="button" class="pp-ref-ir"${ir}><span class="pp-ref-t">${etq[it.tipo]}${it.pm ? ' · proceso menor' : ''}${it.eq ? (it.eq === 'equipos' ? ' · equipo' : ' · utensilio') : ''}${it.refCodigo && it.tipo !== 'solo' ? ` · ${esc(it.refCodigo)}` : ''}</span>${texto}</button>${btn}</div>`;
       }).join('');
       return `<section class="pp-ref" aria-label="Homologar"><div class="pp-ref-cab"><b>Homologar con ${esc(REF.nombre)}</b><span>${n ? `${n} diferencia${n === 1 ? '' : 's'}` : 'Sin diferencias en los pasos'}</span></div><div class="pp-ref-cuerpo">${filas || '<p class="pp-nota">Los pasos y procesos menores son iguales a los del otro RMD.</p>'}</div></section>`;
