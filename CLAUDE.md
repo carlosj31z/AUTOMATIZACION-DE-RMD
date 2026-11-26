@@ -511,7 +511,14 @@ cuenta). Escribir y responder siempre en **español**.
   diferencia los botones del editor (`EMB.homol`: «Usar el de X», «Agregar a Y», «Quitar», «Ordenar como X»; `pintarEd`, `ubicarItems`) con la barra Deshacer /
   Guardar en SAP… / Terminar sin guardar. Las diferencias de equipos y utensilios también salen (falta, sobra, otro orden; `refEqClave`, `ref-ordenar`). «Guardar en
   SAP…» abre el «Ingresar en SAP» de siempre dentro de la pestaña de la comparación (solo las ventanas nuevas, `previos`/`movidos`). Probado en el portal en solo
-  lectura (2202608976 v3 vs 2202608950 v3: 1 paso cambiado + 8 filas reordenadas, nada escrito). **La siguiente versión debe ser > 1.159.0.**
+  lectura (2202608976 v3 vs 2202608950 v3: 1 paso cambiado + 8 filas reordenadas, nada escrito). 1.159.0 publicada en `publicado` el 2026-11-26 (PR #144).
+- 2026-11-26, v1.160.0 (encima de la 1.159.0): **pedido de Carlos: en la edición dentro de «Comparar dos RMD» todas las opciones de la Edición rápida.** Clic en una
+  línea del RMD que se edita (`lineaDeClic`, `abrirMenuEd`; filas del editor ↔ líneas de la comparación por texto con `mapaFilas`) abre las acciones de esa fila
+  en la Edición rápida (`EMB.homol.filas()` / `fila(id, a)`: Editar, Configuración, Paso debajo, Proceso menor, Insumo, Mover a…, Subir, Bajar, Duplicar,
+  Quitar…). Las ventanas del editor oculto (`modal()` llama a `EMB.alModal`) se pasan a la pestaña de la comparación dentro de un Shadow DOM con `PP_EDITOR_CSS`
+  (`mostrarModalEd`); los avisos del editor salen en la barra (`EMB.alAviso`). Lo cambiado se marca en su línea (`cambiados()`). Probado en el portal en solo
+  lectura (2202608976 v3: Configuración y Bajar; el error de predecesor frenó el guardado; tras Deshacer, la revisión mostró 1 configuración; nada escrito).
+  **La siguiente versión debe ser > 1.160.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

@@ -19735,7 +19735,7 @@
       // v1.160.0 (pedido de Carlos): todas las acciones de cada fila (editar, configuración, agregar, mover, quitar…) desde la comparación
       filas: () => $$('.pp-doc tr[data-id]').map((tr) => { const f = encontrar(tr.dataset.id); if (!f || !/^(paso|pm|equipo|utensilio|especificacion|insumo)$/.test(f.clase)) return null;
         const tx = tr.querySelector('.pp-tx') || tr.querySelector('td');
-        const acc = [...tr.querySelectorAll(':scope > td .pp-acc button[data-a]')].filter((b) => !/^(comentar|copiar)$/.test(b.dataset.a)).map((b) => ({ a: b.dataset.a, texto: b.textContent.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim(), qui: b.classList.contains('qui') }));
+        const acc = [...tr.querySelectorAll(':scope > td .pp-acc button[data-a]')].filter((b) => !/^(comentar|copiar|marcar)$/.test(b.dataset.a)).map((b) => ({ a: b.dataset.a, texto: b.textContent.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim(), qui: b.classList.contains('qui') }));
         return { id: tr.dataset.id, clase: f.clase, texto: tx ? tx.textContent.trim() : '', quitado: !!f.item.quitado, acciones: acc }; }).filter(Boolean),
       fila: (id, a) => { const b = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(id)}"] > td .pp-acc [data-a="${a}"]`); if (!b) return false; b.click(); return true; },
       cambiados: () => CMB.map((c) => ({ id: c.id, accion: c.accion, etq: ETQ_ACCION[c.accion] || c.accion, texto: String(c.accion === 'quitar' ? c.antes || '' : c.despues || c.texto || '') })),
