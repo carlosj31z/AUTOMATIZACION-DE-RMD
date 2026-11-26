@@ -2654,6 +2654,7 @@
     // Fase: dígito + revisión opcional (F2, F2R, F2-R)
     const fase = partes.slice(5).join('-'), mFase = /^F(\d)(-?R)?$/.exec(fase);
     if (!mFase) avisos.push(`La fase ("${fase}") debe ser F seguido de un número y, si aplica, "R" (ej. F1, F1R, F2, F2-R).`);
+    else if (+mFase[1] > FASE_MAX_VIGENTE || +mFase[1] < 1) avisos.push(`La fase ${fase} no está vigente: por ahora solo existen de la F1 a la F3R.`);
     const ok = avisos.length === 0;
     return { ok, avisos, resumen: ok ? `fecha ${fechaTxt} · iniciales ${iniciales} · prioridad ${prioridad} · complejidad ${mComp[1]} · fase ${mFase[1]}${mFase[2] ? 'R' : ''}` : null,
       corto: ok ? `${fechaTxt} · ${iniciales} · P${prioridad} · C${mComp[1]} · F${mFase[1]}${mFase[2] ? 'R' : ''}` : null };
@@ -2787,7 +2788,8 @@
   }
   // Nomenclatura sugerida, editable: el botón reemplaza la 1.ª línea (o la agrega arriba si no era una nomenclatura).
   // Se escribe como al teclear: se guarda con el Guardar del portal.
-  const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R', 'F4', 'F4R', 'F5', 'F5R', 'F6', 'F6R'];
+  const FASES_NOM = ['F1', 'F1R', 'F2', 'F2R', 'F3', 'F3R'];   // v1.157.0 (Carlos): en el portal solo existen hasta la fase 3R; las superiores aún no están vigentes
+  const FASE_MAX_VIGENTE = 3;
   // v1.155.0 (regla de Carlos): la fase 3 es para las versiones con MENOS vistos buenos que la anterior. Se cuentan las casillas «V.B.» de los pasos
   // activos de PROCEDIMIENTO (la misma cuenta del PPT «Seguimiento de V°B°», vbConteos). F3 o superior solo se deja elegir si esta versión tiene menos
   // que la anterior, y se sugiere F3 si y solo si los tiene. Sin versión anterior, o sin poder contar, F3 o superior no se permite (se dice por qué).
@@ -2871,7 +2873,7 @@
     const marcar = () => [...sf.options].forEach((o) => { const no = !!bloqueo && numeroFase(o.value) >= FASE_MENOS_VB; o.disabled = false; o.title = no ? bloqueo : ''; });   // v1.157.0: solo el aviso
     const clave = [pri, com, fase, ini, fvx.permite, fvx.buscando].join('|'); if (d.__rmdNmClave === clave || d.__rmdNmToco) { marcar(); return; }
     d.__rmdNmClave = clave;
-    const fases = !fase || FASES_NOM.includes(fase) ? FASES_NOM : [...FASES_NOM, fase];
+    const fases = FASES_NOM;   // v1.157.0: solo las vigentes (F1 a F3R)
     sf.innerHTML = '<option value="">F?</option>' + fases.filter(Boolean).map((x) => `<option>${esc(x)}</option>`).join(''); marcar();
     g.__rmdFaseAnt = ant && ant.fase ? `${vAnt} estaba en ${ant.fase}` : '';
     sf.value = fase; if (sf.selectedOptions[0] && sf.selectedOptions[0].disabled) sf.value = ''; g.querySelector('.rmd-nm-pri').value = pri; g.querySelector('.rmd-nm-com').value = com; g.querySelector('.rmd-nm-ini').value = ini;
