@@ -506,6 +506,12 @@ cuenta). Escribir y responder siempre en **español**.
   (`fuente72Css`), colores fijos (rojo bloquea, ámbar revisar, gris informa), más contraste en tema oscuro, avisos de fase sin repetir.
   **Observaciones de la Edición rápida se minimizan** («Minimizar»/«Mostrar», `obsPlegar`, recordado en `rmdObsPlegada`; plegada muestra la 1.ª línea y
   los avisos). Probado en el portal en solo lectura (2202609513, 2202609528). Prueba `qa_ceo_condiciones.mjs`. **La siguiente versión debe ser > 1.158.0.**
+- 2026-11-26, v1.159.0 (encima de la 1.158.0): **pedido de Carlos: editar el Ingresado dentro de «Comparar dos RMD»**, sin ir a la Edición rápida. «Editar <RMD> aquí»
+  (`empezarEd`) monta la Edición rápida oculta (`abrirHomologar(md, ref, { oculto, homol, alPintar, alIngresar })`) y la página de la comparación pinta sobre cada
+  diferencia los botones del editor (`EMB.homol`: «Usar el de X», «Agregar a Y», «Quitar», «Ordenar como X»; `pintarEd`, `ubicarItems`) con la barra Deshacer /
+  Guardar en SAP… / Terminar sin guardar. Las diferencias de equipos y utensilios también salen (falta, sobra, otro orden; `refEqClave`, `ref-ordenar`). «Guardar en
+  SAP…» abre el «Ingresar en SAP» de siempre dentro de la pestaña de la comparación (solo las ventanas nuevas, `previos`/`movidos`). Probado en el portal en solo
+  lectura (2202608976 v3 vs 2202608950 v3: 1 paso cambiado + 8 filas reordenadas, nada escrito). **La siguiente versión debe ser > 1.159.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
