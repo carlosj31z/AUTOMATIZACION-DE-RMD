@@ -8863,15 +8863,17 @@
         error: (e) => { if (ed) { ed.msg = 'No se pudo preparar la edición: ' + e.message; ed.fallo = true; pintarEd(); } } });
     }
     function terminarEd() { if (VISTA) VISTA.cerrar(); quitarModalesPagina(); ed = null; pintarResultado(); }
-    function quitarModalesPagina() { try { if (pagina && !pagina.closed) pagina.document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove()); } catch (e) { /* sin pestaña */ } if (ed && ed.obs) { ed.obs.disconnect(); ed.obs = null; } }
+    const quitarObs = () => { if (ed && ed.obs) { ed.obs.disconnect(); ed.obs = null; } };
+    function quitarModalesPagina() { try { if (pagina && !pagina.closed) pagina.document.querySelectorAll('.rmd-modal-fondo').forEach((x) => x.remove()); } catch (e) { /* sin pestaña */ } quitarObs(); }
     // «Guardar en SAP…»: la revisión y el ingreso de siempre; sus ventanas se pasan a esta pestaña
     function guardarEd() {
       if (!ed || !ed.api || ed.guardando) return;
       if (!ed.api.cambios()) { ed.msg = 'Todavía no hay cambios.'; pintarEd(); return; }
       const errs = ed.api.errores(); if (errs.length) { ed.msg = 'Corrige primero: ' + errs.slice(0, 3).join(' · '); pintarEd(); return; }
       ed.guardando = true; ed.msg = 'Abriendo la revisión…'; pintarEd();
-      const pd = pagina.document, mover = () => document.querySelectorAll('.rmd-modal-fondo').forEach((x) => { pd.body.appendChild(pd.adoptNode(x)); });
-      ed.obs = new MutationObserver(() => { mover(); if (ed && ed.guardando && !pd.querySelector('.rmd-modal-fondo') && !document.querySelector('.rmd-modal-fondo')) { ed.guardando = false; ed.msg = ''; pintarEd(); } });
+      const pd = pagina.document, previos = new Set(document.querySelectorAll('.rmd-modal-fondo')), movidos = new Set();   // la ventana de «Comparar dos RMD» se queda en el portal
+      const mover = () => document.querySelectorAll('.rmd-modal-fondo').forEach((x) => { if (previos.has(x)) return; movidos.add(x); pd.body.appendChild(pd.adoptNode(x)); if (ed && ed.msg === 'Abriendo la revisión…') { ed.msg = ''; pintarEd(); } });
+      ed.obs = new MutationObserver(() => { mover(); if (ed && ed.guardando && movidos.size && ![...movidos].some((x) => x.isConnected)) { ed.guardando = false; ed.msg = ''; quitarObs(); pintarEd(); } });
       ed.obs.observe(document.body, { childList: true }); ed.obs.observe(pd.body, { childList: true });
       if (!ed.api.guardar()) { ed.guardando = false; ed.msg = 'Hay errores por corregir.'; pintarEd(); return; }
       setTimeout(mover, 50);
