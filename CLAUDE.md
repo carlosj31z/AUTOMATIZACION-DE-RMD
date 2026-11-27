@@ -523,6 +523,9 @@ cuenta). Escribir y responder siempre en **español**.
   ATE 1 068 / LIMA 453). «INACTIVO (solo a la vista)» los marca por código de RMD exacto (`INACTIVO_CODIGOS`, además de los md_id de los 1 328) mientras
   sigan Suspendidos; los 2 Ingresados de la lista (SUEROVIT 2202507417/2202507423) se ven Ingresados. Prueba `qa_inactivos.mjs` I9-I10.
   **La siguiente versión debe ser > 1.161.0.**
+- 2026-11-27, v1.162.0 (encima de la 1.161.0): **2.ª lista de Carlos: 15 códigos más a INACTIVO, todos de ATE** (13033, 18154, 18335, 18155, 13714,
+  16857, 16375, 18798, 15578, 2202300291, 2202401624, 2202401738, 2202300034, 2202300447 y 2202608376, este Ingresado). `INACTIVO_CODIGOS` = 208.
+  status-rmd: ATE 1 083 / LIMA 453. Prueba `qa_inactivos.mjs` I11. **La siguiente versión debe ser > 1.162.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
