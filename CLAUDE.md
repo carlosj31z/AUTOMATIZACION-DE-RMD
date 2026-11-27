@@ -519,6 +519,10 @@ cuenta). Escribir y responder siempre en **español**.
   (`mostrarModalEd`); los avisos del editor salen en la barra (`EMB.alAviso`). Lo cambiado se marca en su línea (`cambiados()`). Probado en el portal en solo
   lectura (2202608976 v3: Configuración y Bajar; el error de predecesor frenó el guardado; tras Deshacer, la revisión mostró 1 configuración; nada escrito).
   **La siguiente versión debe ser > 1.160.0.**
+- 2026-11-27, v1.161.0 (encima de la 1.160.0): **pedido de Carlos: 193 códigos de RMD más «deben considerarse como INACTIVOS»** (status-rmd PR #159:
+  ATE 1 068 / LIMA 453). «INACTIVO (solo a la vista)» los marca por código de RMD exacto (`INACTIVO_CODIGOS`, además de los md_id de los 1 328) mientras
+  sigan Suspendidos; los 2 Ingresados de la lista (SUEROVIT 2202507417/2202507423) se ven Ingresados. Prueba `qa_inactivos.mjs` I9-I10.
+  **La siguiente versión debe ser > 1.161.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.160.0
+// @version      1.161.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.160.0';                                                       // mantener igual a @version
+  const VERSION = '1.161.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -48,7 +48,7 @@
     ['columnas', 'Columnas ordenadas', 'Anchos ajustados en las ventanas del RMD y un orden más claro en la lista principal.'],
     ['ocultar', 'Ocultar columnas poco usadas', 'Estado Mov., Imagen, Formato (salvo en procesos menores), PM OP y Gen PP.'],
     ['estado', 'Estado del RMD en la cabecera', 'Muestra si el RMD está Ingresado, Autorizado, Suspendido…'],
-    ['inactivovista', 'INACTIVO (solo a la vista)', 'Los master que el equipo pasa a INACTIVO (análisis de suspendidos: 1 328, ATE 892 / LIMA 436) se ven como INACTIVO en la lista y en la cabecera, y salen como INACTIVO en los Excel. En SAP siguen Suspendidos: no se escribe nada.'],
+    ['inactivovista', 'INACTIVO (solo a la vista)', 'Los master que el equipo pasa a INACTIVO (análisis de suspendidos: 1 328, ATE 892 / LIMA 436, más 193 códigos del 27/11/2026: ATE 1 068 / LIMA 453) se ven como INACTIVO en la lista y en la cabecera, y salen como INACTIVO en los Excel. En SAP siguen Suspendidos: no se escribe nada.'],
     ['pmtitulo', 'Título completo del proceso menor', 'Muestra la descripción completa del paso mayor.'],
     ['pdfventana', 'Imprimir sin descargar', 'La impresora de «Configurar el RMD» abre el master en otra pestaña, como «Ver master».'],
     ['grupos', 'Ayuda en los títulos de columna', 'Al pasar el ratón sobre un título se explica qué contiene la columna.'],
@@ -2529,11 +2529,16 @@
   const INACTIVO_IDS = (() => { const s = new Set(); for (let i = 0; i + 32 <= INACTIVO_IDS_HEX.length; i += 32) s.add(INACTIVO_IDS_HEX.slice(i, i + 32)); return s; })();
   const claveInactivo = (mdId) => String(mdId == null ? '' : mdId).trim().toLowerCase().replace(/-/g, '');
   // ¿Se muestra como INACTIVO? mdId de la lista y estado de hoy Suspendido.
-  const esInactivo = (mdId, estado) => /^suspendido$/i.test(String(estado || '').trim()) && INACTIVO_IDS.has(claveInactivo(mdId));
-  const estadoConInactivo = (mdId, estado) => (esInactivo(mdId, estado) ? ESTADO_INACTIVO : estado);
+  // v1.161.0 (pedido de Carlos, 27/11/2026): 193 códigos de RMD más que «deben considerarse como INACTIVOS» (ATE 176, LIMA 17; status-rmd
+  // PR #159). Van por código de RMD exacto (1072 no es 10720) porque no hay md_id a mano; igual que arriba, solo mientras sigan Suspendidos.
+  const INACTIVO_CODIGOS = new Set('2202507417 2202507423 2202300429 2202401890 2202402803 2202402206 2202301353 2202402678 18198 19141 2202401825 2202402590 2202402586 2202300446 2202301340 2202402838 16808 2202301351 2202301350 2202301610 2202401833 19013 2202402388 2202402389 2202401945 2202301388 16569 18319 2202607631 16195 2202301335 2202403227 18736 2202403124 2202403135 2202402831 2202301337 2202403223 2202403222 2202402994 2202403098 2202503714 2202503715 17196 2202402407 2202402319 2202300187 2202402267 2202401888 2202401885 2202402663 2202401904 14399 19308 19151 2202402246 2202402318 2202402614 2202402249 2202402600 2202402592 2202402756 15013 19079 2202402591 2202402774 2202402589 2202401935 2202504705 16126 15536 2202300573 18408 2202401822 2202301486 2202401683 2202503850 2202503852 12104 19198 19207 19208 19205 19447 2202301574 2202300954 2202401764 2202402130 14634 14635 2202402146 2202504322 19314 2202401804 2202402240 2202301139 2202300729 2202506707 18241 2202608127 2202608596 2202403136 2202403138 2202403100 2202503900 2202403101 2202403102 2202403157 2202505733 14326 2202300399 2202403224 2202403239 2202403217 2202300755 2202402870 2202300754 2202505162 2202300179 18178 15443 19054 19043 2202301511 2202301513 2202403260 2202402279 19215 2202300818 2202300820 2202300443 2202300819 19222 19326 19322 19339 18395 18396 14731 18937 18908 2202503688 2202503692 2202301349 2202301315 2202301317 19184 2202402443 2202402444 2202403281 19063 19645 2202402042 2202402260 2202301004 17154 2202506263 2202506476 2202506475 2202608681 2202608278 2202608311 2202507124 2202401670 2202506578 2202506579 2202507118 2202402469 2202402413 2202402548 14261 2202402604 16282 16257 2202403429 2202503538 13243 12314 13581 13301 12500 2202609013 1072 12956 12504 13262 16242 14183 14547 14345 14346 2202608441 12461'.split(' '));
+  const esInactivo = (mdId, estado, codigo) => /^suspendido$/i.test(String(estado || '').trim())
+    && (INACTIVO_IDS.has(claveInactivo(mdId)) || (codigo != null && INACTIVO_CODIGOS.has(String(codigo).trim())));
+  const estadoConInactivo = (mdId, estado, codigo) => (esInactivo(mdId, estado, codigo) ? ESTADO_INACTIVO : estado);
   // ==INACTIVOS-FIN==
-  const estadoVisible = (mdId, estado) => (on('inactivovista') ? estadoConInactivo(mdId, estado) : estado);
+  const estadoVisible = (mdId, estado, codigo) => (on('inactivovista') ? estadoConInactivo(mdId, estado, codigo) : estado);
   // mdId del RMD abierto («Asociar Fórmula» y sus ventanas)
+  function codigoAbierto() { try { const c = controladorPrincipal(), a = c && c.getView().getModel('asociarDatos'), d = a && a.getData(); return (d && d.codigo) || null; } catch (e) { return null; } }
   function mdIdAbierto() { try { const c = controladorPrincipal(), a = c && c.getView().getModel('asociarDatos'), d = a && a.getData(); return (d && d.mdId) || null; } catch (e) { return null; } }
 
   // ---- 6. Estado del RMD en la cabecera de cada ventana + título completo del paso menor ------
@@ -2563,7 +2568,7 @@
     }
   }
   function decorarCabeceras() {
-    const estado0 = on('estado') ? estadoDelRmd() : '', estado = estado0 && /^suspendido$/i.test(estado0) ? estadoVisible(mdIdAbierto(), estado0) : estado0;
+    const estado0 = on('estado') ? estadoDelRmd() : '', estado = estado0 && /^suspendido$/i.test(estado0) ? estadoVisible(mdIdAbierto(), estado0, codigoAbierto()) : estado0;
     dialogos().forEach((d) => {
       if (!gestionada(d) && !CODIGO_CORTO.test(cabecera(d))) return;
       const h2 = d.querySelector('header h2.sapMTitle, h2.sapMTitle'); if (!h2) return;
@@ -5895,7 +5900,7 @@
       const tr = it.getDomRef && it.getDomRef(), s = tr && tr.children[i] && tr.children[i].querySelector('span'); if (!s) return;
       const nombres = Object.keys(it.oBindingContexts || {}), c = nombres.length && it.getBindingContext(nombres[0] === 'undefined' ? undefined : nombres[0]), o = c && c.getObject();
       const texto = norm(s.textContent), real = (o && o.estadoIdRmd && o.estadoIdRmd.contenido) || (texto === ESTADO_INACTIVO ? s.dataset.rmdReal : texto);
-      if (o && esInactivo(o.mdId, real)) {
+      if (o && esInactivo(o.mdId, real, o.codigo)) {
         if (texto !== ESTADO_INACTIVO) { s.dataset.rmdReal = s.textContent; s.textContent = ESTADO_INACTIVO; }
         s.title = 'INACTIVO por decisión del equipo: solo a la vista, en SAP sigue Suspendido';
       } else if (s.dataset.rmdReal != null) {   // la fila se reutilizó para otro RMD
@@ -9385,11 +9390,11 @@
   // la última versión de cada master; las anteriores conservan su estado). Se hace después de ultimasVersiones: el linaje y «Reemplazado por» no cambian.
   function marcarInactivosUV(items) {
     let n = 0; if (!on('inactivovista')) return n;
-    items.forEach((x) => { if (x.estado === 'Suspendido' && esInactivo(x.md.mdId, x.estado)) { x.estado = ESTADO_INACTIVO; x.inactivo = true; n++; } });
+    items.forEach((x) => { if (x.estado === 'Suspendido' && esInactivo(x.md.mdId, x.estado, x.md.codigo)) { x.estado = ESTADO_INACTIVO; x.inactivo = true; n++; } });
     return n;
   }
   // estado de un MD para mostrar en el Excel: INACTIVO solo si es la última versión de su master (u) y está en la lista
-  const estadoUVVista = (m, u) => (m && u && m === u && on('inactivovista') ? estadoConInactivo(m.mdId, estadoUV(m)) : estadoUV(m));
+  const estadoUVVista = (m, u) => (m && u && m === u && on('inactivovista') ? estadoConInactivo(m.mdId, estadoUV(m), m.codigo) : estadoUV(m));
   // v1.126.0: SOLICITADOS DEL MES (criterio del equipo, pedido de Carlos). Mes = anio/mes (1-12), fechas con la hora local.
   //  1) entra todo registro (MD) con FECHA DE REGISTRO en el mes (cualquier estado menos Cancelado y Solicitud Rechazada);
   //  2) se quita si su master (alguna versión del linaje) se SUSPENDIÓ el mes anterior (última «Suspendido» de la trazabilidad): ya contó ese mes;
@@ -10773,7 +10778,7 @@
     }
     // v1.127.0: status de hoy INACTIVO (solo a la vista) para los master de la lista del equipo que siguen Suspendidos
     const items = misMovArmar({ usuario, desde, hasta, mds, traz: res.traz, filas });
-    items.forEach((x) => { const e = estadoVisible(x.mdId, x.estado); if (e !== x.estado) { x.estado = e; x.grupo = misMovGrupo(e); } });
+    items.forEach((x) => { const e = estadoVisible(x.mdId, x.estado, x.codigo); if (e !== x.estado) { x.estado = e; x.grupo = misMovGrupo(e); } });
     const obsDe = new Map(mds.map((m) => [m.mdId, m.observacion])); items.forEach((x) => { x.fase = faseCorta(obsDe.get(x.mdId)); });   // v1.155.0: columna «Fase» del Excel
     return { items, avisos };
   }
@@ -11069,7 +11074,7 @@
     const partes = String(ruta).split('/'), leerR = (o) => partes.reduce((v, k) => (v == null ? v : v[k]), o);
     let n = 0;
     const nuevas = arr.map((f) => {
-      if (!f || !esInactivo(f.mdId, leerR(f))) return f;
+      if (!f || !esInactivo(f.mdId, leerR(f), f.codigo)) return f;
       n++; const copia = { ...f }; let o = copia;
       partes.forEach((k, i) => { if (i === partes.length - 1) o[k] = ESTADO_INACTIVO; else { o[k] = { ...(o[k] || {}) }; o = o[k]; } });
       return copia;
