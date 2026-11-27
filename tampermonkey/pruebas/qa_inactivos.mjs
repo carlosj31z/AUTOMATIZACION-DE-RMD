@@ -33,7 +33,8 @@ ok('I6 estadoConInactivo devuelve «INACTIVO»', I.estadoConInactivo(id, 'Suspen
 ok('I7 Mis movimientos: INACTIVO tiene su grupo «Inactivo» (Suspendido sigue en el suyo)', grupo('INACTIVO') === 'Inactivo' && grupo('Suspendido') === 'Suspendido' && grupo('Cancelado') === 'Otros');
 ok('I8 La lista del userscript no trae nombres de producto (solo hexadecimal)', /const INACTIVO_IDS_HEX = '[0-9a-f]+';/.test(fuente));
 
-ok('I9 v1.161.0: los 193 códigos de Carlos (27/11) se ven INACTIVO por código exacto si siguen Suspendidos', I.INACTIVO_CODIGOS.size === 193 && I.esInactivo(null, 'Suspendido', '1072') && I.esInactivo('', 'Suspendido', 12104) && I.estadoConInactivo(null, 'Suspendido', '2202402803') === 'INACTIVO', String(I.INACTIVO_CODIGOS.size));
+ok('I9 v1.161.0: los 193 códigos de Carlos (27/11) se ven INACTIVO por código exacto si siguen Suspendidos', I.esInactivo(null, 'Suspendido', '1072') && I.esInactivo('', 'Suspendido', 12104) && I.estadoConInactivo(null, 'Suspendido', '2202402803') === 'INACTIVO', String(I.INACTIVO_CODIGOS.size));
+ok('I11 v1.162.0: 15 códigos más (2.ª lista del 27/11): 208 en total; 13033 y 2202300447 Suspendidos se ven INACTIVO', I.INACTIVO_CODIGOS.size === 208 && I.esInactivo(null, 'Suspendido', '13033') && I.esInactivo(null, 'Suspendido', '2202300447') && !I.esInactivo(null, 'Ingresado', '2202608376'));
 ok('I10 Por código no atrapa prefijos ni otros estados (10720, 107, 2202507417 Ingresado)', !I.esInactivo(null, 'Suspendido', '10720') && !I.esInactivo(null, 'Suspendido', '107') && !I.esInactivo(null, 'Ingresado', '2202507417') && !I.esInactivo(null, 'Suspendido', ''));
 
 console.log(fallas ? `\n${fallas} falla(s)` : '\nTodo pasa');
