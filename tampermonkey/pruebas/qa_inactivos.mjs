@@ -9,7 +9,7 @@ const aqui = path.dirname(fileURLToPath(import.meta.url));
 const fuente = fs.readFileSync(path.join(aqui, '..', 'rmd-ui-mejoras.user.js'), 'utf8');
 const bloque = (ini, fin) => { const a = fuente.indexOf(ini), b = fuente.indexOf(fin); if (a < 0 || b < a) throw new Error('no encuentro el bloque ' + ini); return fuente.slice(a, b); };
 const I = new Function(bloque('// ==INACTIVOS-INICIO==', '// ==INACTIVOS-FIN==')
-  + '\nreturn { INACTIVO_IDS, INACTIVO_FECHA, ESTADO_INACTIVO, esInactivo, estadoConInactivo };')();
+  + '\nreturn { INACTIVO_IDS, INACTIVO_CODIGOS, INACTIVO_FECHA, ESTADO_INACTIVO, esInactivo, estadoConInactivo };')();
 const { grupo } = new Function(bloque('// ==MISMOV-INICIO==', '// ==MISMOV-FIN==') + '\nreturn { grupo: misMovGrupo };')();
 
 let fallas = 0;
@@ -32,6 +32,9 @@ ok('I5 Un mdId que no está en la lista sigue Suspendido; sin mdId no se marca',
 ok('I6 estadoConInactivo devuelve «INACTIVO»', I.estadoConInactivo(id, 'Suspendido') === 'INACTIVO' && I.ESTADO_INACTIVO === 'INACTIVO');
 ok('I7 Mis movimientos: INACTIVO tiene su grupo «Inactivo» (Suspendido sigue en el suyo)', grupo('INACTIVO') === 'Inactivo' && grupo('Suspendido') === 'Suspendido' && grupo('Cancelado') === 'Otros');
 ok('I8 La lista del userscript no trae nombres de producto (solo hexadecimal)', /const INACTIVO_IDS_HEX = '[0-9a-f]+';/.test(fuente));
+
+ok('I9 v1.161.0: los 193 códigos de Carlos (27/11) se ven INACTIVO por código exacto si siguen Suspendidos', I.INACTIVO_CODIGOS.size === 193 && I.esInactivo(null, 'Suspendido', '1072') && I.esInactivo('', 'Suspendido', 12104) && I.estadoConInactivo(null, 'Suspendido', '2202402803') === 'INACTIVO', String(I.INACTIVO_CODIGOS.size));
+ok('I10 Por código no atrapa prefijos ni otros estados (10720, 107, 2202507417 Ingresado)', !I.esInactivo(null, 'Suspendido', '10720') && !I.esInactivo(null, 'Suspendido', '107') && !I.esInactivo(null, 'Ingresado', '2202507417') && !I.esInactivo(null, 'Suspendido', ''));
 
 console.log(fallas ? `\n${fallas} falla(s)` : '\nTodo pasa');
 process.exit(fallas ? 1 : 0);
