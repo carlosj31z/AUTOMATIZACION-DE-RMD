@@ -112,5 +112,29 @@ ok('grupo repetido por equipo: sin «Proceso menor repetido»', ![...av3.values(
 const t2 = { estructuras: [{ estructuraId: 'E', pasos: [{ id: 'a', codigo: '1', texto: 'PESAR', tipo: 438, pm: [] }, { id: 'b', codigo: '1', texto: 'PESAR', tipo: 438, copiaDe: 'a', pm: [] }] }] };
 ok('copia de lote no se marca como repetido', !/Paso repetido/.test(((PPN.avisos(t2, {}).get('b')) || []).map((x) => x.texto).join()));
 
+// v1.163.0 (regla de Carlos): un paso igual al anterior solo es repetido si sus procesos menores (e insumos) también son los mismos
+{
+  const pm = (pre, ts) => ts.map((t, i) => ({ id: pre + i, codigo: String(500 + i), texto: t }));
+  const t4 = { estructuras: [{ estructuraId: 'E', pasos: [
+    { id: 'r1', codigo: '7', texto: 'SELLADO AL VACIO:', tipo: 446, pm: pm('x', ['SELLADORA N° 5', 'VELOCIDAD:']) },
+    { id: 'r2', codigo: '7', texto: 'SELLADO AL VACIO:', tipo: 446, pm: pm('y', ['SELLADORA N° 6', 'VELOCIDAD:']) },
+    { id: 'r3', codigo: '7', texto: 'SELLADO AL VACIO:', tipo: 446, pm: pm('z', ['SELLADORA N° 6', 'VELOCIDAD:']) },
+    { id: 'r4', codigo: '8', texto: 'AGREGAR ALCOHOL', tipo: 438, pm: [{ id: 'i1', insumo: true, comp: '1000123', cant: '2' }] },
+    { id: 'r5', codigo: '8', texto: 'AGREGAR ALCOHOL', tipo: 438, pm: [{ id: 'i2', insumo: true, comp: '1000123', cant: '3' }] },
+  ] }] };
+  const a4 = PPN.avisos(t4, {}), t = (id) => (a4.get(id) || []).map((x) => x.texto).join(' | ');
+  ok('mismo texto con otros procesos menores: no es repetido', !/repetido|ya está en esta lista/.test(t('r2')), t('r2'));
+  ok('mismo texto y mismos procesos menores: repetido', /Paso repetido|ya está en esta lista/.test(t('r3')), t('r3'));
+  ok('mismo paso con otra cantidad de insumo: no es repetido', !/repetido|ya está en esta lista/.test(t('r5')), t('r5'));
+  // portal (tabla de Pasos): clave de cada proceso menor e insumo
+  const lc = fuente.split('\n').find((l) => l.startsWith('  const clavePmPortal = ')), lr = fuente.split('\n').find((l) => l.startsWith('  const claveRepetido = '));
+  const ci = fuente.split('\n').find((l) => l.startsWith('  const contenidoPasoIgual = '));
+  const SIN_ACENTOS = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const [clavePm, igual] = new Function('SIN_ACENTOS', lr + '\n' + lc + '\n' + ci + '\nreturn [clavePmPortal, contenidoPasoIgual];')(SIN_ACENTOS);
+  const A = [{ desc: 'Velocidad:' }, { insumo: true, codigo: '1000123', cant: '2' }], B = [{ desc: 'VELOCIDAD' }, { insumo: true, codigo: '1000123', cant: '2' }], C = [{ desc: 'VELOCIDAD' }, { insumo: true, codigo: '1000123', cant: '3' }];
+  ok('portal: mismos procesos menores e insumos = mismo contenido', igual(A.map(clavePm), B.map(clavePm)));
+  ok('portal: otra cantidad de insumo = otro contenido', !igual(B.map(clavePm), C.map(clavePm)));
+}
+
 console.log(fallas ? `\n${fallas} falla(s)` : '\nTodo bien');
 process.exit(fallas ? 1 : 0);

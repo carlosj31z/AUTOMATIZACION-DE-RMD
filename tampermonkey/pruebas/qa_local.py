@@ -237,7 +237,7 @@ with sync_playwright() as p:
         filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}] + [{"desc": t, "tipo": "Realizado por"} for t in textos]
         abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
         return [f["falta"] for f in a["filas"]] == [False, False, False, False, False, False, True], str([f["falta"] for f in a["filas"]])
-    @prueba("LN64 Repetidos y reglas de Carlos (v1.146.0): paso igual al anterior y palabra duplicada seguida se marcan en la Descripción y cuentan como incoherencias; procesos menores de Calidad en Operaciones con tipo de dato piden Estado CC y Edit; «TOMAR LA MUESTRA DESDE…» va sin tipo de dato")
+    @prueba("LN64 Repetidos y reglas de Carlos (v1.146.0; v1.163.0: el paso repetido solo con los mismos procesos menores): paso igual al anterior y palabra duplicada seguida se marcan en la Descripción y cuentan como incoherencias; procesos menores de Calidad en Operaciones con tipo de dato piden Estado CC y Edit; «TOMAR LA MUESTRA DESDE…» va sin tipo de dato")
     def _():
         filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}, {"desc": "SELLAR LAS CAJAS.", "tipo": "Realizado por", "dep": "1000 (1)"},
                  {"desc": "SELLAR LAS  CAJAS", "tipo": "Realizado por", "dep": "1001 (2)"}, {"desc": "VERIFICAR QUE COINCIDAN COINCIDAN CON LA INFORMACION.", "tipo": "Realizado por", "dep": "1002 (3)"}]
@@ -248,7 +248,9 @@ with sync_playwright() as p:
                    otro: R({ padre: 'MOLER LA MEZCLA', tipo: 'Texto', desc: 'DESCRIPCION (ASPECTO): MASA BLANCA.' }),
                    sin: R({ padre: 'CALIDAD EN OPERACIONES REGISTRA LOS RESULTADOS:', tipo: 'Sin tipo de dato', desc: 'NOTA: X' }),
                    muestra: R({ padre: 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA Y REALIZA EL MUESTREO', tipo: 'Verificación Check', desc: 'TOMAR LA MUESTRA DESDE LA VALVULA.', chk: { 'EDIT': true, 'ESTADO CC': false } }) }; }""")
-        ok = (des == [False, False, True, True] and "Paso repetido" in a["filas"][2]["avisoDes"] and "COINCIDAN COINCIDAN" in a["filas"][3]["avisoDes"] and "3 incoherencias" in (a["cuenta"] or "")
+        # v1.163.0 (regla de Carlos): el paso repetido solo se marca si además sus procesos menores son los mismos; en la maqueta no se leen procesos menores,
+        # así que «SELLAR LAS CAJAS» seguido ya no se marca (la regla con procesos menores la prueba qa_repetidos.mjs)
+        ok = (des == [False, False, False, True] and "Paso repetido" not in (a["filas"][2]["avisoDes"] or "") and "COINCIDAN COINCIDAN" in a["filas"][3]["avisoDes"] and "2 incoherencias" in (a["cuenta"] or "")
               and r["ceo"] == "EDIT:rmd-marcar,ESTADO CC:rmd-marcar" and r["otro"] == "EDIT:rmd-marcar" and r["sin"] == "" and r["muestra"] == "TIPO DATO:rmd-falta")
         return ok, f"{des} {a['cuenta']!r} {r}"
     @prueba("LN66 CC ACO Planta 2 (v1.149.0, pedido de Carlos): en la tabla de Pasos de un RMD de Acondicionado de LIMA, «Y REGISTRAR EN LA SOLAPA CORRESPONDIENTE» se marca en la Descripción con el texto sugerido; el proceso menor que es solo esa frase pide retirarse; en otra etapa o planta no se marca")
@@ -1911,6 +1913,45 @@ with sync_playwright() as p:
               and r["lineas"][0][1] and "escaneado.pdf" in r["lineas"][0][0] and "no trae los datos del borrador" in r["lineas"][0][0]
               and not r["lineas"][1][1] and "listo" in r["lineas"][1][0] and "RMD 2202600001 v3" in r["lineas"][1][0])
         return ok, json.dumps({"ui": ui, "nombre": nombre, "partes": pdf["n"], "r": r, "abre": abre}, ensure_ascii=False)[:1800]
+
+    @prueba("LN69 Editar en «Comparar dos RMD» (v1.163.0, pedido de Carlos: no solo sirve para homologar): el editor oculto da «Agregar…» (lista de todas las listas, pasos al final y equipos) y «Observaciones…» en ventanas que se pasan a la comparación; lo escrito en Observaciones cuenta como cambio; la edición se puede abrir en la Edición rápida completa (sin pasar ventanas) y volver; al cerrar la vista se avisa a la comparación")
+    def _():
+        d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
+        r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] });
+          paq.rmd.estado = 'Ingresado';
+          const host = document.createElement('div'); host.id = 'qa-cmp-host'; const sr = host.attachShadow({ mode: 'open' }); document.body.appendChild(host);
+          const modales = [], cerrada = { n: 0 }; let api = null;
+          await P.montarVista(paq, null, { claves: [], puestos: [], obs: true, previa: null, oculto: true, referencia: { nombre: '2202600001 v2', corto: 'v2', arbol: { estructuras: JSON.parse(JSON.stringify(d.arbol.estructuras)) } },
+            homol: (a) => { api = a; }, alModal: (f, c) => { f.__cerrar = c; modales.push(f); sr.appendChild(document.adoptNode(f)); }, alCerrar: () => { cerrada.n++; } });
+          for (let i = 0; i < 100 && !api; i++) await new Promise((ok) => setTimeout(ok, 100));
+          const V = window.__rmdStats.vista, oculta0 = V.fondo.hidden && V.fondo.style.display === 'none';
+          const fuera = (n) => !!n && n.getRootNode() === sr;
+          // Agregar…
+          const okAgr = api.agregar(), mA = modales[modales.length - 1], fueraA = fuera(mA), listas = mA ? [...mA.querySelectorAll('.pp-agr-lista button')].map((b) => b.textContent) : [];
+          const q = mA.querySelector('.pp-agr-q'); q.value = 'documentac'; q.dispatchEvent(new Event('input', { bubbles: true }));
+          const visibles = [...mA.querySelectorAll('.pp-agr-lista button')].filter((b) => !b.hidden).map((b) => b.textContent);
+          const i = [...mA.querySelectorAll('.pp-agr-lista button')].findIndex((b) => !b.hidden && /final/.test(b.textContent)); const n0 = modales.length;
+          mA.querySelectorAll('.pp-agr-lista button')[i].click(); await new Promise((ok) => setTimeout(ok, 200));
+          const mEd = modales.length > n0 ? modales[modales.length - 1] : null, edita = !!(mEd && fuera(mEd) && mEd.querySelector('textarea'));
+          if (mEd && mEd.__cerrar) mEd.__cerrar();
+          // Observaciones…
+          const hayObs = api.hayObs(), c0 = api.cambios(); api.obs(); const mO = modales[modales.length - 1], ta = mO && mO.querySelector('#pp-obs-ta');
+          ta.value = (ta.value ? ta.value + '\\n' : '') + '20261128CJ NOTA DE PRUEBA'; ta.dispatchEvent(new Event('input', { bubbles: true }));
+          await new Promise((ok) => setTimeout(ok, 500));
+          const obsOk = api.obsCambiada(), c1 = api.cambios(), revision = !!(mO.querySelector('.pp-obs-der')), fueraO = fuera(mO);
+          mO.querySelector('button[data-x]').click();
+          // Abrir en la Edición rápida y volver
+          V.mostrar(true); const visible = !V.fondo.hidden && V.fondo.style.display === '' && !window.__rmdVistaEmb.alModal;
+          const n1 = modales.length; api.agregar(); const sinPasar = modales.length === n1;
+          const mVista = V.marco.contentDocument.querySelector('.pp-modal-fondo'); if (mVista) mVista.remove();
+          V.mostrar(false); const otraVez = V.fondo.hidden && typeof window.__rmdVistaEmb.alModal === 'function';
+          V.cerrar(); host.remove();
+          return { oculta0, okAgr, listas, visibles, edita, hayObs, c0, c1, obsOk, revision, fueraA, fueraO, visible, sinPasar, mVista: !!mVista, otraVez, cerrada: cerrada.n }; }""", d0)
+        ok = (r["oculta0"] and r["okAgr"] and any("PROCEDIMIENTO" in t or "DOCUMENTACION" in t for t in r["listas"]) and any("equipo" in t.lower() for t in r["listas"])
+              and r["visibles"] and all("DOCUMENTAC" in t.upper() for t in r["visibles"]) and r["edita"] and r["fueraA"]
+              and r["hayObs"] and r["fueraO"] and r["obsOk"] and r["c1"] == r["c0"] + 1 and r["revision"]
+              and r["visible"] and r["sinPasar"] and r["mVista"] and r["otraVez"] and r["cerrada"] == 1)
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
 
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
