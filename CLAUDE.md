@@ -526,6 +526,13 @@ cuenta). Escribir y responder siempre en **español**.
 - 2026-11-27, v1.162.0 (encima de la 1.161.0): **2.ª lista de Carlos: 15 códigos más a INACTIVO, todos de ATE** (13033, 18154, 18335, 18155, 13714,
   16857, 16375, 18798, 15578, 2202300291, 2202401624, 2202401738, 2202300034, 2202300447 y 2202608376, este Ingresado). `INACTIVO_CODIGOS` = 208.
   status-rmd: ATE 1 083 / LIMA 453. Prueba `qa_inactivos.mjs` I11. **La siguiente versión debe ser > 1.162.0.**
+- 2026-11-28, v1.164.0 (encima de la 1.162.0; si la 1.163.0 del PR #148 se fusiona antes, se rehace encima): **pedido de Carlos: reglas de revisión
+  separadas por planta** según los 263 autorizados desde el 15/10 (`REGLAS_PLANTA`, pestaña «Por planta» de Reglas de revisión; `plantaDe`,
+  `plantaAbierta`, `esNotaCierre`). ATE: CALCULO DE RENDIMIENTO sin Edit, nota del jefe específica vale como cierre del 441, 1.er FECHA / HORA INICIO
+  sin predecesor, homologación de términos y nota 186337 solo informativas (decisión de Carlos en tarjeta; `TERMINOS_AVISO_ATE`, `RX_DOC_VIEJO` siguen
+  como aviso). LIMA: el 1.er paso con tipo de dato de cada lista lleva predecesor. Las dos: CONTRAMUESTRA / MUESTRA PARA CONTROL DE CALIDAD en
+  rendimiento → CANTIDAD MUESTREADA. Propuesta y evidencia en `/mnt/project-files/reglas-por-planta/`. Prueba `qa_reglas_planta.mjs`.
+  **La siguiente versión debe ser > 1.164.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
