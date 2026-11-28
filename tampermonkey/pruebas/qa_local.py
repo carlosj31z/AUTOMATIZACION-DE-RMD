@@ -1983,6 +1983,26 @@ with sync_playwright() as p:
               and I["c2"] == I["c0"] and A["may"] == 0 and not A["boton"] and A["n"] == 0)
         return ok, json.dumps({"m": m, "r": r}, ensure_ascii=False)[:1800]
 
+    @prueba("LN71 Comparar sin límites (v1.166.0, pedido de Carlos: editar tal cual en la Edición rápida): el editor oculto da los botones de su barra («Más opciones…»: Vista completa (DOC), Copiar resumen…) y los aplica; las acciones de cada fila incluyen copiar y marcar; los avisos informativos ya no se recortan al tener otro RMD de referencia")
+    def _():
+        d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
+        r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); paq.rmd.estado = 'Ingresado'; let api = null;
+          await P.montarVista(paq, null, { claves: [], puestos: [], obs: true, previa: null, oculto: true, referencia: { nombre: 'X v1', corto: 'v1', arbol: { estructuras: JSON.parse(JSON.stringify(d.arbol.estructuras)) } },
+            homol: (a) => { api = a; }, alModal: () => {}, alCerrar: () => {} });
+          for (let i = 0; i < 100 && !api; i++) await new Promise((ok) => setTimeout(ok, 100));
+          const V = window.__rmdStats.vista, doc = V.marco.contentDocument;
+          const ops = api.barra(), dt0 = !!doc.getElementById('pp-vista-dt').checked;
+          const okDt = api.barraAccion('vista-dt'); await new Promise((ok) => setTimeout(ok, 300)); const dt1 = !!doc.getElementById('pp-vista-dt').checked;
+          api.barraAccion('vista-dt'); await new Promise((ok) => setTimeout(ok, 300));
+          const filas = api.filas(), acc = new Set(); filas.forEach((f) => f.acciones.forEach((a) => acc.add(a.a)));
+          const info = doc.querySelectorAll('.pp-av.info, .pp-aviso.info, [data-nivel="info"]').length;
+          const malo = api.barraAccion('no-existe');
+          V.cerrar();
+          return { ops: ops.map((o) => o.a), dt0, dt1, okDt, acc: [...acc], malo, info }; }""", d0)
+        ok = ("vista-dt" in r["ops"] and "resumen" in r["ops"] and "sap" not in r["ops"] and "cerrar-vista" not in r["ops"] and r["okDt"] and r["dt1"] != r["dt0"]
+              and "copiar" in r["acc"] and not r["malo"])
+        return ok, json.dumps(r, ensure_ascii=False)[:1500]
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
