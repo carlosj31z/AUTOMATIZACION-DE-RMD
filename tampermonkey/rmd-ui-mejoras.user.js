@@ -9042,7 +9042,7 @@
       const n = ed.api ? ed.api.cambios() : 0, items = ed.api ? ed.api.items() : [];
       b.innerHTML = `<b>Editando ${esc(nombre(ed.m))}</b><span>${ed.api ? `${n} cambio${n === 1 ? '' : 's'} por guardar · ${items.filter((x) => !/^lista/.test(x.tipo)).length} diferencia${items.length === 1 ? '' : 's'} con ${esc(nombre(ed.o))} · clic en cualquier línea de ${esc(cortoDe(ed.m))} para editarla, configurarla, agregar debajo, moverla o quitarla` : ''}</span>
         ${ed.msg ? `<span class="rmd-cmp-ed-msg${ed.fallo ? ' error' : ''}">${esc(ed.msg)}</span>` : ''}
-        <span class="rmd-cmp-ed-bot">${ed.api && !ed.enVista ? `<button type="button" class="rmd-btn" data-a="ed-agregar" ${ed.guardando ? 'disabled' : ''} title="Agregar un paso al final de cualquier lista, un equipo o utensilio, o pegar lo copiado">Agregar…</button>${ed.api.hayObs && ed.api.hayObs() ? `<button type="button" class="rmd-btn" data-a="ed-obs" ${ed.guardando ? 'disabled' : ''} title="Nomenclatura, CC aplicados, pendientes y notas">Observaciones…${ed.api.obsCambiada && ed.api.obsCambiada() ? ' ●' : ''}</button>` : ''}<button type="button" class="rmd-btn" data-a="ed-homol" aria-pressed="${!sinHomol}" title="Muestra u oculta los botones de cada diferencia (Usar el de…, Agregar a…, Quitar, Ordenar como…)">${sinHomol ? 'Mostrar botones de diferencias' : 'Ocultar botones de diferencias'}</button>` : ''}${ed.api ? `<button type="button" class="rmd-btn" data-a="ed-vista" ${ed.guardando ? 'disabled' : ''} title="${ed.enVista ? 'Oculta la Edición rápida del portal y sigue editando aquí' : 'Abre esta misma edición en la Edición rápida completa, en la pestaña del portal'}">${ed.enVista ? 'Seguir editando aquí' : 'Abrir en la Edición rápida'}</button>` : ''}<button type="button" class="rmd-btn" data-a="ed-deshacer" ${ed.api && ed.api.hayDeshacer() && !ed.guardando ? '' : 'disabled'}>Deshacer</button><button type="button" class="rmd-btn primario" data-a="ed-guardar" ${ed.api && n && !ed.guardando ? '' : 'disabled'}>Guardar en SAP…</button><button type="button" class="rmd-btn" data-a="ed-salir" ${ed.guardando ? 'disabled' : ''}>Terminar sin guardar</button></span>`;
+        <span class="rmd-cmp-ed-bot">${ed.api && !ed.enVista ? `<button type="button" class="rmd-btn" data-a="ed-agregar" ${ed.guardando ? 'disabled' : ''} title="Agregar un paso al final de cualquier lista, un equipo o utensilio, o pegar lo copiado">Agregar…</button>${ed.api.hayObs && ed.api.hayObs() ? `<button type="button" class="rmd-btn" data-a="ed-obs" ${ed.guardando ? 'disabled' : ''} title="Nomenclatura, CC aplicados, pendientes y notas">Observaciones…${ed.api.obsCambiada && ed.api.obsCambiada() ? ' ●' : ''}</button>` : ''}${(() => { const nm = ed.api.mayusculas ? ed.api.mayusculas() : 0; return nm ? `<button type="button" class="rmd-btn" data-a="ed-minusculas" ${ed.guardando ? 'disabled' : ''} title="Pasa a minúsculas todos los pasos y procesos menores en MAYÚSCULAS del RMD que se edita: mayúscula al iniciar cada oración, comas y signos tal cual, tildes donde corresponden, unidades y códigos sin cambiar">Todo en minúsculas (${nm})</button>` : ''; })()}<button type="button" class="rmd-btn" data-a="ed-homol" aria-pressed="${!sinHomol}" title="Muestra u oculta los botones de cada diferencia (Usar el de…, Agregar a…, Quitar, Ordenar como…)">${sinHomol ? 'Mostrar botones de diferencias' : 'Ocultar botones de diferencias'}</button>` : ''}${ed.api ? `<button type="button" class="rmd-btn" data-a="ed-vista" ${ed.guardando ? 'disabled' : ''} title="${ed.enVista ? 'Oculta la Edición rápida del portal y sigue editando aquí' : 'Abre esta misma edición en la Edición rápida completa, en la pestaña del portal'}">${ed.enVista ? 'Seguir editando aquí' : 'Abrir en la Edición rápida'}</button>` : ''}<button type="button" class="rmd-btn" data-a="ed-deshacer" ${ed.api && ed.api.hayDeshacer() && !ed.guardando ? '' : 'disabled'}>Deshacer</button><button type="button" class="rmd-btn primario" data-a="ed-guardar" ${ed.api && n && !ed.guardando ? '' : 'disabled'}>Guardar en SAP…</button><button type="button" class="rmd-btn" data-a="ed-salir" ${ed.guardando ? 'disabled' : ''}>Terminar sin guardar</button></span>`;
       res.querySelectorAll('.rmd-cmp-acc').forEach((x) => x.remove());
       if (!ed.api) return;
       const otro = cortoDe(ed.o), este = cortoDe(ed.m);
@@ -9159,6 +9159,10 @@
       else if (b.dataset.a === 'ed-guardar') { if (ed && ed.enVista) enVistaEd(false); guardarEd(); }
       else if (b.dataset.a === 'ed-agregar' && ed && ed.api) { if (!ed.api.agregar()) { ed.msg = 'No hay listas donde agregar.'; pintarEd(); } }
       else if (b.dataset.a === 'ed-obs' && ed && ed.api) ed.api.obs();
+      else if (b.dataset.a === 'ed-minusculas' && ed && ed.api && ed.api.minusculas) {   // v1.163.0 (pedido de Carlos): todo el RMD en minúsculas con un clic
+        const nm = ed.api.mayusculas(); if (!nm || !pagina.confirm(`Se pasarán a minúsculas ${nm} paso(s) o proceso(s) menor(es) en MAYÚSCULAS (mayúscula al iniciar cada oración, tildes, unidades y códigos tal cual). Cada uno usará el paso de SAP que ya existe así o quedará como paso nuevo. Revisa el resultado antes de «Guardar en SAP». Se puede deshacer. ¿Continuar?`)) return;
+        ed.hechos.push({ l: ed.l, k: -1, txt: 'Todo en minúsculas' }); ed.api.minusculas();
+      }
       else if (b.dataset.a === 'ed-vista' && ed && ed.api) enVistaEd(!ed.enVista);
       else if (b.dataset.a === 'ed-homol') { sinHomol = !sinHomol; try { localStorage.setItem('rmdCmpSinHomol', sinHomol ? '1' : '0'); } catch (x) { /* sin almacenamiento */ } pintarEd(); }
       else if (b.dataset.a === 'ed-salir' && ed) { if (ed.api && ed.api.cambios() && !pagina.confirm('Los cambios no se guardaron en SAP. ¿Terminar sin guardar?')) return; terminarEd(); }
@@ -13989,6 +13993,9 @@
     return letras.length > 4 && minus <= letras.length * 0.1 && /\p{Lu}/u.test(letras);
   };
   window.__rmdStats.casiTodoMayus = casiTodoMayus;   // pruebas
+  // v1.163.0 («Todo en minúsculas» de la Edición rápida): también los textos cortos («PESO») sin ninguna minúscula fuera de las unidades
+  const textoEnMayusculas = (t) => { const l = String(t || '').replace(MINUSCULAS_DE_UNIDAD, ' ').replace(/[^\p{L}]/gu, ''); return casiTodoMayus(t) || (l.length > 1 && /\p{Lu}/u.test(l) && !/\p{Ll}/u.test(l)); };
+  window.__rmdStats.minusculasRmd = (t) => (textoEnMayusculas(t) ? redactarEnMinusculas(t) : String(t == null ? '' : t));   // pruebas
   function gestionarTextosMayusculas() {
     document.querySelectorAll('.sapMDialog:not(.sapMMessageDialog) textarea').forEach((ta) => {
       // «Nuevo Paso» / «Editar Paso» se detectan por el campo «Descripción Paso», no por el título.
@@ -18936,7 +18943,7 @@
             else if (r && r[0] === 'rango' && (num(x.vi) == null || num(x.vf) == null)) add(x.id, 'error', 'Indica el valor mínimo y el máximo del rango (✎ Editar).', 'rango'); }
         }
         if (x.nuevo && bus) {
-          const ex = bus.exactos(t).filter((f) => f.estr === estr && mismaCaja(t, f.texto)), aqui = ex.filter((f) => !etq || f.etq === etq);
+          const ex = bus.exactos(t).filter((f) => f.estr === estr && mismaCaja(t, f.texto) && (!x.caja || String(f.texto || '').replace(/\s+/g, ' ').trim() === String(t || '').replace(/\s+/g, ' ').trim())), aqui = ex.filter((f) => !etq || f.etq === etq);
           if (aqui.length) add(x.id, 'aviso', `Ya existe el paso ${aqui[0].codigo} con el mismo texto${etq ? ' en esta etiqueta' : ''}: conviene usarlo en vez de crear otro.`, 'existe', aqui[0].codigo);
           // v1.148.2 (Carlos): nunca se sugieren pasos de otra etiqueta
           else { const g = iguales.get(x.id);
@@ -19395,6 +19402,31 @@
           else { x.codigo = null; x.pasoId = null; x.nuevo = true; x.etqCat = null; x.tipo = b ? b.tipo : (x.tipo || null); }
         });
       });
+    }
+    // v1.163.0 (pedido de Carlos): todo el RMD de MAYÚSCULAS a minúsculas con un clic (no solo un paso). El texto lo redacta el portal
+    // (EMB.minusculas = redactarEnMinusculas: respeta comas y signos, conserva pH/mL, unidades, códigos y siglas y pone tildes donde corresponden).
+    // Cada texto usa el paso de SAP que ya existe EXACTAMENTE así (mismas minúsculas) en su etiqueta o queda como paso nuevo; `caja` hace que el
+    // ingreso no tome el paso en MAYÚSCULAS como si fuera el mismo. Solo en un RMD Ingresado (en un Autorizado no se edita ningún texto).
+    const crudoTx = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+    const puedeMinusculas = () => !!(EMB && typeof EMB.minusculas === 'function' && /ingresad/i.test(String(EMB.estado || PQ.rmd.estado || '')));
+    function enMayusculas() {
+      const out = [], vivos = (l) => (l || []).filter((y) => !y.quitado); if (!puedeMinusculas()) return out;
+      const ver = (x, e, t) => { if (x.insumo || !x.texto) return; let nt = ''; try { nt = String(EMB.minusculas(x.texto) || ''); } catch (er) { nt = ''; } if (nt && nt !== x.texto) out.push({ x, e, t, nt }); };
+      W.estructuras.forEach((e) => [[null, e.pasos], ...(e.etiquetas || []).map((t) => [t, t.pasos])].forEach(([t, l]) => vivos(l).forEach((p) => { ver(p, e, t); vivos(p.pm).forEach((m) => ver(m, e, t)); })));
+      return out;
+    }
+    function minusculasTodo(sinPreguntar) {
+      if (!puedeMinusculas()) return 0;
+      const l = enMayusculas(); if (!l.length) { if (!sinPreguntar) alert('No hay pasos ni procesos menores en MAYÚSCULAS en este RMD.'); return 0; }
+      if (!sinPreguntar && !confirm(`Se pasarán a minúsculas ${l.length} paso${l.length === 1 ? '' : 's'} o proceso${l.length === 1 ? '' : 's'} menor${l.length === 1 ? '' : 'es'} (mayúscula al iniciar cada oración, tildes, unidades y códigos tal cual). Cada uno usará el paso de SAP que ya existe así o quedará como paso nuevo (si solo lo usa este RMD, se corrige su texto). Revisa el resultado antes de «Guardar en SAP». Se puede deshacer. ¿Continuar?`)) return 0;
+      cambio(() => l.forEach(({ x, e, t, nt }) => {
+        const b = BI.get(x.id); x.texto = nt; x.caja = true;
+        const ex = BUS.exactos(nt).filter((c) => c.estr === e.estructuraId && (!t || c.etq === t.etiquetaId) && crudoTx(c.texto) === crudoTx(nt));
+        if (b && crudoTx(b.texto) === crudoTx(nt)) { x.codigo = b.codigo; x.pasoId = b.pasoId; x.nuevo = false; x.etqCat = b.etqCat; x.tipo = b.tipo; }
+        else if (ex.length) { x.codigo = String(ex[0].codigo); x.pasoId = null; x.nuevo = false; x.etqCat = ex[0].etq; x.tipo = ex[0].tipo || x.tipo; }
+        else { x.tipo = b ? b.tipo : (x.tipo || null); x.codigo = null; x.pasoId = null; x.nuevo = true; x.etqCat = null; }
+      }));
+      return l.length;
     }
     function guardarLocal() { clearTimeout(guardarLocal.t); guardarLocal.t = setTimeout(() => { try { if (EMB && !contar().total) localStorage.removeItem(CLAVE()); else localStorage.setItem(CLAVE(), JSON.stringify({ t: Date.now(), W, SOL })); } catch (e) { } if (!EMB) armarDatosPdf().catch(() => {}); }, 400); }   // en la Edición rápida no hay PDF
     // Datos del borrador dentro del PDF: enlaces invisibles al final del resumen. «Guardar como PDF» de Chrome y Edge guarda cada dirección tal cual,
@@ -19855,6 +19887,7 @@
       cambiados: () => CMB.map((c) => ({ id: c.id, accion: c.accion, etq: ETQ_ACCION[c.accion] || c.accion, texto: String(c.accion === 'quitar' ? c.antes || '' : c.despues || c.texto || '') })),
       // v1.163.0 (pedido de Carlos: la edición en la comparación no solo sirve para homologar): agregar pasos, equipos o utensilios en cualquier lista y editar las Observaciones
       agregar: () => agregarEnLista(), hayObs: () => !!OBS, obs: () => obsModal(), obsCambiada: () => obsCambiada(),
+      mayusculas: () => enMayusculas().length, minusculas: () => minusculasTodo(true),   // la pregunta la hace la comparación (otra pestaña)
     }), 0);
     // lista de los «＋ Agregar…» del documento (pasos al final de cada lista, equipos y utensilios, pegar lo copiado) para elegir dónde
     function agregarEnLista() {
@@ -20137,6 +20170,7 @@
         <label class="pp-detectar" title="Muestra y deja editar la configuración de cada paso: tipo de dato, decimales, Depende, casillas, Clave Modelo, Puesto de trabajo y color"><input type="checkbox" id="pp-vista-dt"${DT ? ' checked' : ''}> Vista completa (DOC)</label>
         <label class="pp-detectar" title="Marca en rojo las palabras con tilde de los pasos (en los pasos ninguna palabra lleva tilde). Apagada por defecto"><input type="checkbox" id="pp-detectar"${PPN.detectarTildes() ? ' checked' : ''}> Detectar tildes</label>
         ${(() => { const nt = conTilde().length; return nt ? `<button type="button" data-a="quitar-tildes" class="pp-quitar-tildes">Quitar tildes (${nt})</button>` : ''; })()}
+        ${(() => { const nm = enMayusculas().length; return nm ? `<button type="button" data-a="minusculas-todo" title="Pasa a minúsculas todos los pasos y procesos menores en MAYÚSCULAS de este RMD: mayúscula al iniciar cada oración, comas y signos tal cual, tildes donde corresponden, unidades (pH, mL) y códigos sin cambiar. Revisa el resultado antes de guardar">Todo en minúsculas (${nm})</button>` : ''; })()}
         <button type="button" data-a="ayuda" title="Cómo se usa esta página">Ayuda</button>
         <button type="button" data-a="resumen" title="Copia en texto los cambios, errores y avisos para compartirlos o revisarlos más rápido">Copiar resumen</button>
         <button type="button" data-a="cerrar-vista" title="Volver al portal (lo editado queda guardado en este navegador)">Cerrar</button>
@@ -20901,6 +20935,7 @@
       else if (a === 'ayuda') { ayudaAbierta = !ayudaAbierta; pintarTodo(); }
       else if (a === 'ir-obs') { const o = document.getElementById('pp-obs-ta'); if (o) { o.scrollIntoView({ block: 'center' }); o.focus(); } }
       else if (a === 'quitar-tildes') quitarTildesTodo();
+      else if (a === 'minusculas-todo') minusculasTodo();
       else if (a === 'usar-paso') usarPaso(id, b.dataset.codigo);
       else if (a.startsWith('ref-')) refAccion(a, b.dataset.k);
       else if (a === 'usar-texto') usarTextoSugerido(id);
@@ -22361,6 +22396,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado, docs: RR.mapa || null,
       obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa, vbAnt) : null, ref: extra.referencia || null,
       homol: extra.homol || null, alPintar: extra.alPintar || null, alIngresar: extra.alIngresar || null, alModal: extra.alModal || null, alAviso: extra.alAviso || null,   // v1.159.0/v1.160.0: edición desde «Comparar dos RMD»
+      minusculas: (t) => (textoEnMayusculas(t) ? redactarEnMinusculas(t) : String(t == null ? '' : t)),   // v1.163.0: «Todo en minúsculas»
       uso: (cods, cb) => usoDePasosPorCodigo(cods, cb).catch(() => {}),          // v1.129.0: en cuántos masters Autorizados / Ingresados está cada paso
       guardar: (p2) => { vistaGuardar(paq, p2).catch((e) => toast('No se pudo revisar: ' + e.message, true)); }, cerrar: () => { if (VISTA) VISTA.cerrar(); } };
     const titulo = `Edición rápida · RMD ${paq.rmd.codigo} v${paq.rmd.version}${extra.referencia ? ` · homologar con ${extra.referencia.nombre}` : ''}`, html = ppHtml(await ppEmpacar(paq), prop, titulo, true);
@@ -22966,12 +23002,13 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
       const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
-      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && vale(etqL, p.etiquetaId_etiquetaId)).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
+      const igualCaja = (p) => !x.caja || String(p.descripcion || '').replace(/\s+/g, ' ').trim() === texto.replace(/\s+/g, ' ');   // v1.163.0: «Todo en minúsculas»
+      const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && vale(etqL, p.etiquetaId_etiquetaId) && igualCaja(p)).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
       if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); continue; }
       // búsqueda normalizada en el catálogo
       if (!plan0.bus) plan0.bus = PPN.crearBuscador(PPN.desempacarPasos(datos.catalogo));
       const igual = plan0.bus.exactos(texto).find((f) => f.estr === L.e.estructuraId && vale(etqL, f.etq)), pIgual = igual && (await lee([new F('codigo', 'EQ', String(igual.codigo))]))[0];
-      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1 && vale(etqL, pIgual.etiquetaId_etiquetaId)) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
+      if (pIgual && pIgual.activo !== false && +pIgual.estadoId_iMaestraId !== 1 && vale(etqL, pIgual.etiquetaId_etiquetaId) && igualCaja(pIgual)) { porCodigo.set(String(pIgual.codigo), pIgual); x.__codigo = String(pIgual.codigo); continue; }
       const key = PPN.claveNueva(L.e.estructuraId, etqL, texto); let n = nuevosPaso.get(key);       // los idénticos se crean una vez y se usan en todos sus lugares
       if (editadoKey.has(key)) { x.__codigo = editadoKey.get(key).codigo; continue; }
       if (!n) { const ed = await editarEnSitio(x, L, etqL).catch(() => null); if (ed) { ed.texto = texto; editadoKey.set(key, ed); porCodigo.set(ed.codigo, { ...ed.p, descripcion: texto }); x.__codigo = ed.codigo; continue; } }

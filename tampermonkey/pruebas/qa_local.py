@@ -1953,6 +1953,36 @@ with sync_playwright() as p:
               and r["visible"] and r["sinPasar"] and r["mVista"] and r["otraVez"] and r["cerrada"] == 1)
         return ok, json.dumps(r, ensure_ascii=False)[:1500]
 
+    @prueba("LN70 «Todo en minúsculas» (v1.163.0, pedido de Carlos: todo el RMD con un clic, no solo un paso): respeta comas y signos, pone tildes, conserva unidades y códigos; en la Edición rápida de un Ingresado pasa todos los pasos y procesos menores en MAYÚSCULAS como un solo cambio que se deshace, cada texto queda como paso nuevo (o el de SAP con el mismo texto exacto) y en un Autorizado no se ofrece")
+    def _():
+        m = pg.evaluate("""() => { const f = window.__rmdStats.minusculasRmd; return [
+          f('VERIFICAR LA LIMPIEZA DE LA MAQUINA, SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE. REGISTRAR EL PH A 25 °C Y 10 ML.'),
+          f('PESO'), f('Ya en minúsculas, no se toca.'), f('NOTA: LA SOLUCION DEBE ESTAR LISTA; ¿CONFORME?')]; }""")
+        t0, t1, t2, t3 = m
+        okTxt = (t0.startswith('Verificar la limpieza de la máquina, según el procedimiento PDOC-207 vigente. Registrar el pH a 25 °C y 10 mL.')
+                 and t1 == 'Peso' and t2 == 'Ya en minúsculas, no se toca.' and ',' not in t3 and ';' in t3 and '¿' in t3 and 'solución' in t3)
+        d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
+        r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, salida = {};
+          for (const estado of ['Ingresado', 'Autorizado']) {
+            const paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] }); paq.rmd.estado = estado; let api = null;
+            await P.montarVista(paq, null, { claves: [], puestos: [], obs: false, previa: null, oculto: true, referencia: { nombre: 'X v1', corto: 'v1', arbol: { estructuras: JSON.parse(JSON.stringify(d.arbol.estructuras)) } },
+              homol: (a) => { api = a; }, alModal: () => {}, alCerrar: () => {} });
+            for (let i = 0; i < 100 && !api; i++) await new Promise((ok) => setTimeout(ok, 100));
+            const V = window.__rmdStats.vista, doc = V.marco.contentDocument;
+            const may = api.mayusculas(), boton = !!doc.querySelector('[data-a="minusculas-todo"]'), c0 = api.cambios();
+            const n = api.minusculas(); await new Promise((ok) => setTimeout(ok, 300));
+            const c1 = api.cambios(), txts = [...doc.querySelectorAll('.pp-doc tr[data-id] .pp-tx')].map((x) => x.textContent.trim()).filter(Boolean);
+            const cmb = api.cambiados(), botonDespues = !!doc.querySelector('[data-a="minusculas-todo"]');
+            api.deshacer(); await new Promise((ok) => setTimeout(ok, 300)); const c2 = api.cambios();
+            salida[estado] = { may, boton, n, c0, c1, c2, minus: txts.filter((x) => /[a-zñáéíóú]/.test(x)).length, total: txts.length, cambiar: cmb.filter((c) => c.accion === 'cambiar').length, botonDespues, ej: txts.slice(0, 4) };
+            V.cerrar();
+          }
+          return salida; }""", d0)
+        I, A = r["Ingresado"], r["Autorizado"]
+        ok = (okTxt and I["may"] > 0 and I["boton"] and I["n"] == I["may"] and I["c1"] >= I["c0"] + I["n"] and I["cambiar"] >= I["n"] and not I["botonDespues"]
+              and I["c2"] == I["c0"] and A["may"] == 0 and not A["boton"] and A["n"] == 0)
+        return ok, json.dumps({"m": m, "r": r}, ensure_ascii=False)[:1800]
+
     PP_CTX.close()
     # (deja el navegador de la maqueta como estaba: reglas predeterminadas y sin listas)
     pg.evaluate("async () => { const R = window.__rmdStats.reglas; await R.fijar(R.motor.predeterminadas()); await R.ponerVigentes(null); await R.ponerCalificados(null); }")
