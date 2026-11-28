@@ -1939,7 +1939,7 @@
   const palabrasRepetidas = (t) => { const s = String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(), out = new Set(), rx = /(?<![\p{L}\p{N}])(\p{L}{2,})\s+\1(?![\p{L}\p{N}])/gu; let m; while ((m = rx.exec(s))) out.add(m[1]); return [...out]; };
   // texto para comparar repetidos: sin tildes, sin signos ni espacios de más
   const claveRepetido = (t) => SIN_ACENTOS(t).replace(/[^A-Z0-9Ñ%°]+/g, ' ').trim();
-  // v1.163.0: contenido de un paso (sus procesos menores e insumos, en orden) para la regla de pasos repetidos
+  // v1.165.0: contenido de un paso (sus procesos menores e insumos, en orden) para la regla de pasos repetidos
   const clavePmPortal = (q) => (q.insumo ? `I:${String(q.codigo || '').trim()}:${String(q.cant || '').trim()}` : `P:${claveRepetido(q.desc)}`);
   const contenidoPasoIgual = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
   // v1.146.0 (regla de Carlos): la nota del supervisor solo va en pasos «Realizado por y Visto bueno» con V.B. marcado
@@ -2359,7 +2359,7 @@
     const claves = filas.map((tr) => { const td = iDes >= 0 ? celda(tr, iDes) : null, ins = esPM && ((iCant >= 0 && norm((inputDe(celda(tr, iCant)) || {}).value)) || (iUM >= 0 && norm(celda(tr, iUM) && celda(tr, iUM).textContent)));
       return td && !ins ? claveRepetido(td.textContent) : ''; });
     const ordenDe = (k) => norm(iOrd >= 0 ? (inputDe(celda(filas[k], iOrd)) || {}).value : '') || String(k + 1);
-    // v1.163.0 (regla de Carlos): un paso es repetido solo si además sus procesos menores (e insumos) son los mismos que los del paso anterior;
+    // v1.165.0 (regla de Carlos): un paso es repetido solo si además sus procesos menores (e insumos) son los mismos que los del paso anterior;
     // mientras no se hayan leído los procesos menores de la lista no se marca
     const pmTodosLista = esPasos && tabla.__rmdPM && tabla.__rmdPM.todos ? tabla.__rmdPM.todos : null;
     const pmIgualesFilas = (i, j) => { if (!pmTodosLista) return false; const id = (k) => (objetoDeFila(filas[k]) || {}).mdEstructuraPasoId, a = pmTodosLista.get(id(i)) || [], b = pmTodosLista.get(id(j)) || [];
@@ -8222,7 +8222,7 @@
     const ctrl = controladorPrincipal(), V = ctrl.getView(), F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, JM = sap.ui.require('sap/ui/model/json/JSONModel');
     if ([...TZ_LECTURAS_MASTER, 'onCompletarAsociarDatos', 'tratarInformacion'].some((n) => typeof ctrl[n] !== 'function')) throw new Error('no se encontró «Descargar master» en el portal');
     const md = (await leerTodoDe(modelo, 'MD', [new F('mdId', 'EQ', mdId)], { $expand: EXPAND_LISTA_MD }))[0]; if (!md) throw new Error('no se encontró el RMD en SAP');
-    // v1.163.0: conReceta = true (la única fórmula), false (solo el master) o el mdRecetaId de la receta elegida
+    // v1.165.0: conReceta = true (la única fórmula), false (solo el master) o el mdRecetaId de la receta elegida
     const recetas = ((md.aReceta && md.aReceta.results) || []).filter((r) => r.recetaId), rc = typeof conReceta === 'string' || typeof conReceta === 'number' ? recetas.find((r) => String(r.mdRecetaId) === String(conReceta)) || null : conReceta && recetas.length === 1 ? recetas[0] : null;
     if ((typeof conReceta === 'string' || typeof conReceta === 'number') && !rc) throw new Error('la receta elegida ya no está asociada al RMD');
     const locales = new Map([['asociarDatos', new JM(md)]]);
@@ -8798,7 +8798,7 @@
     const nombre = (m) => `${m.codigo} · v${m.version}`;
     const estCls = (e) => SIN_ACENTOS(e || '').toLowerCase().replace(/\s+/g, '-');
     const fichaMd = (m, conReceta) => `<span class="rmd-cmp-cod">${esc(nombre(m))}</span> <span class="rmd-tz-est ${esc(estCls(m.estado))}">${esc(m.estado || '—')}</span> <span class="rmd-cmp-etapa">${esc([m.etapa, m.area, m.planta].filter(Boolean).join(' · '))}</span><div class="rmd-cmp-desc">${esc(m.descripcion)}</div>${conReceta ? `<div class="rmd-cmp-recsel">Receta: ${m.receta ? esc(recetaTxt(m)) : '<i>sin receta (solo el master)</i>'}</div>` : ''}`;
-    // v1.163.0 (pedido de Carlos): la receta de cada RMD se elige (antes: solo con una fórmula y la misma casilla para los dos)
+    // v1.165.0 (pedido de Carlos): la receta de cada RMD se elige (antes: solo con una fórmula y la misma casilla para los dos)
     const recetaTxt = (m) => { const r = (m.recetas || []).find((x) => String(x.mdRecetaId) === String(m.receta)); return r ? r.txt : ''; };
     async function cargarRecetas(l) {
       const m = lados[l]; if (!m || m.recetas) return;
@@ -8905,7 +8905,7 @@
         return `<li><button type="button" data-g="${g}" class="${tipo}"><span class="rmd-cmp-tipo">${esc(NOMBRE_TIPO[tipo])}${c.filas > 1 ? ` · ${c.filas} líneas` : ''}</span><span class="rmd-cmp-secc">${esc(c.seccion || '')}</span>${quitado ? `<del>${esc(quitado.slice(0, 140))}</del>` : ''}${agregado ? `<ins>${esc(agregado.slice(0, 140))}</ins>` : ''}</button></li>`;
       };
       // v1.156.0 (pedido de Carlos): el Ingresado se edita aquí mismo para homologarlo con el otro (Edición rápida con las diferencias en vivo)
-      // v1.163.0 (pedido de Carlos): la edición no solo sirve para homologar: cualquier línea se edita, se agregan pasos y se cambian las Observaciones
+      // v1.165.0 (pedido de Carlos): la edición no solo sirve para homologar: cualquier línea se edita, se agregan pasos y se cambian las Observaciones
       const homol = [['b', mb, ma], ['a', ma, mb]].filter(([, m]) => /ingresad/i.test(SIN_ACENTOS(m.estado || ''))).map(([l, m, o]) => `<button type="button" class="rmd-btn primario" data-a="homologar" data-l="${l}" title="Edita ${esc(nombre(m))} aquí mismo: clic en cualquier línea para editarla, configurarla, moverla o quitarla; «Agregar…» y «Observaciones…» en la barra; las diferencias con ${esc(nombre(o))} traen además su botón. «Guardar en SAP…» lo escribe de una vez"${ed && ed.l === l ? ' disabled' : ''}>Editar ${esc(nombre(m))} aquí</button>`).join('')
         || `<span class="rmd-nota" title="En SAP solo se escribe en un RMD Ingresado (en uno Autorizado no se edita nada)">Para editar, uno de los dos debe estar Ingresado.</span>`;
       res.innerHTML = `<div class="rmd-cmp-titulo"><b>Comparar dos RMD</b> <span>${esc(nombre(ma))} → ${esc(nombre(mb))}</span>${homol ? `<span class="rmd-cmp-homol">${homol}</span>` : ''}</div><div class="rmd-cmp-barra" role="toolbar" aria-label="Diferencias">
@@ -8946,7 +8946,7 @@
         error: (e) => { if (ed) { ed.msg = 'No se pudo preparar la edición: ' + e.message; ed.fallo = true; pintarEd(); } } });
     }
     function terminarEd() { if (ed) ed.cerrando = true; quitarModalesPagina(); if (VISTA) VISTA.cerrar(); ed = null; pintarResultado(); }
-    // v1.163.0: ver lo mismo en la Edición rápida completa (pestaña del portal) y volver a editar aquí
+    // v1.165.0: ver lo mismo en la Edición rápida completa (pestaña del portal) y volver a editar aquí
     function enVistaEd(si) { if (!ed || !ed.api || !VISTA || !VISTA.mostrar) return; quitarModalesPagina(); ed.enVista = si; VISTA.mostrar(si); ed.msg = si ? 'Abierta en la Edición rápida, en la pestaña del portal: allí sigue con todo (Observaciones, guías, Guardar en SAP…). Lo que cambies allá se ve aquí.' : ''; pintarEd(); if (si) { try { window.focus(); } catch (e) { /* el navegador decide */ } } }
     let sinHomol = false; try { sinHomol = localStorage.getItem('rmdCmpSinHomol') === '1'; } catch (x) { /* sin almacenamiento */ }
     const quitarObs = () => { if (ed && ed.obs) { ed.obs.disconnect(); ed.obs = null; } };
@@ -9159,7 +9159,7 @@
       else if (b.dataset.a === 'ed-guardar') { if (ed && ed.enVista) enVistaEd(false); guardarEd(); }
       else if (b.dataset.a === 'ed-agregar' && ed && ed.api) { if (!ed.api.agregar()) { ed.msg = 'No hay listas donde agregar.'; pintarEd(); } }
       else if (b.dataset.a === 'ed-obs' && ed && ed.api) ed.api.obs();
-      else if (b.dataset.a === 'ed-minusculas' && ed && ed.api && ed.api.minusculas) {   // v1.163.0 (pedido de Carlos): todo el RMD en minúsculas con un clic
+      else if (b.dataset.a === 'ed-minusculas' && ed && ed.api && ed.api.minusculas) {   // v1.165.0 (pedido de Carlos): todo el RMD en minúsculas con un clic
         const nm = ed.api.mayusculas(); if (!nm || !pagina.confirm(`Se pasarán a minúsculas ${nm} paso(s) o proceso(s) menor(es) en MAYÚSCULAS (mayúscula al iniciar cada oración, tildes, unidades y códigos tal cual). Cada uno usará el paso de SAP que ya existe así o quedará como paso nuevo. Revisa el resultado antes de «Guardar en SAP». Se puede deshacer. ¿Continuar?`)) return;
         ed.hechos.push({ l: ed.l, k: -1, txt: 'Todo en minúsculas' }); ed.api.minusculas();
       }
@@ -13993,7 +13993,7 @@
     return letras.length > 4 && minus <= letras.length * 0.1 && /\p{Lu}/u.test(letras);
   };
   window.__rmdStats.casiTodoMayus = casiTodoMayus;   // pruebas
-  // v1.163.0 («Todo en minúsculas» de la Edición rápida): también los textos cortos («PESO») sin ninguna minúscula fuera de las unidades
+  // v1.165.0 («Todo en minúsculas» de la Edición rápida): también los textos cortos («PESO») sin ninguna minúscula fuera de las unidades
   const textoEnMayusculas = (t) => { const l = String(t || '').replace(MINUSCULAS_DE_UNIDAD, ' ').replace(/[^\p{L}]/gu, ''); return casiTodoMayus(t) || (l.length > 1 && /\p{Lu}/u.test(l) && !/\p{Ll}/u.test(l)); };
   window.__rmdStats.minusculasRmd = (t) => (textoEnMayusculas(t) ? redactarEnMinusculas(t) : String(t == null ? '' : t));   // pruebas
   function gestionarTextosMayusculas() {
@@ -18970,17 +18970,17 @@
         // v1.136.0: la cantidad dentro de un paso del procedimiento sí se cambia en el RMD (sin aviso de la Lista de Materiales)
         const r = receta.get(m.comp), q = r && num(r.cant); if (q != null && !Number.isNaN(q) && asignado.get(m.comp) > q * 1.0001) add(m.id, insumosPm.every((y) => y.comp !== m.comp || (igualQueSap(y) && !String(y.id).startsWith('n:'))) ? 'info' : 'aviso', `En los pasos suman ${+asignado.get(m.comp).toFixed(6)} ${m.um || ''} de ${m.comp} y la receta tiene ${+q.toFixed(6)} ${r.um || ''}.`, 'cant');
       });
-      // v1.163.0 (regla de Carlos): dos pasos iguales son repetidos solo si su contenido (procesos menores e insumos, en orden) también es el mismo
+      // v1.165.0 (regla de Carlos): dos pasos iguales son repetidos solo si su contenido (procesos menores e insumos, en orden) también es el mismo
       const contenidoDe = (x) => vivos(x && x.pm).map((m) => (m.insumo ? `I:${String(m.comp || '').trim()}:${String(m.cant == null ? '' : m.cant).trim()}` : `P:${normalizar(m.texto)}`));
       const mismoContenido = (x, y) => { if (!x || !y) return false; const a = contenidoDe(x), b = contenidoDe(y); return a.length === b.length && a.every((v, i) => v === b[i]); };
       const revisarLista = (l, estr, etq) => {
         const vistos = new Map(), copias = new Set(vivos(l).filter((y) => y.copiaDe).map((y) => y.id));   // copias de pasos (duplicar un lote): repetir el código es lo esperado
         const porId = new Map(vivos(l).map((y) => [y.id, y]));
-        // v1.163.0: el mismo código solo cuenta como repetido contra un paso anterior con el mismo contenido (vistos: código -> ids)
+        // v1.165.0: el mismo código solo cuenta como repetido contra un paso anterior con el mismo contenido (vistos: código -> ids)
         vivos(l).forEach((x) => { revisar(x, estr, etq, false); if (x.codigo) { const ya = vistos.get(String(x.codigo)) || [], otro = ya.find((id) => mismoContenido(x, porId.get(id))); if (otro && !(igualQueSap(x) && enBase.get(otro) === String(x.codigo))) { const copia = copias.has(x.id) || copias.has(otro); add(x.id, copia ? 'info' : 'aviso', `${copia ? 'Copia: e' : 'E'}l paso ${x.codigo} ${copia ? 'también' : 'ya'} está en esta lista (${numeros.get(otro) || 'más arriba'}).`, 'dup'); } else if (!otro) vistos.set(String(x.codigo), ya.concat(x.id)); }
           vivos(x.pm).filter((m) => !m.insumo).forEach((m) => revisar(m, estr, etq, true));
           // v1.146.0 (pedido de Carlos): repetidos = incoherencia, aunque ya estén así en SAP
-          // v1.163.0 (regla de Carlos): solo si además sus procesos menores (e insumos) son los mismos
+          // v1.165.0 (regla de Carlos): solo si además sus procesos menores (e insumos) son los mismos
           const k = normalizar(x.texto), ant = vivos(l)[vivos(l).indexOf(x) - 1];
           if (k && ant && normalizar(ant.texto) === k && mismoContenido(x, ant) && !x.copiaDe && !ant.copiaDe && !(x.codigo && String(x.codigo) === String(ant.codigo || '') && !(igualQueSap(x) && igualQueSap(ant)))) add(x.id, 'aviso', `Paso repetido: es igual al paso anterior (${numeros.get(ant.id) || 'más arriba'}). Quita uno.`, 'dup');
           let pmPrevio = null;                                               // v1.146.1: solo el igual al inmediatamente anterior (un grupo repetido por equipo no cuenta)
@@ -19403,7 +19403,7 @@
         });
       });
     }
-    // v1.163.0 (pedido de Carlos): todo el RMD de MAYÚSCULAS a minúsculas con un clic (no solo un paso). El texto lo redacta el portal
+    // v1.165.0 (pedido de Carlos): todo el RMD de MAYÚSCULAS a minúsculas con un clic (no solo un paso). El texto lo redacta el portal
     // (EMB.minusculas = redactarEnMinusculas: respeta comas y signos, conserva pH/mL, unidades, códigos y siglas y pone tildes donde corresponden).
     // Cada texto usa el paso de SAP que ya existe EXACTAMENTE así (mismas minúsculas) en su etiqueta o queda como paso nuevo; `caja` hace que el
     // ingreso no tome el paso en MAYÚSCULAS como si fuera el mismo. Solo en un RMD Ingresado (en un Autorizado no se edita ningún texto).
@@ -19488,7 +19488,7 @@
         <button type="button" class="pp-cajon" data-a="panel" aria-expanded="${panelAbierto}">${panelAbierto ? 'Cerrar' : `Cambios <b>${contar().total}</b>`}</button>${htmlMulti()}`;
       window.scrollTo(0, y);
       if (SELECCION) { const tr = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(SELECCION)}"]`); if (tr) tr.classList.add('sel'); else SELECCION = null; }
-      pintarSel(); refMarcarFilas(); if (obsModalRef) obsModalRef();   // v1.163.0: ventana de Observaciones abierta desde la comparación
+      pintarSel(); refMarcarFilas(); if (obsModalRef) obsModalRef();   // v1.165.0: ventana de Observaciones abierta desde la comparación
       document.title = `${sucio ? '● ' : ''}${PPN.nombreArchivo('Borrador', PQ.rmd, new Date()).replace(/ \d{4}-\d\d-\d\d$/, '')}`;   // también nombre sugerido del PDF
     }
     // v1.129.0: en la Edición rápida quien edita es el equipo RMD: los avisos no hablan de «el equipo RMD lo creará»
@@ -19885,7 +19885,7 @@
         return { id: tr.dataset.id, clase: f.clase, texto: tx ? tx.textContent.trim() : '', quitado: !!f.item.quitado, acciones: acc }; }).filter(Boolean),
       fila: (id, a) => { const b = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(id)}"] > td .pp-acc [data-a="${a}"]`); if (!b) return false; b.click(); return true; },
       cambiados: () => CMB.map((c) => ({ id: c.id, accion: c.accion, etq: ETQ_ACCION[c.accion] || c.accion, texto: String(c.accion === 'quitar' ? c.antes || '' : c.despues || c.texto || '') })),
-      // v1.163.0 (pedido de Carlos: la edición en la comparación no solo sirve para homologar): agregar pasos, equipos o utensilios en cualquier lista y editar las Observaciones
+      // v1.165.0 (pedido de Carlos: la edición en la comparación no solo sirve para homologar): agregar pasos, equipos o utensilios en cualquier lista y editar las Observaciones
       agregar: () => agregarEnLista(), hayObs: () => !!OBS, obs: () => obsModal(), obsCambiada: () => obsCambiada(),
       mayusculas: () => enMayusculas().length, minusculas: () => minusculasTodo(true),   // la pregunta la hace la comparación (otra pestaña)
     }), 0);
@@ -20198,7 +20198,7 @@
       return lineas.join('\n');
     }
     // ---------- Observaciones (v1.124.0, solo en la vista del portal) ----------
-    var obsModalRef = null;                                              // v1.163.0: refresca la ventana de Observaciones de la comparación
+    var obsModalRef = null;                                              // v1.165.0: refresca la ventana de Observaciones de la comparación
     const obsTexto = () => (W && W.obs != null ? String(W.obs) : OBS ? OBS.texto : '');
     // v1.155.0: casillas «V.B.» de los pasos de PROCEDIMIENTO tal como quedan en la vista (para la regla de la fase 3)
     const vbEnTrabajo = () => { let n = 0; const sum = (ps) => (ps || []).forEach((x) => { if (!x.quitado && x.vb) n++; });
@@ -21270,7 +21270,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   const ppNulo = (v) => (v == null || v === '' ? null : v);
   // Tras cargar, el portal pierde lecturas unos segundos: se sondea (4 × 8 s) antes de empezar.
   async function ppModeloListo(modelo) {
-    if (PP.listoT && Date.now() - PP.listoT < 90000) return;               // v1.163.0: respondió hace poco: sin volver a sondear
+    if (PP.listoT && Date.now() - PP.listoT < 90000) return;               // v1.165.0: respondió hace poco: sin volver a sondear
     for (let i = 0; i < 4; i++) {
       const ok = await Promise.race([new Promise((r) => modelo.read('/ESTRUCTURA', { urlParameters: { $top: '1', $select: 'estructuraId' }, success: () => r(true), error: () => r(true) })), new Promise((r) => setTimeout(() => r(false), 8000))]);
       if (ok) { PP.listoT = Date.now(); return; }
@@ -21347,7 +21347,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   // Catálogo de SAP. v1.147.0 (pedido de Carlos): los PASOS se releen de SAP cada vez que se abre una plantilla, la Edición rápida o un borrador
   // (a veces se corrige un paso en el maestro y no se veía); estructuras, etiquetas, equipos y utensilios siguen en caché local 12 h (forzar = todo).
   const PP_SEL_PASO = 'pasoId,codigo,descripcion,estructuraId_estructuraId,etiquetaId_etiquetaId,estadoId_iMaestraId,tipoDatoId_iMaestraId,activo';
-  // v1.163.0 (pedido de Carlos: abrir la Edición rápida y descargar la plantilla más rápido): el catálogo de pasos ya no se vuelve a leer entero cada vez.
+  // v1.165.0 (pedido de Carlos: abrir la Edición rápida y descargar la plantilla más rápido): el catálogo de pasos ya no se vuelve a leer entero cada vez.
   // Si PASO trae fechaRegistro y fechaActualiza (fechas), se leen solo los pasos registrados o cambiados desde la última lectura (con 5 min de margen,
   // reloj del servidor) y se comprueba con $count que el total cuadre; si no cuadra, si no hay fechas o pasaron 30 min desde la lectura completa, se lee todo.
   const PP_FECHAS_PASO = ['fechaRegistro', 'fechaActualiza'], PP_TTL_PASOS_TODO = 30 * 60000, PP_MARGEN_PASOS = 5 * 60000;
@@ -21383,7 +21383,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
   const ppConPasos = (c, r) => ({ ...c, pasos: r.pasos, crudos: r.crudos, marca: r.marca, full: r.full });
   async function ppCatalogo(modelo, forzar, avisar) {
     if (!forzar && PP.cat && Date.now() - PP.pasosT < PP_TTL_PASOS) return PP.cat;
-    if (!forzar && PP.catP) return PP.catP;                                  // v1.163.0: una sola lectura a la vez (plantilla, Edición rápida y comparación la comparten)
+    if (!forzar && PP.catP) return PP.catP;                                  // v1.165.0: una sola lectura a la vez (plantilla, Edición rápida y comparación la comparten)
     const p = ppCatalogoLeer(modelo, forzar, avisar); PP.catP = p;
     try { return await p; } finally { if (PP.catP === p) PP.catP = null; }
   }
@@ -21480,7 +21480,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital»');
     avisar('Leyendo el RMD…'); await ppModeloListo(modelo);
     const F = sap.ui.require('sap/ui/model/Filter') || sap.ui.model.Filter, c0 = String(codigo).trim();
-    // v1.163.0: el catálogo, el logo y (con op.mdId) los pasos del RMD se leen a la vez que el RMD, no después
+    // v1.165.0: el catálogo, el logo y (con op.mdId) los pasos del RMD se leen a la vez que el RMD, no después
     const pCat = ppCatalogo(modelo, !!op.forzar, avisar), pLogo = ppLogo(), pArbol = op.mdId != null ? ppLeerArbol(modelo, { mdId: op.mdId }) : null;
     [pCat, pLogo, pArbol].forEach((x) => { if (x && x.catch) x.catch(() => {}); });   // si falla el RMD, sin avisos de promesas sueltas
     const md = (await leerTodoDe(modelo, 'MD', [new F('codigo', 'EQ', isNaN(+c0) ? c0 : +c0)], { $expand: 'estadoIdRmd,sucursalId', $orderby: 'mdId' })).sort((a, b) => b.version - a.version).find((m) => op.mdId == null || m.mdId === op.mdId);   // v1.156.0: op.mdId elige la versión
@@ -22218,7 +22218,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     cod.addEventListener('keydown', (e) => { if (e.key === 'Enter') bAbrir.click(); }); setTimeout(() => cod.focus(), 30);
   }
   async function ppVistaDesdeSap(codigo, op = {}) {
-    // v1.163.0: Claves Modelo, versión anterior y sus V°B° se leen mientras se leen los pasos (antes iban después)
+    // v1.165.0: Claves Modelo, versión anterior y sus V°B° se leen mientras se leen los pasos (antes iban después)
     const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'), pClaves = ppClavesModelo(ctrl);
     let pPrevia = null; const previaDe = (mdId) => { if (!pPrevia) pPrevia = versionAnteriorDe(modelo, mdId).catch(() => null); return pPrevia; };
     let pVb = null; const vbDe = (mdId) => { if (!pVb) pVb = previaDe(mdId).then((pv) => (pv && pv.mdId ? casillasVbDe(modelo, [pv.mdId]).then((x) => x[pv.mdId], () => null) : null)); return pVb; };
@@ -22306,7 +22306,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const avisar = (t) => { if (prog) setTxt(prog, t); if (opc.avisar) opc.avisar(t); };
     try {
       const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital» en la pestaña del portal');
-      // v1.163.0: los pasos del otro RMD, las Claves Modelo y la versión anterior se leen a la vez que este RMD; la receta elegida en la comparación no se vuelve a preguntar
+      // v1.165.0: los pasos del otro RMD, las Claves Modelo y la versión anterior se leen a la vez que este RMD; la receta elegida en la comparación no se vuelve a preguntar
       const pRef = ppLeerArbol(modelo, { mdId: ref.mdId }), pClaves = ppClavesModelo(ctrl), pPrevia = opc.oculto ? versionAnteriorDe(modelo, md.mdId).catch(() => null) : Promise.resolve(null);
       pRef.catch(() => {});
       const r = await ppGenerar(String(md.codigo), { mdId: md.mdId, receta: md.receta || undefined, avisar, elegirReceta: (recs, m) => { avisar(`El RMD tiene ${recs.length} recetas asociadas: elige con cuál se ven los insumos (en la pestaña del portal).`); return ppElegirReceta(recs, m); } });
@@ -22314,7 +22314,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       avisar(`Leyendo los pasos de ${ref.codigo} v${ref.version}…`);
       const [arbolRef, claves, puestos, previa] = await Promise.all([pRef, pClaves, ppPuestosRmd(ctrl, r.paquete.arbol.recetas), pPrevia]);
       const nombreRef = `${ref.codigo} v${ref.version}`, corto = String(ref.codigo) === String(md.codigo) ? `v${ref.version}` : String(ref.codigo);
-      // v1.163.0 (pedido de Carlos): desde la comparación también se editan las Observaciones (no solo se homologa)
+      // v1.165.0 (pedido de Carlos): desde la comparación también se editan las Observaciones (no solo se homologa)
       await montarVista(r.paquete, null, { claves, puestos, obs: !!opc.oculto, previa, referencia: { nombre: nombreRef, corto, arbol: { estructuras: arbolRef.estructuras } },
         oculto: !!opc.oculto, homol: opc.homol || null, alPintar: opc.alPintar || null, alIngresar: opc.alIngresar || null, alModal: opc.alModal || null, alAviso: opc.alAviso || null, alCerrar: opc.alCerrar || null });
       if (espera) espera.cerrar();
@@ -22391,12 +22391,12 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     const ctrl = controladorPrincipal(), paq = { ...datos }; delete paq.desdePdf;
     // v1.155.0: V°B° (casillas «V.B.» de PROCEDIMIENTO) de la versión anterior, para la regla de la fase 3; los de esta versión los cuenta el editor
     let vbAnt = null;
-    if (extra.vbAnt !== undefined) vbAnt = extra.vbAnt;                  // v1.163.0: ya contados mientras se leían los pasos
+    if (extra.vbAnt !== undefined) vbAnt = extra.vbAnt;                  // v1.165.0: ya contados mientras se leían los pasos
     else if (extra.obs && extra.previa && extra.previa.mdId) { try { vbAnt = (await casillasVbDe(ctrl && ctrl.getView ? ctrl.getView().getModel('mainModelv2') : null, [extra.previa.mdId]))[extra.previa.mdId]; } catch (e) { vbAnt = null; } }
     const emb = { dt: null, claves: extra.claves || [], puestos: extra.puestos || [], usuario: codigoUsuario(ctrl), estado: paq.rmd.estado, docs: RR.mapa || null,
       obs: extra.obs ? ppObsEmb(paq.rmd, extra.previa, vbAnt) : null, ref: extra.referencia || null,
       homol: extra.homol || null, alPintar: extra.alPintar || null, alIngresar: extra.alIngresar || null, alModal: extra.alModal || null, alAviso: extra.alAviso || null,   // v1.159.0/v1.160.0: edición desde «Comparar dos RMD»
-      minusculas: (t) => (textoEnMayusculas(t) ? redactarEnMinusculas(t) : String(t == null ? '' : t)),   // v1.163.0: «Todo en minúsculas»
+      minusculas: (t) => (textoEnMayusculas(t) ? redactarEnMinusculas(t) : String(t == null ? '' : t)),   // v1.165.0: «Todo en minúsculas»
       uso: (cods, cb) => usoDePasosPorCodigo(cods, cb).catch(() => {}),          // v1.129.0: en cuántos masters Autorizados / Ingresados está cada paso
       guardar: (p2) => { vistaGuardar(paq, p2).catch((e) => toast('No se pudo revisar: ' + e.message, true)); }, cerrar: () => { if (VISTA) VISTA.cerrar(); } };
     const titulo = `Edición rápida · RMD ${paq.rmd.codigo} v${paq.rmd.version}${extra.referencia ? ` · homologar con ${extra.referencia.nombre}` : ''}`, html = ppHtml(await ppEmpacar(paq), prop, titulo, true);
@@ -22406,7 +22406,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     if (extra.oculto) { f.hidden = true; f.style.display = 'none'; f.classList.add('rmd-vista-oculta'); }
     window.__rmdVistaEmb = emb; document.body.appendChild(f); fr.srcdoc = html;
     VISTA = { fondo: f, marco: fr, datos: paq, emb, cerrar: () => { f.remove(); if (VISTA && VISTA.fondo === f) VISTA = null; if (window.__rmdVistaEmb === emb) window.__rmdVistaEmb = null; if (typeof extra.alCerrar === 'function') { const c = extra.alCerrar; extra.alCerrar = null; try { c(); } catch (e) { /* la comparación ya no está */ } } },
-      // v1.163.0: la edición de «Comparar dos RMD» se pasa a la Edición rápida completa (en la pestaña del portal) y vuelve
+      // v1.165.0: la edición de «Comparar dos RMD» se pasa a la Edición rápida completa (en la pestaña del portal) y vuelve
       mostrar: (si) => { f.hidden = !si; f.style.display = si ? '' : 'none'; f.classList.toggle('rmd-vista-oculta', !si); emb.alModal = si ? null : extra.alModal || null; emb.alAviso = si ? null : extra.alAviso || null; } };
     window.__rmdStats.vista = VISTA;
     return VISTA;
@@ -23002,7 +23002,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     for (const { x, L, tipoBase, pm } of buscarTexto) {
       const texto = String(x.texto || '').trim(), etqL = L.t ? L.t.etiquetaId : null;
       const f = [new F('tolower(descripcion)', FO.EQ, "'" + texto.toLowerCase().replace(/'/g, "''") + "'"), new F('estructuraId_estructuraId', 'EQ', L.e.estructuraId)]; if (etqL) f.push(new F('etiquetaId_etiquetaId', 'EQ', etqL));
-      const igualCaja = (p) => !x.caja || String(p.descripcion || '').replace(/\s+/g, ' ').trim() === texto.replace(/\s+/g, ' ');   // v1.163.0: «Todo en minúsculas»
+      const igualCaja = (p) => !x.caja || String(p.descripcion || '').replace(/\s+/g, ' ').trim() === texto.replace(/\s+/g, ' ');   // v1.165.0: «Todo en minúsculas»
       const r = (await lee(f)).filter((p) => p.activo !== false && +p.estadoId_iMaestraId !== 1 && vale(etqL, p.etiquetaId_etiquetaId) && igualCaja(p)).sort((a, b) => (+a.codigo || 0) - (+b.codigo || 0));
       if (r[0]) { porCodigo.set(String(r[0].codigo), r[0]); x.__codigo = String(r[0].codigo); continue; }
       // búsqueda normalizada en el catálogo

@@ -112,7 +112,7 @@ ok('grupo repetido por equipo: sin «Proceso menor repetido»', ![...av3.values(
 const t2 = { estructuras: [{ estructuraId: 'E', pasos: [{ id: 'a', codigo: '1', texto: 'PESAR', tipo: 438, pm: [] }, { id: 'b', codigo: '1', texto: 'PESAR', tipo: 438, copiaDe: 'a', pm: [] }] }] };
 ok('copia de lote no se marca como repetido', !/Paso repetido/.test(((PPN.avisos(t2, {}).get('b')) || []).map((x) => x.texto).join()));
 
-// v1.163.0 (regla de Carlos): un paso igual al anterior solo es repetido si sus procesos menores (e insumos) también son los mismos
+// v1.165.0 (regla de Carlos): un paso igual al anterior solo es repetido si sus procesos menores (e insumos) también son los mismos
 {
   const pm = (pre, ts) => ts.map((t, i) => ({ id: pre + i, codigo: String(500 + i), texto: t }));
   const t4 = { estructuras: [{ estructuraId: 'E', pasos: [

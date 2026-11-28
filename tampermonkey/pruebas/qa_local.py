@@ -237,7 +237,7 @@ with sync_playwright() as p:
         filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}] + [{"desc": t, "tipo": "Realizado por"} for t in textos]
         abrir(pg, filas); a = leer_alertas(pg); cerrar_todo(pg)
         return [f["falta"] for f in a["filas"]] == [False, False, False, False, False, False, True], str([f["falta"] for f in a["filas"]])
-    @prueba("LN64 Repetidos y reglas de Carlos (v1.146.0; v1.163.0: el paso repetido solo con los mismos procesos menores): paso igual al anterior y palabra duplicada seguida se marcan en la Descripción y cuentan como incoherencias; procesos menores de Calidad en Operaciones con tipo de dato piden Estado CC y Edit; «TOMAR LA MUESTRA DESDE…» va sin tipo de dato")
+    @prueba("LN64 Repetidos y reglas de Carlos (v1.146.0; v1.165.0: el paso repetido solo con los mismos procesos menores): paso igual al anterior y palabra duplicada seguida se marcan en la Descripción y cuentan como incoherencias; procesos menores de Calidad en Operaciones con tipo de dato piden Estado CC y Edit; «TOMAR LA MUESTRA DESDE…» va sin tipo de dato")
     def _():
         filas = [{"desc": "FECHA / HORA INICIO :", "tipo": "Notificacion", "dep": "99 (5)"}, {"desc": "SELLAR LAS CAJAS.", "tipo": "Realizado por", "dep": "1000 (1)"},
                  {"desc": "SELLAR LAS  CAJAS", "tipo": "Realizado por", "dep": "1001 (2)"}, {"desc": "VERIFICAR QUE COINCIDAN COINCIDAN CON LA INFORMACION.", "tipo": "Realizado por", "dep": "1002 (3)"}]
@@ -248,7 +248,7 @@ with sync_playwright() as p:
                    otro: R({ padre: 'MOLER LA MEZCLA', tipo: 'Texto', desc: 'DESCRIPCION (ASPECTO): MASA BLANCA.' }),
                    sin: R({ padre: 'CALIDAD EN OPERACIONES REGISTRA LOS RESULTADOS:', tipo: 'Sin tipo de dato', desc: 'NOTA: X' }),
                    muestra: R({ padre: 'EL PERSONAL DE CALIDAD EN OPERACIONES INGRESA A LA SALA Y REALIZA EL MUESTREO', tipo: 'Verificación Check', desc: 'TOMAR LA MUESTRA DESDE LA VALVULA.', chk: { 'EDIT': true, 'ESTADO CC': false } }) }; }""")
-        # v1.163.0 (regla de Carlos): el paso repetido solo se marca si además sus procesos menores son los mismos; en la maqueta no se leen procesos menores,
+        # v1.165.0 (regla de Carlos): el paso repetido solo se marca si además sus procesos menores son los mismos; en la maqueta no se leen procesos menores,
         # así que «SELLAR LAS CAJAS» seguido ya no se marca (la regla con procesos menores la prueba qa_repetidos.mjs)
         ok = (des == [False, False, False, True] and "Paso repetido" not in (a["filas"][2]["avisoDes"] or "") and "COINCIDAN COINCIDAN" in a["filas"][3]["avisoDes"] and "2 incoherencias" in (a["cuenta"] or "")
               and r["ceo"] == "EDIT:rmd-marcar,ESTADO CC:rmd-marcar" and r["otro"] == "EDIT:rmd-marcar" and r["sin"] == "" and r["muestra"] == "TIPO DATO:rmd-falta")
@@ -1914,7 +1914,7 @@ with sync_playwright() as p:
               and not r["lineas"][1][1] and "listo" in r["lineas"][1][0] and "RMD 2202600001 v3" in r["lineas"][1][0])
         return ok, json.dumps({"ui": ui, "nombre": nombre, "partes": pdf["n"], "r": r, "abre": abre}, ensure_ascii=False)[:1800]
 
-    @prueba("LN69 Editar en «Comparar dos RMD» (v1.163.0, pedido de Carlos: no solo sirve para homologar): el editor oculto da «Agregar…» (lista de todas las listas, pasos al final y equipos) y «Observaciones…» en ventanas que se pasan a la comparación; lo escrito en Observaciones cuenta como cambio; la edición se puede abrir en la Edición rápida completa (sin pasar ventanas) y volver; al cerrar la vista se avisa a la comparación")
+    @prueba("LN69 Editar en «Comparar dos RMD» (v1.165.0, pedido de Carlos: no solo sirve para homologar): el editor oculto da «Agregar…» (lista de todas las listas, pasos al final y equipos) y «Observaciones…» en ventanas que se pasan a la comparación; lo escrito en Observaciones cuenta como cambio; la edición se puede abrir en la Edición rápida completa (sin pasar ventanas) y volver; al cerrar la vista se avisa a la comparación")
     def _():
         d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
         r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, paq = P.paquete(d.md, d.arbol, d.cat, 'PRUEBA', { areas: ['SOLIDOS'] });
@@ -1953,7 +1953,7 @@ with sync_playwright() as p:
               and r["visible"] and r["sinPasar"] and r["mVista"] and r["otraVez"] and r["cerrada"] == 1)
         return ok, json.dumps(r, ensure_ascii=False)[:1500]
 
-    @prueba("LN70 «Todo en minúsculas» (v1.163.0, pedido de Carlos: todo el RMD con un clic, no solo un paso): respeta comas y signos, pone tildes, conserva unidades y códigos; en la Edición rápida de un Ingresado pasa todos los pasos y procesos menores en MAYÚSCULAS como un solo cambio que se deshace, cada texto queda como paso nuevo (o el de SAP con el mismo texto exacto) y en un Autorizado no se ofrece")
+    @prueba("LN70 «Todo en minúsculas» (v1.165.0, pedido de Carlos: todo el RMD con un clic, no solo un paso): respeta comas y signos, pone tildes, conserva unidades y códigos; en la Edición rápida de un Ingresado pasa todos los pasos y procesos menores en MAYÚSCULAS como un solo cambio que se deshace, cada texto queda como paso nuevo (o el de SAP con el mismo texto exacto) y en un Autorizado no se ofrece")
     def _():
         m = pg.evaluate("""() => { const f = window.__rmdStats.minusculasRmd; return [
           f('VERIFICAR LA LIMPIEZA DE LA MAQUINA, SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE. REGISTRAR EL PH A 25 °C Y 10 ML.'),

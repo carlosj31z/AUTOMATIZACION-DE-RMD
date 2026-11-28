@@ -1,4 +1,4 @@
-// Pruebas de la v1.163.0 (pedido de Carlos: abrir la Edición rápida y descargar la plantilla más rápido): el catálogo de pasos se actualiza
+// Pruebas de la v1.165.0 (pedido de Carlos: abrir la Edición rápida y descargar la plantilla más rápido): el catálogo de pasos se actualiza
 // solo con los pasos registrados o cambiados desde la última lectura (con margen), se comprueba el total con $count y, si no cuadra, se lee todo.
 // Sin portal ni navegador: solo Node 18+.
 //     node tampermonkey/pruebas/qa_catalogo_incremental.mjs
