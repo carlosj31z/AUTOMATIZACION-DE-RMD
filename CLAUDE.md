@@ -532,7 +532,20 @@ cuenta). Escribir y responder siempre en **español**.
   sin predecesor, homologación de términos y nota 186337 solo informativas (decisión de Carlos en tarjeta; `TERMINOS_AVISO_ATE`, `RX_DOC_VIEJO` siguen
   como aviso). LIMA: el 1.er paso con tipo de dato de cada lista lleva predecesor. Las dos: CONTRAMUESTRA / MUESTRA PARA CONTROL DE CALIDAD en
   rendimiento → CANTIDAD MUESTREADA. Propuesta y evidencia en `/mnt/project-files/reglas-por-planta/`. Prueba `qa_reglas_planta.mjs`.
-  **La siguiente versión debe ser > 1.164.0.**
+- 2026-11-28, v1.165.0 (antes 1.163.0 del PR #148, rehecha encima de la 1.164.0): **pedidos de Carlos.** «Comparar dos RMD»: **receta de cada lado** (selector por RMD con sus
+  recetas de `MD_RECETA` o «Sin receta»; `contDoc(modelo, mdId, mdRecetaId)` acepta el id de la receta; `abrirHomologar` la pasa a `ppGenerar` como `op.receta`).
+  **Edición no solo para homologar**: en la barra «Agregar…» (`EMB.homol.agregar` → `agregarEnLista`), «Observaciones…» (`obsModal`, con `obs: true` y la
+  versión anterior en la edición oculta; `obsAccion` busca los campos en la raíz de la ventana), «Ocultar botones de diferencias» (`rmdCmpSinHomol`) y «Abrir en la
+  Edición rápida» (`VISTA.mostrar(si)`, sin pasar ventanas; `extra.alCerrar` avisa a la comparación al cerrar la vista). **Repetidos**: paso igual al anterior o con el
+  mismo código solo si sus procesos menores e insumos son los mismos (`mismoContenido` en `PPN.avisos`; en el portal `clavePmPortal`/`contenidoPasoIgual` con
+  `tabla.__rmdPM.todos`, sin marcar mientras no se leyeron). **Velocidad**: catálogo de pasos incremental (`ppPasosAlDia`: `fechaRegistro`/`fechaActualiza` ≥ marca − 5 min +
+  `$count`; todo si no cuadra, sin fechas en el metadato o a los 30 min; `PP.catP` evita lecturas dobles), `ppGenerar` lee catálogo/logo/árbol junto al MD, `ppVistaDesdeSap`
+  lee Claves Modelo, versión anterior y sus V°B° en paralelo, `ppModeloListo` no sondea si respondió hace < 90 s. Pruebas `qa_catalogo_incremental.mjs`, `qa_repetidos.mjs`,
+  `qa_local.py` LN64/LN69. **«Todo en minúsculas»** (pedido de Carlos, misma versión): en la Edición rápida de un Ingresado (y en la edición de «Comparar
+  dos RMD») un botón pasa todos los pasos y procesos menores en MAYÚSCULAS a minúsculas (`minusculasTodo`/`enMayusculas` del editor con `EMB.minusculas` =
+  `redactarEnMinusculas` del portal: comas y signos tal cual, tildes del diccionario, unidades y códigos sin cambiar); cada texto usa el paso de SAP con el
+  texto EXACTO (`x.caja`: el ingreso no toma el paso en MAYÚSCULAS como el mismo) o queda como paso nuevo (si solo lo usa este RMD, «Editar» en sitio). Es una
+  excepción pedida por Carlos a la regla de pasos sin tilde. Prueba `qa_local.py` LN70. **La siguiente versión debe ser > 1.165.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
