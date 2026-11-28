@@ -2052,6 +2052,14 @@
     'óptimo', 'óptima', 'plástico', 'plástica', 'plásticos', 'plásticas', 'metálico', 'metálica', 'metálicos', 'metálicas', 'magnético',
     'magnética', 'volumétrico', 'volumétrica', 'cámara', 'cámaras', 'lámpara', 'lámparas', 'balón', 'almacén', 'vía', 'vías', 'energía',
     'pérdida', 'pérdidas',
+    'síntoma', 'síntomas', 'espátula', 'espátulas', 'móvil', 'móviles', 'tamaño', 'tamaños', 'húmedo', 'húmeda', 'húmedos', 'húmedas', 'tóxico', 'tóxica',   // v1.165.0
+    'líquida', 'líquidas', 'sólida', 'sólidas', 'hélice', 'hélices', 'tapón', 'tapones', 'botón', 'botones', 'cartón', 'cartones', 'pistón', 'émbolo', 'tolva',
+    'molécula', 'partícula', 'partículas', 'película', 'películas', 'cápsula', 'tableta', 'jarabe', 'suspensión', 'ungüento', 'ungüentos', 'óvulo', 'óvulos',
+    'ácidos', 'básico', 'físicamente', 'visualmente', 'rápidamente', 'último', 'mínimamente', 'después', 'película', 'ítem', 'código', 'según', 'baño', 'baños',
+    'temperatura', 'térmicos', 'térmicas', 'eléctrico', 'mecánico', 'mecánica', 'mecánicos', 'mecánicas', 'hidráulico', 'hidráulica', 'neumático', 'neumática',
+    'cronómetro', 'termómetro', 'termómetros', 'manómetro', 'manómetros', 'higrómetro', 'balanza', 'probeta', 'pipeta', 'micrómetro', 'durómetro', 'friabilizador', 'viscosímetro',
+    'aplicación', 'comprobación', 'manipulación', 'conservación', 'eliminación', 'humectación', 'compactación', 'tamización', 'micronización', 'agitación', 'aspiración', 'ventilación',
+    'iluminación', 'recirculación', 'codificación', 'impresión', 'acción', 'operación', 'solución', 'emisión', 'decisión', 'ejecución', 'precaución', 'precauciones',
   ].map((p) => [SIN_ACENTOS(p), p]));
   delete DICCIONARIO_ACENTOS[SIN_ACENTOS('mas')];      // «mas» es ambiguo: no se acentúa
   // siglas que se conservan
@@ -8807,7 +8815,9 @@
         m.recetas = rs.filter((r) => r.activo !== false && r.recetaId).sort((a, b) => (+a.orden || 0) - (+b.orden || 0)).map((r) => { const rc = r.recetaId;
           return { mdRecetaId: r.mdRecetaId, txt: [norm(rc.Text1), [norm(rc.Matnr), norm(rc.Verid)].filter(Boolean).join(' / ')].filter(Boolean).join(' · ') + (norm(rc.Mksp) ? ' (bloqueada)' : '') }; });
       } catch (e) { m.recetas = []; m.recetaError = e.message; }
-      if (lados[l] === m) pintarLados();
+      // con una sola receta asociada se elige esa (antes quedaba en «Sin receta»); el usuario puede cambiarla
+      const sola = lados[l] === m && !m.receta && m.recetas.length === 1 && !m.recetaElegida; if (sola) m.receta = String(m.recetas[0].mdRecetaId);
+      if (lados[l] === m) { pintarLados(); if (sola && R) comparar(); }
     }
     const pintarLados = () => {
       ['a', 'b'].forEach((l) => {
@@ -8839,7 +8849,7 @@
       } catch (e) { res.innerHTML = `<p class="rmd-progreso error">No se pudo buscar: ${esc(e.message)}</p>`; }
     }
     const elegir = (l, m) => { lados[l] = m ? { ...m, receta: '', recetas: null } : m; const res = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"] .rmd-cmp-lista-res`); res.hidden = true; pintarLados(); cargarRecetas(l); };
-    v.cuerpo.querySelector('.rmd-cmp-elegir').addEventListener('change', (e) => { const sr = e.target.closest('select[data-rec]'); if (!sr || !lados[sr.dataset.rec]) return; lados[sr.dataset.rec].receta = sr.value; pintarLados(); if (R) comparar(); });
+    v.cuerpo.querySelector('.rmd-cmp-elegir').addEventListener('change', (e) => { const sr = e.target.closest('select[data-rec]'); if (!sr || !lados[sr.dataset.rec]) return; lados[sr.dataset.rec].receta = sr.value; lados[sr.dataset.rec].recetaElegida = true; pintarLados(); if (R) comparar(); });
     v.cuerpo.querySelector('.rmd-cmp-filtros').addEventListener('change', () => ['a', 'b'].forEach((l) => { const L = v.cuerpo.querySelector(`.rmd-cmp-lado[data-l="${l}"]`); if (!L.querySelector('.rmd-cmp-lista-res').hidden) buscar(l, L.querySelector('input').value); }));
     v.cuerpo.querySelectorAll('.rmd-cmp-buscar').forEach((f) => f.addEventListener('submit', (e) => { e.preventDefault(); buscar(f.closest('.rmd-cmp-lado').dataset.l, f.querySelector('input').value); }));
     v.cuerpo.querySelector('.rmd-cmp-elegir').addEventListener('click', async (e) => {
@@ -19408,9 +19418,9 @@
     // Cada texto usa el paso de SAP que ya existe EXACTAMENTE así (mismas minúsculas) en su etiqueta o queda como paso nuevo; `caja` hace que el
     // ingreso no tome el paso en MAYÚSCULAS como si fuera el mismo. Solo en un RMD Ingresado (en un Autorizado no se edita ningún texto).
     const crudoTx = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
-    const puedeMinusculas = () => !!(EMB && typeof EMB.minusculas === 'function' && /ingresad/i.test(String(EMB.estado || PQ.rmd.estado || '')));
+    const puedeMinusculas = () => !!(EMB && typeof EMB.minusculas === 'function' && /ingresad/i.test(String(EMB.estado || (PQ && PQ.rmd && PQ.rmd.estado) || '')));
     function enMayusculas() {
-      const out = [], vivos = (l) => (l || []).filter((y) => !y.quitado); if (!puedeMinusculas()) return out;
+      const out = [], vivos = (l) => (l || []).filter((y) => !y.quitado); if (!puedeMinusculas() || !W || !W.estructuras) return out;
       const ver = (x, e, t) => { if (x.insumo || !x.texto) return; let nt = ''; try { nt = String(EMB.minusculas(x.texto) || ''); } catch (er) { nt = ''; } if (nt && nt !== x.texto) out.push({ x, e, t, nt }); };
       W.estructuras.forEach((e) => [[null, e.pasos], ...(e.etiquetas || []).map((t) => [t, t.pasos])].forEach(([t, l]) => vivos(l).forEach((p) => { ver(p, e, t); vivos(p.pm).forEach((m) => ver(m, e, t)); })));
       return out;

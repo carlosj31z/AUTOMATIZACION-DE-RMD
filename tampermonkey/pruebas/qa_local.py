@@ -1957,10 +1957,10 @@ with sync_playwright() as p:
     def _():
         m = pg.evaluate("""() => { const f = window.__rmdStats.minusculasRmd; return [
           f('VERIFICAR LA LIMPIEZA DE LA MAQUINA, SEGUN EL PROCEDIMIENTO PDOC-207 VIGENTE. REGISTRAR EL PH A 25 °C Y 10 ML.'),
-          f('PESO'), f('Ya en minúsculas, no se toca.'), f('NOTA: LA SOLUCION DEBE ESTAR LISTA; ¿CONFORME?')]; }""")
-        t0, t1, t2, t3 = m
+          f('PESO'), f('Ya en minúsculas, no se toca.'), f('NOTA: LA SOLUCION DEBE ESTAR LISTA; ¿CONFORME?'), f('SI PRESENTA SINTOMAS, USAR GUANTES TERMICOS Y LA ESPATULA DE LA MARMITA MOVIL.')]; }""")
+        t0, t1, t2, t3, t4 = m
         okTxt = (t0.startswith('Verificar la limpieza de la máquina, según el procedimiento PDOC-207 vigente. Registrar el pH a 25 °C y 10 mL.')
-                 and t1 == 'Peso' and t2 == 'Ya en minúsculas, no se toca.' and ',' not in t3 and ';' in t3 and '¿' in t3 and 'solución' in t3)
+                 and t1 == 'Peso' and t2 == 'Ya en minúsculas, no se toca.' and ',' not in t3 and ';' in t3 and '¿' in t3 and 'solución' in t3 and t4 == 'Si presenta síntomas, usar guantes térmicos y la espátula de la marmita móvil.')
         d0 = pg.evaluate("(" + PP_DT_JS + ")((" + PP_DATOS_JS + ")())")
         r = pg.evaluate("""async (d) => { const P = window.__rmdStats.plantilla, salida = {};
           for (const estado of ['Ingresado', 'Autorizado']) {
