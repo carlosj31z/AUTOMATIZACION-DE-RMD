@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.165.0
+// @version      1.166.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.165.0';                                                       // mantener igual a @version
+  const VERSION = '1.166.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -9005,6 +9005,21 @@
       pd.addEventListener('mousedown', m.__fuera, true); pd.addEventListener('keydown', m.__tecla, true);
       const b0 = m.querySelector('button'); if (b0) b0.focus();
     }
+    // v1.166.0: «Más opciones…» = los botones de la barra de la Edición rápida (mismo menú que el de cada línea)
+    function abrirMenuBarraEd(x, y) {
+      cerrarMenuEd(); if (!ed || !ed.api || ed.guardando || ed.enVista) return;
+      const ops = ed.api.barra(); if (!ops.length) return;
+      const pd = res.ownerDocument, m = pd.createElement('div'); m.className = 'rmd-cmp-menu'; m.setAttribute('role', 'menu');
+      m.innerHTML = `<div class="rmd-cmp-menu-tit"><b>Edición rápida</b></div>` + ops.map((o) => `<button type="button" role="menuitem" data-ba="${esc(o.a)}">${esc(o.texto)}</button>`).join('');
+      pd.body.appendChild(m); menuEd = m;
+      const w = pd.defaultView, r = m.getBoundingClientRect();
+      m.style.left = `${Math.max(8, Math.min(x, w.innerWidth - r.width - 8))}px`; m.style.top = `${Math.max(8, Math.min(y, w.innerHeight - r.height - 8))}px`;
+      m.addEventListener('click', (e) => { const bb = e.target.closest('button[data-ba]'); if (!bb) return; cerrarMenuEd(); if (!ed.api.barraAccion(bb.dataset.ba)) { ed.msg = 'Esa opción ya no está disponible.'; } pintarEd(); });
+      m.__fuera = (e) => { if (!m.contains(e.target)) cerrarMenuEd(); };
+      m.__tecla = (e) => { if (e.key === 'Escape') { e.preventDefault(); cerrarMenuEd(); } };
+      pd.addEventListener('mousedown', m.__fuera, true); pd.addEventListener('keydown', m.__tecla, true);
+      const b0 = m.querySelector('button'); if (b0) b0.focus();
+    }
     function lineaDeClic(t) {
       if (!ed || !R) return null;
       if (vista === 'pdf') { const p = panel(ed.l), el = p && p.contains(t) ? t.closest('[data-l]') : null; return el ? +el.dataset.l : null; }
@@ -9052,7 +9067,7 @@
       const n = ed.api ? ed.api.cambios() : 0, items = ed.api ? ed.api.items() : [];
       b.innerHTML = `<b>Editando ${esc(nombre(ed.m))}</b><span>${ed.api ? `${n} cambio${n === 1 ? '' : 's'} por guardar · ${items.filter((x) => !/^lista/.test(x.tipo)).length} diferencia${items.length === 1 ? '' : 's'} con ${esc(nombre(ed.o))} · clic en cualquier línea de ${esc(cortoDe(ed.m))} para editarla, configurarla, agregar debajo, moverla o quitarla` : ''}</span>
         ${ed.msg ? `<span class="rmd-cmp-ed-msg${ed.fallo ? ' error' : ''}">${esc(ed.msg)}</span>` : ''}
-        <span class="rmd-cmp-ed-bot">${ed.api && !ed.enVista ? `<button type="button" class="rmd-btn" data-a="ed-agregar" ${ed.guardando ? 'disabled' : ''} title="Agregar un paso al final de cualquier lista, un equipo o utensilio, o pegar lo copiado">Agregar…</button>${ed.api.hayObs && ed.api.hayObs() ? `<button type="button" class="rmd-btn" data-a="ed-obs" ${ed.guardando ? 'disabled' : ''} title="Nomenclatura, CC aplicados, pendientes y notas">Observaciones…${ed.api.obsCambiada && ed.api.obsCambiada() ? ' ●' : ''}</button>` : ''}${(() => { const nm = ed.api.mayusculas ? ed.api.mayusculas() : 0; return nm ? `<button type="button" class="rmd-btn" data-a="ed-minusculas" ${ed.guardando ? 'disabled' : ''} title="Pasa a minúsculas todos los pasos y procesos menores en MAYÚSCULAS del RMD que se edita: mayúscula al iniciar cada oración, comas y signos tal cual, tildes donde corresponden, unidades y códigos sin cambiar">Todo en minúsculas (${nm})</button>` : ''; })()}<button type="button" class="rmd-btn" data-a="ed-homol" aria-pressed="${!sinHomol}" title="Muestra u oculta los botones de cada diferencia (Usar el de…, Agregar a…, Quitar, Ordenar como…)">${sinHomol ? 'Mostrar botones de diferencias' : 'Ocultar botones de diferencias'}</button>` : ''}${ed.api ? `<button type="button" class="rmd-btn" data-a="ed-vista" ${ed.guardando ? 'disabled' : ''} title="${ed.enVista ? 'Oculta la Edición rápida del portal y sigue editando aquí' : 'Abre esta misma edición en la Edición rápida completa, en la pestaña del portal'}">${ed.enVista ? 'Seguir editando aquí' : 'Abrir en la Edición rápida'}</button>` : ''}<button type="button" class="rmd-btn" data-a="ed-deshacer" ${ed.api && ed.api.hayDeshacer() && !ed.guardando ? '' : 'disabled'}>Deshacer</button><button type="button" class="rmd-btn primario" data-a="ed-guardar" ${ed.api && n && !ed.guardando ? '' : 'disabled'}>Guardar en SAP…</button><button type="button" class="rmd-btn" data-a="ed-salir" ${ed.guardando ? 'disabled' : ''}>Terminar sin guardar</button></span>`;
+        <span class="rmd-cmp-ed-bot">${ed.api && !ed.enVista ? `<button type="button" class="rmd-btn" data-a="ed-agregar" ${ed.guardando ? 'disabled' : ''} title="Agregar un paso al final de cualquier lista, un equipo o utensilio, o pegar lo copiado">Agregar…</button>${ed.api.hayObs && ed.api.hayObs() ? `<button type="button" class="rmd-btn" data-a="ed-obs" ${ed.guardando ? 'disabled' : ''} title="Nomenclatura, CC aplicados, pendientes y notas">Observaciones…${ed.api.obsCambiada && ed.api.obsCambiada() ? ' ●' : ''}</button>` : ''}${(() => { const nm = ed.api.mayusculas ? ed.api.mayusculas() : 0; return nm ? `<button type="button" class="rmd-btn" data-a="ed-minusculas" ${ed.guardando ? 'disabled' : ''} title="Pasa a minúsculas todos los pasos y procesos menores en MAYÚSCULAS del RMD que se edita: mayúscula al iniciar cada oración, comas y signos tal cual, tildes donde corresponden, unidades y códigos sin cambiar">Todo en minúsculas (${nm})</button>` : ''; })()}<button type="button" class="rmd-btn" data-a="ed-mas" ${ed.guardando ? 'disabled' : ''} title="Las demás opciones de la Edición rápida: Vista completa (DOC), Quitar tildes, Copiar resumen, lo que falta corregir…">Más opciones…</button><button type="button" class="rmd-btn" data-a="ed-homol" aria-pressed="${!sinHomol}" title="Muestra u oculta los botones de cada diferencia (Usar el de…, Agregar a…, Quitar, Ordenar como…)">${sinHomol ? 'Mostrar botones de diferencias' : 'Ocultar botones de diferencias'}</button>` : ''}${ed.api ? `<button type="button" class="rmd-btn" data-a="ed-vista" ${ed.guardando ? 'disabled' : ''} title="${ed.enVista ? 'Oculta la Edición rápida del portal y sigue editando aquí' : 'Abre esta misma edición en la Edición rápida completa, en la pestaña del portal'}">${ed.enVista ? 'Seguir editando aquí' : 'Abrir en la Edición rápida'}</button>` : ''}<button type="button" class="rmd-btn" data-a="ed-deshacer" ${ed.api && ed.api.hayDeshacer() && !ed.guardando ? '' : 'disabled'}>Deshacer</button><button type="button" class="rmd-btn primario" data-a="ed-guardar" ${ed.api && n && !ed.guardando ? '' : 'disabled'}>Guardar en SAP…</button><button type="button" class="rmd-btn" data-a="ed-salir" ${ed.guardando ? 'disabled' : ''}>Terminar sin guardar</button></span>`;
       res.querySelectorAll('.rmd-cmp-acc').forEach((x) => x.remove());
       if (!ed.api) return;
       const otro = cortoDe(ed.o), este = cortoDe(ed.m);
@@ -9169,6 +9184,7 @@
       else if (b.dataset.a === 'ed-guardar') { if (ed && ed.enVista) enVistaEd(false); guardarEd(); }
       else if (b.dataset.a === 'ed-agregar' && ed && ed.api) { if (!ed.api.agregar()) { ed.msg = 'No hay listas donde agregar.'; pintarEd(); } }
       else if (b.dataset.a === 'ed-obs' && ed && ed.api) ed.api.obs();
+      else if (b.dataset.a === 'ed-mas' && ed && ed.api && ed.api.barra) { const r0 = b.getBoundingClientRect(); abrirMenuBarraEd(r0.left, r0.bottom + 4); }
       else if (b.dataset.a === 'ed-minusculas' && ed && ed.api && ed.api.minusculas) {   // v1.165.0 (pedido de Carlos): todo el RMD en minúsculas con un clic
         const nm = ed.api.mayusculas(); if (!nm || !pagina.confirm(`Se pasarán a minúsculas ${nm} paso(s) o proceso(s) menor(es) en MAYÚSCULAS (mayúscula al iniciar cada oración, tildes, unidades y códigos tal cual). Cada uno usará el paso de SAP que ya existe así o quedará como paso nuevo. Revisa el resultado antes de «Guardar en SAP». Se puede deshacer. ¿Continuar?`)) return;
         ed.hechos.push({ l: ed.l, k: -1, txt: 'Todo en minúsculas' }); ed.api.minusculas();
@@ -19490,7 +19506,7 @@
     function pintarTodo() {
       PPN.tildes(!!W.tildes);
       CMB = PPN.cambios(BASE, W, { tipos: PQ.tipos }); AV = PPN.avisos(W, { buscador: BUS, etiquetas: ETQ, base: BASE.estructuras, dt: DT, planta: PQ.rmd.planta, etapa: PQ.rmd.etapa, docs: DOCS, modo: PROD ? 'produccion' : '' }); if (EMB) AV.forEach((l) => l.forEach(textoVista));
-      if (REF) AV.forEach((l, k) => { const q = l.filter((a) => a.nivel !== 'info' || a.usar || a.sugerido || a.agregar || a.alFinal || (a.opciones && a.opciones.length) || (a.exactos && a.exactos.length)); if (q.length) AV.set(k, q); else AV.delete(k); });   // v1.156.0: al homologar, sin guías
+      // v1.166.0 (pedido de Carlos: la edición al comparar no se limita a homologar): todos los avisos y guías, como en la Edición rápida
       refDiferencias(); if (EMB && typeof EMB.alPintar === 'function') setTimeout(() => { try { EMB.alPintar(); } catch (e) { /* la comparación ya no está */ } }, 0); UNI = PPN.nuevosIguales(W); MOV = new Set(CMB.filter((c) => c.accion === 'mover').map((c) => c.id));
       indexarDt();
       const y = window.scrollY; podarMarcados();
@@ -19891,13 +19907,19 @@
       // v1.160.0 (pedido de Carlos): todas las acciones de cada fila (editar, configuración, agregar, mover, quitar…) desde la comparación
       filas: () => $$('.pp-doc tr[data-id]').map((tr) => { const f = encontrar(tr.dataset.id); if (!f || !/^(paso|pm|equipo|utensilio|especificacion|insumo)$/.test(f.clase)) return null;
         const tx = tr.querySelector('.pp-tx') || tr.querySelector('td');
-        const acc = [...tr.querySelectorAll(':scope > td .pp-acc button[data-a]')].filter((b) => !/^(comentar|copiar|marcar)$/.test(b.dataset.a)).map((b) => ({ a: b.dataset.a, texto: b.textContent.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim(), qui: b.classList.contains('qui') }));
+        const acc = [...tr.querySelectorAll(':scope > td .pp-acc button[data-a]')].filter((b) => b.dataset.a !== 'comentar').map((b) => ({ a: b.dataset.a, texto: b.textContent.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim(), qui: b.classList.contains('qui') }));
         return { id: tr.dataset.id, clase: f.clase, texto: tx ? tx.textContent.trim() : '', quitado: !!f.item.quitado, acciones: acc }; }).filter(Boolean),
       fila: (id, a) => { const b = document.querySelector(`.pp-doc tr[data-id="${CSS.escape(id)}"] > td .pp-acc [data-a="${a}"]`); if (!b) return false; b.click(); return true; },
       cambiados: () => CMB.map((c) => ({ id: c.id, accion: c.accion, etq: ETQ_ACCION[c.accion] || c.accion, texto: String(c.accion === 'quitar' ? c.antes || '' : c.despues || c.texto || '') })),
       // v1.165.0 (pedido de Carlos: la edición en la comparación no solo sirve para homologar): agregar pasos, equipos o utensilios en cualquier lista y editar las Observaciones
       agregar: () => agregarEnLista(), hayObs: () => !!OBS, obs: () => obsModal(), obsCambiada: () => obsCambiada(),
       mayusculas: () => enMayusculas().length, minusculas: () => minusculasTodo(true),   // la pregunta la hace la comparación (otra pestaña)
+      // v1.166.0 (pedido de Carlos: todo lo de la Edición rápida desde la comparación): los botones de su barra y «Vista completa (DOC)»
+      barra: () => [{ a: 'vista-dt', texto: DT ? 'Ocultar la vista completa (DOC)' : 'Vista completa (DOC): tipo de dato, decimales, Depende, casillas…' }]
+        .concat($$('.pp-barra .pp-botones button[data-a], .pp-barra .pp-resumen button[data-a]').filter((b) => !b.disabled && !/^(cerrar-vista|sap|deshacer|ayuda|minusculas-todo)$/.test(b.dataset.a))
+          .map((b) => ({ a: b.dataset.a, texto: b.textContent.replace(/\s+/g, ' ').trim() || b.title || b.dataset.a }))).filter((x, i, l) => l.findIndex((y) => y.a === x.a) === i),
+      barraAccion: (a) => { if (a === 'vista-dt') { const c = document.getElementById('pp-vista-dt'); if (!c) return false; c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); return true; }
+        const b = $$('.pp-barra button[data-a]').find((x) => x.dataset.a === a && !x.disabled); if (!b) return false; b.click(); return true; },
     }), 0);
     // lista de los «＋ Agregar…» del documento (pasos al final de cada lista, equipos y utensilios, pegar lo copiado) para elegir dónde
     function agregarEnLista() {
@@ -22317,7 +22339,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
     try {
       const ctrl = controladorPrincipal(), modelo = ctrl && ctrl.getView().getModel('mainModelv2'); if (!modelo) throw new Error('abre la lista «Configuración Manufactura Digital» en la pestaña del portal');
       // v1.165.0: los pasos del otro RMD, las Claves Modelo y la versión anterior se leen a la vez que este RMD; la receta elegida en la comparación no se vuelve a preguntar
-      const pRef = ppLeerArbol(modelo, { mdId: ref.mdId }), pClaves = ppClavesModelo(ctrl), pPrevia = opc.oculto ? versionAnteriorDe(modelo, md.mdId).catch(() => null) : Promise.resolve(null);
+      const pRef = ppLeerArbol(modelo, { mdId: ref.mdId }), pClaves = ppClavesModelo(ctrl), pPrevia = versionAnteriorDe(modelo, md.mdId).catch(() => null);
       pRef.catch(() => {});
       const r = await ppGenerar(String(md.codigo), { mdId: md.mdId, receta: md.receta || undefined, avisar, elegirReceta: (recs, m) => { avisar(`El RMD tiene ${recs.length} recetas asociadas: elige con cuál se ven los insumos (en la pestaña del portal).`); return ppElegirReceta(recs, m); } });
       if (!/ingresad/i.test(r.paquete.rmd.estado || '')) throw new Error(`el RMD ${md.codigo} v${md.version} ya no está Ingresado (${r.paquete.rmd.estado || 'sin estado'})`);
@@ -22325,7 +22347,7 @@ button.pp-dt-c { font: inherit; line-height: 16px; } .pp-dt-c.pp-dt-btn { cursor
       const [arbolRef, claves, puestos, previa] = await Promise.all([pRef, pClaves, ppPuestosRmd(ctrl, r.paquete.arbol.recetas), pPrevia]);
       const nombreRef = `${ref.codigo} v${ref.version}`, corto = String(ref.codigo) === String(md.codigo) ? `v${ref.version}` : String(ref.codigo);
       // v1.165.0 (pedido de Carlos): desde la comparación también se editan las Observaciones (no solo se homologa)
-      await montarVista(r.paquete, null, { claves, puestos, obs: !!opc.oculto, previa, referencia: { nombre: nombreRef, corto, arbol: { estructuras: arbolRef.estructuras } },
+      await montarVista(r.paquete, null, { claves, puestos, obs: true, previa, referencia: { nombre: nombreRef, corto, arbol: { estructuras: arbolRef.estructuras } },
         oculto: !!opc.oculto, homol: opc.homol || null, alPintar: opc.alPintar || null, alIngresar: opc.alIngresar || null, alModal: opc.alModal || null, alAviso: opc.alAviso || null, alCerrar: opc.alCerrar || null });
       if (espera) espera.cerrar();
     } catch (e) {

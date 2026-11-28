@@ -545,7 +545,12 @@ cuenta). Escribir y responder siempre en **español**.
   dos RMD») un botón pasa todos los pasos y procesos menores en MAYÚSCULAS a minúsculas (`minusculasTodo`/`enMayusculas` del editor con `EMB.minusculas` =
   `redactarEnMinusculas` del portal: comas y signos tal cual, tildes del diccionario, unidades y códigos sin cambiar); cada texto usa el paso de SAP con el
   texto EXACTO (`x.caja`: el ingreso no toma el paso en MAYÚSCULAS como el mismo) o queda como paso nuevo (si solo lo usa este RMD, «Editar» en sitio). Es una
-  excepción pedida por Carlos a la regla de pasos sin tilde. Prueba `qa_local.py` LN70. **La siguiente versión debe ser > 1.165.0.**
+  excepción pedida por Carlos a la regla de pasos sin tilde. Prueba `qa_local.py` LN70. 1.165.0 publicada en `publicado` el 2026-11-28 (commit fba882c),
+  probada en el portal en solo lectura (DESKTOP-KJ339H3).
+- 2026-11-28, v1.166.0 (encima de la 1.165.0): **pedido de Carlos: «Comparar dos RMD» no se limita a homologar, se edita tal cual en la Edición rápida.**
+  Con otro RMD de referencia ya no se recortan los avisos ni las guías; cada línea ofrece también Copiar y Marcar; Observaciones también al homologar desde
+  la Edición rápida; botón «Más opciones…» en la barra de la comparación = los botones de la barra de la Edición rápida (`EMB.homol.barra()`/`barraAccion(a)`:
+  Vista completa (DOC), Quitar tildes, Copiar resumen, pendientes…; `abrirMenuBarraEd`). Prueba `qa_local.py` LN71. **La siguiente versión debe ser > 1.166.0.**
 - Fusionados hace poco:
   - PR #54 – v1.106.0: pasos nuevos idénticos (misma sección + etiqueta + texto
     sin mayúsculas/espacios) se crean una sola vez en SAP.
