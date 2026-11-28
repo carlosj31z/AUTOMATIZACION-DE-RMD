@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RMD · mejoras de interfaz (Configuración RMD)
 // @namespace    medifarma.rmd
-// @version      1.162.0
+// @version      1.164.0
 // @description  Mejoras de interfaz y herramientas para la app Configuración RMD (SAP UI5): revisión de la configuración, exportaciones, trazabilidad entre versiones y plantilla para Producción.
 // @match        https://*.hana.ondemand.com/*
 // @run-at       document-idle
@@ -19,7 +19,7 @@
     }, 250);
     return;
   }
-  const VERSION = '1.162.0';                                                       // mantener igual a @version
+  const VERSION = '1.164.0';                                                       // mantener igual a @version
   const CLAVE = 'rmdUiMejoras';
   const CARPETA_SP = '/sites/DOCUMENTACIONMEDIFARMA/Documentos compartidos/PLANTA LIMA/DIRECCION TECNICA/DOCUMENTACION TECNICA/10.-REPORTES 2024-2026/PROYECTOS/MEJORAS DE INTERFAZ';   // igual a CARPETA del cargador
   const URL_CARPETA = 'https://medifarmape.sharepoint.com/sites/DOCUMENTACIONMEDIFARMA/Documentos%20compartidos/Forms/AllItems.aspx?id=' + encodeURIComponent(CARPETA_SP);
@@ -1874,7 +1874,36 @@
   const CON_EDIT = new Set(['FECHA Y HORA', 'FECHA', 'HORA', 'NUMEROS', 'RANGO', 'TEXTO', 'LOTE', 'FECHA VENCIMIENTO', 'FORMULA', 'ENTREGA', 'MUESTRACC', 'CANTIDAD', 'NOTIFICACION']);
   const NUMERICOS = new Set(['NUMEROS', 'RANGO', 'FORMULA', 'ENTREGA', 'MUESTRACC']);
   const CLAVES = ['SETUP PRE PROCESO', 'PROCESO', 'SETUP POST PROCESO'];
-  const CEO_CA_USUARIOS = ['CJESUSZ'];                                  // v1.158.0: predecesor automático de Calidad en Operaciones (pedido de Carlos)
+  const CEO_CA_USUARIOS = ['CJESUSZ'];
+  // v1.164.0 (pedido de Carlos, 28/11): reglas de revisión separadas por planta, sacadas de cómo se autorizan los RMD (263 Autorizados
+  // desde el 15/10/2026: ATE 139, LIMA 124). Sin planta conocida vale lo de siempre (lo mismo que LIMA).
+  const plantaDe = (pl) => { const t = SIN_ACENTOS(pl).trim(); return /\bATE\b|PLANTA 1\b|^P1$/.test(t) ? 'ATE' : /\bLIMA\b|PLANTA 2\b|^P2$/.test(t) ? 'LIMA' : ''; };
+  const RX_RENDIMIENTO_CALC = /^\s*CALCULO DE RENDIMIENTO\b/;                 // «CALCULO DE RENDIMIENTO (%):» (Fórmula): ATE sin Edit (111 de 139), LIMA con Edit
+  const RX_NOTA_JEFE = /^NOTA\W*EL JEFE O SUPERVISOR DE (LA )?(SECCION|TURNO)\b/;   // ATE: el 441 cierra con una nota del jefe, la genérica o una específica
+  const RX_FH_INICIO = /^\s*FECHA ?\/ ?HORA (DE )?INICIO\b/;                  // ATE: el primer paso «FECHA / HORA INICIO» de la lista va sin predecesor
+  // nota que cierra un «Realizado por y Visto bueno» con R. Por y V.B.: LIMA (y sin planta) solo la genérica; ATE también una específica del jefe
+  const esNotaCierre = (txt, pl) => RX_NOTA_SUPERVISOR.test(txt) || (pl === 'ATE' && RX_NOTA_JEFE.test(txt));
+  const REGLAS_PLANTA = {
+    ATE: [
+      ['«CALCULO DE RENDIMIENTO (%)» (Fórmula) va sin Edit.', '111 de 139 autorizados'],
+      ['«Realizado por y Visto bueno» con R. Por y V.B.: el último proceso menor es una NOTA del jefe o supervisor de la sección, la genérica o una específica (p. ej. «NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR EL RETIRO…»).', '1 459 de 1 521'],
+      ['El primer paso de una lista, «FECHA / HORA INICIO», va sin predecesor.', '342 de 417'],
+      ['Homologación de términos (POE → PROCEDIMIENTO, VIGENTE) y nota de V°B° 186337: solo informativo (en gris), no cuenta como incoherencia (decisión de Carlos, 28/11). Los códigos de documento que cambiaron (PDSG-202 → PDOC-207, PBEB-200 → PPRO-243) y CONTRAMUESTRA siguen como aviso.', 'desde el 19/11: POE en 457 filas, nota 182341 en 20 RMD'],
+    ],
+    LIMA: [
+      ['«CALCULO DE RENDIMIENTO (%)» (Fórmula) va con Edit.', '124 de 124'],
+      ['«Realizado por y Visto bueno» con R. Por y V.B.: el último proceso menor es la nota genérica «NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.»', '797 de 809'],
+      ['Todo paso con tipo de dato lleva predecesor, también «FECHA / HORA INICIO» (salvo RENDIMIENTO y CONDICIONES AMBIENTALES).', '12 de 7 953 sin predecesor'],
+      ['Homologación de términos obligatoria: PROCEDIMIENTO (no POE), VIGENTE / VIGENTES, «SEGUN PROCEDIMIENTO / INSTRUCTIVO <código>».', 'desde el 19/11: 220 con PROCEDIMIENTO, 10 con POE'],
+      ['Nota de V°B° = paso 186337 (no 182341).', 'desde el 19/11: 186337 en 32 RMD, 182341 en 2'],
+    ],
+    AMBAS: [
+      ['Casillas por tipo de dato (Edit, R. Por, V.B., Estado CC) como hasta ahora.', 'más del 99 % de los autorizados'],
+      ['Pasos de Calidad en Operaciones: R. Por + Estado CC; sus procesos menores con tipo de dato: Edit + Estado CC (salvo los del jefe o supervisor).', 'ATE 252/252 y 759/761; LIMA 158/158 y 387/411'],
+      ['En RENDIMIENTO va «CANTIDAD MUESTREADA (unidad):», nunca «MUESTRA PARA CONTROL DE CALIDAD» ni «CONTRAMUESTRA».', '252 filas con CANTIDAD MUESTREADA; 6 con el texto viejo, 0 con CONTRAMUESTRA'],
+      ['RENDIMIENTO y CONDICIONES AMBIENTALES sin predecesor.', ''],
+    ],
+  };                                  // v1.158.0: predecesor automático de Calidad en Operaciones (pedido de Carlos)
   // Textos con «CONTROL DE CALIDAD» que no se alertan:
   // - «…APROBACION DE CONTROL DE CALIDAD O CALIDAD EN OPERACIONES, SEGUN APLIQUE» (granel de Envase)
   // - «…(FPRO-250 VIGENTE) A CONTROL DE CALIDAD PARA SU APROBACION EN EL SISTEMA…» (cierre de Acondicionado); solo se excluye esa frase
@@ -1917,6 +1946,7 @@
   const NOTA_SUPERVISOR_TXT = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
   const notaSupervisorObligatoria = (tipoPaso, rPor, vb) => SIN_ACENTOS(tipoPaso) === 'REALIZADO POR Y VISTO BUENO' && rPor === true && vb === true;
   const MSG_NOTA_FALTA = `Paso «Realizado por y Visto bueno» con R. Por y V.B.: su último proceso menor debe ser «${NOTA_SUPERVISOR_TXT}» (con o sin punto final) y no lo tiene. Agrégalo al final (regla de Carlos)`;
+  const MSG_NOTA_FALTA_ATE = 'Paso «Realizado por y Visto bueno» con R. Por y V.B.: su último proceso menor debe ser una NOTA del jefe o supervisor de la sección (la genérica «' + NOTA_SUPERVISOR_TXT + '» o una específica) y no la tiene (regla de ATE)';
   const MSG_NOTA_NO_ULTIMA = 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final (regla de Carlos)';
   // v1.146.0 (regla de Carlos): los procesos menores que llena Calidad en Operaciones y llevan tipo de dato van con Estado CC y Edit;
   // «TOMAR LA MUESTRA DESDE…» (punto de muestreo) es instrucción: Sin tipo de dato
@@ -1927,7 +1957,9 @@
   const RX_RESP_PRODUCCION = /\b(JEFE|SUPERVISOR|OPERARIO|OPERADOR)\b|\bPERSONAL DE PRODUCCION\b/;
   function reglasDeFila(f) {
     const out = [], tipo = f.tipo || '', t = SIN_ACENTOS(tipo), desc = SIN_ACENTOS(f.desc || ''), chk = f.chk || {};
-    const regla = reglaCasillas(tipo, f.esPM);
+    const regla = reglaCasillas(tipo, f.esPM), pl = plantaDe(f.planta);
+    // v1.164.0 (por planta): «CALCULO DE RENDIMIENTO (%)» va sin Edit en ATE y con Edit en LIMA
+    if (regla && !f.esPM && t === 'FORMULA' && RX_RENDIMIENTO_CALC.test(desc)) regla.EDIT = pl !== 'ATE';
     // PM de insumos (Cantidad Insumos / UM): sin Edit.
     if (f.esPM && regla && (norm(f.cant) || norm(f.um))) regla.EDIT = false;
     // Calidad en Operaciones: paso «PERSONAL DE CALIDAD EN OPERACIONES...» y PM de muestreo llevan Estado CC (muestreo además Edit).
@@ -1952,7 +1984,7 @@
     // PM OP: no debe ir marcada en ningún paso.
     if (chk['PM OP']) out.push({ col: 'PM OP', clase: 'rmd-desmarcar', msg: 'DESMARCAR PM OP: ningún paso debe llevarla marcada' });
     if (f.desc != null && (f.esPM || !BIOCARGA.test(desc))) {
-      if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD/.test(desc)) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "MUESTRA PARA CONTROL DE CALIDAD"' });
+      if (/MUESTRA PARA (EL )?CONTROL DE CALIDAD|\bCONTRAMUESTRA\b/.test(desc)) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: `En Rendimiento debe figurar "CANTIDAD MUESTREADA (kg):" en lugar de "${/CONTRAMUESTRA/.test(desc) ? 'CONTRAMUESTRA' : 'MUESTRA PARA CONTROL DE CALIDAD'}" (las dos plantas)` });
       else if (/CONTROL DE CALIDAD|APROBACION DE .*CONTROL DE PROCESO/.test(sinCalidadCorrecta(desc))) out.push({ col: 'DESCRIPCION', clase: 'rmd-falta', msg: 'Reemplazar "CONTROL DE CALIDAD" por "CALIDAD EN OPERACIONES" (solo debe quedar Calidad en Operaciones)' });
     }
     // Regla de Carlos (2026-11-03): en los pasos ninguna palabra lleva tilde
@@ -2297,10 +2329,11 @@
     const filasDelRmd = () => {
       if (filasRmd) return filasRmd; filasRmd = { porId: new Map(), codigos: new Set(), ing: false };
       try { const V = vistaDeTabla(tabla), a = V && V.getModel('asociarDatos') && V.getModel('asociarDatos').getData(); filasRmd.ing = !!a && +a.estadoIdRmd_iMaestraId === 467;
-        filasRmd.etapa = (a && a.nivelTxt) || ''; filasRmd.planta = (a && a.sucursalId && (a.sucursalId.contenido || a.sucursalId.descripcion)) || '';
+        filasRmd.etapa = (a && a.nivelTxt) || ''; filasRmd.planta = (a && a.sucursalId && (a.sucursalId.contenido || a.sucursalId.descripcion)) || (a && (+a.sucursalId_iMaestraId === 67 ? 'PLANTA ATE' : +a.sucursalId_iMaestraId === 68 ? 'PLANTA LIMA' : '')) || '';
         ((a && a.aEstructura && a.aEstructura.results) || []).forEach((e) => ((e.aPaso && e.aPaso.results) || []).forEach((x) => {
           if (x.activo === false || (a.mdId && x.mdId_mdId && x.mdId_mdId !== a.mdId)) return; const c = String((x.pasoId && x.pasoId.codigo) || '');
           filasRmd.porId.set(x.mdEstructuraPasoId, { codigo: c, orden: x.orden }); if (c) filasRmd.codigos.add(c); })); } catch (e) { /* sin datos del RMD */ }
+      if (!filasRmd.planta) filasRmd.planta = plantaAbierta();
       return filasRmd;
     };
     const citaDepende = (ob, mm, v) => {
@@ -2327,7 +2360,7 @@
     // v1.147.1 (regla de Carlos): en la ventana de procesos menores de un «Realizado por y Visto bueno» con R. Por y V.B., la nota del supervisor va al final
     const notaFin = { falta: -1, noUltima: -1 };
     if (esPM && padre && notaSupervisorObligatoria(padre.tipo, padre.rPor, padre.vb)) {
-      const conTexto = claves.map((c, k) => (c ? k : -1)).filter((k) => k >= 0), iNota = conTexto.find((k) => RX_NOTA_SUPERVISOR.test(claves[k])), ult = conTexto[conTexto.length - 1];
+      const plN = plantaDe(filasDelRmd().planta), conTexto = claves.map((c, k) => (c ? k : -1)).filter((k) => k >= 0), iNota = conTexto.find((k) => esNotaCierre(claves[k], plN)), ult = conTexto[conTexto.length - 1];
       if (iNota == null) { if (ult != null) notaFin.falta = ult; } else if (iNota !== ult) notaFin.noUltima = iNota;
     }
     // Predecesor obligatorio con tipo de dato, salvo el primero de PRECAUCIONES, condicionales/paralelos y RENDIMIENTO / CONDICIONES AMBIENTALES.
@@ -2335,6 +2368,9 @@
     const tipadoFila = (tr) => { const t = SIN_ACENTOS((inputDe(celda(tr, iTipo)) || {}).value || ''); return !!t && t !== 'SIN TIPO DE DATO'; };
     const aplicaPred = esPasos && iDep >= 0 && !LISTAS_SIN_PREDECESOR.test(lista);
     const kCabeza = aplicaPred && /^PRECAUCIONES/.test(lista) ? filas.findIndex(tipadoFila) : -1;
+    // v1.164.0 (por planta): en ATE el primer paso con tipo de dato de la lista, si es «FECHA / HORA INICIO», va sin predecesor
+    const kPrimero = aplicaPred ? filas.findIndex(tipadoFila) : -1, kFhAte = kPrimero >= 0 && plantaDe(filasDelRmd().planta) === 'ATE'
+      && RX_FH_INICIO.test(SIN_ACENTOS(celda(filas[kPrimero], iDes) && celda(filas[kPrimero], iDes).textContent)) ? kPrimero : -1;
     filas.forEach((tr, k) => {
       const tdTipo = iTipo >= 0 ? celda(tr, iTipo) : null;
       const tipo = tdTipo ? (inputDe(tdTipo) || {}).value || '' : '';
@@ -2384,7 +2420,7 @@
         else if (v && esPasos && citaDepende(ob, mm, v)) { const msg = citaDepende(ob, mm, v); marcarFalta(iDep, msg); if (ob.dependeMdEstructuraPasoId) programarCorreccionDependencias(); }
         else if (sinTipo) { /* sin tipo de dato: solo el propio o el posterior */ }
         else if (mm && infoOrden[mm[2]] && infoOrden[mm[2]].codigo === mm[1] && infoOrden[mm[2]].sin) marcarFalta(iDep, 'El predecesor es un "Sin tipo de dato": debe depender del paso anterior con tipo de dato');
-        else if (!v && t && aplicaPred && k !== kCabeza && !INDEPENDIENTES.test(desc)) {
+        else if (!v && t && aplicaPred && k !== kCabeza && k !== kFhAte && !INDEPENDIENTES.test(desc)) {
           // el portal vacía el predecesor al marcar Estado CC
           const cc = iChk['ESTADO CC'] >= 0 && celda(tr, iChk['ESTADO CC']) && marcada(celda(tr, iChk['ESTADO CC']));
           marcarFalta(iDep, 'Falta el predecesor (Depende): todo paso con tipo de dato debe depender de un paso anterior con tipo de dato; solo se omite en pasos condicionales o en paralelo.' +
@@ -2400,9 +2436,11 @@
       if (notaSup && notaSupervisorSobra(tipo, iChk['V.B.'] >= 0 && celda(tr, iChk['V.B.']) ? chk['V.B.'] : undefined)) avisosPM.push(`Proceso menor ${notaSup.orden} (${notaSup.codigo} ${notaSup.desc.slice(0, 40)}): ${MSG_NOTA_SUPERVISOR}`);
       // v1.147.1 (regla de Carlos): con R. Por y V.B. la nota del supervisor es obligatoria y va al final (solo cuando ya se leyeron los procesos menores)
       if (esPasos && tabla.__rmdPM && tabla.__rmdPM.todos && notaSupervisorObligatoria(tipo, chk['R. POR'], chk['V.B.'])) {
-        const pmTexto = pmTodos.filter((q) => !q.insumo), ultimo = pmTexto[pmTexto.length - 1];
-        if (!notaSup) avisosPM.push(MSG_NOTA_FALTA);
-        else if (ultimo !== notaSup) avisosPM.push(`Proceso menor ${notaSup.orden} (${notaSup.codigo}): ${MSG_NOTA_NO_ULTIMA}`);
+        const pmTexto = pmTodos.filter((q) => !q.insumo), ultimo = pmTexto[pmTexto.length - 1], plN = plantaDe(R0.planta);
+        // v1.164.0 (por planta): en ATE vale también una nota específica del jefe o supervisor como cierre
+        const cierre = notaSup || (plN === 'ATE' ? pmTexto.find((q) => RX_NOTA_JEFE.test(claveRepetido(q.desc))) : null);
+        if (!cierre) avisosPM.push(plN === 'ATE' ? MSG_NOTA_FALTA_ATE : MSG_NOTA_FALTA);
+        else if (ultimo !== cierre && !(plN === 'ATE' && ultimo && esNotaCierre(claveRepetido(ultimo.desc), plN))) avisosPM.push(`Proceso menor ${cierre.orden} (${cierre.codigo}): ${MSG_NOTA_NO_ULTIMA}`);
       }
       const tdPM = iProcMen >= 0 ? celda(tr, iProcMen) : null;
       if (avisosPM.length && tdPM) { tdPM.classList.add('rmd-pm-mal'); tdPM.dataset.rmdPm = String(avisosPM.length); tdPM.title = 'Procesos menores con incoherencias (ábrelos para ver dónde):\n' + avisosPM.join('\n'); }
@@ -2540,6 +2578,9 @@
   const estadoVisible = (mdId, estado, codigo) => (on('inactivovista') ? estadoConInactivo(mdId, estado, codigo) : estado);
   // mdId del RMD abierto («Asociar Fórmula» y sus ventanas)
   function codigoAbierto() { try { const c = controladorPrincipal(), a = c && c.getView().getModel('asociarDatos'), d = a && a.getData(); return (d && d.codigo) || null; } catch (e) { return null; } }
+  // v1.164.0: planta del RMD abierto («PLANTA ATE» / «PLANTA LIMA»; 67 = ATE, 68 = LIMA si no viene el texto)
+  function plantaAbierta() { try { const c = controladorPrincipal(), a = c && c.getView().getModel('asociarDatos'), d = a && a.getData(); if (!d) return '';
+    const t = (d.sucursalId && (d.sucursalId.contenido || d.sucursalId.descripcion)) || ''; return t || (+d.sucursalId_iMaestraId === 67 ? 'PLANTA ATE' : +d.sucursalId_iMaestraId === 68 ? 'PLANTA LIMA' : ''); } catch (e) { return ''; } }
   function mdIdAbierto() { try { const c = controladorPrincipal(), a = c && c.getView().getModel('asociarDatos'), d = a && a.getData(); return (d && d.mdId) || null; } catch (e) { return null; } }
 
   // ---- 6. Estado del RMD en la cabecera de cada ventana + título completo del paso menor ------
@@ -15782,7 +15823,7 @@
     const tarjeta = v.fondo.querySelector('.rmd-modal'), h3 = tarjeta.querySelector('h3');
     tarjeta.classList.add('rmd-reglas'); v.fondo.classList.add('rmd-reglas-fondo');
     const tabs = document.createElement('div'); tabs.className = 'rmd-rg-tabs'; tabs.setAttribute('role', 'tablist');
-    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button><button type="button" role="tab" data-p="calificados">Equipos calificados <span></span></button><button type="button" role="tab" data-p="cambios">Controles de cambio <span></span></button>';
+    tabs.innerHTML = '<button type="button" role="tab" data-p="reglas">Reglas <span></span></button><button type="button" role="tab" data-p="vigentes">Documentos vigentes <span></span></button><button type="button" role="tab" data-p="calificados">Equipos calificados <span></span></button><button type="button" role="tab" data-p="cambios">Controles de cambio <span></span></button><button type="button" role="tab" data-p="planta">Por planta <span></span></button>';
     h3.insertAdjacentElement('afterend', tabs);
     const archivo = document.createElement('input'); archivo.type = 'file'; archivo.hidden = true; archivo.className = 'rmd-rg-archivo'; tarjeta.appendChild(archivo);
     let alElegir = null;
@@ -15825,7 +15866,7 @@
       } catch (e) { toast(`No se pudo leer «${f.name}»: ${e.message}`, true); }
     }
     function pintar() {
-      const pest = vista === 'vigentes' || vista === 'cargarVig' ? 'vigentes' : vista === 'calificados' || vista === 'cargarCalif' ? 'calificados' : vista === 'cambios' || vista === 'cargarCam' ? 'cambios' : 'reglas';
+      const pest = vista === 'planta' ? 'planta' : vista === 'vigentes' || vista === 'cargarVig' ? 'vigentes' : vista === 'calificados' || vista === 'cargarCalif' ? 'calificados' : vista === 'cambios' || vista === 'cargarCam' ? 'cambios' : 'reglas';
       tabs.querySelectorAll('button').forEach((b) => { const act = b.dataset.p === pest; b.classList.toggle('activa', act); b.setAttribute('aria-selected', String(act)); });
       tabs.querySelector('[data-p=reglas] span').textContent = `(${reglasActuales().length})`;
       tabs.querySelector('[data-p=vigentes] span').textContent = RR.vigentes ? `(${RR.vigentes.docs.length.toLocaleString('es-PE')})` : '';
@@ -15835,11 +15876,19 @@
       h3.textContent = vista === 'editor' ? (editando.nueva ? 'Nueva regla de revisión' : `Editar regla — ${editando.regla.nombre || ''}`) : vista === 'importar' ? 'Importar configuración'
         : vista === 'cargarVig' ? 'Cargar la lista de documentos vigentes' : vista === 'cargarCalif' ? 'Cargar la lista de equipos calificados' : vista === 'cargarCam' ? 'Cargar el listado de controles de cambio' : 'Reglas de revisión';
       v.pie.innerHTML = ''; v.fondo.__ctrlS = null; v.cuerpo.oninput = null; v.cuerpo.onchange = null;
-      ({ reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, cambios: pintarCambios, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif, cargarCam: pintarCargaCam })[vista]();
+      ({ planta: pintarPlanta, reglas: pintarLista, editor: pintarEditor, vigentes: pintarVigentes, calificados: pintarCalificados, cambios: pintarCambios, importar: pintarImportar, cargarVig: pintarCargaVig, cargarCalif: pintarCargaCalif, cargarCam: pintarCargaCam })[vista]();
       if (['reglas', 'vigentes', 'calificados', 'cambios'].includes(vista)) {
         const bT = botonModal('Restablecer todo…', 'peligro', () => restablecerTodo()); bT.title = 'Vuelve todo a como venía: reglas predeterminadas y sin listas cargadas';
         v.pie.insertBefore(bT, v.pie.lastElementChild);
       }
+    }
+    // -- v1.164.0 (pedido de Carlos): reglas de revisión por planta (fijas, salen de cómo se autorizan los RMD de cada planta) --
+    function pintarPlanta() {
+      const fila = ([r, ev]) => `<li style="margin:4px 0">${esc(r)}${ev ? ` <span class="rmd-nota">(${esc(ev)})</span>` : ''}</li>`;
+      const bloque = (t, l) => `<h4 style="margin:14px 0 4px">${t}</h4><ul style="margin:0;padding-left:20px">${l.map(fila).join('')}</ul>`;
+      v.cuerpo.innerHTML = `<p class="rmd-nota">Reglas fijas de la revisión de pasos y procesos menores según la planta del RMD, sacadas de los 263 RMD Autorizados desde el 15/10/2026 (ATE 139, LIMA 124). Se aplican solas: no se editan aquí. Las de la pestaña «Reglas» son las tuyas.</p>`
+        + bloque('ATE (Planta 1)', REGLAS_PLANTA.ATE) + bloque('LIMA (Planta 2)', REGLAS_PLANTA.LIMA) + bloque('Las dos plantas', REGLAS_PLANTA.AMBAS);
+      v.pie.append(botonModal('Cerrar', 'primario', () => salir()));
     }
     // -- lista de reglas --
     function pintarLista() {
@@ -18472,6 +18521,11 @@
     // v1.146.0 (pedido de Carlos): palabras duplicadas seguidas («COINCIDAN COINCIDAN») -> ['COINCIDAN']
     const palabrasRepetidas = (t) => { const s = String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(), out = new Set(), rx = /(?<![\p{L}\p{N}])(\p{L}{2,})\s+\1(?![\p{L}\p{N}])/gu; let m; while ((m = rx.exec(s))) out.add(m[1]); return [...out]; };
     // v1.146.0 (reglas de Carlos): nota del supervisor solo en «Realizado por y Visto bueno» (441) con V.B.; Calidad en Operaciones; punto de muestreo
+    // v1.164.0 (reglas por planta, pedido de Carlos 28/11): en ATE el 441 también cierra con una nota específica del jefe; «CALCULO DE RENDIMIENTO (%)»
+    // va sin Edit en ATE; en ATE «FECHA / HORA INICIO» primero de la lista va sin predecesor y en LIMA todo paso con tipo lleva predecesor;
+    // en ATE la homologación de términos es informativa (decisión de Carlos), salvo documentos que cambiaron de código y CONTRAMUESTRA.
+    const RX_NOTA_JEFE_N = /^NOTA\W*EL JEFE O SUPERVISOR DE (LA )?(SECCION|TURNO)\b/, RX_REND_CALC = /^CALCULO DE RENDIMIENTO\b/;
+    const TERMINOS_AVISO_ATE = new Set(['contramuestra', 'pdoc-207', 'ppro-243']), RX_DOC_VIEJO = /\bPDSG-202\b|\bPBEB-200\b/;
     const RX_NOTA_SUP = /\bJEFE O SUPERVISOR DE (LA )?SECCION DEBE VERIFI?CAR PRESENCIALMENTE\b/, RX_PASO_CEO = /^(EL )?PERSONAL DE CALIDAD|^CALIDAD EN OPERACIONES (REGISTRA|REALIZA|INGRESA)/;
     const RX_PUNTO_MUESTREO = /^TOMAR (LA |LAS )?MUESTRAS? DESDE\b|\bPUNTOS? DE MUESTREO\b/;
     const NOTA_SUP_TXT = 'NOTA: EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE LA ACTIVIDAD U OPERACION REALIZADA.';
@@ -18790,7 +18844,7 @@
       const enCatalogo = (cod, estr, etq) => { const f = cod && bus && bus.porCodigo(cod); if (!f) return null; const aqui = (g) => (!estr || g.estr === estr) && (!etq || String(g.etq || '') === String(etq));
         if (aqui(f)) return f; if (etq === undefined && (!estr || f.estr === estr)) return f;
         const cr = (v) => String(v || '').replace(/\s+/g, ' ').trim(); return (bus.exactos ? bus.exactos(f.texto) : []).find((g) => aqui(g) && cr(g.texto) === cr(f.texto)) || null; }, hoy = new Date();
-      const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base);
+      const bus = ctx.buscador, nomEtq = (id) => (ctx.etiquetas && ctx.etiquetas.get(id)) || 'otra etiqueta', numeros = numerar(trabajo.estructuras, ctx.base), ate = plantaHomolog(ctx.planta) === 'A';
       const enBase = new Map(), cantBase = new Map();                          // id -> código en la base; insumo -> cantidad en la base
       (ctx.base || []).forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => l.forEach((p) => { enBase.set(p.id, String(p.codigo || '')); (p.pm || []).forEach((m) => { enBase.set(m.id, String(m.codigo || '')); if (m.insumo) cantBase.set(m.id, m.cant); }); })));
       const igualQueSap = (x) => enBase.has(x.id) && enBase.get(x.id) === String(x.codigo || '');
@@ -18816,7 +18870,7 @@
         }
         if (!x.insumo) {                                                       // v1.132.0: homologación (docs/homologacion_rmd.md)
           if (hpCeo) add(x.id, 'aviso', `Paso homologado de Calidad en Operaciones: se reemplaza por el ${hpCeo.codigo} «${hpCeo.texto}».`, 'ceo', hpCeo.codigo);
-          else if (hp) { const cat = enCatalogo(hp.codigo, estr, etq || null); add(x.id, 'aviso', `Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${cat ? cat.codigo : hp.codigo} «${hp.texto}». ${cat ? 'Selecciónalo con el botón.' : 'No existe en esta etapa: créalo con ese texto.'}`, 'homolog', cat && cat.codigo); }
+          else if (hp) { const cat = enCatalogo(hp.codigo, estr, etq || null); add(x.id, ate && !RX_DOC_VIEJO.test(n) ? 'info' : 'aviso', `${ate && !RX_DOC_VIEJO.test(n) ? 'ATE (informativo): ' : ''}Por homologar: el equipo reemplaza el paso ${x.codigo} por el ${cat ? cat.codigo : hp.codigo} «${hp.texto}». ${cat ? 'Selecciónalo con el botón.' : 'No existe en esta etapa: créalo con ese texto.'}`, 'homolog', cat && cat.codigo); }
           else if (!prod) { const h = homologarTexto(t, { etapa: ctx.etapa, planta: ctx.planta });
             // v1.149.0 (CC de ACO de LIMA, pedido de Carlos): si todo el texto es «REGISTRAR EN LA SOLAPA CORRESPONDIENTE», se retira la fila
             if (h.reglas.length && !h.texto) add(x.id, 'aviso', `Por retirar: ${h.reglas.join(' ')} Quita este ${esPm ? 'proceso menor' : 'paso'} con el botón.`, 'retirar');
@@ -18833,7 +18887,8 @@
             // los parecidos con otro texto (p. ej. otra sala) solo salen cuando no hay ninguno idéntico
             const deUnico = (lista) => [...new Map(lista.filter((f) => String(f.codigo) !== String(x.codigo || '')).map((f) => [String(f.codigo), f])).keys()].slice(0, 6);
             const exOtros = deUnico(ex), opciones = exOtros, nEx = exOtros.length;   // v1.148.2 (Carlos): solo pasos EXACTAMENTE iguales; nunca parecidos
-            add(x.id, 'aviso', `Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${nEx > 1 ? `ya existen ${nEx} pasos con ese texto: usa el recomendado (el más usado).` : nEx ? `ya existe el paso ${exOtros[0]} con ese texto: selecciónalo con el botón.` : 'no hay un paso con ese texto exacto en esta etapa: créalo con el texto homologado.'}`, 'terminos', nEx ? exOtros[0] : undefined);
+            const infoAte = ate && !(h.claves || []).some((c) => TERMINOS_AVISO_ATE.has(c));   // v1.164.0: en ATE solo informativo
+            add(x.id, infoAte ? 'info' : 'aviso', `${infoAte ? 'ATE (informativo): ' : ''}Términos por homologar: ${h.reglas.join(' ')} Debe decir «${h.texto}»; ${nEx > 1 ? `ya existen ${nEx} pasos con ese texto: usa el recomendado (el más usado).` : nEx ? `ya existe el paso ${exOtros[0]} con ese texto: selecciónalo con el botón.` : 'no hay un paso con ese texto exacto en esta etapa: créalo con el texto homologado.'}`, 'terminos', nEx ? exOtros[0] : undefined);
             if (nEx > 1) { const ul = out.get(x.id).slice(-1)[0]; ul.opciones = opciones; ul.exactos = nEx > 0; }
             // v1.149.0 (pedido de Carlos: «sugerir el paso así quedaría después»): sin un paso idéntico, botón para poner el texto sugerido
             if (!nEx) out.get(x.id).slice(-1)[0].sugerido = h.texto; } }
@@ -18887,7 +18942,11 @@
           // v1.147.1 (regla de Carlos): «Realizado por y Visto bueno» con R. Por y V.B. lleva la nota del supervisor como último proceso menor
           if (tipoP === 441 && x.rpor === true && x.vb === true) {
             const pmT = vivos(x.pm).filter((m) => !m.insumo), ult = pmT[pmT.length - 1];
-            if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» (con o sin punto final) como último proceso menor.`, 'notafalta');
+            // v1.164.0 (ATE): una nota específica del jefe o supervisor también cierra el paso
+            const cierreAte = ate && ult && RX_NOTA_JEFE_N.test(normalizar(ult.texto));
+            if (cierreAte) { /* ATE: cierra con una nota del jefe */ }
+            else if (!nota && ate && pmT.some((m) => RX_NOTA_JEFE_N.test(normalizar(m.texto)))) { const nj = pmT.find((m) => RX_NOTA_JEFE_N.test(normalizar(m.texto))); add(nj.id, 'aviso', 'La NOTA del jefe o supervisor debe ser el último proceso menor del paso: muévela al final.', 'notafin'); out.get(nj.id).slice(-1)[0].alFinal = true; }
+            else if (!nota) { add(x.id, 'aviso', `Paso «Realizado por y Visto bueno» con R. Por y V.B.: falta la nota «${NOTA_SUP_TXT}» (con o sin punto final) como último proceso menor.`, 'notafalta');
               const cat = bus && bus.exactos ? [NOTA_SUP_TXT, NOTA_SUP_TXT.slice(0, -1)].map((t) => bus.exactos(t).find((f) => (!estr || f.estr === estr) && (!etq || f.etq === etq))).find(Boolean) : null; if (cat) out.get(x.id).slice(-1)[0].agregar = String(cat.codigo); }
             else if (nota !== ult) { add(nota.id, 'aviso', 'La nota «EL JEFE O SUPERVISOR DE LA SECCION DEBE VERIFICAR PRESENCIALMENTE…» debe ser el último proceso menor del paso: muévela al final.', 'notafin'); out.get(nota.id).slice(-1)[0].alFinal = true; }
           } });
@@ -18899,7 +18958,7 @@
         (e.etiquetas || []).forEach((t) => revisarLista(t.pasos, e.estructuraId, t.etiquetaId));
         ['equipos', 'utensilios'].forEach((k) => { const vistos = new Set(); vivos(e[k]).forEach((x) => { const c = x.equipoId || x.utensilioId || x.agrupadorId; if (c && vistos.has(c)) add(x.id, 'aviso', 'Está repetido en esta lista.', 'dup'); vistos.add(c); }); });
       });
-      if (ctx.dt) avisosDt(trabajo, add, numeros);
+      if (ctx.dt) avisosDt(trabajo, add, numeros, ctx);
       // v1.134.0 (pedido de Carlos): a Producción solo le llega lo que le sirve (errores, pasos que ya existen, repetidos, Calidad en Operaciones,
       // documentos vencidos, qué se anota en un paso nuevo, cantidades); Documentación Técnica ve el detalle completo al importar
       if (prod) out.forEach((l, id) => { const f = l.filter((a) => a.nivel === 'error' || (a.nivel === 'aviso' && AVISOS_PRODUCCION.has(a.k))); if (f.length) out.set(id, f); else out.delete(id); });
@@ -18953,7 +19012,8 @@
       return null;
     }
     // reglas de la configuración (vista completa): las mismas que pide el portal al grabar y las de «Cómo se configura un RMD»
-    function avisosDt(trabajo, add, numeros) {
+    function avisosDt(trabajo, add, numeros, ctx = {}) {
+      const plA = plantaHomolog(ctx.planta);
       const vivos = (l) => (l || []).filter((x) => !x.quitado), todos = new Map(), orden = [];
       trabajo.estructuras.forEach((e) => [[null, e.pasos || []], ...(e.etiquetas || []).map((t) => [t, t.pasos || []])].forEach(([t, l]) => { const sinPred = listaSinPredecesor(e, t); vivos(l).forEach((p) => { todos.set(p.id, { p, l, sinPred, e }); orden.push(p.id); }); }));
       const quitados = new Set(); trabajo.estructuras.forEach((e) => [e.pasos || [], ...(e.etiquetas || []).map((t) => t.pasos || [])].forEach((l) => (l || []).filter((x) => x.quitado).forEach((x) => quitados.add(x.id))));
@@ -18964,7 +19024,9 @@
         if (!vacio(d.dec) && (!/^\d+$/.test(String(d.dec).trim()) || +d.dec > 6)) add(x.id, 'error', 'Decimales: un número entero de 0 a 6.');
         if (!esPm && tipo === DT_NOTIF) { if (vacio(d.clv)) add(x.id, 'error', 'Tipo «Notificación»: falta la Clave Modelo.'); if (vacio(d.puesto)) add(x.id, 'aviso', 'Tipo «Notificación»: falta el Puesto de trabajo.'); }
         if (!esPm && tipo !== DT_NOTIF && (!vacio(d.clv) || !vacio(d.puesto))) add(x.id, 'info', 'Clave Modelo y Puesto de trabajo solo se graban en pasos de tipo «Notificación»: con este tipo quedan vacíos.');
-        if (!esPm && DT_TIPOS_CON_EDIT.has(tipo) && !d.edit) add(x.id, 'aviso', 'Este tipo de dato registra un valor: suele llevar «Edit».');
+        const rendAte = !esPm && tipo === 445 && plA === 'A' && RX_REND_CALC.test(normalizar(x.texto));   // v1.164.0: en ATE el cálculo de rendimiento va sin Edit
+        if (rendAte && d.edit) add(x.id, 'aviso', 'En ATE «CALCULO DE RENDIMIENTO (%)» va sin «Edit» (así se autoriza en ATE).');
+        if (!esPm && DT_TIPOS_CON_EDIT.has(tipo) && !d.edit && !rendAte) add(x.id, 'aviso', 'Este tipo de dato registra un valor: suele llevar «Edit».');
         if (!esPm && DT_TIPOS_SIN_EDIT.has(tipo) && d.edit) add(x.id, 'aviso', 'Con este tipo de dato no se marca «Edit».');
         if (!esPm && (tipo === 439 || tipo === 441) && !x.rpor) add(x.id, 'aviso', 'Tipo «Realizado por»: falta marcar «R. Por».');
         if (!esPm && (tipo === 440 || tipo === 441) && !x.vb) add(x.id, 'aviso', 'Tipo «Visto bueno»: falta marcar «V.B.».');
@@ -18980,7 +19042,11 @@
         if (dep && dep === x.id) add(x.id, 'error', 'Depende de sí mismo: en Producción nunca se habilita.');
         else if (dep && quitados.has(dep)) add(x.id, 'error', 'Depende de un paso que se quita: elige otro predecesor.');
         else if (dep && todos.has(dep)) { const pd = todos.get(dep), mismo = pd.l === todos.get(x.id).l; if (mismo && pd.l.indexOf(pd.p) > pd.l.indexOf(x)) add(x.id, 'error', 'Depende de un paso posterior: en Producción nunca se habilita.'); if (+((pd.p.dt || {}).tipo) === DT_SIN_TIPO) add(x.id, 'aviso', 'El predecesor es un «Sin tipo de dato»: debe depender del paso anterior con tipo de dato.'); }
-        else if (!dep && tipo && tipo !== DT_SIN_TIPO && !PASO_INDEPENDIENTE.test(planoNom(x.texto))) { const l = todos.get(x.id).l, i = l.indexOf(x); if (vivos(l.slice(0, i)).some((y) => y.dt && +y.dt.tipo !== DT_SIN_TIPO)) add(x.id, 'aviso', 'Falta el predecesor (Depende): todo paso con tipo de dato depende de un paso anterior con tipo de dato, salvo los condicionales o en paralelo.'); }
+        else if (!dep && tipo && tipo !== DT_SIN_TIPO && !PASO_INDEPENDIENTE.test(planoNom(x.texto))) { const l = todos.get(x.id).l, i = l.indexOf(x), antes = vivos(l.slice(0, i)).some((y) => y.dt && +y.dt.tipo !== DT_SIN_TIPO);
+          if (antes) add(x.id, 'aviso', 'Falta el predecesor (Depende): todo paso con tipo de dato depende de un paso anterior con tipo de dato, salvo los condicionales o en paralelo.');
+          // v1.164.0 (LIMA): el primero de la lista también lleva predecesor (de la lista anterior) si antes en la estructura hay un paso con tipo de dato
+          else if (plA === 'L' && orden.slice(0, orden.indexOf(x.id)).some((id) => { const o = todos.get(id); return o.e === todos.get(x.id).e && !o.sinPred && o.p.dt && +o.p.dt.tipo && +o.p.dt.tipo !== DT_SIN_TIPO; }))
+            add(x.id, 'aviso', 'En LIMA todo paso con tipo de dato lleva predecesor, también el primero de la lista (p. ej. «FECHA / HORA INICIO»): asígnale el último paso con tipo de dato de la lista anterior.'); }
       };
       orden.forEach((id) => { const { p } = todos.get(id); fila(p, false); vivos(p.pm).forEach((m) => fila(m, true));
         // v1.146.0 (reglas de Carlos): lo que llena Calidad en Operaciones con tipo de dato lleva Estado CC y Edit; «TOMAR LA MUESTRA DESDE…» va sin tipo de dato
